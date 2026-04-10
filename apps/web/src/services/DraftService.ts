@@ -474,12 +474,9 @@ export const DraftService = {
             }
             const delay = Math.min(1000 * Math.pow(2, attempt), 16000);
             attempt++;
-            setTimeout(() => {
+            const timeoutId = setTimeout(() => {
               logger.log(`Draft picks reconnect attempt ${attempt} for league ${leagueId}`);
               supabase.removeChannel(channel);
-              // Re-subscribe by re-calling this method — the returned cleanup
-              // from the outer call already ran (channel removed above), so
-              // the caller's polling fallback keeps working in the meantime.
               channel.subscribe((retryStatus) => {
                 if (retryStatus === 'SUBSCRIBED') {
                   logger.log(`Draft picks reconnected for league ${leagueId}`);
@@ -488,12 +485,18 @@ export const DraftService = {
                 }
               });
             }, delay);
+            reconnectTimeouts.push(timeoutId);
           };
           tryReconnect();
         }
       });
 
+    // Track reconnection timeouts so they can be cleaned up on unsubscribe
+    const reconnectTimeouts: ReturnType<typeof setTimeout>[] = [];
+
     return () => {
+      reconnectTimeouts.forEach(clearTimeout);
+      reconnectTimeouts.length = 0;
       supabase.removeChannel(channel);
     };
   },

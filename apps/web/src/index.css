@@ -179,6 +179,7 @@
   .scrollbar-styled {
     scrollbar-width: thin;
     scrollbar-color: #7A9B7A #E8EED9; /* citrus-sage thumb on citrus-cream track */
+    -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
   }
 
   .scrollbar-styled::-webkit-scrollbar {

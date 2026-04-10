@@ -142,6 +142,13 @@ const DraftRoom = () => {
   const [snapshotCreatedAt, setSnapshotCreatedAt] = useState<string | undefined>(undefined);
   const [savingSnapshot, setSavingSnapshot] = useState(false);
   const [userAutoDraftEnabled, setUserAutoDraftEnabled] = useState(false);
+  // State-driven confirmation dialog (replaces window.confirm which fails in mobile PWA)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    description: string;
+    action: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   // Calculate loading state for minimum loading time hook
   const actualLoading = loading || authLoading || (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league');
@@ -948,14 +955,16 @@ const DraftRoom = () => {
 
     const nomination = auctionState.currentNomination;
     const expiresAt = new Date(nomination.expires_at).getTime();
+    let auctionCloseInProgress = false;
 
     const tick = async () => {
       const now = Date.now();
       const remaining = Math.max(0, Math.ceil((expiresAt - now) / 1000));
       setAuctionTimeRemaining(remaining);
 
-      // Timer expired — auto-close the nomination
-      if (remaining <= 0 && leagueId && auctionSessionId && nomination.id) {
+      // Timer expired — auto-close the nomination (guard against concurrent calls)
+      if (remaining <= 0 && leagueId && auctionSessionId && nomination.id && !auctionCloseInProgress) {
+        auctionCloseInProgress = true;
         const closeResult = await AuctionDraftService.closeNomination(leagueId, auctionSessionId, nomination.id);
         if (closeResult.success) {
           toast({ title: 'Nomination Closed', description: closeResult.winner_team_id ? `Sold for $${closeResult.amount}!` : 'No bids — player returned to pool.' });
@@ -1024,15 +1033,14 @@ const DraftRoom = () => {
           logger.debug('DraftRoom: League status changed via realtime:', updatedLeague.draft_status);
 
           // Update local league state (including settings with timerStartedAt)
-          if (league) {
-            setLeague({
-              ...league,
-              draft_status: updatedLeague.draft_status,
-              draft_rounds: updatedLeague.draft_rounds || league.draft_rounds,
-              settings: updatedLeague.settings || league.settings,
-              scheduled_draft_time: updatedLeague.scheduled_draft_time ?? league.scheduled_draft_time
-            });
-          }
+          // Use functional updater to avoid stale closure over `league`
+          setLeague(prev => prev ? {
+            ...prev,
+            draft_status: updatedLeague.draft_status,
+            draft_rounds: updatedLeague.draft_rounds || prev.draft_rounds,
+            settings: updatedLeague.settings || prev.settings,
+            scheduled_draft_time: updatedLeague.scheduled_draft_time ?? prev.scheduled_draft_time
+          } : null);
 
           // Derive draftTimerStarted from server state for ALL clients
           if (updatedLeague.settings?.timerStartedAt && !draftTimerStartedRef.current) {
@@ -1108,8 +1116,8 @@ const DraftRoom = () => {
             // Stay in LOBBY - user clicks "Join Draft Room" to enter ACTIVE
           }
 
-          // Handle draft completion
-          if (updatedLeague.draft_status === 'completed' && draftPhase !== DraftPhase.COMPLETED) {
+          // Handle draft completion (use ref to avoid stale closure)
+          if (updatedLeague.draft_status === 'completed' && draftPhaseRef.current !== DraftPhase.COMPLETED) {
             logger.debug('DraftRoom: Draft completed via realtime');
             setDraftPhase(DraftPhase.COMPLETED);
             ssRemove(`draft_phase_${leagueId}`);
@@ -1122,10 +1130,10 @@ const DraftRoom = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  // Supabase realtime subscription: league, teams, and resolveTeamOrder are accessed via closures
-  // and intentionally excluded to prevent re-subscribing on every state update (causes missed events).
+  // Supabase realtime subscription: league, draftPhase, teams, and resolveTeamOrder are accessed
+  // via refs/functional-updaters to prevent re-subscribing on state changes (causes missed events).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leagueId, user?.id, draftPhase]);
+  }, [leagueId, user?.id]);
 
   const loadDraftState = async (retryCount: number = 0): Promise<DraftState | null> => {
     if (!leagueId || !league) {
@@ -1328,16 +1336,36 @@ const DraftRoom = () => {
   const handleAutoDraftRef = useRef<() => void>(() => {});
 
   // Reusable AudioContext for turn notifications (avoids creating/leaking new contexts)
+  // Initialized lazily on first user gesture (click/tap) to satisfy iOS Safari requirement
   const audioCtxRef = useRef<AudioContext | null>(null);
   const prevIsMyTurnRef = useRef(false);
+
+  // Warm up AudioContext on the first user interaction so it's ready for turn notifications.
+  // iOS Safari blocks AudioContext creation unless triggered by a user gesture.
+  useEffect(() => {
+    const warmUp = () => {
+      if (audioCtxRef.current) return;
+      try {
+        audioCtxRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+        // Resume immediately (required by some browsers even after gesture)
+        if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+      } catch { /* AudioContext not supported */ }
+    };
+    document.addEventListener('click', warmUp, { once: true });
+    document.addEventListener('touchstart', warmUp, { once: true });
+    return () => {
+      document.removeEventListener('click', warmUp);
+      document.removeEventListener('touchstart', warmUp);
+    };
+  }, []);
+
+  // Play turn notification chime when it becomes the user's turn
   useEffect(() => {
     const isMyTurn = !!(currentTeam && user && currentTeam.owner_id === user.id && draftPhase === DraftPhase.ACTIVE);
     if (isMyTurn && !prevIsMyTurnRef.current) {
       try {
-        if (!audioCtxRef.current) {
-          audioCtxRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-        }
         const ctx = audioCtxRef.current;
+        if (!ctx) return; // Not yet warmed up — skip silently
         if (ctx.state === 'suspended') ctx.resume();
         // Two-tone chime: C5 (523 Hz) then E5 (659 Hz)
         [523, 659].forEach((freq, i) => {
@@ -1352,7 +1380,7 @@ const DraftRoom = () => {
           osc.stop(ctx.currentTime + i * 0.15 + 0.25);
         });
       } catch {
-        // AudioContext may not be available (e.g., before user gesture)
+        // AudioContext not available — visual indicators still work
       }
     }
     prevIsMyTurnRef.current = isMyTurn;
@@ -1917,12 +1945,17 @@ const DraftRoom = () => {
   };
 
   // Undo the last draft pick (commissioner only)
-  const handleUndoLastPick = async () => {
+  const handleUndoLastPick = () => {
     if (!leagueId || !isCommissioner) return;
-
-    const confirmed = confirm('Are you sure you want to undo the last pick?');
-    if (!confirmed) return;
-
+    setConfirmDialog({
+      title: 'Undo Last Pick?',
+      description: 'This will remove the most recent draft pick and reset the timer for the restored turn.',
+      action: 'Undo Pick',
+      onConfirm: executeUndoLastPick,
+    });
+  };
+  const executeUndoLastPick = async () => {
+    if (!leagueId || !isCommissioner) return;
     try {
       const { undone, error: undoError } = await DraftService.undoLastPick(leagueId, user.id);
       if (undoError || !undone) {
@@ -2484,15 +2517,18 @@ const DraftRoom = () => {
     }
   };
 
-  const handleCleanupDraft = async () => {
+  const handleCleanupDraft = () => {
     if (!leagueId) return;
-    
+    setConfirmDialog({
+      title: 'Reset Draft Session?',
+      description: 'This will reset the draft and start a fresh session. Old draft data will remain in the database but will be ignored.',
+      action: 'Reset Draft',
+      onConfirm: () => executeCleanupDraft(),
+    });
+  };
+  const executeCleanupDraft = async () => {
+    if (!leagueId) return;
     try {
-      const confirmed = window.confirm(
-        'This will reset the draft and start a fresh draft session. Old draft data will remain in the database but will be ignored. Continue?'
-      );
-      if (!confirmed) return;
-
       logger.log('Resetting draft - starting fresh session');
       
       // Just reset the league status to 'not_started' - don't try to delete old data
@@ -2529,20 +2565,18 @@ const DraftRoom = () => {
     }
   };
 
-  const handleDeleteAllDrafts = async () => {
+  const handleDeleteAllDrafts = () => {
     if (!isCommissioner) return;
-    
+    setConfirmDialog({
+      title: 'Delete ALL Draft Data?',
+      description: 'WARNING: This will permanently delete ALL draft data from ALL leagues in the database. This cannot be undone!',
+      action: 'Yes, Delete Everything',
+      onConfirm: () => executeDeleteAllDrafts(),
+    });
+  };
+  const executeDeleteAllDrafts = async () => {
+    if (!isCommissioner) return;
     try {
-      const confirmed = window.confirm(
-        '⚠️ WARNING: This will permanently delete ALL draft data from ALL leagues in the database. This cannot be undone!\n\nAre you absolutely sure you want to continue?'
-      );
-      if (!confirmed) return;
-
-      const doubleConfirm = window.confirm(
-        'This is your last chance. This will delete EVERYTHING. Type OK to confirm.'
-      );
-      if (!doubleConfirm) return;
-
       logger.log('Starting deletion of ALL draft data...');
       
       const { error } = await DraftService.deleteAllDraftData();
@@ -2582,15 +2616,17 @@ const DraftRoom = () => {
     setRandomizedTeamOrder(null);
   };
 
-  const handleResetDraft = async () => {
+  const handleResetDraft = () => {
     if (!leagueId || !isCommissioner) return;
-    
-    const confirmed = confirm(
-      'Are you sure you want to reset the draft? This will permanently delete all draft data and start fresh.'
-    );
-    
-    if (!confirmed) return;
-
+    setConfirmDialog({
+      title: 'Reset Draft?',
+      description: 'This will permanently delete all draft data and start fresh. This action cannot be undone.',
+      action: 'Reset Draft',
+      onConfirm: () => executeResetDraft(),
+    });
+  };
+  const executeResetDraft = async () => {
+    if (!leagueId || !isCommissioner) return;
     try {
       logger.log('Starting draft reset for league:', leagueId);
       
@@ -2903,7 +2939,7 @@ const DraftRoom = () => {
 
   // ALWAYS render something - never return null
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#D4E8B8] relative overflow-x-hidden touch-manipulation">
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
@@ -2916,7 +2952,7 @@ const DraftRoom = () => {
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
-            <div className="min-w-0 overflow-y-visible lg:overflow-y-auto lg:max-h-[calc(100vh-7rem)] px-0 sm:px-2 lg:px-6 order-1 lg:order-2">
+            <div className="min-w-0 overflow-y-visible lg:overflow-y-auto lg:max-h-[calc(100dvh-7rem)] px-0 sm:px-2 lg:px-6 order-1 lg:order-2">
         {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}
         {displayLoading && (
           <LoadingScreen
@@ -3956,7 +3992,7 @@ const DraftRoom = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && (activeLeagueId || leagueId) && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100dvh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId || leagueId || ''} />
                 </div>
               </aside>
@@ -4012,6 +4048,25 @@ const DraftRoom = () => {
           </Card>
         </div>
       )}
+
+      {/* Reusable confirmation dialog (replaces window.confirm for mobile compatibility) */}
+      <AlertDialog open={!!confirmDialog} onOpenChange={(open) => { if (!open) setConfirmDialog(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmDialog?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { confirmDialog?.onConfirm(); setConfirmDialog(null); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {confirmDialog?.action}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
