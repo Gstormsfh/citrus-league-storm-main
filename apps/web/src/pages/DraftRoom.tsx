@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { LeagueService, League, Team, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
 import type { LeagueSettings } from '@/types/leagueTypes';
-import { DraftService, DraftPick, DraftState } from '@/services/DraftService';
+import { DraftService, DraftPick, DraftState, clearDraftCache } from '@/services/DraftService';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { AuctionDraftService } from '@/services/AuctionDraftService';
 import { supabase } from '@/integrations/supabase/client';
@@ -95,6 +95,7 @@ const DraftRoom = () => {
   const [draftPhase, setDraftPhase] = useState<DraftPhase>(DraftPhase.LOBBY);
   const [timeRemaining, setTimeRemaining] = useState(90); // Will be updated from league settings when loaded
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [pickInProgress, setPickInProgress] = useState(false);
   const [isCommissioner, setIsCommissioner] = useState(false);
   const [isAuctionDraft, setIsAuctionDraft] = useState(false);
   const [auctionSessionId, setAuctionSessionId] = useState<string | null>(null);
@@ -354,6 +355,9 @@ const DraftRoom = () => {
     // ═══════════════════════════════════════════════════════════════════
     // ACTIVE USER STATE: Load real draft data
     // ═══════════════════════════════════════════════════════════════════
+    // Clear stale cache on page load/refresh so we always get fresh state
+    clearDraftCache();
+
     if (!leagueId || !user) {
       logger.debug('DraftRoom: Cannot load draft data - missing leagueId or user', { leagueId, hasUser: !!user });
       setLoading(false);
@@ -1520,6 +1524,10 @@ const DraftRoom = () => {
   }, [isCommissioner, league?.scheduled_draft_time, league?.draft_status, draftPhase]);
 
   const handlePlayerDraft = async (player: Player, isAutoDraft: boolean = false) => {
+    // Prevent double-click / concurrent picks
+    if (pickInProgress && !isAutoDraft) return;
+    setPickInProgress(true);
+
     // ⚠️ DEMO STATE: Disable all draft actions
     if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
       if (userLeagueState === 'guest') {
@@ -1645,7 +1653,8 @@ const DraftRoom = () => {
       setDraftedPlayerIds(prev => new Set([...prev, player.id]));
       setSelectedPlayer(null);
 
-      // Reload all picks to ensure sync
+      // Clear cache + reload all picks to ensure sync
+      clearDraftCache();
       const { picks } = await DraftService.getDraftPicks(leagueId, user?.id || '');
       const activePicks = picks.filter(p => !p.deleted_at);
       setDraftHistory(activePicks);
@@ -1717,6 +1726,8 @@ const DraftRoom = () => {
         toast({ title: "Error", description: `Failed to draft player: ${errorMessage}`, variant: "destructive" });
       }
       // Don't throw - let draft continue
+    } finally {
+      setPickInProgress(false);
     }
   };
 
@@ -3001,6 +3012,7 @@ const DraftRoom = () => {
                             variant="default"
                             size="sm"
                             className="text-xs md:text-sm"
+                            disabled={pickInProgress}
                             onClick={() => handlePlayerDraft(selectedPlayer)}
                           >
                             Draft
@@ -3076,7 +3088,7 @@ const DraftRoom = () => {
                         onClick={(e) => { e.stopPropagation(); handlePlayerDraft(selectedPlayer); }}
                         size="sm"
                         className="flex-shrink-0 relative z-20 bg-primary hover:bg-primary/90 font-bold px-4"
-                        disabled={draftedPlayerIds.has(selectedPlayer.id)}
+                        disabled={pickInProgress || draftedPlayerIds.has(selectedPlayer.id)}
                       >
                         {draftedPlayerIds.has(selectedPlayer.id) ? 'Taken' : 'Draft'}
                       </Button>
@@ -3471,7 +3483,7 @@ const DraftRoom = () => {
                               onClick={(e) => { e.stopPropagation(); handlePlayerDraft(selectedPlayer); }}
                               className="w-full bg-fantasy-primary hover:bg-fantasy-primary/90 py-4"
                               size="lg"
-                              disabled={draftedPlayerIds.has(selectedPlayer.id)}
+                              disabled={pickInProgress || draftedPlayerIds.has(selectedPlayer.id)}
                             >
                               {draftedPlayerIds.has(selectedPlayer.id) ? 'Already Drafted' : 'Draft This Player'}
                             </Button>
@@ -3508,6 +3520,7 @@ const DraftRoom = () => {
                                 canPause={!!league?.settings?.timerStartedAt && draftPhase === DraftPhase.ACTIVE}
                                 canContinue={!league?.settings?.timerStartedAt && draftPhase === DraftPhase.ACTIVE}
                                 onUndoLastPick={isCommissioner ? handleUndoLastPick : undefined}
+                                onSkipPick={isCommissioner ? handleAutoDraft : undefined}
                                 canUndo={isCommissioner && draftHistory.length > 0}
                                 pickTimeLimit={draftSettings.pickTimeLimit}
                               />
@@ -3625,7 +3638,7 @@ const DraftRoom = () => {
                         }}
                         className="w-full bg-fantasy-primary hover:bg-fantasy-primary/90 text-lg py-6 relative z-20 pointer-events-auto"
                         size="lg"
-                        disabled={draftedPlayerIds.has(selectedPlayer.id)}
+                        disabled={pickInProgress || draftedPlayerIds.has(selectedPlayer.id)}
                       >
                         {draftedPlayerIds.has(selectedPlayer.id) ? 'Already Drafted' : 'Draft This Player'}
                       </Button>
@@ -3669,6 +3682,7 @@ const DraftRoom = () => {
                           canPause={!!league?.settings?.timerStartedAt && draftPhase === DraftPhase.ACTIVE}
                           canContinue={!league?.settings?.timerStartedAt && draftPhase === DraftPhase.ACTIVE}
                           onUndoLastPick={isCommissioner ? handleUndoLastPick : undefined}
+                          onSkipPick={isCommissioner ? handleAutoDraft : undefined}
                           canUndo={isCommissioner && draftHistory.length > 0}
                           pickTimeLimit={draftSettings.pickTimeLimit}
                         />

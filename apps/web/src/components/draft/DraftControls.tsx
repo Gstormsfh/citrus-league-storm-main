@@ -15,6 +15,7 @@ interface DraftControlsProps {
   onPause?: () => void;
   onContinue?: () => void;
   onUndoLastPick?: () => void;
+  onSkipPick?: () => void;
   canPause?: boolean;
   canContinue?: boolean;
   canUndo?: boolean;
@@ -27,6 +28,7 @@ export const DraftControls = ({
   onPause,
   onContinue,
   onUndoLastPick,
+  onSkipPick,
   canPause = true,
   canContinue = true,
   canUndo = false,
@@ -67,9 +69,9 @@ export const DraftControls = ({
             </Button>
           )}
 
-          <Button variant="outline" className="w-full" disabled={!isDraftActive}>
+          <Button variant="outline" className="w-full" disabled={!isDraftActive} onClick={onSkipPick}>
             <SkipForward className="h-4 w-4 mr-2" />
-            Skip Pick
+            Skip Pick (Auto)
           </Button>
         </div>
 
