@@ -298,6 +298,7 @@ export const schemas = {
     pickTimeLimit: z.number().int().min(0).optional(),
     draft_status: z.enum(['not_started', 'queued', 'in_progress', 'paused', 'completed']).optional(),
     scheduled_draft_time: z.string().optional(),
+    teams_count: z.number().int().min(2).max(20).optional(),
   }),
 
   rosterSlots: z.object({

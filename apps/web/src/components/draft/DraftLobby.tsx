@@ -75,6 +75,7 @@ interface DraftLobbyProps {
   leagueName?: string; // League name for email template
   scheduledDraftTime?: string | null; // Scheduled draft time (ISO string)
   onScheduleDraft?: (scheduledTime: string | null) => void; // Callback to set/clear scheduled draft time
+  onTeamsCountChange?: (count: number) => void; // Callback to change max teams (commissioner only)
 }
 
 export const DraftLobby = ({
@@ -100,7 +101,8 @@ export const DraftLobby = ({
   joinCode,
   leagueName,
   scheduledDraftTime,
-  onScheduleDraft
+  onScheduleDraft,
+  onTeamsCountChange
 }: DraftLobbyProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -339,9 +341,31 @@ export const DraftLobby = ({
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="teamsCount">Max Teams</Label>
+                  <Select
+                    value={maxTeams.toString()}
+                    onValueChange={(value) => {
+                      const count = parseInt(value);
+                      if (onTeamsCountChange) onTeamsCountChange(count);
+                    }}
+                    disabled={!isCommissioner || !onTeamsCountChange || hasExistingDraft}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[4, 6, 8, 10, 12, 14, 16, 18, 20].filter(n => n >= teams.length).map(n => (
+                        <SelectItem key={n} value={n.toString()}>{n} Teams</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {teams.length > 0 && <p className="text-xs text-muted-foreground">{teams.length} joined so far</p>}
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="order">Draft Order</Label>
-                  <Select 
-                    value={settings.draftOrder} 
+                  <Select
+                    value={settings.draftOrder}
                     onValueChange={(value: 'standard' | 'serpentine' | 'custom') => setSettings({...settings, draftOrder: value})}
                     disabled={!isCommissioner}
                   >

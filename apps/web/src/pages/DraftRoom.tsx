@@ -2200,6 +2200,31 @@ const DraftRoom = () => {
     }
   };
 
+  const handleTeamsCountChange = async (count: number) => {
+    if (!leagueId || !isCommissioner) return;
+    if (count < teams.length) {
+      toast({ title: "Error", description: `Cannot set max teams below ${teams.length} (current team count).`, variant: "destructive" });
+      return;
+    }
+
+    try {
+      await leagueApi.updateDraftSettings(leagueId, { teams_count: count });
+
+      // Update local league state
+      if (league) {
+        setLeague({
+          ...league,
+          settings: { ...(league.settings || {}), teamsCount: count }
+        });
+      }
+
+      toast({ title: "Teams Updated", description: `Max teams set to ${count}.` });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast({ title: "Error", description: `Failed to update teams count: ${errorMessage}`, variant: "destructive" });
+    }
+  };
+
   // Prepare draft - initializes draft order but doesn't start yet
   const handlePrepareDraft = async (settings: DraftSettings) => {
     // ⚠️ DEMO STATE: Disable all draft actions
@@ -3096,6 +3121,7 @@ const DraftRoom = () => {
                 leagueName={league?.name}
                 scheduledDraftTime={league?.scheduled_draft_time}
                 onScheduleDraft={isCommissioner ? handleScheduleDraft : undefined}
+                onTeamsCountChange={isCommissioner ? handleTeamsCountChange : undefined}
               />
             ) : null}
           </div>

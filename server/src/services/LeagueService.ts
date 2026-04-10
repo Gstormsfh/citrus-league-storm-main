@@ -260,7 +260,7 @@ export class LeagueService {
   async updateDraftSettings(
     leagueId: string,
     userId: string,
-    draftSettings: { draft_rounds?: number; pickTimeLimit?: number; draft_status?: string; scheduled_draft_time?: string },
+    draftSettings: { draft_rounds?: number; pickTimeLimit?: number; draft_status?: string; scheduled_draft_time?: string; teams_count?: number },
   ) {
     await this.membership.requireCommissioner(leagueId, userId);
 
@@ -275,6 +275,9 @@ export class LeagueService {
     if (draftSettings.pickTimeLimit !== undefined) {
       updatedSettings.pickTimeLimit = draftSettings.pickTimeLimit;
     }
+    if (draftSettings.teams_count !== undefined) {
+      updatedSettings.teamsCount = draftSettings.teams_count;
+    }
 
     const updatePayload: Record<string, any> = {
       settings: updatedSettings,
@@ -288,6 +291,9 @@ export class LeagueService {
     }
     if (draftSettings.scheduled_draft_time !== undefined) {
       updatePayload.scheduled_draft_time = draftSettings.scheduled_draft_time;
+    }
+    if (draftSettings.teams_count !== undefined) {
+      updatePayload.league_size = draftSettings.teams_count;
     }
 
     const { error } = await this.supabase
