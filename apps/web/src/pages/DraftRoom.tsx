@@ -3189,9 +3189,9 @@ const DraftRoom = () => {
 
                   {/* Right: Draft button + Auto-draft toggle */}
                   <div className="flex-shrink-0 flex items-center gap-2">
-                    {currentTeam?.owner_id === user?.id && userLeagueState === 'active-user' && (
+                    {userLeagueState === 'active-user' && (
                       <>
-                        {!userAutoDraftEnabled && selectedPlayer && (
+                        {selectedPlayer && currentTeam?.owner_id === user?.id && !userAutoDraftEnabled && (
                           <Button
                             variant="default"
                             size="sm"

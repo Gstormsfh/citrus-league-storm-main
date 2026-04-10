@@ -351,7 +351,7 @@ export const PlayerPool = memo(({
         )}
         <td className="px-2 py-1.5 text-xs text-center font-bold text-green-700 bg-green-50/30">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
         <td className="px-2 py-1.5 text-xs text-center font-semibold text-green-600 bg-green-50/30">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(2) : '-'}</td>
-        <td className="px-2 py-1.5 text-xs text-center font-bold text-blue-700 bg-blue-50/30">{(projectedFptsMap.get(player.id)?.total || 0) > 0 ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-bold text-blue-700 bg-blue-50/30" title={`${projectedFptsMap.get(player.id)?.gamesRemaining || 0} games remaining`}>{(projectedFptsMap.get(player.id)?.total || 0) > 0 ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
         <td className="px-2 py-1.5 text-xs text-center font-semibold text-blue-600 bg-blue-50/30">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(2) : '-'}</td>
         <td className="px-2 py-1.5">
           <div className="flex items-center gap-1 relative z-10" onClick={(e) => e.stopPropagation()}>
