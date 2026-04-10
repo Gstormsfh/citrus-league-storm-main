@@ -3358,11 +3358,11 @@ const DraftRoom = () => {
             </div>
 
             {/* Draft Content */}
-            <div className={`container mx-auto px-2 sm:px-4 py-3 sm:py-6 pb-20 sm:pb-6 ${isCommissioner && (draftHistory?.length || 0) > 0 ? '!pb-32 sm:!pb-6' : ''}`}>
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-6">
+            <div className={`container mx-auto px-2 sm:px-4 py-3 sm:py-6 pb-20 sm:pb-6 min-w-0 overflow-hidden ${isCommissioner && (draftHistory?.length || 0) > 0 ? '!pb-32 sm:!pb-6' : ''}`}>
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-6 min-w-0">
                 {/* Main Draft Area */}
-                <div className="lg:col-span-3">
-                  <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-6">
+                <div className="lg:col-span-3 min-w-0">
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-6 min-w-0">
                     {/* Mobile: 4 tabs (includes Roster). Desktop: 3 tabs (Roster in sidebar) */}
                     <TabsList className="grid w-full grid-cols-4 lg:grid-cols-3 h-11 sm:h-10">
                       <TabsTrigger value="players" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
@@ -3557,7 +3557,7 @@ const DraftRoom = () => {
                     )}
 
                     {/* Always render players tab */}
-                    <TabsContent value="players" className="space-y-0">
+                    <TabsContent value="players" className="space-y-0 min-w-0 overflow-x-visible">
                       <PlayerPool
                         onPlayerSelect={setSelectedPlayer}
                         onPlayerDraft={isAuctionDraft ? (player) => {

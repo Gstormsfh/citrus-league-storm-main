@@ -531,8 +531,8 @@ export const PlayerPool = memo(({
       </div>
 
       {/* Mobile: Table view with unified horizontal scroll — scrolls all players as one */}
-      <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-w-full">
-        <div className="overflow-x-auto w-full scrollbar-styled" style={{ scrollbarGutter: 'stable', WebkitOverflowScrolling: 'touch' }}>
+      <div className="md:hidden border border-fantasy-border rounded-lg bg-[#E8EED9]/50 backdrop-blur-sm min-w-0">
+        <div className="overflow-x-auto scrollbar-styled" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full min-w-[900px] text-sm border-collapse">
             <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
               <tr>
@@ -656,8 +656,8 @@ export const PlayerPool = memo(({
       </div>
 
       {/* Desktop: Full table view — horizontally scrollable to show all stats */}
-      <div className="hidden md:block border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-w-full">
-        <div className="overflow-x-auto w-full scrollbar-styled" style={{ scrollbarGutter: 'stable', WebkitOverflowScrolling: 'touch' }}>
+      <div className="hidden md:block border border-fantasy-border rounded-lg bg-[#E8EED9]/50 backdrop-blur-sm min-w-0">
+        <div className="overflow-x-auto scrollbar-styled" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full min-w-[1400px] text-sm border-collapse">
             <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
               <tr>
