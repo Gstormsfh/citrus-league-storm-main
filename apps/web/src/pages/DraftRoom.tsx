@@ -23,6 +23,7 @@ import { DraftTimer } from '@/components/draft/DraftTimer';
 import { DraftControls } from '@/components/draft/DraftControls';
 import { DraftHistory } from '@/components/draft/DraftHistory';
 import { DraftQueue } from '@/components/draft/DraftQueue';
+import { ConnectionStatus } from '@/components/draft/ConnectionStatus';
 import { RosterDepthChart } from '@/components/draft/RosterDepthChart';
 import { DraftSnapshotView } from '@/components/draft/DraftSnapshotView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -162,7 +163,7 @@ const DraftRoom = () => {
   }, [teams]);
 
   // Stable array of drafted player IDs — avoids re-creating on every render for child props
-  const draftedPlayerIdsArray = useMemo(() => draftedPlayerIdsArray, [draftedPlayerIds]);
+  const draftedPlayerIdsArray = useMemo(() => Array.from(draftedPlayerIds), [draftedPlayerIds]);
 
   const playersById = useMemo(() => {
     const map = new Map<string, Player>();
@@ -751,6 +752,11 @@ const DraftRoom = () => {
     const unsubscribe = DraftService.subscribeToDraftPicks(leagueId, user.id, async (newPick) => {
       logger.debug('DraftRoom: New pick received via realtime:', newPick);
 
+      // Play a subtle sound when another team picks (immediate, not debounced)
+      if (newPick.team_id !== userTeamRef.current?.id) {
+        playOpponentPickSound();
+      }
+
       // Debounce rapid updates - wait 50ms for batched processing (fast enough to feel real-time)
       clearTimeout(updateTimeout);
       updateTimeout = setTimeout(async () => {
@@ -936,6 +942,7 @@ const DraftRoom = () => {
   // Keep refs in sync with state for realtime callbacks (avoids stale closures)
   useEffect(() => { pickTimeLimitRef.current = draftSettings.pickTimeLimit; }, [draftSettings.pickTimeLimit]);
   useEffect(() => { draftTimerStartedRef.current = draftTimerStarted; }, [draftTimerStarted]);
+  useEffect(() => { userTeamRef.current = userTeam; }, [userTeam]);
 
   // Persist draft phase and timer state to sessionStorage for tab/page navigation resilience
   useEffect(() => {
@@ -1333,6 +1340,7 @@ const DraftRoom = () => {
   // Refs for stale closure prevention in realtime subscription callbacks
   const pickTimeLimitRef = useRef(draftSettings.pickTimeLimit);
   const draftTimerStartedRef = useRef(false);
+  const userTeamRef = useRef(userTeam);
   // Track pending retry timeouts from handleStartDraft for cleanup on unmount
   const startDraftRetryRef = useRef<NodeJS.Timeout | null>(null);
   // Ref for handleAutoDraft to avoid stale closures in timer intervals
@@ -1388,6 +1396,51 @@ const DraftRoom = () => {
     }
     prevIsMyTurnRef.current = isMyTurn;
   }, [currentTeam, user, draftPhase]);
+
+  // Play a subtle tick sound when an opponent makes a pick (so users know the draft is moving)
+  const playOpponentPickSound = useCallback(() => {
+    try {
+      const ctx = audioCtxRef.current;
+      if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+      // Single low pop: G4 (392 Hz), quieter than the turn chime
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 392;
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.12);
+    } catch {
+      // AudioContext not available
+    }
+  }, []);
+
+  // Keyboard shortcuts for the active draft phase
+  useEffect(() => {
+    if (draftPhase !== DraftPhase.ACTIVE) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept when typing in an input/textarea/select
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if ((e.key === ' ' || e.key === 'Enter') && selectedPlayer && currentTeam?.owner_id === user?.id && !pickInProgress) {
+        e.preventDefault();
+        handlePlayerDraft(selectedPlayer);
+      } else if (e.key === 'Escape' && selectedPlayer) {
+        e.preventDefault();
+        setSelectedPlayer(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  // handlePlayerDraft is not memoized — accessed via closure; selectedPlayer change triggers re-creation
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftPhase, selectedPlayer, currentTeam, user, pickInProgress]);
 
   // Handler to start the draft timer (commissioner only)
   // Saves timerStartedAt to DB so ALL clients can sync their timers
@@ -3080,10 +3133,11 @@ const DraftRoom = () => {
               <div className="px-3 py-2 md:container md:mx-auto md:px-4 md:py-3">
                 {/* Row 1: Pick info + Timer + Action */}
                 <div className="flex items-center justify-between gap-2">
-                  {/* Left: Round/Pick + Team */}
+                  {/* Left: Round/Pick + Team + Connection */}
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs md:text-sm text-muted-foreground">
-                      R{draftState?.currentRound || 1} • Pick {draftState?.currentPick || 1}/{(teams?.length || 0) * (draftSettings?.rounds || 21)}
+                    <div className="text-xs md:text-sm text-muted-foreground flex items-center gap-2">
+                      <span>R{draftState?.currentRound || 1} • Pick {draftState?.currentPick || 1}/{(teams?.length || 0) * (draftSettings?.rounds || 21)}</span>
+                      {leagueId && <ConnectionStatus leagueId={leagueId} />}
                     </div>
                     {currentTeam && (
                       <div className="font-semibold text-sm md:text-lg truncate">
