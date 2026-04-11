@@ -956,6 +956,8 @@ const DraftRoom = () => {
   useEffect(() => { pickTimeLimitRef.current = draftSettings.pickTimeLimit; }, [draftSettings.pickTimeLimit]);
   useEffect(() => { draftTimerStartedRef.current = draftTimerStarted; }, [draftTimerStarted]);
   useEffect(() => { userTeamRef.current = userTeam; }, [userTeam]);
+  useEffect(() => { teamsRef.current = teams; }, [teams]);
+  useEffect(() => { leagueRef.current = league; }, [league]);
 
   // Persist draft phase and timer state to sessionStorage for tab/page navigation resilience
   useEffect(() => {
@@ -1083,7 +1085,7 @@ const DraftRoom = () => {
           }
 
           // Handle draft reset (nuclear delete by commissioner)
-          if (updatedLeague.draft_status === 'not_started' && draftPhase !== DraftPhase.LOBBY) {
+          if (updatedLeague.draft_status === 'not_started' && draftPhaseRef.current !== DraftPhase.LOBBY) {
             logger.debug('DraftRoom: Draft was reset, returning to lobby');
             setDraftPhase(DraftPhase.LOBBY);
             setDraftState(null);
@@ -1095,35 +1097,37 @@ const DraftRoom = () => {
             ssRemove(`draft_timer_${leagueId}`);
           }
 
-          // When draft starts, pre-load state but stay in LOBBY with join banner
-          if (updatedLeague.draft_status === 'in_progress' && draftPhase !== DraftPhase.ACTIVE) {
-            logger.debug('DraftRoom: Draft started by commissioner, showing join banner in lobby');
+          // When draft starts, pre-load state but stay in LOBBY with join banner.
+          // Use refs to read latest teams/league — this effect only re-subscribes on
+          // leagueId/user.id changes, so direct closure reads would be stale.
+          if (updatedLeague.draft_status === 'in_progress' && draftPhaseRef.current !== DraftPhase.ACTIVE) {
+            logger.debug('DraftRoom: Draft started by commissioner, pre-loading state for join');
 
-            // Pre-load draft state so it's ready when user clicks "Join"
+            const currentTeams = teamsRef.current;
+            const currentLeague = leagueRef.current;
+
+            // Pre-load draft state + order in PARALLEL so the Join button is ready instantly
             try {
-              const { state: joinState } = await DraftService.getDraftState(
-                leagueId,
-                teams,
-                updatedLeague.draft_rounds || league?.draft_rounds || 21,
-                user.id
-              );
+              const [stateRes, orderRes] = await Promise.all([
+                DraftService.getDraftState(
+                  leagueId,
+                  currentTeams,
+                  updatedLeague.draft_rounds || currentLeague?.draft_rounds || 21,
+                  user.id
+                ),
+                DraftService.getDraftOrder(leagueId, user.id, 1),
+              ]);
 
-              if (joinState) {
-                setDraftState(joinState);
-                if (joinState.sessionId) {
-                  try {
-                    const { order: joinOrder } = await DraftService.getDraftOrder(
-                      leagueId, user.id, 1, joinState.sessionId
-                    );
-                    if (joinOrder && joinOrder.team_order && joinOrder.team_order.length > 0) {
-                      const orderedTeams = resolveTeamOrder(joinOrder.team_order);
-                      if (orderedTeams.length === teams.length) {
-                        setOrderedTeamsForBoard(orderedTeams);
-                      }
-                    }
-                  } catch (orderErr) {
-                    logger.error('DraftRoom: Error loading draft order:', orderErr);
-                  }
+              if (stateRes.state) {
+                setDraftState(stateRes.state);
+              }
+
+              if (orderRes.order && orderRes.order.team_order && orderRes.order.team_order.length > 0) {
+                const orderedTeams = orderRes.order.team_order
+                  .map((id: string) => currentTeams.find(t => t.id === id))
+                  .filter((t): t is (Team & { owner_name?: string }) => t !== undefined);
+                if (orderedTeams.length > 0 && orderedTeams.length === currentTeams.length) {
+                  setOrderedTeamsForBoard(orderedTeams);
                 }
               }
 
@@ -1285,14 +1289,16 @@ const DraftRoom = () => {
         }
       }
 
-      // Set up orderedTeamsForBoard based on draft order (round 1)
-      if (state && teams && teams.length > 0) {
+      // Set up orderedTeamsForBoard based on draft order (round 1).
+      // Skip if already populated — the round-1 order never changes mid-draft,
+      // so caching it eliminates one API call on every loadDraftState call.
+      if (state && teams && teams.length > 0 && orderedTeamsForBoard.length === 0) {
         try {
           const { order } = await DraftService.getDraftOrder(leagueId, user.id, 1, state.sessionId);
           if (order && order.team_order && order.team_order.length > 0) {
             // Map team IDs to team objects in the correct order
             const orderedTeams = resolveTeamOrder(order.team_order);
-            
+
             if (orderedTeams.length === teams.length) {
               setOrderedTeamsForBoard(orderedTeams);
               logger.log('loadDraftState: Set orderedTeamsForBoard', { count: orderedTeams.length });
@@ -1356,6 +1362,8 @@ const DraftRoom = () => {
   const pickTimeLimitRef = useRef(draftSettings.pickTimeLimit);
   const draftTimerStartedRef = useRef(false);
   const userTeamRef = useRef(userTeam);
+  const teamsRef = useRef<(Team & { owner_name?: string })[]>([]);
+  const leagueRef = useRef<League | null>(null);
   // Track pending retry timeouts from handleStartDraft for cleanup on unmount
   const startDraftRetryRef = useRef<NodeJS.Timeout | null>(null);
   // Ref for handleAutoDraft to avoid stale closures in timer intervals
@@ -1835,61 +1843,109 @@ const DraftRoom = () => {
         toast({ title: `${player.full_name} drafted!`, description: `Round ${effectiveDraftState.currentRound}, Pick ${effectiveDraftState.currentPick}` });
       }
 
-      // Clear cache + reload all picks to ensure sync
-      clearDraftCache();
-      const { picks } = await DraftService.getDraftPicks(leagueId, user?.id || '');
-      const activePicks = picks.filter(p => !p.deleted_at);
-      setDraftHistory(activePicks);
-      setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
+      // ── OPTIMISTIC LOCAL STATE UPDATE ──────────────────────────────
+      // Instead of 3+ sequential API calls (getDraftPicks + getDraftState +
+      // getDraftOrder), compute next state locally. Eliminates ~600ms-1.5s
+      // of round-trip latency per pick.
 
-      // timerStartedAt is now updated server-side in the makePick endpoint,
-      // so all clients get the update via realtime subscription.
-      // Update local state optimistically so this client's timer restarts immediately.
+      // 1. Append pick to history locally (no API call)
+      const optimisticPick: DraftPick = {
+        id: (pick as unknown as Record<string, unknown>)?.id as string || crypto.randomUUID(),
+        league_id: leagueId,
+        team_id: effectiveCurrentTeam.id,
+        player_id: player.id,
+        round_number: effectiveDraftState.currentRound,
+        pick_number: effectiveDraftState.currentPick,
+        picked_at: new Date().toISOString(),
+        draft_session_id: effectiveDraftState.sessionId,
+        deleted_at: null,
+      };
+      const newHistory = [...draftHistory, optimisticPick];
+      setDraftHistory(newHistory);
+      // draftedPlayerIds already updated optimistically above (line 1802)
+
+      // 2. Restart timer immediately (no API call)
       const newTimerStartedAt = new Date().toISOString();
       setLeague(prev => prev ? {
         ...prev,
         settings: { ...prev.settings, timerStartedAt: newTimerStartedAt }
       } : null);
-
-      // Auto-start timer on first pick
       if (!draftTimerStarted) {
         setDraftTimerStarted(true);
       }
 
-      // Check if draft is complete
-      // NOTE: DraftService.makePick already handles completion logic (status update, roster sync, matchup generation)
-      // We only need to update local state and show the completion screen here
-      if (isComplete || activePicks.length >= teams.length * draftSettings.rounds) {
-        // Update local state only - DraftService.makePick handles the rest
+      // 3. Compute next draft state locally (no API call)
+      const newTotalPicks = newHistory.length;
+      const newCurrentPick = newTotalPicks + 1;
+      const newCurrentRound = Math.floor(newTotalPicks / teams.length) + 1;
+      const draftType = ((league?.settings as LeagueSettings)?.draftType || 'snake') as string;
+      const isLinear = draftType === 'linear';
+
+      if (isComplete || newCurrentRound > draftSettings.rounds) {
+        // Draft complete
         setLeague(prev => prev ? { ...prev, draft_status: 'completed' } : null);
-        
-        // Show congratulations screen
         setDraftPhase(DraftPhase.COMPLETED);
-        
-        // Reload data to ensure rosters are available
         await loadDraftData();
-        return; // Exit early, don't reload draft state
+        return;
       }
 
-      // Reset timer and reload draft state
+      // Compute next team from local board order (handles snake reversal)
+      let nextTeamId: string | null = null;
+      const boardOrder = orderedTeamsForBoard.length > 0 ? orderedTeamsForBoard : teams;
+      if (boardOrder.length > 0) {
+        const pickIndexInRound = newTotalPicks % teams.length;
+        const isReversedRound = !isLinear && newCurrentRound % 2 === 0;
+        const roundOrder = isReversedRound ? [...boardOrder].reverse() : boardOrder;
+        nextTeamId = roundOrder[pickIndexInRound]?.id || null;
+      }
+
+      const optimisticState: DraftState = {
+        currentRound: newCurrentRound,
+        currentPick: newCurrentPick,
+        totalPicks: newTotalPicks,
+        nextTeamId,
+        isComplete: false,
+        sessionId: effectiveDraftState.sessionId,
+      };
+      setDraftState(optimisticState);
       setTimeRemaining(draftSettings.pickTimeLimit);
-      // Reset timer refs to allow timer to restart for next pick
       timerRunningRef.current = false;
       lastPickNumberRef.current = 0;
-      const freshState = await loadDraftState();
 
-      // If the NEXT team is AI, immediately schedule their pick (don't wait for timer effect)
-      if (freshState?.nextTeamId && isCommissioner) {
-        const nextTeam = teams.find(t => t.id === freshState.nextTeamId);
+      // 4. If next team is AI, schedule auto-pick immediately
+      if (nextTeamId && isCommissioner) {
+        const nextTeam = teams.find(t => t.id === nextTeamId);
         if (nextTeam && !nextTeam.owner_id) {
-          // Clear any existing timeout, then schedule AI pick in 1.5s
           if (autoPickTimeoutRef.current) clearTimeout(autoPickTimeoutRef.current);
-          autoPickInProgressRef.current = false; // Reset so the next pick can fire
+          autoPickInProgressRef.current = false;
           autoPickTimeoutRef.current = setTimeout(() => {
             handleAutoDraftRef.current();
           }, 1500);
         }
       }
+
+      // 5. Background reconciliation — non-blocking sync with server
+      // Ensures we catch any missed picks from other clients
+      clearDraftCache();
+      Promise.all([
+        DraftService.getDraftPicks(leagueId, user?.id || ''),
+        leagueApi.getLeague(leagueId),
+      ]).then(([picksResult, leagueResult]) => {
+        const serverPicks = picksResult.picks.filter(p => !p.deleted_at);
+        // Only update if server has different data (e.g., another client picked simultaneously)
+        if (serverPicks.length !== newHistory.length) {
+          setDraftHistory(serverPicks);
+          setDraftedPlayerIds(new Set(serverPicks.map(p => p.player_id)));
+        }
+        const freshLeague = leagueResult.data as League | null;
+        if (freshLeague) {
+          setLeague(prev => prev ? {
+            ...prev,
+            settings: freshLeague.settings || prev.settings,
+            draft_status: freshLeague.draft_status || prev.draft_status,
+          } : null);
+        }
+      }).catch(err => logger.debug('Background reconciliation error (non-critical):', err));
     } catch (error: unknown) {
       logger.error('handlePlayerDraft error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -2396,30 +2452,43 @@ const DraftRoom = () => {
     if (!isCommissioner) {
       if (league?.draft_status === 'in_progress') {
         logger.log('Non-commissioner rejoining in-progress draft');
+        // Transition to ACTIVE immediately — don't wait on network. The draft board
+        // falls back to `teams` when `orderedTeamsForBoard` is empty, and loadDraftState
+        // will populate state in the background.
         setDraftPhase(DraftPhase.ACTIVE);
-        // Load draft state
-        const { state: rejoinState } = await DraftService.getDraftState(
-          leagueId, teams, league.draft_rounds || 21, user?.id
-        );
-        if (rejoinState) {
-          setDraftState(rejoinState);
-          // Set up ordered teams for board
-          if (rejoinState.sessionId) {
-            const { order: rejoinOrder } = await DraftService.getDraftOrder(leagueId, user.id, 1, rejoinState.sessionId);
-            if (rejoinOrder && rejoinOrder.team_order) {
-              const orderedTeams = resolveTeamOrder(rejoinOrder.team_order);
-              if (orderedTeams.length === teams.length) {
-                setOrderedTeamsForBoard(orderedTeams);
-              }
+
+        // Parallelize all fetches — previously these were sequential, causing 3+ round trips
+        // before the user saw anything. Don't gate the draft-order call on sessionId —
+        // the server query returns the latest round-1 order regardless.
+        try {
+          const [stateRes, orderRes, picksRes] = await Promise.all([
+            DraftService.getDraftState(leagueId, teams, league.draft_rounds || 21, user?.id),
+            DraftService.getDraftOrder(leagueId, user?.id || '', 1),
+            DraftService.getDraftPicks(leagueId, user?.id || ''),
+          ]);
+
+          if (stateRes.state) {
+            setDraftState(stateRes.state);
+          }
+
+          if (orderRes.order && orderRes.order.team_order && orderRes.order.team_order.length > 0) {
+            const orderedTeams = resolveTeamOrder(orderRes.order.team_order);
+            if (orderedTeams.length === teams.length) {
+              setOrderedTeamsForBoard(orderedTeams);
             }
           }
-        }
-        // Auto-start timer if picks already exist
-        const { picks: rejoinPicks } = await DraftService.getDraftPicks(leagueId, user.id);
-        const activeRejoinPicks = rejoinPicks.filter((p: DraftPick) => !p.deleted_at);
-        if (activeRejoinPicks.length > 0) {
-          setDraftTimerStarted(true);
-          draftTimerStartedRef.current = true;
+
+          // Auto-start timer if picks already exist
+          const activeRejoinPicks = picksRes.picks.filter((p: DraftPick) => !p.deleted_at);
+          if (activeRejoinPicks.length > 0) {
+            setDraftHistory(activeRejoinPicks);
+            setDraftedPlayerIds(new Set(activeRejoinPicks.map(p => p.player_id)));
+            setDraftTimerStarted(true);
+            draftTimerStartedRef.current = true;
+          }
+        } catch (rejoinErr) {
+          logger.error('Non-commissioner rejoin: error loading draft data:', rejoinErr);
+          // loadDraftState will retry via polling fallback
         }
         return;
       }
@@ -2431,30 +2500,37 @@ const DraftRoom = () => {
     if (league?.draft_status === 'in_progress') {
       logger.log('Commissioner rejoining in-progress draft');
       setDraftPhase(DraftPhase.ACTIVE);
-      // Load draft state
-      const { state: rejoinState } = await DraftService.getDraftState(
-        leagueId, teams, league.draft_rounds || 21, user?.id
-      );
-      if (rejoinState) {
-        setDraftState(rejoinState);
-        if (rejoinState.sessionId) {
-          const { order: rejoinOrder } = await DraftService.getDraftOrder(leagueId, user.id, 1, rejoinState.sessionId);
-          if (rejoinOrder && rejoinOrder.team_order) {
-            const orderedTeams = rejoinOrder.team_order
-              .map((teamId: string) => teams.find(t => t.id === teamId))
-              .filter((t): t is (Team & { owner_name?: string }) => t !== undefined);
-            if (orderedTeams.length === teams.length) {
-              setOrderedTeamsForBoard(orderedTeams);
-            }
+
+      // Parallelize all fetches — 3 sequential round-trips was causing a visible delay
+      // when rejoining on mobile.
+      try {
+        const [stateRes, orderRes, picksRes] = await Promise.all([
+          DraftService.getDraftState(leagueId, teams, league.draft_rounds || 21, user?.id),
+          DraftService.getDraftOrder(leagueId, user?.id || '', 1),
+          DraftService.getDraftPicks(leagueId, user?.id || ''),
+        ]);
+
+        if (stateRes.state) {
+          setDraftState(stateRes.state);
+        }
+
+        if (orderRes.order && orderRes.order.team_order && orderRes.order.team_order.length > 0) {
+          const orderedTeams = resolveTeamOrder(orderRes.order.team_order);
+          if (orderedTeams.length === teams.length) {
+            setOrderedTeamsForBoard(orderedTeams);
           }
         }
-      }
-      // Auto-start timer if picks already exist (otherwise commissioner sees "Start Draft Timer" button)
-      const { picks: rejoinPicks } = await DraftService.getDraftPicks(leagueId, user.id);
-      const activeRejoinPicks = rejoinPicks.filter((p: DraftPick) => !p.deleted_at);
-      if (activeRejoinPicks.length > 0) {
-        setDraftTimerStarted(true);
-        draftTimerStartedRef.current = true;
+
+        // Auto-start timer if picks already exist (otherwise commissioner sees "Start Draft Timer" button)
+        const activeRejoinPicks = picksRes.picks.filter((p: DraftPick) => !p.deleted_at);
+        if (activeRejoinPicks.length > 0) {
+          setDraftHistory(activeRejoinPicks);
+          setDraftedPlayerIds(new Set(activeRejoinPicks.map(p => p.player_id)));
+          setDraftTimerStarted(true);
+          draftTimerStartedRef.current = true;
+        }
+      } catch (rejoinErr) {
+        logger.error('Commissioner rejoin: error loading draft data:', rejoinErr);
       }
       return;
     }

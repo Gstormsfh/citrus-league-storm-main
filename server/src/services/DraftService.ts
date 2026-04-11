@@ -151,30 +151,29 @@ export class DraftService {
     sessionId?: string,
     teamsCount?: number,
   ) {
-    // Check player not already drafted
-    const { data: existing } = await this.supabase
-      .from('draft_picks')
-      .select('id')
-      .eq('league_id', leagueId)
-      .eq('player_id', playerId)
-      .is('deleted_at', null)
-      .limit(1)
-      .maybeSingle();
+    // Validate player not already drafted AND pick number not used in parallel
+    const [{ data: existing }, { data: existingPick }] = await Promise.all([
+      this.supabase
+        .from('draft_picks')
+        .select('id')
+        .eq('league_id', leagueId)
+        .eq('player_id', playerId)
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle(),
+      this.supabase
+        .from('draft_picks')
+        .select('id')
+        .eq('league_id', leagueId)
+        .eq('pick_number', pickNumber)
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
     if (existing) {
       return { pick: null, error: 'Player already drafted', isComplete: false };
     }
-
-    // Check for duplicate pick number
-    const { data: existingPick } = await this.supabase
-      .from('draft_picks')
-      .select('id')
-      .eq('league_id', leagueId)
-      .eq('pick_number', pickNumber)
-      .is('deleted_at', null)
-      .limit(1)
-      .maybeSingle();
-
     if (existingPick) {
       return { pick: null, error: 'Pick number already used', isComplete: false };
     }
@@ -217,31 +216,39 @@ export class DraftService {
       return { pick: null, error: error.message || error, isComplete: false };
     }
 
-    // Update league status from not_started to in_progress
-    await this.supabase
-      .from('leagues')
-      .update({ draft_status: 'in_progress' })
-      .eq('id', leagueId)
-      .in('draft_status', ['not_started', 'queued']);
-
-    // Atomically check completion, update status, and sync rosters in one transaction
+    // Run league status update + completion check in parallel
+    // Status update is idempotent; completion check is independent
     let isComplete = false;
-    if (teamsCount) {
-      const { data: completionResult, error: completionError } = await this.supabase.rpc(
-        'complete_draft_and_sync',
-        {
-          p_league_id: leagueId,
-          p_draft_session_id: sessionId || null,
-          p_teams_count: teamsCount,
-        },
-      );
+    const statusUpdatePromise: Promise<void> = (async () => {
+      await this.supabase
+        .from('leagues')
+        .update({ draft_status: 'in_progress' })
+        .eq('id', leagueId)
+        .in('draft_status', ['not_started', 'queued']);
+    })();
 
-      if (completionError) {
-        logger.error('Draft completion check failed', { leagueId, error: completionError.message });
-      } else {
-        isComplete = completionResult?.is_complete ?? false;
-      }
+    const postPickTasks: Promise<void>[] = [statusUpdatePromise];
+
+    if (teamsCount) {
+      const completionPromise: Promise<void> = (async () => {
+        const { data: completionResult, error: completionError } = await this.supabase.rpc(
+          'complete_draft_and_sync',
+          {
+            p_league_id: leagueId,
+            p_draft_session_id: sessionId || null,
+            p_teams_count: teamsCount,
+          },
+        );
+        if (completionError) {
+          logger.error('Draft completion check failed', { leagueId, error: completionError.message });
+        } else {
+          isComplete = completionResult?.is_complete ?? false;
+        }
+      })();
+      postPickTasks.push(completionPromise);
     }
+
+    await Promise.all(postPickTasks);
 
     return { pick, error: null, isComplete };
   }
