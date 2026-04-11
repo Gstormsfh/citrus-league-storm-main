@@ -92,6 +92,15 @@ export const NotificationService = {
   /**
    * Subscribe to real-time notification updates.
    * Realtime subscriptions are client-side by design (not a 3-tier violation).
+   *
+   * NOTE: Supabase Realtime `postgres_changes` filter strings do NOT support
+   * comma-separated AND. Do not write `filter: "a=eq.1,b=eq.2"` — the broker
+   * parses the comma as part of the value, the filter matches nothing, and
+   * the subscription silently degrades to delivering every row the JWT can
+   * SELECT. That exact bug caused the April 10 2026 draft-disaster
+   * cross-league notification leak (see
+   * `docs/LIVE_DRAFT_DISASTER_POSTMORTEM.md` §1). We scope the server-side
+   * filter to `user_id` only and do the league check in the callback.
    */
   subscribeToNotifications(
     leagueId: string,
@@ -106,12 +115,15 @@ export const NotificationService = {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `league_id=eq.${leagueId},user_id=eq.${userId}`,
+          filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          if (payload.eventType === 'INSERT') {
-            callback(payload.new as Notification);
-          }
+          if (payload.eventType !== 'INSERT') return;
+          const notification = payload.new as Notification;
+          // Client-side league guard — the server filter only scopes by
+          // user_id (see method-level NOTE above).
+          if (notification.league_id !== leagueId) return;
+          callback(notification);
         }
       )
       .subscribe();
