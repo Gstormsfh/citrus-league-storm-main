@@ -426,7 +426,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     let cancelled = false;
     playoffApi.getBracket(activeLeagueId).then((res) => {
       if (cancelled) return;
-      setShowPlayoffs(!!(res.data?.bracket));
+      setShowPlayoffs(!!((res.data as Record<string, unknown>)?.bracket));
     }).catch(() => {
       if (!cancelled) setShowPlayoffs(false);
     });

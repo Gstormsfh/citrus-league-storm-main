@@ -143,7 +143,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string): Promise<AuthResponse> => {
     // Use server-side signup to auto-confirm email so users can sign in immediately.
     // Falls back to Supabase client signup if the server endpoint is unavailable.
     const apiBase = import.meta.env.VITE_API_URL || '';
@@ -155,11 +155,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       const json = await res.json();
       if (!res.ok) {
-        return { data: { user: null, session: null }, error: { message: json?.error?.message || 'Signup failed' } };
+        const msg = json?.error?.message || 'Signup failed';
+        return { data: { user: null, session: null }, error: new AuthError(msg) };
       }
       // User created and auto-confirmed — sign in immediately
-      const signInResult = await supabase.auth.signInWithPassword({ email, password });
-      return signInResult;
+      return await supabase.auth.signInWithPassword({ email, password });
     } catch {
       // Fallback: use Supabase client signup (requires email verification)
       const redirectUrl = `${window.location.origin}/auth/callback`;

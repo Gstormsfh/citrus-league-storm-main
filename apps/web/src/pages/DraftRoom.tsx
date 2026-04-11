@@ -50,7 +50,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
-import { ScoringCalculator } from '@/utils/scoringUtils';
+import { ScoringCalculator, type ScoringSettings } from '@/utils/scoringUtils';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { useToast } from '@/hooks/use-toast';
@@ -1948,7 +1948,7 @@ const DraftRoom = () => {
     // Strategy 2: Fantasy points + positional need (applies to ALL teams, not just AI)
     if (!selectedPlayer) {
       // Calculate fantasy points for each undrafted player
-      const scorer = new ScoringCalculator(league?.scoring_settings);
+      const scorer = new ScoringCalculator(league?.scoring_settings as unknown as ScoringSettings | undefined);
       const calcFpts = (p: Player): number => {
         const isGoalie = p.position === 'G';
         return scorer.calculatePoints(
@@ -3599,7 +3599,7 @@ const DraftRoom = () => {
                         onToggleWatchlist={handleToggleWatchlist}
                         queue={draftQueue}
                         watchlist={watchlist}
-                        scoringSettings={league?.scoring_settings}
+                        scoringSettings={league?.scoring_settings as unknown as ScoringSettings | undefined}
                         projectedFptsMap={projectedFptsMap}
                       />
                     </TabsContent>

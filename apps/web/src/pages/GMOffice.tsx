@@ -26,8 +26,8 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 interface GMAction {
   title: string;
   description: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
-  citrusIcon: React.ComponentType<{ className?: string; color?: string }>;
+  icon: React.ElementType;
+  citrusIcon: React.ElementType;
   gradient: string;
   link: string;
   hasNewInsight?: boolean;
