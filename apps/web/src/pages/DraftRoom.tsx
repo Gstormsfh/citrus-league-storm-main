@@ -758,25 +758,35 @@ const DraftRoom = () => {
         playOpponentPickSound();
       }
 
+      // IMMEDIATE: Reset timer optimistically so all clients see the countdown
+      // restart instantly, before any network calls. The server already set the
+      // real timerStartedAt — we'll correct to it once the league fetch lands.
+      const optimisticTimerStart = new Date().toISOString();
+      setLeague(prev => prev ? {
+        ...prev,
+        settings: { ...prev.settings, timerStartedAt: optimisticTimerStart }
+      } : null);
+
+      if (!draftTimerStartedRef.current) {
+        setDraftTimerStarted(true);
+        draftTimerStartedRef.current = true;
+      }
+
       // Debounce rapid updates - wait 50ms for batched processing (fast enough to feel real-time)
       clearTimeout(updateTimeout);
       updateTimeout = setTimeout(async () => {
-        // Reload all picks to ensure we have the latest state
-        const { picks } = await DraftService.getDraftPicks(leagueId, user.id);
-        const activePicks = picks.filter(p => !p.deleted_at);
+        // Run picks fetch, league fetch, and draft state reload in parallel
+        const [picksResult, freshLeagueRes] = await Promise.all([
+          DraftService.getDraftPicks(leagueId, user.id),
+          leagueApi.getLeague(leagueId),
+        ]);
 
+        // Update picks
+        const activePicks = picksResult.picks.filter(p => !p.deleted_at);
         setDraftHistory(activePicks);
         setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
 
-        // Auto-start timer when picks exist (for ALL users)
-        if (activePicks.length >= 1 && !draftTimerStartedRef.current) {
-          setDraftTimerStarted(true);
-          draftTimerStartedRef.current = true;
-        }
-
-        // Reload league to get updated timerStartedAt (set after each pick)
-        // This drives the server-timestamp-based timer for all clients
-        const freshLeagueRes = await leagueApi.getLeague(leagueId);
+        // Update league with server-authoritative timerStartedAt
         const freshLeague = freshLeagueRes.data as League | null;
         if (freshLeague) {
           setLeague(prev => prev ? {
@@ -806,15 +816,19 @@ const DraftRoom = () => {
 
   // POLLING FALLBACK: safety net in case Supabase realtime drops.
   // Realtime handles the fast path; polling only catches missed events.
-  // PERF: 15s interval (was 5s) — reduces 12 queries/min to 4.
+  // 5s during active draft — fast enough to catch missed picks without overloading.
   useEffect(() => {
     if (draftPhase !== DraftPhase.ACTIVE || !leagueId || !user?.id) return;
 
     const pollInterval = setInterval(async () => {
       try {
-        // Reload picks
-        const { picks } = await DraftService.getDraftPicks(leagueId, user.id);
-        const activePicks = picks.filter(p => !p.deleted_at);
+        // Fetch picks and league in parallel to minimize latency
+        const [picksResult, freshLeagueRes] = await Promise.all([
+          DraftService.getDraftPicks(leagueId, user.id),
+          leagueApi.getLeague(leagueId),
+        ]);
+
+        const activePicks = picksResult.picks.filter(p => !p.deleted_at);
 
         // Only update state if picks actually changed (avoid unnecessary re-renders)
         let picksChanged = false;
@@ -830,8 +844,6 @@ const DraftRoom = () => {
           setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
         }
 
-        // Reload league for timerStartedAt and settings
-        const freshLeagueRes = await leagueApi.getLeague(leagueId);
         const freshLeague = freshLeagueRes.data as League | null;
 
         if (freshLeague) {
@@ -885,7 +897,7 @@ const DraftRoom = () => {
         // Silent fail - polling is best-effort
         logger.debug('DraftRoom: Poll error (non-critical):', err);
       }
-    }, 15000);
+    }, 5000);
 
     return () => clearInterval(pollInterval);
   // Polling interval: only recreate when phase or identity changes. loadDraftState is not memoized —
