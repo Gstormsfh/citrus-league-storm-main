@@ -625,10 +625,6 @@ export const DraftLobby = ({
                     onClick={async () => {
                       if (onAddAITeams) {
                         await onAddAITeams();
-                        toast({
-                          title: 'AI Teams Added',
-                          description: 'AI teams have been added to your league. Refresh to see them.',
-                        });
                       }
                     }}
                     className="w-full mt-2"

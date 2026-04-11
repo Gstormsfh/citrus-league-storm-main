@@ -328,6 +328,33 @@ leagueRoutes.delete('/:leagueId/teams/:teamId', commissionerMiddleware, async (c
   }
 });
 
+// POST /api/leagues/:leagueId/simulate-fill — Add AI teams to fill league (commissioner only)
+leagueRoutes.post('/:leagueId/simulate-fill', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const userId = c.get('userId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new LeagueService(supabase);
+
+  try {
+    const body = await c.req.json();
+    const teamNames: string[] = body.teamNames || [];
+
+    if (!teamNames.length) {
+      return fail(c, AppError.badRequest('No team names provided'));
+    }
+
+    const { teams, error } = await service.addAITeams(leagueId, userId, teamNames);
+    if (error) return handleError(c, error, 'Failed to add AI teams');
+
+    const audit = new AuditService(supabase);
+    audit.log('ADMIN_ACTION', leagueId, { action: 'add_ai_teams', count: teams.length, addedBy: userId });
+
+    return ok(c, { teams, count: teams.length });
+  } catch (err) {
+    return handleError(c, err, 'Failed to add AI teams');
+  }
+});
+
 // GET /api/leagues/:leagueId/transactions — Get transaction history
 leagueRoutes.get('/:leagueId/transactions', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');

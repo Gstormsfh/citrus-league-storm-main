@@ -1577,6 +1577,21 @@ const DraftRoom = () => {
     const updateTimer = () => {
       const elapsedSec = Math.floor((Date.now() - timerStartMs) / 1000);
       const remaining = Math.max(0, timeLimit - elapsedSec);
+
+      // Prevent cosmetic glitch: if remaining is 0 or negative but this is a
+      // stale timerStartedAt (currentPick changed but timerStartedAt hasn't
+      // updated yet), show the full time limit instead of flashing 0:00
+      if (remaining <= 0 && !autoTriggered) {
+        const elapsed = Date.now() - timerStartMs;
+        const farPastExpiry = elapsed > (timeLimit + 5) * 1000;
+        if (farPastExpiry && !isAITeam) {
+          // Timer is >5s past expiry — this is likely a stale timestamp during
+          // pick transition. Show full time until new timerStartedAt arrives.
+          setTimeRemaining(timeLimit);
+          return;
+        }
+      }
+
       setTimeRemaining(remaining);
 
       if (remaining <= 0 && !isAITeam && !autoTriggered) {
@@ -2110,13 +2125,16 @@ const DraftRoom = () => {
       const { error } = await LeagueService.simulateLeagueFill(leagueId, maxTeams);
       if (error) {
         logger.error('Error adding AI teams:', error);
+        toast({ title: "Error", description: "Failed to add AI teams. Please try again.", variant: "destructive" });
         return;
       }
 
+      toast({ title: "AI Teams Added", description: "AI teams have been added to your league." });
       // Reload teams after adding AI teams
       await loadDraftData();
     } catch (err) {
       logger.error('Exception adding AI teams:', err);
+      toast({ title: "Error", description: "Failed to add AI teams. Please try again.", variant: "destructive" });
     }
   };
 

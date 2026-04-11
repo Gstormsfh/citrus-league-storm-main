@@ -273,4 +273,29 @@ describe('LeagueService', () => {
       expect(result.team).toEqual(team);
     });
   });
+
+  describe('addAITeams', () => {
+    it('inserts AI teams with null owner_id', async () => {
+      const aiTeams = [
+        { id: 'ai1', team_name: 'AI Team 1' },
+        { id: 'ai2', team_name: 'AI Team 2' },
+      ];
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'leagues') return createChain({ data: { commissioner_id: 'user-1' }, error: null });
+        if (table === 'teams') return createChain({ data: aiTeams, error: null });
+        return createChain();
+      });
+
+      const result = await service.addAITeams('league-1', 'user-1', ['AI Team 1', 'AI Team 2']);
+      expect(result.teams).toHaveLength(2);
+      expect(result.error).toBeNull();
+      expect(mockSupabase.from).toHaveBeenCalledWith('teams');
+    });
+
+    it('returns empty array when no team names provided', async () => {
+      const result = await service.addAITeams('league-1', 'user-1', []);
+      expect(result.teams).toEqual([]);
+      expect(result.error).toBeNull();
+    });
+  });
 });

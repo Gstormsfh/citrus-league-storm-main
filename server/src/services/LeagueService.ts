@@ -430,6 +430,26 @@ export class LeagueService {
     return { success: !error, error };
   }
 
+  /** Add AI teams to fill a league (commissioner only) */
+  async addAITeams(leagueId: string, userId: string, teamNames: string[]) {
+    await this.membership.requireCommissioner(leagueId, userId);
+
+    if (!teamNames.length) return { teams: [], error: null };
+
+    const rows = teamNames.map(name => ({
+      league_id: leagueId,
+      team_name: name,
+      owner_id: null,
+    }));
+
+    const { data, error } = await this.supabase
+      .from('teams')
+      .insert(rows)
+      .select('id, team_name');
+
+    return { teams: data || [], error };
+  }
+
   /** Update league settings (generic) */
   async updateSettings(leagueId: string, userId: string, settings: Record<string, any>, scoringSettings?: Record<string, any>) {
     await this.membership.requireCommissioner(leagueId, userId);
