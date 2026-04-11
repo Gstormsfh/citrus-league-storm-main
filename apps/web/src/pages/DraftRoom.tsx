@@ -1165,7 +1165,7 @@ const DraftRoom = () => {
       logger.log('loadDraftState: No teams loaded yet, skipping');
       // Retry after a short delay if teams aren't loaded yet
       if (retryCount < 3) {
-        return await loadDraftState(retryCount + 1);
+        return await loadDraftState(retryCount + 1, skipStatusCheck);
       }
       return null;
     }
@@ -1193,7 +1193,7 @@ const DraftRoom = () => {
           if (retryCount < 5) {
             logger.log(`loadDraftState: Draft order not found, retrying (${retryCount + 1}/5)...`);
             await new Promise(resolve => setTimeout(resolve, 500));
-            return await loadDraftState(retryCount + 1);
+            return await loadDraftState(retryCount + 1, skipStatusCheck);
           } else {
             logger.log('loadDraftState: Draft order not found after max retries, clearing state');
             setDraftState(null);
@@ -1315,7 +1315,7 @@ const DraftRoom = () => {
       logger.error('loadDraftState: Exception loading draft state', err);
       // Retry if we haven't exceeded max retries
       if (retryCount < 3) {
-        return await loadDraftState(retryCount + 1);
+        return await loadDraftState(retryCount + 1, skipStatusCheck);
       } else {
         setDraftState(null);
         return null;
@@ -1525,9 +1525,11 @@ const DraftRoom = () => {
   const draftPhaseRef = useRef(draftPhase);
   const currentTeamRef = useRef(currentTeam);
   const userAutoDraftEnabledRef = useRef(userAutoDraftEnabled);
+  const isCommissionerRef = useRef(isCommissioner);
   useEffect(() => { draftPhaseRef.current = draftPhase; }, [draftPhase]);
   useEffect(() => { currentTeamRef.current = currentTeam; }, [currentTeam]);
   useEffect(() => { userAutoDraftEnabledRef.current = userAutoDraftEnabled; }, [userAutoDraftEnabled]);
+  useEffect(() => { isCommissionerRef.current = isCommissioner; }, [isCommissioner]);
 
   useEffect(() => {
     const cleanup = () => {
@@ -1600,10 +1602,14 @@ const DraftRoom = () => {
       setTimeRemaining(remaining);
 
       if (remaining <= 0 && !isAITeam && !autoTriggered) {
-        // Time expired for human team - auto-draft (only once per timer cycle)
+        // Time expired for human team — only commissioner triggers auto-draft
+        // to prevent multiple clients racing. Non-commissioners keep the interval
+        // running so the timer naturally restarts when a new timerStartedAt arrives
+        // via realtime subscription after the commissioner's auto-pick.
         autoTriggered = true;
-        cleanup();
-        handleAutoDraftRef.current();
+        if (isCommissionerRef.current) {
+          handleAutoDraftRef.current();
+        }
       }
     };
 
