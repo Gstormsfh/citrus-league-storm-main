@@ -140,22 +140,24 @@ draftRoutes.post('/league/:leagueId/pick', membershipMiddleware, validateBody(sc
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Draft pick failed'));
   }
 
-  // Update timerStartedAt in league settings so all clients reset their countdown.
-  // Done server-side so ANY league member (not just commissioner) triggers the reset.
-  try {
-    const { data: currentLeague } = await supabase
-      .from('leagues')
-      .select('settings')
-      .eq('id', leagueId)
-      .single();
-    const currentSettings = (currentLeague?.settings as Record<string, unknown>) || {};
-    await supabaseAdmin
-      .from('leagues')
-      .update({ settings: { ...currentSettings, timerStartedAt: new Date().toISOString() } })
-      .eq('id', leagueId);
-  } catch {
-    // Non-critical — timer will resync when commissioner's client updates
-  }
+  // Fire-and-forget: update timerStartedAt so all clients reset their countdown.
+  // Don't block the response — the client already sets an optimistic timestamp.
+  (async () => {
+    try {
+      const { data: currentLeague } = await supabase
+        .from('leagues')
+        .select('settings')
+        .eq('id', leagueId)
+        .single();
+      const currentSettings = (currentLeague?.settings as Record<string, unknown>) || {};
+      await supabaseAdmin
+        .from('leagues')
+        .update({ settings: { ...currentSettings, timerStartedAt: new Date().toISOString() } })
+        .eq('id', leagueId);
+    } catch {
+      // Non-critical — timer will resync via realtime or polling
+    }
+  })();
 
   return created(c, { pick, isComplete });
 });

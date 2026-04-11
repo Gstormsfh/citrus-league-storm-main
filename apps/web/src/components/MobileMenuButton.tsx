@@ -160,9 +160,26 @@ const MobileMenuButton = () => {
                       return (
                         <DropdownMenuItem
                           key={l.id}
-                          onClick={() => {
+                          onSelect={() => {
                             setActiveLeagueId(l.id);
-                            if (isPoolLeague(lType)) navigate(getPoolRoute(lType, l.id));
+                            // Path-aware navigation: pages that use path-based league IDs
+                            // (useParams) need an explicit navigate, otherwise the page
+                            // sees the OLD league and either silently reverts the context
+                            // (Matchup's syncLeagueFromUrl) or renders stale data
+                            // (LeagueDashboard). Pool leagues also need explicit navigate.
+                            if (isPoolLeague(lType)) {
+                              navigate(getPoolRoute(lType, l.id));
+                            } else if (location.pathname.startsWith('/matchup/') || location.pathname === '/matchup') {
+                              navigate(`/matchup/${l.id}`);
+                            } else if (location.pathname.match(/^\/league\/[^/]+\/playoffs$/)) {
+                              navigate(`/league/${l.id}/playoffs`);
+                            } else if (location.pathname.match(/^\/league\/[^/]+$/)) {
+                              navigate(`/league/${l.id}`);
+                            } else if (location.pathname.startsWith('/draft-room') || location.pathname === '/draft') {
+                              // Don't trap users on the draft room of a different league —
+                              // take them to GM Office so they can choose where to go.
+                              navigate('/gm-office');
+                            }
                             closeMenu();
                           }}
                           className={cn("cursor-pointer", activeLeagueId === l.id && "bg-citrus-sage/20 font-semibold")}
