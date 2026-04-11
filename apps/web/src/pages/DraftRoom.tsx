@@ -27,6 +27,7 @@ import { ConnectionStatus } from '@/components/draft/ConnectionStatus';
 import { RosterDepthChart } from '@/components/draft/RosterDepthChart';
 import { DraftSnapshotView } from '@/components/draft/DraftSnapshotView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

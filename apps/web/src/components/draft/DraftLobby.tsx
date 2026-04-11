@@ -567,10 +567,48 @@ export const DraftLobby = ({
           {/* Team List */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                All Teams ({teams.length}/{maxTeams})
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  All Teams ({teams.length}/{maxTeams})
+                </CardTitle>
+                {isCommissioner && teams.length < maxTeams && onAddAITeams && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={async () => {
+                      if (onAddAITeams) {
+                        await onAddAITeams();
+                      }
+                    }}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Add AI Teams
+                  </Button>
+                )}
+              </div>
+              {isCommissioner && onTeamsCountChange && (
+                <div className="flex items-center gap-3 mt-2">
+                  <Label htmlFor="teamsCountHeader" className="text-sm whitespace-nowrap">Max Teams:</Label>
+                  <Select
+                    value={maxTeams.toString()}
+                    onValueChange={(value) => {
+                      const count = parseInt(value);
+                      if (onTeamsCountChange) onTeamsCountChange(count);
+                    }}
+                    disabled={hasExistingDraft}
+                  >
+                    <SelectTrigger className="w-[120px] h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[4, 6, 8, 10, 12, 14, 16, 18, 20].filter(n => n >= teams.length).map(n => (
+                        <SelectItem key={n} value={n.toString()}>{n} Teams</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -586,7 +624,7 @@ export const DraftLobby = ({
                       <div className="font-medium truncate">{team.name}</div>
                       <div className="text-sm text-muted-foreground truncate">{team.owner}</div>
                     </div>
-                    {isCommissioner && onDeleteTeam && !hasExistingDraft && (
+                    {isCommissioner && onDeleteTeam && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -598,42 +636,24 @@ export const DraftLobby = ({
                     )}
                   </div>
                 ))}
-                
-                {/* Empty slots */}
-                {Array.from({ length: Math.max(0, maxTeams - teams.length) }).map((_, index) => (
-                  <div key={`empty-${index}`} className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-muted">
-                    <UserPlus className="h-4 w-4 text-muted-foreground" />
-                    <div className="text-muted-foreground">Waiting for manager...</div>
-                  </div>
-                ))}
+
+                {/* Show a few empty slots (max 3) to indicate open spots without flooding the page */}
+                {teams.length < maxTeams && (
+                  <>
+                    {Array.from({ length: Math.min(3, maxTeams - teams.length) }).map((_, index) => (
+                      <div key={`empty-${index}`} className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-muted">
+                        <UserPlus className="h-4 w-4 text-muted-foreground" />
+                        <div className="text-muted-foreground">Waiting for manager...</div>
+                      </div>
+                    ))}
+                    {maxTeams - teams.length > 3 && (
+                      <div className="flex items-center gap-3 p-3 text-sm text-muted-foreground">
+                        + {maxTeams - teams.length - 3} more open spots
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-              
-              {/* Optional: Add AI Teams (Commissioner Only) */}
-              {isCommissioner && teams.length < maxTeams && !hasExistingDraft && onAddAITeams && (
-                <div className="mt-4 p-4 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h4 className="font-semibold text-sm">Need to Fill Spots?</h4>
-                      <p className="text-xs text-muted-foreground">
-                        Add AI teams to fill your league ({teams.length}/{maxTeams} teams)
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      if (onAddAITeams) {
-                        await onAddAITeams();
-                      }
-                    }}
-                    className="w-full mt-2"
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Add AI Teams to Fill League
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>
