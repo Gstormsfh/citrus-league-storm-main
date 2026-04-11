@@ -1551,8 +1551,11 @@ const DraftRoom = () => {
     const timerStartedAt = league?.settings?.timerStartedAt;
     const timeLimit = draftSettings.pickTimeLimit;
 
-    // Don't run timer if not in active draft with valid state
-    if (draftPhaseRef.current !== DraftPhase.ACTIVE || !draftState || !currentTeamRef.current) {
+    // Don't run timer if draft isn't active. We intentionally do NOT check
+    // draftState or currentTeamRef here — those can be transiently null during
+    // pick transitions and killing the interval causes the timer to freeze for
+    // non-commissioner clients that never restart it.
+    if (draftPhaseRef.current !== DraftPhase.ACTIVE) {
       cleanup();
       if (!timerStartedAt) {
         setTimeRemaining(timeLimit);
@@ -1567,14 +1570,17 @@ const DraftRoom = () => {
     }
 
     const timerStartMs = new Date(timerStartedAt as string | number).getTime();
-    const isAITeam = !currentTeamRef.current.owner_id;
+    const currentTeamSnap = currentTeamRef.current;
+    const isAITeam = currentTeamSnap ? !currentTeamSnap.owner_id : false;
 
     // For AI teams or human users with auto-draft enabled, auto-pick after 1.5 seconds
-    const isUserAutoPicking = !isAITeam && userAutoDraftEnabledRef.current && currentTeamRef.current.owner_id === user?.id;
-    if (isAITeam || isUserAutoPicking) {
-      autoPickTimeoutRef.current = setTimeout(() => {
-        handleAutoDraftRef.current();
-      }, 1500);
+    if (currentTeamSnap) {
+      const isUserAutoPicking = !isAITeam && userAutoDraftEnabledRef.current && currentTeamSnap.owner_id === user?.id;
+      if (isAITeam || isUserAutoPicking) {
+        autoPickTimeoutRef.current = setTimeout(() => {
+          handleAutoDraftRef.current();
+        }, 1500);
+      }
     }
 
     // Track if we already triggered auto-draft for this timer cycle
@@ -1591,7 +1597,10 @@ const DraftRoom = () => {
       if (remaining <= 0 && !autoTriggered) {
         const elapsed = Date.now() - timerStartMs;
         const farPastExpiry = elapsed > (timeLimit + 5) * 1000;
-        if (farPastExpiry && !isAITeam) {
+        // Re-read ref inside interval — currentTeam may have updated
+        const currentTeamNow = currentTeamRef.current;
+        const isAITeamNow = currentTeamNow ? !currentTeamNow.owner_id : false;
+        if (farPastExpiry && !isAITeamNow) {
           // Timer is >5s past expiry — this is likely a stale timestamp during
           // pick transition. Show full time until new timerStartedAt arrives.
           setTimeRemaining(timeLimit);
@@ -1601,14 +1610,19 @@ const DraftRoom = () => {
 
       setTimeRemaining(remaining);
 
-      if (remaining <= 0 && !isAITeam && !autoTriggered) {
-        // Time expired for human team — only commissioner triggers auto-draft
-        // to prevent multiple clients racing. Non-commissioners keep the interval
-        // running so the timer naturally restarts when a new timerStartedAt arrives
-        // via realtime subscription after the commissioner's auto-pick.
-        autoTriggered = true;
-        if (isCommissionerRef.current) {
-          handleAutoDraftRef.current();
+      if (remaining <= 0 && !autoTriggered) {
+        // Re-read ref inside interval for current state
+        const currentTeamNow = currentTeamRef.current;
+        const isAITeamNow = currentTeamNow ? !currentTeamNow.owner_id : false;
+        if (!isAITeamNow) {
+          // Time expired for human team — only commissioner triggers auto-draft
+          // to prevent multiple clients racing. Non-commissioners keep the interval
+          // running so the timer naturally restarts when a new timerStartedAt arrives
+          // via realtime subscription after the commissioner's auto-pick.
+          autoTriggered = true;
+          if (isCommissionerRef.current) {
+            handleAutoDraftRef.current();
+          }
         }
       }
     };
