@@ -4,7 +4,7 @@ import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
 import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
-import { createUserClient } from '../lib/supabase';
+import { createUserClient, getSupabaseAdmin } from '../lib/supabase';
 import { LeagueService } from '../services/LeagueService';
 import { SeasonStateService } from '../services/SeasonStateService';
 import { AuditService } from '../services/AuditService';
@@ -329,11 +329,10 @@ leagueRoutes.delete('/:leagueId/teams/:teamId', commissionerMiddleware, async (c
 });
 
 // POST /api/leagues/:leagueId/simulate-fill — Add AI teams to fill league (commissioner only)
+// Uses admin client because AI teams have owner_id=null which RLS blocks on user-scoped clients.
 leagueRoutes.post('/:leagueId/simulate-fill', commissionerMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const userId = c.get('userId');
-  const supabase = createUserClient(c.get('userToken'));
-  const service = new LeagueService(supabase);
 
   try {
     const body = await c.req.json();
@@ -343,13 +342,25 @@ leagueRoutes.post('/:leagueId/simulate-fill', commissionerMiddleware, async (c) 
       return fail(c, AppError.badRequest('No team names provided'));
     }
 
-    const { teams, error } = await service.addAITeams(leagueId, userId, teamNames);
+    // Use admin client to bypass RLS — AI teams have null owner_id
+    const adminClient = getSupabaseAdmin();
+    const rows = teamNames.map(name => ({
+      league_id: leagueId,
+      team_name: name,
+      owner_id: null,
+    }));
+
+    const { data: teams, error } = await adminClient
+      .from('teams')
+      .insert(rows)
+      .select('id, team_name');
+
     if (error) return handleError(c, error, 'Failed to add AI teams');
 
-    const audit = new AuditService(supabase);
-    audit.log('ADMIN_ACTION', leagueId, { action: 'add_ai_teams', count: teams.length, addedBy: userId });
+    const audit = new AuditService(createUserClient(c.get('userToken')));
+    audit.log('ADMIN_ACTION', leagueId, { action: 'add_ai_teams', count: (teams || []).length, addedBy: userId });
 
-    return ok(c, { teams, count: teams.length });
+    return ok(c, { teams: teams || [], count: (teams || []).length });
   } catch (err) {
     return handleError(c, err, 'Failed to add AI teams');
   }
