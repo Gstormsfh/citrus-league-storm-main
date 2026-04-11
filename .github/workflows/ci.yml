@@ -116,6 +116,71 @@ jobs:
             echo "All chunks are within the 600KB budget."
           fi
 
+      # Hard PNG budget gate — regression check for LIVE_DRAFT_DISASTER §7.
+      #
+      # On April 10 2026 the production build shipped 5.1 MB of unused Gemini
+      # mockup PNGs because Vite bundled every PNG referenced by any import,
+      # including ones reachable only from dead code. `npm run build` stayed
+      # green and nobody checks the bundle report after a deploy, so the bloat
+      # survived until a live draft hit it during a 10-deploy afternoon and
+      # every CDN cache miss multiplied the damage.
+      #
+      # Scope: `dist/assets/**/*.png`. This is the directory Vite writes
+      # IMPORT-bundled PNGs to (with content-hash filenames). The postmortem
+      # §7 fix is specifically about import-bundled PNGs — static public/
+      # files land at `dist/*.png` and are a separate category (PWA icons
+      # live there). Narrowing the gate here avoids false-positive failures
+      # on PWA assets while still catching the exact regression §7 describes.
+      #
+      # Budget: 512 KB total (per postmortem P2 action item).
+      # Failure mode: HARD exit 1, not a warning — the existing JS step above
+      # is advisory, this one is not. A warning would not have caught April 10.
+      - name: Dist PNG budget gate (dist/assets/**/*.png ≤ 512 KB)
+        run: |
+          set -euo pipefail
+          BUDGET_BYTES=$((512 * 1024))
+          dist_dir="apps/web/dist/assets"
+
+          if [ ! -d "$dist_dir" ]; then
+            echo "::error::Expected $dist_dir to exist after build step"
+            exit 1
+          fi
+
+          # Sum bytes across every PNG Vite bundled into dist/assets.
+          total=0
+          count=0
+          while IFS= read -r -d '' file; do
+            size=$(stat --format=%s "$file")
+            total=$((total + size))
+            count=$((count + 1))
+          done < <(find "$dist_dir" -type f -name '*.png' -print0)
+
+          total_kb=$((total / 1024))
+          budget_kb=$((BUDGET_BYTES / 1024))
+
+          echo "=== Dist PNG Budget Report ==="
+          echo "Scope:  $dist_dir/**/*.png"
+          echo "Files:  $count"
+          echo "Total:  ${total_kb} KB"
+          echo "Budget: ${budget_kb} KB"
+          echo ""
+
+          if [ "$total" -gt "$BUDGET_BYTES" ]; then
+            echo "::error::dist/assets PNGs total ${total_kb} KB, exceeds ${budget_kb} KB budget"
+            echo ""
+            echo "Top 5 largest PNGs in $dist_dir:"
+            # Print size (bytes)  path, sorted descending, take first 5.
+            find "$dist_dir" -type f -name '*.png' -printf '%s  %p\n' \
+              | sort -nr \
+              | head -5 \
+              | awk '{ printf "  %8d bytes  %s\n", $1, $2 }'
+            echo ""
+            echo "See docs/LIVE_DRAFT_DISASTER_POSTMORTEM.md §7 for context."
+            exit 1
+          fi
+
+          echo "PASS — dist PNGs within budget."
+
   build-server:
     name: Build (Server)
     runs-on: ubuntu-latest
