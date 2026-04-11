@@ -54,9 +54,15 @@ interface TalentMetricsRow {
   is_ir_eligible: boolean | null;
 }
 
+// Row shape for `goalie_gsax_primary` — see
+// supabase/migrations/20250114000001_create_goalie_gsax_primary_table.sql.
+// Key column is `goalie_id`, not `player_id`; the GSAx value we consume
+// is the Bayesian-regressed one. The public NormalizedPlayer.gsax field
+// is projected from `regressed_gsax` so the HTTP wire contract is
+// unchanged for API clients.
 interface GoalieGsaxRow {
-  player_id: number;
-  gsax: number | null;
+  goalie_id: number;
+  regressed_gsax: number | null;
 }
 
 interface NormalizedPlayer {
@@ -141,7 +147,7 @@ function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talen
     save_pct: stat.nhl_save_pct || 0,
     gaa: stat.nhl_gaa || 0,
     shutouts: stat.nhl_shutouts || 0,
-    gsax: goalieGsax?.gsax || null,
+    gsax: goalieGsax?.regressed_gsax ?? null,
     xg_per_60: talent?.xg_per_60 || null,
     xg_rating: talent?.xg_rating || null,
     stats_updated_at: stat.updated_at || null,
@@ -194,7 +200,11 @@ export class PlayerService {
 
     const statsMap = new Map(((stats || []) as unknown as PlayerStatsRow[]).map((s) => [s.player_id, s]));
     const talentMap = new Map(((talents || []) as unknown as TalentMetricsRow[]).map((t) => [t.player_id, t]));
-    const gsaxMap = new Map(((gsax || []) as unknown as GoalieGsaxRow[]).map((g) => [g.player_id, g]));
+    // goalie_gsax_primary is keyed on `goalie_id`, which is the same NHL
+    // player id as `player_directory.player_id` — the column name just
+    // differs. Keep the Map keyed on the numeric id so downstream lookup
+    // by `p.player_id` still works.
+    const gsaxMap = new Map(((gsax || []) as unknown as GoalieGsaxRow[]).map((g) => [g.goalie_id, g]));
 
     const players = ((directory || []) as unknown as PlayerDirectoryRow[]).map((p) => {
       const stat = statsMap.get(p.player_id) || {};
@@ -241,12 +251,13 @@ export class PlayerService {
       this.supabase
         .from('goalie_gsax_primary')
         .select(COLUMNS.GOALIE_GSAX)
-        .in('player_id', dirIds),
+        .in('goalie_id', dirIds),
     ]);
 
     const statsMap = new Map(((stats || []) as unknown as PlayerStatsRow[]).map((s) => [s.player_id, s]));
     const talentMap = new Map(((talents || []) as unknown as TalentMetricsRow[]).map((t) => [t.player_id, t]));
-    const gsaxMap = new Map(((gsax || []) as unknown as GoalieGsaxRow[]).map((g) => [g.player_id, g]));
+    // goalie_gsax_primary is keyed on `goalie_id` (same numeric NHL id).
+    const gsaxMap = new Map(((gsax || []) as unknown as GoalieGsaxRow[]).map((g) => [g.goalie_id, g]));
 
     const players = ((directory || []) as unknown as PlayerDirectoryRow[]).map((p) => {
       const stat = statsMap.get(p.player_id) || {};

@@ -177,7 +177,15 @@ export const PLAYER_TALENT_METRICS_COLUMNS = 'player_id, xg_per_60, xg_rating, r
 // ============================================================================
 // GOALIE GSAX COLUMNS
 // ============================================================================
-export const GOALIE_GSAX_COLUMNS = 'player_id, gsax';
+// Must match the real `goalie_gsax_primary` schema:
+//   goalie_id INTEGER PRIMARY KEY, raw_gsax NUMERIC, regressed_gsax NUMERIC, ...
+// (see supabase/migrations/20250114000001_create_goalie_gsax_primary_table.sql).
+// The prior value `'player_id, gsax'` selected two columns that do not exist,
+// which made every goalie player card 500 during the April 10 2026 draft
+// disaster (see docs/LIVE_DRAFT_DISASTER_POSTMORTEM.md §2). We select the
+// Bayesian-regressed value because that is what the projection system
+// consumes; callers that need the raw value should fetch it explicitly.
+export const GOALIE_GSAX_COLUMNS = 'goalie_id, regressed_gsax';
 
 // ============================================================================
 // TEAM LINEUPS COLUMNS
