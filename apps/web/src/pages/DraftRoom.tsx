@@ -1145,14 +1145,16 @@ const DraftRoom = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, user?.id]);
 
-  const loadDraftState = async (retryCount: number = 0): Promise<DraftState | null> => {
+  const loadDraftState = async (retryCount: number = 0, skipStatusCheck: boolean = false): Promise<DraftState | null> => {
     if (!leagueId || !league) {
       logger.log('loadDraftState: Missing leagueId or league', { leagueId, league: !!league });
       return null;
     }
 
     // CRITICAL: Don't load draft state if draft hasn't started
-    if (league?.draft_status === 'not_started') {
+    // skipStatusCheck allows handleBeginDraft to bypass this when the status
+    // was just changed to 'in_progress' but the React state hasn't committed yet.
+    if (!skipStatusCheck && league?.draft_status === 'not_started') {
       logger.log('loadDraftState: Draft not started, clearing draft state');
       setDraftState(null);
       return null;
@@ -1454,10 +1456,12 @@ const DraftRoom = () => {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      // Ensure draft state is loaded
+      // Ensure draft state is loaded — skipStatusCheck=true because the league
+      // draft_status may still read 'not_started' in the React closure even though
+      // handleStartDraft already set it to 'in_progress'.
       let currentDraftState = draftState;
       if (!currentDraftState) {
-        currentDraftState = await loadDraftState();
+        currentDraftState = await loadDraftState(0, true);
         if (!currentDraftState) {
           toast({ title: "Error", description: "Cannot start draft: draft state could not be loaded. Please try starting the draft first.", variant: "destructive" });
           return;
@@ -1805,16 +1809,10 @@ const DraftRoom = () => {
       setDraftHistory(activePicks);
       setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
 
-      // Update timerStartedAt in DB so ALL clients reset their countdown
+      // timerStartedAt is now updated server-side in the makePick endpoint,
+      // so all clients get the update via realtime subscription.
+      // Update local state optimistically so this client's timer restarts immediately.
       const newTimerStartedAt = new Date().toISOString();
-      await leagueApi.updateSettings(leagueId, {
-        settings: {
-          ...(league?.settings || {}),
-          timerStartedAt: newTimerStartedAt
-        }
-      });
-
-      // Update local league state
       setLeague(prev => prev ? {
         ...prev,
         settings: { ...prev.settings, timerStartedAt: newTimerStartedAt }
@@ -2533,7 +2531,7 @@ const DraftRoom = () => {
           const updatedLeague = updatedLeagueRes.data as League | null;
 
           if (updatedLeague?.draft_status === 'in_progress') {
-            const loadedState = await loadDraftState();
+            const loadedState = await loadDraftState(0, true);
             if (loadedState) {
               logger.log('Draft state loaded successfully after start');
             } else if (retryCount < 10) {
@@ -2596,14 +2594,19 @@ const DraftRoom = () => {
 
   // Handle continuing/resuming the draft timer - sets new timerStartedAt in DB
   const handleContinueDraft = async () => {
-    if (!draftState || !currentTeam) {
-      if (!draftState && leagueId) {
-        await loadDraftState();
-      }
-      await new Promise(resolve => setTimeout(resolve, 300));
+    // Use return value from loadDraftState — React state won't be committed yet
+    let state = draftState;
+    if (!state && leagueId) {
+      state = await loadDraftState(0, true);
     }
 
-    if (!draftState || !currentTeam) {
+    // If we still don't have state, try one more time with a delay
+    if (!state) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      state = draftState; // Check if React committed in the meantime
+    }
+
+    if (!state) {
       toast({ title: "Error", description: "Cannot continue draft: draft state not ready. Please try again.", variant: "destructive" });
       return;
     }
