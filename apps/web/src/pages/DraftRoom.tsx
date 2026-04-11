@@ -744,23 +744,34 @@ const DraftRoom = () => {
   }, [leagueId, user, authLoading, userLeagueState, loadDraftData, loadUserLeague, navigate]);
 
 
-  // Debounced realtime subscription to reduce lag
+  // Realtime subscription — optimized for instant UI updates on remote clients.
+  // When any client makes a pick, every other client must IMMEDIATELY see:
+  //   1. Timer reset (<1ms, synchronous setState)
+  //   2. New pick in history (optimistic insert from realtime payload)
+  //   3. Updated currentPick / currentRound / nextTeamId (computed LOCALLY)
+  // A single background fetch reconciles against the server. No loadDraftState
+  // round-trip (which would add ~300–800ms of blocking API calls on mobile).
   useEffect(() => {
     if (!leagueId || !user?.id) return;
 
-    let updateTimeout: NodeJS.Timeout;
-    
     const unsubscribe = DraftService.subscribeToDraftPicks(leagueId, user.id, async (newPick) => {
       logger.debug('DraftRoom: New pick received via realtime:', newPick);
 
-      // Play a subtle sound when another team picks (immediate, not debounced)
+      // Ignore own picks — handlePlayerDraft already updated local state optimistically,
+      // and reprocessing here would cause double-counting or visual flicker.
+      const alreadyHave = draftHistoryRef.current.some(p => p.id === newPick.id || p.player_id === newPick.player_id);
+      if (alreadyHave) {
+        logger.debug('DraftRoom: Pick already in local history, skipping');
+        return;
+      }
+
+      // Play a subtle sound when another team picks
       if (newPick.team_id !== userTeamRef.current?.id) {
         playOpponentPickSound();
       }
 
-      // IMMEDIATE: Reset timer optimistically so all clients see the countdown
-      // restart instantly, before any network calls. The server already set the
-      // real timerStartedAt — we'll correct to it once the league fetch lands.
+      // ── INSTANT VISUAL UPDATES (all synchronous, no network) ────────
+      // 1. Timer reset — all clients see countdown restart immediately
       const optimisticTimerStart = new Date().toISOString();
       setLeague(prev => prev ? {
         ...prev,
@@ -772,21 +783,57 @@ const DraftRoom = () => {
         draftTimerStartedRef.current = true;
       }
 
-      // Debounce rapid updates - wait 50ms for batched processing (fast enough to feel real-time)
-      clearTimeout(updateTimeout);
-      updateTimeout = setTimeout(async () => {
-        // Run picks fetch, league fetch, and draft state reload in parallel
-        const [picksResult, freshLeagueRes] = await Promise.all([
-          DraftService.getDraftPicks(leagueId, user.id),
-          leagueApi.getLeague(leagueId),
-        ]);
+      // 2. Append the new pick to history (from the realtime payload itself — no fetch!)
+      const nextHistory = [...draftHistoryRef.current, newPick];
+      setDraftHistory(nextHistory);
+      setDraftedPlayerIds(prev => {
+        const next = new Set(prev);
+        next.add(newPick.player_id);
+        return next;
+      });
 
-        // Update picks
-        const activePicks = picksResult.picks.filter(p => !p.deleted_at);
-        setDraftHistory(activePicks);
-        setDraftedPlayerIds(new Set(activePicks.map(p => p.player_id)));
+      // 3. Compute next draft state LOCALLY (handles snake reversal)
+      const currentTeams = teamsRef.current;
+      const currentLeague = leagueRef.current;
+      if (currentTeams.length > 0 && currentLeague) {
+        const totalPicks = nextHistory.length;
+        const newCurrentPick = totalPicks + 1;
+        const newCurrentRound = Math.floor(totalPicks / currentTeams.length) + 1;
+        const draftType = ((currentLeague.settings as LeagueSettings)?.draftType || 'snake') as string;
+        const isLinear = draftType === 'linear';
 
-        // Update league with server-authoritative timerStartedAt
+        const boardOrder = orderedTeamsForBoardRef.current.length > 0
+          ? orderedTeamsForBoardRef.current
+          : currentTeams;
+        let nextTeamId: string | null = null;
+        if (boardOrder.length > 0) {
+          const pickIndexInRound = totalPicks % currentTeams.length;
+          const isReversedRound = !isLinear && newCurrentRound % 2 === 0;
+          const roundOrder = isReversedRound ? [...boardOrder].reverse() : boardOrder;
+          nextTeamId = roundOrder[pickIndexInRound]?.id || null;
+        }
+
+        setDraftState(prev => ({
+          currentRound: newCurrentRound,
+          currentPick: newCurrentPick,
+          totalPicks,
+          nextTeamId,
+          isComplete: false,
+          sessionId: newPick.draft_session_id || prev?.sessionId || '',
+        }));
+
+        // Reset the local countdown immediately (don't wait for server pickTimeLimit roundtrip)
+        setTimeRemaining(pickTimeLimitRef.current || 90);
+      }
+
+      // ── BACKGROUND RECONCILIATION (non-blocking) ────────────────────
+      // Fetch the authoritative league state in the background to sync
+      // timerStartedAt / pickTimeLimit. Do NOT await — UI already updated above.
+      // Also fetch picks in case we missed any (rare but possible on reconnect).
+      Promise.all([
+        leagueApi.getLeague(leagueId),
+        DraftService.getDraftPicks(leagueId, user.id),
+      ]).then(([freshLeagueRes, picksResult]) => {
         const freshLeague = freshLeagueRes.data as League | null;
         if (freshLeague) {
           setLeague(prev => prev ? {
@@ -799,18 +846,24 @@ const DraftRoom = () => {
             setDraftSettings(prev => ({ ...prev, pickTimeLimit: freshLeague.settings.pickTimeLimit }));
           }
         }
-
-        // Reload draft state to update current pick/round/nextTeam
-        await loadDraftState();
-      }, 50);
+        // Reconcile picks if server has more than we do (caught up via realtime replay)
+        const serverPicks = picksResult.picks.filter(p => !p.deleted_at);
+        if (serverPicks.length > draftHistoryRef.current.length) {
+          logger.debug('DraftRoom: Reconciling picks from server', {
+            local: draftHistoryRef.current.length,
+            server: serverPicks.length
+          });
+          setDraftHistory(serverPicks);
+          setDraftedPlayerIds(new Set(serverPicks.map(p => p.player_id)));
+        }
+      }).catch(err => logger.debug('DraftRoom: Background reconciliation error (non-critical):', err));
     });
 
     return () => {
-      clearTimeout(updateTimeout);
       unsubscribe();
     };
   // Supabase realtime subscription: only re-subscribe when channel identity changes (leagueId, user?.id).
-  // loadDraftState is not memoized — including it would cause re-subscription on every render.
+  // All state is read via refs to avoid stale closures without re-subscribing.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, user?.id]);
 
@@ -958,6 +1011,8 @@ const DraftRoom = () => {
   useEffect(() => { userTeamRef.current = userTeam; }, [userTeam]);
   useEffect(() => { teamsRef.current = teams; }, [teams]);
   useEffect(() => { leagueRef.current = league; }, [league]);
+  useEffect(() => { orderedTeamsForBoardRef.current = orderedTeamsForBoard; }, [orderedTeamsForBoard]);
+  useEffect(() => { draftHistoryRef.current = draftHistory; }, [draftHistory]);
 
   // Persist draft phase and timer state to sessionStorage for tab/page navigation resilience
   useEffect(() => {
@@ -1364,6 +1419,8 @@ const DraftRoom = () => {
   const userTeamRef = useRef(userTeam);
   const teamsRef = useRef<(Team & { owner_name?: string })[]>([]);
   const leagueRef = useRef<League | null>(null);
+  const orderedTeamsForBoardRef = useRef<(Team & { owner_name?: string })[]>([]);
+  const draftHistoryRef = useRef<DraftPick[]>([]);
   // Track pending retry timeouts from handleStartDraft for cleanup on unmount
   const startDraftRetryRef = useRef<NodeJS.Timeout | null>(null);
   // Ref for handleAutoDraft to avoid stale closures in timer intervals

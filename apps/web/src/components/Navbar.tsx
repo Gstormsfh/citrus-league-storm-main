@@ -174,13 +174,19 @@ const Navbar = () => {
                     return (
                     <DropdownMenuItem
                       key={l.id}
-                      onClick={() => {
+                      onSelect={() => {
                         setActiveLeagueId(l.id);
-                        // Navigate to the correct page for this league type
+                        // Path-aware navigation: see mobile dropdown below for rationale.
                         if (isPoolLeague(lType)) {
                           navigate(getPoolRoute(lType, l.id));
-                        } else if (location.pathname.startsWith('/matchup')) {
+                        } else if (location.pathname.startsWith('/matchup/') || location.pathname === '/matchup') {
                           navigate(`/matchup/${l.id}`);
+                        } else if (location.pathname.match(/^\/league\/[^/]+\/playoffs$/)) {
+                          navigate(`/league/${l.id}/playoffs`);
+                        } else if (location.pathname.match(/^\/league\/[^/]+$/)) {
+                          navigate(`/league/${l.id}`);
+                        } else if (location.pathname.startsWith('/draft-room') || location.pathname === '/draft') {
+                          navigate('/gm-office');
                         }
                       }}
                       className={cn(
@@ -402,12 +408,24 @@ const Navbar = () => {
                       return (
                       <DropdownMenuItem
                         key={l.id}
-                        onClick={() => {
+                        onSelect={() => {
                           setActiveLeagueId(l.id);
+                          // Path-aware navigation: pages that use path-based league IDs
+                          // (useParams) need an explicit navigate, otherwise the page
+                          // sees the OLD league and either silently reverts the context
+                          // (Matchup's syncLeagueFromUrl) or renders stale data
+                          // (LeagueDashboard).
                           if (isPoolLeague(lType)) {
                             navigate(getPoolRoute(lType, l.id));
-                          } else if (location.pathname.startsWith('/matchup')) {
+                          } else if (location.pathname.startsWith('/matchup/') || location.pathname === '/matchup') {
                             navigate(`/matchup/${l.id}`);
+                          } else if (location.pathname.match(/^\/league\/[^/]+\/playoffs$/)) {
+                            navigate(`/league/${l.id}/playoffs`);
+                          } else if (location.pathname.match(/^\/league\/[^/]+$/)) {
+                            navigate(`/league/${l.id}`);
+                          } else if (location.pathname.startsWith('/draft-room') || location.pathname === '/draft') {
+                            // Don't trap users on the draft room of a different league.
+                            navigate('/gm-office');
                           }
                           closeMobileMenu();
                         }}
