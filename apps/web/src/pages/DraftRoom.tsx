@@ -1471,6 +1471,10 @@ const DraftRoom = () => {
   const autoPickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Guard against concurrent auto-draft calls (race condition prevention)
   const autoPickInProgressRef = useRef<boolean>(false);
+  // Safety valve: auto-reset pickInProgress after 20s even if `finally` never
+  // fires (browser crash, hung promise, etc.). Without this, the Draft button
+  // stays permanently disabled and the user has to reload the entire page.
+  const pickLockTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Track which pick number we last auto-drafted for to prevent duplicate attempts
   const lastAutoPickedNumberRef = useRef<number>(0);
   // Refs for stale closure prevention in realtime subscription callbacks
@@ -1927,6 +1931,16 @@ const DraftRoom = () => {
     // or the UI gets permanently stuck (April 10 incident root cause).
     setPickInProgress(true);
 
+    // Safety valve: auto-unlock after 20s even if `finally` never fires.
+    // The API client has a 15s timeout + up to 2 retries (each 15s + backoff),
+    // so 20s covers the happy path. If we're still locked at 20s, something
+    // catastrophically failed and the user needs the button back.
+    if (pickLockTimerRef.current) clearTimeout(pickLockTimerRef.current);
+    pickLockTimerRef.current = setTimeout(() => {
+      setPickInProgress(false);
+      pickLockTimerRef.current = null;
+    }, 20_000);
+
     // Optimistic update: show the pick immediately in the UI before the API call
     const previousSelectedPlayer = selectedPlayer;
     setDraftedPlayerIds(prev => new Set([...prev, player.id]));
@@ -2071,6 +2085,8 @@ const DraftRoom = () => {
     } catch (error: unknown) {
       logger.error('handlePlayerDraft error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorName = error instanceof Error ? error.name : '';
+
       // Silently handle race condition errors - another client/trigger already handled this pick
       const isRaceCondition = errorMessage.includes('already taken') || errorMessage.includes('already drafted');
       if (isRaceCondition) {
@@ -2087,12 +2103,24 @@ const DraftRoom = () => {
           setSelectedPlayer(previousSelectedPlayer);
         }
         if (!isAutoDraft) {
-          toast({ title: "Error", description: `Failed to draft player: ${errorMessage}`, variant: "destructive" });
+          // Show user-friendly messages for common failure modes
+          const isTimeout = errorName === 'TimeoutError' || errorName === 'AbortError' || errorMessage.includes('timed out');
+          const isNetwork = errorMessage === 'Failed to fetch' || errorMessage.includes('Network');
+          const userMsg = isTimeout
+            ? 'Pick timed out. Please try again — the server may be busy.'
+            : isNetwork
+              ? 'Network error. Check your connection and try again.'
+              : `Failed to draft player: ${errorMessage}`;
+          toast({ title: "Error", description: userMsg, variant: "destructive" });
         }
       }
       // Don't throw - let draft continue
     } finally {
       setPickInProgress(false);
+      if (pickLockTimerRef.current) {
+        clearTimeout(pickLockTimerRef.current);
+        pickLockTimerRef.current = null;
+      }
     }
   };
 
@@ -2122,6 +2150,24 @@ const DraftRoom = () => {
       }
       autoPickInProgressRef.current = true;
       lastAutoPickedNumberRef.current = draftState.currentPick;
+
+      // Freshness check: verify server-side pick count before autopicking.
+      // The user's manual pick might be in-flight (retrying after 429/503).
+      // Without this check, the commissioner's autopick races the user's
+      // retry and the user gets autopicked while actively trying to pick.
+      try {
+        const { picks } = await DraftService.getDraftPicks(leagueId, user?.id || '');
+        const serverPickCount = picks.filter(p => !p.deleted_at).length;
+        if (serverPickCount >= draftState.currentPick) {
+          logger.log('handleAutoDraft: Server already has pick #' + draftState.currentPick + ', skipping autopick');
+          autoPickInProgressRef.current = false;
+          await loadDraftState();
+          return;
+        }
+      } catch {
+        // If freshness check fails, proceed with autopick — better to pick
+        // than to stall the entire draft waiting for a health check.
+      }
 
     // Get available (undrafted) players
     const undraftedPlayers = availablePlayers.filter(
