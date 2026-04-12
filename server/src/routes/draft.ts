@@ -10,8 +10,47 @@ import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
+import { logger } from '@citrus/shared';
 
 const draftRoutes = new Hono<Env>();
+
+/**
+ * Broadcast a draft pick to all clients via Supabase Broadcast (direct WebSocket).
+ * Fire-and-forget — postgres_changes is the reconciliation fallback.
+ *
+ * Supabase Broadcast: ~6ms median latency (direct WebSocket fan-out)
+ * vs postgres_changes: ~200-500ms (WAL → CDC → RLS → WebSocket)
+ *
+ * This is the core architectural fix for making the draft room feel instant
+ * like Yahoo/ESPN/Sleeper. See docs/LIVE_DRAFT_DISASTER_POSTMORTEM.md §3.
+ */
+function broadcastDraftPick(
+  leagueId: string,
+  pick: Record<string, unknown>,
+  isComplete: boolean,
+) {
+  try {
+    const admin = supabaseAdmin;
+    const channel = admin.channel(`draft_picks:${leagueId}`, {
+      config: { broadcast: { self: false } },
+    });
+    channel.subscribe((status) => {
+      if (status !== 'SUBSCRIBED') return;
+      channel
+        .send({
+          type: 'broadcast',
+          event: 'new_pick',
+          payload: { pick, isComplete },
+        })
+        .catch(() => {})
+        .finally(() => {
+          admin.removeChannel(channel);
+        });
+    });
+  } catch {
+    // Non-critical — postgres_changes delivers the pick as fallback
+  }
+}
 
 draftRoutes.use('*', authMiddleware);
 
@@ -140,6 +179,12 @@ draftRoutes.post('/league/:leagueId/pick', membershipMiddleware, validateBody(sc
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Draft pick failed'));
   }
 
+  // Fire-and-forget: broadcast the pick via Supabase Broadcast for instant delivery
+  // to all connected clients (~6ms vs ~200-500ms for postgres_changes).
+  if (pick) {
+    broadcastDraftPick(leagueId, pick as Record<string, unknown>, isComplete ?? false);
+  }
+
   // Fire-and-forget: update timerStartedAt so all clients reset their countdown.
   // Don't block the response — the client already sets an optimistic timestamp.
   (async () => {
@@ -265,6 +310,21 @@ draftRoutes.post('/league/:leagueId/autopick', membershipMiddleware, validateBod
 
   if (result.error) {
     return fail(c, AppError.badRequest(typeof result.error === 'string' ? result.error : 'Autopick failed'));
+  }
+
+  // Broadcast autopick via Supabase Broadcast for instant delivery
+  if (result.pickId && result.playerId) {
+    broadcastDraftPick(leagueId, {
+      id: result.pickId,
+      league_id: leagueId,
+      team_id: String(body.teamId),
+      player_id: String(result.playerId),
+      round_number: body.roundNumber,
+      pick_number: body.pickNumber,
+      picked_at: new Date().toISOString(),
+      draft_session_id: body.sessionId,
+      deleted_at: null,
+    }, false);
   }
 
   return ok(c, result);

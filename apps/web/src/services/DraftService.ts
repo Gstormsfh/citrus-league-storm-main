@@ -440,6 +440,25 @@ export const DraftService = {
   ) {
     const channel = supabase
       .channel(`draft_picks:${leagueId}`)
+      // ── FAST PATH: Supabase Broadcast (~6ms median latency) ──────────
+      // The server broadcasts picks directly via WebSocket after a successful
+      // makePick/autopick. This bypasses the postgres_changes pipeline entirely
+      // (WAL → CDC → RLS → WebSocket) which adds 200-500ms of latency.
+      // This is how Yahoo/ESPN/Sleeper achieve instant draft rooms.
+      .on(
+        'broadcast',
+        { event: 'new_pick' },
+        (payload) => {
+          const pick = payload.payload?.pick as DraftPick | undefined;
+          if (pick && !pick.deleted_at) {
+            callback(pick);
+          }
+        }
+      )
+      // ── SLOW PATH: postgres_changes (~200-500ms, reconciliation fallback) ─
+      // Kept as a safety net in case the broadcast is missed (e.g. server
+      // broadcast fails, or client reconnects mid-pick). The DraftRoom callback
+      // deduplicates via `alreadyHave` check, so double-delivery is harmless.
       .on(
         'postgres_changes',
         {
