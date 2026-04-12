@@ -197,11 +197,15 @@ export class AuctionService {
   }
 
   async getBidHistory(nominationId: string) {
+    // Limit to last 25 bids — clients poll this every 5-7s during active
+    // nominations, so returning the full history is wasteful when a
+    // nomination receives many bids.
     const { data, error } = await this.supabase
       .from('auction_bids')
       .select(COLUMNS.AUCTION_BID)
       .eq('nomination_id', nominationId)
-      .order('bid_amount', { ascending: false });
+      .order('bid_amount', { ascending: false })
+      .limit(25);
     return { bids: data ?? [], error };
   }
 

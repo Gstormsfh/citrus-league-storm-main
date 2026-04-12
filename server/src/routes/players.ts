@@ -130,9 +130,9 @@ playerRoutes.get('/projections/batch', authMiddleware, async (c) => {
     if (endDate) {
       query = query.lte('projection_date', endDate);
     }
-    if (season) {
-      query = query.eq('season', parseInt(season, 10));
-    }
+    // Default to current season so missing param doesn't return all
+    // historical projections (multiple rows per player × 82 games).
+    query = query.eq('season', season ? parseInt(season, 10) : CURRENT_SEASON);
 
     const { data, error } = await query;
 
@@ -251,13 +251,12 @@ playerRoutes.get('/:playerId/projections', authMiddleware, async (c) => {
     const { data, error } = await query;
 
     if (error) {
-      const errObj = error as { message: string; details?: string; hint?: string; code?: string };
-      logger.error(`[players/:id/projections] Supabase error for player ${playerId}:`, JSON.stringify({
-        message: errObj.message,
-        details: errObj.details,
-        hint: errObj.hint,
-        code: errObj.code,
-      }));
+      // PGRST116 = "no rows returned" — normal for players without projections.
+      // Only log actual errors to avoid flooding logs during draft room player opens.
+      const errObj = error as { message: string; code?: string };
+      if (errObj.code !== 'PGRST116') {
+        logger.error(`[players/:id/projections] Supabase error for player ${playerId}:`, errObj.message);
+      }
       return handleError(c, error, 'Failed to fetch projections');
     }
 

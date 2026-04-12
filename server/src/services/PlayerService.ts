@@ -193,10 +193,11 @@ export class PlayerService {
       .eq('season', CURRENT_SEASON)
       .range(0, 4999);
 
-    // Fetch goalie GSAx
+    // Fetch goalie GSAx (range matches the other three queries above)
     const { data: gsax } = await this.supabase
       .from('goalie_gsax_primary')
-      .select(COLUMNS.GOALIE_GSAX);
+      .select(COLUMNS.GOALIE_GSAX)
+      .range(0, 4999);
 
     const statsMap = new Map(((stats || []) as unknown as PlayerStatsRow[]).map((s) => [s.player_id, s]));
     const talentMap = new Map(((talents || []) as unknown as TalentMetricsRow[]).map((t) => [t.player_id, t]));

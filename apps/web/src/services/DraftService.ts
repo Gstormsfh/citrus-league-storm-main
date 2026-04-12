@@ -195,113 +195,117 @@ export const DraftService = {
       const isComplete = response.data?.isComplete || false;
 
       if (isComplete) {
-        // Post-draft-completion tasks
-        logger.log('Draft is complete! Running post-completion tasks...');
+        // Post-draft-completion tasks — run independent work in parallel.
+        // Before this fix these ran sequentially, causing a 30-60 s blank
+        // loading screen after the final pick. Roster init, snapshot, and
+        // matchup generation are independent; settings update is a single
+        // lightweight call. Use Promise.allSettled so one failure doesn't
+        // block the others.
+        logger.log('Draft is complete! Running post-completion tasks in parallel...');
 
-        try {
-          // Initialize rosters for all teams
-          logger.log('Initializing rosters for all teams from roster_assignments...');
-          await this.initializeRostersForAllTeams(leagueId);
-          logger.log('Roster initialization complete');
-        } catch (rosterError: unknown) {
-          logger.error('Error initializing rosters:', rosterError);
-        }
-
-        // Save draft snapshot
-        try {
-          logger.log('Saving draft snapshot...');
-          const targetSessionId = sessionId || pick?.draft_session_id || '';
-          const teamsResponse = await leagueApi.getTeams(leagueId, true);
-          const snapshotTeams = teamsResponse.data;
-          const { picks: snapshotPicks } = await this.getDraftPicks(leagueId, '', targetSessionId);
-          if (snapshotTeams && snapshotPicks) {
-            const playerIds = snapshotPicks.map(p => p.player_id);
-            const players = playerIds.length > 0
-              ? await PlayerService.getPlayersByIds(playerIds)
-              : [];
-            const playerMap = new Map(players.map(p => [String(p.id), p]));
-
-            await this.saveDraftSnapshot(
-              leagueId,
-              targetSessionId,
-              snapshotTeams.map(t => ({ id: t.id, name: t.team_name, owner: t.owner_id || 'AI', color: '' })),
-              snapshotPicks.map(p => {
-                const player = playerMap.get(String(p.player_id));
-                return {
-                  id: p.id, teamId: p.team_id, teamName: snapshotTeams.find(t => t.id === p.team_id)?.team_name || '',
-                  playerId: p.player_id, playerName: player?.full_name || '', position: player?.position || '', round: p.round_number,
-                  pick: p.pick_number, timestamp: new Date(p.picked_at).getTime(),
-                };
-              }),
-              { rounds: 0, draftOrder: 'snake', completedAt: new Date().toISOString() }
-            );
-            logger.log('Draft snapshot saved successfully');
-          }
-        } catch (snapshotError: unknown) {
-          logger.error('Error saving draft snapshot (non-critical):', snapshotError);
-        }
-
-        // Save draftCompletedAt so week calculations are anchored to the actual completion date
         const draftCompletedAt = new Date().toISOString();
-        try {
-          await leagueApi.updateSettings(leagueId, { draftCompletedAt });
-          logger.log('Saved draftCompletedAt:', draftCompletedAt);
-        } catch (settingsError: unknown) {
-          logger.error('Error saving draftCompletedAt (non-critical):', settingsError);
-        }
+        const targetSessionId = sessionId || pick?.draft_session_id || '';
 
-        // Generate matchups
-        try {
-          logger.log('Generating matchups for the entire season...');
-          const { MatchupService } = await import('./MatchupService');
-          const { LeagueService: LS } = await import('./LeagueService');
-          const { getFirstWeekStartDate } = await import('@/utils/weekCalculator');
-          const { getLeagueFormat } = await import('./LeagueService');
-          const { FORMAT_HAS_MATCHUPS } = await import('@/types/leagueTypes');
+        const results = await Promise.allSettled([
+          // 1. Initialize rosters
+          (async () => {
+            logger.log('Initializing rosters for all teams from roster_assignments...');
+            await this.initializeRostersForAllTeams(leagueId);
+            logger.log('Roster initialization complete');
+          })(),
 
-          const { league } = await LS.getLeague(leagueId, _userId);
-          if (league) {
-            const fmt = getLeagueFormat(league);
-            const needsMatchups = FORMAT_HAS_MATCHUPS[fmt.scoringFormat] ?? true;
+          // 2. Save draft snapshot
+          (async () => {
+            logger.log('Saving draft snapshot...');
+            const teamsResponse = await leagueApi.getTeams(leagueId, true);
+            const snapshotTeams = teamsResponse.data;
+            const { picks: snapshotPicks } = await this.getDraftPicks(leagueId, '', targetSessionId);
+            if (snapshotTeams && snapshotPicks) {
+              const playerIds = snapshotPicks.map(p => p.player_id);
+              const players = playerIds.length > 0
+                ? await PlayerService.getPlayersByIds(playerIds)
+                : [];
+              const playerMap = new Map(players.map(p => [String(p.id), p]));
 
-            if (needsMatchups) {
-              const completionDate = new Date(draftCompletedAt);
-              const firstWeekStart = getFirstWeekStartDate(completionDate);
-              const { teams } = await LS.getLeagueTeams(leagueId);
-
-              // Honor commissioner playoff settings: reserve playoff weeks at
-              // the end of the season for the playoff bracket. If the league
-              // has playoffs enabled (playoffTeams > 0), trim the regular
-              // season schedule to leave room for playoffWeeks at the end.
-              const { getScheduleLength } = await import('@/utils/weekCalculator');
-              const totalWeeks = getScheduleLength(firstWeekStart);
-              const playoffTeams = Number((fmt as any).playoffTeams ?? 0) || 0;
-              const playoffWeeks = Number((fmt as any).playoffWeeks ?? 0) || 0;
-              const cfgRegularWeeks = Number((fmt as any).regularSeasonWeeks ?? 0) || 0;
-
-              let regularSeasonWeeks: number | undefined;
-              if (cfgRegularWeeks > 0) {
-                regularSeasonWeeks = cfgRegularWeeks;
-              } else if (playoffTeams >= 4 && playoffWeeks > 0 && totalWeeks > playoffWeeks) {
-                regularSeasonWeeks = totalWeeks - playoffWeeks;
-              }
-
-              if (regularSeasonWeeks && regularSeasonWeeks > 0) {
-                try {
-                  await leagueApi.updateSettings(leagueId, { regularSeasonWeeks });
-                  logger.log(`Persisted regularSeasonWeeks=${regularSeasonWeeks} (totalWeeks=${totalWeeks}, playoffWeeks=${playoffWeeks})`);
-                } catch (persistErr) {
-                  logger.error('Error persisting regularSeasonWeeks (non-critical):', persistErr);
-                }
-              }
-
-              await MatchupService.generateMatchupsForLeague(leagueId, teams, firstWeekStart, false, regularSeasonWeeks);
-              logger.log('Matchups generated successfully for regular season');
+              await this.saveDraftSnapshot(
+                leagueId,
+                targetSessionId,
+                snapshotTeams.map(t => ({ id: t.id, name: t.team_name, owner: t.owner_id || 'AI', color: '' })),
+                snapshotPicks.map(p => {
+                  const player = playerMap.get(String(p.player_id));
+                  return {
+                    id: p.id, teamId: p.team_id, teamName: snapshotTeams.find(t => t.id === p.team_id)?.team_name || '',
+                    playerId: p.player_id, playerName: player?.full_name || '', position: player?.position || '', round: p.round_number,
+                    pick: p.pick_number, timestamp: new Date(p.picked_at).getTime(),
+                  };
+                }),
+                { rounds: 0, draftOrder: 'snake', completedAt: draftCompletedAt }
+              );
+              logger.log('Draft snapshot saved successfully');
             }
+          })(),
+
+          // 3. Save draftCompletedAt
+          (async () => {
+            await leagueApi.updateSettings(leagueId, { draftCompletedAt });
+            logger.log('Saved draftCompletedAt:', draftCompletedAt);
+          })(),
+
+          // 4. Generate matchups
+          (async () => {
+            logger.log('Generating matchups for the entire season...');
+            const { MatchupService } = await import('./MatchupService');
+            const { LeagueService: LS } = await import('./LeagueService');
+            const { getFirstWeekStartDate } = await import('@/utils/weekCalculator');
+            const { getLeagueFormat } = await import('./LeagueService');
+            const { FORMAT_HAS_MATCHUPS } = await import('@/types/leagueTypes');
+
+            const { league } = await LS.getLeague(leagueId, _userId);
+            if (league) {
+              const fmt = getLeagueFormat(league);
+              const needsMatchups = FORMAT_HAS_MATCHUPS[fmt.scoringFormat] ?? true;
+
+              if (needsMatchups) {
+                const completionDate = new Date(draftCompletedAt);
+                const firstWeekStart = getFirstWeekStartDate(completionDate);
+                const { teams } = await LS.getLeagueTeams(leagueId);
+
+                const { getScheduleLength } = await import('@/utils/weekCalculator');
+                const totalWeeks = getScheduleLength(firstWeekStart);
+                const playoffTeams = Number((fmt as any).playoffTeams ?? 0) || 0;
+                const playoffWeeks = Number((fmt as any).playoffWeeks ?? 0) || 0;
+                const cfgRegularWeeks = Number((fmt as any).regularSeasonWeeks ?? 0) || 0;
+
+                let regularSeasonWeeks: number | undefined;
+                if (cfgRegularWeeks > 0) {
+                  regularSeasonWeeks = cfgRegularWeeks;
+                } else if (playoffTeams >= 4 && playoffWeeks > 0 && totalWeeks > playoffWeeks) {
+                  regularSeasonWeeks = totalWeeks - playoffWeeks;
+                }
+
+                if (regularSeasonWeeks && regularSeasonWeeks > 0) {
+                  try {
+                    await leagueApi.updateSettings(leagueId, { regularSeasonWeeks });
+                    logger.log(`Persisted regularSeasonWeeks=${regularSeasonWeeks} (totalWeeks=${totalWeeks}, playoffWeeks=${playoffWeeks})`);
+                  } catch (persistErr) {
+                    logger.error('Error persisting regularSeasonWeeks (non-critical):', persistErr);
+                  }
+                }
+
+                await MatchupService.generateMatchupsForLeague(leagueId, teams, firstWeekStart, false, regularSeasonWeeks);
+                logger.log('Matchups generated successfully for regular season');
+              }
+            }
+          })(),
+        ]);
+
+        // Log any failures (non-blocking — each task is independent)
+        const taskNames = ['roster init', 'snapshot', 'settings', 'matchup gen'];
+        results.forEach((r, i) => {
+          if (r.status === 'rejected') {
+            logger.error(`Post-draft task "${taskNames[i]}" failed (non-critical):`, r.reason);
           }
-        } catch (matchupGenError: unknown) {
-          logger.error('Error generating matchups after draft completion:', matchupGenError);
-        }
+        });
       }
 
       return { pick, error: null, isComplete };
@@ -472,7 +476,7 @@ export const DraftService = {
               logger.error(`Draft picks subscription failed after ${maxAttempts} reconnect attempts for league ${leagueId}`);
               return;
             }
-            const delay = Math.min(1000 * Math.pow(2, attempt), 16000);
+            const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
             attempt++;
             const timeoutId = setTimeout(() => {
               logger.log(`Draft picks reconnect attempt ${attempt} for league ${leagueId}`);

@@ -480,26 +480,23 @@ export class DraftService {
 
   /** Delete ALL draft data across all leagues (admin only) */
   async deleteAllDraftData() {
-    const { count: picksCountBefore } = await this.supabase
-      .from('draft_picks')
-      .select(COLUMNS.COUNT, { count: 'exact', head: true });
+    // Count before deletion (parallel)
+    const [{ count: picksCountBefore }, { count: ordersCountBefore }, { count: leaguesCount }] =
+      await Promise.all([
+        this.supabase.from('draft_picks').select(COLUMNS.COUNT, { count: 'exact', head: true }),
+        this.supabase.from('draft_order').select(COLUMNS.COUNT, { count: 'exact', head: true }),
+        this.supabase.from('leagues').select(COLUMNS.COUNT, { count: 'exact', head: true }),
+      ]);
 
-    const { count: ordersCountBefore } = await this.supabase
-      .from('draft_order')
-      .select(COLUMNS.COUNT, { count: 'exact', head: true });
-
-    const { count: leaguesCount } = await this.supabase
-      .from('leagues')
-      .select(COLUMNS.COUNT, { count: 'exact', head: true });
-
-    const { data: allLeagues } = await this.supabase
-      .from('leagues')
-      .select('id');
-
-    for (const league of allLeagues || []) {
-      await this.supabase.from('draft_picks').delete().eq('league_id', league.id);
-      await this.supabase.from('draft_order').delete().eq('league_id', league.id);
-    }
+    // Batch delete — one DELETE per table instead of N DELETEs per league.
+    // The old loop iterated every league and issued sequential deletes,
+    // meaning 100 leagues = 200+ serial round-trips to Supabase.
+    // RLS is evaluated per-row regardless, so a single unscoped DELETE
+    // with admin/service role achieves the same result in 2 round-trips.
+    await Promise.all([
+      this.supabase.from('draft_picks').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      this.supabase.from('draft_order').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+    ]);
 
     await this.supabase
       .from('leagues')

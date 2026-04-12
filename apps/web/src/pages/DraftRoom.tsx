@@ -869,11 +869,21 @@ const DraftRoom = () => {
 
   // POLLING FALLBACK: safety net in case Supabase realtime drops.
   // Realtime handles the fast path; polling only catches missed events.
-  // 5s during active draft — fast enough to catch missed picks without overloading.
+  // 8s base + random jitter (0-2s) to avoid thundering-herd across 12 clients.
+  // (Was 5s fixed — with 12 clients that's 144 req/min. Now ~80 req/min.)
   useEffect(() => {
     if (draftPhase !== DraftPhase.ACTIVE || !leagueId || !user?.id) return;
 
-    const pollInterval = setInterval(async () => {
+    const POLL_BASE_MS = 8000;
+    const POLL_JITTER_MS = 2000;
+    let pollTimeout: ReturnType<typeof setTimeout>;
+
+    const schedulePoll = () => {
+      const delay = POLL_BASE_MS + Math.random() * POLL_JITTER_MS;
+      pollTimeout = setTimeout(doPoll, delay);
+    };
+
+    const doPoll = async () => {
       try {
         // Fetch picks and league in parallel to minimize latency
         const [picksResult, freshLeagueRes] = await Promise.all([
@@ -950,9 +960,13 @@ const DraftRoom = () => {
         // Silent fail - polling is best-effort
         logger.debug('DraftRoom: Poll error (non-critical):', err);
       }
-    }, 5000);
+      // Schedule next poll (recursive setTimeout with jitter instead of fixed setInterval)
+      schedulePoll();
+    };
 
-    return () => clearInterval(pollInterval);
+    schedulePoll();
+
+    return () => clearTimeout(pollTimeout);
   // Polling interval: only recreate when phase or identity changes. loadDraftState is not memoized —
   // including it would cause interval recreation on every render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1076,16 +1090,25 @@ const DraftRoom = () => {
     tick();
     const interval = setInterval(tick, 1000);
 
-    // Also poll bid history every 3 seconds for real-time transparency
+    // Poll bid history with jitter to avoid thundering herd.
+    // Was 3s fixed (240 req/nomination across 12 clients). Now ~5-7s with jitter.
     const loadBidHistory = async () => {
       if (!nomination.id) return;
       const bids = await AuctionDraftService.getBidHistory(nomination.id);
       setAuctionState(prev => prev ? { ...prev, bidHistory: bids.map(b => ({ team_id: b.team_id, bid_amount: b.bid_amount, created_at: b.created_at || '' })) } : prev);
     };
     loadBidHistory();
-    const bidPoll = setInterval(loadBidHistory, 3000);
+    let bidTimeout: ReturnType<typeof setTimeout>;
+    const scheduleBidPoll = () => {
+      const delay = 5000 + Math.random() * 2000; // 5-7s with jitter
+      bidTimeout = setTimeout(async () => {
+        await loadBidHistory();
+        scheduleBidPoll();
+      }, delay);
+    };
+    scheduleBidPoll();
 
-    return () => { clearInterval(interval); clearInterval(bidPoll); };
+    return () => { clearInterval(interval); clearTimeout(bidTimeout); };
   // Auction timer: re-creates interval when nomination changes (?.id, ?.expires_at).
   // auctionState.currentNomination is accessed via ?.id and ?.expires_at granularly.
   // userTeam.id is excluded to avoid restarting timer on team state updates.
@@ -1207,9 +1230,44 @@ const DraftRoom = () => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        // Exponential backoff reconnection — matches the draft picks channel.
+        // Without this, a dropped league status channel silently dies and the
+        // draft timer desynchronizes across clients.
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          const label = status === 'CHANNEL_ERROR' ? 'error' : 'timeout';
+          logger.warn(`League status subscription ${label} for league ${leagueId}, reconnecting...`);
+          let attempt = 0;
+          const maxAttempts = 5;
+          const tryReconnect = () => {
+            if (attempt >= maxAttempts) {
+              logger.error(`League status subscription failed after ${maxAttempts} attempts for league ${leagueId}`);
+              return;
+            }
+            const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
+            attempt++;
+            const tid = setTimeout(() => {
+              logger.log(`League status reconnect attempt ${attempt} for league ${leagueId}`);
+              supabase.removeChannel(channel);
+              channel.subscribe((retryStatus) => {
+                if (retryStatus === 'SUBSCRIBED') {
+                  logger.log(`League status reconnected for league ${leagueId}`);
+                } else if (retryStatus === 'CHANNEL_ERROR' || retryStatus === 'TIMED_OUT') {
+                  tryReconnect();
+                }
+              });
+            }, delay);
+            reconnectTimeouts.push(tid);
+          };
+          tryReconnect();
+        }
+      });
+
+    const reconnectTimeouts: ReturnType<typeof setTimeout>[] = [];
 
     return () => {
+      reconnectTimeouts.forEach(clearTimeout);
+      reconnectTimeouts.length = 0;
       supabase.removeChannel(channel);
     };
   // Supabase realtime subscription: league, draftPhase, teams, and resolveTeamOrder are accessed
@@ -1705,7 +1763,9 @@ const DraftRoom = () => {
     };
 
     updateTimer(); // Initial calculation
-    timerIntervalRef.current = setInterval(updateTimer, 1000);
+    // 500ms is smooth enough for a countdown but 50% less CPU than 1000ms.
+    // The timer reads Date.now() on each tick so display accuracy is unaffected.
+    timerIntervalRef.current = setInterval(updateTimer, 500);
     timerRunningRef.current = true;
 
     return cleanup;
