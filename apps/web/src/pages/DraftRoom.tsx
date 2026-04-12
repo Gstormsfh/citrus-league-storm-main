@@ -1311,7 +1311,7 @@ const DraftRoom = () => {
       const { state, error } = await DraftService.getDraftState(
         leagueId,
         teams,
-        league.draft_rounds,
+        league.draft_rounds || 21,
         user?.id
       );
 
@@ -1352,7 +1352,8 @@ const DraftRoom = () => {
         logger.warn('loadDraftState: nextTeamId is null, trying to fix...');
         // Try to get the first team from draft order
         try {
-          const { order } = await DraftService.getDraftOrder(leagueId, user.id, state.currentRound, state.sessionId);
+          const safeRound = Number.isFinite(state.currentRound) && state.currentRound >= 1 ? state.currentRound : 1;
+          const { order } = await DraftService.getDraftOrder(leagueId, user.id, safeRound, state.sessionId);
           if (order && order.team_order && order.team_order.length > 0) {
             const pickIndex = (state.currentPick - 1) % (teams?.length || 1);
             const correctTeamId = order.team_order[pickIndex];
@@ -1376,7 +1377,8 @@ const DraftRoom = () => {
           });
           // Try to fix by getting the draft order for current round
           try {
-            const { order } = await DraftService.getDraftOrder(leagueId, user.id, state.currentRound, state.sessionId);
+            const safeRound2 = Number.isFinite(state.currentRound) && state.currentRound >= 1 ? state.currentRound : 1;
+            const { order } = await DraftService.getDraftOrder(leagueId, user.id, safeRound2, state.sessionId);
             if (order && order.team_order && order.team_order.length > 0) {
               // DraftOrder has team_order array with team IDs
               const pickIndex = (state.currentPick - 1) % (teams?.length || 1);

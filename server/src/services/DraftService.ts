@@ -192,7 +192,15 @@ export class DraftService {
     });
 
     if (rpcError) {
-      // Fallback to direct insert
+      // RPC may fail with a race-condition message from the DB function.
+      // Surface these as clean 400s instead of falling through to a raw insert
+      // that would hit the same unique constraint and return an opaque Postgres error.
+      const rpcMsg = rpcError.message || '';
+      if (rpcMsg.includes('already drafted') || rpcMsg.includes('already taken')) {
+        return { pick: null, error: rpcMsg, isComplete: false };
+      }
+
+      // Fallback to direct insert for non-conflict RPC errors
       const { data: insertResult, error: insertError } = await this.supabase
         .from('draft_picks')
         .insert({
@@ -213,7 +221,15 @@ export class DraftService {
     }
 
     if (error) {
-      return { pick: null, error: error.message || error, isComplete: false };
+      // Translate unique constraint violations into user-friendly messages
+      const errMsg = (error.message || String(error));
+      if (errMsg.includes('idx_draft_picks_unique_player') || errMsg.includes('unique_player')) {
+        return { pick: null, error: 'Player already drafted', isComplete: false };
+      }
+      if (errMsg.includes('idx_draft_picks_unique_pick') || errMsg.includes('unique_pick')) {
+        return { pick: null, error: 'Pick number already used', isComplete: false };
+      }
+      return { pick: null, error: errMsg, isComplete: false };
     }
 
     // Run league status update + completion check in parallel

@@ -325,6 +325,9 @@ export const DraftService = {
     sessionId?: string
   ): Promise<{ state: DraftState | null; error: unknown }> {
     try {
+      // Guard against NaN/undefined totalRounds (caused /api/draft/.../order/NaN in prod)
+      const safeTotalRounds = Number.isFinite(totalRounds) && totalRounds >= 1 ? totalRounds : 21;
+
       // Get all active picks via API
       const { picks } = await this.getDraftPicks(leagueId, '', sessionId);
       const totalPicks = picks.length;
@@ -335,10 +338,10 @@ export const DraftService = {
       const currentRound = Math.floor(totalPicks / teams.length) + 1;
       const currentPick = totalPicks + 1;
 
-      if (currentRound > totalRounds) {
+      if (currentRound > safeTotalRounds) {
         return {
           state: {
-            currentRound: totalRounds,
+            currentRound: safeTotalRounds,
             currentPick: totalPicks,
             totalPicks,
             nextTeamId: null,
