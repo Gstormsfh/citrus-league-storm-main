@@ -1829,7 +1829,6 @@ const DraftRoom = () => {
   const handlePlayerDraft = async (player: Player, isAutoDraft: boolean = false) => {
     // Prevent double-click / concurrent picks
     if (pickInProgress && !isAutoDraft) return;
-    setPickInProgress(true);
 
     // ⚠️ DEMO STATE: Disable all draft actions
     if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
@@ -1840,11 +1839,11 @@ const DraftRoom = () => {
       }
       return;
     }
-    
-    logger.log('handlePlayerDraft called:', { 
-      leagueId, 
-      draftState, 
-      currentTeam, 
+
+    logger.log('handlePlayerDraft called:', {
+      leagueId,
+      draftState,
+      currentTeam,
       user: user?.id,
       player: player.full_name,
       isAutoDraft
@@ -1859,29 +1858,29 @@ const DraftRoom = () => {
     // If draft state is null, try to load it and use it directly
     let effectiveDraftState = draftState;
     let effectiveCurrentTeam = currentTeam;
-    
+
     if (!effectiveDraftState) {
       logger.log('handlePlayerDraft: Draft state is null, attempting to load...');
-      
+
       // Load draft state and get it directly (the function now returns the state)
       const loadedState = await loadDraftState();
-      
+
       if (!loadedState) {
         // State didn't load - show error
         toast({ title: "Error", description: "Draft state not loaded. Please ensure the draft has been started. If you just started the draft, please wait a moment and try again.", variant: "destructive" });
         logger.error('handlePlayerDraft: Missing draftState after load attempt');
         return;
       }
-      
+
       logger.log('handlePlayerDraft: Draft state loaded successfully');
       setDraftState(loadedState);
       effectiveDraftState = loadedState;
-      
+
       // Calculate current team from loaded state
       effectiveCurrentTeam = loadedState.nextTeamId
         ? teams.find(t => t.id === loadedState.nextTeamId) || null
         : null;
-        
+
       if (!effectiveCurrentTeam) {
         toast({ title: "Error", description: "Current team not found after loading draft state. Please try again.", variant: "destructive" });
         logger.error('handlePlayerDraft: Missing currentTeam after loading state', {
@@ -1891,13 +1890,13 @@ const DraftRoom = () => {
         return;
       }
     }
-    
+
     // Use effective state and team for the rest of the function
     if (!effectiveDraftState) {
       toast({ title: "Error", description: "Draft state not available. Please try again.", variant: "destructive" });
       return;
     }
-    
+
     if (!effectiveCurrentTeam) {
       toast({ title: "Error", description: "Current team not found. Please try again.", variant: "destructive" });
       return;
@@ -1923,6 +1922,10 @@ const DraftRoom = () => {
       toast({ title: "Player Unavailable", description: "This player has already been drafted!", variant: "destructive" });
       return;
     }
+
+    // Lock AFTER all validation — early returns above must NOT hold the lock
+    // or the UI gets permanently stuck (April 10 incident root cause).
+    setPickInProgress(true);
 
     // Optimistic update: show the pick immediately in the UI before the API call
     const previousSelectedPlayer = selectedPlayer;

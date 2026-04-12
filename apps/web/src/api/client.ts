@@ -26,9 +26,16 @@ interface ApiResponse<T = unknown> {
   };
 }
 
+// Default timeout for API requests (15 seconds). During the April 10
+// incident, Cloud Run 429/503 responses hung the fetch indefinitely,
+// locking the draft UI forever because the `finally` block that resets
+// the pick-in-progress state never ran.
+const DEFAULT_TIMEOUT_MS = 15_000;
+
 interface RequestOptions {
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 // ── Token refresh lock ──────────────────────────────────────────────────
@@ -112,11 +119,19 @@ async function doFetch(
 
   const url = `${API_BASE_URL}${path}`;
 
+  // Apply a timeout to prevent hung fetches from locking the UI forever.
+  // Callers can pass their own signal or override the timeout.
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  let signal = options?.signal;
+  if (!signal && typeof AbortSignal.timeout === 'function') {
+    signal = AbortSignal.timeout(timeoutMs);
+  }
+
   const response = await fetch(url, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
-    signal: options?.signal,
+    signal,
   });
 
   // Safely parse JSON — if the response is HTML (e.g. a proxy 404 page,
