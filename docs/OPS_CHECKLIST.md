@@ -169,6 +169,30 @@ to actually get watched.
 
 ---
 
+## 7. Consolidate duplicate `firebase.json`
+
+- [ ] Done (date + initials: ____________)
+
+**Why:** The repo ships two byte-identical `firebase.json` files — one at
+repo root (authoritative, used by `production-deploy.yml`) and one at
+`apps/web/firebase.json` (only used when an engineer runs
+`npm run deploy` from inside `apps/web/`). If they drift, local deploys
+ship a different CSP than production — the class of bug that made
+April 10 take two extra hours to diagnose.
+
+**Steps (code change, not console — tracked here because it's cleanup
+adjacent to §2 Blaze work):**
+
+1. Decide: keep root only (recommended — matches production CI).
+2. Delete `apps/web/firebase.json` and `apps/web/.firebaserc`.
+3. Update `apps/web/package.json` scripts:
+   - `"deploy": "npm run build && cd ../.. && firebase deploy --project citrus-fantasy-sports"`
+   - `"deploy:hosting": "cd ../.. && firebase deploy --only hosting --project citrus-fantasy-sports"`
+4. Verify: `npm run deploy --dry-run --workspace=apps/web` from repo root.
+5. Document in `CLAUDE.md`: "All Firebase config lives at repo root."
+
+---
+
 ## Ongoing: Secret rotation
 
 - [ ] Next rotation due: ____________
