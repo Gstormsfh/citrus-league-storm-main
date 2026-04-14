@@ -144,6 +144,9 @@ const DraftRoom = () => {
   const [snapshotCreatedAt, setSnapshotCreatedAt] = useState<string | undefined>(undefined);
   const [savingSnapshot, setSavingSnapshot] = useState(false);
   const [userAutoDraftEnabled, setUserAutoDraftEnabled] = useState(false);
+  // Realtime channel health — surfaces a banner when the draft-pick channel
+  // drops so users know their picks may stall. 'connected' = hidden.
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('connected');
   // State-driven confirmation dialog (replaces window.confirm which fails in mobile PWA)
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
@@ -754,7 +757,10 @@ const DraftRoom = () => {
   useEffect(() => {
     if (!leagueId || !user?.id) return;
 
-    const unsubscribe = DraftService.subscribeToDraftPicks(leagueId, user.id, async (newPick) => {
+    const unsubscribe = DraftService.subscribeToDraftPicks(
+      leagueId,
+      user.id,
+      async (newPick) => {
       logger.debug('DraftRoom: New pick received via realtime:', newPick);
 
       // Ignore own picks — handlePlayerDraft already updated local state optimistically,
@@ -857,7 +863,15 @@ const DraftRoom = () => {
           setDraftedPlayerIds(new Set(serverPicks.map(p => p.player_id)));
         }
       }).catch(err => logger.debug('DraftRoom: Background reconciliation error (non-critical):', err));
-    });
+      },
+      undefined,
+      (status) => {
+        // Surface channel health to the UI. Polling (see effect below)
+        // continues regardless, so even 'disconnected' is degraded, not
+        // broken — but the user needs to know picks are not instant.
+        setRealtimeStatus(status);
+      },
+    );
 
     return () => {
       unsubscribe();
@@ -3344,6 +3358,19 @@ const DraftRoom = () => {
   // ALWAYS render something - never return null
   return (
     <div className="min-h-screen bg-[#D4E8B8] relative touch-manipulation overflow-x-clip">
+      {/* Realtime connection banner — surfaces when the draft-pick channel
+          drops so users know their draft isn't silently stalled.
+          'connected' is the quiescent state; we don't render anything. */}
+      {realtimeStatus === 'reconnecting' && (
+        <div className="sticky top-0 z-50 bg-amber-500 text-black text-sm font-semibold px-4 py-2 text-center shadow-md pt-[env(safe-area-inset-top)]">
+          Reconnecting to draft — your picks may be delayed for a few seconds.
+        </div>
+      )}
+      {realtimeStatus === 'disconnected' && (
+        <div className="sticky top-0 z-50 bg-red-600 text-white text-sm font-semibold px-4 py-2 text-center shadow-md pt-[env(safe-area-inset-top)]">
+          Lost connection to draft. Refresh the page to reconnect. Your picks will not arrive in real time until you do.
+        </div>
+      )}
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">

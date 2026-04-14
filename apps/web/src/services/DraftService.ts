@@ -431,12 +431,23 @@ export const DraftService = {
   /**
    * Subscribe to draft picks changes (realtime)
    * NOTE: Stays on Supabase — realtime channels don't go through REST
+   *
+   * @param callback Invoked for every new/updated pick.
+   * @param _sessionId Reserved for future session-scoped filtering.
+   * @param onStatus Optional connection status callback. Called whenever
+   *   the channel transitions. Values:
+   *   - `'connected'` — first successful subscribe, or after a reconnect.
+   *   - `'reconnecting'` — we saw CHANNEL_ERROR/TIMED_OUT and are
+   *     backing off. Surface a banner to the user.
+   *   - `'disconnected'` — exhausted reconnect attempts. Picks will not
+   *     arrive until the user refreshes. Show a hard-fail banner.
    */
   subscribeToDraftPicks(
     leagueId: string,
     _userId: string,
     callback: (pick: DraftPick) => void,
-    _sessionId?: string
+    _sessionId?: string,
+    onStatus?: (status: 'connected' | 'reconnecting' | 'disconnected') => void,
   ) {
     const channel = supabase
       .channel(`draft_picks:${leagueId}`)
@@ -487,15 +498,21 @@ export const DraftService = {
         }
       )
       .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          onStatus?.('connected');
+          return;
+        }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           const label = status === 'CHANNEL_ERROR' ? 'error' : 'timeout';
           logger.warn(`Draft picks subscription ${label} for league ${leagueId}, reconnecting...`);
+          onStatus?.('reconnecting');
           // Exponential backoff reconnection: remove broken channel and re-subscribe
           let attempt = 0;
           const maxAttempts = 5;
           const tryReconnect = () => {
             if (attempt >= maxAttempts) {
               logger.error(`Draft picks subscription failed after ${maxAttempts} reconnect attempts for league ${leagueId}`);
+              onStatus?.('disconnected');
               return;
             }
             const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
@@ -506,6 +523,7 @@ export const DraftService = {
               channel.subscribe((retryStatus) => {
                 if (retryStatus === 'SUBSCRIBED') {
                   logger.log(`Draft picks reconnected for league ${leagueId}`);
+                  onStatus?.('connected');
                 } else if (retryStatus === 'CHANNEL_ERROR' || retryStatus === 'TIMED_OUT') {
                   tryReconnect();
                 }
