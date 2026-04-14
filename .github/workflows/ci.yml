@@ -181,6 +181,73 @@ jobs:
 
           echo "PASS — dist PNGs within budget."
 
+      # Hard total-bundle gzipped budget — extends the PNG gate to cover
+      # every file in dist/. Postmortem P2: `dist/**` ≤ 5 MB gzipped.
+      #
+      # Why gzipped: the browser downloads the gzipped payload over the
+      # wire, so that's the number that actually hits the user's connection
+      # and Firebase's egress bill. A 3.38 MB PNG directory is 3.38 MB on
+      # disk AND on the wire because PNGs are already compressed — but a
+      # 2 MB JS bundle might compress to 400 KB. Measuring gzipped gives a
+      # fair budget across file types.
+      #
+      # Failure mode: HARD exit 1. The existing PNG gate catches the
+      # specific April 10 regression (image bloat); this gate catches
+      # the broader "we shipped a giant bundle" category.
+      - name: Dist total gzipped budget (dist/** ≤ 5 MB gzipped)
+        run: |
+          set -euo pipefail
+          BUDGET_BYTES=$((5 * 1024 * 1024))
+          dist_dir="apps/web/dist"
+
+          if [ ! -d "$dist_dir" ]; then
+            echo "::error::Expected $dist_dir to exist after build step"
+            exit 1
+          fi
+
+          # Sum gzipped bytes across every file in dist/. Skip files that
+          # don't benefit from gzip (already-compressed PNG/JPG/WOFF2) —
+          # for those, count raw size since the browser won't re-compress.
+          total=0
+          count=0
+          while IFS= read -r -d '' file; do
+            case "$file" in
+              *.png|*.jpg|*.jpeg|*.webp|*.woff|*.woff2|*.gz|*.br|*.ico)
+                size=$(stat --format=%s "$file")
+                ;;
+              *)
+                size=$(gzip -c -9 "$file" | wc -c)
+                ;;
+            esac
+            total=$((total + size))
+            count=$((count + 1))
+          done < <(find "$dist_dir" -type f -print0)
+
+          total_kb=$((total / 1024))
+          budget_kb=$((BUDGET_BYTES / 1024))
+
+          echo "=== Dist Total Gzipped Budget Report ==="
+          echo "Scope:  $dist_dir/**"
+          echo "Files:  $count"
+          echo "Total:  ${total_kb} KB gzipped"
+          echo "Budget: ${budget_kb} KB gzipped"
+          echo ""
+
+          if [ "$total" -gt "$BUDGET_BYTES" ]; then
+            echo "::error::dist/** totals ${total_kb} KB gzipped, exceeds ${budget_kb} KB budget"
+            echo ""
+            echo "Top 10 largest files in $dist_dir (raw bytes):"
+            find "$dist_dir" -type f -printf '%s  %p\n' \
+              | sort -nr \
+              | head -10 \
+              | awk '{ printf "  %10d bytes  %s\n", $1, $2 }'
+            echo ""
+            echo "See docs/LIVE_DRAFT_DISASTER_POSTMORTEM.md P2 for context."
+            exit 1
+          fi
+
+          echo "PASS — dist total within gzipped budget."
+
   build-server:
     name: Build (Server)
     runs-on: ubuntu-latest
