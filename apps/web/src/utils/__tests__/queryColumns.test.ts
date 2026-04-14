@@ -18,6 +18,11 @@ import {
   MATCHUP_LINES_COLUMNS_SLIM,
   COUNT_ONLY,
 } from '../queryColumns';
+// Server-side goalie column constant (postmortem §2 tripwire below).
+// This imports from the shared package where GOALIE_GSAX_COLUMNS actually
+// lives — the web-side queryColumns.ts is a legacy copy that does not
+// query the goalie table directly.
+import { GOALIE_GSAX_COLUMNS } from '@citrus/shared';
 
 /** Parse a column string into a set of trimmed column names */
 function parseColumns(columnStr: string): Set<string> {
@@ -62,6 +67,41 @@ describe('COLUMNS object exports', () => {
 
   it('COUNT_ONLY equals "id"', () => {
     expect(COUNT_ONLY).toBe('id');
+  });
+});
+
+// =============================================================================
+// Regression tripwire — COLUMNS.GOALIE_GSAX schema shape
+// =============================================================================
+//
+// April 10 2026 live draft disaster (postmortem §2): COLUMNS.GOALIE_GSAX was
+// set to `'player_id, gsax'`, selecting two columns that do not exist on the
+// `goalie_gsax_primary` table. Every goalie player card returned a 500.
+//
+// The real schema (see supabase/migrations/20250114000001_create_goalie_gsax_
+// primary_table.sql) is `goalie_id` + `raw_gsax` + `regressed_gsax` + ...
+// This tripwire catches the next accidental rename / typo before it ships.
+// A real schema-aware integration test is P1 work; this is the unit-test
+// stopgap.
+
+describe('GOALIE_GSAX column tripwire (postmortem §2 regression)', () => {
+  it('selects goalie_id as the join key', () => {
+    expect(GOALIE_GSAX_COLUMNS.startsWith('goalie_id')).toBe(true);
+  });
+
+  it('selects the Bayesian-regressed value, not the raw value alone', () => {
+    expect(GOALIE_GSAX_COLUMNS).toContain('regressed_gsax');
+  });
+
+  it('does NOT reference player_id (the April 10 bug)', () => {
+    // Use word-boundary check so `goalie_id` doesn't accidentally match.
+    expect(/\bplayer_id\b/.test(GOALIE_GSAX_COLUMNS)).toBe(false);
+  });
+
+  it('does NOT select a bare `gsax` column (the April 10 bug)', () => {
+    // Word-boundary so we don't match `regressed_gsax` or `raw_gsax`.
+    const tokens = GOALIE_GSAX_COLUMNS.split(',').map((c) => c.trim());
+    expect(tokens).not.toContain('gsax');
   });
 });
 
