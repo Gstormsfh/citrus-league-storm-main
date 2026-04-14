@@ -27,6 +27,21 @@ jobs:
 
       - run: npm ci
 
+      # ── Change freeze guard ─────────────────────────────────────────
+      # Blocks production deploys within 24 hours of any scheduled live
+      # draft. See docs/LIVE_DRAFT_DISASTER_POSTMORTEM.md §4 — ten deploys
+      # in 2.5 hours before the inaugural draft is how a combination of
+      # latent bugs became a production incident.
+      #
+      # Emergency bypass: set OVERRIDE_DRAFT_FREEZE=1 in the workflow env.
+      # Must be justified in the commit message.
+      - name: Change freeze guard (24h before any scheduled draft)
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OVERRIDE_DRAFT_FREEZE: ${{ vars.OVERRIDE_DRAFT_FREEZE }}
+        run: npx tsx scripts/check_draft_freeze.ts
+
       - name: Lint
         run: cd apps/web && npx eslint src/
 
