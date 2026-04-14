@@ -1,0 +1,46 @@
+name: RLS Audit
+
+# Weekly audit of RLS SELECT policies in the public schema. Fires a
+# hard failure if any permissive (`USING (true)`) policy exists on a
+# table that isn't in the allowlist in scripts/audit_rls.ts.
+#
+# The April 10 2026 cross-league notification leak (postmortem §5) was
+# enabled in part by the "permissive SELECT + realtime filter"
+# anti-pattern. This audit is the tripwire for that class of bug — it
+# won't catch a realtime-filter bug on its own, but it stops tables
+# from drifting into the permissive-SELECT camp in the first place.
+#
+# Also wired to workflow_dispatch so engineers can run it ad hoc
+# after landing RLS changes.
+
+on:
+  schedule:
+    - cron: '0 13 * * 1'  # Mondays 07:00 MT (13:00 UTC) — start-of-week review
+  workflow_dispatch:
+  # Also run on PRs that touch migrations, so a new `USING (true)`
+  # doesn't silently land.
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/audit_rls.ts'
+
+jobs:
+  audit:
+    name: RLS Policy Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run RLS audit
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx scripts/audit_rls.ts
