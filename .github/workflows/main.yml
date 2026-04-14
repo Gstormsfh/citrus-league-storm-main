@@ -9,19 +9,27 @@ jobs:
   calculate:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
-      
-      - run: pip install -r requirements.txt
-      
+          cache-dependency-path: 'data-pipeline/requirements.txt'
+
+      # The Python package imports resolve as `data_pipeline.*` (underscore).
+      # A symlink `data_pipeline -> data-pipeline` exists at the repo root so
+      # `python data-pipeline/projections/...` runs with the package importable
+      # from CWD. Do not rename — every Python entry point depends on it.
+      - run: pip install -r data-pipeline/requirements.txt
+
+      # Align with ci.yml / production-deploy.yml secret names. The script
+      # reads VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY from env
+      # (see data-pipeline/projections/nightly_projection_batch.py lines 78-81).
       - name: Run nightly projections
         env:
-          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: python scripts/nightly_projection_batch.py --season 2025
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python data-pipeline/projections/nightly_projection_batch.py --season 2025

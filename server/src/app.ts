@@ -22,7 +22,7 @@ import { accountRoutes } from './routes/account';
 import { publicRoutes } from './routes/public';
 import { poolRoutes } from './routes/pools';
 import { authRoutes } from './routes/auth';
-import { standardRateLimit, strictRateLimit } from './middleware/rateLimit';
+import { standardRateLimit, strictRateLimit, authRateLimit } from './middleware/rateLimit';
 import { requestContextMiddleware } from './middleware/requestContext';
 import { metricsMiddleware, metrics } from './middleware/metrics';
 import { cacheControlMiddleware } from './middleware/cacheControl';
@@ -71,6 +71,11 @@ app.use('/api/*', cacheControlMiddleware);
 app.use('/api/*', standardRateLimit);
 // Stricter limit on AI chat — 10 req/min per IP
 app.use('/api/stormy/*', strictRateLimit);
+// Strict brute-force protection on signup/login — 5 req/min per IP
+// Applied per-path (not per-prefix) because /api/auth/* may grow to
+// include non-mutating endpoints later; we explicitly protect the
+// mutating ones here so the decision is traceable.
+app.use('/api/auth/signup', authRateLimit);
 
 // ── Health check — no auth required ──────────────────────────────────
 app.get('/api/health', async (c) => {

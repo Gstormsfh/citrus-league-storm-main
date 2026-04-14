@@ -192,7 +192,15 @@ export class DraftService {
     });
 
     if (rpcError) {
-      // Fallback to direct insert
+      // RPC may fail with a race-condition message from the DB function.
+      // Surface these as clean 400s instead of falling through to a raw insert
+      // that would hit the same unique constraint and return an opaque Postgres error.
+      const rpcMsg = rpcError.message || '';
+      if (rpcMsg.includes('already drafted') || rpcMsg.includes('already taken')) {
+        return { pick: null, error: rpcMsg, isComplete: false };
+      }
+
+      // Fallback to direct insert for non-conflict RPC errors
       const { data: insertResult, error: insertError } = await this.supabase
         .from('draft_picks')
         .insert({
@@ -213,7 +221,15 @@ export class DraftService {
     }
 
     if (error) {
-      return { pick: null, error: error.message || error, isComplete: false };
+      // Translate unique constraint violations into user-friendly messages
+      const errMsg = (error.message || String(error));
+      if (errMsg.includes('idx_draft_picks_unique_player') || errMsg.includes('unique_player')) {
+        return { pick: null, error: 'Player already drafted', isComplete: false };
+      }
+      if (errMsg.includes('idx_draft_picks_unique_pick') || errMsg.includes('unique_pick')) {
+        return { pick: null, error: 'Pick number already used', isComplete: false };
+      }
+      return { pick: null, error: errMsg, isComplete: false };
     }
 
     // Run league status update + completion check in parallel
@@ -480,26 +496,23 @@ export class DraftService {
 
   /** Delete ALL draft data across all leagues (admin only) */
   async deleteAllDraftData() {
-    const { count: picksCountBefore } = await this.supabase
-      .from('draft_picks')
-      .select(COLUMNS.COUNT, { count: 'exact', head: true });
+    // Count before deletion (parallel)
+    const [{ count: picksCountBefore }, { count: ordersCountBefore }, { count: leaguesCount }] =
+      await Promise.all([
+        this.supabase.from('draft_picks').select(COLUMNS.COUNT, { count: 'exact', head: true }),
+        this.supabase.from('draft_order').select(COLUMNS.COUNT, { count: 'exact', head: true }),
+        this.supabase.from('leagues').select(COLUMNS.COUNT, { count: 'exact', head: true }),
+      ]);
 
-    const { count: ordersCountBefore } = await this.supabase
-      .from('draft_order')
-      .select(COLUMNS.COUNT, { count: 'exact', head: true });
-
-    const { count: leaguesCount } = await this.supabase
-      .from('leagues')
-      .select(COLUMNS.COUNT, { count: 'exact', head: true });
-
-    const { data: allLeagues } = await this.supabase
-      .from('leagues')
-      .select('id');
-
-    for (const league of allLeagues || []) {
-      await this.supabase.from('draft_picks').delete().eq('league_id', league.id);
-      await this.supabase.from('draft_order').delete().eq('league_id', league.id);
-    }
+    // Batch delete — one DELETE per table instead of N DELETEs per league.
+    // The old loop iterated every league and issued sequential deletes,
+    // meaning 100 leagues = 200+ serial round-trips to Supabase.
+    // RLS is evaluated per-row regardless, so a single unscoped DELETE
+    // with admin/service role achieves the same result in 2 round-trips.
+    await Promise.all([
+      this.supabase.from('draft_picks').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      this.supabase.from('draft_order').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+    ]);
 
     await this.supabase
       .from('leagues')

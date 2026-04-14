@@ -26,9 +26,21 @@ interface ApiResponse<T = unknown> {
   };
 }
 
+// Default timeout for API requests (15 seconds). During the April 10
+// incident, Cloud Run 429/503 responses hung the fetch indefinitely,
+// locking the draft UI forever because the `finally` block that resets
+// the pick-in-progress state never ran.
+const DEFAULT_TIMEOUT_MS = 15_000;
+
+// Transient HTTP status codes that should be retried automatically.
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+
 interface RequestOptions {
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  timeoutMs?: number;
+  /** Max retry attempts for transient errors (429/503/timeout). Default 2. */
+  retries?: number;
 }
 
 // ── Token refresh lock ──────────────────────────────────────────────────
@@ -112,11 +124,19 @@ async function doFetch(
 
   const url = `${API_BASE_URL}${path}`;
 
+  // Apply a timeout to prevent hung fetches from locking the UI forever.
+  // Callers can pass their own signal or override the timeout.
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  let signal = options?.signal;
+  if (!signal && typeof AbortSignal.timeout === 'function') {
+    signal = AbortSignal.timeout(timeoutMs);
+  }
+
   const response = await fetch(url, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
-    signal: options?.signal,
+    signal,
   });
 
   // Safely parse JSON — if the response is HTML (e.g. a proxy 404 page,
@@ -137,27 +157,68 @@ async function request<T = unknown>(
   body?: unknown,
   options?: RequestOptions
 ): Promise<ApiResponse<T>> {
-  const token = await getAuthToken();
-  let { response, json } = await doFetch(method, path, token, body, options);
+  const maxAttempts = (options?.retries ?? 2) + 1; // retries + initial attempt
+  let lastError: ApiError | null = null;
 
-  // On 401, try refreshing the session and retry once.
-  // Uses a lock so concurrent 401s share a single refreshSession() call.
-  if (response.status === 401 && token) {
-    const newToken = await refreshTokenOnce();
-    if (newToken && newToken !== token) {
-      ({ response, json } = await doFetch(method, path, newToken, body, options));
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const token = await getAuthToken();
+      let { response, json } = await doFetch(method, path, token, body, options);
+
+      // On 401, try refreshing the session and retry once.
+      if (response.status === 401 && token) {
+        const newToken = await refreshTokenOnce();
+        if (newToken && newToken !== token) {
+          ({ response, json } = await doFetch(method, path, newToken, body, options));
+        }
+      }
+
+      // Retryable server error — back off and try again
+      if (RETRYABLE_STATUSES.has(response.status) && attempt < maxAttempts) {
+        const backoff = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+        await new Promise(r => setTimeout(r, backoff));
+        lastError = new ApiError(
+          `Server returned ${response.status}`,
+          response.status,
+          json,
+        );
+        continue;
+      }
+
+      if (!response.ok) {
+        const fallback = `API request failed with status ${response.status}`;
+        const errorMsg = typeof json.error === 'string'
+          ? json.error
+          : json.error?.message || json.message || fallback;
+        throw new ApiError(errorMsg, response.status, json);
+      }
+
+      return json;
+    } catch (err) {
+      // Timeout (AbortError) or network error — retry with backoff
+      if (
+        attempt < maxAttempts &&
+        err instanceof Error &&
+        (err.name === 'TimeoutError' || err.name === 'AbortError' || err.message === 'Failed to fetch')
+      ) {
+        const backoff = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+        await new Promise(r => setTimeout(r, backoff));
+        lastError = err instanceof ApiError
+          ? err
+          : new ApiError(
+              err.name === 'TimeoutError' || err.name === 'AbortError'
+                ? 'Request timed out — retrying'
+                : 'Network error — retrying',
+              0,
+            );
+        continue;
+      }
+      throw err;
     }
   }
 
-  if (!response.ok) {
-    const fallback = `API request failed with status ${response.status}`;
-    const errorMsg = typeof json.error === 'string'
-      ? json.error
-      : json.error?.message || json.message || fallback;
-    throw new ApiError(errorMsg, response.status, json);
-  }
-
-  return json;
+  // All retries exhausted
+  throw lastError || new ApiError('Request failed after retries', 0);
 }
 
 export class ApiError extends Error {

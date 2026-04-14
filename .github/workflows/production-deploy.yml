@@ -27,6 +27,21 @@ jobs:
 
       - run: npm ci
 
+      # ── Change freeze guard ─────────────────────────────────────────
+      # Blocks production deploys within 24 hours of any scheduled live
+      # draft. See docs/LIVE_DRAFT_DISASTER_POSTMORTEM.md §4 — ten deploys
+      # in 2.5 hours before the inaugural draft is how a combination of
+      # latent bugs became a production incident.
+      #
+      # Emergency bypass: set OVERRIDE_DRAFT_FREEZE=1 in the workflow env.
+      # Must be justified in the commit message.
+      - name: Change freeze guard (24h before any scheduled draft)
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OVERRIDE_DRAFT_FREEZE: ${{ vars.OVERRIDE_DRAFT_FREEZE }}
+        run: npx tsx scripts/check_draft_freeze.ts
+
       - name: Lint
         run: cd apps/web && npx eslint src/
 
@@ -146,14 +161,24 @@ jobs:
             SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
             SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
             SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # ── Cloud Run scaling config ────────────────────────────────
+          # These flags MUST stay in sync with ops/cloudrun/service.yaml.
+          # The April 10 disaster (LIVE_DRAFT_DISASTER_POSTMORTEM.md §3)
+          # was caused by the default values below (512Mi, maxScale=3,
+          # minScale=0) — cold start + three-instance cap + half a gig of
+          # RAM under 12-owner live-draft fan-out hit 429/503 territory
+          # immediately. Every push to master was silently resetting the
+          # service back to these disaster values. Never downgrade.
           flags: >-
             --allow-unauthenticated
-            --memory=512Mi
-            --cpu=1
-            --min-instances=0
-            --max-instances=3
+            --memory=2Gi
+            --cpu=2
+            --min-instances=1
+            --max-instances=10
             --concurrency=80
             --timeout=60s
+            --no-cpu-throttling
+            --cpu-boost
 
       - name: API health check
         if: steps.check-gcp.outputs.has_creds == 'true'

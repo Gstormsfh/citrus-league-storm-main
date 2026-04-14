@@ -206,13 +206,21 @@ describe('NotificationService', () => {
   // subscribeToNotifications (still uses Supabase realtime directly)
   // ---------------------------------------------------------------------------
   describe('subscribeToNotifications', () => {
-    it('returns an unsubscribe function', () => {
+    // Helper: wire up a fresh channel mock that captures the handler and the
+    // filter config passed to `.on(...)`, and return the spies so each test
+    // can assert on them independently.
+    function setupChannelMock() {
       const mockChannelObj: Record<string, any> = {
         on: vi.fn().mockReturnThis(),
         subscribe: vi.fn(),
       };
       mockChannelObj.subscribe.mockReturnValue(mockChannelObj);
       mockChannel.mockReturnValue(mockChannelObj);
+      return mockChannelObj;
+    }
+
+    it('returns an unsubscribe function', () => {
+      const mockChannelObj = setupChannelMock();
 
       const callback = vi.fn();
       const unsubscribe = NotificationService.subscribeToNotifications(
@@ -236,6 +244,92 @@ describe('NotificationService', () => {
       // Test unsubscribe calls removeChannel
       unsubscribe();
       expect(mockRemoveChannel).toHaveBeenCalledWith(mockChannelObj);
+    });
+
+    // -------------------------------------------------------------------------
+    // Regression: April 10 2026 live draft disaster, postmortem §1.
+    // The old filter `league_id=eq.X,user_id=eq.Y` was not an AND — Supabase
+    // Realtime parses that as a single malformed predicate and silently
+    // degrades the subscription to "every row the JWT can SELECT", which
+    // leaked notifications across leagues. The filter must scope by a single
+    // predicate and the league check must happen client-side in the callback.
+    // See docs/LIVE_DRAFT_DISASTER_POSTMORTEM.md.
+    // -------------------------------------------------------------------------
+    it('passes a single-predicate filter with no comma (postmortem §1 regression)', () => {
+      const mockChannelObj = setupChannelMock();
+
+      NotificationService.subscribeToNotifications('league-1', 'user-1', vi.fn());
+
+      expect(mockChannelObj.on).toHaveBeenCalledTimes(1);
+      const config = mockChannelObj.on.mock.calls[0][1] as { filter: string };
+      expect(config.filter).toBeDefined();
+      // A literal comma in a postgres_changes filter is the exact bug we
+      // are regressing against. Never ship one.
+      expect(config.filter).not.toContain(',');
+      // The single predicate must scope to the user, not the league (the
+      // league check moves into the callback).
+      expect(config.filter).toBe('user_id=eq.user-1');
+    });
+
+    it('does NOT forward notifications from a different league (postmortem §1 regression)', () => {
+      const mockChannelObj = setupChannelMock();
+      const callback = vi.fn();
+
+      NotificationService.subscribeToNotifications('league-1', 'user-1', callback);
+
+      // Grab the handler the service registered with the channel
+      const handler = mockChannelObj.on.mock.calls[0][2] as (
+        payload: { eventType: string; new: Record<string, unknown> }
+      ) => void;
+
+      // Simulate a realtime INSERT event for user-1 but in a DIFFERENT league.
+      // Pre-fix: this leaked to the callback. Post-fix: it must be dropped.
+      handler({
+        eventType: 'INSERT',
+        new: {
+          id: 'notif-leak',
+          league_id: 'league-2',
+          user_id: 'user-1',
+          type: 'TRADE',
+          title: 'Leak attempt',
+          message: 'You should never see this',
+          metadata: {},
+          read_status: false,
+          created_at: '2026-04-10T20:00:00Z',
+          read_at: null,
+        },
+      });
+
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('DOES forward notifications from the same league', () => {
+      const mockChannelObj = setupChannelMock();
+      const callback = vi.fn();
+
+      NotificationService.subscribeToNotifications('league-1', 'user-1', callback);
+
+      const handler = mockChannelObj.on.mock.calls[0][2] as (
+        payload: { eventType: string; new: Record<string, unknown> }
+      ) => void;
+
+      const notification = {
+        id: 'notif-legit',
+        league_id: 'league-1',
+        user_id: 'user-1',
+        type: 'TRADE',
+        title: 'Trade offer',
+        message: 'You received a trade offer',
+        metadata: {},
+        read_status: false,
+        created_at: '2026-04-10T20:00:00Z',
+        read_at: null,
+      };
+
+      handler({ eventType: 'INSERT', new: notification });
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith(notification);
     });
   });
 });

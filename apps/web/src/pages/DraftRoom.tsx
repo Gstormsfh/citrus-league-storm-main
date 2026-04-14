@@ -144,6 +144,9 @@ const DraftRoom = () => {
   const [snapshotCreatedAt, setSnapshotCreatedAt] = useState<string | undefined>(undefined);
   const [savingSnapshot, setSavingSnapshot] = useState(false);
   const [userAutoDraftEnabled, setUserAutoDraftEnabled] = useState(false);
+  // Realtime channel health — surfaces a banner when the draft-pick channel
+  // drops so users know their picks may stall. 'connected' = hidden.
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('connected');
   // State-driven confirmation dialog (replaces window.confirm which fails in mobile PWA)
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
@@ -754,7 +757,10 @@ const DraftRoom = () => {
   useEffect(() => {
     if (!leagueId || !user?.id) return;
 
-    const unsubscribe = DraftService.subscribeToDraftPicks(leagueId, user.id, async (newPick) => {
+    const unsubscribe = DraftService.subscribeToDraftPicks(
+      leagueId,
+      user.id,
+      async (newPick) => {
       logger.debug('DraftRoom: New pick received via realtime:', newPick);
 
       // Ignore own picks — handlePlayerDraft already updated local state optimistically,
@@ -857,7 +863,15 @@ const DraftRoom = () => {
           setDraftedPlayerIds(new Set(serverPicks.map(p => p.player_id)));
         }
       }).catch(err => logger.debug('DraftRoom: Background reconciliation error (non-critical):', err));
-    });
+      },
+      undefined,
+      (status) => {
+        // Surface channel health to the UI. Polling (see effect below)
+        // continues regardless, so even 'disconnected' is degraded, not
+        // broken — but the user needs to know picks are not instant.
+        setRealtimeStatus(status);
+      },
+    );
 
     return () => {
       unsubscribe();
@@ -869,11 +883,21 @@ const DraftRoom = () => {
 
   // POLLING FALLBACK: safety net in case Supabase realtime drops.
   // Realtime handles the fast path; polling only catches missed events.
-  // 5s during active draft — fast enough to catch missed picks without overloading.
+  // 8s base + random jitter (0-2s) to avoid thundering-herd across 12 clients.
+  // (Was 5s fixed — with 12 clients that's 144 req/min. Now ~80 req/min.)
   useEffect(() => {
     if (draftPhase !== DraftPhase.ACTIVE || !leagueId || !user?.id) return;
 
-    const pollInterval = setInterval(async () => {
+    const POLL_BASE_MS = 8000;
+    const POLL_JITTER_MS = 2000;
+    let pollTimeout: ReturnType<typeof setTimeout>;
+
+    const schedulePoll = () => {
+      const delay = POLL_BASE_MS + Math.random() * POLL_JITTER_MS;
+      pollTimeout = setTimeout(doPoll, delay);
+    };
+
+    const doPoll = async () => {
       try {
         // Fetch picks and league in parallel to minimize latency
         const [picksResult, freshLeagueRes] = await Promise.all([
@@ -950,9 +974,13 @@ const DraftRoom = () => {
         // Silent fail - polling is best-effort
         logger.debug('DraftRoom: Poll error (non-critical):', err);
       }
-    }, 5000);
+      // Schedule next poll (recursive setTimeout with jitter instead of fixed setInterval)
+      schedulePoll();
+    };
 
-    return () => clearInterval(pollInterval);
+    schedulePoll();
+
+    return () => clearTimeout(pollTimeout);
   // Polling interval: only recreate when phase or identity changes. loadDraftState is not memoized —
   // including it would cause interval recreation on every render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1076,16 +1104,25 @@ const DraftRoom = () => {
     tick();
     const interval = setInterval(tick, 1000);
 
-    // Also poll bid history every 3 seconds for real-time transparency
+    // Poll bid history with jitter to avoid thundering herd.
+    // Was 3s fixed (240 req/nomination across 12 clients). Now ~5-7s with jitter.
     const loadBidHistory = async () => {
       if (!nomination.id) return;
       const bids = await AuctionDraftService.getBidHistory(nomination.id);
       setAuctionState(prev => prev ? { ...prev, bidHistory: bids.map(b => ({ team_id: b.team_id, bid_amount: b.bid_amount, created_at: b.created_at || '' })) } : prev);
     };
     loadBidHistory();
-    const bidPoll = setInterval(loadBidHistory, 3000);
+    let bidTimeout: ReturnType<typeof setTimeout>;
+    const scheduleBidPoll = () => {
+      const delay = 5000 + Math.random() * 2000; // 5-7s with jitter
+      bidTimeout = setTimeout(async () => {
+        await loadBidHistory();
+        scheduleBidPoll();
+      }, delay);
+    };
+    scheduleBidPoll();
 
-    return () => { clearInterval(interval); clearInterval(bidPoll); };
+    return () => { clearInterval(interval); clearTimeout(bidTimeout); };
   // Auction timer: re-creates interval when nomination changes (?.id, ?.expires_at).
   // auctionState.currentNomination is accessed via ?.id and ?.expires_at granularly.
   // userTeam.id is excluded to avoid restarting timer on team state updates.
@@ -1207,9 +1244,44 @@ const DraftRoom = () => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        // Exponential backoff reconnection — matches the draft picks channel.
+        // Without this, a dropped league status channel silently dies and the
+        // draft timer desynchronizes across clients.
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          const label = status === 'CHANNEL_ERROR' ? 'error' : 'timeout';
+          logger.warn(`League status subscription ${label} for league ${leagueId}, reconnecting...`);
+          let attempt = 0;
+          const maxAttempts = 5;
+          const tryReconnect = () => {
+            if (attempt >= maxAttempts) {
+              logger.error(`League status subscription failed after ${maxAttempts} attempts for league ${leagueId}`);
+              return;
+            }
+            const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
+            attempt++;
+            const tid = setTimeout(() => {
+              logger.log(`League status reconnect attempt ${attempt} for league ${leagueId}`);
+              supabase.removeChannel(channel);
+              channel.subscribe((retryStatus) => {
+                if (retryStatus === 'SUBSCRIBED') {
+                  logger.log(`League status reconnected for league ${leagueId}`);
+                } else if (retryStatus === 'CHANNEL_ERROR' || retryStatus === 'TIMED_OUT') {
+                  tryReconnect();
+                }
+              });
+            }, delay);
+            reconnectTimeouts.push(tid);
+          };
+          tryReconnect();
+        }
+      });
+
+    const reconnectTimeouts: ReturnType<typeof setTimeout>[] = [];
 
     return () => {
+      reconnectTimeouts.forEach(clearTimeout);
+      reconnectTimeouts.length = 0;
       supabase.removeChannel(channel);
     };
   // Supabase realtime subscription: league, draftPhase, teams, and resolveTeamOrder are accessed
@@ -1253,7 +1325,7 @@ const DraftRoom = () => {
       const { state, error } = await DraftService.getDraftState(
         leagueId,
         teams,
-        league.draft_rounds,
+        league.draft_rounds || 21,
         user?.id
       );
 
@@ -1294,7 +1366,8 @@ const DraftRoom = () => {
         logger.warn('loadDraftState: nextTeamId is null, trying to fix...');
         // Try to get the first team from draft order
         try {
-          const { order } = await DraftService.getDraftOrder(leagueId, user.id, state.currentRound, state.sessionId);
+          const safeRound = Number.isFinite(state.currentRound) && state.currentRound >= 1 ? state.currentRound : 1;
+          const { order } = await DraftService.getDraftOrder(leagueId, user.id, safeRound, state.sessionId);
           if (order && order.team_order && order.team_order.length > 0) {
             const pickIndex = (state.currentPick - 1) % (teams?.length || 1);
             const correctTeamId = order.team_order[pickIndex];
@@ -1318,7 +1391,8 @@ const DraftRoom = () => {
           });
           // Try to fix by getting the draft order for current round
           try {
-            const { order } = await DraftService.getDraftOrder(leagueId, user.id, state.currentRound, state.sessionId);
+            const safeRound2 = Number.isFinite(state.currentRound) && state.currentRound >= 1 ? state.currentRound : 1;
+            const { order } = await DraftService.getDraftOrder(leagueId, user.id, safeRound2, state.sessionId);
             if (order && order.team_order && order.team_order.length > 0) {
               // DraftOrder has team_order array with team IDs
               const pickIndex = (state.currentPick - 1) % (teams?.length || 1);
@@ -1411,6 +1485,10 @@ const DraftRoom = () => {
   const autoPickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Guard against concurrent auto-draft calls (race condition prevention)
   const autoPickInProgressRef = useRef<boolean>(false);
+  // Safety valve: auto-reset pickInProgress after 20s even if `finally` never
+  // fires (browser crash, hung promise, etc.). Without this, the Draft button
+  // stays permanently disabled and the user has to reload the entire page.
+  const pickLockTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Track which pick number we last auto-drafted for to prevent duplicate attempts
   const lastAutoPickedNumberRef = useRef<number>(0);
   // Refs for stale closure prevention in realtime subscription callbacks
@@ -1705,7 +1783,9 @@ const DraftRoom = () => {
     };
 
     updateTimer(); // Initial calculation
-    timerIntervalRef.current = setInterval(updateTimer, 1000);
+    // 500ms is smooth enough for a countdown but 50% less CPU than 1000ms.
+    // The timer reads Date.now() on each tick so display accuracy is unaffected.
+    timerIntervalRef.current = setInterval(updateTimer, 500);
     timerRunningRef.current = true;
 
     return cleanup;
@@ -1767,7 +1847,6 @@ const DraftRoom = () => {
   const handlePlayerDraft = async (player: Player, isAutoDraft: boolean = false) => {
     // Prevent double-click / concurrent picks
     if (pickInProgress && !isAutoDraft) return;
-    setPickInProgress(true);
 
     // ⚠️ DEMO STATE: Disable all draft actions
     if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
@@ -1778,11 +1857,11 @@ const DraftRoom = () => {
       }
       return;
     }
-    
-    logger.log('handlePlayerDraft called:', { 
-      leagueId, 
-      draftState, 
-      currentTeam, 
+
+    logger.log('handlePlayerDraft called:', {
+      leagueId,
+      draftState,
+      currentTeam,
       user: user?.id,
       player: player.full_name,
       isAutoDraft
@@ -1797,29 +1876,29 @@ const DraftRoom = () => {
     // If draft state is null, try to load it and use it directly
     let effectiveDraftState = draftState;
     let effectiveCurrentTeam = currentTeam;
-    
+
     if (!effectiveDraftState) {
       logger.log('handlePlayerDraft: Draft state is null, attempting to load...');
-      
+
       // Load draft state and get it directly (the function now returns the state)
       const loadedState = await loadDraftState();
-      
+
       if (!loadedState) {
         // State didn't load - show error
         toast({ title: "Error", description: "Draft state not loaded. Please ensure the draft has been started. If you just started the draft, please wait a moment and try again.", variant: "destructive" });
         logger.error('handlePlayerDraft: Missing draftState after load attempt');
         return;
       }
-      
+
       logger.log('handlePlayerDraft: Draft state loaded successfully');
       setDraftState(loadedState);
       effectiveDraftState = loadedState;
-      
+
       // Calculate current team from loaded state
       effectiveCurrentTeam = loadedState.nextTeamId
         ? teams.find(t => t.id === loadedState.nextTeamId) || null
         : null;
-        
+
       if (!effectiveCurrentTeam) {
         toast({ title: "Error", description: "Current team not found after loading draft state. Please try again.", variant: "destructive" });
         logger.error('handlePlayerDraft: Missing currentTeam after loading state', {
@@ -1829,13 +1908,13 @@ const DraftRoom = () => {
         return;
       }
     }
-    
+
     // Use effective state and team for the rest of the function
     if (!effectiveDraftState) {
       toast({ title: "Error", description: "Draft state not available. Please try again.", variant: "destructive" });
       return;
     }
-    
+
     if (!effectiveCurrentTeam) {
       toast({ title: "Error", description: "Current team not found. Please try again.", variant: "destructive" });
       return;
@@ -1861,6 +1940,20 @@ const DraftRoom = () => {
       toast({ title: "Player Unavailable", description: "This player has already been drafted!", variant: "destructive" });
       return;
     }
+
+    // Lock AFTER all validation — early returns above must NOT hold the lock
+    // or the UI gets permanently stuck (April 10 incident root cause).
+    setPickInProgress(true);
+
+    // Safety valve: auto-unlock after 20s even if `finally` never fires.
+    // The API client has a 15s timeout + up to 2 retries (each 15s + backoff),
+    // so 20s covers the happy path. If we're still locked at 20s, something
+    // catastrophically failed and the user needs the button back.
+    if (pickLockTimerRef.current) clearTimeout(pickLockTimerRef.current);
+    pickLockTimerRef.current = setTimeout(() => {
+      setPickInProgress(false);
+      pickLockTimerRef.current = null;
+    }, 20_000);
 
     // Optimistic update: show the pick immediately in the UI before the API call
     const previousSelectedPlayer = selectedPlayer;
@@ -2006,6 +2099,8 @@ const DraftRoom = () => {
     } catch (error: unknown) {
       logger.error('handlePlayerDraft error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorName = error instanceof Error ? error.name : '';
+
       // Silently handle race condition errors - another client/trigger already handled this pick
       const isRaceCondition = errorMessage.includes('already taken') || errorMessage.includes('already drafted');
       if (isRaceCondition) {
@@ -2022,12 +2117,24 @@ const DraftRoom = () => {
           setSelectedPlayer(previousSelectedPlayer);
         }
         if (!isAutoDraft) {
-          toast({ title: "Error", description: `Failed to draft player: ${errorMessage}`, variant: "destructive" });
+          // Show user-friendly messages for common failure modes
+          const isTimeout = errorName === 'TimeoutError' || errorName === 'AbortError' || errorMessage.includes('timed out');
+          const isNetwork = errorMessage === 'Failed to fetch' || errorMessage.includes('Network');
+          const userMsg = isTimeout
+            ? 'Pick timed out. Please try again — the server may be busy.'
+            : isNetwork
+              ? 'Network error. Check your connection and try again.'
+              : `Failed to draft player: ${errorMessage}`;
+          toast({ title: "Error", description: userMsg, variant: "destructive" });
         }
       }
       // Don't throw - let draft continue
     } finally {
       setPickInProgress(false);
+      if (pickLockTimerRef.current) {
+        clearTimeout(pickLockTimerRef.current);
+        pickLockTimerRef.current = null;
+      }
     }
   };
 
@@ -2057,6 +2164,24 @@ const DraftRoom = () => {
       }
       autoPickInProgressRef.current = true;
       lastAutoPickedNumberRef.current = draftState.currentPick;
+
+      // Freshness check: verify server-side pick count before autopicking.
+      // The user's manual pick might be in-flight (retrying after 429/503).
+      // Without this check, the commissioner's autopick races the user's
+      // retry and the user gets autopicked while actively trying to pick.
+      try {
+        const { picks } = await DraftService.getDraftPicks(leagueId, user?.id || '');
+        const serverPickCount = picks.filter(p => !p.deleted_at).length;
+        if (serverPickCount >= draftState.currentPick) {
+          logger.log('handleAutoDraft: Server already has pick #' + draftState.currentPick + ', skipping autopick');
+          autoPickInProgressRef.current = false;
+          await loadDraftState();
+          return;
+        }
+      } catch {
+        // If freshness check fails, proceed with autopick — better to pick
+        // than to stall the entire draft waiting for a health check.
+      }
 
     // Get available (undrafted) players
     const undraftedPlayers = availablePlayers.filter(
@@ -3233,6 +3358,19 @@ const DraftRoom = () => {
   // ALWAYS render something - never return null
   return (
     <div className="min-h-screen bg-[#D4E8B8] relative touch-manipulation overflow-x-clip">
+      {/* Realtime connection banner — surfaces when the draft-pick channel
+          drops so users know their draft isn't silently stalled.
+          'connected' is the quiescent state; we don't render anything. */}
+      {realtimeStatus === 'reconnecting' && (
+        <div className="sticky top-0 z-50 bg-amber-500 text-black text-sm font-semibold px-4 py-2 text-center shadow-md pt-[env(safe-area-inset-top)]">
+          Reconnecting to draft — your picks may be delayed for a few seconds.
+        </div>
+      )}
+      {realtimeStatus === 'disconnected' && (
+        <div className="sticky top-0 z-50 bg-red-600 text-white text-sm font-semibold px-4 py-2 text-center shadow-md pt-[env(safe-area-inset-top)]">
+          Lost connection to draft. Refresh the page to reconnect. Your picks will not arrive in real time until you do.
+        </div>
+      )}
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">

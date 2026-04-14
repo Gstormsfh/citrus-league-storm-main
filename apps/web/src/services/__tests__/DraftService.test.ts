@@ -1010,4 +1010,36 @@ describe('DraftService.subscribeToDraftPicks', () => {
 
     expect(supabase.removeChannel).toHaveBeenCalledWith(mockChannelObj);
   });
+
+  // Regression coverage for the reconnection UX: the draft room relies on
+  // the onStatus callback to render the "reconnecting…" / "lost connection"
+  // banner. If the service stops calling onStatus, the banner silently
+  // disappears and users are back to the pre-playoff state where they had
+  // no idea their draft was stalled.
+  it('forwards channel lifecycle transitions to the optional onStatus callback', async () => {
+    const { supabase } = await import('@/integrations/supabase/client');
+
+    let capturedSubscribeCallback: ((status: string) => void) | undefined;
+    const mockChannelObj: Record<string, any> = {
+      on: vi.fn().mockReturnThis(),
+      subscribe: vi.fn((cb: (status: string) => void) => {
+        capturedSubscribeCallback = cb;
+        return mockChannelObj;
+      }),
+    };
+    (supabase.channel as ReturnType<typeof vi.fn>).mockReturnValue(mockChannelObj);
+
+    const onStatus = vi.fn();
+    DraftService.subscribeToDraftPicks('league-1', 'user-1', vi.fn(), undefined, onStatus);
+
+    // Simulate the broker confirming the subscription.
+    capturedSubscribeCallback?.('SUBSCRIBED');
+    expect(onStatus).toHaveBeenCalledWith('connected');
+
+    // Simulate a channel error — caller should see 'reconnecting' first
+    // (the backoff kicks in inside the service).
+    onStatus.mockClear();
+    capturedSubscribeCallback?.('CHANNEL_ERROR');
+    expect(onStatus).toHaveBeenCalledWith('reconnecting');
+  });
 });

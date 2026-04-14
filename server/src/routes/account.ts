@@ -121,6 +121,46 @@ accountRoutes.put('/profile', async (c) => {
   }
 });
 
+// PUT /api/account/team-name — Update default team name + sync to owned teams
+accountRoutes.put('/team-name', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const body = await c.req.json();
+    const teamName = typeof body.teamName === 'string' ? body.teamName.trim() : '';
+
+    if (!teamName) {
+      return fail(c, AppError.badRequest('teamName is required'));
+    }
+
+    const supabase = createUserClient(c.get('userToken'));
+
+    // Update profile default_team_name
+    const { error: profileErr } = await supabase
+      .from('profiles')
+      .update({ default_team_name: teamName })
+      .eq('id', userId);
+
+    if (profileErr) {
+      return handleError(c, profileErr, 'Failed to update profile team name');
+    }
+
+    // Sync name to all teams owned by this user
+    const { data: updatedTeams, error: teamsErr } = await supabase
+      .from('teams')
+      .update({ team_name: teamName })
+      .eq('owner_id', userId)
+      .select('id');
+
+    if (teamsErr) {
+      return handleError(c, teamsErr, 'Failed to sync team names');
+    }
+
+    return ok(c, { updatedCount: updatedTeams?.length || 0 });
+  } catch (err) {
+    return handleError(c, err, 'Failed to update team name');
+  }
+});
+
 // GET /api/account/check-username/:username — Check username availability
 accountRoutes.get('/check-username/:username', async (c) => {
   try {
