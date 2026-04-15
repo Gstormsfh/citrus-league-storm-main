@@ -959,6 +959,34 @@ gcloud resource-manager org-policies enable-enforce \
   --project=$PROJECT_ID
 ```
 
+### 7.3a Grant Compute SA the Cloud Build builder role (new-project gotcha)
+
+As of late 2024, Google changed Cloud Build to default to the Compute
+Engine default service account (`<PROJECT_NUMBER>-compute@developer.gserviceaccount.com`)
+instead of the legacy Cloud Build SA. New projects don't auto-grant
+this account the permissions it needs, so `gcloud run deploy --source=.`
+fails in Phase 9 with:
+
+```
+Error 403: <PROJECT_NUMBER>-compute@developer.gserviceaccount.com does
+not have storage.objects.get access to the Google Cloud Storage object.
+```
+
+Pre-empt it here:
+
+```bash
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+  --role="roles/cloudbuild.builds.builder" \
+  --condition=None
+```
+
+`roles/cloudbuild.builds.builder` bundles the storage / logging /
+artifact-registry permissions Cloud Build needs to stage source,
+write logs, and push images.
+
 ### 7.4 Pre-seed Secret Manager for later
 
 We won't wire Supabase secrets in tonight (Phase 9 uses env vars on the
