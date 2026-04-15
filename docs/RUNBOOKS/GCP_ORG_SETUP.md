@@ -1141,25 +1141,33 @@ gcloud workstations create citrus-dev-<cto-handle> \
   --project=$PROJECT_ID
 ```
 
-### 8.5 Grant each user access to their own workstation
+### 8.5 Grant each user access
+
+Per-workstation IAM bindings via `gcloud workstations add-iam-policy-binding`
+are awkward (the subcommand isn't exposed at the top-level CLI in
+current gcloud versions). Project-level is simpler and sufficient
+for small teams: `roles/workstations.user` at the project lets each
+user launch any workstation, and naming convention
+(`citrus-dev-<handle>`) communicates ownership.
 
 ```bash
 YOUR_EMAIL=<you>@citrusfantasysports.com
 CTO_EMAIL=<cto>@citrusfantasysports.com
 
-# Each person gets "workstations.user" on their own instance
-gcloud workstations add-iam-policy-binding citrus-dev-<your-handle> \
-  --cluster=citrus-dev-cluster --config=citrus-dev-config \
-  --region=$REGION --project=$PROJECT_ID \
+gcloud projects add-iam-policy-binding $PROJECT_ID \
   --member="user:$YOUR_EMAIL" \
-  --role="roles/workstations.user"
+  --role="roles/workstations.user" \
+  --condition=None
 
-gcloud workstations add-iam-policy-binding citrus-dev-<cto-handle> \
-  --cluster=citrus-dev-cluster --config=citrus-dev-config \
-  --region=$REGION --project=$PROJECT_ID \
+gcloud projects add-iam-policy-binding $PROJECT_ID \
   --member="user:$CTO_EMAIL" \
-  --role="roles/workstations.user"
+  --role="roles/workstations.user" \
+  --condition=None
 ```
+
+If you later want per-workstation IAM (e.g., when a contractor joins
+and you don't want them hitting the CTO's workstation), use the
+Console UI: Workstations → click a workstation → Permissions panel.
 
 ### 8.6 Start and connect
 
