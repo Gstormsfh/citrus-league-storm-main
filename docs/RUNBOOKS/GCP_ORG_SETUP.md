@@ -987,6 +987,39 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 artifact-registry permissions Cloud Build needs to stage source,
 write logs, and push images.
 
+### 7.3b Disable the domain-restriction org policy (new-project gotcha #2)
+
+New GCP orgs ship with `constraints/iam.allowedPolicyMemberDomains`
+enforced. It blocks adding `allUsers` to any IAM binding, which means
+`gcloud run deploy --allow-unauthenticated` silently warns and the
+service stays unreachable from the public internet. Phase 9's
+parallel-stack smoke test needs the API publicly reachable.
+
+**Prerequisite:** Workspace super-admin / Org Admin is *not* the same
+as `roles/orgpolicy.policyAdmin` in IAM. The disable command below
+will fail with `does not have permission to access projects instance
+[...:setOrgPolicy]` until you grant yourself the role at the org level.
+
+```bash
+# 1) Find your org ID
+gcloud organizations list
+
+# 2) Grant yourself orgpolicy.policyAdmin (replace ORG_ID + email)
+gcloud organizations add-iam-policy-binding $ORG_ID \
+  --member="user:you@yourdomain.com" \
+  --role="roles/orgpolicy.policyAdmin"
+
+# Wait ~30s for IAM propagation, then disable the constraint:
+gcloud resource-manager org-policies disable-enforce \
+  constraints/iam.allowedPolicyMemberDomains \
+  --project=$PROJECT_ID
+```
+
+After the binding is in place in Phase 9, you can re-enable enforcement
+if you want — existing bindings stay. Most teams leave it off at the
+project level for this reason; the constraint is more useful at org
+scope to catch drift in *new* projects.
+
 ### 7.4 Pre-seed Secret Manager for later
 
 We won't wire Supabase secrets in tonight (Phase 9 uses env vars on the
