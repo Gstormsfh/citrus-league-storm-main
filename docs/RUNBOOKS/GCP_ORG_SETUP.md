@@ -599,5 +599,407 @@ of each other.
 
 ---
 
-<!-- Phases 5–12 will be added in the next commit. -->
+## Phase 5 — Enable APIs (10 min)
+
+**Purpose.** A fresh GCP project has almost everything disabled. Before
+we can deploy Cloud Run, provision Workstations, or use Firebase, we
+need to turn on the underlying APIs. Each one takes 30–90 seconds to
+enable.
+
+### 5.1 Enable the needed APIs
+
+Run this as a single batch. It's idempotent — safe to re-run.
+
+```bash
+PROJECT_ID=citrus-fantasy-prod
+
+gcloud services enable \
+  run.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com \
+  firebase.googleapis.com \
+  firebasehosting.googleapis.com \
+  firebaserules.googleapis.com \
+  firestore.googleapis.com \
+  iam.googleapis.com \
+  iamcredentials.googleapis.com \
+  cloudresourcemanager.googleapis.com \
+  serviceusage.googleapis.com \
+  workstations.googleapis.com \
+  compute.googleapis.com \
+  logging.googleapis.com \
+  monitoring.googleapis.com \
+  secretmanager.googleapis.com \
+  --project=$PROJECT_ID
+```
+
+Expected output:
+
+```
+Operation "operations/acf.XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" finished successfully.
+```
+
+Repeated for each API. If one fails (common for `compute` if billing
+isn't propagated yet), re-run the whole command — enabled APIs skip,
+failed ones retry.
+
+### 5.2 What each API is for
+
+| API | Why we need it |
+| --- | --- |
+| `run` | Cloud Run — the `@citrus/server` API deploy target |
+| `cloudbuild` | Builds container images during deploy |
+| `artifactregistry` | Stores those container images |
+| `firebase`, `firebasehosting`, `firebaserules` | Firebase Hosting for the `@citrus/web` SPA |
+| `firestore` | Needed even though we use Supabase — Firebase internally provisions a Firestore instance for Hosting metadata |
+| `iam`, `iamcredentials` | Service account creation, workload identity federation |
+| `cloudresourcemanager`, `serviceusage` | API enablement itself, quota management |
+| `workstations` | Phase 8 (Cloud Workstations) |
+| `compute` | Workstations run on Compute Engine under the hood |
+| `logging`, `monitoring` | Cloud Run logs, the ops dashboard, alerting |
+| `secretmanager` | Eventual home for Supabase service role key, etc. |
+
+### 5.3 Verify
+
+```bash
+gcloud services list --enabled --project=$PROJECT_ID \
+  --format="value(config.name)" | sort
+```
+
+Confirm all 16 APIs above appear in the output.
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `FAILED_PRECONDITION: Billing must be enabled` | Phase 3 billing link hasn't propagated | Wait 2 min, retry. If persistent, re-run `gcloud billing projects link` |
+| `compute.googleapis.com` takes 2+ minutes | Normal — Compute Engine initializes a default VPC on first enable | Wait it out |
+| `workstations.googleapis.com` returns `PERMISSION_DENIED` | Your project is in some kind of trial sandbox | Verify billing and retry; if still failing, file a support ticket from the console |
+
+### Rollback
+
+```bash
+# Disable an API (will break anything using it)
+gcloud services disable <api>.googleapis.com --project=$PROJECT_ID
+```
+
+Not recommended — no cost impact from leaving APIs enabled.
+
+### Checkpoint
+
+- [ ] All 16 APIs show up in `gcloud services list --enabled`
+- [ ] No errors from the enable command
+
+---
+
+## Phase 6 — Create Firebase project (links to same GCP project) (15 min)
+
+**Purpose.** Firebase projects are not separate from GCP projects —
+they're the same resource with a Firebase overlay. Adding Firebase to
+a GCP project is free and lets us use Firebase Hosting, Auth
+(if we ever want it), and the Firebase CLI for deploys.
+
+**Critical constraint:** Firebase Hosting can only serve a given
+custom domain (`citrusfantasysports.com`) from **one Firebase project
+at a time**. We will NOT connect the custom domain tonight — we'll
+deploy to the default `.web.app` URL and leave the old project serving
+the custom domain until cutover.
+
+### 6.1 Add Firebase to the GCP project
+
+1. Open https://console.firebase.google.com
+2. Click **Add project**
+3. At the "Enter your project name" step, click **"Add Firebase to
+   Google Cloud project"** at the bottom of the form
+4. Pick `citrus-fantasy-prod` from the dropdown
+5. **Do NOT enable Google Analytics.** You can add it later; for now
+   it just adds consent banners and GDPR complexity.
+6. Click **Add Firebase**
+
+Wait 30–60 seconds for provisioning. You'll land on the project
+dashboard.
+
+### 6.2 Upgrade to Blaze (pay-as-you-go)
+
+Firebase Hosting on Spark has a hard egress cap that will hurt during
+a draft. Blaze with a budget cap is the right config — same pattern as
+the April 10 postmortem remediation.
+
+1. Firebase Console → project → left sidebar bottom: **Upgrade**
+2. Pick **Blaze — Pay as you go**
+3. **Billing account:** pick `Citrus Fantasy Sports — Production`
+   (the one from Phase 3)
+4. Confirm upgrade
+
+The $50/mo global budget cap from Phase 3.3 still applies — you cannot
+be billed more than $50 without getting 4 email alerts before you hit
+the cap.
+
+### 6.3 Register the web app inside Firebase
+
+This is what gets us the `VITE_FIREBASE_*` config values for the SPA.
+
+1. Firebase Console → project overview → **Add app** → **Web** icon (`</>`)
+2. **App nickname:** `citrus-web-prod`
+3. **Do NOT** check "Also set up Firebase Hosting for this app" — we'll
+   do that via the CLI in Phase 10
+4. Click **Register app**
+5. **Copy the config object** that appears:
+
+```js
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "citrus-fantasy-prod.firebaseapp.com",
+  projectId: "citrus-fantasy-prod",
+  storageBucket: "citrus-fantasy-prod.firebasestorage.app",
+  messagingSenderId: "<project-number>",
+  appId: "1:<project-number>:web:...",
+  measurementId: "G-..."
+};
+```
+
+Write these down in a secure place (password manager is fine) — you'll
+need them for GitHub Actions secrets later. Don't check them into git,
+even though the API key is technically a public identifier:
+
+- `VITE_FIREBASE_API_KEY` = `apiKey`
+- `VITE_FIREBASE_APP_ID` = `appId`
+- `VITE_FIREBASE_MEASUREMENT_ID` = `measurementId` (blank if Analytics off)
+
+### 6.4 Set up a separate Hosting site (prep for Phase 10)
+
+The default Hosting site gets the URL `citrus-fantasy-prod.web.app`.
+That's fine for tonight — that's our parallel-testing URL.
+
+Verify it shows up:
+
+```bash
+firebase projects:list
+# Expect the new project in the list.
+
+firebase use citrus-fantasy-prod
+# Switches the Firebase CLI to operate on this project.
+
+firebase hosting:sites:list
+# Expect:
+# ┌────────────────────────┬────────────────────────────────────┬──────────────┐
+# │ Site ID                │ Default URL                        │ App ID       │
+# ├────────────────────────┼────────────────────────────────────┼──────────────┤
+# │ citrus-fantasy-prod    │ https://citrus-fantasy-prod.web.app│ (none)       │
+# └────────────────────────┴────────────────────────────────────┴──────────────┘
+```
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| "Add Firebase to Google Cloud project" option is missing | Your account isn't Owner on the GCP project | Go to GCP IAM, grant yourself `roles/firebase.admin` |
+| Firebase upgrade to Blaze fails with "billing account not eligible" | Rare; usually a payment-profile geo mismatch | Verify the billing account country matches your card's country |
+| `firebase projects:list` doesn't show the new project | CLI still pointed at old account | `firebase logout && firebase login` |
+| `firebase use` says "Invalid project id" | Project hasn't fully provisioned | Wait 60 sec and retry |
+
+### Rollback
+
+- To remove Firebase from the GCP project:
+  Firebase Console → Project Settings → scroll to bottom →
+  **Delete project**. This deletes the underlying GCP project too.
+  Only do this if you want to start over.
+
+### Checkpoint
+
+- [ ] Firebase project exists at https://console.firebase.google.com,
+      linked to `citrus-fantasy-prod`
+- [ ] Plan shows **Blaze**
+- [ ] Web app `citrus-web-prod` registered
+- [ ] Config values saved to your password manager
+- [ ] `firebase hosting:sites:list` shows the default `.web.app` site
+- [ ] **No** custom domain connected yet
+
+---
+
+## Phase 7 — Service accounts + keys (15 min)
+
+**Purpose.** CI/CD and runtime need identities. We create two service
+accounts and download one JSON key (for GitHub Actions — the other uses
+workload identity and doesn't need a key).
+
+**Why two accounts:** least-privilege. The deploy SA can push new
+revisions but can't read Supabase secrets at runtime. The runtime SA
+can read secrets but can't deploy new code. Compromise of one does not
+give you both.
+
+### 7.1 Create the deploy service account (used by GitHub Actions)
+
+```bash
+PROJECT_ID=citrus-fantasy-prod
+
+gcloud iam service-accounts create citrus-deploy \
+  --display-name="Citrus CI Deploy" \
+  --description="GitHub Actions uses this SA to push Cloud Run revisions" \
+  --project=$PROJECT_ID
+```
+
+Grant roles:
+
+```bash
+DEPLOY_SA=citrus-deploy@$PROJECT_ID.iam.gserviceaccount.com
+
+for role in \
+  roles/run.admin \
+  roles/iam.serviceAccountUser \
+  roles/artifactregistry.writer \
+  roles/cloudbuild.builds.editor \
+  roles/storage.admin \
+  roles/firebasehosting.admin; do
+  gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$DEPLOY_SA" \
+    --role="$role" \
+    --condition=None
+done
+```
+
+**What these roles do:**
+
+| Role | Why |
+| --- | --- |
+| `run.admin` | Push new Cloud Run revisions, route traffic |
+| `iam.serviceAccountUser` | Cloud Run needs to "actAs" the runtime SA |
+| `artifactregistry.writer` | Push built container images |
+| `cloudbuild.builds.editor` | Trigger Cloud Build during `gcloud run deploy --source` |
+| `storage.admin` | Cloud Build uses a GCS staging bucket |
+| `firebasehosting.admin` | Deploy the web SPA to Firebase Hosting |
+
+### 7.2 Create the runtime service account
+
+This is the identity that Cloud Run uses to make calls (to Secret
+Manager, logging, etc.). It should have the *minimum* permissions to
+run the server.
+
+```bash
+gcloud iam service-accounts create citrus-api-runtime \
+  --display-name="Citrus API Runtime" \
+  --description="Cloud Run service identity for @citrus/server" \
+  --project=$PROJECT_ID
+
+RUNTIME_SA=citrus-api-runtime@$PROJECT_ID.iam.gserviceaccount.com
+
+for role in \
+  roles/secretmanager.secretAccessor \
+  roles/logging.logWriter \
+  roles/monitoring.metricWriter; do
+  gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:$RUNTIME_SA" \
+    --role="$role" \
+    --condition=None
+done
+```
+
+### 7.3 Download the deploy SA key (ONLY the deploy one)
+
+This key goes into GitHub Actions as `GCP_SA_KEY`. The runtime SA
+does **not** need a key — Cloud Run uses workload identity
+automatically.
+
+```bash
+gcloud iam service-accounts keys create ~/citrus-deploy-key.json \
+  --iam-account=$DEPLOY_SA \
+  --project=$PROJECT_ID
+
+# Display it for copy-paste into GitHub secrets (Phase 12)
+cat ~/citrus-deploy-key.json
+```
+
+**⚠️ Security:** This file is equivalent to a username+password for
+your deploy SA. Do not commit it. Do not paste it into chat. After
+storing it in GitHub Actions secrets (Phase 12), delete the local file:
+`rm ~/citrus-deploy-key.json`.
+
+### 7.4 Pre-seed Secret Manager for later
+
+We won't wire Supabase secrets in tonight (Phase 9 uses env vars on the
+Cloud Run service directly for speed). But create the secret entries
+as empty placeholders so we remember the right names:
+
+```bash
+for secret in \
+  supabase-url \
+  supabase-anon-key \
+  supabase-service-role-key \
+  sentry-dsn; do
+  echo -n "placeholder" | gcloud secrets create $secret \
+    --data-file=- \
+    --replication-policy=automatic \
+    --project=$PROJECT_ID
+done
+```
+
+Real values go in during cutover or in a follow-up session.
+
+### 7.5 Verify
+
+```bash
+gcloud iam service-accounts list --project=$PROJECT_ID
+# Expect two user-created SAs plus the default ones:
+#   citrus-deploy@citrus-fantasy-prod.iam.gserviceaccount.com
+#   citrus-api-runtime@citrus-fantasy-prod.iam.gserviceaccount.com
+
+gcloud projects get-iam-policy $PROJECT_ID \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:citrus-deploy@*" \
+  --format="value(bindings.role)"
+# Expect the 6 roles from 7.1
+
+gcloud secrets list --project=$PROJECT_ID
+# Expect 4 placeholders
+```
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `You do not have permission to perform this operation` on SA create | `iam.googleapis.com` not enabled yet | Re-run Phase 5 |
+| `add-iam-policy-binding` says "condition is invalid" | Your gcloud version is old | Upgrade: `gcloud components update` |
+| Key download file is empty | Rare; 401 from the API | Re-run the command; old key appears in the console anyway |
+| `gcloud secrets create` says already exists | You've run this phase twice | Safe to ignore — secret already there |
+
+### Rollback
+
+```bash
+# Remove a service account (will break anything using it)
+gcloud iam service-accounts delete $DEPLOY_SA --project=$PROJECT_ID
+
+# Remove a key (force a rotation)
+gcloud iam service-accounts keys list --iam-account=$DEPLOY_SA --project=$PROJECT_ID
+gcloud iam service-accounts keys delete <KEY_ID> --iam-account=$DEPLOY_SA --project=$PROJECT_ID
+```
+
+### Checkpoint
+
+- [ ] `citrus-deploy` SA exists with 6 roles
+- [ ] `citrus-api-runtime` SA exists with 3 roles
+- [ ] Deploy SA key saved in your password manager
+- [ ] Local `~/citrus-deploy-key.json` deleted
+- [ ] 4 placeholder secrets exist in Secret Manager
+
+---
+
+## 🛑 Second checkpoint — consider stopping here for the night
+
+At this point the new project exists, has APIs enabled, has Firebase,
+and has deploy identities. The old project is still serving 100% of
+production traffic. Nothing has broken.
+
+The remaining phases are the "stand up the parallel stack" phases,
+and they're rewarding but involved. If you're past midnight or tired,
+stopping here is fine — the foundation is safe, the startup program
+application is in, and you can pick up Phase 8+ fresh tomorrow.
+
+If you're continuing: Phase 8 is Cloud Workstations (can run in the
+background while you do 9–11). Phases 9–11 are the actual
+parallel-deploy of the Citrus stack.
+
+---
+
+<!-- Phases 8–12 added in the next commit. -->
+
 
