@@ -1143,31 +1143,35 @@ gcloud workstations create citrus-dev-<cto-handle> \
 
 ### 8.5 Grant each user access
 
-Per-workstation IAM bindings via `gcloud workstations add-iam-policy-binding`
-are awkward (the subcommand isn't exposed at the top-level CLI in
-current gcloud versions). Project-level is simpler and sufficient
-for small teams: `roles/workstations.user` at the project lets each
-user launch any workstation, and naming convention
-(`citrus-dev-<handle>`) communicates ownership.
+`roles/workstations.user` is **not bindable at the project level**
+(`INVALID_ARGUMENT: Role roles/workstations.user is not supported
+for this resource`). It has to be bound at workstation-cluster,
+workstation-config, or workstation-instance level. The CLI
+subcommand coverage for those is patchy across gcloud versions,
+so the reliable path is the Console UI.
+
+**Console UI (recommended):**
+
+1. https://console.cloud.google.com/workstations/configurations → pick
+   `citrus-dev-config`
+2. Open the **Permissions** panel (right-side info panel)
+3. **Grant access** → New principals: `<you>@citrusfantasysports.com`
+   → Role: **Cloud Workstations User** → Save
+4. Repeat for your CTO
+
+Config-level grants both users access to every workstation in the
+config. For a 2-person team that's the same effective outcome as
+per-instance. If you later want stricter scoping (contractors,
+external reviewers), switch to per-instance via the same Permissions
+panel on the workstation itself.
+
+**CLI fallback (may not be exposed in your gcloud version):**
 
 ```bash
-YOUR_EMAIL=<you>@citrusfantasysports.com
-CTO_EMAIL=<cto>@citrusfantasysports.com
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="user:$YOUR_EMAIL" \
-  --role="roles/workstations.user" \
-  --condition=None
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="user:$CTO_EMAIL" \
-  --role="roles/workstations.user" \
-  --condition=None
+gcloud workstations configs add-iam-policy-binding citrus-dev-config \
+  --cluster=citrus-dev-cluster --region=$REGION --project=$PROJECT_ID \
+  --member="user:<email>" --role="roles/workstations.user"
 ```
-
-If you later want per-workstation IAM (e.g., when a contractor joins
-and you don't want them hitting the CTO's workstation), use the
-Console UI: Workstations → click a workstation → Permissions panel.
 
 ### 8.6 Start and connect
 
