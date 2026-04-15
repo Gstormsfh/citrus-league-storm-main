@@ -1000,6 +1000,776 @@ parallel-deploy of the Citrus stack.
 
 ---
 
-<!-- Phases 8–12 added in the next commit. -->
+## Phase 8 — Provision Cloud Workstations (30–45 min, mostly waiting)
+
+**Purpose.** Stand up browser/IDE-accessible dev environments for you
+and your CTO. Two instances, one shared cluster, pre-installed with
+Node 20, Python 3.12, gcloud, firebase-tools. Solves: "my laptop is
+authed to the wrong account," "new engineer onboarding takes 4 hours,"
+and "CTO and I keep stepping on each other's local state."
+
+**Cost reminder:** ~$0.10/hr for the cluster (always-on) + ~$0.15/hr
+per running workstation instance. Workstations auto-stop after 2 hours
+idle by default. Expect ~$30/mo for 2 devs at 6h/day each. The $300
+free trial covers ~10 months of this.
+
+### 8.1 Pick a region
+
+Use `us-central1` to match Cloud Run. Keeps network latency to Cloud
+Run, Supabase (us-east via Vercel Edge), and your laptop within a
+reasonable envelope.
+
+```bash
+PROJECT_ID=citrus-fantasy-prod
+REGION=us-central1
+```
+
+### 8.2 Create the cluster
+
+The cluster is the control plane. One cluster per region, shared by
+all workstation configs/instances.
+
+```bash
+gcloud workstations clusters create citrus-dev-cluster \
+  --region=$REGION \
+  --network="projects/$PROJECT_ID/global/networks/default" \
+  --subnetwork="projects/$PROJECT_ID/regions/$REGION/subnetworks/default" \
+  --project=$PROJECT_ID
+```
+
+**This command blocks for 5–10 minutes.** The cluster provisions a
+private VPC connector, a control plane, and readiness probes. Leave
+the terminal open. If you Ctrl-C, it keeps provisioning in the
+background — don't panic, just poll with:
+
+```bash
+gcloud workstations clusters describe citrus-dev-cluster \
+  --region=$REGION \
+  --project=$PROJECT_ID \
+  --format="value(state)"
+# ACTIVE when ready.
+```
+
+### 8.3 Create a workstation config
+
+The config defines the machine type, disk, and container image all
+workstations in it will use.
+
+```bash
+gcloud workstations configs create citrus-dev-config \
+  --cluster=citrus-dev-cluster \
+  --region=$REGION \
+  --machine-type=e2-standard-4 \
+  --pd-disk-size=200 \
+  --pd-disk-type=pd-standard \
+  --idle-timeout=7200 \
+  --running-timeout=43200 \
+  --container-predefined-image=codeoss \
+  --project=$PROJECT_ID
+```
+
+**Flags:**
+
+| Flag | Value | Why |
+| --- | --- | --- |
+| `machine-type` | `e2-standard-4` | 4 vCPU / 16GB. Enough to run the full Citrus stack locally. |
+| `pd-disk-size` | `200` | 200GB persistent disk. Survives restarts. |
+| `pd-disk-type` | `pd-standard` | Cheaper than SSD; IDEs don't need SSD IOPS. |
+| `idle-timeout` | `7200` | Auto-stop after 2h idle. Bill stops. |
+| `running-timeout` | `43200` | Hard-stop after 12h continuous use. Forgetful-dev protection. |
+| `container-predefined-image` | `codeoss` | Visual Studio Code OSS in the browser. Alternatives: `intellij`, `pycharm`. |
+
+### 8.4 Create two workstation instances
+
+```bash
+# Yours
+gcloud workstations create citrus-dev-<your-handle> \
+  --cluster=citrus-dev-cluster \
+  --config=citrus-dev-config \
+  --region=$REGION \
+  --project=$PROJECT_ID
+
+# CTO's
+gcloud workstations create citrus-dev-<cto-handle> \
+  --cluster=citrus-dev-cluster \
+  --config=citrus-dev-config \
+  --region=$REGION \
+  --project=$PROJECT_ID
+```
+
+### 8.5 Grant each user access to their own workstation
+
+```bash
+YOUR_EMAIL=<you>@citrusfantasysports.com
+CTO_EMAIL=<cto>@citrusfantasysports.com
+
+# Each person gets "workstations.user" on their own instance
+gcloud workstations add-iam-policy-binding citrus-dev-<your-handle> \
+  --cluster=citrus-dev-cluster --config=citrus-dev-config \
+  --region=$REGION --project=$PROJECT_ID \
+  --member="user:$YOUR_EMAIL" \
+  --role="roles/workstations.user"
+
+gcloud workstations add-iam-policy-binding citrus-dev-<cto-handle> \
+  --cluster=citrus-dev-cluster --config=citrus-dev-config \
+  --region=$REGION --project=$PROJECT_ID \
+  --member="user:$CTO_EMAIL" \
+  --role="roles/workstations.user"
+```
+
+### 8.6 Start and connect
+
+```bash
+# Start yours
+gcloud workstations start citrus-dev-<your-handle> \
+  --cluster=citrus-dev-cluster \
+  --config=citrus-dev-config \
+  --region=$REGION \
+  --project=$PROJECT_ID
+
+# Get the URL (valid for ~30 min; re-run to get a fresh link)
+gcloud workstations get-iam-policy citrus-dev-<your-handle> \
+  --cluster=citrus-dev-cluster --config=citrus-dev-config \
+  --region=$REGION --project=$PROJECT_ID
+
+# Or open the UI (easier):
+# https://console.cloud.google.com/workstations
+```
+
+From the console, click **Start** next to your workstation, then
+**Launch** once it's running. The browser tab opens a full VS Code
+interface backed by the cloud VM.
+
+### 8.7 First-run setup inside the workstation
+
+In the VS Code terminal of your new workstation:
+
+```bash
+# Auth gcloud against your identity
+gcloud auth login --no-launch-browser
+# Follow the URL, paste the verification code back
+
+gcloud config set project citrus-fantasy-prod
+
+# Install firebase
+npm install -g firebase-tools
+firebase login --no-localhost
+
+# Clone the repo
+git clone https://github.com/Gstormsfh/citrus-league-storm-main.git
+cd citrus-league-storm-main
+
+# Set up branch
+git checkout claude/recover-previous-session-YHNSG
+
+# Install deps
+npm ci
+
+# Sanity check
+npm run test
+```
+
+You now have an identical dev environment to your laptop, usable from
+any browser at `workstations.cloud.google.com`.
+
+### 8.8 Share a startup script (optional, nice-to-have)
+
+To save 10 min per new workstation, bake the setup into the config:
+
+```bash
+cat > /tmp/workstation-startup.sh <<'EOF'
+#!/bin/bash
+npm install -g firebase-tools
+echo 'export PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
+EOF
+
+# Apply it (requires re-creating the config — do this only if you
+# don't have workstations running yet)
+```
+
+Skip this for tonight. Add it after the workstations are proven.
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Cluster stuck in `CREATING` > 15 min | Network provisioning issue | `gcloud workstations clusters describe ... --format=yaml` and look at `conditions` |
+| Can't launch workstation | Instance not started | Click **Start** in the console UI first, then **Launch** |
+| VS Code terminal `gcloud auth login` opens a broken URL | Running inside the browser tab, can't redirect | Use `--no-launch-browser` and follow the code flow |
+| `firebase login` fails | Same reason | Use `--no-localhost` and follow the code flow |
+| `npm ci` fails on first run | Default image doesn't have Node 20 | `nvm install 20 && nvm use 20 && npm ci` |
+
+### Rollback
+
+```bash
+# Delete one workstation
+gcloud workstations delete citrus-dev-<handle> \
+  --cluster=citrus-dev-cluster --config=citrus-dev-config \
+  --region=$REGION --project=$PROJECT_ID
+
+# Delete the config
+gcloud workstations configs delete citrus-dev-config \
+  --cluster=citrus-dev-cluster --region=$REGION --project=$PROJECT_ID
+
+# Delete the cluster (tears down control plane)
+gcloud workstations clusters delete citrus-dev-cluster \
+  --region=$REGION --project=$PROJECT_ID
+```
+
+### Checkpoint
+
+- [ ] Cluster `citrus-dev-cluster` is `ACTIVE`
+- [ ] Config `citrus-dev-config` exists with e2-standard-4 + 200GB disk
+- [ ] Two workstations created, IAM bound to you and CTO
+- [ ] You can open your workstation in the browser and it reaches
+      VS Code
+- [ ] Inside the workstation, `git clone` + `npm ci` + `npm run test`
+      all succeed
+- [ ] CTO has received the link to their workstation
+
+---
+
+## Phase 9 — Deploy `@citrus/server` to new Cloud Run (parallel) (20 min)
+
+**Purpose.** Stand up a fully working copy of the API server in the
+new project. This does NOT replace prod — old Cloud Run keeps serving
+`api.citrusfantasysports.com`. The new service gets its own autogenerated
+URL (`https://citrus-api-<hash>.a.run.app`), which we'll wire to the new
+Firebase Hosting in Phase 10.
+
+**Run this inside your new Cloud Workstation** if you want — the
+environment is identical. Or run from your laptop, still fine.
+
+### 9.1 Prerequisites inside the workstation/laptop
+
+```bash
+cd /path/to/citrus-league-storm-main
+git status                 # clean working tree, on claude/recover-previous-session-YHNSG
+gcloud config get-value project   # → citrus-fantasy-prod
+```
+
+If the project is wrong: `gcloud config set project citrus-fantasy-prod`.
+
+### 9.2 First, let's actually build and test locally
+
+Don't deploy a broken build. Takes 2 min.
+
+```bash
+npm ci
+npm run build                  # builds shared + web
+npm run build:server           # builds shared + server
+npm run test                   # ~1200+ web tests
+npm run test:server            # ~420+ server tests
+```
+
+If any of these fail, **stop and fix**. Deploying broken code to the
+new stack just adds "new broken stack" to the problem list.
+
+### 9.3 Deploy to the new Cloud Run
+
+Use the declarative config we already have at
+`ops/cloudrun/service.yaml` — it's the post-postmortem config
+(minScale=1, maxScale=10, 2Gi, 2 CPU). We'll adapt it for the new
+project with a one-liner.
+
+```bash
+PROJECT_ID=citrus-fantasy-prod
+REGION=us-central1
+RUNTIME_SA=citrus-api-runtime@$PROJECT_ID.iam.gserviceaccount.com
+
+# Build from source, deploy to new Cloud Run, minimal env vars for now
+cd server
+gcloud run deploy citrus-api \
+  --source=. \
+  --region=$REGION \
+  --project=$PROJECT_ID \
+  --service-account=$RUNTIME_SA \
+  --min-instances=1 \
+  --max-instances=10 \
+  --memory=2Gi \
+  --cpu=2 \
+  --cpu-boost \
+  --no-cpu-throttling \
+  --allow-unauthenticated \
+  --set-env-vars="NODE_ENV=production,PORT=8080,VITE_SUPABASE_URL=<your-supabase-url>,SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>,VITE_SUPABASE_ANON_KEY=<your-anon-key>"
+cd ..
+```
+
+**Security note:** env vars for secrets are a stopgap for tonight's
+parallel test. Before cutover we migrate these to Secret Manager
+(pre-seeded in Phase 7.4). Track in the cutover runbook.
+
+First deploy takes ~3–5 min (Cloud Build compiles the Docker image,
+pushes to Artifact Registry, creates a revision, routes 100% traffic).
+
+### 9.4 Grab the new Cloud Run URL
+
+```bash
+gcloud run services describe citrus-api \
+  --region=$REGION \
+  --project=$PROJECT_ID \
+  --format="value(status.url)"
+
+# Expected:
+# https://citrus-api-<12-char-hash>-uc.a.run.app
+```
+
+Write this down: `NEW_API_URL = ____________________`
+
+### 9.5 Smoke-test the new API
+
+```bash
+NEW_API_URL=<from 9.4>
+
+# Health check
+curl -s $NEW_API_URL/api/health | jq .
+# Expected: {"status":"ok","timestamp":"...","version":"..."}
+
+# Public players endpoint (no auth)
+curl -s $NEW_API_URL/api/public/player-ids | jq '.[] | select(.id != null)' | head -5
+# Expected: 5 player ID records
+
+# 404 for missing routes (not a 500)
+curl -s -w "%{http_code}\n" -o /dev/null $NEW_API_URL/api/nonexistent
+# Expected: 404
+```
+
+If the health check fails, check Cloud Run logs:
+
+```bash
+gcloud run services logs read citrus-api \
+  --region=$REGION --project=$PROJECT_ID --limit=50
+```
+
+### 9.6 Check the GOALIE_GSAX regression test
+
+The April 10 regression that broke every goalie player card. We
+shipped a tripwire for it (`d26d232`). Verify it runs against the
+new schema:
+
+```bash
+# From inside the repo (laptop or workstation, doesn't matter — tests
+# hit the real Supabase schema)
+npm run test -- GOALIE_GSAX
+# Expected: pass
+```
+
+If this fails on the new stack, something with the Supabase
+service-role key is wrong — the test can't read the projections
+table. Re-check env vars in 9.3.
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `gcloud run deploy` says "Permission denied on service account" | Deploy SA can't actAs runtime SA | Phase 7 should have granted this; re-run `roles/iam.serviceAccountUser` |
+| Build fails at "copying files" | `.gcloudignore` is blocking something needed | `touch server/.gcloudignore` and re-deploy; or `gcloud beta run deploy` for more forgiving defaults |
+| Build succeeds but health check 503s | Container didn't bind to $PORT | Check `server/src/index.ts` uses `process.env.PORT`. Should already be fixed on this branch. |
+| Deploy succeeds, health check 500s | Supabase env vars wrong | Re-check the --set-env-vars in 9.3; watch logs |
+| CORS error when you hit the URL from a browser | Hono CORS config doesn't allow the new origin | Not needed tonight — we're hitting the API directly. In Phase 10, use the Firebase `.web.app` URL which CORS already permits |
+
+### Rollback
+
+```bash
+# Delete the Cloud Run service (no cost impact, fully reversible)
+gcloud run services delete citrus-api \
+  --region=$REGION --project=$PROJECT_ID
+
+# Or roll a revision back if a bad deploy shipped
+gcloud run services update-traffic citrus-api \
+  --region=$REGION --project=$PROJECT_ID \
+  --to-revisions=<previous-revision>=100
+```
+
+### Checkpoint
+
+- [ ] `gcloud run services list` in new project shows `citrus-api` as Ready
+- [ ] Health endpoint returns `{"status":"ok"}` from the new URL
+- [ ] `NEW_API_URL` written down for Phase 10
+- [ ] Goalie GSAX tripwire test passes
+- [ ] Old prod API (`api.citrusfantasysports.com`) still healthy
+      — confirm: `curl https://api.citrusfantasysports.com/api/health`
+
+---
+
+## Phase 10 — Deploy `@citrus/web` to new Firebase Hosting (.web.app URL) (15 min)
+
+**Purpose.** Stand up the SPA in the new Firebase project at the default
+`citrus-fantasy-prod.web.app` URL. Points at the new Cloud Run API from
+Phase 9. Does NOT touch the custom domain `citrusfantasysports.com` —
+that stays on the old project until cutover.
+
+### 10.1 Build the web app pointed at the new API
+
+The web build bakes in `VITE_API_URL` at build time, so we need to
+build fresh with the new API URL.
+
+```bash
+NEW_API_URL=<from Phase 9.4>
+
+# From repo root
+VITE_API_URL=$NEW_API_URL \
+VITE_SUPABASE_URL=<your-supabase-url> \
+VITE_SUPABASE_ANON_KEY=<your-anon-key> \
+VITE_FIREBASE_API_KEY=<from Phase 6.3> \
+VITE_FIREBASE_APP_ID=<from Phase 6.3> \
+VITE_FIREBASE_MEASUREMENT_ID=<from Phase 6.3 or blank> \
+VITE_SENTRY_DSN=<your sentry dsn, or blank for now> \
+npm run build
+```
+
+The build should complete in ~30–60s. `dist/` now contains the
+production bundle.
+
+**Verify no regressions:**
+
+```bash
+ls -lh apps/web/dist/assets/*.png 2>/dev/null | awk '{print $5, $9}'
+# Total PNG budget: ≤ 512KB per our CI gate. Confirm.
+
+du -sh apps/web/dist/
+# Expect < 5MB gzipped per our budget
+```
+
+### 10.2 Deploy to Firebase Hosting
+
+```bash
+PROJECT_ID=citrus-fantasy-prod
+
+firebase use $PROJECT_ID
+firebase deploy --only hosting --project=$PROJECT_ID
+```
+
+First deploy ~30s. Output:
+
+```
+✔  hosting[citrus-fantasy-prod]: release complete
+Hosting URL: https://citrus-fantasy-prod.web.app
+```
+
+### 10.3 Smoke-test the new site
+
+Open `https://citrus-fantasy-prod.web.app` in an incognito window.
+
+Check:
+
+1. **Page loads** — landing page renders without console errors
+2. **Sign in works** — try signing in with a test account. Supabase
+   auth should succeed because the Supabase project is shared.
+3. **API calls succeed** — open DevTools Network tab. Click anything
+   that triggers an API call (e.g., league list). Confirm requests
+   go to `<NEW_API_URL>/api/*` and return 200.
+4. **No CORS errors** — if you see CORS errors, add the `.web.app`
+   origin to the server's CORS allowlist. Should already be permissive
+   in our Hono setup, but verify.
+5. **Draft room loads** — navigate to a league's draft room. Confirm
+   broadcast / realtime connection establishes (see `ConnectionStatus`
+   component top-right).
+
+### 10.4 Update Supabase auth redirect URLs
+
+Supabase auth only allows redirects to URLs you've whitelisted. To
+let the new `.web.app` URL work for auth flows (email confirmation,
+password reset):
+
+1. https://supabase.com/dashboard → your project → Authentication →
+   URL Configuration
+2. **Site URL:** leave as `https://citrusfantasysports.com` (prod)
+3. **Additional Redirect URLs:** add `https://citrus-fantasy-prod.web.app`
+   (and `https://citrus-fantasy-prod.web.app/**` for path patterns)
+4. Save
+
+This is the one non-GCP step tonight that touches a shared resource.
+Old prod still works — we're only **adding** to the allowlist, not
+replacing.
+
+### 10.5 Optional — hook up a "staging" subdomain
+
+If you want a cleaner URL than `.web.app` for parallel testing,
+create `staging.citrusfantasysports.com`:
+
+1. Firebase Console → new project → Hosting → **Add custom domain**
+2. Enter `staging.citrusfantasysports.com`
+3. Firebase generates a TXT record + A records
+4. Add them in your DNS provider (wherever `citrusfantasysports.com`
+   is registered)
+5. Wait for propagation (5 min to 24h)
+6. Firebase auto-provisions SSL
+
+This is optional. The `.web.app` URL works fine for tonight's smoke
+testing. If you're juggling too much, skip it.
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Build fails with "unknown env VITE_*" | Missing env var in the build command | Re-check 10.1; every VITE_* must be set |
+| Firebase deploy "site does not exist" | Wrong project | `firebase use citrus-fantasy-prod` then retry |
+| Page loads but shows "API not reachable" | `NEW_API_URL` has trailing slash or is wrong | Rebuild with clean URL |
+| Supabase sign-in redirects fail | Didn't add the redirect URL | Go back to 10.4 |
+| Sentry errors fire on load | Sentry DSN is from old project | Either set VITE_SENTRY_DSN blank for tonight, or create a new Sentry project |
+
+### Rollback
+
+```bash
+firebase hosting:disable --project=$PROJECT_ID
+# Takes the .web.app URL offline. Can be re-enabled.
+```
+
+### Checkpoint
+
+- [ ] `https://citrus-fantasy-prod.web.app` loads
+- [ ] Sign-in works (Supabase auth)
+- [ ] Network tab shows calls hitting the new Cloud Run URL
+- [ ] Draft room opens without console errors
+- [ ] Old prod site `citrusfantasysports.com` still working
+      — confirm in a different incognito window
+
+---
+
+## Phase 11 — End-to-end smoke test (20 min)
+
+**Purpose.** Prove the new stack works against real user flows before
+declaring it ready for cutover later this week. Five scenarios,
+executed against `citrus-fantasy-prod.web.app`.
+
+**Before you start:** make sure you have two browsers or one browser
+with two profiles, so you can test multi-user flows.
+
+### 11.1 Auth flow (5 min)
+
+- [ ] Open `citrus-fantasy-prod.web.app` in incognito
+- [ ] Click **Sign up**
+- [ ] Enter a test email + password (use `+citrustest@` alias)
+- [ ] Receive and click the confirmation email
+- [ ] Redirected back to the new site, now signed in
+- [ ] `/api/users/me` returns your user record (check Network tab)
+
+**Failure mode:** Confirmation email links to old site. Fix:
+Phase 10.4 — double-check Additional Redirect URLs on Supabase.
+
+### 11.2 League creation + join (5 min)
+
+- [ ] As the test user, click **Create League**
+- [ ] Create a standard H2H points league, 10 teams, snake draft
+- [ ] Open a second browser, sign up as a different test user
+- [ ] From league settings, get the join code
+- [ ] Second user joins via code
+- [ ] Both users appear in league member list
+
+**Failure mode:** Join fails with 403. The server can't find the
+league for the joining user. RLS issue — verify
+`LeagueMembershipService` is using the per-request Supabase client.
+Already fixed on this branch, but re-verify.
+
+### 11.3 Draft room smoke (5 min)
+
+**Critical flow** — this is what April 10 broke.
+
+- [ ] Both users open the draft room for their league
+- [ ] Commissioner (first user) clicks **Start Draft**
+- [ ] Timer starts and ticks down in both browsers
+- [ ] First user's pick appears in second user's browser within 100ms
+- [ ] `ConnectionStatus` component (top-right) shows **Connected**
+      in both
+- [ ] Open a player card for a goaltender — page loads with GSAX
+      numbers (not 500 error)
+- [ ] Make a few picks on both sides; confirm pick history, team rosters,
+      auto-advance of draft order
+
+**Failure mode:** This is where the April 10 regressions would show
+up. If a goalie card 500s, the GSAX_COLUMNS constant is still wrong
+in the new env — inspect `packages/shared/src/constants/columns.ts:180`.
+If notifications leak between leagues, `NotificationService.ts:109`
+isn't the fixed build.
+
+### 11.4 Concurrent load (3 min, optional but recommended)
+
+Using k6 from the repo (already scaffolded in `scripts/load-test/`):
+
+```bash
+k6 run \
+  --env API_URL=$NEW_API_URL \
+  --env WEB_URL=https://citrus-fantasy-prod.web.app \
+  scripts/load-test/scenarios/smoke.js
+```
+
+- [ ] k6 completes without errors
+- [ ] p95 latency < 500ms
+- [ ] No 5xx responses
+
+### 11.5 Confirm old prod still healthy (2 min)
+
+You've been swimming in the new project for hours. Spot-check
+production is still fine:
+
+- [ ] `curl https://api.citrusfantasysports.com/api/health` → 200
+- [ ] Open `https://citrusfantasysports.com` in incognito — landing
+      page loads
+- [ ] Real user signed in to real league can still see their draft
+
+**If old prod broke while you worked on new:** rare but possible if
+Supabase auth redirect URL edits accidentally removed the prod URL.
+Go back to Phase 10.4 and confirm `https://citrusfantasysports.com`
+is still in the redirect list.
+
+### Checkpoint
+
+- [ ] All 5 scenarios above pass on the new stack
+- [ ] Old prod still works
+- [ ] You have screenshots or a short video of the new stack working
+      (for your CTO/cofounders)
+
+---
+
+## Phase 12 — Document & next steps (15 min)
+
+**Purpose.** Capture what exists now so tomorrow-you (or CTO-you) can
+pick up the cutover cleanly.
+
+### 12.1 Write down the IDs you generated tonight
+
+Create a **private** note in your password manager (1Password secure
+note, Bitwarden, etc.) with:
+
+```
+Citrus Fantasy Sports — New GCP Org — provisioned <date>
+
+ORG_ID                    = <from Phase 1.1>
+BILLING_ACCOUNT_ID        = <from Phase 3.2>
+PROJECT_ID                = citrus-fantasy-prod
+PROJECT_NUMBER            = <from Phase 4.4>
+NEW_API_URL               = <from Phase 9.4>
+NEW_WEB_URL               = https://citrus-fantasy-prod.web.app
+
+Deploy SA                 = citrus-deploy@citrus-fantasy-prod.iam.gserviceaccount.com
+Runtime SA                = citrus-api-runtime@citrus-fantasy-prod.iam.gserviceaccount.com
+
+Deploy SA key             = [stored in 1Password as "GCP_SA_KEY (new org)"]
+Firebase config JSON      = [stored in 1Password as "Firebase config — citrus-fantasy-prod"]
+
+Google for Startups app   = submitted <date>, awaiting approval
+$300 free trial expires   = <90 days from Phase 3 date>
+
+DO NOT ROTATE GITHUB SECRETS YET. That happens in cutover.
+```
+
+### 12.2 DO NOT do these things yet
+
+These are the cutover actions. Doing them tonight would break prod.
+
+- ❌ Change DNS for `citrusfantasysports.com`
+- ❌ Change GitHub Actions secrets (`VITE_API_URL`, `GCP_SA_KEY`,
+  `FIREBASE_SERVICE_ACCOUNT`) from the old values
+- ❌ Disable billing on the old project
+- ❌ Delete the old project
+- ❌ Remove `gstormsff@gmail.com` from the old project IAM
+- ❌ Execute the postmortem ops items (`docs/OPS_CHECKLIST.md`) in
+  the new project — wait until after cutover, otherwise you'll
+  do the work in the wrong project
+
+### 12.3 What TO do in the next 24–48 hours
+
+- Monitor the new stack for stability (you'll get Firebase/Cloud Run
+  usage alerts in your email — eyeball them)
+- Let the Google for Startups application bake (1–3 weeks)
+- Draft the cutover runbook with your CTO:
+  `docs/RUNBOOKS/GCP_PROJECT_CUTOVER.md` (skeleton lives in this repo
+  already — expand it with your specific DNS provider and timing
+  preferences)
+
+### 12.4 Update `CLAUDE.md` with a dated note
+
+Add a line to `CLAUDE.md` under a new "Migration status" section:
+
+```markdown
+## Migration status (as of <date>)
+
+- NEW GCP project `citrus-fantasy-prod` is provisioned under
+  `citrusfantasysports.com` org. See
+  `docs/RUNBOOKS/GCP_ORG_SETUP.md` for what was built.
+- OLD GCP project `citrus-fantasy-sports` (gmail-parented) still
+  serves 100% of production traffic at `citrusfantasysports.com`.
+- Cutover pending. See `docs/RUNBOOKS/GCP_PROJECT_CUTOVER.md`.
+- Do not execute `docs/OPS_CHECKLIST.md` items in the new project
+  until after cutover.
+```
+
+I'll add that paragraph as a follow-up edit to this branch.
+
+### 12.5 Communicate to your CTO
+
+Short message like:
+
+> "Stood up the new GCP org tonight. Old prod is untouched and serving
+> traffic as normal. New stack parallel-running at
+> `citrus-fantasy-prod.web.app` — please poke at it over the next 24h
+> and let me know if anything looks off. If it looks stable, we'll do
+> the DNS cutover this weekend. Your workstation URL: <link>"
+
+### Checkpoint
+
+- [ ] Private note written with all IDs
+- [ ] `CLAUDE.md` update PR / edit in flight
+- [ ] CTO has the new workstation URL and the `.web.app` smoke URL
+- [ ] You've resisted the urge to do any "just one more thing" in the
+      old project tonight
+
+---
+
+## Troubleshooting index — anything that went wrong
+
+If you made it this far, you have a working parallel stack. If you did
+not, jump to the phase where things stopped working:
+
+- Can't see the org: **Phase 1.1**
+- Can't grant yourself roles: **Phase 1.2**
+- Billing failed: **Phase 3**
+- Project won't create: **Phase 4.2**
+- APIs won't enable: **Phase 5.3**
+- Firebase won't link: **Phase 6.1**
+- SA key download broken: **Phase 7.3**
+- Workstation stuck: **Phase 8.2**
+- Cloud Run deploy failing: **Phase 9.3**
+- Firebase Hosting deploy failing: **Phase 10.2**
+- Auth redirect loop: **Phase 10.4**
+- Goalie card 500s: **Phase 11.3**
+
+## Total teardown (nuclear option)
+
+If something is so broken you want to start over:
+
+```bash
+# 1. Delete workstations
+gcloud workstations delete <name> --cluster=citrus-dev-cluster \
+  --config=citrus-dev-config --region=us-central1 --project=citrus-fantasy-prod
+
+# 2. Delete the whole project (30-day recovery window)
+gcloud projects delete citrus-fantasy-prod
+
+# 3. Billing account can be closed from console → Billing → Close
+# 4. Org itself cannot be deleted — it's tied to the Workspace domain.
+#    Only way is to delete the Workspace account, which you do not want.
+```
+
+Old prod (`citrus-fantasy-sports` under `gstormsff@gmail.com`) is
+**unaffected** by any of the above. That's the entire point of doing
+this in parallel.
+
+---
+
+## Related documents
+
+- `docs/LIVE_DRAFT_DISASTER_POSTMORTEM.md` — the April 10 incident
+  this migration helps prevent recurring
+- `docs/RUNBOOKS/PRE_DRAFT_CHECKLIST.md` — T-60/45/30/15/5 draft
+  readiness (will be re-executed against the NEW project after cutover)
+- `docs/OPS_CHECKLIST.md` — 7 console-side ops items (do AFTER cutover)
+- `docs/DEPLOY_RUNBOOK.md` — playoff-readiness deploy runbook (applies
+  to whichever project is currently serving prod)
+- `docs/RUNBOOKS/GCP_PROJECT_CUTOVER.md` — the DNS-flip runbook for
+  later this week
+
+
 
 
