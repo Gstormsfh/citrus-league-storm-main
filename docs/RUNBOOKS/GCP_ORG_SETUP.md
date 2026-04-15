@@ -894,25 +894,70 @@ for role in \
 done
 ```
 
-### 7.3 Download the deploy SA key (ONLY the deploy one)
+### 7.3 Deploy-SA auth — SKIP tonight
 
-This key goes into GitHub Actions as `GCP_SA_KEY`. The runtime SA
-does **not** need a key — Cloud Run uses workload identity
-automatically.
+Tonight's Phase 9/10 deploys run from your local terminal using your
+own interactive `gcloud` / `firebase login` auth. CI auth for the new
+project is explicitly out of scope for tonight per the runbook header
+("rotating GitHub Actions secrets to the new SA" is cutover work).
+
+On a fresh Org, Google now enables
+`constraints/iam.disableServiceAccountKeyCreation` by default — trying
+to download a long-lived SA key will fail with `FAILED_PRECONDITION`.
+That's the secure default and we're going to keep it.
+
+When cutover night arrives, wire GitHub Actions to the new project via
+**Workload Identity Federation** instead — no key ever created, GitHub
+→ GCP via OIDC. The rough outline (do NOT execute tonight):
 
 ```bash
+# At cutover time, not now:
+gcloud iam workload-identity-pools create github \
+  --location=global --display-name="GitHub Actions" \
+  --project=$PROJECT_ID
+
+gcloud iam workload-identity-pools providers create-oidc github-provider \
+  --workload-identity-pool=github --location=global \
+  --issuer-uri=https://token.actions.githubusercontent.com \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  --attribute-condition="assertion.repository=='gstormsfh/citrus-league-storm-main'" \
+  --project=$PROJECT_ID
+
+gcloud iam service-accounts add-iam-policy-binding $DEPLOY_SA \
+  --role=roles/iam.workloadIdentityUser \
+  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/gstormsfh/citrus-league-storm-main" \
+  --project=$PROJECT_ID
+```
+
+Then `production-deploy.yml` swaps `credentials_json` for
+`workload_identity_provider` + `service_account`.
+
+**Net effect tonight:** Phase 7.3 is a no-op. The `citrus-deploy` SA
+exists with the right roles, ready to be bound to WIF at cutover.
+
+#### Fallback: if you need CI auth NOW for some reason
+
+Only override the org policy if you've decided you cannot wait for
+cutover to wire CI. This is strongly discouraged — it creates a
+long-lived credential exactly the kind the April 10 postmortem flagged
+as a rotation hazard. The commands exist if you need them:
+
+```bash
+# Temporarily allow key creation (requires Organization Policy Admin role)
+gcloud resource-manager org-policies disable-enforce \
+  iam.disableServiceAccountKeyCreation \
+  --project=$PROJECT_ID
+
+# Now the 7.3 original command works:
 gcloud iam service-accounts keys create ~/citrus-deploy-key.json \
   --iam-account=$DEPLOY_SA \
   --project=$PROJECT_ID
 
-# Display it for copy-paste into GitHub secrets (Phase 12)
-cat ~/citrus-deploy-key.json
+# Immediately re-enable the constraint after:
+gcloud resource-manager org-policies enable-enforce \
+  iam.disableServiceAccountKeyCreation \
+  --project=$PROJECT_ID
 ```
-
-**⚠️ Security:** This file is equivalent to a username+password for
-your deploy SA. Do not commit it. Do not paste it into chat. After
-storing it in GitHub Actions secrets (Phase 12), delete the local file:
-`rm ~/citrus-deploy-key.json`.
 
 ### 7.4 Pre-seed Secret Manager for later
 
@@ -977,8 +1022,7 @@ gcloud iam service-accounts keys delete <KEY_ID> --iam-account=$DEPLOY_SA --proj
 
 - [ ] `citrus-deploy` SA exists with 6 roles
 - [ ] `citrus-api-runtime` SA exists with 3 roles
-- [ ] Deploy SA key saved in your password manager
-- [ ] Local `~/citrus-deploy-key.json` deleted
+- [ ] (deferred to cutover) Workload Identity Federation for CI
 - [ ] 4 placeholder secrets exist in Secret Manager
 
 ---
