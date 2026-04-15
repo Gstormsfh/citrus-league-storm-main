@@ -1347,9 +1347,14 @@ gcloud run deploy citrus-api \
   --cpu-boost \
   --no-cpu-throttling \
   --allow-unauthenticated \
-  --set-env-vars="NODE_ENV=production,PORT=8080,VITE_SUPABASE_URL=<your-supabase-url>,SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>,VITE_SUPABASE_ANON_KEY=<your-anon-key>"
+  --set-env-vars="NODE_ENV=production,VITE_SUPABASE_URL=<your-supabase-url>,SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>,VITE_SUPABASE_ANON_KEY=<your-anon-key>"
 cd ..
 ```
+
+**⚠️ Do not include `PORT` in `--set-env-vars`.** Cloud Run reserves
+the `PORT` env var and will reject the deploy with `The following
+reserved env names were provided: PORT`. The Hono server already
+reads `process.env.PORT` and Cloud Run injects it (default 8080).
 
 **Security note:** env vars for secrets are a stopgap for tonight's
 parallel test. Before cutover we migrate these to Secret Manager
