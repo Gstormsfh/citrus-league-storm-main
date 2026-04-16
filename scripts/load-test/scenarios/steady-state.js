@@ -90,29 +90,37 @@ export default function () {
 }
 
 export function handleSummary(data) {
-  const errorRate = data.metrics.http_req_failed.values.rate;
-  const p95 = data.metrics.http_req_duration.values['p(95)'];
-  const p99 = data.metrics.http_req_duration.values['p(99)'];
+  const v = data.metrics.http_req_duration.values;
+  const num = (x) => (typeof x === 'number' ? x : 0);
+  const errorRate = num(data.metrics.http_req_failed.values.rate);
+  const p50 = num(v.med ?? v['p(50)']);
+  const p95 = num(v['p(95)']);
+  const p99 = num(v['p(99)']);
+  const maxLat = num(v.max);
+  const peakVUs = num(data.metrics.vus_max.values.max);
+  const totalReqs = num(data.metrics.http_reqs.values.count);
+  const throughput = num(data.metrics.http_reqs.values.rate);
+  const checksRate = num(data.metrics.checks?.values?.rate);
   const passed = errorRate < 0.005 && p95 < 1000 && p99 < 2000;
 
   const report = `\n${'='.repeat(70)}\n` +
-    `STEADY-STATE 200-USER TEST — ${passed ? 'PASS ✓' : 'FAIL ✗'}\n` +
+    `STEADY-STATE 200-USER TEST — ${passed ? 'PASS' : 'FAIL'}\n` +
     `${'='.repeat(70)}\n` +
     `Duration: 13 minutes\n` +
-    `Peak VUs: ${data.metrics.vus_max.values.max}\n` +
-    `Total requests: ${data.metrics.http_reqs.values.count}\n` +
-    `Throughput: ${(data.metrics.http_reqs.values.rate).toFixed(1)} req/s\n` +
+    `Peak VUs: ${peakVUs}\n` +
+    `Total requests: ${totalReqs}\n` +
+    `Throughput: ${throughput.toFixed(1)} req/s\n` +
     `\n` +
     `Latency:\n` +
-    `  p50: ${(data.metrics.http_req_duration.values.med ?? data.metrics.http_req_duration.values['p(50)'] ?? 0).toFixed(0)}ms\n` +
-    `  p95: ${p95.toFixed(0)}ms (budget: 1000ms) ${p95 < 1000 ? '✓' : '✗'}\n` +
-    `  p99: ${p99.toFixed(0)}ms (budget: 2000ms) ${p99 < 2000 ? '✓' : '✗'}\n` +
-    `  max: ${data.metrics.http_req_duration.values.max.toFixed(0)}ms\n` +
+    `  p50: ${p50.toFixed(0)}ms\n` +
+    `  p95: ${p95.toFixed(0)}ms (budget: 1000ms) ${p95 < 1000 ? 'OK' : 'FAIL'}\n` +
+    `  p99: ${p99.toFixed(0)}ms (budget: 2000ms) ${p99 < 2000 ? 'OK' : 'FAIL'}\n` +
+    `  max: ${maxLat.toFixed(0)}ms\n` +
     `\n` +
     `Errors:\n` +
-    `  Failed requests: ${(errorRate * 100).toFixed(3)}% (budget: 0.5%) ${errorRate < 0.005 ? '✓' : '✗'}\n` +
+    `  Failed requests: ${(errorRate * 100).toFixed(3)}% (budget: 0.5%) ${errorRate < 0.005 ? 'OK' : 'FAIL'}\n` +
     `\n` +
-    `Checks passed: ${(data.metrics.checks.values.rate * 100).toFixed(1)}%\n` +
+    `Checks passed: ${(checksRate * 100).toFixed(1)}%\n` +
     `${'='.repeat(70)}\n` +
     `\n` +
     `Cross-reference against GCP Cloud Run metrics during this window:\n` +

@@ -69,17 +69,21 @@ export default function () {
 
 // Teardown runs once after all VUs finish. Print a concrete pass/fail.
 export function handleSummary(data) {
-  const passed =
-    data.metrics.http_req_failed.values.rate < 0.001 &&
-    data.metrics.http_req_duration.values['p(95)'] < 500;
+  const v = data.metrics.http_req_duration.values;
+  const num = (x) => (typeof x === 'number' ? x : 0);
+  const p50 = num(v.med ?? v['p(50)']);
+  const p95 = num(v['p(95)']);
+  const p99 = num(v['p(99)']);
+  const errorRate = num(data.metrics.http_req_failed.values.rate);
+  const passed = errorRate < 0.001 && p95 < 500;
 
   const summary = {
     'stdout': `\n${'='.repeat(60)}\nSMOKE TEST — ${passed ? 'PASS' : 'FAIL'}\n${'='.repeat(60)}\n` +
-      `Requests: ${data.metrics.http_reqs.values.count}\n` +
-      `Error rate: ${(data.metrics.http_req_failed.values.rate * 100).toFixed(3)}%\n` +
-      `p50 latency: ${(data.metrics.http_req_duration.values.med ?? data.metrics.http_req_duration.values['p(50)'] ?? 0).toFixed(0)}ms\n` +
-      `p95 latency: ${data.metrics.http_req_duration.values['p(95)'].toFixed(0)}ms\n` +
-      `p99 latency: ${data.metrics.http_req_duration.values['p(99)'].toFixed(0)}ms\n` +
+      `Requests: ${num(data.metrics.http_reqs.values.count)}\n` +
+      `Error rate: ${(errorRate * 100).toFixed(3)}%\n` +
+      `p50 latency: ${p50.toFixed(0)}ms\n` +
+      `p95 latency: ${p95.toFixed(0)}ms\n` +
+      `p99 latency: ${p99.toFixed(0)}ms\n` +
       `${'='.repeat(60)}\n\n`,
   };
   return summary;
