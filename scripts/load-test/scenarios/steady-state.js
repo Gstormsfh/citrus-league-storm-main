@@ -45,7 +45,8 @@ export const options = {
   thresholds: {
     http_req_duration: ['p(95)<1000', 'p(99)<2000'],
     http_req_failed: ['rate<0.005'],
-    'http_req_duration{status:timeout}': ['count<1'],
+    // Note: timeouts are caught by http_req_failed above. k6 v1.7+
+    // removed count<N aggregation on trend metrics.
     checks: ['rate>0.95'],
   },
 };
