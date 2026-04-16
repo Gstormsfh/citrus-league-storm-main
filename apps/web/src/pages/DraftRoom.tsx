@@ -622,17 +622,12 @@ const DraftRoom = () => {
           draftTimerStartedRef.current = true;
         }
 
-        // Check if user was previously in ACTIVE phase (returning from another page/tab)
-        const cachedPhase = ssGet(`draft_phase_${leagueId}`);
-        if (cachedPhase === DraftPhase.ACTIVE) {
-          // Auto-resume to ACTIVE phase without requiring lobby click
-          setDraftPhase(DraftPhase.ACTIVE);
-          logger.debug('DraftRoom: Auto-resuming to ACTIVE phase from sessionStorage');
-        } else {
-          // Show LOBBY - user clicks "Join Draft" to enter ACTIVE phase
-          setDraftPhase(DraftPhase.LOBBY);
-          logger.debug('DraftRoom: Showing LOBBY with join banner for user:', user.id);
-        }
+        // Auto-join: state is pre-loaded above, no reason to force a manual "Join" click.
+        // This matches the realtime path (line 1241) and prevents users who arrive
+        // during an active draft from being stuck watching the lobby while picks happen.
+        setDraftPhase(DraftPhase.ACTIVE);
+        ssPut(`draft_phase_${leagueId}`, String(DraftPhase.ACTIVE));
+        logger.debug('DraftRoom: Auto-joined in-progress draft on initial load');
       } else if (leagueData.draft_status === 'completed') {
         // Draft completed
         if (hasActiveDraftData) {
