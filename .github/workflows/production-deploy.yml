@@ -142,8 +142,8 @@ jobs:
       - name: Build and push Docker image
         if: steps.check-gcp.outputs.has_creds == 'true'
         run: |
-          IMAGE="us-central1-docker.pkg.dev/citrus-fantasy-sports/citrus-api/server:${{ github.sha }}"
-          LATEST="us-central1-docker.pkg.dev/citrus-fantasy-sports/citrus-api/server:latest"
+          IMAGE="us-central1-docker.pkg.dev/citrus-fantasy-prod/citrus-api/server:${{ github.sha }}"
+          LATEST="us-central1-docker.pkg.dev/citrus-fantasy-prod/citrus-api/server:latest"
           docker build -t "$IMAGE" -t "$LATEST" -f Dockerfile .
           docker push "$IMAGE"
           docker push "$LATEST"
@@ -155,7 +155,7 @@ jobs:
         with:
           service: citrus-api
           region: us-central1
-          image: us-central1-docker.pkg.dev/citrus-fantasy-sports/citrus-api/server:${{ github.sha }}
+          image: us-central1-docker.pkg.dev/citrus-fantasy-prod/citrus-api/server:${{ github.sha }}
           env_vars: |
             NODE_ENV=production
             SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
@@ -232,7 +232,7 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: citrus-fantasy-sports
+          projectId: citrus-fantasy-prod
           channelId: live
 
       - name: Post-deploy health check

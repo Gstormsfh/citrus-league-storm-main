@@ -5,7 +5,7 @@
 # Prerequisites:
 #   - gcloud CLI installed and authenticated
 #   - Docker installed and running
-#   - Project: citrus-fantasy-sports
+#   - Project: citrus-fantasy-prod
 #   - Artifact Registry repo: citrus-api (us-central1)
 #
 # Usage:
@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-PROJECT_ID="citrus-fantasy-sports"
+PROJECT_ID="citrus-fantasy-prod"
 REGION="us-central1"
 SERVICE="citrus-api"
 REGISTRY="us-central1-docker.pkg.dev/${PROJECT_ID}/citrus-api"
@@ -85,12 +85,14 @@ if [ "${SECRETS_EXIST}" = true ]; then
     --region="${REGION}" \
     --platform=managed \
     --allow-unauthenticated \
-    --memory=512Mi \
-    --cpu=1 \
-    --min-instances=0 \
-    --max-instances=3 \
+    --memory=2Gi \
+    --cpu=2 \
+    --min-instances=1 \
+    --max-instances=10 \
     --concurrency=80 \
     --timeout=60s \
+    --no-cpu-throttling \
+    --cpu-boost \
     --set-env-vars="NODE_ENV=production,PORT=8080" \
     --set-secrets="SUPABASE_URL=SUPABASE_URL:latest,SUPABASE_ANON_KEY=SUPABASE_ANON_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest" \
     --quiet
@@ -110,9 +112,10 @@ else
   echo "         --region=${REGION} \\"
   echo "         --platform=managed \\"
   echo "         --allow-unauthenticated \\"
-  echo "         --memory=512Mi --cpu=1 \\"
-  echo "         --min-instances=0 --max-instances=3 \\"
+  echo "         --memory=2Gi --cpu=2 \\"
+  echo "         --min-instances=1 --max-instances=10 \\"
   echo "         --concurrency=80 --timeout=60s \\"
+  echo "         --no-cpu-throttling --cpu-boost \\"
   echo "         --set-env-vars='NODE_ENV=production,PORT=8080,SUPABASE_URL=<url>,SUPABASE_ANON_KEY=<key>,SUPABASE_SERVICE_ROLE_KEY=<key>'"
   exit 1
 fi

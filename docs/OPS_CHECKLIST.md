@@ -4,7 +4,38 @@ Console-side work that has to be done by a human with the right credentials.
 None of this is code — it's GCP / Firebase / GitHub / Sentry / BetterStack
 console work. Track status in the checkboxes.
 
-Updated: 2026-04-14
+Updated: 2026-04-15
+
+---
+
+## ⚠️ GCP migration in progress — do not execute against the wrong project
+
+We are standing up a new GCP Organization + project
+(`citrus-fantasy-prod`) under `citrusfantasysports.com`, replacing the
+legacy `citrus-fantasy-sports` project parented under
+`gstormsff@gmail.com`.
+
+**See `docs/RUNBOOKS/GCP_ORG_SETUP.md` for the tonight runbook** that
+provisions the new stack in parallel.
+
+**Do NOT execute the items below against the NEW project until AFTER**
+the cutover runbook (`docs/RUNBOOKS/GCP_PROJECT_CUTOVER.md`) has moved
+production traffic. Until then:
+
+- §1–§6 in this file apply to whichever project is currently serving
+  `citrusfantasysports.com`. As of 2026-04-15, that's
+  `citrus-fantasy-sports` (old). After cutover, that's
+  `citrus-fantasy-prod` (new).
+- §7 (firebase.json dedup) is code-level, so it applies regardless.
+- Executing §1–§6 on the new project before cutover means you do the
+  work in a project that isn't serving users — wasted effort and
+  potential confusion at cutover time.
+
+**Cutover target:** this weekend / when new stack has 24–48h of
+parallel-stability data.
+
+---
+
 
 ---
 

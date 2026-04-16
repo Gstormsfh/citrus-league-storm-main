@@ -82,14 +82,17 @@ app.get('/api/health', async (c) => {
   const checks: Record<string, string> = {};
   let healthy = true;
 
-  // Database connectivity check
+  // Database connectivity check — use service role key for the probe because
+  // PostgREST restricts the root /rest/v1/ endpoint for the anon role.
+  // Falls back to anon key if service role is unavailable.
   try {
     const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    const healthKey = process.env.SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+    if (SUPABASE_URL && healthKey) {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/`, {
         method: 'HEAD',
-        headers: { apikey: SUPABASE_ANON_KEY },
+        headers: { apikey: healthKey, Authorization: `Bearer ${healthKey}` },
         signal: AbortSignal.timeout(3000),
       });
       checks.database = res.ok ? 'ok' : 'degraded';
