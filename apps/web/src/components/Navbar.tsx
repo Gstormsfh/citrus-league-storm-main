@@ -174,7 +174,10 @@ const Navbar = () => {
                     return (
                     <DropdownMenuItem
                       key={l.id}
-                      onSelect={() => {
+                      // onClick fires reliably on both mouse and touch; onSelect is
+                      // inconsistent on mobile Safari where Radix's pointerdown
+                      // handling can swallow the selection before it propagates.
+                      onClick={() => {
                         setActiveLeagueId(l.id);
                         // Path-aware navigation: see mobile dropdown below for rationale.
                         if (isPoolLeague(lType)) {
@@ -408,7 +411,10 @@ const Navbar = () => {
                       return (
                       <DropdownMenuItem
                         key={l.id}
-                        onSelect={() => {
+                        // onClick instead of onSelect — onSelect is unreliable on
+                        // mobile touch (Radix pointerdown can close before the
+                        // selection event fires, leaving activeLeagueId unchanged).
+                        onClick={() => {
                           setActiveLeagueId(l.id);
                           // Path-aware navigation: pages that use path-based league IDs
                           // (useParams) need an explicit navigate, otherwise the page

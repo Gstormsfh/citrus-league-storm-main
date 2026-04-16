@@ -160,7 +160,10 @@ const MobileMenuButton = () => {
                       return (
                         <DropdownMenuItem
                           key={l.id}
-                          onSelect={() => {
+                          // onClick instead of onSelect — onSelect is unreliable on
+                          // mobile touch where Radix's pointerdown handling can
+                          // swallow the selection before it propagates.
+                          onClick={() => {
                             setActiveLeagueId(l.id);
                             // Path-aware navigation: pages that use path-based league IDs
                             // (useParams) need an explicit navigate, otherwise the page
