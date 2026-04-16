@@ -241,6 +241,22 @@ export class DraftService {
         return { pick: null, error: 'Player already drafted', isComplete: false };
       }
       if (errMsg.includes('idx_draft_picks_unique_pick') || errMsg.includes('unique_pick')) {
+        // Race condition: client computed pickNumber=N based on stale state, but another
+        // pick landed under pickNumber=N between our check and our insert. Our player
+        // MAY have been accepted under a different pick_number by the RPC's advance-and-retry
+        // path. Check before surfacing a user-facing error — silently accept if the player
+        // is now drafted (realtime will reconcile the client state).
+        const { data: ourPick } = await this.supabase
+          .from('draft_picks')
+          .select('id, pick_number, round_number')
+          .eq('league_id', leagueId)
+          .eq('player_id', String(playerId))
+          .is('deleted_at', null)
+          .maybeSingle();
+        if (ourPick) {
+          logger.log('makePick: recovered from pick-number race', { leagueId, playerId, actualPick: ourPick.pick_number });
+          return { pick: ourPick as Record<string, unknown>, error: null, isComplete: false };
+        }
         return { pick: null, error: 'Pick number already used', isComplete: false };
       }
       return { pick: null, error: errMsg, isComplete: false };

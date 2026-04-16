@@ -1833,10 +1833,14 @@ const DraftRoom = () => {
     timerRunningRef.current = true;
 
     return cleanup;
-  // Timer interval: draftPhase and currentTeam are accessed via refs to avoid unnecessary interval
-  // recreation. draftState is accessed via ?.currentPick granularly. handleAutoDraftRef is a stable ref.
+  // Timer interval: dependencies intentionally scoped to timerStartedAt + pickTimeLimit only.
+  // currentPick was removed from deps because every realtime pick event bumps currentPick,
+  // which was tearing down and recreating the interval mid-second — causing visible stutter
+  // and occasional freezes observed during the canary. The interval computes elapsed time
+  // via Date.now() each tick, so it stays accurate without re-instantiation. draftPhase,
+  // currentTeam, and handleAutoDraft are all accessed via stable refs inside updateTimer.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [league?.settings?.timerStartedAt, draftSettings.pickTimeLimit, draftState?.currentPick]);
+  }, [league?.settings?.timerStartedAt, draftSettings.pickTimeLimit]);
 
   // When user enables auto-draft mid-turn, immediately trigger auto-pick
   useEffect(() => {
