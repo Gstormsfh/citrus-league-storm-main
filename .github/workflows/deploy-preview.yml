@@ -98,7 +98,7 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: citrus-fantasy-sports
+          projectId: citrus-fantasy-prod
           expires: 7d
 
       - name: Post preview URL comment
