@@ -987,7 +987,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 artifact-registry permissions Cloud Build needs to stage source,
 write logs, and push images.
 
-### 7.3b Disable the domain-restriction org policy (new-project gotcha #2)
+### 7.3b Allow public IAM bindings (new-project gotcha #2)
 
 New GCP orgs ship with `constraints/iam.allowedPolicyMemberDomains`
 enforced. It blocks adding `allUsers` to any IAM binding, which means
@@ -995,30 +995,62 @@ enforced. It blocks adding `allUsers` to any IAM binding, which means
 service stays unreachable from the public internet. Phase 9's
 parallel-stack smoke test needs the API publicly reachable.
 
-**Prerequisite:** Workspace super-admin / Org Admin is *not* the same
-as `roles/orgpolicy.policyAdmin` in IAM. The disable command below
-will fail with `does not have permission to access projects instance
-[...:setOrgPolicy]` until you grant yourself the role at the org level.
+**Three gotchas compound here — handle them in order:**
+
+1. **`iam.allowedPolicyMemberDomains` is a list constraint, not boolean.**
+   `gcloud resource-manager org-policies disable-enforce` appears to
+   succeed but only sets an empty `booleanPolicy: {}` that has no effect
+   on the inherited list policy. Use `gcloud org-policies set-policy`
+   with a YAML file that explicitly sets `allowAll: true` instead.
+
+2. **Org Admin ≠ `roles/orgpolicy.policyAdmin`.** Workspace super-admin
+   lets you create orgs and projects, but the Org Policy Admin IAM role
+   is separate. Without it, `set-policy` fails with `does not have
+   permission to access projects instance [...:setOrgPolicy]`.
+
+3. **The Org Policy API is not enabled by default on new projects.**
+   `set-policy` will fail with `SERVICE_DISABLED` until you enable
+   `orgpolicy.googleapis.com` on the project.
 
 ```bash
 # 1) Find your org ID
 gcloud organizations list
 
-# 2) Grant yourself orgpolicy.policyAdmin (replace ORG_ID + email)
+# 2) Grant yourself orgpolicy.policyAdmin at the org level
 gcloud organizations add-iam-policy-binding $ORG_ID \
   --member="user:you@yourdomain.com" \
   --role="roles/orgpolicy.policyAdmin"
 
-# Wait ~30s for IAM propagation, then disable the constraint:
-gcloud resource-manager org-policies disable-enforce \
-  constraints/iam.allowedPolicyMemberDomains \
-  --project=$PROJECT_ID
+# 3) Enable the Org Policy API on the project
+gcloud services enable orgpolicy.googleapis.com --project=$PROJECT_ID
+
+# 4) Write an allow-all policy file (YAML, v2 API shape)
+cat > /tmp/allow-all-domains.yaml <<EOF
+name: projects/$PROJECT_ID/policies/iam.allowedPolicyMemberDomains
+spec:
+  rules:
+    - allowAll: true
+EOF
+
+# 5) Apply it (wait ~30s after step 2 and step 3 for propagation)
+gcloud org-policies set-policy /tmp/allow-all-domains.yaml
+
+# 6) Verify — should show `allowAll: true` in effective policy
+gcloud org-policies describe \
+  iam.allowedPolicyMemberDomains \
+  --project=$PROJECT_ID \
+  --effective
 ```
 
-After the binding is in place in Phase 9, you can re-enable enforcement
-if you want — existing bindings stay. Most teams leave it off at the
-project level for this reason; the constraint is more useful at org
-scope to catch drift in *new* projects.
+List-policy propagation can take up to ~60s after step 5 before the
+`allUsers` binding in Phase 9.5 will succeed. If the binding still fails
+with `FAILED_PRECONDITION: ... do not belong to a permitted customer`,
+wait another minute and retry — don't re-apply the policy.
+
+After the `allUsers` binding is in place, you can re-enable enforcement
+at the org level if you want — existing bindings stay. Most teams leave
+this policy permissive at the project level; the constraint is more
+useful at org scope to catch drift in *new* projects.
 
 ### 7.4 Pre-seed Secret Manager for later
 
