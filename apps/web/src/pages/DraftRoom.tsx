@@ -132,7 +132,13 @@ const DraftRoom = () => {
   const [draftQueue, setDraftQueue] = useState<string[]>([]);
   const [randomizedTeamOrder, setRandomizedTeamOrder] = useState<string[] | null>(null);
   const [customDraftOrder, setCustomDraftOrder] = useState<string[] | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('players');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    try { return sessionStorage.getItem('draftRoomTab') || 'players'; } catch { return 'players'; }
+  });
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    try { sessionStorage.setItem('draftRoomTab', tab); } catch { /* quota */ }
+  };
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [orderedTeamsForBoard, setOrderedTeamsForBoard] = useState<(Team & { owner_name?: string })[]>([]);
@@ -3593,6 +3599,44 @@ const DraftRoom = () => {
                   </div>
                 </div>
 
+                {/* Mobile draft-order bar — next picks at a glance so users don't need to switch tabs */}
+                {teams.length > 1 && draftState && (
+                  <div className="flex items-center gap-1 mt-1.5 overflow-x-auto text-xs lg:hidden pb-0.5 scrollbar-styled">
+                    <span className="text-muted-foreground flex-shrink-0 text-[10px]">Next:</span>
+                    {(() => {
+                      const boardOrder = orderedTeamsForBoard.length > 0 ? orderedTeamsForBoard : teams;
+                      const teamsCount = boardOrder.length;
+                      const draftType = ((league?.settings as LeagueSettings)?.draftType || 'snake') as string;
+                      const isLinear = draftType === 'linear';
+                      const picks: { team: typeof boardOrder[0]; isCurrent: boolean }[] = [];
+                      for (let i = 0; i < Math.min(6, teamsCount * 2); i++) {
+                        const pickNum = (draftState.currentPick || 1) + i;
+                        const round = Math.floor((pickNum - 1) / teamsCount) + 1;
+                        const pickInRound = (pickNum - 1) % teamsCount;
+                        const isReversed = !isLinear && round % 2 === 0;
+                        const roundOrder = isReversed ? [...boardOrder].reverse() : boardOrder;
+                        const team = roundOrder[pickInRound];
+                        if (team) picks.push({ team, isCurrent: i === 0 });
+                      }
+                      return picks.map((p, i) => (
+                        <span
+                          key={i}
+                          className={cn(
+                            'px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap flex-shrink-0',
+                            p.isCurrent
+                              ? 'bg-primary text-primary-foreground'
+                              : p.team.owner_id === user?.id
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                : 'bg-muted text-muted-foreground'
+                          )}
+                        >
+                          {p.team.team_name.length > 10 ? p.team.team_name.slice(0, 10) + '…' : p.team.team_name}
+                        </span>
+                      ));
+                    })()}
+                  </div>
+                )}
+
                 {/* Row 2: Player spotlight — selected player, queued player, or last pick */}
                 {selectedPlayer ? (
                   <div className="mt-2 flex items-center gap-2 bg-primary/10 border-2 border-primary/30 rounded-lg px-3 py-2.5 shadow-sm">
@@ -3726,7 +3770,7 @@ const DraftRoom = () => {
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-6" style={{ minWidth: 0 }}>
                 {/* Main Draft Area */}
                 <div className="lg:col-span-3" style={{ minWidth: 0 }}>
-                  <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-6" style={{ minWidth: 0 }}>
+                  <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-3 sm:space-y-6" style={{ minWidth: 0 }}>
                     {/* Mobile: 4 tabs (includes Roster). Desktop: 3 tabs (Roster in sidebar) */}
                     <TabsList className="grid w-full grid-cols-4 lg:grid-cols-3 h-11 sm:h-10">
                       <TabsTrigger value="players" className="flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
