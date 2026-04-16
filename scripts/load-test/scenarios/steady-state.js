@@ -51,13 +51,15 @@ export const options = {
 };
 
 // Realistic user behavior — simulates browsing the site.
-// Weight reflects traffic mix: most traffic is landing page + player
-// lookups, some is schedule/matchup pages.
+// Weight reflects traffic mix: most traffic is landing page + demo
+// league lookups, some is schedule/matchup pages.
+const DEMO_LEAGUE_ID = '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
+const TODAY = new Date().toISOString().slice(0, 10);
 const BROWSE_FLOWS = [
   { weight: 40, path: '/api/health', name: 'health' },
-  { weight: 30, path: '/api/public/players', name: 'public_players' },
-  { weight: 20, path: '/api/public/teams', name: 'public_teams' },
-  { weight: 10, path: '/api/public/schedule', name: 'public_schedule' },
+  { weight: 30, path: `/api/public/leagues/${DEMO_LEAGUE_ID}`, name: 'public_league' },
+  { weight: 20, path: `/api/public/leagues/${DEMO_LEAGUE_ID}/teams`, name: 'public_teams' },
+  { weight: 10, path: `/api/public/schedule/games?date=${TODAY}`, name: 'public_schedule' },
 ];
 
 function pickFlow() {
@@ -102,7 +104,7 @@ export function handleSummary(data) {
     `Throughput: ${(data.metrics.http_reqs.values.rate).toFixed(1)} req/s\n` +
     `\n` +
     `Latency:\n` +
-    `  p50: ${data.metrics.http_req_duration.values.med.toFixed(0)}ms\n` +
+    `  p50: ${(data.metrics.http_req_duration.values.med ?? data.metrics.http_req_duration.values['p(50)'] ?? 0).toFixed(0)}ms\n` +
     `  p95: ${p95.toFixed(0)}ms (budget: 1000ms) ${p95 < 1000 ? '✓' : '✗'}\n` +
     `  p99: ${p99.toFixed(0)}ms (budget: 2000ms) ${p99 < 2000 ? '✓' : '✗'}\n` +
     `  max: ${data.metrics.http_req_duration.values.max.toFixed(0)}ms\n` +

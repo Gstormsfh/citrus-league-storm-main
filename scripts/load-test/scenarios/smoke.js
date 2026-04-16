@@ -54,13 +54,14 @@ export default function () {
 
   sleep(1);
 
-  // Endpoint 2: public players list (validates DB reachability)
-  const players = http.get(`${TARGET_URL}/api/public/players`, {
-    tags: { endpoint: 'public_players' },
+  // Endpoint 2: public demo league (validates DB reachability via leagues table)
+  const DEMO_LEAGUE_ID = '750f4e1a-92ae-44cf-a798-2f3e06d0d5c9';
+  const league = http.get(`${TARGET_URL}/api/public/leagues/${DEMO_LEAGUE_ID}`, {
+    tags: { endpoint: 'public_league' },
   });
-  check(players, {
-    'public players status 200': (r) => r.status === 200,
-    'public players has content': (r) => r.body.length > 100,
+  check(league, {
+    'public league status 200': (r) => r.status === 200,
+    'public league has content': (r) => r.body.length > 100,
   });
 
   sleep(2);
@@ -76,7 +77,7 @@ export function handleSummary(data) {
     'stdout': `\n${'='.repeat(60)}\nSMOKE TEST — ${passed ? 'PASS' : 'FAIL'}\n${'='.repeat(60)}\n` +
       `Requests: ${data.metrics.http_reqs.values.count}\n` +
       `Error rate: ${(data.metrics.http_req_failed.values.rate * 100).toFixed(3)}%\n` +
-      `p50 latency: ${data.metrics.http_req_duration.values.med.toFixed(0)}ms\n` +
+      `p50 latency: ${(data.metrics.http_req_duration.values.med ?? data.metrics.http_req_duration.values['p(50)'] ?? 0).toFixed(0)}ms\n` +
       `p95 latency: ${data.metrics.http_req_duration.values['p(95)'].toFixed(0)}ms\n` +
       `p99 latency: ${data.metrics.http_req_duration.values['p(99)'].toFixed(0)}ms\n` +
       `${'='.repeat(60)}\n\n`,
