@@ -138,128 +138,72 @@ export const PlayerPool = memo(({
       return matchesSearch && matchesPosition && matchesDraftStatus;
     });
 
-    filtered.sort((a, b) => {
+    // Sort goalies and skaters separately to avoid cross-type NaN comparisons
+    // (goalies have wins/saves/gaa, skaters have points/goals/assists — mixing them
+    // produces NaN from undefined fields, causing "wonky" sort in All Players view).
+    const goalieSort = (a: typeof filtered[0], b: typeof filtered[0]) => {
       let comparison = 0;
-      const isGoalie = a.position === 'G' || b.position === 'G';
-      
-      // Goalie-specific sorting
-      if (isGoalie && selectedPosition === 'G') {
-        switch (sortBy) {
-          case 'wins':
-            comparison = (b.wins || 0) - (a.wins || 0);
-            break;
-          case 'losses':
-            comparison = (b.losses || 0) - (a.losses || 0);
-            break;
-          case 'gaa': {
-            // Lower GAA is better, so reverse the comparison
-            const gaaA = a.goals_against_average || 999;
-            const gaaB = b.goals_against_average || 999;
-            comparison = gaaA - gaaB;
-            break;
-          }
-          case 'savePct': {
-            // Higher save % is better
-            const svA = a.save_percentage || 0;
-            const svB = b.save_percentage || 0;
-            comparison = svB - svA;
-            break;
-          }
-          case 'saves':
-            comparison = (b.saves || 0) - (a.saves || 0);
-            break;
-          case 'shutouts':
-            comparison = (b.shutouts || 0) - (a.shutouts || 0);
-            break;
-          case 'fpts': {
-            comparison = (fptsMap.get(b.id) || 0) - (fptsMap.get(a.id) || 0);
-            break;
-          }
-          case 'fptsPerGp': {
-            const fptsA = a.games_played ? (fptsMap.get(a.id) || 0) / a.games_played : 0;
-            const fptsB = b.games_played ? (fptsMap.get(b.id) || 0) / b.games_played : 0;
-            comparison = fptsB - fptsA;
-            break;
-          }
-          case 'projFpts':
-            comparison = (projectedFptsMap.get(b.id)?.total || 0) - (projectedFptsMap.get(a.id)?.total || 0);
-            break;
-          case 'projFptsPerGp':
-            comparison = (projectedFptsMap.get(b.id)?.perGp || 0) - (projectedFptsMap.get(a.id)?.perGp || 0);
-            break;
-          case 'name':
-            comparison = a.full_name.localeCompare(b.full_name);
-            break;
-          default:
-            comparison = (b.wins || 0) - (a.wins || 0);
+      switch (sortBy) {
+        case 'wins': comparison = (b.wins || 0) - (a.wins || 0); break;
+        case 'losses': comparison = (b.losses || 0) - (a.losses || 0); break;
+        case 'gaa': comparison = (a.goals_against_average || 999) - (b.goals_against_average || 999); break;
+        case 'savePct': comparison = (b.save_percentage || 0) - (a.save_percentage || 0); break;
+        case 'saves': comparison = (b.saves || 0) - (a.saves || 0); break;
+        case 'shutouts': comparison = (b.shutouts || 0) - (a.shutouts || 0); break;
+        case 'fpts': comparison = (fptsMap.get(b.id) || 0) - (fptsMap.get(a.id) || 0); break;
+        case 'fptsPerGp': {
+          const fptsA = a.games_played ? (fptsMap.get(a.id) || 0) / a.games_played : 0;
+          const fptsB = b.games_played ? (fptsMap.get(b.id) || 0) / b.games_played : 0;
+          comparison = fptsB - fptsA; break;
         }
-      } else {
-        // Skater sorting
-        switch (sortBy) {
-          case 'points':
-            comparison = b.points - a.points;
-            break;
-          case 'goals':
-            comparison = b.goals - a.goals;
-            break;
-          case 'assists':
-            comparison = b.assists - a.assists;
-            break;
-          case 'shots':
-            comparison = b.shots - a.shots;
-            break;
-          case 'hits':
-            comparison = b.hits - a.hits;
-            break;
-          case 'blocks':
-            comparison = b.blocks - a.blocks;
-            break;
-          case 'xGoals':
-            comparison = b.xGoals - a.xGoals;
-            break;
-          case 'plusMinus':
-            comparison = (b.plus_minus || 0) - (a.plus_minus || 0);
-            break;
-          case 'ppp':
-            comparison = (b.ppp || 0) - (a.ppp || 0);
-            break;
-          case 'shp':
-            comparison = (b.shp || 0) - (a.shp || 0);
-            break;
-          case 'pim':
-            comparison = (b.pim || 0) - (a.pim || 0);
-            break;
-          case 'toi': {
-            const toiA = a.icetime_seconds || 0;
-            const toiB = b.icetime_seconds || 0;
-            comparison = toiB - toiA;
-            break;
-          }
-          case 'fpts': {
-            comparison = (fptsMap.get(b.id) || 0) - (fptsMap.get(a.id) || 0);
-            break;
-          }
-          case 'fptsPerGp': {
-            const fptsA = a.games_played ? (fptsMap.get(a.id) || 0) / a.games_played : 0;
-            const fptsB = b.games_played ? (fptsMap.get(b.id) || 0) / b.games_played : 0;
-            comparison = fptsB - fptsA;
-            break;
-          }
-          case 'projFpts':
-            comparison = (projectedFptsMap.get(b.id)?.total || 0) - (projectedFptsMap.get(a.id)?.total || 0);
-            break;
-          case 'projFptsPerGp':
-            comparison = (projectedFptsMap.get(b.id)?.perGp || 0) - (projectedFptsMap.get(a.id)?.perGp || 0);
-            break;
-          case 'name':
-            comparison = a.full_name.localeCompare(b.full_name);
-            break;
-          default:
-            comparison = b.points - a.points;
-        }
+        case 'projFpts': comparison = (projectedFptsMap.get(b.id)?.total || 0) - (projectedFptsMap.get(a.id)?.total || 0); break;
+        case 'projFptsPerGp': comparison = (projectedFptsMap.get(b.id)?.perGp || 0) - (projectedFptsMap.get(a.id)?.perGp || 0); break;
+        case 'name': comparison = a.full_name.localeCompare(b.full_name); break;
+        default: comparison = (b.wins || 0) - (a.wins || 0);
       }
       return sortDirection === 'desc' ? comparison : -comparison;
-    });
+    };
+
+    const skaterSort = (a: typeof filtered[0], b: typeof filtered[0]) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'points': comparison = (b.points || 0) - (a.points || 0); break;
+        case 'goals': comparison = (b.goals || 0) - (a.goals || 0); break;
+        case 'assists': comparison = (b.assists || 0) - (a.assists || 0); break;
+        case 'shots': comparison = (b.shots || 0) - (a.shots || 0); break;
+        case 'hits': comparison = (b.hits || 0) - (a.hits || 0); break;
+        case 'blocks': comparison = (b.blocks || 0) - (a.blocks || 0); break;
+        case 'xGoals': comparison = (b.xGoals || 0) - (a.xGoals || 0); break;
+        case 'plusMinus': comparison = (b.plus_minus || 0) - (a.plus_minus || 0); break;
+        case 'ppp': comparison = (b.ppp || 0) - (a.ppp || 0); break;
+        case 'shp': comparison = (b.shp || 0) - (a.shp || 0); break;
+        case 'pim': comparison = (b.pim || 0) - (a.pim || 0); break;
+        case 'toi': comparison = (b.icetime_seconds || 0) - (a.icetime_seconds || 0); break;
+        case 'fpts': comparison = (fptsMap.get(b.id) || 0) - (fptsMap.get(a.id) || 0); break;
+        case 'fptsPerGp': {
+          const fptsA = a.games_played ? (fptsMap.get(a.id) || 0) / a.games_played : 0;
+          const fptsB = b.games_played ? (fptsMap.get(b.id) || 0) / b.games_played : 0;
+          comparison = fptsB - fptsA; break;
+        }
+        case 'projFpts': comparison = (projectedFptsMap.get(b.id)?.total || 0) - (projectedFptsMap.get(a.id)?.total || 0); break;
+        case 'projFptsPerGp': comparison = (projectedFptsMap.get(b.id)?.perGp || 0) - (projectedFptsMap.get(a.id)?.perGp || 0); break;
+        case 'name': comparison = a.full_name.localeCompare(b.full_name); break;
+        default: comparison = (b.points || 0) - (a.points || 0);
+      }
+      return sortDirection === 'desc' ? comparison : -comparison;
+    };
+
+    if (selectedPosition === 'All') {
+      const skaters = filtered.filter(p => p.position !== 'G');
+      const goalies = filtered.filter(p => p.position === 'G');
+      skaters.sort(skaterSort);
+      goalies.sort(goalieSort);
+      return [...skaters, ...goalies];
+    } else if (selectedPosition === 'G') {
+      filtered.sort(goalieSort);
+    } else {
+      filtered.sort(skaterSort);
+    }
 
     return filtered;
   }, [debouncedSearch, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, availablePlayers, fptsMap, projectedFptsMap]);

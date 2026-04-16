@@ -133,10 +133,10 @@ class StormyServiceImpl {
     if (ctx.scoringSettings) {
       lines.push(`League scoring: ${ctx.scoringSettings}`);
     }
-    if (ctx.rosterSummary) lines.push(`Roster:\n${ctx.rosterSummary}`);
-    if (ctx.matchupSummary) lines.push(`Matchup:\n${ctx.matchupSummary}`);
-    if (ctx.standingsSummary) lines.push(`Standings:\n${ctx.standingsSummary}`);
-    if (ctx.extra) lines.push(ctx.extra);
+    if (ctx.rosterSummary) lines.push(`=== YOUR DRAFTED ROSTER ===\n${ctx.rosterSummary}`);
+    if (ctx.matchupSummary) lines.push(`=== CURRENT MATCHUP ===\n${ctx.matchupSummary}`);
+    if (ctx.standingsSummary) lines.push(`=== STANDINGS ===\n${ctx.standingsSummary}`);
+    if (ctx.extra) lines.push(`=== AVAILABLE PLAYERS (Not Yet Drafted) ===\n${ctx.extra}`);
 
     return lines.join("\n");
   }

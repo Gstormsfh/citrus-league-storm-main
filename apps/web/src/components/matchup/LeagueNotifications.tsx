@@ -138,14 +138,6 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
 
       // Clear the input
       setChatMessage('');
-      
-      // Reload notifications to show the new message
-      // Small delay to ensure database commits
-      setTimeout(() => {
-        if (user) {
-          loadNotifications(leagueId, user.id);
-        }
-      }, 300);
     } catch (error: unknown) {
       logger.error('Error sending chat message:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to send message. Please try again.';

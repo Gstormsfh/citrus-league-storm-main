@@ -1528,28 +1528,67 @@ const DraftRoom = () => {
     };
   }, []);
 
-  // Play turn notification chime when it becomes the user's turn
+  // Notify user when it becomes their turn — audio chime, browser notification, tab title flash
   useEffect(() => {
     const isMyTurn = !!(currentTeam && user && currentTeam.owner_id === user.id && draftPhase === DraftPhase.ACTIVE);
     if (isMyTurn && !prevIsMyTurnRef.current) {
+      // Audio chime: two-tone C5 (523 Hz) then E5 (659 Hz)
       try {
         const ctx = audioCtxRef.current;
-        if (!ctx) return; // Not yet warmed up — skip silently
-        if (ctx.state === 'suspended') ctx.resume();
-        // Two-tone chime: C5 (523 Hz) then E5 (659 Hz)
-        [523, 659].forEach((freq, i) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.25);
-          osc.connect(gain).connect(ctx.destination);
-          osc.start(ctx.currentTime + i * 0.15);
-          osc.stop(ctx.currentTime + i * 0.15 + 0.25);
-        });
-      } catch {
-        // AudioContext not available — visual indicators still work
+        if (ctx) {
+          if (ctx.state === 'suspended') ctx.resume();
+          [523, 659].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.25);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(ctx.currentTime + i * 0.15);
+            osc.stop(ctx.currentTime + i * 0.15 + 0.25);
+          });
+        }
+      } catch { /* AudioContext not available */ }
+
+      // Browser Notification API — works even when tab is backgrounded
+      try {
+        if ('Notification' in window) {
+          if (Notification.permission === 'granted') {
+            new Notification("It's Your Turn!", {
+              body: "You're on the clock — make your pick!",
+              tag: 'draft-turn',
+              requireInteraction: true,
+            });
+          } else if (Notification.permission === 'default') {
+            Notification.requestPermission().then((perm) => {
+              if (perm === 'granted') {
+                new Notification("It's Your Turn!", {
+                  body: "You're on the clock — make your pick!",
+                  tag: 'draft-turn',
+                  requireInteraction: true,
+                });
+              }
+            });
+          }
+        }
+      } catch { /* Notification API not available */ }
+
+      // Tab title flash — visible when tab is in background
+      const originalTitle = document.title;
+      document.title = "\uD83D\uDFE2 Your Turn \u2014 Citrus Draft";
+      const restoreTitle = () => {
+        document.title = originalTitle;
+        document.removeEventListener('visibilitychange', onVisible);
+      };
+      const onVisible = () => {
+        if (document.visibilityState === 'visible') restoreTitle();
+      };
+      document.addEventListener('visibilitychange', onVisible);
+    } else if (!isMyTurn && prevIsMyTurnRef.current) {
+      // Turn ended — restore title if it was flashing
+      if (document.title.includes('Your Turn')) {
+        document.title = 'Citrus Fantasy Sports';
       }
     }
     prevIsMyTurnRef.current = isMyTurn;
@@ -3993,8 +4032,8 @@ const DraftRoom = () => {
                           </Card>
                         )}
 
-                        {/* Draft Queue on mobile */}
-                        {draftQueue.length > 0 && (
+                        {/* Draft Queue on mobile — always visible so users discover the star-queue mechanic */}
+                        {(
                           <DraftQueue
                             queue={draftQueue}
                             players={availablePlayers}
@@ -4065,7 +4104,7 @@ const DraftRoom = () => {
                   {/* Teams Selector */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Teams</CardTitle>
+                      <CardTitle>View Team Roster</CardTitle>
                       <Select 
                         value={selectedTeamId || userTeam?.id || ''} 
                         onValueChange={setSelectedTeamId}
@@ -4155,8 +4194,8 @@ const DraftRoom = () => {
                     </Card>
                   )}
 
-                  {/* Simplified Queue - only show if items exist */}
-                  {draftQueue.length > 0 && (
+                  {/* Draft Queue — always visible so users discover the star-queue mechanic */}
+                  {(
                     <DraftQueue
                       queue={draftQueue}
                       players={availablePlayers}

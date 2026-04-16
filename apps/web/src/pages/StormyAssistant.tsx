@@ -39,19 +39,37 @@ const StormyAssistant = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [messagesUsed, setMessagesUsed] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const apiHistoryRef = useRef<StormyMessage[]>([]);
+  const defaultGreeting = "Hey! I'm Stormy — your Assistant GM powered by our xG projection model. I already know your league settings, roster, and matchup. Let's win your week — what's on your mind?";
+  const apiHistoryRef = useRef<StormyMessage[]>((() => {
+    try {
+      const saved = localStorage.getItem('stormyApiHistory');
+      if (saved) return JSON.parse(saved) as StormyMessage[];
+    } catch { /* fall through */ }
+    return [];
+  })());
   // Cached league context (roster, matchup, team name) — fetched lazily on first message
   const leagueCtxRef = useRef<Partial<StormyContext> | null>(null);
   const leagueCtxFetchedForRef = useRef<string | null>(null);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      text: "Hey! I'm Stormy — your Assistant GM powered by our xG projection model. I already know your league settings, roster, and matchup. Let's win your week — what's on your mind?",
-      sender: 'stormy',
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('stormyMessages');
+      if (saved) {
+        const parsed = JSON.parse(saved) as ChatMessage[];
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(-50);
+      }
+    } catch { /* corrupted — fall through */ }
+    return [{ id: '1', text: defaultGreeting, sender: 'stormy' as const, timestamp: new Date() }];
+  });
+
+  // Persist messages + API history to localStorage
+  useEffect(() => {
+    try { localStorage.setItem('stormyMessages', JSON.stringify(messages.slice(-50))); } catch { /* quota */ }
+  }, [messages]);
+
+  useEffect(() => {
+    try { localStorage.setItem('stormyApiHistory', JSON.stringify(apiHistoryRef.current.slice(-50))); } catch { /* quota */ }
+  });
 
   useEffect(() => {
     if (scrollRef.current) {

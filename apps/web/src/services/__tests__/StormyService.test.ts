@@ -252,10 +252,10 @@ describe('StormyService', () => {
       const contextStr = call[1].body.context;
       expect(contextStr).toContain('Page: roster');
       expect(contextStr).toContain('League scoring: G:3 A:2');
-      expect(contextStr).toContain('Roster:');
-      expect(contextStr).toContain('Matchup:');
-      expect(contextStr).toContain('Standings:');
-      expect(contextStr).toContain('Free agents available');
+      expect(contextStr).toContain('=== YOUR DRAFTED ROSTER ===');
+      expect(contextStr).toContain('=== CURRENT MATCHUP ===');
+      expect(contextStr).toContain('=== STANDINGS ===');
+      expect(contextStr).toContain('=== AVAILABLE PLAYERS (Not Yet Drafted) ===');
     });
   });
 

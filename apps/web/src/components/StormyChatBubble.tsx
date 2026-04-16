@@ -79,16 +79,42 @@ export const StormyChatBubble = () => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', text: getContextGreeting(location.pathname), sender: 'stormy', timestamp: new Date() },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('stormyMessages');
+      if (saved) {
+        const parsed = JSON.parse(saved) as ChatMessage[];
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(-50);
+      }
+    } catch { /* corrupted storage — fall through to default */ }
+    return [{ id: '1', text: getContextGreeting(location.pathname), sender: 'stormy', timestamp: new Date() }];
+  });
   // Conversation history for the API (excludes the initial greeting)
-  const apiHistoryRef = useRef<StormyMessage[]>([]);
+  const apiHistoryRef = useRef<StormyMessage[]>((() => {
+    try {
+      const saved = localStorage.getItem('stormyApiHistory');
+      if (saved) return JSON.parse(saved) as StormyMessage[];
+    } catch { /* fall through */ }
+    return [];
+  })());
   // Cached league context (roster, matchup, team name) — fetched lazily on first message
   const leagueCtxRef = useRef<Partial<StormyContext> | null>(null);
   const leagueCtxFetchedForRef = useRef<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Persist messages + API history to localStorage on change
+  useEffect(() => {
+    try {
+      localStorage.setItem('stormyMessages', JSON.stringify(messages.slice(-50)));
+    } catch { /* quota exceeded — silently drop */ }
+  }, [messages]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('stormyApiHistory', JSON.stringify(apiHistoryRef.current.slice(-50)));
+    } catch { /* quota exceeded */ }
+  });
 
   // Update greeting when navigating (only if conversation hasn't started)
   useEffect(() => {
