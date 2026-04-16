@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, logger } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
+import { withResilience } from '../lib/resilientSupabase';
 
 /**
  * DraftService — Server-side draft management with DI Supabase client.
@@ -182,14 +183,22 @@ export class DraftService {
     let pick: Record<string, unknown> | null = null;
     let error: { message?: string } | null = null;
 
-    const { data: rpcResult, error: rpcError } = await this.supabase.rpc('make_draft_pick', {
-      p_league_id: leagueId,
-      p_team_id: teamId,
-      p_player_id: String(playerId),
-      p_round_number: roundNumber,
-      p_pick_number: pickNumber,
-      p_draft_session_id: sessionId || null,
-    });
+    // Wrap the primary pick-submission RPC with circuit breaker + retry.
+    // April 10: single Supabase blips killed picks with no recovery. Now transient
+    // 429/5xx/network failures retry with backoff (100ms → 300ms), and repeated
+    // infrastructure failures trip the breaker to fail-fast instead of piling up.
+    // Domain errors like "already drafted" are NOT retried — they pass through.
+    const { data: rpcResult, error: rpcError } = await withResilience(
+      () => this.supabase.rpc('make_draft_pick', {
+        p_league_id: leagueId,
+        p_team_id: teamId,
+        p_player_id: String(playerId),
+        p_round_number: roundNumber,
+        p_pick_number: pickNumber,
+        p_draft_session_id: sessionId || null,
+      }),
+      { label: 'draft.makePick.rpc' },
+    );
 
     if (rpcError) {
       // RPC may fail with a race-condition message from the DB function.
@@ -200,24 +209,29 @@ export class DraftService {
         return { pick: null, error: rpcMsg, isComplete: false };
       }
 
-      // Fallback to direct insert for non-conflict RPC errors
-      const { data: insertResult, error: insertError } = await this.supabase
-        .from('draft_picks')
-        .insert({
-          league_id: leagueId,
-          team_id: teamId,
-          player_id: String(playerId),
-          pick_number: pickNumber,
-          round_number: roundNumber,
-          draft_session_id: sessionId,
-        })
-        .select(COLUMNS.DRAFT_PICK)
-        .single();
+      // Fallback to direct insert for non-conflict RPC errors.
+      // Same resilience treatment — transient blips retried, DB unique-constraint
+      // errors pass through unchanged.
+      const { data: insertResult, error: insertError } = await withResilience(
+        () => this.supabase
+          .from('draft_picks')
+          .insert({
+            league_id: leagueId,
+            team_id: teamId,
+            player_id: String(playerId),
+            pick_number: pickNumber,
+            round_number: roundNumber,
+            draft_session_id: sessionId,
+          })
+          .select(COLUMNS.DRAFT_PICK)
+          .single(),
+        { label: 'draft.makePick.fallbackInsert' },
+      );
 
       pick = insertResult as unknown as Record<string, unknown>;
       error = insertError;
     } else {
-      pick = rpcResult;
+      pick = rpcResult as Record<string, unknown> | null;
     }
 
     if (error) {
