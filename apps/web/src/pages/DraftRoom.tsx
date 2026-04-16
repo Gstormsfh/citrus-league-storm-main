@@ -1238,7 +1238,11 @@ const DraftRoom = () => {
             } catch (joinError) {
               logger.error('DraftRoom: Error pre-loading draft state:', joinError);
             }
-            // Stay in LOBBY - user clicks "Join Draft Room" to enter ACTIVE
+            // Auto-join the active draft — don't force users to find a "Join" button.
+            // Pre-loaded state is ready; transition immediately so nobody misses picks.
+            setDraftPhase(DraftPhase.ACTIVE);
+            ssPut(`draft_phase_${leagueId}`, String(DraftPhase.ACTIVE));
+            logger.debug('DraftRoom: Auto-joined active draft via realtime');
           }
 
           // Handle draft completion (use ref to avoid stale closure)
