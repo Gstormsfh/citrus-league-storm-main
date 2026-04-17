@@ -53,3 +53,21 @@ jobs:
           print(f'Aggregated {result} player playoff stat rows')
           "
         continue-on-error: true
+
+      # Step 4: Score ALL roster pool leagues using each league's custom
+      # scoring_settings (goals weighted X, hits weighted Y, etc.).
+      # This is what keeps roster pool standings dynamic to commissioner settings.
+      - name: Score playoff roster pools
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, 'data-pipeline')
+          from data_pipeline.utils.supabase_rest import SupabaseRest
+          db = SupabaseRest()
+          result = db.rpc('score_all_playoff_roster_pools', {})
+          print(f'Scored {result} playoff roster pool leagues')
+          "
+        continue-on-error: true
