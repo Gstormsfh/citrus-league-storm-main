@@ -232,11 +232,45 @@ export default function PoolPlayoffHub() {
                 </CardContent>
               </Card>
 
-              {/* Standings CTA */}
+              {/* Standings — shows all members with current points (0 until games start) */}
               <Card className="border-citrus-sage/30">
-                <CardContent className="pt-4">
-                  <h3 className="text-sm font-display font-bold text-citrus-forest mb-1">Standings</h3>
-                  <p className="text-xs text-citrus-charcoal/60 mb-3">Standings populate once playoff games start. Leaderboard updates live as series complete.</p>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-citrus-orange" />
+                    Standings
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {teams.length === 0 ? (
+                    <p className="text-xs text-citrus-charcoal/60 italic">Invite players to populate standings.</p>
+                  ) : (
+                    <>
+                      <div className="rounded border border-citrus-sage/20 overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-citrus-sage/10 border-b border-citrus-sage/20">
+                            <tr>
+                              <th className="px-2 py-1.5 text-left text-[10px] uppercase font-display font-bold text-citrus-charcoal/60 w-10">#</th>
+                              <th className="px-2 py-1.5 text-left text-[10px] uppercase font-display font-bold text-citrus-charcoal/60">Team</th>
+                              <th className="px-2 py-1.5 text-right text-[10px] uppercase font-display font-bold text-citrus-charcoal/60">Points</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {teams.map((t, i) => (
+                              <tr key={t.id} className={cn("border-b border-citrus-sage/10 last:border-b-0", t.owner_id === user?.id && "bg-citrus-sage/5")}>
+                                <td className="px-2 py-1.5 text-xs font-mono text-citrus-charcoal/50">{i + 1}</td>
+                                <td className="px-2 py-1.5 text-sm">
+                                  <span className="font-medium">{t.team_name}</span>
+                                  {t.owner_id === user?.id && <span className="text-[10px] text-citrus-sage ml-1">(You)</span>}
+                                </td>
+                                <td className="px-2 py-1.5 text-sm text-right font-bold text-citrus-forest">0</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <p className="text-[10px] text-citrus-charcoal/50 mt-2 italic">Rankings update live as playoff games complete.</p>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>

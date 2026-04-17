@@ -135,9 +135,10 @@ export default function PoolPlayoffRosterEntry() {
       try {
         const session = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session;
         const headers: Record<string, string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
-        const [leagueRes, playersRes] = await Promise.all([
+        const [leagueRes, playersRes, picksRes] = await Promise.all([
           fetch(`/api/leagues/${leagueId}`, { headers }).then(r => r.json()),
           fetch('/api/players?limit=1000', { headers }).then(r => r.json()),
+          fetch(`/api/playoff-pools/${leagueId}/picks?type=roster`, { headers }).then(r => r.json()).catch(() => null),
         ]);
         const leagueData = leagueRes.data || leagueRes;
         setLeague(leagueData);
@@ -149,6 +150,15 @@ export default function PoolPlayoffRosterEntry() {
         const PLAYOFF_TEAMS = new Set(['BUF','BOS','TBL','MTL','CAR','OTT','PIT','PHI','COL','LAK','DAL','MIN','VGK','UTA','EDM','ANA']);
         const playoffOnly = (playerArr as PoolPlayer[]).filter(p => PLAYOFF_TEAMS.has(p.team));
         setPlayers(playoffOnly);
+        // Restore existing roster picks — match saved player_ids back to player objects
+        if (picksRes && user?.id) {
+          const rawPicks = picksRes.data?.picks || picksRes.picks || [];
+          const myPicks = (rawPicks as Array<{ player_id: number; user_id: string }>).filter(p => p.user_id === user.id);
+          const savedPlayers = myPicks
+            .map(pick => playoffOnly.find(p => parseInt(p.id) === pick.player_id))
+            .filter((p): p is PoolPlayer => !!p);
+          setRoster(savedPlayers);
+        }
         // Check lock
         const lockAt = leagueData?.settings?.playoffRosterLockedAt;
         if (lockAt && new Date(lockAt) <= new Date()) setLocked(true);
@@ -157,7 +167,8 @@ export default function PoolPlayoffRosterEntry() {
       }
     };
     load();
-  }, [leagueId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leagueId, user?.id]);
 
   // Roster IDs set for O(1) lookup
   const rosterIds = useMemo(() => new Set(roster.map(p => p.id)), [roster]);
