@@ -26,6 +26,7 @@ export interface ScoringSettings {
     blocks: number;
     hits: number;
     penalty_minutes: number;
+    plus_minus?: number;
   };
   goalie: {
     wins: number;
@@ -48,7 +49,8 @@ export const DEFAULT_SCORING: ScoringSettings = {
     shots_on_goal: 0.4,
     blocks: 0.5,
     hits: 0.2,
-    penalty_minutes: 0.5
+    penalty_minutes: 0.5,
+    plus_minus: 0.5
   },
   goalie: {
     wins: 4,
@@ -97,7 +99,8 @@ export class ScoringCalculator {
         (stats.sog || stats.shots_on_goal || stats.shots || 0) * this.settings.skater.shots_on_goal +
         (stats.blocks || stats.blk || stats.blockedShots || 0) * this.settings.skater.blocks +
         (stats.hits || 0) * this.settings.skater.hits +
-        (stats.pim || stats.penalty_minutes || 0) * this.settings.skater.penalty_minutes
+        (stats.pim || stats.penalty_minutes || 0) * this.settings.skater.penalty_minutes +
+        (stats.plus_minus || stats.plusMinus || 0) * (this.settings.skater.plus_minus || 0)
       );
     }
   }

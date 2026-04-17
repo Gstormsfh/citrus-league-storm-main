@@ -424,7 +424,8 @@ const CreateLeague = () => {
           shots_on_goal: leagueStats.find(s => s.id === 'sog')?.points || 0.4,
           blocks: leagueStats.find(s => s.id === 'blk')?.points || 0.5,
           hits: leagueStats.find(s => s.id === 'hit')?.points || 0.2,
-          penalty_minutes: leagueStats.find(s => s.id === 'pim')?.points || 0.5
+          penalty_minutes: leagueStats.find(s => s.id === 'pim')?.points || 0.5,
+          plus_minus: leagueStats.find(s => s.id === 'pm')?.points || 0
         },
         goalie: {
           wins: leagueStats.find(s => s.id === 'w')?.points || 4,

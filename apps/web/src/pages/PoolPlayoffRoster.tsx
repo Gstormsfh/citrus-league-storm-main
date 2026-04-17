@@ -45,6 +45,7 @@ interface PoolPlayer {
   pim: number;
   ppp: number;
   shp: number;
+  plus_minus?: number;
   wins?: number;
   saves?: number;
   shutouts?: number;
@@ -121,7 +122,7 @@ export default function PoolPlayoffRosterEntry() {
       return scorer.calculatePoints(
         isGoalie
           ? { wins: p.wins || 0, saves: p.saves || 0, shutouts: p.shutouts || 0, goals_against: p.goals_against || 0 }
-          : { goals: p.goals, assists: p.assists, shots: p.shots, blocks: p.blocks, hits: p.hits, pim: p.pim, ppp: p.ppp, shp: p.shp },
+          : { goals: p.goals, assists: p.assists, shots: p.shots, blocks: p.blocks, hits: p.hits, pim: p.pim, ppp: p.ppp, shp: p.shp, plus_minus: (p as unknown as { plus_minus?: number }).plus_minus || 0 },
         isGoalie
       );
     },
@@ -399,10 +400,10 @@ export default function PoolPlayoffRosterEntry() {
                       <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest">Pos</th>
                       <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest">Team</th>
                       <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest">GP</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest">G</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest">A</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest">PTS</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell">SOG</th>
+                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest" title="Goals (skater) / Wins (goalie)">G/W</th>
+                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest" title="Assists (skater) / Saves (goalie)">A/SV</th>
+                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest" title="Points (skater) / Shutouts (goalie)">PTS/SO</th>
+                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell" title="Shots (skater) / Goals Against (goalie)">SOG/GA</th>
                       <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell">HIT</th>
                       <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell">BLK</th>
                       <th className="px-2 py-2 text-center text-xs font-bold text-green-700 bg-green-50/50">FPTS</th>
@@ -454,12 +455,24 @@ export default function PoolPlayoffRosterEntry() {
                             </span>
                           </td>
                           <td className="px-2 py-1.5 text-center text-xs">{player.games_played}</td>
-                          <td className="px-2 py-1.5 text-center text-xs font-semibold">{player.goals}</td>
-                          <td className="px-2 py-1.5 text-center text-xs">{player.assists}</td>
-                          <td className="px-2 py-1.5 text-center text-xs font-bold">{player.points}</td>
-                          <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.shots}</td>
-                          <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.hits}</td>
-                          <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.blocks}</td>
+                          {norm === 'G' ? (
+                            <>
+                              <td className="px-2 py-1.5 text-center text-xs font-semibold">{player.wins || 0}</td>
+                              <td className="px-2 py-1.5 text-center text-xs">{player.saves || 0}</td>
+                              <td className="px-2 py-1.5 text-center text-xs font-bold">{player.shutouts || 0}</td>
+                              <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.goals_against || 0}</td>
+                              <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell" colSpan={2}>—</td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-2 py-1.5 text-center text-xs font-semibold">{player.goals}</td>
+                              <td className="px-2 py-1.5 text-center text-xs">{player.assists}</td>
+                              <td className="px-2 py-1.5 text-center text-xs font-bold">{player.points}</td>
+                              <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.shots}</td>
+                              <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.hits}</td>
+                              <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.blocks}</td>
+                            </>
+                          )}
                           <td className="px-2 py-1.5 text-center text-xs font-bold text-green-700 bg-green-50/20">{fpts.toFixed(1)}</td>
                           <td className="px-2 py-1.5 text-center">
                             {onRoster ? (
