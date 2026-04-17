@@ -101,11 +101,6 @@ export default function NHLPlayoffBracket() {
             </h1>
           </div>
           <p className="text-sm text-citrus-charcoal/70">{season}-{(season + 1).toString().slice(2)} Season</p>
-          {isStale && (
-            <Badge className="mt-2 bg-orange-100 text-orange-800 border-orange-300">
-              <AlertTriangle className="h-3 w-3 mr-1" /> Data may be delayed — last update {meta?.oldest_refresh ? new Date(meta.oldest_refresh).toLocaleString() : 'unknown'}
-            </Badge>
-          )}
         </div>
 
         {/* CTA banner */}
