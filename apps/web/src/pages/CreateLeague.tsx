@@ -88,6 +88,7 @@ const DEFAULT_LEAGUE_STATS = [
   { id: "blk", name: "Blocks", points: 0.5, default: true, category: "Defense", enabled: true },
   { id: "hit", name: "Hits", points: 0.2, default: true, category: "Defense", enabled: true },
   { id: "pim", name: "Penalty Minutes", points: 0.5, default: false, category: "Defense", enabled: false },
+  { id: "pm", name: "Plus/Minus", points: 0.5, default: true, category: "Defense", enabled: true },
   { id: "w", name: "Wins", points: 4, default: true, category: "Goalie", enabled: true },
   { id: "so", name: "Shutouts", points: 3, default: true, category: "Goalie", enabled: true },
   { id: "sv", name: "Saves", points: 0.2, default: true, category: "Goalie", enabled: true },
