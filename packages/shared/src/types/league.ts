@@ -222,6 +222,18 @@ export interface LeagueFormatSettings {
   survivorLives?: number;        // 1 = standard, 2+ = mulligan variant
   confidenceMaxPoints?: number;  // Max confidence points (usually = number of games)
 
+  // === Playoff Pool Settings ===
+  // Bracket Pickem
+  playoffBracketPointsPerRound?: { r1: number; r2: number; r3: number; scf: number };
+  playoffGamesPickBonus?: number;        // +pts for correctly predicting # of games in series
+  // Confidence
+  playoffConfidenceVariant?: 'cumulative' | 'per-round';
+  // Roster Pool (team-select style — multiple users can pick same player)
+  playoffRosterSize?: number;            // Total players per roster (e.g., 18)
+  playoffPositionRequirements?: { F: number; D: number; G: number };
+  playoffMaxPlayersPerTeam?: number;     // Per-NHL-team cap (e.g., 3)
+  playoffRosterLockedAt?: string;        // ISO timestamp — rosters lock at this time
+
   // === Trade Settings (Commissioner-configurable) ===
   tradeExpirationDays?: number;    // How many days before a trade offer expires (default: 7)
   tradeReviewType?: 'none' | 'commissioner' | 'league_vote';  // How trades are reviewed
