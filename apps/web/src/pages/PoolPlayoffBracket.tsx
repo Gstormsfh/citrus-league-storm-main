@@ -14,12 +14,17 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { NHL_TEAMS } from '@/types/captracker';
 
 interface Seed {
   team_id: number;
   team_abbrev: string | null;
   conference: string;
   seed: number;
+  wins?: number;
+  losses?: number;
+  ot_losses?: number;
+  points?: number;
 }
 interface Series {
   series_id: string;
@@ -177,41 +182,84 @@ export default function PoolPlayoffBracket() {
                   {rs.map(s => {
                     const high = s.high_seed_team_id ? teamById.get(s.high_seed_team_id) : null;
                     const low = s.low_seed_team_id ? teamById.get(s.low_seed_team_id) : null;
+                    const highInfo = high ? NHL_TEAMS.find(t => t.abbrev === high.team_abbrev) : null;
+                    const lowInfo = low ? NHL_TEAMS.find(t => t.abbrev === low.team_abbrev) : null;
                     const myPick = picks.get(s.bracket_slot);
                     const locked = s.series_status !== 'pending';
+                    const isActive = s.series_status === 'active';
+
+                    const renderTeamCard = (team: Seed | null, info: typeof NHL_TEAMS[0] | null, isTop: boolean) => {
+                      const picked = myPick?.picked_team_id === team?.team_id;
+                      const wins = team?.team_id === s.high_seed_team_id ? s.high_seed_wins : s.low_seed_wins;
+                      return (
+                        <button
+                          onClick={() => team && handlePick(s.bracket_slot, team.team_id)}
+                          disabled={!team || locked}
+                          className={cn(
+                            'relative overflow-hidden rounded-lg border-2 p-2.5 text-left transition-all',
+                            picked ? 'border-citrus-sage shadow-md ring-1 ring-citrus-sage' : 'border-fantasy-border hover:border-citrus-sage/70',
+                            !team && 'opacity-40',
+                          )}
+                          style={picked && info ? { background: `linear-gradient(135deg, ${info.primaryColor}12, ${info.secondaryColor}08)` } : undefined}
+                        >
+                          {/* Color bar on left */}
+                          {info && (
+                            <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: info.primaryColor }} />
+                          )}
+                          <div className="flex items-center gap-2.5 pl-1.5">
+                            {info ? (
+                              <img src={info.logoUrl} alt={info.abbrev} className="w-9 h-9 object-contain flex-shrink-0" />
+                            ) : (
+                              <div className="w-9 h-9 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">?</div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] font-mono text-citrus-charcoal/60">#{team?.seed || '-'}</span>
+                                <span className="text-sm font-display font-bold truncate" style={info ? { color: info.primaryColor } : undefined}>
+                                  {info?.name || team?.team_abbrev || 'TBD'}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-citrus-charcoal/60 truncate">
+                                {team && (team.wins !== undefined) ? `${team.wins}-${team.losses}-${team.ot_losses}` : (info?.fullName || '')}
+                              </div>
+                            </div>
+                            {picked && (
+                              <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={info ? { background: info.primaryColor } : { background: '#7A9B7A' }}>
+                                <Check className="w-3 h-3 text-white" />
+                              </div>
+                            )}
+                            {(isActive || locked) && wins !== undefined && (
+                              <div className={cn('font-varsity text-xl flex-shrink-0', wins >= 4 ? 'text-citrus-forest font-black' : 'text-citrus-charcoal/70')}>
+                                {wins}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    };
+
                     return (
-                      <div key={s.series_id} className={cn('border rounded-lg p-3 space-y-2', locked && 'opacity-75 bg-muted/30')}>
+                      <div key={s.series_id} className={cn('border-2 rounded-xl p-3 space-y-2 bg-white',
+                          isActive && 'border-red-300 bg-red-50/20',
+                          locked && s.series_status === 'final' && 'border-citrus-sage/40 bg-citrus-sage/5',
+                          !locked && !isActive && 'border-fantasy-border',
+                      )}>
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] uppercase font-display text-citrus-charcoal/60">Series {s.bracket_slot}</span>
-                          {locked && <Badge className="bg-muted text-[9px]"><Lock className="h-3 w-3 mr-1" />Locked</Badge>}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] uppercase font-display font-bold text-citrus-charcoal/60">Series {String.fromCharCode(64 + s.bracket_slot)}</span>
+                            {s.conference && (
+                              <Badge variant="outline" className={cn('text-[9px] px-1 py-0', s.conference === 'Eastern' ? 'border-blue-300 text-blue-700' : 'border-orange-300 text-orange-700')}>
+                                {s.conference === 'Eastern' ? 'EAST' : 'WEST'}
+                              </Badge>
+                            )}
+                          </div>
+                          {isActive && <Badge className="bg-red-500 text-white text-[9px] animate-pulse">LIVE</Badge>}
+                          {s.series_status === 'final' && <Badge className="bg-citrus-sage text-white text-[9px]">FINAL</Badge>}
+                          {!locked && !isActive && <Badge variant="outline" className="text-[9px]">Pending</Badge>}
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => high && handlePick(s.bracket_slot, high.team_id)}
-                            disabled={!high || locked}
-                            className={cn(
-                              'p-2 rounded border text-left transition-colors',
-                              myPick?.picked_team_id === high?.team_id ? 'border-citrus-sage bg-citrus-sage/10 font-bold' : 'border-citrus-border hover:border-citrus-sage',
-                              !high && 'opacity-40',
-                            )}
-                          >
-                            <div className="text-[10px] text-citrus-charcoal/60">#{high?.seed || '-'}</div>
-                            <div className="text-sm">{high?.team_abbrev || 'TBD'}</div>
-                            {myPick?.picked_team_id === high?.team_id && <Check className="h-3 w-3 inline text-citrus-sage" />}
-                          </button>
-                          <button
-                            onClick={() => low && handlePick(s.bracket_slot, low.team_id)}
-                            disabled={!low || locked}
-                            className={cn(
-                              'p-2 rounded border text-left transition-colors',
-                              myPick?.picked_team_id === low?.team_id ? 'border-citrus-sage bg-citrus-sage/10 font-bold' : 'border-citrus-border hover:border-citrus-sage',
-                              !low && 'opacity-40',
-                            )}
-                          >
-                            <div className="text-[10px] text-citrus-charcoal/60">#{low?.seed || '-'}</div>
-                            <div className="text-sm">{low?.team_abbrev || 'TBD'}</div>
-                            {myPick?.picked_team_id === low?.team_id && <Check className="h-3 w-3 inline text-citrus-sage" />}
-                          </button>
+                        <div className="grid grid-cols-1 gap-2">
+                          {renderTeamCard(high, highInfo, true)}
+                          {renderTeamCard(low, lowInfo, false)}
                         </div>
                         {myPick?.picked_team_id && !locked && (
                           <div className="flex items-center gap-1.5 text-xs">

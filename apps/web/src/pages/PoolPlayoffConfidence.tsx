@@ -12,6 +12,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Trophy, Lock, Save, AlertTriangle, ChevronDown, ChevronUp, Check, ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { NHL_TEAMS } from '@/types/captracker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -230,23 +231,46 @@ export default function PoolPlayoffConfidence() {
                           {isCorrect && <Badge className="bg-green-500 text-white text-[9px]"><Check className="h-3 w-3 mr-1" />+{pick.confidence_value}</Badge>}
                         </div>
 
-                        {/* Team picks */}
-                        <div className="grid grid-cols-2 gap-2">
-                          {[{ team: high, id: s.high_seed_team_id }, { team: low, id: s.low_seed_team_id }].map(({ team, id }) => (
-                            <button
-                              key={id || 'tbd'}
-                              onClick={() => id && setPickTeam(s.bracket_slot, id)}
-                              disabled={!id || locked}
-                              className={cn(
-                                'p-2 rounded border text-left transition-all',
-                                pick?.picked_team_id === id ? 'border-citrus-sage bg-citrus-sage/10 font-bold ring-1 ring-citrus-sage' : 'border-fantasy-border hover:border-citrus-sage',
-                                !id && 'opacity-40',
-                              )}
-                            >
-                              <div className="text-[10px] text-citrus-charcoal/60">#{team?.seed || '-'}</div>
-                              <div className="text-sm font-medium">{team?.team_abbrev || 'TBD'}</div>
-                            </button>
-                          ))}
+                        {/* Team picks — rich cards with logos + colors */}
+                        <div className="grid grid-cols-1 gap-2">
+                          {[{ team: high, id: s.high_seed_team_id }, { team: low, id: s.low_seed_team_id }].map(({ team, id }) => {
+                            const info = team ? NHL_TEAMS.find(t => t.abbrev === team.team_abbrev) : null;
+                            const picked = pick?.picked_team_id === id;
+                            return (
+                              <button
+                                key={id || 'tbd'}
+                                onClick={() => id && setPickTeam(s.bracket_slot, id)}
+                                disabled={!id || locked}
+                                className={cn(
+                                  'relative overflow-hidden rounded-lg border-2 p-2.5 text-left transition-all',
+                                  picked ? 'border-citrus-sage shadow-md ring-1 ring-citrus-sage' : 'border-fantasy-border hover:border-citrus-sage/70',
+                                  !id && 'opacity-40',
+                                )}
+                                style={picked && info ? { background: `linear-gradient(135deg, ${info.primaryColor}12, ${info.secondaryColor}08)` } : undefined}
+                              >
+                                {info && <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: info.primaryColor }} />}
+                                <div className="flex items-center gap-2.5 pl-1.5">
+                                  {info ? (
+                                    <img src={info.logoUrl} alt={info.abbrev} className="w-9 h-9 object-contain flex-shrink-0" />
+                                  ) : <div className="w-9 h-9 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">?</div>}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[10px] font-mono text-citrus-charcoal/60">#{team?.seed || '-'}</span>
+                                      <span className="text-sm font-display font-bold truncate" style={info ? { color: info.primaryColor } : undefined}>
+                                        {info?.name || team?.team_abbrev || 'TBD'}
+                                      </span>
+                                    </div>
+                                    <div className="text-[10px] text-citrus-charcoal/60 truncate">{info?.fullName || ''}</div>
+                                  </div>
+                                  {picked && (
+                                    <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={info ? { background: info.primaryColor } : { background: '#7A9B7A' }}>
+                                      <Check className="w-3 h-3 text-white" />
+                                    </div>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
 
                         {/* Confidence selector */}
