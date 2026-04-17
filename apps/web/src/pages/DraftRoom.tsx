@@ -701,15 +701,39 @@ const DraftRoom = () => {
       ]);
       setAvailablePlayers(allPlayers);
 
-      // Build projected FPTS lookup map (keyed by string player_id)
+      // Build projected FPTS lookup map (keyed by string player_id).
+      // Recalculate using LEAGUE scoring settings instead of the pre-baked
+      // default-scoring totals stored in the DB.
+      const projScorer = new ScoringCalculator(leagueData?.scoring_settings as unknown as ScoringSettings | undefined);
       const projMap = new Map<string, { total: number; perGp: number; gamesRemaining: number }>();
-      const rosData = (rosProjectionsRes as { data?: Array<{ player_id: number; total_projected_points: number; avg_points_per_game: number; games_remaining: number }> }).data;
+      interface RosRow {
+        player_id: number; is_goalie?: boolean; games_remaining: number;
+        projected_goals?: number; projected_assists?: number; projected_sog?: number;
+        projected_blocks?: number; projected_ppp?: number; projected_shp?: number;
+        projected_hits?: number; projected_pim?: number;
+        projected_wins_ros?: number; projected_saves_ros?: number; projected_shutouts_ros?: number;
+        total_projected_points?: number; avg_points_per_game?: number;
+      }
+      const rosData = (rosProjectionsRes as { data?: RosRow[] }).data;
       if (Array.isArray(rosData)) {
         rosData.forEach((p) => {
+          const gr = p.games_remaining || 0;
+          let total: number;
+          if (p.is_goalie) {
+            total = projScorer.calculatePoints(
+              { wins: p.projected_wins_ros || 0, saves: p.projected_saves_ros || 0, shutouts: p.projected_shutouts_ros || 0, goals_against: 0 },
+              true
+            );
+          } else {
+            total = projScorer.calculatePoints(
+              { goals: p.projected_goals || 0, assists: p.projected_assists || 0, shots: p.projected_sog || 0, blocks: p.projected_blocks || 0, hits: p.projected_hits || 0, pim: p.projected_pim || 0, ppp: p.projected_ppp || 0, shp: p.projected_shp || 0 },
+              false
+            );
+          }
           projMap.set(String(p.player_id), {
-            total: p.total_projected_points || 0,
-            perGp: p.avg_points_per_game || 0,
-            gamesRemaining: p.games_remaining || 0,
+            total,
+            perGp: gr > 0 ? total / gr : 0,
+            gamesRemaining: gr,
           });
         });
       }

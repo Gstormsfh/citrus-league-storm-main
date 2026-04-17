@@ -62,23 +62,27 @@ export const PlayerPool = memo(({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showDrafted, setShowDrafted] = useState(false);
 
-  // Static pre-draft ranking based on actual fantasy points (league scoring).
-  // Uses FPTS as the primary ranking signal — this is a fixed ordering that
-  // does NOT change as players get drafted, matching ESPN/Yahoo behavior.
-  // ROS projections are unreliable when games_remaining is 0 (end of season).
+  // Fixed pre-draft ranking based on projected FPTS (league scoring settings).
+  // Ranks ALL players once — ranking does NOT change as players are drafted.
   const rankMap = useMemo<Map<string, number>>(() => {
     const scored = availablePlayers.map(p => ({
       id: p.id,
+      proj: projectedFptsMap.get(p.id)?.total ?? 0,
       fpts: calcFpts(p),
     }));
-    scored.sort((a, b) => b.fpts - a.fpts);
+    // Primary sort: projected FPTS (league scoring). Fallback to actual FPTS
+    // for players with no projection data (ensures no gaps from missing data).
+    scored.sort((a, b) => {
+      const projDiff = (b.proj || b.fpts) - (a.proj || a.fpts);
+      return projDiff;
+    });
     const map = new Map<string, number>();
     scored.forEach((p, i) => {
       map.set(p.id, i + 1);
     });
     return map;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availablePlayers, scorer]);
+  }, [availablePlayers, projectedFptsMap, scorer]);
 
   // PERF: Use pre-built Set for O(1) lookups instead of O(n) Array.includes on every player
   const draftedSet = useMemo(() => {

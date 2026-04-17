@@ -87,10 +87,8 @@ playerRoutes.get('/ros-projections', authMiddleware, async (c) => {
 
   const { data, error } = await supabase
     .from('player_ros_projections')
-    .select('player_id, player_name, position, team_abbrev, total_projected_points, avg_points_per_game, games_remaining')
+    .select('player_id, player_name, position, team_abbrev, is_goalie, total_projected_points, avg_points_per_game, games_remaining, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins_ros, projected_saves_ros, projected_shutouts_ros')
     .eq('season', CURRENT_SEASON)
-    .gt('total_projected_points', 0)
-    .gt('games_remaining', 0)
     .order('total_projected_points', { ascending: false })
     .limit(Math.min(limit, 500));
 
