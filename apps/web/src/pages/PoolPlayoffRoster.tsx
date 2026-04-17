@@ -199,8 +199,9 @@ export default function PoolPlayoffRosterEntry() {
     return Array.from(s).sort();
   }, [players]);
 
-  // Total roster FPTS
-  const rosterTotal = useMemo(() => roster.reduce((sum, p) => sum + calcFpts(p), 0), [roster, calcFpts]);
+  // rosterTotal intentionally removed — regular-season totals don't sum
+  // into a meaningful "team FPTS" for a playoff pool. Live standings
+  // will be based on actual playoff stats instead.
 
   // Filtered & sorted players
   const filteredPlayers = useMemo(() => {
@@ -291,7 +292,6 @@ export default function PoolPlayoffRosterEntry() {
                 <span>F: {posCounts.F}/{posReqs.F}</span>
                 <span>D: {posCounts.D}/{posReqs.D}</span>
                 <span>G: {posCounts.G}/{posReqs.G}</span>
-                <span className="font-bold text-citrus-orange">{rosterTotal.toFixed(1)} FPTS</span>
               </div>
             </div>
             <Button
@@ -512,7 +512,6 @@ export default function PoolPlayoffRosterEntry() {
                     <Users className="h-4 w-4 text-citrus-orange" />
                     Your Roster ({roster.length}/{rosterSize})
                   </span>
-                  <span className="text-citrus-orange font-bold">{rosterTotal.toFixed(1)} FPTS</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-3">
