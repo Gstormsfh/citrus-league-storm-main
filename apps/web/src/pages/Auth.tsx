@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Mail, Lock, HelpCircle, Chrome, Apple, CheckCircle2 } from 'lucide-react';
+import { Loader2, Mail, Lock, HelpCircle, Chrome, CheckCircle2 } from 'lucide-react';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
 import { Separator } from '@/components/ui/separator';
 
@@ -221,7 +221,7 @@ const Auth = () => {
     }
   };
 
-  const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
+  const handleOAuthSignIn = async (provider: 'google') => {
     setOauthLoading(provider);
     setError(null);
 
@@ -273,20 +273,6 @@ const Auth = () => {
                       <Chrome className="mr-2 h-4 w-4" />
                     )}
                     Sign in with Google
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleOAuthSignIn('apple')}
-                    disabled={loading || oauthLoading !== null}
-                  >
-                    {oauthLoading === 'apple' ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Apple className="mr-2 h-4 w-4" />
-                    )}
-                    Sign in with Apple
                   </Button>
                 </div>
 
@@ -441,20 +427,6 @@ const Auth = () => {
                       <Chrome className="mr-2 h-4 w-4" />
                     )}
                     Sign up with Google
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleOAuthSignIn('apple')}
-                    disabled={loading || oauthLoading !== null}
-                  >
-                    {oauthLoading === 'apple' ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Apple className="mr-2 h-4 w-4" />
-                    )}
-                    Sign up with Apple
                   </Button>
                 </div>
 
