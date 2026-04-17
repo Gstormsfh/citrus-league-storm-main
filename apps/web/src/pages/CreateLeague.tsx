@@ -251,7 +251,10 @@ const CreateLeague = () => {
   // Derived state
   const isFantasy = leagueType === 'fantasy';
   const isPool = !isFantasy;
-  const showPointValues = isFantasy && usesPointValues(scoringFormat);
+  // Playoff roster pools also need full scoring customization
+  // (dynamic scoring per league — same engine fantasy uses)
+  const isPlayoffRosterPool = leagueType === 'playoff-roster-pool';
+  const showPointValues = (isFantasy && usesPointValues(scoringFormat)) || isPlayoffRosterPool;
   const showCategories = isFantasy && (scoringFormat === 'h2h-categories' || scoringFormat === 'roto');
   const showMatchupSettings = isFantasy && FORMAT_HAS_MATCHUPS[scoringFormat];
   const showDraftSettings = requiresDraft(leagueType);
