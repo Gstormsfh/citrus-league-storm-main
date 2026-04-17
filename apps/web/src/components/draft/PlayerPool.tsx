@@ -656,9 +656,9 @@ export const PlayerPool = memo(({
 
       {/* Desktop: Full table view — horizontally scrollable to show all stats */}
       <div className="hidden md:block border border-fantasy-border rounded-lg bg-[#E8EED9]/50 backdrop-blur-sm min-w-0">
-        <div className="overflow-x-auto scrollbar-styled" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="overflow-auto scrollbar-styled max-h-[calc(100dvh-18rem)]" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full min-w-[1400px] text-sm border-collapse">
-            <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
+            <thead className="bg-fantasy-light sticky top-0 z-20 border-b border-fantasy-border">
               <tr>
                 <th
                   className="px-1.5 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs w-[44px]"
