@@ -13,13 +13,16 @@
 // LEAGUE TYPE - The fundamental format of the league
 // ============================================================================
 
-export type LeagueType = 'fantasy' | 'pickem' | 'survivor' | 'confidence-pool';
+export type LeagueType = 'fantasy' | 'pickem' | 'survivor' | 'confidence-pool' | 'playoff-bracket-pickem' | 'playoff-confidence-pool' | 'playoff-roster-pool';
 
 export const LEAGUE_TYPE_LABELS: Record<LeagueType, string> = {
   'fantasy': 'Fantasy Hockey',
   'pickem': "Pick'em Pool",
   'survivor': 'Survivor Pool',
   'confidence-pool': 'Confidence Pool',
+  'playoff-bracket-pickem': 'Playoff Bracket Challenge',
+  'playoff-confidence-pool': 'Playoff Confidence Pool',
+  'playoff-roster-pool': 'Playoff Roster Pool',
 };
 
 export const LEAGUE_TYPE_DESCRIPTIONS: Record<LeagueType, string> = {
@@ -27,6 +30,9 @@ export const LEAGUE_TYPE_DESCRIPTIONS: Record<LeagueType, string> = {
   'pickem': 'Pick the winners of NHL games each week. No roster management needed — just predict outcomes.',
   'survivor': 'Pick one NHL team to win each week. Get it wrong and you\'re eliminated. Can\'t pick the same team twice.',
   'confidence-pool': 'Pick NHL game winners and rank them by confidence. Higher confidence = more points if correct.',
+  'playoff-bracket-pickem': 'Pick the winner of every Stanley Cup Playoff series. Bonus points for predicting the number of games. Points double each round.',
+  'playoff-confidence-pool': 'Pick playoff series winners and assign confidence points. Higher confidence = more risk and reward. Each value used only once.',
+  'playoff-roster-pool': 'Select your dream roster from all 16 playoff teams. Players earn fantasy points throughout the entire playoffs. Fully customizable scoring.',
 };
 
 // ============================================================================
@@ -331,8 +337,43 @@ export function getDefaultSettings(leagueType: LeagueType): LeagueFormatSettings
         confidenceMaxPoints: 10,
         stats: [],
       };
+    case 'playoff-bracket-pickem':
+      return {
+        leagueType: 'playoff-bracket-pickem',
+        scoringFormat: 'total-points',
+        draftType: 'offline',
+        teamsCount: 20,
+        draftRounds: 0,
+        pickTimeLimit: 0,
+        playoffBracketPointsPerRound: { r1: 2, r2: 4, r3: 8, scf: 16 },
+        playoffGamesPickBonus: 1,
+        stats: [],
+      };
+    case 'playoff-confidence-pool':
+      return {
+        leagueType: 'playoff-confidence-pool',
+        scoringFormat: 'total-points',
+        draftType: 'offline',
+        teamsCount: 20,
+        draftRounds: 0,
+        pickTimeLimit: 0,
+        playoffConfidenceVariant: 'cumulative',
+        stats: [],
+      };
+    case 'playoff-roster-pool':
+      return {
+        leagueType: 'playoff-roster-pool',
+        scoringFormat: 'total-points',
+        draftType: 'offline',
+        teamsCount: 20,
+        draftRounds: 0,
+        pickTimeLimit: 0,
+        playoffRosterSize: 16,
+        playoffPositionRequirements: { F: 10, D: 4, G: 2 },
+        playoffMaxPlayersPerTeam: 3,
+        stats: [],
+      };
     default: {
-      // Exhaustive check — ensures compile-time safety if a new LeagueType is added
       const _exhaustive: never = leagueType;
       throw new Error(`Unknown league type: ${_exhaustive}`);
     }
