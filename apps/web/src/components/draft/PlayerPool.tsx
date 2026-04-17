@@ -62,27 +62,22 @@ export const PlayerPool = memo(({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showDrafted, setShowDrafted] = useState(false);
 
-  // Fixed pre-draft ranking based on projected FPTS (league scoring settings).
-  // Ranks ALL players once — ranking does NOT change as players are drafted.
+  // Rank ALL players by actual season FPTS (using league scoring settings).
+  // Actual stats are always current; ROS projections can be stale if the
+  // pipeline hasn't run recently. Rankings stay dynamic to league scoring.
   const rankMap = useMemo<Map<string, number>>(() => {
     const scored = availablePlayers.map(p => ({
       id: p.id,
-      proj: projectedFptsMap.get(p.id)?.total ?? 0,
       fpts: calcFpts(p),
     }));
-    // Primary sort: projected FPTS (league scoring). Fallback to actual FPTS
-    // for players with no projection data (ensures no gaps from missing data).
-    scored.sort((a, b) => {
-      const projDiff = (b.proj || b.fpts) - (a.proj || a.fpts);
-      return projDiff;
-    });
+    scored.sort((a, b) => b.fpts - a.fpts);
     const map = new Map<string, number>();
     scored.forEach((p, i) => {
       map.set(p.id, i + 1);
     });
     return map;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availablePlayers, projectedFptsMap, scorer]);
+  }, [availablePlayers, scorer]);
 
   // PERF: Use pre-built Set for O(1) lookups instead of O(n) Array.includes on every player
   const draftedSet = useMemo(() => {
@@ -274,7 +269,7 @@ export const PlayerPool = memo(({
 
   // Desktop table row for a player — memoized to prevent re-rendering all rows on each pick
   const PlayerRow = useMemo(() => {
-    const Row = memo(({ player }: { player: Player }) => {
+    const Row = memo(({ player, displayRank }: { player: Player; displayRank: number }) => {
     const isSelected = selectedPlayer?.id === player.id;
     const isDrafted = draftedSet.has(player.id);
     const isInQueue = queue.includes(player.id);
@@ -289,15 +284,9 @@ export const PlayerPool = memo(({
         onClick={() => !isDrafted && onPlayerSelect(player)}
       >
         <td className="px-1.5 py-2 text-center w-[44px] bg-[#E8EED9]/95">
-          {(() => {
-            const rank = rankMap.get(player.id);
-            if (!rank || rank >= 999999) return <span className="text-muted-foreground">-</span>;
-            return (
-              <span className="text-xs font-mono text-citrus-forest font-bold">
-                {rank}
-              </span>
-            );
-          })()}
+          <span className="text-xs font-mono text-citrus-forest font-bold">
+            {displayRank}
+          </span>
         </td>
         <td className="px-2 py-2 sticky left-[44px] bg-[#E8EED9]/95 z-10">
           <div className="flex items-center gap-1">
@@ -383,7 +372,7 @@ export const PlayerPool = memo(({
   });
     Row.displayName = 'PlayerRow';
     return Row;
-  }, [selectedPlayer?.id, draftedSet, isDraftActive, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, fptsMap, projectedFptsMap, rankMap]);
+  }, [selectedPlayer?.id, draftedSet, isDraftActive, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, fptsMap, projectedFptsMap]);
 
   return (
     <Card className="p-2 sm:p-4 border-fantasy-border bg-fantasy-surface">
@@ -564,7 +553,7 @@ export const PlayerPool = memo(({
               </tr>
             </thead>
             <tbody>
-              {visiblePlayers.map(player => {
+              {visiblePlayers.map((player, index) => {
                 const isSelected = selectedPlayer?.id === player.id;
                 const isDrafted = draftedSet.has(player.id);
                 const isInQueue = queue.includes(player.id);
@@ -579,11 +568,7 @@ export const PlayerPool = memo(({
                     onClick={() => !isDrafted && onPlayerSelect(player)}
                   >
                     <td className="px-1 py-1.5 text-center w-[32px] sticky left-0 bg-[#E8EED9]/95 z-10">
-                      {(() => {
-                        const rank = rankMap.get(player.id);
-                        if (!rank || rank >= 999999) return <span className="text-muted-foreground text-[10px]">-</span>;
-                        return <span className="text-[10px] font-mono text-citrus-forest font-bold">{rank}</span>;
-                      })()}
+                      <span className="text-[10px] font-mono text-citrus-forest font-bold">{index + 1}</span>
                     </td>
                     <td className="px-1.5 py-1.5 sticky left-[32px] bg-[#E8EED9]/95 z-10">
                       <div className="flex items-center gap-1">
@@ -931,8 +916,8 @@ export const PlayerPool = memo(({
                   className="px-2 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 cursor-pointer hover:bg-blue-100/50 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('projFpts')}
                 >
-                  <div className="flex items-center justify-center gap-1" title="Rest-of-season projected fantasy points">
-                    ROS
+                  <div className="flex items-center justify-center gap-1" title="Rest-of-season projected fantasy points (from last pipeline run)">
+                    Proj ROS
                     {sortBy === 'projFpts' && (
                       sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
                     )}
@@ -943,8 +928,8 @@ export const PlayerPool = memo(({
                   className="px-2 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 cursor-pointer hover:bg-blue-100/50 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('projFptsPerGp')}
                 >
-                  <div className="flex items-center justify-center gap-1" title="Projected fantasy points per game (rest of season)">
-                    ROS/GP
+                  <div className="flex items-center justify-center gap-1" title="Projected fantasy points per game (rest of season, from last pipeline run)">
+                    Proj/GP
                     {sortBy === 'projFptsPerGp' && (
                       sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
                     )}
@@ -955,8 +940,8 @@ export const PlayerPool = memo(({
               </tr>
             </thead>
             <tbody>
-              {visiblePlayers.map(player => (
-                <PlayerRow key={player.id} player={player} />
+              {visiblePlayers.map((player, index) => (
+                <PlayerRow key={player.id} player={player} displayRank={index + 1} />
               ))}
             </tbody>
           </table>

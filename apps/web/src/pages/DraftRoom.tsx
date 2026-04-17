@@ -809,7 +809,7 @@ const DraftRoom = () => {
   // subscribed that's ~50 superfluous fetches per burst, which was the
   // client-side lag source observed during the canary.
   const lastReconcileAtRef = useRef<number>(0);
-  const RECONCILE_MIN_INTERVAL_MS = 3000;
+  const RECONCILE_MIN_INTERVAL_MS = 1500;
 
   useEffect(() => {
     if (!leagueId || !user?.id) return;
@@ -956,8 +956,8 @@ const DraftRoom = () => {
   useEffect(() => {
     if (draftPhase !== DraftPhase.ACTIVE || !leagueId || !user?.id) return;
 
-    const POLL_BASE_MS = 5000;
-    const POLL_JITTER_MS = 1000;
+    const POLL_BASE_MS = 2000;
+    const POLL_JITTER_MS = 500;
     let pollTimeout: ReturnType<typeof setTimeout>;
 
     const schedulePoll = () => {
