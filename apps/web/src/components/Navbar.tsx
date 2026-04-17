@@ -111,14 +111,14 @@ const Navbar = () => {
   const navTabs = isPool && activeLeagueId
     ? getPoolTabs()
     : [
+        // Playoffs front and center
+        { label: 'NHL Playoffs', path: '/nhl/playoffs', icon: Trophy },
+        { label: 'Create Pool', path: '/create-league?type=playoff', icon: Sparkles },
+        // Season-long (accessible but secondary)
         { label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup', icon: Swords },
-        { label: 'Roster', path: '/roster', icon: Users },
         { label: 'Standings', path: '/standings', icon: BarChart3 },
-        ...(showPlayoffs && activeLeagueId ? [{ label: 'Playoffs', path: `/league/${activeLeagueId}/playoffs`, icon: Trophy }] : []),
         { label: 'Players', path: '/free-agents', icon: Search },
-        { label: 'GM Office', path: '/gm-office', icon: Settings },
-        { label: 'Draft', path: activeLeagueId ? `/draft-room?league=${activeLeagueId}` : '/draft-room', icon: Sparkles },
-        { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
+        { label: 'Draft', path: activeLeagueId ? `/draft-room?league=${activeLeagueId}` : '/draft-room', icon: Settings },
       ];
 
   return (
