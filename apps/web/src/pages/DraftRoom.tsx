@@ -3989,19 +3989,25 @@ const DraftRoom = () => {
                                 className="bg-amber-500 hover:bg-amber-600 text-white font-bold"
                                 onClick={async () => {
                                   if (!leagueId || !auctionSessionId || !userTeam?.id || !selectedPlayer) return;
+                                  // Pull league-configured auction settings instead of hardcoding.
+                                  // Was silently forcing opening-bid=$1 and 30s nomination timer regardless
+                                  // of what the commissioner chose at creation.
+                                  const auctionSettings = (league?.settings as LeagueSettings) || {};
+                                  const openingBid = auctionSettings.auctionMinBid ?? 1;
+                                  const nominationSeconds = auctionSettings.auctionNominationTime ?? 30;
                                   const result = await AuctionDraftService.nominatePlayer(
                                     leagueId,
                                     auctionSessionId,
                                     userTeam.id,
                                     String(selectedPlayer.id),
                                     selectedPlayer.full_name,
-                                    1, // opening bid
-                                    30  // timer seconds
+                                    openingBid,
+                                    nominationSeconds,
                                   );
                                   if (result.success && result.nomination) {
                                     toast({ title: 'Player Nominated', description: `${selectedPlayer.full_name} is up for bidding!` });
                                     setAuctionNominationId(result.nomination.id || null);
-                                    setBidAmount(2); // Set to minimum overbid
+                                    setBidAmount(openingBid + 1); // Set to minimum overbid
                                     // Refresh auction state
                                     const refreshed = await AuctionDraftService.getAuctionState(leagueId, auctionSessionId);
                                     if (refreshed) {
