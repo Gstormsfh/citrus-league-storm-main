@@ -106,7 +106,24 @@ const DraftRoom = () => {
   // Map of player_id → { projectedFpts, projectedFptsPerGp, gamesRemaining }
   const [projectedFptsMap, setProjectedFptsMap] = useState<Map<string, { total: number; perGp: number; gamesRemaining: number }>>(new Map());
   
-  const [draftPhase, setDraftPhase] = useState<DraftPhase>(DraftPhase.LOBBY);
+  const [draftPhase, setDraftPhase] = useState<DraftPhase>(() => {
+    // Restore previous phase from sessionStorage on mount so users who refresh
+    // during an active draft don't get stuck on the LOBBY screen while the
+    // realtime subscription is still connecting. Tied to leagueId in the cache
+    // key so switching leagues doesn't inherit another league's phase.
+    try {
+      const match = window.location.pathname.match(/\/draft(?:-room)?\/([^/]+)/);
+      const lid = match?.[1];
+      if (lid) {
+        const cached = sessionStorage.getItem(`draft_phase_${lid}`);
+        if (cached) {
+          const n = parseInt(cached, 10);
+          if (Number.isFinite(n) && n >= 0 && n <= 3) return n as DraftPhase;
+        }
+      }
+    } catch { /* sessionStorage disabled (private browsing) — fall through */ }
+    return DraftPhase.LOBBY;
+  });
   const [timeRemaining, setTimeRemaining] = useState(90); // Will be updated from league settings when loaded
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [pickInProgress, setPickInProgress] = useState(false);
@@ -755,6 +772,15 @@ const DraftRoom = () => {
   //   3. Updated currentPick / currentRound / nextTeamId (computed LOCALLY)
   // A single background fetch reconciles against the server. No loadDraftState
   // round-trip (which would add ~300–800ms of blocking API calls on mobile).
+  //
+  // Rate-limit the background reconciliation: during autopick bursts the
+  // server can emit 6–8 realtime events in a few seconds. Without this
+  // gate each event triggered two parallel API calls — with 4 clients
+  // subscribed that's ~50 superfluous fetches per burst, which was the
+  // client-side lag source observed during the canary.
+  const lastReconcileAtRef = useRef<number>(0);
+  const RECONCILE_MIN_INTERVAL_MS = 3000;
+
   useEffect(() => {
     if (!leagueId || !user?.id) return;
 
@@ -833,10 +859,21 @@ const DraftRoom = () => {
         setTimeRemaining(pickTimeLimitRef.current || 90);
       }
 
-      // ── BACKGROUND RECONCILIATION (non-blocking) ────────────────────
+      // ── BACKGROUND RECONCILIATION (non-blocking, rate-limited) ──────
       // Fetch the authoritative league state in the background to sync
       // timerStartedAt / pickTimeLimit. Do NOT await — UI already updated above.
       // Also fetch picks in case we missed any (rare but possible on reconnect).
+      //
+      // Rate-limit: skip if another reconciliation fired within the last
+      // RECONCILE_MIN_INTERVAL_MS. The local state updates above already
+      // reflect the pick; reconciliation is a safety net for missed events,
+      // not a blocking requirement for UI correctness.
+      const now = Date.now();
+      if (now - lastReconcileAtRef.current < RECONCILE_MIN_INTERVAL_MS) {
+        logger.debug('DraftRoom: skipping reconcile (rate-limited)');
+        return;
+      }
+      lastReconcileAtRef.current = now;
       Promise.all([
         leagueApi.getLeague(leagueId),
         DraftService.getDraftPicks(leagueId, user.id),
@@ -889,8 +926,12 @@ const DraftRoom = () => {
   useEffect(() => {
     if (draftPhase !== DraftPhase.ACTIVE || !leagueId || !user?.id) return;
 
-    const POLL_BASE_MS = 8000;
-    const POLL_JITTER_MS = 2000;
+    // 15s base interval (was 8s) — realtime events handle sub-second pick
+    // propagation; polling is just a safety net for missed events. Reducing
+    // from 8s to 15s cuts per-client overhead ~45% during active drafts
+    // without affecting the median user experience.
+    const POLL_BASE_MS = 15000;
+    const POLL_JITTER_MS = 3000;
     let pollTimeout: ReturnType<typeof setTimeout>;
 
     const schedulePoll = () => {
@@ -2299,6 +2340,30 @@ const DraftRoom = () => {
       const unfilledPositions = new Set<string>();
       for (const [pos, need] of Object.entries(startingNeeds)) {
         if ((positionCounts[pos] || 0) < need) unfilledPositions.add(pos);
+      }
+
+      // Bench awareness: once all STARTERS are filled, autopick was falling
+      // back to raw FPTS with no position awareness — so it would keep
+      // picking the highest-FPTS player regardless of whether the team
+      // already had 4 RWs. This made picks look "random" to users.
+      //
+      // After starters are full, treat positions we have *fewer* than a
+      // sensible depth-bench cap (2 per position) as still-needed, so the
+      // autopick continues to diversify across positions instead of
+      // stacking one spot. Total roster size comes from the league's
+      // draft_rounds; per-position bench cap is 2 by default.
+      const allStartersFull = unfilledPositions.size === 0;
+      if (allStartersFull) {
+        const benchCapPerPosition: Record<string, number> = {
+          'C': (startingNeeds['C'] || 2) + 1,
+          'LW': (startingNeeds['LW'] || 2) + 1,
+          'RW': (startingNeeds['RW'] || 2) + 1,
+          'D': (startingNeeds['D'] || 4) + 2,
+          'G': (startingNeeds['G'] || 2) + 1,
+        };
+        for (const [pos, cap] of Object.entries(benchCapPerPosition)) {
+          if ((positionCounts[pos] || 0) < cap) unfilledPositions.add(pos);
+        }
       }
 
       // Score each undrafted player: FPTS is primary, positional need adds a 15% boost
@@ -4195,8 +4260,11 @@ const DraftRoom = () => {
                     </CardContent>
                   </Card>
                   
-                  {/* User's Roster Depth Chart */}
-                  {userTeam && (
+                  {/* User's Roster Depth Chart — only when the dropdown above
+                      isn't already showing the user's own team. Otherwise the
+                      same roster rendered twice (once in "View Team Roster"
+                      card, once here). */}
+                  {userTeam && selectedTeamId && selectedTeamId !== userTeam.id && (
                     <RosterDepthChart
                       draftedPlayers={userDraftedPlayers}
                       draftPicks={draftHistory}

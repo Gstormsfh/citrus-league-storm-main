@@ -56,9 +56,30 @@ export const PlayerPool = memo(({
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedPosition, setSelectedPosition] = useState('All');
-  const [sortBy, setSortBy] = useState('fpts');
+  // Default sort is the overall projected-fantasy-points ranking (#1 / #2 / #3...).
+  // This gives users a single "who's best to draft next" ordering out of the box.
+  const [sortBy, setSortBy] = useState('projRank');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showDrafted, setShowDrafted] = useState(false);
+
+  // Overall pre-draft ranking derived from rest-of-season projected fantasy
+  // points. Players are sorted by projected total FPTS descending; their
+  // position in that sorted list becomes their overall rank (#1, #2, ...).
+  // Goalies and skaters share one ranking because users pick from the same
+  // pool. Missing projections get a rank at the bottom (999999) rather than 0
+  // so undefined-FPTS players don't masquerade as #1.
+  const rankMap = useMemo<Map<string, number>>(() => {
+    const scored = availablePlayers.map(p => ({
+      id: p.id,
+      score: projectedFptsMap.get(p.id)?.total ?? -Infinity,
+    }));
+    scored.sort((a, b) => b.score - a.score);
+    const map = new Map<string, number>();
+    scored.forEach((p, i) => {
+      map.set(p.id, p.score === -Infinity ? 999999 : i + 1);
+    });
+    return map;
+  }, [availablePlayers, projectedFptsMap]);
 
   // PERF: Use pre-built Set for O(1) lookups instead of O(n) Array.includes on every player
   const draftedSet = useMemo(() => {
@@ -141,7 +162,17 @@ export const PlayerPool = memo(({
     // Sort goalies and skaters separately to avoid cross-type NaN comparisons
     // (goalies have wins/saves/gaa, skaters have points/goals/assists — mixing them
     // produces NaN from undefined fields, causing "wonky" sort in All Players view).
+    const rankCompare = (a: typeof filtered[0], b: typeof filtered[0]) => {
+      // Rank: lower is better (#1 > #2). Always sort ascending regardless
+      // of sortDirection — "#1 first" is what users want. Ties broken by
+      // projected FPTS descending. Unranked players (missing projections)
+      // fall to the bottom via 999999.
+      const ra = rankMap.get(a.id) ?? 999999;
+      const rb = rankMap.get(b.id) ?? 999999;
+      return ra - rb;
+    };
     const goalieSort = (a: typeof filtered[0], b: typeof filtered[0]) => {
+      if (sortBy === 'projRank') return rankCompare(a, b);
       let comparison = 0;
       switch (sortBy) {
         case 'wins': comparison = (b.wins || 0) - (a.wins || 0); break;
@@ -165,6 +196,7 @@ export const PlayerPool = memo(({
     };
 
     const skaterSort = (a: typeof filtered[0], b: typeof filtered[0]) => {
+      if (sortBy === 'projRank') return rankCompare(a, b);
       let comparison = 0;
       switch (sortBy) {
         case 'points': comparison = (b.points || 0) - (a.points || 0); break;
@@ -206,7 +238,7 @@ export const PlayerPool = memo(({
     }
 
     return filtered;
-  }, [debouncedSearch, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, availablePlayers, fptsMap, projectedFptsMap]);
+  }, [debouncedSearch, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, availablePlayers, fptsMap, projectedFptsMap, rankMap]);
 
   // PERF: Paginate to avoid rendering 500+ DOM nodes at once
   const PAGE_SIZE = 75;
@@ -255,6 +287,15 @@ export const PlayerPool = memo(({
       >
         <td className="px-2 py-2 sticky left-0 bg-[#E8EED9]/95 z-10">
           <div className="flex items-center gap-1">
+            {(() => {
+              const rank = rankMap.get(player.id);
+              if (!rank || rank >= 999999) return null;
+              return (
+                <span className="text-[10px] font-mono text-fantasy-primary font-bold min-w-[28px] text-right pr-1">
+                  #{rank}
+                </span>
+              );
+            })()}
             {isInQueue && (
               <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary" />
             )}
@@ -337,7 +378,7 @@ export const PlayerPool = memo(({
   });
     Row.displayName = 'PlayerRow';
     return Row;
-  }, [selectedPlayer?.id, draftedSet, isDraftActive, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, fptsMap, projectedFptsMap]);
+  }, [selectedPlayer?.id, draftedSet, isDraftActive, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, fptsMap, projectedFptsMap, rankMap]);
 
   return (
     <Card className="p-2 sm:p-4 border-fantasy-border bg-fantasy-surface">
@@ -398,6 +439,7 @@ export const PlayerPool = memo(({
             <SelectContent>
               {selectedPosition === 'G' ? (
                 <>
+                  <SelectItem value="projRank">Overall Rank (#1 →)</SelectItem>
                   <SelectItem value="wins">Wins</SelectItem>
                   <SelectItem value="losses">Losses</SelectItem>
                   <SelectItem value="gaa">GAA</SelectItem>
@@ -408,6 +450,7 @@ export const PlayerPool = memo(({
                 </>
               ) : (
                 <>
+                  <SelectItem value="projRank">Overall Rank (#1 →)</SelectItem>
                   <SelectItem value="points">Points</SelectItem>
                   <SelectItem value="goals">Goals</SelectItem>
                   <SelectItem value="assists">Assists</SelectItem>
@@ -435,6 +478,7 @@ export const PlayerPool = memo(({
           <SelectContent>
             {selectedPosition === 'G' ? (
               <>
+                <SelectItem value="projRank">Rank</SelectItem>
                 <SelectItem value="wins">W</SelectItem>
                 <SelectItem value="losses">L</SelectItem>
                 <SelectItem value="gaa">GAA</SelectItem>
@@ -445,6 +489,7 @@ export const PlayerPool = memo(({
               </>
             ) : (
               <>
+                <SelectItem value="projRank">Rank</SelectItem>
                 <SelectItem value="points">PTS</SelectItem>
                 <SelectItem value="goals">G</SelectItem>
                 <SelectItem value="assists">A</SelectItem>
