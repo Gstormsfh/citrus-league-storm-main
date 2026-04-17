@@ -594,7 +594,7 @@ const DraftRoom = () => {
         // couldn't prepare and felt locked out.
         setDraftState(null);
         setDraftPhase(DraftPhase.ACTIVE);
-        ssPut(`draft_phase_${leagueId}`, String(DraftPhase.ACTIVE));
+        ssSet(`draft_phase_${leagueId}`, String(DraftPhase.ACTIVE));
         logger.debug('DraftRoom: Draft queued, entering ACTIVE (pre-draft room)');
       } else if (leagueData.draft_status === 'in_progress') {
         // Draft is IN PROGRESS - show LOBBY with "join active draft" banner
@@ -649,7 +649,7 @@ const DraftRoom = () => {
         // This matches the realtime path (line 1241) and prevents users who arrive
         // during an active draft from being stuck watching the lobby while picks happen.
         setDraftPhase(DraftPhase.ACTIVE);
-        ssPut(`draft_phase_${leagueId}`, String(DraftPhase.ACTIVE));
+        ssSet(`draft_phase_${leagueId}`, String(DraftPhase.ACTIVE));
         logger.debug('DraftRoom: Auto-joined in-progress draft on initial load');
       } else if (leagueData.draft_status === 'completed') {
         // Draft completed
@@ -1244,7 +1244,7 @@ const DraftRoom = () => {
           if (updatedLeague.draft_status === 'queued' && draftPhaseRef.current === DraftPhase.LOBBY) {
             logger.debug('DraftRoom: Draft queued by commissioner, auto-entering draft room');
             setDraftPhase(DraftPhase.ACTIVE);
-            ssPut(`draft_phase_${leagueId}`, String(DraftPhase.ACTIVE));
+            ssSet(`draft_phase_${leagueId}`, String(DraftPhase.ACTIVE));
           }
 
           // When draft starts, pre-load state but stay in LOBBY with join banner.
@@ -1293,7 +1293,7 @@ const DraftRoom = () => {
             // Auto-join the active draft — don't force users to find a "Join" button.
             // Pre-loaded state is ready; transition immediately so nobody misses picks.
             setDraftPhase(DraftPhase.ACTIVE);
-            ssPut(`draft_phase_${leagueId}`, String(DraftPhase.ACTIVE));
+            ssSet(`draft_phase_${leagueId}`, String(DraftPhase.ACTIVE));
             logger.debug('DraftRoom: Auto-joined active draft via realtime');
           }
 
