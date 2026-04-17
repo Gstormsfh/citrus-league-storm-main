@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trophy, Clock, AlertTriangle } from 'lucide-react';
+import Navbar from '@/components/Navbar';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -80,14 +81,16 @@ export default function NHLPlayoffBracket() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center">
         <div className="text-center text-citrus-charcoal/60">Loading bracket...</div>
-      </div>
+      </div></>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-[#F5F8ED] py-6 px-4">
+    <>
+    <Navbar />
+    <div className="min-h-screen bg-gradient-to-b from-white to-[#F5F8ED] py-6 px-4 pt-24">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-6">
@@ -194,5 +197,6 @@ export default function NHLPlayoffBracket() {
         )}
       </div>
     </div>
+    </>
   );
 }

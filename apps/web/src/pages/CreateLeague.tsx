@@ -123,7 +123,7 @@ const CreateLeague = () => {
 
   // ---- Core Settings ----
   const [leagueName, setLeagueName] = useState("");
-  const [leagueType, setLeagueType] = useState<LeagueType>("fantasy");
+  const [leagueType, setLeagueType] = useState<LeagueType>("playoff-bracket-pickem");
   const [scoringFormat, setScoringFormat] = useState<ScoringFormat>("h2h-points");
   const [draftType, setDraftType] = useState<DraftType>("snake");
   const [teamsCount, setTeamsCount] = useState("12");
@@ -626,16 +626,17 @@ const CreateLeague = () => {
                   {/* ======================================================== */}
                   <div>
                     <SectionHeader
-                      title={searchParams.get('type') === 'playoff' ? "Choose Your Playoff Pool Format" : "Choose Your League Type"}
-                      subtitle={searchParams.get('type') === 'playoff' ? "Pick how your playoff pool will work" : "Select the format that fits your group"}
+                      title={searchParams.get('type') === 'all' ? "Choose Your League Type" : "Choose Your Playoff Pool Format"}
+                      subtitle={searchParams.get('type') === 'all' ? "Select the format that fits your group" : "Pick how your playoff pool will work"}
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {(Object.keys(LEAGUE_TYPE_LABELS) as LeagueType[])
                         .filter(type => {
                           const isPlayoffType = type === 'playoff-bracket-pickem' || type === 'playoff-confidence-pool' || type === 'playoff-roster-pool';
-                          // If URL says type=playoff, only show the 3 playoff types
-                          if (searchParams.get('type') === 'playoff') return isPlayoffType;
-                          return true;
+                          // ?type=all shows everything (backdoor for testing season-long)
+                          if (searchParams.get('type') === 'all') return true;
+                          // Default: only show playoff types (we're in playoff season)
+                          return isPlayoffType;
                         })
                         .map((type) => (
                         <button
