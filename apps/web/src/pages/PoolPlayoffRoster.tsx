@@ -46,10 +46,14 @@ interface PoolPlayer {
   ppp: number;
   shp: number;
   plus_minus?: number;
+  xGoals?: number;
+  icetime_seconds?: number;
   wins?: number;
   saves?: number;
   shutouts?: number;
   goals_against?: number;
+  goals_against_average?: number | null;
+  save_percentage?: number | null;
 }
 
 interface RosterSlot {
@@ -406,6 +410,9 @@ export default function PoolPlayoffRosterEntry() {
                       <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell" title="Shots (skater) / Goals Against (goalie)">SOG/GA</th>
                       <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell">HIT</th>
                       <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell">BLK</th>
+                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden md:table-cell" title="Plus/Minus (skater) / Save % (goalie)">+/-/SV%</th>
+                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-purple-700 hidden md:table-cell" title="Expected Goals (skater) / Goals Against Avg (goalie)">xG/GAA</th>
+                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden lg:table-cell" title="Avg time on ice per game (min:sec)">TOI</th>
                       <th className="px-2 py-2 text-center text-xs font-bold text-green-700 bg-green-50/50">FPTS</th>
                       <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest w-14"></th>
                     </tr>
@@ -462,6 +469,13 @@ export default function PoolPlayoffRosterEntry() {
                               <td className="px-2 py-1.5 text-center text-xs font-bold">{player.shutouts || 0}</td>
                               <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.goals_against || 0}</td>
                               <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell" colSpan={2}>—</td>
+                              <td className="px-2 py-1.5 text-center text-xs hidden md:table-cell">
+                                {player.save_percentage != null ? (player.save_percentage * 100).toFixed(1) + '%' : '—'}
+                              </td>
+                              <td className="px-2 py-1.5 text-center text-xs hidden md:table-cell text-purple-700">
+                                {player.goals_against_average != null ? player.goals_against_average.toFixed(2) : '—'}
+                              </td>
+                              <td className="px-2 py-1.5 text-center text-xs hidden lg:table-cell">—</td>
                             </>
                           ) : (
                             <>
@@ -471,6 +485,20 @@ export default function PoolPlayoffRosterEntry() {
                               <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.shots}</td>
                               <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.hits}</td>
                               <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.blocks}</td>
+                              <td className={cn('px-2 py-1.5 text-center text-xs hidden md:table-cell', (player.plus_minus || 0) > 0 && 'text-green-700', (player.plus_minus || 0) < 0 && 'text-red-600')}>
+                                {(player.plus_minus ?? 0) > 0 ? '+' : ''}{player.plus_minus ?? 0}
+                              </td>
+                              <td className="px-2 py-1.5 text-center text-xs hidden md:table-cell text-purple-700 font-semibold">
+                                {(player.xGoals ?? 0).toFixed(1)}
+                              </td>
+                              <td className="px-2 py-1.5 text-center text-xs hidden lg:table-cell text-citrus-charcoal/70">
+                                {player.icetime_seconds && player.games_played ? (() => {
+                                  const totalSec = Math.round(player.icetime_seconds / player.games_played);
+                                  const m = Math.floor(totalSec / 60);
+                                  const s = totalSec % 60;
+                                  return `${m}:${s < 10 ? '0' : ''}${s}`;
+                                })() : '—'}
+                              </td>
                             </>
                           )}
                           <td className="px-2 py-1.5 text-center text-xs font-bold text-green-700 bg-green-50/20">{fpts.toFixed(1)}</td>
