@@ -105,7 +105,7 @@ ALTER TABLE public.player_playoff_stats ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "League members read bracket picks" ON public.playoff_bracket_picks
   FOR SELECT USING (
     auth.uid() = user_id
-    OR EXISTS (SELECT 1 FROM public.league_members lm WHERE lm.league_id = playoff_bracket_picks.league_id AND lm.user_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.teams t WHERE t.league_id = playoff_bracket_picks.league_id AND t.owner_id = auth.uid())
   );
 
 CREATE POLICY "Users manage own bracket picks" ON public.playoff_bracket_picks
@@ -114,7 +114,7 @@ CREATE POLICY "Users manage own bracket picks" ON public.playoff_bracket_picks
 CREATE POLICY "League members read confidence picks" ON public.playoff_confidence_picks
   FOR SELECT USING (
     auth.uid() = user_id
-    OR EXISTS (SELECT 1 FROM public.league_members lm WHERE lm.league_id = playoff_confidence_picks.league_id AND lm.user_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.teams t WHERE t.league_id = playoff_confidence_picks.league_id AND t.owner_id = auth.uid())
   );
 
 CREATE POLICY "Users manage own confidence picks" ON public.playoff_confidence_picks
@@ -123,7 +123,7 @@ CREATE POLICY "Users manage own confidence picks" ON public.playoff_confidence_p
 CREATE POLICY "League members read roster picks" ON public.playoff_roster_picks
   FOR SELECT USING (
     auth.uid() = user_id
-    OR EXISTS (SELECT 1 FROM public.league_members lm WHERE lm.league_id = playoff_roster_picks.league_id AND lm.user_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.teams t WHERE t.league_id = playoff_roster_picks.league_id AND t.owner_id = auth.uid())
   );
 
 CREATE POLICY "Users manage own roster picks" ON public.playoff_roster_picks
@@ -131,7 +131,7 @@ CREATE POLICY "Users manage own roster picks" ON public.playoff_roster_picks
 
 CREATE POLICY "League members read standings" ON public.playoff_pool_standings
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.league_members lm WHERE lm.league_id = playoff_pool_standings.league_id AND lm.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.teams t WHERE t.league_id = playoff_pool_standings.league_id AND t.owner_id = auth.uid())
   );
 
 CREATE POLICY "Service role writes standings" ON public.playoff_pool_standings
