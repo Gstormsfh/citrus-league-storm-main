@@ -1,0 +1,312 @@
+/**
+ * Playoff Pool Hub — the homepage for a created playoff pool.
+ *
+ * Shows:
+ *  - League name + format label
+ *  - All members who have joined (teams)
+ *  - Join code for inviting friends
+ *  - Lock deadline countdown
+ *  - CTA for each member to go submit their picks/roster
+ *  - Commissioner controls (if applicable)
+ */
+
+import { useEffect, useState, useMemo } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
+import {
+  Trophy, Users, Clock, Copy, Check, Lock, ChevronRight, Crown, Target,
+} from 'lucide-react';
+import Navbar from '@/components/Navbar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
+interface Team {
+  id: string;
+  team_name: string;
+  owner_id: string;
+  owner_name?: string;
+}
+
+interface League {
+  id: string;
+  name: string;
+  commissioner_id: string;
+  join_code: string;
+  settings: {
+    leagueType?: string;
+    playoffRosterLockedAt?: string;
+    playoffRosterSize?: number;
+    playoffBracketPointsPerRound?: Record<string, number>;
+    playoffConfidenceVariant?: string;
+  };
+}
+
+const POOL_TYPE_LABELS: Record<string, string> = {
+  'playoff-bracket-pickem': 'Playoff Bracket Challenge',
+  'playoff-confidence-pool': 'Playoff Confidence Pool',
+  'playoff-roster-pool': 'Playoff Roster Pool',
+};
+
+const POOL_TYPE_ROUTES: Record<string, string> = {
+  'playoff-bracket-pickem': '/pool/playoff-bracket',
+  'playoff-confidence-pool': '/pool/playoff-confidence',
+  'playoff-roster-pool': '/pool/playoff-roster',
+};
+
+export default function PoolPlayoffHub() {
+  const [params] = useSearchParams();
+  const leagueId = params.get('league') || '';
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const [league, setLeague] = useState<League | null>(null);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!leagueId) return;
+    const load = async () => {
+      try {
+        const session = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session;
+        const headers: Record<string, string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+        const [leagueRes, teamsRes] = await Promise.all([
+          fetch(`/api/leagues/${leagueId}`, { headers }).then(r => r.json()).catch(() => null),
+          fetch(`/api/leagues/${leagueId}/teams`, { headers }).then(r => r.json()).catch(() => null),
+        ]);
+        setLeague(leagueRes?.data || leagueRes);
+        const teamList = teamsRes?.data?.teams || teamsRes?.teams || teamsRes?.data || [];
+        setTeams(Array.isArray(teamList) ? teamList : []);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [leagueId]);
+
+  const leagueType = league?.settings?.leagueType || 'playoff-bracket-pickem';
+  const poolLabel = POOL_TYPE_LABELS[leagueType] || 'Playoff Pool';
+  const makePicksRoute = POOL_TYPE_ROUTES[leagueType] || '/pool/playoff-bracket';
+  const isCommissioner = user?.id === league?.commissioner_id;
+
+  // Lock deadline
+  const lockAt = league?.settings?.playoffRosterLockedAt;
+  const lockCountdown = useMemo(() => {
+    if (!lockAt) return null;
+    const ms = new Date(lockAt).getTime() - Date.now();
+    if (ms <= 0) return { locked: true, label: 'Rosters locked' };
+    const hours = Math.floor(ms / 3600000);
+    const days = Math.floor(hours / 24);
+    if (days > 0) return { locked: false, label: `Locks in ${days}d ${hours % 24}h` };
+    if (hours > 0) return { locked: false, label: `Locks in ${hours}h` };
+    const minutes = Math.floor(ms / 60000);
+    return { locked: false, label: `Locks in ${minutes}m` };
+  }, [lockAt]);
+
+  const copyJoinCode = () => {
+    if (!league?.join_code) return;
+    navigator.clipboard.writeText(league.join_code);
+    setCopied(true);
+    toast({ title: 'Join code copied!', description: 'Send it to your friends to invite them.' });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const shareUrl = `${window.location.origin}/create-league?tab=join&code=${league?.join_code || ''}`;
+
+  if (loading) {
+    return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center text-citrus-charcoal/60">Loading pool...</div></>;
+  }
+
+  if (!league) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen pt-24 flex items-center justify-center">
+          <Card className="p-6 text-center">
+            <p className="text-sm">Pool not found.</p>
+            <Button asChild className="mt-3"><Link to="/nhl/playoffs">Back to NHL Playoffs</Link></Button>
+          </Card>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Navbar />
+      <div className="min-h-screen bg-gradient-to-b from-white to-[#F5F8ED] pt-24 pb-12 px-4">
+        <div className="max-w-5xl mx-auto">
+          {/* Hero */}
+          <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Trophy className="h-6 w-6 text-citrus-orange" />
+                <h1 className="text-2xl sm:text-3xl font-varsity font-black uppercase text-citrus-forest tracking-tight">{league.name}</h1>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-citrus-charcoal/70">
+                <Badge variant="outline" className="border-citrus-sage">{poolLabel}</Badge>
+                {isCommissioner && <Badge className="bg-citrus-orange/20 text-citrus-orange border-citrus-orange/30"><Crown className="h-3 w-3 mr-1" />Commissioner</Badge>}
+              </div>
+            </div>
+            {lockCountdown && (
+              <div className="text-right">
+                <div className="text-[10px] font-display uppercase text-citrus-charcoal/60">
+                  {lockCountdown.locked ? 'Status' : 'Pick deadline'}
+                </div>
+                <div className={cn(
+                  'text-base font-bold flex items-center gap-1 justify-end',
+                  lockCountdown.locked ? 'text-red-500' : 'text-citrus-orange'
+                )}>
+                  {lockCountdown.locked ? <Lock className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                  {lockCountdown.label}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4">
+            {/* Main */}
+            <div className="space-y-4">
+              {/* Your Picks CTA */}
+              <Card className="border-citrus-orange/30 bg-gradient-to-br from-citrus-orange/5 to-citrus-sage/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Target className="h-4 w-4 text-citrus-orange" />
+                    Your Picks
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-citrus-charcoal/70 mb-3">
+                    {lockCountdown?.locked
+                      ? 'Rosters are locked — check your lineup and watch live scoring.'
+                      : leagueType === 'playoff-roster-pool'
+                        ? 'Build your roster from players across all 16 playoff teams.'
+                        : leagueType === 'playoff-confidence-pool'
+                          ? 'Pick winners and assign confidence values to each series.'
+                          : 'Pick the winner and # of games for each playoff series.'}
+                  </p>
+                  <Button asChild className="bg-citrus-orange hover:bg-citrus-orange/90 text-white font-display font-bold">
+                    <Link to={`${makePicksRoute}?league=${leagueId}`}>
+                      {lockCountdown?.locked ? 'View Picks' : 'Make My Picks'} <ChevronRight className="h-4 w-4 ml-1" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Members */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="h-4 w-4 text-citrus-sage" />
+                    Members ({teams.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {teams.length === 0 ? (
+                    <p className="text-xs text-citrus-charcoal/60 italic">No members yet — invite friends with the join code →</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {teams.map((t) => (
+                        <div key={t.id} className="flex items-center justify-between p-2 rounded border border-citrus-sage/20 bg-white">
+                          <div className="flex items-center gap-2">
+                            <div className="h-7 w-7 rounded-full bg-citrus-sage/20 flex items-center justify-center text-xs font-bold text-citrus-forest">
+                              {(t.team_name || '?').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium">{t.team_name}</div>
+                              {t.owner_id === league.commissioner_id && (
+                                <div className="text-[10px] text-citrus-orange flex items-center gap-0.5"><Crown className="h-2.5 w-2.5" />Commissioner</div>
+                              )}
+                              {t.owner_id === user?.id && t.owner_id !== league.commissioner_id && (
+                                <div className="text-[10px] text-citrus-sage">You</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Standings CTA */}
+              <Card className="border-citrus-sage/30">
+                <CardContent className="pt-4">
+                  <h3 className="text-sm font-display font-bold text-citrus-forest mb-1">Standings</h3>
+                  <p className="text-xs text-citrus-charcoal/60 mb-3">Standings populate once playoff games start. Leaderboard updates live as series complete.</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-3">
+              {/* Invite */}
+              <Card className="border-citrus-orange/30 bg-white">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-display">Invite Friends</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="text-[10px] uppercase font-display text-citrus-charcoal/50">Join Code</div>
+                  <button
+                    onClick={copyJoinCode}
+                    className="w-full flex items-center justify-between p-2 rounded border border-citrus-sage/30 bg-citrus-sage/5 hover:bg-citrus-sage/10 transition-colors"
+                  >
+                    <span className="text-lg font-mono font-bold text-citrus-forest tracking-wider">{league.join_code}</span>
+                    {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4 text-citrus-charcoal/50" />}
+                  </button>
+                  <div className="text-[10px] uppercase font-display text-citrus-charcoal/50 mt-2">Or share link</div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(shareUrl);
+                      toast({ title: 'Link copied!' });
+                    }}
+                    className="w-full text-left text-[11px] p-2 rounded border border-citrus-sage/20 bg-white hover:bg-citrus-sage/5 break-all"
+                  >
+                    {shareUrl}
+                  </button>
+                </CardContent>
+              </Card>
+
+              {/* Rules recap */}
+              <Card className="border-citrus-sage/20 bg-citrus-sage/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-display">Pool Rules</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="text-[11px] text-citrus-charcoal/70 space-y-1 list-disc pl-3">
+                    {leagueType === 'playoff-roster-pool' && (
+                      <>
+                        <li>Pick {league.settings?.playoffRosterSize || 18} players from the 16 playoff teams</li>
+                        <li>Max 3 players per NHL team</li>
+                        <li>Total fantasy points across all playoff games</li>
+                        <li>Scoring uses your league's custom point values</li>
+                      </>
+                    )}
+                    {leagueType === 'playoff-bracket-pickem' && (
+                      <>
+                        <li>Pick the winner of all 15 playoff series</li>
+                        <li>Points double each round (2 / 4 / 8 / 16)</li>
+                        <li>+1 bonus for correctly predicting number of games</li>
+                      </>
+                    )}
+                    {leagueType === 'playoff-confidence-pool' && (
+                      <>
+                        <li>Pick series winners + assign confidence 1-15</li>
+                        <li>Each confidence value used exactly once</li>
+                        <li>Correct pick = you earn that many points</li>
+                      </>
+                    )}
+                    <li>Picks lock {lockAt ? `at ${new Date(lockAt).toLocaleString()}` : 'at puck drop of Round 1 Game 1'}</li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

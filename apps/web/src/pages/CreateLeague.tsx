@@ -25,7 +25,7 @@ import {
   Trophy, CheckCircle, AlertCircle, UserPlus,
   Copy, Sparkles, Target, Shield, BarChart3,
   Crown, DollarSign, Shuffle, ArrowDown, Bot, FileEdit,
-  ChevronDown, ChevronUp, Info,
+  ChevronDown, ChevronUp, Info, Lock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -159,6 +159,11 @@ const CreateLeague = () => {
   const [survivorLives, setSurvivorLives] = useState("1");
   const [confidenceMaxPoints, setConfidenceMaxPoints] = useState("10");
   const [pickDeadline, setPickDeadline] = useState<'per-game' | 'first-game'>('per-game');
+  // Default playoff roster lock: April 21, 2026 at 8:00 PM UTC (Round 1 Game 1 estimate)
+  const [playoffLockDeadline, setPlayoffLockDeadline] = useState<string>(() => {
+    const d = new Date(); d.setDate(d.getDate() + 4); d.setHours(20, 0, 0, 0);
+    return d.toISOString().slice(0, 16); // yyyy-mm-ddThh:mm format for datetime-local
+  });
   const [tiebreaker, setTiebreaker] = useState<'none' | 'total-points' | 'most-upsets'>('none');
   const [allowRepeatTeams, setAllowRepeatTeams] = useState(false);
   const [poolVisibility, setPoolVisibility] = useState<'private' | 'public'>('private');
@@ -389,12 +394,17 @@ const CreateLeague = () => {
         } else if (leagueType === 'playoff-bracket-pickem') {
           settings.playoffBracketPointsPerRound = { r1: 2, r2: 4, r3: 8, scf: 16 };
           settings.playoffGamesPickBonus = 1;
+          // Commissioner-selected pick lock deadline (ISO string)
+          settings.playoffRosterLockedAt = new Date(playoffLockDeadline).toISOString();
         } else if (leagueType === 'playoff-confidence-pool') {
           settings.playoffConfidenceVariant = 'cumulative';
+          settings.playoffRosterLockedAt = new Date(playoffLockDeadline).toISOString();
         } else if (leagueType === 'playoff-roster-pool') {
           settings.playoffRosterSize = 18;
           settings.playoffPositionRequirements = { F: 10, D: 6, G: 2 };
           settings.playoffMaxPlayersPerTeam = 3;
+          // Commissioner-selected roster lock deadline
+          settings.playoffRosterLockedAt = new Date(playoffLockDeadline).toISOString();
         }
       }
 
@@ -455,12 +465,9 @@ const CreateLeague = () => {
         navigate(`/pool/survivor?league=${league.id}`);
       } else if (leagueType === 'confidence-pool') {
         navigate(`/pool/confidence?league=${league.id}`);
-      } else if (leagueType === 'playoff-bracket-pickem') {
-        navigate(`/pool/playoff-bracket?league=${league.id}`);
-      } else if (leagueType === 'playoff-confidence-pool') {
-        navigate(`/pool/playoff-confidence?league=${league.id}`);
-      } else if (leagueType === 'playoff-roster-pool') {
-        navigate(`/pool/playoff-roster?league=${league.id}`);
+      } else if (leagueType === 'playoff-bracket-pickem' || leagueType === 'playoff-confidence-pool' || leagueType === 'playoff-roster-pool') {
+        // Playoff pools → always land on the Hub (dashboard) after creation
+        navigate(`/pool/playoff-hub?league=${league.id}`);
       } else {
         navigate(`/league/${league.id}?league=${league.id}`);
       }
@@ -693,6 +700,28 @@ const CreateLeague = () => {
                           {isPool ? 'Any number from 2 to 100' : 'Any number from 2 to 50'}
                         </p>
                       </div>
+
+                      {/* Pick/Roster Lock Deadline - Playoff Pools */}
+                      {(leagueType === 'playoff-bracket-pickem' || leagueType === 'playoff-confidence-pool' || leagueType === 'playoff-roster-pool') && (
+                        <div className="space-y-3">
+                          <Label htmlFor="playoff-lock" className="text-base flex items-center gap-2">
+                            <Lock className="h-4 w-4 text-citrus-orange" />
+                            {leagueType === 'playoff-roster-pool' ? 'Roster Lock Deadline' : 'Pick Lock Deadline'}
+                          </Label>
+                          <Input
+                            id="playoff-lock"
+                            type="datetime-local"
+                            value={playoffLockDeadline}
+                            onChange={(e) => setPlayoffLockDeadline(e.target.value)}
+                            className="h-12"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            {leagueType === 'playoff-roster-pool'
+                              ? 'After this time, rosters lock and players cannot be swapped. Default is Round 1 Game 1 puck drop.'
+                              : 'After this time, picks lock. Typically set to just before the first playoff game.'}
+                          </p>
+                        </div>
+                      )}
 
                       {/* Scoring Format - Fantasy only */}
                       {isFantasy && (

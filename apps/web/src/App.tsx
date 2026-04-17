@@ -101,6 +101,7 @@ const NHLPlayoffBracket = lazyWithErrorHandling(() => import("./pages/NHLPlayoff
 const PoolPlayoffBracket = lazyWithErrorHandling(() => import("./pages/PoolPlayoffBracket"));
 const PoolPlayoffRoster = lazyWithErrorHandling(() => import("./pages/PoolPlayoffRoster"));
 const PoolPlayoffConfidence = lazyWithErrorHandling(() => import("./pages/PoolPlayoffConfidence"));
+const PoolPlayoffHub = lazyWithErrorHandling(() => import("./pages/PoolPlayoffHub"));
 const Admin = lazyWithErrorHandling(() => import("./pages/Admin"));
 
 // Use the picturesque LoadingScreen as the Suspense fallback for lazy-loaded routes
@@ -201,6 +202,7 @@ const App = () => {
                 <Route path="/pool/playoff-bracket" element={<ProtectedRoute><ErrorBoundary><PoolPlayoffBracket /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/pool/playoff-roster" element={<ProtectedRoute><ErrorBoundary><PoolPlayoffRoster /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/pool/playoff-confidence" element={<ProtectedRoute><ErrorBoundary><PoolPlayoffConfidence /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/pool/playoff-hub" element={<ProtectedRoute><ErrorBoundary><PoolPlayoffHub /></ErrorBoundary></ProtectedRoute>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
