@@ -586,7 +586,8 @@ const CreateLeague = () => {
             </p>
           </div>
 
-          {/* Testing Phase Banner */}
+          {/* Testing Phase Banner — only for season-long fantasy */}
+          {searchParams.get('type') === 'all' && (
           <Alert className="mb-6 bg-citrus-orange/20 border-2 border-citrus-orange/40">
             <Sparkles className="h-4 w-4 text-citrus-orange" />
             <AlertDescription className="text-citrus-forest">
@@ -596,6 +597,7 @@ const CreateLeague = () => {
               </span>
             </AlertDescription>
           </Alert>
+          )}
 
           {/* Waitlist Signup */}
           <div className="mb-6">
