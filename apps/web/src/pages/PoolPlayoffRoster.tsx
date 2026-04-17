@@ -51,12 +51,13 @@ interface PoolPlayer {
   icetime_seconds?: number;
   wins?: number;
   saves?: number;
+  shots_faced?: number;
   shutouts?: number;
   goals_against?: number;
-  gaa?: number | null;
-  save_pct?: number | null;
-  goals_against_average?: number | null;
-  save_percentage?: number | null;
+  gaa?: number | string | null;
+  save_pct?: number | string | null;
+  goals_against_average?: number | string | null;
+  save_percentage?: number | string | null;
 }
 
 interface RosterSlot {
@@ -111,6 +112,13 @@ export default function PoolPlayoffRosterEntry() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [sortBy, setSortBy] = useState<string>('fpts');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const toggleSort = (col: string) => {
+    if (sortBy === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    else { setSortBy(col); setSortDir('desc'); }
+  };
 
   // Defaults
   const rosterSize = league?.settings?.playoffRosterSize ?? 18;
@@ -223,8 +231,43 @@ export default function PoolPlayoffRosterEntry() {
         if (teamFilter && p.team !== teamFilter) return false;
         return true;
       })
-      .sort((a, b) => calcFpts(b) - calcFpts(a));
-  }, [players, searchTerm, posFilter, teamFilter, calcFpts]);
+      .sort((a, b) => {
+        const getVal = (p: PoolPlayer): number => {
+          switch (sortBy) {
+            case 'name': return 0; // handle separately
+            case 'team': return 0; // handle separately
+            case 'gp': return p.games_played;
+            case 'g_w': return normalizePos(p.position) === 'G' ? (p.wins || 0) : p.goals;
+            case 'a_sv': return normalizePos(p.position) === 'G' ? (p.saves || 0) : p.assists;
+            case 'pts_so': return normalizePos(p.position) === 'G' ? (p.shutouts || 0) : p.points;
+            case 'sog_ga': return normalizePos(p.position) === 'G' ? (p.goals_against || 0) : p.shots;
+            case 'hit': return p.hits;
+            case 'blk': return p.blocks;
+            case 'pm_svpct': {
+              if (normalizePos(p.position) === 'G') return (p.save_pct ?? p.save_percentage ?? 0);
+              return p.plus_minus ?? 0;
+            }
+            case 'xg_gaa': {
+              if (normalizePos(p.position) === 'G') return (p.gaa ?? p.goals_against_average ?? 0);
+              return p.xGoals ?? p.x_goals ?? 0;
+            }
+            case 'toi': return p.icetime_seconds && p.games_played ? p.icetime_seconds / p.games_played : 0;
+            case 'fpts':
+            default: return calcFpts(p);
+          }
+        };
+        if (sortBy === 'name') {
+          const r = a.full_name.localeCompare(b.full_name);
+          return sortDir === 'asc' ? r : -r;
+        }
+        if (sortBy === 'team') {
+          const r = a.team.localeCompare(b.team);
+          return sortDir === 'asc' ? r : -r;
+        }
+        const diff = getVal(b) - getVal(a);
+        return sortDir === 'desc' ? diff : -diff;
+      });
+  }, [players, searchTerm, posFilter, teamFilter, calcFpts, sortBy, sortDir]);
 
   // Can add this player?
   const canAdd = (p: PoolPlayer): boolean => {
@@ -396,27 +439,59 @@ export default function PoolPlayoffRosterEntry() {
               })}
             </div>
 
-            {/* Player table */}
-            {/* Two scrollbars: parent overflow-x lets you slide horizontally from the top or bottom,
-                inner max-h + overflow-y lets you scroll the rows. Both always visible via scrollbar-styled. */}
-            <Card className="border-fantasy-border bg-fantasy-surface overflow-x-auto scrollbar-styled">
-              <div className="overflow-auto scrollbar-styled max-h-[calc(100dvh-20rem)]">
-                <table className="w-full text-sm border-collapse">
+            {/* Top sticky horizontal scrollbar (mirrors the table scroll position)
+                so users can slide left/right without scrolling down first. */}
+            <div
+              className="overflow-x-auto scrollbar-styled mb-1 bg-fantasy-light/30 rounded"
+              onScroll={(e) => {
+                const container = e.currentTarget;
+                const table = container.parentElement?.querySelector<HTMLDivElement>('[data-roster-table]');
+                if (table) table.scrollLeft = container.scrollLeft;
+              }}
+            >
+              <div id="roster-scroll-helper-inner" style={{ width: '900px', height: '1px' }} />
+            </div>
+
+            {/* Player table — single scroll container that scrolls BOTH axes.
+                overflow-auto = horizontal + vertical scrollbars always visible
+                (styled by .scrollbar-styled). max-h bounds vertical so the
+                horizontal bar at the bottom stays within the viewport. */}
+            <Card className="border-fantasy-border bg-fantasy-surface">
+              <div
+                data-roster-table
+                className="overflow-auto scrollbar-styled"
+                style={{ maxHeight: 'calc(100dvh - 16rem)', scrollbarGutter: 'stable' }}
+                onScroll={(e) => {
+                  // Mirror the scroll to the top helper bar
+                  const t = e.currentTarget;
+                  const helper = document.getElementById('roster-scroll-helper-inner');
+                  if (helper && helper.parentElement) helper.parentElement.scrollLeft = t.scrollLeft;
+                }}
+              >
+                <table className="w-full text-sm border-collapse" style={{ minWidth: '900px' }}>
                   <thead className="bg-fantasy-light sticky top-0 z-10 border-b border-fantasy-border">
                     <tr>
                       <th className="px-2 py-2 text-left text-xs font-display font-bold text-citrus-forest w-8">#</th>
-                      <th className="px-2 py-2 text-left text-xs font-display font-bold text-citrus-forest min-w-[140px]">Player</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest">Pos</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest">Team</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest">GP</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest" title="Goals (skater) / Wins (goalie)">G/W</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest" title="Assists (skater) / Saves (goalie)">A/SV</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest" title="Points (skater) / Shutouts (goalie)">PTS/SO</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell" title="Shots (skater) / Goals Against (goalie)">SOG/GA</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell">HIT</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell">BLK</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden md:table-cell" title="Plus/Minus (skater) / Save % (goalie)">+/-/SV%</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-purple-700 hidden md:table-cell" title="Expected Goals (skater) / Goals Against Avg (goalie)">xG/GAA</th>
+                      {(() => {
+                        const ind = (col: string) => sortBy === col ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '';
+                        const cn_sort = 'cursor-pointer select-none hover:text-citrus-orange transition-colors';
+                        return (
+                          <>
+                            <th onClick={() => toggleSort('name')} className={cn('px-2 py-2 text-left text-xs font-display font-bold text-citrus-forest min-w-[140px]', cn_sort)}>Player{ind('name')}</th>
+                            <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest">Pos</th>
+                            <th onClick={() => toggleSort('team')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>Team{ind('team')}</th>
+                            <th onClick={() => toggleSort('gp')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>GP{ind('gp')}</th>
+                            <th onClick={() => toggleSort('g_w')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)} title="Goals (skater) / Wins (goalie)">G/W{ind('g_w')}</th>
+                            <th onClick={() => toggleSort('a_sv')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)} title="Assists / Saves">A/SV{ind('a_sv')}</th>
+                            <th onClick={() => toggleSort('pts_so')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)} title="Points / Shutouts">PTS/SO{ind('pts_so')}</th>
+                            <th onClick={() => toggleSort('sog_ga')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)} title="Shots / Goals Against">SOG/GA{ind('sog_ga')}</th>
+                            <th onClick={() => toggleSort('hit')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)}>HIT{ind('hit')}</th>
+                            <th onClick={() => toggleSort('blk')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)}>BLK{ind('blk')}</th>
+                            <th onClick={() => toggleSort('pm_svpct')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden md:table-cell', cn_sort)} title="+/- (skater) / SV% (goalie)">+/-/SV%{ind('pm_svpct')}</th>
+                            <th onClick={() => toggleSort('xg_gaa')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-purple-700 hidden md:table-cell', cn_sort)} title="xGoals / GAA">xG/GAA{ind('xg_gaa')}</th>
+                          </>
+                        );
+                      })()}
                       <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden lg:table-cell" title="Avg time on ice per game (min:sec)">TOI</th>
                       <th className="px-2 py-2 text-center text-xs font-bold text-green-700 bg-green-50/50">FPTS</th>
                       <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest w-14"></th>
@@ -476,15 +551,24 @@ export default function PoolPlayoffRosterEntry() {
                               <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell" colSpan={2}>—</td>
                               <td className="px-2 py-1.5 text-center text-xs hidden md:table-cell">
                                 {(() => {
-                                  const sp = player.save_pct ?? player.save_percentage;
-                                  if (sp == null || sp === 0) return '—';
-                                  return (sp < 1 ? (sp * 100).toFixed(1) : sp.toFixed(1)) + '%';
+                                  // Prefer API value (string or number), fall back to computing from saves/shots_faced
+                                  let sp = Number(player.save_pct ?? player.save_percentage ?? 0);
+                                  if (!sp && player.saves && player.shots_faced) {
+                                    sp = player.saves / player.shots_faced;
+                                  }
+                                  if (!sp) return '—';
+                                  const pct = sp < 1 ? sp * 100 : sp;
+                                  return pct.toFixed(1) + '%';
                                 })()}
                               </td>
                               <td className="px-2 py-1.5 text-center text-xs hidden md:table-cell text-purple-700">
                                 {(() => {
-                                  const g = player.gaa ?? player.goals_against_average;
-                                  return g != null && g > 0 ? g.toFixed(2) : '—';
+                                  let g = Number(player.gaa ?? player.goals_against_average ?? 0);
+                                  // Fallback: GAA = goals_against * 60 / (icetime_seconds / 60) = goals_against * 3600 / icetime_seconds
+                                  if (!g && player.goals_against && player.icetime_seconds) {
+                                    g = (player.goals_against * 3600) / player.icetime_seconds;
+                                  }
+                                  return g > 0 ? g.toFixed(2) : '—';
                                 })()}
                               </td>
                               <td className="px-2 py-1.5 text-center text-xs hidden lg:table-cell">—</td>
