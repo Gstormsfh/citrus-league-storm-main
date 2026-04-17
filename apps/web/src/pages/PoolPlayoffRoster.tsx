@@ -405,13 +405,16 @@ export default function PoolPlayoffRosterEntry() {
                         <tr
                           key={player.id}
                           className={cn(
-                            'border-b border-fantasy-border/30 transition-colors',
+                            'border-b border-fantasy-border/30 transition-colors cursor-pointer',
                             onRoster
                               ? 'bg-citrus-sage/10 border-l-2 border-l-citrus-sage'
-                              : 'hover:bg-fantasy-light/30 cursor-pointer',
+                              : 'hover:bg-fantasy-light/30',
                             !addable && !onRoster && 'opacity-40'
                           )}
-                          onClick={() => !onRoster && addable && addPlayer(player)}
+                          onClick={() => {
+                            if (onRoster) { removePlayer(player.id); }
+                            else if (addable) { addPlayer(player); }
+                          }}
                         >
                           <td className="px-2 py-1.5 text-xs font-mono text-citrus-forest/60">{idx + 1}</td>
                           <td className="px-2 py-1.5">
@@ -447,10 +450,10 @@ export default function PoolPlayoffRosterEntry() {
                             {onRoster ? (
                               <button
                                 onClick={(e) => { e.stopPropagation(); removePlayer(player.id); }}
-                                className="p-1 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors"
+                                className="px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 transition-colors text-[11px] font-bold"
                                 title="Remove from roster"
                               >
-                                <X className="h-4 w-4" />
+                                Remove
                               </button>
                             ) : addable ? (
                               <button

@@ -114,9 +114,14 @@ export default function NHLPlayoffBracket() {
             <h2 className="font-display font-bold text-citrus-forest text-base">Pick your bracket. Build your roster. Win your pool.</h2>
             <p className="text-xs text-citrus-charcoal/70 mt-1">Free playoff pools with fully customizable scoring.</p>
           </div>
-          <Button asChild className="bg-citrus-orange hover:bg-citrus-orange/90 text-white font-display font-bold">
-            <Link to="/create-league?type=playoff">Create a Playoff Pool</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild className="bg-citrus-orange hover:bg-citrus-orange/90 text-white font-display font-bold">
+              <Link to="/create-league?type=playoff">Create Pool</Link>
+            </Button>
+            <Button asChild variant="outline" className="border-citrus-sage text-citrus-forest font-display font-bold">
+              <Link to="/create-league?tab=join">Join Pool</Link>
+            </Button>
+          </div>
         </Card>
 
         {/* Bracket — desktop horizontal, mobile stacked */}
