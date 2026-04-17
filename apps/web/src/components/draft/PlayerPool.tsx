@@ -62,23 +62,6 @@ export const PlayerPool = memo(({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showDrafted, setShowDrafted] = useState(false);
 
-  // Rank ALL players by actual season FPTS (using league scoring settings).
-  // Actual stats are always current; ROS projections can be stale if the
-  // pipeline hasn't run recently. Rankings stay dynamic to league scoring.
-  const rankMap = useMemo<Map<string, number>>(() => {
-    const scored = availablePlayers.map(p => ({
-      id: p.id,
-      fpts: calcFpts(p),
-    }));
-    scored.sort((a, b) => b.fpts - a.fpts);
-    const map = new Map<string, number>();
-    scored.forEach((p, i) => {
-      map.set(p.id, i + 1);
-    });
-    return map;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availablePlayers, scorer]);
-
   // PERF: Use pre-built Set for O(1) lookups instead of O(n) Array.includes on every player
   const draftedSet = useMemo(() => {
     return externalDraftedSet || new Set(draftedPlayers);
@@ -105,6 +88,23 @@ export const PlayerPool = memo(({
   const fptsMap = useMemo(() => {
     const map = new Map<string, number>();
     availablePlayers.forEach(p => map.set(p.id, calcFpts(p)));
+    return map;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availablePlayers, scorer]);
+
+  // Rank ALL players by actual season FPTS (using league scoring settings).
+  // Actual stats are always current; ROS projections can be stale if the
+  // pipeline hasn't run recently. Rankings stay dynamic to league scoring.
+  const rankMap = useMemo<Map<string, number>>(() => {
+    const scored = availablePlayers.map(p => ({
+      id: p.id,
+      fpts: calcFpts(p),
+    }));
+    scored.sort((a, b) => b.fpts - a.fpts);
+    const map = new Map<string, number>();
+    scored.forEach((p, i) => {
+      map.set(p.id, i + 1);
+    });
     return map;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availablePlayers, scorer]);

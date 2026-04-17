@@ -200,8 +200,13 @@ const CreateLeague = () => {
   useEffect(() => {
     const tab = searchParams.get('tab');
     const code = searchParams.get('code');
+    const type = searchParams.get('type');
     if (tab === 'join') setDefaultTab('join');
     if (code) setJoinCode(code);
+    // ?type=playoff → default to bracket pickem (most common playoff format)
+    if (type === 'playoff') {
+      setLeagueType('playoff-bracket-pickem');
+    }
   }, [searchParams]);
 
   // Reset format settings and smart defaults when league type changes
@@ -600,11 +605,18 @@ const CreateLeague = () => {
                   {/* ======================================================== */}
                   <div>
                     <SectionHeader
-                      title="Choose Your League Type"
-                      subtitle="Select the format that fits your group"
+                      title={searchParams.get('type') === 'playoff' ? "Choose Your Playoff Pool Format" : "Choose Your League Type"}
+                      subtitle={searchParams.get('type') === 'playoff' ? "Pick how your playoff pool will work" : "Select the format that fits your group"}
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {(Object.keys(LEAGUE_TYPE_LABELS) as LeagueType[]).map((type) => (
+                      {(Object.keys(LEAGUE_TYPE_LABELS) as LeagueType[])
+                        .filter(type => {
+                          const isPlayoffType = type === 'playoff-bracket-pickem' || type === 'playoff-confidence-pool' || type === 'playoff-roster-pool';
+                          // If URL says type=playoff, only show the 3 playoff types
+                          if (searchParams.get('type') === 'playoff') return isPlayoffType;
+                          return true;
+                        })
+                        .map((type) => (
                         <button
                           key={type}
                           type="button"
