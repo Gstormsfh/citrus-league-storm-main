@@ -110,22 +110,26 @@ const Auth = () => {
       return;
     }
 
-    // On success: the useEffect watching `user` handles redirection after
-    // React commits the auth state update. However, on mobile the
-    // onAuthStateChange listener can stall (e.g., stale token defers to
-    // TOKEN_REFRESHED which may not fire). As a safety net, verify the
-    // session explicitly and set a timeout to re-enable the sign-in button.
+    // On success: explicitly verify the session and navigate.
+    // Don't rely solely on the useEffect watching `user` — onAuthStateChange
+    // can race with the redirect, leaving users in guest mode briefly and
+    // forcing them to sign in again.
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       if (sessionData?.session) {
-        // Session exists — AuthContext listener should pick it up shortly.
-        // If it doesn't, the timeout below will clear loading so the user
-        // can retry without refreshing.
+        // Re-set the session to force the listener to fire, then navigate.
+        await supabase.auth.setSession({
+          access_token: sessionData.session.access_token,
+          refresh_token: sessionData.session.refresh_token,
+        });
+        setTimeout(() => navigate('/', { replace: true }), 50);
+        return;
       }
     } catch (sessionError) {
       logger.warn('Post-sign-in session verification failed', sessionError);
     }
 
+    // Safety: if somehow we got here without a session, re-enable the button
     signInSafetyTimeoutRef.current = setTimeout(() => {
       setLoading(false);
     }, 4000);
@@ -185,7 +189,18 @@ const Auth = () => {
       if (data?.user && !data?.session) {
         navigate('/verify-email', { state: { email }, replace: true });
       } else if (data?.session) {
-        // useEffect watching `user` will redirect once auth state is committed
+        // Session is already set in the supabase client by signInWithPassword.
+        // Navigate immediately — don't wait for onAuthStateChange to fire the
+        // listener that sets React user state. The race was causing users to
+        // see guest mode briefly, then have to sign in again.
+        // Force-refresh the session once to guarantee AuthContext picks it up,
+        // then navigate with replace so Back doesn't return to /auth.
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+        // Let the state propagate one tick before redirecting
+        setTimeout(() => navigate('/', { replace: true }), 50);
       } else {
         navigate('/verify-email', { state: { email }, replace: true });
       }
