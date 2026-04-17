@@ -414,24 +414,33 @@ const CreateLeague = () => {
       // Playoff roster pools ALWAYS need scoring_settings (for ScoringCalculator).
       // Force default fantasy scoring if user didn't explicitly customize.
       const forceScoring = leagueType === 'playoff-roster-pool';
+      // CRITICAL: if a stat is DISABLED by the commissioner, its point weight
+      // must be 0 so ScoringCalculator contributes zero for that stat.
+      // Previously we returned the default point value regardless of enabled flag,
+      // which meant disabling hits/blocks/etc did nothing — FPTS still included them.
+      const ptsFor = (id: string): number => {
+        const stat = leagueStats.find(s => s.id === id);
+        if (!stat || !stat.enabled) return 0;
+        return stat.points;
+      };
       // Build scoring_settings JSONB (for points-based formats)
       const scoringSettings = (showPointValues || forceScoring) ? {
         skater: {
-          goals: leagueStats.find(s => s.id === 'g')?.points || 3,
-          assists: leagueStats.find(s => s.id === 'a')?.points || 2,
-          power_play_points: leagueStats.find(s => s.id === 'ppp')?.points || 1,
-          short_handed_points: leagueStats.find(s => s.id === 'shg')?.points || 2,
-          shots_on_goal: leagueStats.find(s => s.id === 'sog')?.points || 0.4,
-          blocks: leagueStats.find(s => s.id === 'blk')?.points || 0.5,
-          hits: leagueStats.find(s => s.id === 'hit')?.points || 0.2,
-          penalty_minutes: leagueStats.find(s => s.id === 'pim')?.points || 0.5,
-          plus_minus: leagueStats.find(s => s.id === 'pm')?.points || 0
+          goals: ptsFor('g'),
+          assists: ptsFor('a'),
+          power_play_points: ptsFor('ppp'),
+          short_handed_points: ptsFor('shg'),
+          shots_on_goal: ptsFor('sog'),
+          blocks: ptsFor('blk'),
+          hits: ptsFor('hit'),
+          penalty_minutes: ptsFor('pim'),
+          plus_minus: ptsFor('pm')
         },
         goalie: {
-          wins: leagueStats.find(s => s.id === 'w')?.points || 4,
-          shutouts: leagueStats.find(s => s.id === 'so')?.points || 3,
-          saves: leagueStats.find(s => s.id === 'sv')?.points || 0.2,
-          goals_against: leagueStats.find(s => s.id === 'ga')?.points || -1
+          wins: ptsFor('w'),
+          shutouts: ptsFor('so'),
+          saves: ptsFor('sv'),
+          goals_against: ptsFor('ga')
         }
       } : undefined;
 
