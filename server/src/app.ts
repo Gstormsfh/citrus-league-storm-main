@@ -22,6 +22,7 @@ import { accountRoutes } from './routes/account';
 import { publicRoutes } from './routes/public';
 import { poolRoutes } from './routes/pools';
 import { nhlPlayoffsRoutes } from './routes/nhl-playoffs';
+import { playoffPoolRoutes } from './routes/playoff-pools';
 import { authRoutes } from './routes/auth';
 import { standardRateLimit, strictRateLimit, authRateLimit } from './middleware/rateLimit';
 import { requestContextMiddleware } from './middleware/requestContext';
@@ -231,6 +232,7 @@ app.route('/api/account', accountRoutes);
 app.route('/api/public', publicRoutes);
 app.route('/api/pools', poolRoutes);
 app.route('/api/nhl-playoffs', nhlPlayoffsRoutes);
+app.route('/api/playoff-pools', playoffPoolRoutes);
 app.route('/api/auth', authRoutes);
 
 // ── 404 handler ──────────────────────────────────────────────────────
