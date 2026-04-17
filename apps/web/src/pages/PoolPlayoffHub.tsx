@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { NHL_TEAMS } from '@/types/captracker';
 
 interface Team {
   id: string;
@@ -66,6 +67,9 @@ export default function PoolPlayoffHub() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [userPicks, setUserPicks] = useState<Array<{ series_slot: number; picked_team_id: number; predicted_games?: number; confidence_value?: number; points_earned?: number; is_correct?: boolean | null }>>([]);
+  const [bracketSeeds, setBracketSeeds] = useState<Array<{ team_id: number; team_abbrev: string | null; seed: number; conference: string }>>([]);
+  const [bracketSeries, setBracketSeries] = useState<Array<{ series_id: string; bracket_slot: number; round: number; series_status: string; winner_team_id: number | null; high_seed_team_id: number | null; low_seed_team_id: number | null }>>([]);
 
   useEffect(() => {
     if (!leagueId) return;
@@ -73,13 +77,34 @@ export default function PoolPlayoffHub() {
       try {
         const session = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session;
         const headers: Record<string, string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
-        const [leagueRes, teamsRes] = await Promise.all([
+        const [leagueRes, teamsRes, bracketRes] = await Promise.all([
           fetch(`/api/leagues/${leagueId}`, { headers }).then(r => r.json()).catch(() => null),
           fetch(`/api/leagues/${leagueId}/teams`, { headers }).then(r => r.json()).catch(() => null),
+          fetch('/api/nhl-playoffs/bracket?season=2025').then(r => r.json()).catch(() => null),
         ]);
-        setLeague(leagueRes?.data || leagueRes);
+        const leagueData = leagueRes?.data || leagueRes;
+        setLeague(leagueData);
         const teamList = teamsRes?.data?.teams || teamsRes?.teams || teamsRes?.data || [];
         setTeams(Array.isArray(teamList) ? teamList : []);
+
+        // Fetch user's picks based on league type
+        const lgType = leagueData?.settings?.leagueType;
+        const pickType = lgType === 'playoff-bracket-pickem' ? 'bracket'
+                      : lgType === 'playoff-confidence-pool' ? 'confidence'
+                      : lgType === 'playoff-roster-pool' ? 'roster' : null;
+        if (pickType && session?.access_token) {
+          const picksRes = await fetch(`/api/playoff-pools/${leagueId}/picks?type=${pickType}`, { headers }).then(r => r.json()).catch(() => null);
+          const rawPicks = picksRes?.data?.picks || picksRes?.picks || [];
+          const myPicks = Array.isArray(rawPicks) ? rawPicks.filter((p: { user_id: string }) => p.user_id === session.user?.id) : [];
+          setUserPicks(myPicks);
+        }
+
+        // Parse bracket data for team/series lookups
+        const br = bracketRes?.data || bracketRes;
+        if (br) {
+          setBracketSeeds(br.seeds || []);
+          setBracketSeries(br.series || []);
+        }
       } finally {
         setLoading(false);
       }
@@ -195,6 +220,64 @@ export default function PoolPlayoffHub() {
                   </Button>
                 </CardContent>
               </Card>
+
+              {/* Picks Overview — bracket + confidence pools */}
+              {(leagueType === 'playoff-bracket-pickem' || leagueType === 'playoff-confidence-pool') && userPicks.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Target className="h-4 w-4 text-citrus-sage" />
+                      Your Picks ({userPicks.length}/{bracketSeries.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {bracketSeries.map(s => {
+                        const pick = userPicks.find(p => p.series_slot === s.bracket_slot);
+                        const high = s.high_seed_team_id ? bracketSeeds.find(seed => seed.team_id === s.high_seed_team_id) : null;
+                        const low = s.low_seed_team_id ? bracketSeeds.find(seed => seed.team_id === s.low_seed_team_id) : null;
+                        const pickedTeam = pick ? (pick.picked_team_id === s.high_seed_team_id ? high : pick.picked_team_id === s.low_seed_team_id ? low : null) : null;
+                        const pickedInfo = pickedTeam ? NHL_TEAMS.find(t => t.abbrev === pickedTeam.team_abbrev) : null;
+                        const isFinal = s.series_status === 'final';
+                        const isCorrect = isFinal && pick && s.winner_team_id === pick.picked_team_id;
+                        const isWrong = isFinal && pick && s.winner_team_id && s.winner_team_id !== pick.picked_team_id;
+                        const roundName = s.round === 1 ? 'R1' : s.round === 2 ? 'R2' : s.round === 3 ? 'CF' : 'SCF';
+                        return (
+                          <div key={s.series_id} className={cn(
+                            'flex items-center gap-2 p-2 rounded border',
+                            isCorrect && 'border-green-400 bg-green-50/50',
+                            isWrong && 'border-red-300 bg-red-50/30',
+                            !isFinal && pick && 'border-citrus-sage/30 bg-citrus-sage/5',
+                            !pick && 'border-dashed border-fantasy-border/50 bg-muted/20'
+                          )}>
+                            <span className="text-[9px] font-mono text-citrus-charcoal/50 w-8">{roundName}-{String.fromCharCode(64 + s.bracket_slot)}</span>
+                            {pick && pickedInfo ? (
+                              <>
+                                <img src={pickedInfo.logoUrl} alt={pickedInfo.abbrev} className="w-6 h-6 object-contain flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-semibold truncate" style={{ color: pickedInfo.primaryColor }}>{pickedInfo.name}</div>
+                                  <div className="text-[9px] text-citrus-charcoal/60">
+                                    {leagueType === 'playoff-confidence-pool' && pick.confidence_value && `Confidence: ${pick.confidence_value}`}
+                                    {leagueType === 'playoff-bracket-pickem' && pick.predicted_games && `in ${pick.predicted_games}`}
+                                  </div>
+                                </div>
+                                {isCorrect && <Check className="h-4 w-4 text-green-500 flex-shrink-0" />}
+                                {isFinal && pick.points_earned != null && (
+                                  <span className={cn('text-xs font-bold flex-shrink-0', isCorrect ? 'text-green-600' : 'text-citrus-charcoal/40')}>
+                                    +{pick.points_earned}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-[11px] text-citrus-charcoal/40 italic flex-1">No pick yet</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Members */}
               <Card>
