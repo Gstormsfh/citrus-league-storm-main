@@ -132,14 +132,20 @@ export default function PoolPlayoffRosterEntry() {
     if (!leagueId) return;
     const load = async () => {
       try {
+        const session = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session;
+        const headers: Record<string, string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
         const [leagueRes, playersRes] = await Promise.all([
-          fetch(`/api/leagues/${leagueId}`).then(r => r.json()),
-          fetch('/api/players/search?limit=500').then(r => r.json()),
+          fetch(`/api/leagues/${leagueId}`, { headers }).then(r => r.json()),
+          fetch('/api/players?limit=500', { headers }).then(r => r.json()),
         ]);
-        setLeague(leagueRes.data || leagueRes);
-        setPlayers((leagueRes.data?.players || playersRes.data || playersRes || []) as PoolPlayer[]);
+        const leagueData = leagueRes.data || leagueRes;
+        setLeague(leagueData);
+        // API returns { data: [...players] } — extract array safely
+        const playerArr = Array.isArray(playersRes.data) ? playersRes.data
+          : Array.isArray(playersRes) ? playersRes : [];
+        setPlayers(playerArr as PoolPlayer[]);
         // Check lock
-        const lockAt = (leagueRes.data || leagueRes)?.settings?.playoffRosterLockedAt;
+        const lockAt = leagueData?.settings?.playoffRosterLockedAt;
         if (lockAt && new Date(lockAt) <= new Date()) setLocked(true);
       } finally {
         setLoading(false);
