@@ -103,6 +103,24 @@ const Navbar = () => {
           { label: 'News', path: '/news', icon: Newspaper },
           { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
         ];
+      case 'playoff-bracket-pickem':
+        return [
+          { label: 'Pool Home', path: `/pool/playoff-hub?league=${activeLeagueId}`, icon: Trophy },
+          { label: 'My Picks', path: poolRoute, icon: Target },
+          { label: 'NHL Bracket', path: '/nhl/playoffs', icon: BarChart3 },
+        ];
+      case 'playoff-confidence-pool':
+        return [
+          { label: 'Pool Home', path: `/pool/playoff-hub?league=${activeLeagueId}`, icon: Trophy },
+          { label: 'My Picks', path: poolRoute, icon: Target },
+          { label: 'NHL Bracket', path: '/nhl/playoffs', icon: BarChart3 },
+        ];
+      case 'playoff-roster-pool':
+        return [
+          { label: 'Pool Home', path: `/pool/playoff-hub?league=${activeLeagueId}`, icon: Trophy },
+          { label: 'My Roster', path: poolRoute, icon: Users },
+          { label: 'NHL Bracket', path: '/nhl/playoffs', icon: BarChart3 },
+        ];
       default:
         return [];
     }

@@ -124,9 +124,13 @@ def upsert_series_from_bracket(db: SupabaseRest, bracket: dict, season: int, tea
         elif s.get("gamesPlayed", 0) > 0:
             status = "active"
 
+        # NHL API returns playoffRound=2 for all non-R1 TBD series.
+        # Derive actual round from bracket position: slots 1-8=R1, 9-12=R2, 13-14=R3, 15=R4.
+        actual_round = 1 if slot <= 8 else (2 if slot <= 12 else (3 if slot <= 14 else 4))
+
         rows.append({
             "season": season,
-            "round": s.get("roundNumber", 0),
+            "round": actual_round,
             "conference": s.get("conferenceAbbrev"),
             "bracket_slot": slot,
             "high_seed_team_id": high_id,
