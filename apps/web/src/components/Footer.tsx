@@ -60,6 +60,7 @@ const Footer = () => {
               <li><Link to={activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup'} className="text-citrus-forest dark:text-muted-foreground hover:text-citrus-sage dark:hover:text-foreground transition-colors font-sans">Matchups</Link></li>
               <li><Link to="/roster" className="text-citrus-forest dark:text-muted-foreground hover:text-citrus-sage dark:hover:text-foreground transition-colors font-sans">Roster</Link></li>
               <li><Link to="/free-agents" className="text-citrus-forest dark:text-muted-foreground hover:text-citrus-sage dark:hover:text-foreground transition-colors font-sans">Free Agents</Link></li>
+              <li><Link to="/nhl/playoffs" className="text-citrus-forest dark:text-muted-foreground hover:text-citrus-sage dark:hover:text-foreground transition-colors font-sans">NHL Playoffs</Link></li>
             </ul>
           </div>
           
