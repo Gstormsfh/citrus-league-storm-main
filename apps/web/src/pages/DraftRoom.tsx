@@ -586,10 +586,16 @@ const DraftRoom = () => {
         setDraftPhase(DraftPhase.LOBBY);
         logger.debug('DraftRoom: Draft not started, showing LOBBY');
       } else if (leagueData.draft_status === 'queued') {
-        // Draft queued/prepared but not started - show lobby
+        // Draft queued/prepared — let ALL users into the draft room immediately.
+        // Industry standard: the draft room opens when the commissioner sets it
+        // up (queues it). Users browse players, build their queue, check
+        // rankings, all BEFORE the commissioner clicks "Start Draft" to begin
+        // the timer. Keeping users in LOBBY until in_progress meant they
+        // couldn't prepare and felt locked out.
         setDraftState(null);
-        setDraftPhase(DraftPhase.LOBBY);
-        logger.debug('DraftRoom: Draft queued, showing LOBBY');
+        setDraftPhase(DraftPhase.ACTIVE);
+        ssPut(`draft_phase_${leagueId}`, String(DraftPhase.ACTIVE));
+        logger.debug('DraftRoom: Draft queued, entering ACTIVE (pre-draft room)');
       } else if (leagueData.draft_status === 'in_progress') {
         // Draft is IN PROGRESS - show LOBBY with "join active draft" banner
         // Users click to join rather than auto-joining
@@ -1229,6 +1235,16 @@ const DraftRoom = () => {
             draftTimerStartedRef.current = false;
             ssRemove(`draft_phase_${leagueId}`);
             ssRemove(`draft_timer_${leagueId}`);
+          }
+
+          // When commissioner queues the draft, let everyone into the room
+          // immediately — don't wait for "Start Draft" (in_progress). This
+          // matches ESPN/Yahoo/Sleeper where the draft room opens early so
+          // users can browse players, build their queue, and prepare.
+          if (updatedLeague.draft_status === 'queued' && draftPhaseRef.current === DraftPhase.LOBBY) {
+            logger.debug('DraftRoom: Draft queued by commissioner, auto-entering draft room');
+            setDraftPhase(DraftPhase.ACTIVE);
+            ssPut(`draft_phase_${leagueId}`, String(DraftPhase.ACTIVE));
           }
 
           // When draft starts, pre-load state but stay in LOBBY with join banner.
