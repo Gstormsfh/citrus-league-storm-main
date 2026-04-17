@@ -1146,16 +1146,27 @@ const CreateLeague = () => {
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs text-muted-foreground">Pts:</span>
-                                    <Input
-                                      type="number"
-                                      className="h-8 w-16 text-right font-mono"
-                                      value={stat.points}
-                                      onChange={(e) => handleStatPointsChange(stat.id, e.target.value)}
+                                    <Select
+                                      value={String(stat.points)}
+                                      onValueChange={(v) => handleStatPointsChange(stat.id, v)}
                                       disabled={!stat.enabled}
-                                      step="0.1"
-                                      min={-10}
-                                      max={20}
-                                    />
+                                    >
+                                      <SelectTrigger className="h-8 w-24 font-mono">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {['-2', '-1', '-0.5', '-0.25', '-0.1', '0', '0.1', '0.2', '0.25', '0.3', '0.4', '0.5', '0.75', '1', '1.5', '2', '2.5', '3', '4', '5', '6', '8', '10']
+                                          .map(v => (
+                                            <SelectItem key={v} value={v} className="font-mono">
+                                              {parseFloat(v) > 0 ? `+${v}` : v}
+                                            </SelectItem>
+                                          ))}
+                                        {/* Ensure current value is always in the list even if custom */}
+                                        {!['-2', '-1', '-0.5', '-0.25', '-0.1', '0', '0.1', '0.2', '0.25', '0.3', '0.4', '0.5', '0.75', '1', '1.5', '2', '2.5', '3', '4', '5', '6', '8', '10'].includes(String(stat.points)) && (
+                                          <SelectItem value={String(stat.points)} className="font-mono">{stat.points}</SelectItem>
+                                        )}
+                                      </SelectContent>
+                                    </Select>
                                   </div>
                                 </div>
                               ))}
