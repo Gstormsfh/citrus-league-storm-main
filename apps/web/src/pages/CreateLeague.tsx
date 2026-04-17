@@ -62,6 +62,9 @@ const LEAGUE_TYPE_ICONS: Record<LeagueType, React.ReactNode> = {
   'pickem': <Target className="w-8 h-8" />,
   'survivor': <Shield className="w-8 h-8" />,
   'confidence-pool': <BarChart3 className="w-8 h-8" />,
+  'playoff-bracket-pickem': <Trophy className="w-8 h-8" />,
+  'playoff-confidence-pool': <BarChart3 className="w-8 h-8" />,
+  'playoff-roster-pool': <Shield className="w-8 h-8" />,
 };
 
 const DRAFT_TYPE_ICONS: Record<DraftType, React.ReactNode> = {
