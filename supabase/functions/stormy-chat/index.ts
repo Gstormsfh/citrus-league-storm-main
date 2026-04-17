@@ -36,8 +36,8 @@ function getCorsHeaders(req: Request): Record<string, string> {
 //   Monthly budget hard cap of 300K tokens ≈ $4.50 worst case
 //
 
-const WEEKLY_MESSAGE_LIMIT = 10;         // per registered user per matchup week (7 days) — bumped for demo
-const GLOBAL_DAILY_MESSAGE_LIMIT = 100;  // ALL users combined per 24 h (safety net) — bumped for demo
+const WEEKLY_MESSAGE_LIMIT = 15;         // per registered user per matchup week (7 days) — bumped for playoff launch
+const GLOBAL_DAILY_MESSAGE_LIMIT = 500;  // ALL users combined per 24 h (safety net) — bumped for playoff launch
 const MONTHLY_TOKEN_BUDGET = 500_000;    // total tokens (in + out) per calendar month — hard kill switch
 const MAX_RESPONSE_TOKENS = 1536;        // cap each reply (enough for data-rich GM advice)
 const MAX_CONVERSATION_TURNS = 6;        // max prior turns sent to API

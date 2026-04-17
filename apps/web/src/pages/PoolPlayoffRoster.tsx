@@ -47,11 +47,14 @@ interface PoolPlayer {
   shp: number;
   plus_minus?: number;
   xGoals?: number;
+  x_goals?: number;
   icetime_seconds?: number;
   wins?: number;
   saves?: number;
   shutouts?: number;
   goals_against?: number;
+  gaa?: number | null;
+  save_pct?: number | null;
   goals_against_average?: number | null;
   save_percentage?: number | null;
 }
@@ -394,8 +397,10 @@ export default function PoolPlayoffRosterEntry() {
             </div>
 
             {/* Player table */}
-            <Card className="border-fantasy-border bg-fantasy-surface">
-              <div className="overflow-auto scrollbar-styled max-h-[calc(100dvh-18rem)]">
+            {/* Two scrollbars: parent overflow-x lets you slide horizontally from the top or bottom,
+                inner max-h + overflow-y lets you scroll the rows. Both always visible via scrollbar-styled. */}
+            <Card className="border-fantasy-border bg-fantasy-surface overflow-x-auto scrollbar-styled">
+              <div className="overflow-auto scrollbar-styled max-h-[calc(100dvh-20rem)]">
                 <table className="w-full text-sm border-collapse">
                   <thead className="bg-fantasy-light sticky top-0 z-10 border-b border-fantasy-border">
                     <tr>
@@ -470,10 +475,17 @@ export default function PoolPlayoffRosterEntry() {
                               <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.goals_against || 0}</td>
                               <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell" colSpan={2}>—</td>
                               <td className="px-2 py-1.5 text-center text-xs hidden md:table-cell">
-                                {player.save_percentage != null ? (player.save_percentage * 100).toFixed(1) + '%' : '—'}
+                                {(() => {
+                                  const sp = player.save_pct ?? player.save_percentage;
+                                  if (sp == null || sp === 0) return '—';
+                                  return (sp < 1 ? (sp * 100).toFixed(1) : sp.toFixed(1)) + '%';
+                                })()}
                               </td>
                               <td className="px-2 py-1.5 text-center text-xs hidden md:table-cell text-purple-700">
-                                {player.goals_against_average != null ? player.goals_against_average.toFixed(2) : '—'}
+                                {(() => {
+                                  const g = player.gaa ?? player.goals_against_average;
+                                  return g != null && g > 0 ? g.toFixed(2) : '—';
+                                })()}
                               </td>
                               <td className="px-2 py-1.5 text-center text-xs hidden lg:table-cell">—</td>
                             </>
@@ -489,7 +501,10 @@ export default function PoolPlayoffRosterEntry() {
                                 {(player.plus_minus ?? 0) > 0 ? '+' : ''}{player.plus_minus ?? 0}
                               </td>
                               <td className="px-2 py-1.5 text-center text-xs hidden md:table-cell text-purple-700 font-semibold">
-                                {(player.xGoals ?? 0).toFixed(1)}
+                                {(() => {
+                                  const xg = player.xGoals ?? player.x_goals ?? 0;
+                                  return xg > 0 ? xg.toFixed(1) : '—';
+                                })()}
                               </td>
                               <td className="px-2 py-1.5 text-center text-xs hidden lg:table-cell text-citrus-charcoal/70">
                                 {player.icetime_seconds && player.games_played ? (() => {
