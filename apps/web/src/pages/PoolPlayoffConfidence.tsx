@@ -9,8 +9,9 @@
  */
 
 import { useEffect, useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Trophy, Lock, Save, AlertTriangle, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { useSearchParams, Link } from 'react-router-dom';
+import { Trophy, Lock, Save, AlertTriangle, ChevronDown, ChevronUp, Check, ArrowLeft } from 'lucide-react';
+import Navbar from '@/components/Navbar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -150,7 +151,14 @@ export default function PoolPlayoffConfidence() {
   if (loading) return <div className="min-h-screen flex items-center justify-center text-citrus-charcoal/60">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-[#F5F8ED] py-6 px-4">
+    <>
+    <Navbar />
+    <div className="min-h-screen bg-gradient-to-b from-white to-[#F5F8ED] py-6 px-4 pt-24">
+      <div className="max-w-5xl mx-auto mb-3">
+        <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-citrus-sage hover:text-citrus-forest inline-flex items-center gap-1">
+          <ArrowLeft className="h-4 w-4" />Back to Pool Home
+        </Link>
+      </div>
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -304,5 +312,6 @@ export default function PoolPlayoffConfidence() {
         </Card>
       </div>
     </div>
+    </>
   );
 }
