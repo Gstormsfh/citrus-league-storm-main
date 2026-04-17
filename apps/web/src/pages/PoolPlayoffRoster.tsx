@@ -137,14 +137,18 @@ export default function PoolPlayoffRosterEntry() {
         const headers: Record<string, string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
         const [leagueRes, playersRes] = await Promise.all([
           fetch(`/api/leagues/${leagueId}`, { headers }).then(r => r.json()),
-          fetch('/api/players?limit=500', { headers }).then(r => r.json()),
+          fetch('/api/players?limit=1000', { headers }).then(r => r.json()),
         ]);
         const leagueData = leagueRes.data || leagueRes;
         setLeague(leagueData);
         // API returns { data: [...players] } — extract array safely
         const playerArr = Array.isArray(playersRes.data) ? playersRes.data
           : Array.isArray(playersRes) ? playersRes : [];
-        setPlayers(playerArr as PoolPlayer[]);
+        // Filter to ONLY playoff teams so users see a focused pool.
+        // Matches the 16 teams in nhl_playoff_seeds for 2025-26.
+        const PLAYOFF_TEAMS = new Set(['BUF','BOS','TBL','MTL','CAR','OTT','PIT','PHI','COL','LAK','DAL','MIN','VGK','UTA','EDM','ANA']);
+        const playoffOnly = (playerArr as PoolPlayer[]).filter(p => PLAYOFF_TEAMS.has(p.team));
+        setPlayers(playoffOnly);
         // Check lock
         const lockAt = leagueData?.settings?.playoffRosterLockedAt;
         if (lockAt && new Date(lockAt) <= new Date()) setLocked(true);
