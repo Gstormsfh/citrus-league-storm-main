@@ -250,9 +250,12 @@ export default function PoolPlayoffConfidence() {
                               >
                                 {info && <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: info.primaryColor }} />}
                                 <div className="flex items-center gap-2.5 pl-1.5">
-                                  {info ? (
-                                    <img src={info.logoUrl} alt={info.abbrev} className="w-9 h-9 object-contain flex-shrink-0" />
-                                  ) : <div className="w-9 h-9 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">?</div>}
+                                  <div
+                                    className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-varsity font-black text-white flex-shrink-0 shadow-sm"
+                                    style={info ? { background: info.primaryColor } : { background: '#6b7280' }}
+                                  >
+                                    {team?.team_abbrev || '?'}
+                                  </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1">
                                       <span className="text-[10px] font-mono text-citrus-charcoal/60">#{team?.seed || '-'}</span>

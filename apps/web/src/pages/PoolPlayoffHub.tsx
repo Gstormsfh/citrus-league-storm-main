@@ -253,7 +253,12 @@ export default function PoolPlayoffHub() {
                             <span className="text-[9px] font-mono text-citrus-charcoal/50 w-8">{roundName}-{String.fromCharCode(64 + s.bracket_slot)}</span>
                             {pick && pickedInfo ? (
                               <>
-                                <img src={pickedInfo.logoUrl} alt={pickedInfo.abbrev} className="w-6 h-6 object-contain flex-shrink-0" />
+                                <div
+                                  className="w-7 h-7 rounded flex items-center justify-center text-[9px] font-varsity font-black text-white flex-shrink-0"
+                                  style={{ background: pickedInfo.primaryColor }}
+                                >
+                                  {pickedInfo.abbrev}
+                                </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="text-xs font-semibold truncate" style={{ color: pickedInfo.primaryColor }}>{pickedInfo.name}</div>
                                   <div className="text-[9px] text-citrus-charcoal/60">
