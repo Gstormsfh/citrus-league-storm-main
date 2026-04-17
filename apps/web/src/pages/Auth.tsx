@@ -60,22 +60,31 @@ const Auth = () => {
     if (lower.includes('invalid login') || lower.includes('invalid credentials')) {
       return 'Invalid email or password. Please check and try again.';
     }
+    if (lower.includes('already registered') || lower.includes('already exists') || lower.includes('already in use')) {
+      return 'This email already has an account. Please sign in instead.';
+    }
     if (lower.includes('email not confirmed') || lower.includes('email not verified')) {
       return 'Please verify your email address. Check your inbox for the verification link.';
     }
-    if (lower.includes('too many requests')) {
+    if (lower.includes('rate limit') || lower.includes('too many requests')) {
       return 'Too many attempts. Please wait a few minutes before trying again.';
     }
     if (lower.includes('provider is not enabled') || lower.includes('unsupported provider')) {
       return 'This sign-in method is not available yet. Please use email and password to sign in.';
     }
+    if (lower.includes('signups not allowed') || lower.includes('signup is disabled')) {
+      return 'Sign-ups are temporarily disabled. Please try again later or contact support.';
+    }
     if (lower.includes('validation_failed') || lower.includes('validation failed')) {
-      return 'Sign-in could not be completed. Please try again or use email and password.';
+      return 'Sign-up could not be completed. Please try again.';
     }
     if (lower.includes('password')) {
       return errorMessage;
     }
-    if (lower.includes('email')) {
+    // Only treat as invalid email if the error specifically says the email format is bad.
+    // Otherwise pass the original Supabase message through so users see the real cause
+    // (previously any error containing "email" was mis-labeled as "Invalid email address").
+    if (lower.includes('invalid email') || lower.includes('email format') || lower.includes('malformed email')) {
       return 'Invalid email address. Please check and try again.';
     }
 
