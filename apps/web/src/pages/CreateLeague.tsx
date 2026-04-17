@@ -540,6 +540,8 @@ const CreateLeague = () => {
         navigate(`/pool/survivor?league=${league.id}`);
       } else if (joinedLeagueType === 'confidence-pool') {
         navigate(`/pool/confidence?league=${league.id}`);
+      } else if (joinedLeagueType === 'playoff-bracket-pickem' || joinedLeagueType === 'playoff-confidence-pool' || joinedLeagueType === 'playoff-roster-pool') {
+        navigate(`/pool/playoff-hub?league=${league.id}`);
       } else {
         navigate(`/league/${league.id}?league=${league.id}`);
       }
