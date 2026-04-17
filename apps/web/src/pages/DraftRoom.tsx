@@ -932,12 +932,8 @@ const DraftRoom = () => {
   useEffect(() => {
     if (draftPhase !== DraftPhase.ACTIVE || !leagueId || !user?.id) return;
 
-    // 15s base interval (was 8s) — realtime events handle sub-second pick
-    // propagation; polling is just a safety net for missed events. Reducing
-    // from 8s to 15s cuts per-client overhead ~45% during active drafts
-    // without affecting the median user experience.
-    const POLL_BASE_MS = 15000;
-    const POLL_JITTER_MS = 3000;
+    const POLL_BASE_MS = 5000;
+    const POLL_JITTER_MS = 1000;
     let pollTimeout: ReturnType<typeof setTimeout>;
 
     const schedulePoll = () => {
@@ -2208,9 +2204,76 @@ const DraftRoom = () => {
 
       // Silently handle race condition errors - another client/trigger already handled this pick
       const isRaceCondition = errorMessage.includes('already taken') || errorMessage.includes('already drafted');
+      const isStalePickNumber = errorMessage.includes('Pick number already used');
       if (isRaceCondition) {
         logger.log('handlePlayerDraft: Pick already handled, reloading state');
         await loadDraftState();
+      } else if (isStalePickNumber) {
+        // Client had stale draftState (realtime didn't deliver the other team's
+        // pick in time). Refresh from server and auto-retry with correct pick number.
+        logger.log('handlePlayerDraft: Stale pick number — refreshing state and retrying');
+        setDraftedPlayerIds(prev => { const s = new Set(prev); s.delete(player.id); return s; });
+        if (!isAutoDraft) {
+          toast({ title: "Syncing draft...", description: "Catching up with the latest picks. Retrying..." });
+        }
+        try {
+          const [freshPicks, freshLeagueRes] = await Promise.all([
+            DraftService.getDraftPicks(leagueId, user?.id || ''),
+            leagueApi.getLeague(leagueId),
+          ]);
+          const serverPicks = freshPicks.picks.filter((p: DraftPick) => !p.deleted_at);
+          setDraftHistory(serverPicks);
+          setDraftedPlayerIds(new Set(serverPicks.map((p: DraftPick) => p.player_id)));
+          const freshLeague = freshLeagueRes.data as League | null;
+          if (freshLeague) {
+            setLeague(prev => prev ? { ...prev, settings: freshLeague.settings || prev.settings, draft_status: freshLeague.draft_status || prev.draft_status } : null);
+          }
+
+          // Compute correct pick number from fresh server state
+          const totalPicks = serverPicks.length;
+          const retryPick = totalPicks + 1;
+          const retryRound = Math.floor(totalPicks / teams.length) + 1;
+          const sessionId = effectiveDraftState.sessionId;
+
+          // Check if this player was already drafted in the refreshed state
+          if (serverPicks.some((p: DraftPick) => p.player_id === player.id)) {
+            toast({ title: "Player Already Drafted", description: `${player.full_name} was just drafted by another team.`, variant: "destructive" });
+          } else {
+            // Figure out whose turn it actually is now
+            const draftType = ((league?.settings as LeagueSettings)?.draftType || 'snake') as string;
+            const isLinear = draftType === 'linear';
+            const boardOrder = orderedTeamsForBoardRef.current.length > 0 ? orderedTeamsForBoardRef.current : teams;
+            const pickIdx = totalPicks % teams.length;
+            const isReversedRound = !isLinear && retryRound % 2 === 0;
+            const roundOrder = isReversedRound ? [...boardOrder].reverse() : boardOrder;
+            const actualNextTeam = roundOrder[pickIdx];
+
+            // Only retry if it's still this user's turn (or commissioner)
+            if (actualNextTeam && (actualNextTeam.owner_id === user?.id || isCommissioner)) {
+              setDraftedPlayerIds(prev => new Set([...prev, player.id]));
+              const { pick: retryResult, error: retryErr } = await DraftService.makePick(
+                leagueId, actualNextTeam.id, player.id, retryRound, retryPick, sessionId, teams.length
+              );
+              if (retryErr) {
+                setDraftedPlayerIds(prev => { const s = new Set(prev); s.delete(player.id); return s; });
+                toast({ title: "Error", description: `Retry failed: ${(retryErr as any)?.message || retryErr}`, variant: "destructive" });
+              } else {
+                toast({ title: `${player.full_name} drafted!`, description: `Round ${retryRound}, Pick ${retryPick}` });
+                // Trigger a full reconciliation after successful retry
+                clearDraftCache();
+                const [rPicks] = await Promise.all([DraftService.getDraftPicks(leagueId, user?.id || '')]);
+                const rServerPicks = rPicks.picks.filter((p: DraftPick) => !p.deleted_at);
+                setDraftHistory(rServerPicks);
+                setDraftedPlayerIds(new Set(rServerPicks.map((p: DraftPick) => p.player_id)));
+              }
+            } else {
+              toast({ title: "Not Your Turn", description: "The draft advanced — it's another team's turn now." });
+            }
+          }
+        } catch (retryError) {
+          logger.error('handlePlayerDraft: Auto-retry failed:', retryError);
+          toast({ title: "Error", description: "Could not sync draft state. Please refresh the page.", variant: "destructive" });
+        }
       } else {
         // Rollback optimistic update on non-race-condition errors
         setDraftedPlayerIds(prev => {

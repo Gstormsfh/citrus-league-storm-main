@@ -62,24 +62,23 @@ export const PlayerPool = memo(({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showDrafted, setShowDrafted] = useState(false);
 
-  // Overall pre-draft ranking derived from rest-of-season projected fantasy
-  // points. Players are sorted by projected total FPTS descending; their
-  // position in that sorted list becomes their overall rank (#1, #2, ...).
-  // Goalies and skaters share one ranking because users pick from the same
-  // pool. Missing projections get a rank at the bottom (999999) rather than 0
-  // so undefined-FPTS players don't masquerade as #1.
+  // Static pre-draft ranking based on actual fantasy points (league scoring).
+  // Uses FPTS as the primary ranking signal — this is a fixed ordering that
+  // does NOT change as players get drafted, matching ESPN/Yahoo behavior.
+  // ROS projections are unreliable when games_remaining is 0 (end of season).
   const rankMap = useMemo<Map<string, number>>(() => {
     const scored = availablePlayers.map(p => ({
       id: p.id,
-      score: projectedFptsMap.get(p.id)?.total ?? -Infinity,
+      fpts: calcFpts(p),
     }));
-    scored.sort((a, b) => b.score - a.score);
+    scored.sort((a, b) => b.fpts - a.fpts);
     const map = new Map<string, number>();
     scored.forEach((p, i) => {
-      map.set(p.id, p.score === -Infinity ? 999999 : i + 1);
+      map.set(p.id, i + 1);
     });
     return map;
-  }, [availablePlayers, projectedFptsMap]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availablePlayers, scorer]);
 
   // PERF: Use pre-built Set for O(1) lookups instead of O(n) Array.includes on every player
   const draftedSet = useMemo(() => {
@@ -555,8 +554,8 @@ export const PlayerPool = memo(({
                 )}
                 <th className="px-1.5 py-1.5 text-center font-bold text-green-700 bg-green-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('fpts')}>FPTS</th>
                 <th className="px-1.5 py-1.5 text-center font-bold text-green-700 bg-green-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('fptsPerGp')}>F/GP</th>
-                <th className="px-1.5 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projFpts')}>Proj</th>
-                <th className="px-1.5 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projFptsPerGp')}>P/GP</th>
+                <th className="px-1.5 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projFpts')} title="Rest-of-season projected fantasy points">ROS</th>
+                <th className="px-1.5 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projFptsPerGp')} title="Projected fantasy points per game (rest of season)">P/GP</th>
                 <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px]"></th>
               </tr>
             </thead>
@@ -928,8 +927,8 @@ export const PlayerPool = memo(({
                   className="px-2 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 cursor-pointer hover:bg-blue-100/50 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('projFpts')}
                 >
-                  <div className="flex items-center justify-center gap-1">
-                    Proj
+                  <div className="flex items-center justify-center gap-1" title="Rest-of-season projected fantasy points">
+                    ROS
                     {sortBy === 'projFpts' && (
                       sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
                     )}
@@ -940,8 +939,8 @@ export const PlayerPool = memo(({
                   className="px-2 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 cursor-pointer hover:bg-blue-100/50 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('projFptsPerGp')}
                 >
-                  <div className="flex items-center justify-center gap-1">
-                    Proj/GP
+                  <div className="flex items-center justify-center gap-1" title="Projected fantasy points per game (rest of season)">
+                    ROS/GP
                     {sortBy === 'projFptsPerGp' && (
                       sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
                     )}
