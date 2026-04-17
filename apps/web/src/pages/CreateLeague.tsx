@@ -214,6 +214,9 @@ const CreateLeague = () => {
       setTeamsCount('20');
     } else if (leagueType === 'survivor') {
       setTeamsCount('30');
+    } else if (leagueType === 'playoff-bracket-pickem' || leagueType === 'playoff-confidence-pool' || leagueType === 'playoff-roster-pool') {
+      setScoringFormat('total-points');
+      setTeamsCount('20');
     }
   }, [leagueType]);
 
@@ -377,6 +380,15 @@ const CreateLeague = () => {
         } else if (leagueType === 'confidence-pool') {
           settings.picksPerWeek = parseInt(picksPerWeek);
           settings.confidenceMaxPoints = parseInt(confidenceMaxPoints);
+        } else if (leagueType === 'playoff-bracket-pickem') {
+          settings.playoffBracketPointsPerRound = { r1: 2, r2: 4, r3: 8, scf: 16 };
+          settings.playoffGamesPickBonus = 1;
+        } else if (leagueType === 'playoff-confidence-pool') {
+          settings.playoffConfidenceVariant = 'cumulative';
+        } else if (leagueType === 'playoff-roster-pool') {
+          settings.playoffRosterSize = 18;
+          settings.playoffPositionRequirements = { F: 10, D: 6, G: 2 };
+          settings.playoffMaxPlayersPerTeam = 3;
         }
       }
 
@@ -434,6 +446,12 @@ const CreateLeague = () => {
         navigate(`/pool/survivor?league=${league.id}`);
       } else if (leagueType === 'confidence-pool') {
         navigate(`/pool/confidence?league=${league.id}`);
+      } else if (leagueType === 'playoff-bracket-pickem') {
+        navigate(`/pool/playoff-bracket?league=${league.id}`);
+      } else if (leagueType === 'playoff-confidence-pool') {
+        navigate(`/pool/playoff-confidence?league=${league.id}`);
+      } else if (leagueType === 'playoff-roster-pool') {
+        navigate(`/pool/playoff-roster?league=${league.id}`);
       } else {
         navigate(`/league/${league.id}?league=${league.id}`);
       }
