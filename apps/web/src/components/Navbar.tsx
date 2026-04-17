@@ -111,14 +111,10 @@ const Navbar = () => {
   const navTabs = isPool && activeLeagueId
     ? getPoolTabs()
     : [
-        // Playoffs front and center
+        // Playoffs front and center. Season-long still accessible via direct URL.
         { label: 'NHL Playoffs', path: '/nhl/playoffs', icon: Trophy },
         { label: 'Create Pool', path: '/create-league?type=playoff', icon: Sparkles },
-        // Season-long (accessible but secondary)
-        { label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup', icon: Swords },
-        { label: 'Standings', path: '/standings', icon: BarChart3 },
-        { label: 'Players', path: '/free-agents', icon: Search },
-        { label: 'Draft', path: activeLeagueId ? `/draft-room?league=${activeLeagueId}` : '/draft-room', icon: Settings },
+        { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
       ];
 
   return (
