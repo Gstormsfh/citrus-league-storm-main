@@ -106,7 +106,7 @@ function SortableQueueItem({
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <div className={cn(
           "text-sm font-medium w-6 text-center",
-          index === 0 && isYourTurn && !isDrafted ? "text-fantasy-primary font-bold" : "text-muted-foreground"
+          index === 0 && isYourTurn && !isDrafted ? "text-citrus-orange font-bold" : "text-muted-foreground"
         )}>
           #{index + 1}
         </div>

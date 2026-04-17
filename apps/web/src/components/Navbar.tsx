@@ -174,12 +174,8 @@ const Navbar = () => {
                     return (
                     <DropdownMenuItem
                       key={l.id}
-                      // onClick fires reliably on both mouse and touch; onSelect is
-                      // inconsistent on mobile Safari where Radix's pointerdown
-                      // handling can swallow the selection before it propagates.
-                      onClick={() => {
+                      onSelect={() => {
                         setActiveLeagueId(l.id);
-                        // Path-aware navigation: see mobile dropdown below for rationale.
                         if (isPoolLeague(lType)) {
                           navigate(getPoolRoute(lType, l.id));
                         } else if (location.pathname.startsWith('/matchup/') || location.pathname === '/matchup') {
@@ -207,7 +203,7 @@ const Navbar = () => {
                     </DropdownMenuItem>
                   );})}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/create-league')} className="text-citrus-sage font-medium">
+                  <DropdownMenuItem onSelect={() => navigate('/create-league')} className="text-citrus-sage font-medium">
                     <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -254,7 +250,7 @@ const Navbar = () => {
                       <Link to="/profile?tab=settings"><Settings className="h-4 w-4 mr-2" /> Settings</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
+                    <DropdownMenuItem onSelect={handleSignOut} className="text-destructive focus:text-destructive">
                       <LogOut className="h-4 w-4 mr-2" /> Log out
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -411,16 +407,8 @@ const Navbar = () => {
                       return (
                       <DropdownMenuItem
                         key={l.id}
-                        // onClick instead of onSelect — onSelect is unreliable on
-                        // mobile touch (Radix pointerdown can close before the
-                        // selection event fires, leaving activeLeagueId unchanged).
-                        onClick={() => {
+                        onSelect={() => {
                           setActiveLeagueId(l.id);
-                          // Path-aware navigation: pages that use path-based league IDs
-                          // (useParams) need an explicit navigate, otherwise the page
-                          // sees the OLD league and either silently reverts the context
-                          // (Matchup's syncLeagueFromUrl) or renders stale data
-                          // (LeagueDashboard).
                           if (isPoolLeague(lType)) {
                             navigate(getPoolRoute(lType, l.id));
                           } else if (location.pathname.startsWith('/matchup/') || location.pathname === '/matchup') {
@@ -430,7 +418,6 @@ const Navbar = () => {
                           } else if (location.pathname.match(/^\/league\/[^/]+$/)) {
                             navigate(`/league/${l.id}`);
                           } else if (location.pathname.startsWith('/draft-room') || location.pathname === '/draft') {
-                            // Don't trap users on the draft room of a different league.
                             navigate('/gm-office');
                           }
                           closeMobileMenu();
@@ -450,7 +437,7 @@ const Navbar = () => {
                       </DropdownMenuItem>
                     );})}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => { navigate('/create-league'); closeMobileMenu(); }} className="text-citrus-sage font-medium">
+                    <DropdownMenuItem onSelect={() => { navigate('/create-league'); closeMobileMenu(); }} className="text-citrus-sage font-medium">
                       <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
                     </DropdownMenuItem>
                   </DropdownMenuContent>

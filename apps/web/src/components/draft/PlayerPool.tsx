@@ -285,17 +285,19 @@ export const PlayerPool = memo(({
         )}
         onClick={() => !isDrafted && onPlayerSelect(player)}
       >
-        <td className="px-2 py-2 sticky left-0 bg-[#E8EED9]/95 z-10">
+        <td className="px-1.5 py-2 text-center w-[44px] bg-[#E8EED9]/95">
+          {(() => {
+            const rank = rankMap.get(player.id);
+            if (!rank || rank >= 999999) return <span className="text-muted-foreground">-</span>;
+            return (
+              <span className="text-xs font-mono text-citrus-forest font-bold">
+                {rank}
+              </span>
+            );
+          })()}
+        </td>
+        <td className="px-2 py-2 sticky left-[44px] bg-[#E8EED9]/95 z-10">
           <div className="flex items-center gap-1">
-            {(() => {
-              const rank = rankMap.get(player.id);
-              if (!rank || rank >= 999999) return null;
-              return (
-                <span className="text-[10px] font-mono text-fantasy-primary font-bold min-w-[28px] text-right pr-1">
-                  #{rank}
-                </span>
-              );
-            })()}
             {isInQueue && (
               <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary" />
             )}
@@ -525,7 +527,8 @@ export const PlayerPool = memo(({
           <table className="w-full min-w-[900px] text-sm border-collapse">
             <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
               <tr>
-                <th className="px-2 py-1.5 text-left font-semibold text-fantasy-dark sticky left-0 bg-fantasy-light/95 z-10 min-w-[120px] text-xs">Player</th>
+                <th className="px-1 py-1.5 text-center font-semibold text-fantasy-dark sticky left-0 bg-fantasy-light/95 z-10 w-[32px] text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projRank')}>#</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-fantasy-dark sticky left-[32px] bg-fantasy-light/95 z-10 min-w-[100px] text-xs">Player</th>
                 {selectedPosition === 'G' ? (
                   <>
                     <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('wins')}>W</th>
@@ -572,7 +575,14 @@ export const PlayerPool = memo(({
                     )}
                     onClick={() => !isDrafted && onPlayerSelect(player)}
                   >
-                    <td className="px-2 py-1.5 sticky left-0 bg-[#E8EED9]/95 z-10">
+                    <td className="px-1 py-1.5 text-center w-[32px] sticky left-0 bg-[#E8EED9]/95 z-10">
+                      {(() => {
+                        const rank = rankMap.get(player.id);
+                        if (!rank || rank >= 999999) return <span className="text-muted-foreground text-[10px]">-</span>;
+                        return <span className="text-[10px] font-mono text-citrus-forest font-bold">{rank}</span>;
+                      })()}
+                    </td>
+                    <td className="px-1.5 py-1.5 sticky left-[32px] bg-[#E8EED9]/95 z-10">
                       <div className="flex items-center gap-1">
                         {isInQueue && <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />}
                         <span className="font-medium text-xs truncate max-w-[100px]">{player.full_name}</span>
@@ -650,7 +660,19 @@ export const PlayerPool = memo(({
           <table className="w-full min-w-[1400px] text-sm border-collapse">
             <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
               <tr>
-                <th className="px-2 py-2 text-left font-semibold text-fantasy-dark sticky left-0 bg-fantasy-light/95 z-10 min-w-[160px]">Player</th>
+                <th
+                  className="px-1.5 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs w-[44px]"
+                  onClick={() => handleHeaderClick('projRank')}
+                >
+                  <div className="flex items-center justify-center gap-0.5">
+                    #
+                    {sortBy === 'projRank' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'projRank' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-2 py-2 text-left font-semibold text-fantasy-dark sticky left-[44px] bg-fantasy-light/95 z-10 min-w-[160px]">Player</th>
                 <th className="px-2 py-2 text-left font-semibold text-fantasy-dark">Pos</th>
                 <th className="px-2 py-2 text-left font-semibold text-fantasy-dark">Team</th>
                 <th className="px-2 py-2 text-center font-semibold text-fantasy-dark">GP</th>
