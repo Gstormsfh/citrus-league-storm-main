@@ -77,6 +77,77 @@ nhlPlayoffsRoutes.get('/series/:slot', async (c) => {
   }
 });
 
+// GET /api/nhl-playoffs/h2h?season=2025 — Season H2H record for every playoff matchup
+// Returns { [slot]: { high_wins, low_wins, games, high_abbrev, low_abbrev } }
+nhlPlayoffsRoutes.get('/h2h', async (c) => {
+  const seasonParam = c.req.query('season');
+  const season = seasonParam ? parseInt(seasonParam, 10) : CURRENT_SEASON;
+
+  try {
+    // Get all playoff series with both teams known
+    const { data: seriesRows } = await supabaseAdmin
+      .from('nhl_playoff_series')
+      .select('bracket_slot, high_seed_team_id, low_seed_team_id')
+      .eq('season', season)
+      .not('high_seed_team_id', 'is', null)
+      .not('low_seed_team_id', 'is', null);
+
+    if (!seriesRows || seriesRows.length === 0) {
+      return ok(c, { h2h: {} });
+    }
+
+    // Get team_id → abbrev lookup
+    const { data: teams } = await supabaseAdmin
+      .from('nhl_teams')
+      .select('team_id, abbreviation');
+    const idToAbbrev = new Map((teams || []).map(t => [t.team_id, t.abbreviation]));
+
+    // Collect unique team pairs
+    const pairs = new Set<string>();
+    const slotPairs = new Map<number, { high: string; low: string }>();
+    for (const s of seriesRows) {
+      const hi = idToAbbrev.get(s.high_seed_team_id);
+      const lo = idToAbbrev.get(s.low_seed_team_id);
+      if (!hi || !lo) continue;
+      pairs.add([hi, lo].sort().join('|'));
+      slotPairs.set(s.bracket_slot, { high: hi, low: lo });
+    }
+
+    // Single query — all regular-season head-to-head games between any playoff teams
+    const allAbbrevs = Array.from(new Set(Array.from(slotPairs.values()).flatMap(p => [p.high, p.low])));
+    const { data: games } = await supabaseAdmin
+      .from('nhl_games')
+      .select('home_team, away_team, home_score, away_score')
+      .eq('status', 'final')
+      .eq('season', season)
+      .eq('game_type', 'regular')
+      .in('home_team', allAbbrevs)
+      .in('away_team', allAbbrevs)
+      .range(0, 4999);
+
+    // Build H2H per slot
+    const h2h: Record<number, { high_wins: number; low_wins: number; games: number; high_abbrev: string; low_abbrev: string }> = {};
+    for (const [slot, pair] of slotPairs) {
+      let highWins = 0, lowWins = 0, total = 0;
+      for (const g of games || []) {
+        const hiInvolved = g.home_team === pair.high || g.away_team === pair.high;
+        const loInvolved = g.home_team === pair.low || g.away_team === pair.low;
+        if (!hiInvolved || !loInvolved) continue;
+        total++;
+        const winner = g.home_score > g.away_score ? g.home_team : g.away_team;
+        if (winner === pair.high) highWins++;
+        else if (winner === pair.low) lowWins++;
+      }
+      h2h[slot] = { high_wins: highWins, low_wins: lowWins, games: total, high_abbrev: pair.high, low_abbrev: pair.low };
+    }
+
+    c.header('Cache-Control', 'public, max-age=300'); // 5 min
+    return ok(c, { h2h });
+  } catch (err) {
+    return handleError(c, err as Error, 'Failed to fetch H2H');
+  }
+});
+
 // GET /api/nhl-playoffs/meta — data freshness for stale-data UI badge
 nhlPlayoffsRoutes.get('/meta', async (c) => {
   try {

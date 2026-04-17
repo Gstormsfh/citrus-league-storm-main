@@ -25,6 +25,11 @@ interface Seed {
   team_abbrev: string | null;
   seed: number;
   conference: string;
+  wins?: number | null;
+  losses?: number | null;
+  ot_losses?: number | null;
+  points?: number | null;
+  row_wins?: number | null;
 }
 
 interface Series {
@@ -62,6 +67,7 @@ export default function PoolPlayoffConfidence() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [h2hMap, setH2hMap] = useState<Record<number, { high_wins: number; low_wins: number; games: number }>>({});
 
   // Total series = available confidence values (cumulative: 1-N)
   const totalSeries = series.length;
@@ -70,14 +76,17 @@ export default function PoolPlayoffConfidence() {
     if (!leagueId || !user) return;
     const load = async () => {
       try {
-        const [bracketRes, picksRes] = await Promise.all([
+        const [bracketRes, picksRes, h2hRes] = await Promise.all([
           fetch('/api/nhl-playoffs/bracket?season=2025').then(r => r.json()),
           fetch(`/api/playoff-pools/${leagueId}/picks?type=confidence`, {
             headers: { Authorization: `Bearer ${(await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session?.access_token || ''}` },
           }).then(r => r.json()),
+          fetch('/api/nhl-playoffs/h2h?season=2025').then(r => r.json()).catch(() => null),
         ]);
         setSeeds(bracketRes.data?.seeds || bracketRes.seeds || []);
         setSeries(bracketRes.data?.series || bracketRes.series || []);
+        if (h2hRes?.data?.h2h) setH2hMap(h2hRes.data.h2h);
+        else if (h2hRes?.h2h) setH2hMap(h2hRes.h2h);
         const myPicks = (picksRes.data?.picks || picksRes.picks || []).filter((p: ConfPick & { user_id: string }) => p.user_id === user.id);
         const m = new Map<number, ConfPick>();
         myPicks.forEach((p: ConfPick) => m.set(p.series_slot, p));
@@ -263,7 +272,11 @@ export default function PoolPlayoffConfidence() {
                                         {info?.name || team?.team_abbrev || 'TBD'}
                                       </span>
                                     </div>
-                                    <div className="text-[10px] text-citrus-charcoal/60 truncate">{info?.fullName || ''}</div>
+                                    <div className="text-[10px] text-citrus-charcoal/60 truncate">
+                                      {team && team.wins != null
+                                        ? `${team.wins}-${team.losses}-${team.ot_losses} · ${team.points} pts`
+                                        : (info?.fullName || '')}
+                                    </div>
                                   </div>
                                   {picked && (
                                     <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={info ? { background: info.primaryColor } : { background: '#7A9B7A' }}>
@@ -275,6 +288,25 @@ export default function PoolPlayoffConfidence() {
                             );
                           })}
                         </div>
+
+                        {/* Season H2H record */}
+                        {h2hMap[s.bracket_slot] && h2hMap[s.bracket_slot].games > 0 && high && low && (() => {
+                          const highInfo = NHL_TEAMS.find(t => t.abbrev === high.team_abbrev);
+                          const lowInfo = NHL_TEAMS.find(t => t.abbrev === low.team_abbrev);
+                          return (
+                            <div className="flex items-center justify-center gap-1.5 text-[10px] text-citrus-charcoal/60 pt-1 border-t border-fantasy-border/40">
+                              <span className="font-mono">Season H2H:</span>
+                              <span className="font-semibold" style={highInfo ? { color: highInfo.primaryColor } : undefined}>
+                                {high.team_abbrev} {h2hMap[s.bracket_slot].high_wins}
+                              </span>
+                              <span className="text-citrus-charcoal/40">—</span>
+                              <span className="font-semibold" style={lowInfo ? { color: lowInfo.primaryColor } : undefined}>
+                                {h2hMap[s.bracket_slot].low_wins} {low.team_abbrev}
+                              </span>
+                              <span className="text-citrus-charcoal/40">({h2hMap[s.bracket_slot].games} games)</span>
+                            </div>
+                          );
+                        })()}
 
                         {/* Confidence selector */}
                         {pick?.picked_team_id && !locked && (

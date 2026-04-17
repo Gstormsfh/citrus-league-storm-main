@@ -63,18 +63,24 @@ export default function PoolPlayoffBracket() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
+  const [h2hMap, setH2hMap] = useState<Record<number, { high_wins: number; low_wins: number; games: number }>>({});
+
   useEffect(() => {
     if (!leagueId || !user) return;
     const load = async () => {
       try {
-        const [bracketRes, picksRes] = await Promise.all([
+        const [bracketRes, picksRes, h2hRes] = await Promise.all([
           fetch('/api/nhl-playoffs/bracket?season=2025'),
           fetch(`/api/playoff-pools/${leagueId}/picks?type=bracket`, {
             headers: { Authorization: `Bearer ${(await import('@/integrations/supabase/client')).supabase.auth.getSession ? (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session?.access_token || '' : ''}` },
           }),
+          fetch('/api/nhl-playoffs/h2h?season=2025').catch(() => null),
         ]);
         const bracket = await bracketRes.json();
         const picksData = await picksRes.json();
+        const h2hData = h2hRes ? await h2hRes.json().catch(() => null) : null;
+        if (h2hData?.data?.h2h) setH2hMap(h2hData.data.h2h);
+        else if (h2hData?.h2h) setH2hMap(h2hData.h2h);
         setSeeds(bracket.data?.seeds || bracket.seeds || []);
         setSeries(bracket.data?.series || bracket.series || []);
         const myPicks = (picksData.data?.picks || picksData.picks || []).filter((p: Pick & { user_id: string }) => p.user_id === user.id);
@@ -265,6 +271,20 @@ export default function PoolPlayoffBracket() {
                           {renderTeamCard(high, highInfo, true)}
                           {renderTeamCard(low, lowInfo, false)}
                         </div>
+                        {/* Season H2H record */}
+                        {h2hMap[s.bracket_slot] && h2hMap[s.bracket_slot].games > 0 && (
+                          <div className="flex items-center justify-center gap-1.5 text-[10px] text-citrus-charcoal/60 pt-1 border-t border-fantasy-border/40">
+                            <span className="font-mono">Season H2H:</span>
+                            <span className="font-semibold" style={highInfo ? { color: highInfo.primaryColor } : undefined}>
+                              {high?.team_abbrev} {h2hMap[s.bracket_slot].high_wins}
+                            </span>
+                            <span className="text-citrus-charcoal/40">—</span>
+                            <span className="font-semibold" style={lowInfo ? { color: lowInfo.primaryColor } : undefined}>
+                              {h2hMap[s.bracket_slot].low_wins} {low?.team_abbrev}
+                            </span>
+                            <span className="text-citrus-charcoal/40">({h2hMap[s.bracket_slot].games} games)</span>
+                          </div>
+                        )}
                         {myPick?.picked_team_id && !locked && (
                           <div className="flex items-center gap-1.5 text-xs">
                             <span className="text-citrus-charcoal/60">In:</span>
