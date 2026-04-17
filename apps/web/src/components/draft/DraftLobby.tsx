@@ -332,10 +332,13 @@ export const DraftLobby = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="30">30 seconds</SelectItem>
+                      <SelectItem value="45">45 seconds</SelectItem>
                       <SelectItem value="60">60 seconds</SelectItem>
                       <SelectItem value="90">90 seconds</SelectItem>
                       <SelectItem value="120">2 minutes</SelectItem>
                       <SelectItem value="180">3 minutes</SelectItem>
+                      <SelectItem value="300">5 minutes</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

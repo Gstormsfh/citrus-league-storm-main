@@ -2339,18 +2339,48 @@ const DraftRoom = () => {
       const teamPlayerIds = teamPicks.map(p => p.player_id);
       const teamPlayers = availablePlayers.filter(p => teamPlayerIds.includes(p.id));
 
-      // Count positions already drafted
+      // Read league position configuration. Two formats are supported:
+      //   'individual' → C / LW / RW / D / G (and maybe UTIL)
+      //   'forward'    → F / D / G           (C, LW, RW all collapse into F)
+      // Default to individual if settings are missing. This used to be hard-
+      // coded to C/LW/RW/D/G, which meant "forward format" leagues had
+      // autopick misbehaving because their rosterSlots['C'] was undefined.
+      const leagueSettings = (league?.settings as LeagueSettings) || {};
+      const positionType: 'individual' | 'forward' =
+        leagueSettings.positionType === 'forward' ? 'forward' : 'individual';
+      const leagueRosterSlots = leagueSettings.rosterSlots || {};
+
+      // Normalize a player's raw position (from NHL data) to the league's
+      // position-format key. In a 'forward' league, C/LW/RW all count toward
+      // the F slot. Used for both counting drafted picks and scoring candidates.
+      const toLeaguePos = (rawPos: string | undefined): string => {
+        const p = rawPos || (positionType === 'forward' ? 'F' : 'C');
+        if (positionType === 'forward' && (p === 'C' || p === 'LW' || p === 'RW')) return 'F';
+        return p;
+      };
+
+      // Count positions already drafted (normalized to league format)
       const positionCounts: Record<string, number> = {};
       teamPlayers.forEach(p => {
-        const pos = p.position || 'F';
+        const pos = toLeaguePos(p.position);
         positionCounts[pos] = (positionCounts[pos] || 0) + 1;
       });
 
-      // Read starting roster slots from league settings
-      const leagueRosterSlots = (league?.settings as LeagueSettings)?.rosterSlots;
-      const startingNeeds: Record<string, number> = leagueRosterSlots
-        ? { 'C': leagueRosterSlots['C'] || 2, 'LW': leagueRosterSlots['LW'] || 2, 'RW': leagueRosterSlots['RW'] || 2, 'D': leagueRosterSlots['D'] || 4, 'G': leagueRosterSlots['G'] || 2 }
-        : { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2 };
+      // Build the starting-needs map from whatever positions the league
+      // actually defined in rosterSlots (plus sensible fallbacks by format).
+      const startingNeeds: Record<string, number> = {};
+      const configuredPositions = positionType === 'forward'
+        ? ['F', 'D', 'G']
+        : ['C', 'LW', 'RW', 'D', 'G'];
+      const fallbackNeeds: Record<string, number> = positionType === 'forward'
+        ? { F: 6, D: 4, G: 2 }
+        : { C: 2, LW: 2, RW: 2, D: 4, G: 2 };
+      for (const pos of configuredPositions) {
+        const slotCount = leagueRosterSlots[pos];
+        startingNeeds[pos] = typeof slotCount === 'number' && slotCount > 0
+          ? slotCount
+          : (fallbackNeeds[pos] || 0);
+      }
 
       // Check which starting positions still have empty slots
       const unfilledPositions = new Set<string>();
@@ -2363,30 +2393,29 @@ const DraftRoom = () => {
       // picking the highest-FPTS player regardless of whether the team
       // already had 4 RWs. This made picks look "random" to users.
       //
-      // After starters are full, treat positions we have *fewer* than a
-      // sensible depth-bench cap (2 per position) as still-needed, so the
-      // autopick continues to diversify across positions instead of
-      // stacking one spot. Total roster size comes from the league's
-      // draft_rounds; per-position bench cap is 2 by default.
+      // After starters are full, allow each position to continue being picked
+      // up to starters + reasonable depth (1-2 extra for skaters, +2 for D,
+      // +1 for G). Also respects UTIL and BN slots implicitly by letting
+      // positions keep receiving picks beyond the strict starter count.
       const allStartersFull = unfilledPositions.size === 0;
       if (allStartersFull) {
-        const benchCapPerPosition: Record<string, number> = {
-          'C': (startingNeeds['C'] || 2) + 1,
-          'LW': (startingNeeds['LW'] || 2) + 1,
-          'RW': (startingNeeds['RW'] || 2) + 1,
-          'D': (startingNeeds['D'] || 4) + 2,
-          'G': (startingNeeds['G'] || 2) + 1,
-        };
-        for (const [pos, cap] of Object.entries(benchCapPerPosition)) {
+        const depthBonus: Record<string, number> = positionType === 'forward'
+          ? { F: 4, D: 2, G: 1 }
+          : { C: 1, LW: 1, RW: 1, D: 2, G: 1 };
+        for (const pos of configuredPositions) {
+          const cap = (startingNeeds[pos] || 0) + (depthBonus[pos] || 1);
           if ((positionCounts[pos] || 0) < cap) unfilledPositions.add(pos);
         }
       }
 
-      // Score each undrafted player: FPTS is primary, positional need adds a 15% boost
+      // Score each undrafted player: FPTS is primary, positional need adds a 15% boost.
+      // Map the player's raw position to the league's format BEFORE checking need,
+      // otherwise a 'forward' league's autopick can never match C/LW/RW players
+      // against its F-only startingNeeds.
       const scored = undraftedPlayers.map(p => {
         const fpts = calcFpts(p);
-        const needsPosition = unfilledPositions.has(p.position);
-        // Boost players who fill a starting roster need
+        const leaguePos = toLeaguePos(p.position);
+        const needsPosition = unfilledPositions.has(leaguePos);
         const score = needsPosition ? fpts * 1.15 : fpts;
         return { player: p, fpts, score };
       });
@@ -2398,8 +2427,10 @@ const DraftRoom = () => {
           team: currentTeam.team_name,
           player: selectedPlayer.full_name,
           fpts: scored[0].fpts.toFixed(1),
-          boosted: unfilledPositions.has(selectedPlayer.position),
+          boosted: unfilledPositions.has(toLeaguePos(selectedPlayer.position)),
           position: selectedPlayer.position,
+          leaguePosition: toLeaguePos(selectedPlayer.position),
+          positionFormat: positionType,
           isAI: !currentTeam.owner_id
         });
       }
@@ -4134,6 +4165,8 @@ const DraftRoom = () => {
                               draftPicks={draftHistory}
                               currentRound={draftState?.currentRound || 1}
                               totalRounds={draftSettings.rounds}
+                              positionType={(league?.settings as LeagueSettings)?.positionType === 'forward' ? 'forward' : 'individual'}
+                              rosterSlots={(league?.settings as LeagueSettings)?.rosterSlots}
                             />
                           );
                         })()}
@@ -4270,6 +4303,8 @@ const DraftRoom = () => {
                             draftPicks={draftHistory}
                             currentRound={draftState?.currentRound || 1}
                             totalRounds={draftSettings.rounds}
+                            positionType={(league?.settings as LeagueSettings)?.positionType === 'forward' ? 'forward' : 'individual'}
+                            rosterSlots={(league?.settings as LeagueSettings)?.rosterSlots}
                           />
                         );
                       })()}
@@ -4288,6 +4323,8 @@ const DraftRoom = () => {
                       totalRounds={draftSettings.rounds}
                       availablePlayers={availablePlayers.filter(p => !draftedPlayerIds.has(p.id))}
                       onAddToQueue={handleAddToQueue}
+                      positionType={(league?.settings as LeagueSettings)?.positionType === 'forward' ? 'forward' : 'individual'}
+                      rosterSlots={(league?.settings as LeagueSettings)?.rosterSlots}
                     />
                   )}
                   

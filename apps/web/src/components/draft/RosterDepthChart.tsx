@@ -11,6 +11,17 @@ interface RosterDepthChartProps {
   totalRounds: number;
   availablePlayers?: Player[];
   onAddToQueue?: (playerId: string) => void;
+  /**
+   * 'individual' shows C/LW/RW/D/G slots separately; 'forward' collapses
+   * C/LW/RW into a single F slot (Yahoo-style). Defaults to 'individual'.
+   */
+  positionType?: 'individual' | 'forward';
+  /**
+   * League-configured slot counts (e.g. { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 2 }
+   * or { F: 6, D: 4, G: 2, UTIL: 1 }). Overrides the format's default counts
+   * when provided so the chart matches what the commissioner actually chose.
+   */
+  rosterSlots?: Record<string, number>;
 }
 
 // Normalize position (L -> LW, R -> RW)
@@ -22,12 +33,16 @@ const normalizePosition = (pos: string): string => {
   return upper;
 };
 
-// Starting lineup slots (what actually plays)
-const startingLineup = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
-const positionColors = {
+// Default starting lineups for each position format. The actual counts can be
+// overridden by `rosterSlots` on the league settings.
+const DEFAULT_INDIVIDUAL: Record<string, number> = { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
+const DEFAULT_FORWARD: Record<string, number> = { F: 6, D: 4, G: 2, UTIL: 1 };
+
+const positionColors: Record<string, string> = {
   'C': 'bg-fantasy-primary/10',
   'LW': 'bg-fantasy-secondary/10',
   'RW': 'bg-fantasy-tertiary/10',
+  'F': 'bg-fantasy-primary/10',
   'D': 'bg-blue-50',
   'G': 'bg-purple-50',
   'UTIL': 'bg-yellow-50',
@@ -39,86 +54,95 @@ export const RosterDepthChart = ({
   currentRound,
   totalRounds,
   availablePlayers = [],
-  onAddToQueue
+  onAddToQueue,
+  positionType = 'individual',
+  rosterSlots
 }: RosterDepthChartProps) => {
   // Separate players into starters and bench
-  const { starters, bench } = useMemo(() => {
+  const { starters, bench, startingLineup } = useMemo(() => {
+    // Derive starting lineup counts from the league's configured rosterSlots,
+    // falling back to sensible defaults per position format. Only include
+    // keys that are actually relevant to this format to keep the UI clean.
+    const keys = positionType === 'forward' ? ['F', 'D', 'G', 'UTIL'] : ['C', 'LW', 'RW', 'D', 'G', 'UTIL'];
+    const defaults = positionType === 'forward' ? DEFAULT_FORWARD : DEFAULT_INDIVIDUAL;
+    const startingLineup: Record<string, number> = {};
+    for (const k of keys) {
+      const configured = rosterSlots?.[k];
+      startingLineup[k] = (typeof configured === 'number' && configured > 0) ? configured : (defaults[k] || 0);
+    }
+
+    const primaryPositions: string[] = positionType === 'forward' ? ['F', 'D', 'G'] : ['C', 'LW', 'RW', 'D', 'G'];
+    // UTIL can be filled by any skater (never a goalie)
+    const utilCandidatePositions: string[] = positionType === 'forward' ? ['F', 'D'] : ['C', 'LW', 'RW', 'D'];
+
     const starters: Array<{ player: Player; position: string; slotIndex: number }> = [];
     const bench: Player[] = [];
-    
-    // Group players by position
-    const playersByPos: Record<string, Player[]> = {
-      'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
-    };
-    
+
+    // Group players by position — collapse C/LW/RW into F if league is forward format
+    const playersByPos: Record<string, Player[]> = {};
+    for (const p of primaryPositions) playersByPos[p] = [];
+    playersByPos['UTIL'] = [];
+
     draftedPlayers.forEach(player => {
-      const pos = normalizePosition(player.position);
-      // For players that can play multiple positions, try to assign to primary position first
-      if (pos === 'C' || pos === 'LW' || pos === 'RW' || pos === 'D' || pos === 'G') {
-        playersByPos[pos].push(player);
+      const raw = normalizePosition(player.position);
+      let bucket: string;
+      if (positionType === 'forward' && (raw === 'C' || raw === 'LW' || raw === 'RW')) {
+        bucket = 'F';
+      } else if (primaryPositions.includes(raw)) {
+        bucket = raw;
       } else {
-        // Unknown position goes to UTIL candidates
-        playersByPos['UTIL'].push(player);
+        bucket = 'UTIL';
       }
+      playersByPos[bucket].push(player);
     });
-    
+
     // Sort each position by points (best players first)
     Object.keys(playersByPos).forEach(pos => {
       playersByPos[pos].sort((a, b) => b.points - a.points);
     });
-    
-    // Assign to starting lineup slots
-    const slotsFilled: Record<string, number> = {
-      'C': 0, 'LW': 0, 'RW': 0, 'D': 0, 'G': 0, 'UTIL': 0
-    };
-    
+
+    const slotsFilled: Record<string, number> = {};
+    for (const k of Object.keys(startingLineup)) slotsFilled[k] = 0;
+
     // First, fill primary positions
-    (['C', 'LW', 'RW', 'D', 'G'] as const).forEach(pos => {
+    primaryPositions.forEach(pos => {
       const players = playersByPos[pos];
-      const slotsNeeded = startingLineup[pos];
-      
+      const slotsNeeded = startingLineup[pos] || 0;
       for (let i = 0; i < Math.min(players.length, slotsNeeded); i++) {
         starters.push({ player: players[i], position: pos, slotIndex: i });
         slotsFilled[pos]++;
       }
-      
-      // Remaining players at this position go to bench
       for (let i = slotsNeeded; i < players.length; i++) {
         bench.push(players[i]);
       }
     });
-    
-    // Fill UTIL slot with best available forward/defenseman (not goalies)
+
+    // Fill UTIL slots with best available skater (not goalies)
     const utilCandidates: Player[] = [];
-    ['C', 'LW', 'RW', 'D'].forEach(pos => {
+    utilCandidatePositions.forEach(pos => {
       const players = playersByPos[pos];
-      const slotsNeeded = startingLineup[pos];
-      // Players beyond starting slots can be used for UTIL
+      const slotsNeeded = startingLineup[pos] || 0;
       for (let i = slotsNeeded; i < players.length; i++) {
         utilCandidates.push(players[i]);
       }
     });
-    // Also include any players that were already in UTIL group
-    utilCandidates.push(...playersByPos['UTIL']);
+    utilCandidates.push(...(playersByPos['UTIL'] || []));
     utilCandidates.sort((a, b) => b.points - a.points);
-    
-    // Fill UTIL slot
-    if (slotsFilled['UTIL'] < startingLineup['UTIL'] && utilCandidates.length > 0) {
-      const utilPlayer = utilCandidates[0];
-      starters.push({ player: utilPlayer, position: 'UTIL', slotIndex: 0 });
+
+    const utilSlots = startingLineup['UTIL'] || 0;
+    for (let i = 0; i < Math.min(utilSlots, utilCandidates.length); i++) {
+      const utilPlayer = utilCandidates[i];
+      starters.push({ player: utilPlayer, position: 'UTIL', slotIndex: i });
       slotsFilled['UTIL']++;
-      // Remove from bench if it was there
       const benchIndex = bench.findIndex(p => p.id === utilPlayer.id);
-      if (benchIndex >= 0) {
-        bench.splice(benchIndex, 1);
-      }
+      if (benchIndex >= 0) bench.splice(benchIndex, 1);
     }
     
     // Any remaining players go to bench
     // (already handled above, but double-check)
-    
-    return { starters, bench };
-  }, [draftedPlayers]);
+
+    return { starters, bench, startingLineup };
+  }, [draftedPlayers, positionType, rosterSlots]);
 
   // PERF: O(1) lookup for draft round by player ID instead of O(n) find per slot
   const picksByPlayerId = useMemo(() => {
@@ -153,7 +177,7 @@ export const RosterDepthChart = ({
               </thead>
               <tbody>
                 {Object.entries(startingLineup).map(([pos, slots]) => {
-                  const colors = positionColors[pos as keyof typeof positionColors] || '';
+                  const colors = positionColors[pos] || '';
                   return (
                     <>
                       {Array.from({ length: slots }).map((_, idx) => {
