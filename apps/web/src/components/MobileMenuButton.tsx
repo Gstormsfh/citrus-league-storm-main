@@ -1,19 +1,11 @@
 import { useState } from 'react';
-import { Menu, X, Trophy, UserPlus, Newspaper, Calendar, LogOut, CircleUser, Settings } from 'lucide-react';
+import { Menu, X, Trophy, UserPlus, Newspaper, Calendar, LogOut, CircleUser, Settings, ChevronDown, Check } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
 import { isPoolLeague, getPoolRoute, getPoolLabel, getLeagueTypeFromSettings } from '@/utils/leagueTypeHelpers';
 import { CitrusLogo } from '@/components/icons/CitrusIcons';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -28,6 +20,7 @@ import {
  */
 const MobileMenuButton = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [leagueListOpen, setLeagueListOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -138,29 +131,36 @@ const MobileMenuButton = () => {
               </button>
             </div>
 
-            {/* League switcher */}
+            {/* League switcher — plain buttons, no Radix dropdown */}
             {userLeagues.length > 0 && !leagueLoading && (
               <div className="mb-3">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-3 px-3 py-2.5 bg-citrus-forest/5 rounded-xl w-full hover:bg-citrus-forest/10 transition-colors">
-                      <Trophy className="h-4 w-4 text-citrus-orange flex-shrink-0" />
-                      <span className="text-sm font-display font-semibold text-citrus-forest truncate flex-1 text-left">
-                        {activeLeague?.name || 'Select League'}
-                      </span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-w-[320px]">
-                    <DropdownMenuLabel className="text-xs font-display uppercase text-citrus-forest">
+                <button
+                  className="flex items-center gap-3 px-3 py-2.5 bg-citrus-forest/5 rounded-xl w-full active:bg-citrus-forest/15 transition-colors"
+                  onClick={() => setLeagueListOpen(prev => !prev)}
+                >
+                  <Trophy className="h-4 w-4 text-citrus-orange flex-shrink-0" />
+                  <span className="text-sm font-display font-semibold text-citrus-forest truncate flex-1 text-left">
+                    {activeLeague?.name || 'Select League'}
+                  </span>
+                  <ChevronDown className={cn("h-4 w-4 text-citrus-forest/50 transition-transform", leagueListOpen && "rotate-180")} />
+                </button>
+
+                {leagueListOpen && (
+                  <div className="mt-1 rounded-xl border border-citrus-sage/20 bg-white overflow-hidden">
+                    <div className="px-3 py-2 text-xs font-display uppercase text-citrus-forest/60 border-b border-citrus-sage/10">
                       My Leagues ({userLeagues.length})
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
+                    </div>
                     {userLeagues.map((l) => {
                       const lType = getLeagueTypeFromSettings(l.settings as Record<string, unknown>);
+                      const isActive = activeLeagueId === l.id;
                       return (
-                        <DropdownMenuItem
+                        <button
                           key={l.id}
-                          onSelect={() => {
+                          className={cn(
+                            "flex items-center gap-3 w-full px-3 py-3 text-left active:bg-citrus-sage/20 transition-colors border-b border-citrus-sage/10 last:border-b-0",
+                            isActive && "bg-citrus-sage/10"
+                          )}
+                          onClick={() => {
                             setActiveLeagueId(l.id);
                             if (isPoolLeague(lType)) {
                               navigate(getPoolRoute(lType, l.id));
@@ -173,26 +173,30 @@ const MobileMenuButton = () => {
                             } else if (location.pathname.startsWith('/draft-room') || location.pathname === '/draft') {
                               navigate('/gm-office');
                             }
+                            setLeagueListOpen(false);
                             closeMenu();
                           }}
-                          className={cn("cursor-pointer", activeLeagueId === l.id && "bg-citrus-sage/20 font-semibold")}
                         >
-                          <Trophy className="h-4 w-4 mr-2" />
-                          <div className="flex-1">
-                            <div className="font-medium truncate">{l.name}</div>
+                          <Trophy className="h-4 w-4 text-citrus-orange flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-citrus-forest truncate">{l.name}</div>
                             <div className="text-xs text-muted-foreground">
                               {isPoolLeague(lType) ? getPoolLabel(lType) + ' Pool' : 'Fantasy'}
                             </div>
                           </div>
-                        </DropdownMenuItem>
+                          {isActive && <Check className="h-4 w-4 text-citrus-orange flex-shrink-0" />}
+                        </button>
                       );
                     })}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => { navigate('/create-league'); closeMenu(); }} className="text-citrus-sage font-medium">
-                      <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    <button
+                      className="flex items-center gap-3 w-full px-3 py-3 text-left active:bg-citrus-sage/20 transition-colors text-citrus-sage font-medium"
+                      onClick={() => { navigate('/create-league'); closeMenu(); }}
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      <span className="text-sm">Create / Join League</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
