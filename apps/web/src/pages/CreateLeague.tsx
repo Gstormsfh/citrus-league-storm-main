@@ -87,7 +87,7 @@ const DEFAULT_LEAGUE_STATS = [
   { id: "sog", name: "Shots on Goal", points: 0.4, default: true, category: "Offense", enabled: true },
   { id: "blk", name: "Blocks", points: 0.5, default: true, category: "Defense", enabled: true },
   { id: "hit", name: "Hits", points: 0.2, default: true, category: "Defense", enabled: true },
-  { id: "pim", name: "Penalty Minutes", points: 0.5, default: false, category: "Defense", enabled: false },
+  { id: "pim", name: "Penalty Minutes", points: 0.5, default: true, category: "Defense", enabled: true },
   { id: "pm", name: "Plus/Minus", points: 0.5, default: true, category: "Defense", enabled: true },
   { id: "w", name: "Wins", points: 4, default: true, category: "Goalie", enabled: true },
   { id: "so", name: "Shutouts", points: 3, default: true, category: "Goalie", enabled: true },
@@ -1156,16 +1156,33 @@ const CreateLeague = () => {
                                         <SelectValue />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        {['-2', '-1', '-0.5', '-0.25', '-0.1', '0', '0.1', '0.2', '0.25', '0.3', '0.4', '0.5', '0.75', '1', '1.5', '2', '2.5', '3', '4', '5', '6', '8', '10']
-                                          .map(v => (
-                                            <SelectItem key={v} value={v} className="font-mono">
-                                              {parseFloat(v) > 0 ? `+${v}` : v}
+                                        {(() => {
+                                          // Per-stat option sets — sensible ranges around each stat's default
+                                          const OPTIONS_BY_STAT: Record<string, number[]> = {
+                                            g: [1, 2, 3, 4, 5, 6],                    // Goals (default 3)
+                                            a: [1, 1.5, 2, 2.5, 3, 4],                // Assists (default 2)
+                                            ppp: [0.5, 1, 1.5, 2, 3],                 // Power Play Points (default 1)
+                                            shg: [1, 1.5, 2, 2.5, 3, 4],              // Shorthanded Points (default 2)
+                                            sog: [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5], // Shots on Goal (default 0.4)
+                                            blk: [0.25, 0.5, 0.75, 1, 1.5],           // Blocks (default 0.5)
+                                            hit: [0.1, 0.15, 0.2, 0.25, 0.3, 0.5],    // Hits (default 0.2)
+                                            pim: [-1, -0.5, -0.25, 0.25, 0.5, 1],     // Penalty Minutes (default 0.5)
+                                            pm: [-1, -0.5, -0.25, 0.25, 0.5, 1, 1.5], // Plus/Minus (default 0.5)
+                                            w: [2, 3, 4, 5, 6, 8],                    // Wins (default 4)
+                                            so: [2, 3, 4, 5, 6, 8],                   // Shutouts (default 3)
+                                            sv: [0.1, 0.15, 0.2, 0.25, 0.3, 0.5],     // Saves (default 0.2)
+                                            ga: [-2, -1.5, -1, -0.5, -0.25, 0],       // Goals Against (default -1)
+                                          };
+                                          const opts = OPTIONS_BY_STAT[stat.id] || [0, 0.25, 0.5, 1, 2, 3];
+                                          const current = Number(stat.points);
+                                          // Include current value even if it's outside the suggested range
+                                          const all = opts.includes(current) ? opts : [...opts, current].sort((a, b) => a - b);
+                                          return all.map(v => (
+                                            <SelectItem key={v} value={String(v)} className="font-mono">
+                                              {v > 0 ? `+${v}` : String(v)}
                                             </SelectItem>
-                                          ))}
-                                        {/* Ensure current value is always in the list even if custom */}
-                                        {!['-2', '-1', '-0.5', '-0.25', '-0.1', '0', '0.1', '0.2', '0.25', '0.3', '0.4', '0.5', '0.75', '1', '1.5', '2', '2.5', '3', '4', '5', '6', '8', '10'].includes(String(stat.points)) && (
-                                          <SelectItem value={String(stat.points)} className="font-mono">{stat.points}</SelectItem>
-                                        )}
+                                          ));
+                                        })()}
                                       </SelectContent>
                                     </Select>
                                   </div>
