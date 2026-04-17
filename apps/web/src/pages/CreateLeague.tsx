@@ -30,6 +30,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@citrus/shared";
 import WaitlistSignup from "@/components/WaitlistSignup";
 import {
   type LeagueType,
@@ -397,8 +398,11 @@ const CreateLeague = () => {
         }
       }
 
+      // Playoff roster pools ALWAYS need scoring_settings (for ScoringCalculator).
+      // Force default fantasy scoring if user didn't explicitly customize.
+      const forceScoring = leagueType === 'playoff-roster-pool';
       // Build scoring_settings JSONB (for points-based formats)
-      const scoringSettings = showPointValues ? {
+      const scoringSettings = (showPointValues || forceScoring) ? {
         skater: {
           goals: leagueStats.find(s => s.id === 'g')?.points || 3,
           assists: leagueStats.find(s => s.id === 'a')?.points || 2,
@@ -461,7 +465,17 @@ const CreateLeague = () => {
         navigate(`/league/${league.id}?league=${league.id}`);
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create league";
+      // Extract message from ApiError, native Error, or generic object
+      let errorMessage = "Failed to create league";
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'object' && err !== null) {
+        const e = err as { message?: string; error?: string; details?: string };
+        errorMessage = e.message || e.error || e.details || JSON.stringify(err).slice(0, 200);
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+      logger.error('League creation failed:', { leagueType, err });
       setError(errorMessage);
       setLoading(false);
 
