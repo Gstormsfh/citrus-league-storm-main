@@ -632,77 +632,9 @@ export default function PoolPlayoffRosterEntry() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 pt-4">
-        {/* ─── TODAY'S GAMES ──────────────────────────────────────────── */}
-        {todayGamesWithPlayers.length > 0 && (
-          <Card className="mb-4 border-citrus-orange/30 bg-gradient-to-br from-citrus-orange/5 to-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-citrus-orange" />
-                Today&apos;s Games — {isViewMode ? `${viewOwnerName || 'Their'} Players` : 'Your Players'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {todayGamesWithPlayers.map(g => {
-                  const statusText = gameStatusLabel(g);
-                  const isLive = g.status === 'live';
-                  const isFinal = g.status === 'final';
-                  return (
-                    <div key={g.game_id} className={cn(
-                      'rounded-lg border p-3',
-                      isLive ? 'border-green-400 bg-green-50/30' : isFinal ? 'border-citrus-charcoal/20 bg-muted/20' : 'border-citrus-sage/30 bg-white'
-                    )}>
-                      {/* Game header */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1.5 text-sm font-display font-bold text-citrus-forest">
-                          <span>{g.away_team}</span>
-                          <span className="text-citrus-charcoal/40">@</span>
-                          <span>{g.home_team}</span>
-                        </div>
-                        {g.series_game_number && (
-                          <Badge variant="outline" className="text-[9px] border-citrus-sage/40">Game {g.series_game_number}</Badge>
-                        )}
-                      </div>
-                      {/* Score / time */}
-                      <div className={cn(
-                        'text-xs font-display mb-2 flex items-center gap-1.5',
-                        isLive ? 'text-green-700 font-bold' : isFinal ? 'text-citrus-charcoal/60' : 'text-citrus-charcoal/50'
-                      )}>
-                        <Clock className="h-3 w-3" />
-                        {(isLive || isFinal) ? (
-                          <span>{g.away_score} - {g.home_score} {statusText}</span>
-                        ) : (
-                          <span>{statusText}</span>
-                        )}
-                      </div>
-                      {/* My players in this game */}
-                      <div className="space-y-1">
-                        {g.myPlayers.map(p => (
-                          <div key={p.id} className="flex items-center justify-between text-[11px]">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <Badge variant="outline" className={cn(
-                                'text-[8px] px-1 py-0',
-                                normalizePos(p.position) === 'G' ? 'border-purple-300 text-purple-700' : normalizePos(p.position) === 'D' ? 'border-blue-300 text-blue-700' : 'border-citrus-sage text-citrus-forest'
-                              )}>{normalizePos(p.position)}</Badge>
-                              <span className="font-medium truncate">{p.full_name}</span>
-                              <span className="text-citrus-charcoal/40">{p.team}</span>
-                            </div>
-                            {(isLive || isFinal) && normalizePos(p.position) !== 'G' && (
-                              <span className="text-citrus-charcoal/60 flex-shrink-0 ml-1">{p.goals}G {p.assists}A</span>
-                            )}
-                            {(isLive || isFinal) && normalizePos(p.position) === 'G' && (
-                              <span className="text-citrus-charcoal/60 flex-shrink-0 ml-1">{p.saves ?? 0}SV</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Today's Games widget moved to PoolPlayoffHub ("Pool Home") so
+            users see their live lineup immediately on the hub. The roster
+            page stays focused on picking/editing. */}
 
         {/* ─── VIEW MODE: full-width playoff stats breakdown ─────────── */}
         {isViewMode && (() => {
