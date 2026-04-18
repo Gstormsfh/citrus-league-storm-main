@@ -228,8 +228,8 @@ export const StormyChatBubble = () => {
         className="fixed h-14 w-14 rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest hover:scale-105 hover:-translate-y-1 transition-all z-[100] p-0 overflow-hidden"
         style={{
           position: 'fixed',
-          bottom: isMobile ? 'calc(3.5rem + env(safe-area-inset-bottom) + 2rem)' : '1.5rem',
-          right: isMobile ? '1.5rem' : 'auto',
+          bottom: isMobile ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem)' : '1.5rem',
+          right: isMobile ? '1rem' : 'auto',
           left: isMobile ? 'auto' : '1.5rem',
           zIndex: 100,
         }}
@@ -249,8 +249,8 @@ export const StormyChatBubble = () => {
       className={`fixed w-[calc(100vw-3rem)] md:w-[380px] shadow-[0_8px_0_rgba(27,48,34,0.2)] border-4 border-citrus-forest rounded-[2rem] overflow-hidden flex flex-col transition-all duration-300 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture ${isMinimized ? 'h-[70px]' : 'h-[min(400px,60vh)]'}`}
       style={{
         position: 'fixed',
-        bottom: isMobile ? 'calc(4rem + env(safe-area-inset-bottom) + 2rem)' : '1.5rem',
-        right: isMobile ? '1.5rem' : 'auto',
+        bottom: isMobile ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem)' : '1.5rem',
+        right: isMobile ? '1rem' : 'auto',
         left: isMobile ? 'auto' : '1.5rem',
         zIndex: 100,
       }}
