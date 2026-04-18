@@ -63,7 +63,7 @@ jobs:
           sys.path.insert(0, 'data-pipeline')
           from data_pipeline.utils.supabase_rest import SupabaseRest
           db = SupabaseRest()
-          result = db.rpc('aggregate_player_playoff_stats', {'p_season': 2025})
+          result = db.rpc('aggregate_player_playoff_stats_live', {'p_season': 2025})
           print(f'Aggregated {result} player playoff stat rows')
           "
         continue-on-error: true
