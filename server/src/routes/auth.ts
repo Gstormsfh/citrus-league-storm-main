@@ -27,14 +27,33 @@ authRoutes.post('/signup', validateBody(signupSchema), async (c) => {
     });
 
     if (error) {
-      // Map common Supabase admin errors to user-friendly messages
       if (error.message?.includes('already been registered') || error.message?.includes('already exists')) {
         return fail(c, AppError.badRequest('This email already has an account. Please sign in instead.'));
       }
       return fail(c, AppError.badRequest(error.message || 'Signup failed'));
     }
 
-    return created(c, { user: { id: data.user.id, email: data.user.email } });
+    // Sign in server-side so the client gets session tokens without
+    // hitting Supabase's IP-level rate limiter on signInWithPassword.
+    // The admin client uses the service role key → no user-facing throttle.
+    const { data: signInData, error: signInError } = await admin.auth.signInWithPassword({
+      email: body.email,
+      password: body.password,
+    });
+
+    if (signInError || !signInData?.session) {
+      // User created but sign-in failed — still return success, client will sign in manually
+      return created(c, { user: { id: data.user.id, email: data.user.email } });
+    }
+
+    return created(c, {
+      user: { id: data.user.id, email: data.user.email },
+      session: {
+        access_token: signInData.session.access_token,
+        refresh_token: signInData.session.refresh_token,
+        expires_in: signInData.session.expires_in,
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Signup failed';
     return fail(c, AppError.badRequest(message));

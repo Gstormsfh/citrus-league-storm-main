@@ -144,8 +144,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string): Promise<AuthResponse> => {
-    // Use server-side signup to auto-confirm email so users can sign in immediately.
-    // Falls back to Supabase client signup if the server endpoint is unavailable.
+    // Server-side signup: creates user + signs in via admin API (bypasses
+    // Supabase's IP-level rate limiter that was blocking users).
     const apiBase = import.meta.env.VITE_API_URL || '';
     try {
       const res = await fetch(`${apiBase}/api/auth/signup`, {
@@ -158,7 +158,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const msg = json?.error?.message || 'Signup failed';
         return { data: { user: null, session: null }, error: new AuthError(msg) };
       }
-      // User created and auto-confirmed — sign in immediately
+      // Server returns session tokens — set them directly, no client-side signIn call
+      const serverSession = json?.data?.session;
+      if (serverSession?.access_token && serverSession?.refresh_token) {
+        const { data, error } = await supabase.auth.setSession({
+          access_token: serverSession.access_token,
+          refresh_token: serverSession.refresh_token,
+        });
+        return { data: { user: data.user, session: data.session }, error: error || null };
+      }
+      // Fallback: server created user but didn't return session — sign in client-side
       return await supabase.auth.signInWithPassword({ email, password });
     } catch {
       // Fallback: use Supabase client signup (requires email verification)
