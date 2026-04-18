@@ -1250,21 +1250,22 @@ const CreateLeague = () => {
                                     </SelectTrigger>
                                       <SelectContent>
                                         {(() => {
-                                          // Per-stat option sets — sensible ranges around each stat's default
+                                          // Per-stat option sets — every stat now includes 0 so
+                                          // commissioners can zero out any stat for simpler leagues.
                                           const OPTIONS_BY_STAT: Record<string, number[]> = {
-                                            g: [1, 2, 3, 4, 5, 6],                    // Goals (default 3)
-                                            a: [1, 1.5, 2, 2.5, 3, 4],                // Assists (default 2)
-                                            ppp: [0.5, 1, 1.5, 2, 3],                 // Power Play Points (default 1)
-                                            shg: [1, 1.5, 2, 2.5, 3, 4],              // Shorthanded Points (default 2)
-                                            sog: [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5], // Shots on Goal (default 0.4)
-                                            blk: [0.25, 0.5, 0.75, 1, 1.5],           // Blocks (default 0.5)
-                                            hit: [0.1, 0.15, 0.2, 0.25, 0.3, 0.5],    // Hits (default 0.2)
-                                            pim: [-1, -0.5, -0.25, 0.25, 0.5, 1],     // Penalty Minutes (default 0.5)
-                                            pm: [-1, -0.5, -0.25, 0.25, 0.5, 1, 1.5], // Plus/Minus (default 0.5)
-                                            w: [2, 3, 4, 5, 6, 8],                    // Wins (default 4)
-                                            so: [2, 3, 4, 5, 6, 8],                   // Shutouts (default 3)
-                                            sv: [0.1, 0.15, 0.2, 0.25, 0.3, 0.5],     // Saves (default 0.2)
-                                            ga: [-2, -1.5, -1, -0.5, -0.25, 0],       // Goals Against (default -1)
+                                            g: [0, 1, 2, 3, 4, 5, 6],                    // Goals (default 3)
+                                            a: [0, 1, 1.5, 2, 2.5, 3, 4],                // Assists (default 2)
+                                            ppp: [0, 0.5, 1, 1.5, 2, 3],                 // Power Play Points (default 1)
+                                            shg: [0, 1, 1.5, 2, 2.5, 3, 4],              // Shorthanded Points (default 2)
+                                            sog: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5], // Shots on Goal (default 0.4)
+                                            blk: [0, 0.25, 0.5, 0.75, 1, 1.5],           // Blocks (default 0.5)
+                                            hit: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5],    // Hits (default 0.2)
+                                            pim: [-1, -0.5, -0.25, 0, 0.25, 0.5, 1],     // Penalty Minutes (default 0.5)
+                                            pm: [-1, -0.5, -0.25, 0, 0.25, 0.5, 1, 1.5], // Plus/Minus (default 0.5)
+                                            w: [0, 2, 3, 4, 5, 6, 8],                    // Wins (default 4)
+                                            so: [0, 2, 3, 4, 5, 6, 8],                   // Shutouts (default 3)
+                                            sv: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5],     // Saves (default 0.2)
+                                            ga: [-2, -1.5, -1, -0.5, -0.25, 0],          // Goals Against (default -1)
                                           };
                                           const opts = OPTIONS_BY_STAT[stat.id] || [0, 0.25, 0.5, 1, 2, 3];
                                           const current = Number(stat.points);
@@ -1272,7 +1273,7 @@ const CreateLeague = () => {
                                           const all = opts.includes(current) ? opts : [...opts, current].sort((a, b) => a - b);
                                           return all.map(v => (
                                             <SelectItem key={v} value={String(v)} className="font-mono">
-                                              {v > 0 ? `+${v}` : String(v)}
+                                              {v === 0 ? '0' : v > 0 ? `+${v}` : String(v)}
                                             </SelectItem>
                                           ));
                                         })()}
