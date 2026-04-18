@@ -536,71 +536,137 @@ export default function PoolPlayoffHub() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         {gamesWithMyPlayers.map(g => {
                           const isLive = g.status === 'live';
                           const isFinal = g.status === 'final';
+                          const hasGameData = isLive || isFinal;
+                          const awayInfo = NHL_TEAMS.find(t => t.abbrev === g.away_team);
+                          const homeInfo = NHL_TEAMS.find(t => t.abbrev === g.home_team);
+
+                          // Time shown under scoreboard: live period, final marker, or start time
+                          const timeLabel = isLive
+                            ? `${g.period || ''}${g.period_time ? ` · ${g.period_time}` : ''}`.trim()
+                            : isFinal
+                            ? 'FINAL'
+                            : gameStatusLabel(g);
+
                           return (
                             <div key={g.game_id} className={cn(
-                              'relative rounded-lg border p-3',
-                              isLive ? 'border-red-400 bg-red-50/40 ring-1 ring-red-400/30' :
-                              isFinal ? 'border-citrus-charcoal/20 bg-muted/20' :
-                              'border-citrus-sage/30 bg-white'
+                              'relative rounded-xl border-2 overflow-hidden bg-white transition-all',
+                              isLive && 'border-red-400 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]',
+                              isFinal && 'border-citrus-sage/30',
+                              !isLive && !isFinal && 'border-citrus-sage/20'
                             )}>
-                              {isLive && (
-                                <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-varsity font-black uppercase px-2 py-0.5 rounded-full shadow-md">
-                                  <span className="relative flex h-1.5 w-1.5">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
-                                  </span>
-                                  LIVE
-                                </div>
-                              )}
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-1.5 text-sm font-display font-bold text-citrus-forest">
-                                  <span>{g.away_team}</span>
-                                  <span className="text-citrus-charcoal/40">@</span>
-                                  <span>{g.home_team}</span>
-                                </div>
-                                {g.series_game_number && (
-                                  <Badge variant="outline" className="text-[9px] border-citrus-sage/40">Game {g.series_game_number}</Badge>
-                                )}
-                              </div>
-                              <div className={cn(
-                                'text-xs font-display mb-2 flex items-center gap-1.5',
-                                isLive ? 'text-red-700 font-bold' : isFinal ? 'text-citrus-charcoal/60' : 'text-citrus-charcoal/50'
-                              )}>
-                                <Clock className="h-3 w-3" />
-                                {(isLive || isFinal) ? (
-                                  <span>{g.away_score} - {g.home_score} · {gameStatusLabel(g)}</span>
-                                ) : (
-                                  <span>{gameStatusLabel(g)}</span>
-                                )}
-                              </div>
-                              <div className="space-y-1">
-                                {g.myPlayers.map(p => (
-                                  <div key={p.player_id} className="flex items-center justify-between text-[11px]">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                      <Badge variant="outline" className={cn(
-                                        'text-[8px] px-1 py-0',
-                                        p.is_goalie ? 'border-purple-300 text-purple-700' : p.position === 'D' ? 'border-blue-300 text-blue-700' : 'border-citrus-sage text-citrus-forest'
-                                      )}>{p.position}</Badge>
-                                      <span className="font-medium truncate">{p.full_name}</span>
-                                    </div>
-                                    <span className="text-citrus-charcoal/70 flex-shrink-0 ml-1 tabular-nums">
-                                      {p.is_goalie
-                                        ? `${p.saves}SV ${p.fpts.toFixed(1)}pts`
-                                        : `${p.goals}G ${p.assists}A ${p.fpts.toFixed(1)}pts`}
-                                    </span>
+                              {/* Team-colored header with score */}
+                              <div className="relative">
+                                <div className="grid grid-cols-[1fr_auto_1fr] items-stretch">
+                                  <div
+                                    className="flex items-center justify-center py-3 px-2 text-white font-varsity font-black text-xl tracking-tight"
+                                    style={{ background: awayInfo?.primaryColor || '#7A9B7A' }}
+                                  >
+                                    {g.away_team}
                                   </div>
-                                ))}
+                                  <div className="flex flex-col items-center justify-center py-2 px-3 bg-citrus-forest text-white min-w-[96px]">
+                                    {hasGameData ? (
+                                      <div className="flex items-center gap-1 font-mono font-black text-xl tabular-nums">
+                                        <span>{g.away_score}</span>
+                                        <span className="text-white/50 text-base">–</span>
+                                        <span>{g.home_score}</span>
+                                      </div>
+                                    ) : (
+                                      <div className="font-display font-bold text-xs uppercase tracking-wider">VS</div>
+                                    )}
+                                    <div className={cn(
+                                      'text-[10px] font-display uppercase tracking-wider mt-0.5',
+                                      isLive ? 'text-red-300' : 'text-white/70'
+                                    )}>
+                                      {isLive && (
+                                        <span className="inline-flex items-center gap-1">
+                                          <span className="relative flex h-1.5 w-1.5">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-400" />
+                                          </span>
+                                          LIVE
+                                        </span>
+                                      )}
+                                      {!isLive && timeLabel}
+                                    </div>
+                                  </div>
+                                  <div
+                                    className="flex items-center justify-center py-3 px-2 text-white font-varsity font-black text-xl tracking-tight"
+                                    style={{ background: homeInfo?.primaryColor || '#7A9B7A' }}
+                                  >
+                                    {g.home_team}
+                                  </div>
+                                </div>
+                                {/* Live period/clock strip — only during live play */}
+                                {isLive && (
+                                  <div className="bg-red-50 border-t border-red-200 px-3 py-1 text-center text-[11px] font-display font-bold text-red-700 tabular-nums">
+                                    {timeLabel}
+                                  </div>
+                                )}
+                                {/* Series game + tip strip for scheduled/final */}
+                                {!isLive && (g.series_game_number || isFinal) && (
+                                  <div className="bg-citrus-sage/10 border-t border-citrus-sage/20 px-3 py-1 text-center text-[10px] font-display uppercase tracking-wider text-citrus-charcoal/70">
+                                    {g.series_game_number ? `Game ${g.series_game_number}` : ''}
+                                    {g.series_game_number && isFinal ? ' · ' : ''}
+                                    {isFinal ? 'Final' : ''}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Your players in this game */}
+                              <div className="p-3 space-y-1.5">
+                                <div className="flex items-center justify-between mb-1 pb-1 border-b border-citrus-sage/10">
+                                  <span className="text-[10px] uppercase font-display font-bold text-citrus-charcoal/50 tracking-wider">
+                                    Your Players ({g.myPlayers.length})
+                                  </span>
+                                  {hasGameData && (
+                                    <span className="text-[10px] uppercase font-display font-bold text-citrus-forest tabular-nums">
+                                      {g.myPlayers.reduce((sum, p) => sum + p.fpts, 0).toFixed(1)} FPTS
+                                    </span>
+                                  )}
+                                </div>
+                                {g.myPlayers.map(p => {
+                                  const posColor = p.is_goalie
+                                    ? 'bg-purple-100 text-purple-800 border-purple-200'
+                                    : p.position === 'D'
+                                    ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                    : 'bg-citrus-sage/20 text-citrus-forest border-citrus-sage/40';
+                                  return (
+                                    <div key={p.player_id} className="flex items-center justify-between gap-2 text-xs">
+                                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <span className={cn(
+                                          'text-[9px] font-display font-black uppercase px-1.5 py-0.5 rounded border tabular-nums w-7 text-center flex-shrink-0',
+                                          posColor
+                                        )}>{p.position}</span>
+                                        <span className="font-medium truncate">{p.full_name}</span>
+                                      </div>
+                                      {hasGameData ? (
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                          <span className="text-[10px] text-citrus-charcoal/60 tabular-nums font-mono">
+                                            {p.is_goalie
+                                              ? `${p.saves}SV`
+                                              : `${p.goals}G ${p.assists}A`}
+                                          </span>
+                                          <span className="text-sm font-bold text-citrus-forest tabular-nums w-10 text-right">
+                                            {p.fpts.toFixed(1)}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-[10px] text-citrus-charcoal/40 italic flex-shrink-0">Not started</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           );
                         })}
                         {gamesWithMyPlayers.length === 0 && rosterCtx.length > 0 && (
-                          <div className="col-span-full text-center text-sm text-citrus-charcoal/50 italic py-4">
-                            None of your rostered players have games scheduled today.
+                          <div className="col-span-full text-center text-sm text-citrus-charcoal/50 italic py-6 border border-dashed border-citrus-sage/30 rounded-lg">
+                            None of your rostered players have games today. Check back tomorrow!
                           </div>
                         )}
                       </div>
