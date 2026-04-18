@@ -580,14 +580,29 @@ export default function PoolPlayoffRosterEntry() {
                             <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest">Pos</th>
                             <th onClick={() => toggleSort('team')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>Team{ind('team')}</th>
                             <th onClick={() => toggleSort('gp')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>GP{ind('gp')}</th>
-                            <th onClick={() => toggleSort('g_w')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)} title="Goals (skater) / Wins (goalie)">G/W{ind('g_w')}</th>
-                            <th onClick={() => toggleSort('a_sv')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)} title="Assists / Saves">A/SV{ind('a_sv')}</th>
-                            <th onClick={() => toggleSort('pts_so')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)} title="Points / Shutouts">PTS/SO{ind('pts_so')}</th>
-                            <th onClick={() => toggleSort('sog_ga')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)} title="Shots / Goals Against">SOG/GA{ind('sog_ga')}</th>
-                            <th onClick={() => toggleSort('hit')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)}>HIT{ind('hit')}</th>
-                            <th onClick={() => toggleSort('blk')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)}>BLK{ind('blk')}</th>
-                            <th onClick={() => toggleSort('pm_svpct')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden md:table-cell', cn_sort)} title="+/- (skater) / SV% (goalie)">+/-/SV%{ind('pm_svpct')}</th>
-                            <th onClick={() => toggleSort('xg_gaa')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-purple-700 hidden md:table-cell', cn_sort)} title="xGoals / GAA">xG/GAA{ind('xg_gaa')}</th>
+                            {posFilter === 'G' ? (
+                              /* Goalie-specific columns */
+                              <>
+                                <th onClick={() => toggleSort('g_w')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>W{ind('g_w')}</th>
+                                <th onClick={() => toggleSort('a_sv')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>SV{ind('a_sv')}</th>
+                                <th onClick={() => toggleSort('pts_so')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>SO{ind('pts_so')}</th>
+                                <th onClick={() => toggleSort('sog_ga')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)}>GA{ind('sog_ga')}</th>
+                                <th onClick={() => toggleSort('pm_svpct')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden md:table-cell', cn_sort)}>SV%{ind('pm_svpct')}</th>
+                                <th onClick={() => toggleSort('xg_gaa')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-purple-700 hidden md:table-cell', cn_sort)}>GAA{ind('xg_gaa')}</th>
+                              </>
+                            ) : (
+                              /* Skater columns — default for All / Forwards / Defense */
+                              <>
+                                <th onClick={() => toggleSort('g_w')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>G{ind('g_w')}</th>
+                                <th onClick={() => toggleSort('a_sv')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>A{ind('a_sv')}</th>
+                                <th onClick={() => toggleSort('pts_so')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>PTS{ind('pts_so')}</th>
+                                <th onClick={() => toggleSort('sog_ga')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)}>SOG{ind('sog_ga')}</th>
+                                <th onClick={() => toggleSort('hit')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)}>HIT{ind('hit')}</th>
+                                <th onClick={() => toggleSort('blk')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)}>BLK{ind('blk')}</th>
+                                <th onClick={() => toggleSort('pm_svpct')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden md:table-cell', cn_sort)}>+/-{ind('pm_svpct')}</th>
+                                <th onClick={() => toggleSort('xg_gaa')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-purple-700 hidden md:table-cell', cn_sort)}>xG{ind('xg_gaa')}</th>
+                              </>
+                            )}
                           </>
                         );
                       })()}
@@ -679,7 +694,10 @@ export default function PoolPlayoffRosterEntry() {
                               <td className="px-2 py-1.5 text-center text-xs">{player.saves || 0}</td>
                               <td className="px-2 py-1.5 text-center text-xs font-bold">{player.shutouts || 0}</td>
                               <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.goals_against || 0}</td>
-                              <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell" colSpan={2}>—</td>
+                              {/* HIT+BLK placeholders only when headers are showing (skater/all filter) */}
+                              {posFilter !== 'G' && (
+                                <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell text-citrus-charcoal/30" colSpan={2}>—</td>
+                              )}
                               <td className="px-2 py-1.5 text-center text-xs hidden md:table-cell">
                                 {(() => {
                                   // Prefer API value (string or number), fall back to computing from saves/shots_faced
