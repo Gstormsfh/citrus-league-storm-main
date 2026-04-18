@@ -440,16 +440,21 @@ export default function PoolPlayoffRosterEntry() {
             </div>
 
             {/* Top sticky horizontal scrollbar (mirrors the table scroll position)
-                so users can slide left/right without scrolling down first. */}
+                so users can slide left/right without scrolling to the bottom. */}
             <div
-              className="overflow-x-auto scrollbar-styled mb-1 bg-fantasy-light/30 rounded"
+              className="overflow-x-scroll scrollbar-styled mb-1 bg-fantasy-light/40 rounded border border-fantasy-border/40"
+              style={{ height: '14px' }}
               onScroll={(e) => {
                 const container = e.currentTarget;
                 const table = container.parentElement?.querySelector<HTMLDivElement>('[data-roster-table]');
-                if (table) table.scrollLeft = container.scrollLeft;
+                if (table && table.scrollLeft !== container.scrollLeft) table.scrollLeft = container.scrollLeft;
               }}
             >
-              <div id="roster-scroll-helper-inner" style={{ width: '900px', height: '1px' }} />
+              <div id="roster-scroll-helper-inner" style={{ width: '1100px', height: '1px' }} />
+            </div>
+            {/* Hint text so users know they can scroll */}
+            <div className="text-[10px] text-citrus-charcoal/50 mb-2 text-center italic">
+              Tip: scroll ↔ to see more stats (xG, TOI, +/-, etc.)
             </div>
 
             {/* Player table — single scroll container that scrolls BOTH axes.
@@ -468,7 +473,7 @@ export default function PoolPlayoffRosterEntry() {
                   if (helper && helper.parentElement) helper.parentElement.scrollLeft = t.scrollLeft;
                 }}
               >
-                <table className="w-full text-sm border-collapse" style={{ minWidth: '900px' }}>
+                <table className="w-full text-sm border-collapse" style={{ minWidth: '1100px' }}>
                   <thead className="bg-fantasy-light sticky top-0 z-10 border-b border-fantasy-border">
                     <tr>
                       <th className="px-2 py-2 text-left text-xs font-display font-bold text-citrus-forest w-8">#</th>
