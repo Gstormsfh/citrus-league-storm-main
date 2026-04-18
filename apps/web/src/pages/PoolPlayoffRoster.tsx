@@ -116,6 +116,9 @@ export default function PoolPlayoffRosterEntry() {
   const [sortBy, setSortBy] = useState<string>('fpts');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [statsModalPlayer, setStatsModalPlayer] = useState<PoolPlayer | null>(null);
+  // Selected player for the "click to preview, then confirm" flow.
+  // Matches draft room UX — click row → preview card at top → Add/Remove button confirms.
+  const [selectedPlayer, setSelectedPlayer] = useState<PoolPlayer | null>(null);
 
   // Shorten full name for mobile: "Connor McDavid" -> "C. McDavid"
   const shortName = (full: string): string => {
@@ -451,6 +454,81 @@ export default function PoolPlayoffRosterEntry() {
               })}
             </div>
 
+            {/* Selected player preview card — appears when user clicks a row. */}
+            {selectedPlayer && (() => {
+              const onRoster = rosterIds.has(selectedPlayer.id);
+              const addable = canAdd(selectedPlayer);
+              const norm = normalizePos(selectedPlayer.position);
+              const fpts = calcFpts(selectedPlayer);
+              return (
+                <Card className="mb-3 border-2 border-citrus-orange/40 bg-gradient-to-r from-citrus-orange/5 to-citrus-sage/5 shadow-md">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Badge variant="outline" className={cn(
+                          'text-[11px] px-2',
+                          norm === 'G' ? 'border-purple-300 text-purple-700' : norm === 'D' ? 'border-blue-300 text-blue-700' : 'border-citrus-sage text-citrus-forest'
+                        )}>{norm}</Badge>
+                        <div className="min-w-0">
+                          <div className="font-display font-bold text-base text-citrus-forest truncate">{selectedPlayer.full_name}</div>
+                          <div className="text-[11px] text-citrus-charcoal/60">
+                            {selectedPlayer.team} · GP {selectedPlayer.games_played}
+                            {norm === 'G'
+                              ? ` · ${selectedPlayer.wins || 0}W · ${(() => {
+                                  const sp = Number(selectedPlayer.save_pct ?? 0);
+                                  return sp > 0 ? `${(sp < 1 ? sp * 100 : sp).toFixed(1)}% SV` : '';
+                                })()}`
+                              : ` · ${selectedPlayer.goals}G ${selectedPlayer.assists}A ${selectedPlayer.points}PTS`}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <div className="text-[10px] uppercase font-display text-citrus-charcoal/50">FPTS</div>
+                          <div className="font-varsity text-lg text-green-700 font-black">{fpts.toFixed(1)}</div>
+                        </div>
+                        <button
+                          onClick={() => setStatsModalPlayer(selectedPlayer)}
+                          className="px-3 py-2 rounded bg-white border border-citrus-sage/40 text-citrus-forest text-xs font-bold hover:bg-citrus-sage/10 transition-colors"
+                        >
+                          Details
+                        </button>
+                        {onRoster ? (
+                          <button
+                            onClick={() => { removePlayer(selectedPlayer.id); setSelectedPlayer(null); }}
+                            className="px-4 py-2 rounded bg-red-500 hover:bg-red-600 text-white text-xs font-display font-bold transition-colors"
+                          >
+                            Remove from Roster
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => { if (addable) { addPlayer(selectedPlayer); setSelectedPlayer(null); } }}
+                            disabled={!addable}
+                            className={cn(
+                              'px-4 py-2 rounded text-xs font-display font-bold transition-colors',
+                              addable
+                                ? 'bg-citrus-orange hover:bg-citrus-orange/90 text-white'
+                                : 'bg-muted text-citrus-charcoal/50 cursor-not-allowed'
+                            )}
+                            title={addable ? 'Add to roster' : 'Position full or team cap reached'}
+                          >
+                            {addable ? 'Add to Roster' : 'Cannot Add'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setSelectedPlayer(null)}
+                          className="p-2 rounded text-citrus-charcoal/50 hover:text-citrus-charcoal hover:bg-muted/30"
+                          title="Close preview"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
+
             {/* Top sticky horizontal scrollbar (mirrors the table scroll position)
                 so users can slide left/right without scrolling to the bottom. */}
             <div
@@ -489,6 +567,7 @@ export default function PoolPlayoffRosterEntry() {
                   <thead className="bg-fantasy-light sticky top-0 z-10 border-b border-fantasy-border">
                     <tr>
                       <th className="px-2 py-2 text-left text-xs font-display font-bold text-citrus-forest w-8">#</th>
+                      <th className="px-2 py-2 text-left text-xs font-display font-bold text-citrus-forest w-20">Action</th>
                       {(() => {
                         const ind = (col: string) => sortBy === col ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '';
                         const cn_sort = 'cursor-pointer select-none hover:text-citrus-orange transition-colors';
@@ -511,7 +590,6 @@ export default function PoolPlayoffRosterEntry() {
                       })()}
                       <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden lg:table-cell" title="Avg time on ice per game (min:sec)">TOI</th>
                       <th className="px-2 py-2 text-center text-xs font-bold text-green-700 bg-green-50/50">FPTS</th>
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest w-14"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -526,17 +604,40 @@ export default function PoolPlayoffRosterEntry() {
                           key={player.id}
                           className={cn(
                             'border-b border-fantasy-border/30 transition-colors cursor-pointer',
-                            onRoster
-                              ? 'bg-citrus-sage/10 border-l-2 border-l-citrus-sage'
-                              : 'hover:bg-fantasy-light/30',
-                            !addable && !onRoster && 'opacity-40'
+                            selectedPlayer?.id === player.id && 'bg-citrus-orange/10 ring-1 ring-citrus-orange/30',
+                            onRoster && selectedPlayer?.id !== player.id && 'bg-citrus-sage/10 border-l-2 border-l-citrus-sage',
+                            !onRoster && selectedPlayer?.id !== player.id && 'hover:bg-fantasy-light/30',
+                            !addable && !onRoster && selectedPlayer?.id !== player.id && 'opacity-50'
                           )}
-                          onClick={() => {
-                            if (onRoster) { removePlayer(player.id); }
-                            else if (addable) { addPlayer(player); }
-                          }}
+                          onClick={() => setSelectedPlayer(player)}
                         >
                           <td className="px-2 py-1.5 text-xs font-mono text-citrus-forest/60">{idx + 1}</td>
+                          {/* Add / Remove button on the LEFT (discoverable) */}
+                          <td className="px-2 py-1.5">
+                            {onRoster ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); removePlayer(player.id); }}
+                                className="px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 transition-colors text-[11px] font-bold border border-red-200"
+                                title="Remove from roster"
+                              >
+                                Remove
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); if (addable) addPlayer(player); }}
+                                disabled={!addable}
+                                className={cn(
+                                  'px-2 py-1 rounded transition-colors text-[11px] font-bold border',
+                                  addable
+                                    ? 'bg-citrus-sage/10 hover:bg-citrus-sage/20 text-citrus-forest border-citrus-sage/40'
+                                    : 'bg-muted/30 text-citrus-charcoal/40 border-muted cursor-not-allowed'
+                                )}
+                                title={addable ? 'Add to roster' : 'Cannot add (position full or team cap)'}
+                              >
+                                Add
+                              </button>
+                            )}
+                          </td>
                           <td className="px-2 py-1.5">
                             <div className="flex items-center gap-1.5">
                               {onRoster && <Check className="h-3.5 w-3.5 text-citrus-sage flex-shrink-0" />}
@@ -628,25 +729,6 @@ export default function PoolPlayoffRosterEntry() {
                             </>
                           )}
                           <td className="px-2 py-1.5 text-center text-xs font-bold text-green-700 bg-green-50/20">{fpts.toFixed(1)}</td>
-                          <td className="px-2 py-1.5 text-center">
-                            {onRoster ? (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); removePlayer(player.id); }}
-                                className="px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 transition-colors text-[11px] font-bold"
-                                title="Remove from roster"
-                              >
-                                Remove
-                              </button>
-                            ) : addable ? (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); addPlayer(player); }}
-                                className="p-1 rounded hover:bg-citrus-sage/20 text-citrus-sage hover:text-citrus-forest transition-colors"
-                                title="Add to roster"
-                              >
-                                <Star className="h-4 w-4" />
-                              </button>
-                            ) : null}
-                          </td>
                         </tr>
                       );
                     })}
