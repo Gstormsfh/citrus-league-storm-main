@@ -534,11 +534,25 @@ const CreateLeague = () => {
       return;
     }
 
-    const effectiveCode = (codeOverride ?? joinCode).trim();
-    if (!effectiveCode) {
+    // Defensive code resolution: explicit arg → local state → URL query →
+    // browser location (triple fallback). Fixes the 'Join code is required'
+    // error that fired when the Input was controlled but state hadn't
+    // committed yet, or when the URL had ?code= but a re-render cleared
+    // joinCode state. ALL three sources are checked before giving up.
+    let resolvedCode = (codeOverride ?? '').trim();
+    if (!resolvedCode) resolvedCode = (joinCode ?? '').trim();
+    if (!resolvedCode) resolvedCode = (searchParams.get('code') ?? '').trim();
+    if (!resolvedCode && typeof window !== 'undefined') {
+      try {
+        resolvedCode = (new URLSearchParams(window.location.search).get('code') ?? '').trim();
+      } catch { /* fall through */ }
+    }
+
+    if (!resolvedCode) {
       setError("Join code is required");
       return;
     }
+    const effectiveCode = resolvedCode;
 
     setLoading(true);
     setError(null);

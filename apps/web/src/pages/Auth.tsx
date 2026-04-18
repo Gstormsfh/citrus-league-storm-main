@@ -41,6 +41,24 @@ const Auth = () => {
     };
   }, []);
 
+  // CRITICAL: stash ?redirect= in sessionStorage on every Auth-page mount.
+  // This preserves the destination across EVERY sign-in method, including:
+  //   - Email/password (reads from window.location.search — already works)
+  //   - OAuth (Google strips query params on callback)
+  //   - Email signup that requires verification (user leaves /auth entirely,
+  //     comes back via /auth/callback with no query params)
+  // Without this stash, invite-link users who sign up (vs. sign in) land
+  // on the homepage after verifying their email — infuriating UX.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect');
+      if (redirect && redirect.startsWith('/')) {
+        sessionStorage.setItem('citrus:postAuthRedirect', redirect);
+      }
+    } catch { /* storage disabled — defaults still work for signin path */ }
+  }, []);
+
   // Reactive redirect: once AuthContext commits user state, navigate away.
   // Honors ?redirect=<path> so share-link flows survive the auth round trip.
   useEffect(() => {
@@ -277,17 +295,8 @@ const Auth = () => {
     setOauthLoading(provider);
     setError(null);
 
-    // CRITICAL: stash the redirect param in sessionStorage BEFORE the OAuth
-    // handoff. Google redirects back to /auth/callback, which wipes any
-    // query params we had on /auth. Without this stash, invite links
-    // deposit users on the homepage instead of the join flow.
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const redirect = params.get('redirect');
-      if (redirect && redirect.startsWith('/')) {
-        sessionStorage.setItem('citrus:postAuthRedirect', redirect);
-      }
-    } catch { /* storage may be disabled — fall through */ }
+    // Redirect is already stashed in sessionStorage on Auth-page mount.
+    // AuthCallback reads it back after the OAuth round-trip.
 
     try {
       const { error } = await signInWithOAuth(provider);
