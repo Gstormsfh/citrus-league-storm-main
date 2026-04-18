@@ -529,10 +529,10 @@ export default function PoolPlayoffRosterEntry() {
               );
             })()}
 
-            {/* Top sticky horizontal scrollbar (mirrors the table scroll position)
-                so users can slide left/right without scrolling to the bottom. */}
+            {/* Top sticky horizontal scrollbar (desktop only — mobile doesn't
+                need it since the table fits the viewport). */}
             <div
-              className="overflow-x-scroll scrollbar-styled mb-1 bg-fantasy-light/40 rounded border border-fantasy-border/40"
+              className="hidden md:block overflow-x-scroll scrollbar-styled mb-1 bg-fantasy-light/40 rounded border border-fantasy-border/40"
               style={{ height: '14px' }}
               onScroll={(e) => {
                 const container = e.currentTarget;
@@ -543,7 +543,7 @@ export default function PoolPlayoffRosterEntry() {
               <div id="roster-scroll-helper-inner" style={{ width: '1100px', height: '1px' }} />
             </div>
             {/* Hint text so users know they can scroll */}
-            <div className="text-[10px] text-citrus-charcoal/50 mb-2 text-center italic">
+            <div className="hidden md:block text-[10px] text-citrus-charcoal/50 mb-2 text-center italic">
               Tip: scroll ↔ to see more stats (xG, TOI, +/-, etc.)
             </div>
 
@@ -563,7 +563,10 @@ export default function PoolPlayoffRosterEntry() {
                   if (helper && helper.parentElement) helper.parentElement.scrollLeft = t.scrollLeft;
                 }}
               >
-                <table className="w-full text-sm border-collapse" style={{ minWidth: '1100px' }}>
+                {/* min-width only kicks in at md+ where all columns are visible.
+                    On mobile, table naturally shrinks to fit the few visible columns
+                    (no dead horizontal space after the player name). */}
+                <table className="w-full text-sm border-collapse md:min-w-[1100px]">
                   <thead className="bg-fantasy-light sticky top-0 z-10 border-b border-fantasy-border">
                     <tr>
                       <th className="px-2 py-2 text-left text-xs font-display font-bold text-citrus-forest w-8">#</th>
@@ -903,31 +906,52 @@ export default function PoolPlayoffRosterEntry() {
         </div>
       </div>
     </div>
-    {/* Player detail modal — opens when clicking any player name */}
+    {/* Player detail modal — HockeyPlayer shape with nested stats object */}
     <PlayerStatsModal
-      player={statsModalPlayer ? {
-        id: statsModalPlayer.id,
-        full_name: statsModalPlayer.full_name,
-        position: statsModalPlayer.position,
-        team: statsModalPlayer.team,
-        games_played: statsModalPlayer.games_played,
-        goals: statsModalPlayer.goals,
-        assists: statsModalPlayer.assists,
-        points: statsModalPlayer.points,
-        shots: statsModalPlayer.shots,
-        hits: statsModalPlayer.hits,
-        blocks: statsModalPlayer.blocks,
-        pim: statsModalPlayer.pim,
-        ppp: statsModalPlayer.ppp,
-        shp: statsModalPlayer.shp,
-        plus_minus: statsModalPlayer.plus_minus ?? 0,
-        xGoals: statsModalPlayer.xGoals ?? statsModalPlayer.x_goals ?? 0,
-        icetime_seconds: statsModalPlayer.icetime_seconds ?? 0,
-        wins: statsModalPlayer.wins,
-        saves: statsModalPlayer.saves,
-        shutouts: statsModalPlayer.shutouts,
-        goals_against: statsModalPlayer.goals_against,
-      } as unknown as Parameters<typeof PlayerStatsModal>[0]['player'] : null}
+      player={statsModalPlayer ? (() => {
+        const p = statsModalPlayer;
+        const isGoalie = normalizePos(p.position) === 'G';
+        const toiPerGame = p.icetime_seconds && p.games_played
+          ? Math.round(p.icetime_seconds / p.games_played)
+          : 0;
+        const toiStr = toiPerGame > 0
+          ? `${Math.floor(toiPerGame / 60)}:${String(toiPerGame % 60).padStart(2, '0')}`
+          : undefined;
+        const savePctNum = Number(p.save_pct ?? p.save_percentage ?? 0);
+        const gaaNum = Number(p.gaa ?? p.goals_against_average ?? 0);
+        return {
+          id: p.id,
+          name: p.full_name,
+          position: p.position,
+          number: 0,
+          starter: false,
+          team: p.team,
+          teamAbbreviation: p.team,
+          stats: isGoalie ? {
+            gamesPlayed: p.games_played,
+            wins: p.wins ?? 0,
+            saves: p.saves ?? 0,
+            shutouts: p.shutouts ?? 0,
+            goalsAgainst: p.goals_against ?? 0,
+            savePct: savePctNum > 0 ? (savePctNum < 1 ? savePctNum : savePctNum / 100) : undefined,
+            gaa: gaaNum > 0 ? gaaNum : undefined,
+          } : {
+            gamesPlayed: p.games_played,
+            goals: p.goals,
+            assists: p.assists,
+            points: p.points,
+            plusMinus: p.plus_minus ?? 0,
+            shots: p.shots,
+            blockedShots: p.blocks,
+            hits: p.hits,
+            powerPlayPoints: p.ppp,
+            shortHandedPoints: p.shp,
+            pim: p.pim,
+            toi: toiStr,
+            xGoals: Number(p.xGoals ?? p.x_goals ?? 0),
+          },
+        } as unknown as Parameters<typeof PlayerStatsModal>[0]['player'];
+      })() : null}
       isOpen={!!statsModalPlayer}
       onClose={() => setStatsModalPlayer(null)}
     />
