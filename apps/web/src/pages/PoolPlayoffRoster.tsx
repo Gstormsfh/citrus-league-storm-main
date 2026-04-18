@@ -461,68 +461,71 @@ export default function PoolPlayoffRosterEntry() {
               const norm = normalizePos(selectedPlayer.position);
               const fpts = calcFpts(selectedPlayer);
               return (
-                <Card className="mb-3 border-2 border-citrus-orange/40 bg-gradient-to-r from-citrus-orange/5 to-citrus-sage/5 shadow-md">
+                <Card className="mb-3 border-2 border-citrus-orange/40 bg-gradient-to-r from-citrus-orange/5 to-citrus-sage/5 shadow-md relative">
                   <CardContent className="p-3">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <Badge variant="outline" className={cn(
-                          'text-[11px] px-2',
-                          norm === 'G' ? 'border-purple-300 text-purple-700' : norm === 'D' ? 'border-blue-300 text-blue-700' : 'border-citrus-sage text-citrus-forest'
-                        )}>{norm}</Badge>
-                        <div className="min-w-0">
-                          <div className="font-display font-bold text-base text-citrus-forest truncate">{selectedPlayer.full_name}</div>
-                          <div className="text-[11px] text-citrus-charcoal/60">
-                            {selectedPlayer.team} · GP {selectedPlayer.games_played}
-                            {norm === 'G'
-                              ? ` · ${selectedPlayer.wins || 0}W · ${(() => {
-                                  const sp = Number(selectedPlayer.save_pct ?? 0);
-                                  return sp > 0 ? `${(sp < 1 ? sp * 100 : sp).toFixed(1)}% SV` : '';
-                                })()}`
-                              : ` · ${selectedPlayer.goals}G ${selectedPlayer.assists}A ${selectedPlayer.points}PTS`}
-                          </div>
+                    {/* Close X — absolute corner so it never fights for space */}
+                    <button
+                      onClick={() => setSelectedPlayer(null)}
+                      className="absolute top-1.5 right-1.5 p-1 rounded text-citrus-charcoal/40 hover:text-citrus-charcoal hover:bg-muted/30"
+                      title="Close preview"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+
+                    {/* Row 1: Pos + Name + Meta */}
+                    <div className="flex items-center gap-2 pr-6 mb-2">
+                      <Badge variant="outline" className={cn(
+                        'text-[11px] px-2 flex-shrink-0',
+                        norm === 'G' ? 'border-purple-300 text-purple-700' : norm === 'D' ? 'border-blue-300 text-blue-700' : 'border-citrus-sage text-citrus-forest'
+                      )}>{norm}</Badge>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-display font-bold text-base text-citrus-forest truncate">{selectedPlayer.full_name}</div>
+                        <div className="text-[11px] text-citrus-charcoal/60 truncate">
+                          {selectedPlayer.team} · GP {selectedPlayer.games_played}
+                          {norm === 'G'
+                            ? ` · ${selectedPlayer.wins || 0}W${(() => {
+                                const sp = Number(selectedPlayer.save_pct ?? 0);
+                                return sp > 0 ? ` · ${(sp < 1 ? sp * 100 : sp).toFixed(1)}% SV` : '';
+                              })()}`
+                            : ` · ${selectedPlayer.goals}G ${selectedPlayer.assists}A ${selectedPlayer.points}PTS`}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-right">
-                          <div className="text-[10px] uppercase font-display text-citrus-charcoal/50">FPTS</div>
-                          <div className="font-varsity text-lg text-green-700 font-black">{fpts.toFixed(1)}</div>
-                        </div>
-                        <button
-                          onClick={() => setStatsModalPlayer(selectedPlayer)}
-                          className="px-3 py-2 rounded bg-white border border-citrus-sage/40 text-citrus-forest text-xs font-bold hover:bg-citrus-sage/10 transition-colors"
-                        >
-                          Details
-                        </button>
-                        {onRoster ? (
-                          <button
-                            onClick={() => { removePlayer(selectedPlayer.id); setSelectedPlayer(null); }}
-                            className="px-4 py-2 rounded bg-red-500 hover:bg-red-600 text-white text-xs font-display font-bold transition-colors"
-                          >
-                            Remove from Roster
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => { if (addable) { addPlayer(selectedPlayer); setSelectedPlayer(null); } }}
-                            disabled={!addable}
-                            className={cn(
-                              'px-4 py-2 rounded text-xs font-display font-bold transition-colors',
-                              addable
-                                ? 'bg-citrus-orange hover:bg-citrus-orange/90 text-white'
-                                : 'bg-muted text-citrus-charcoal/50 cursor-not-allowed'
-                            )}
-                            title={addable ? 'Add to roster' : 'Position full or team cap reached'}
-                          >
-                            {addable ? 'Add to Roster' : 'Cannot Add'}
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setSelectedPlayer(null)}
-                          className="p-2 rounded text-citrus-charcoal/50 hover:text-citrus-charcoal hover:bg-muted/30"
-                          title="Close preview"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-[9px] uppercase font-display text-citrus-charcoal/50 leading-none">FPTS</div>
+                        <div className="font-varsity text-lg text-green-700 font-black leading-tight">{fpts.toFixed(1)}</div>
                       </div>
+                    </div>
+
+                    {/* Row 2: Action buttons — full width, easy to tap on mobile */}
+                    <div className="flex items-stretch gap-2">
+                      <button
+                        onClick={() => setStatsModalPlayer(selectedPlayer)}
+                        className="flex-1 sm:flex-initial px-3 py-2 rounded bg-white border border-citrus-sage/40 text-citrus-forest text-xs font-bold hover:bg-citrus-sage/10 transition-colors"
+                      >
+                        Details
+                      </button>
+                      {onRoster ? (
+                        <button
+                          onClick={() => { removePlayer(selectedPlayer.id); setSelectedPlayer(null); }}
+                          className="flex-1 sm:flex-initial px-4 py-2 rounded bg-red-500 hover:bg-red-600 text-white text-xs font-display font-bold transition-colors"
+                        >
+                          Remove from Roster
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => { if (addable) { addPlayer(selectedPlayer); setSelectedPlayer(null); } }}
+                          disabled={!addable}
+                          className={cn(
+                            'flex-1 sm:flex-initial px-4 py-2 rounded text-xs font-display font-bold transition-colors',
+                            addable
+                              ? 'bg-citrus-orange hover:bg-citrus-orange/90 text-white'
+                              : 'bg-muted text-citrus-charcoal/50 cursor-not-allowed'
+                          )}
+                          title={addable ? 'Add to roster' : 'Position full or team cap reached'}
+                        >
+                          {addable ? 'Add to Roster' : 'Cannot Add'}
+                        </button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

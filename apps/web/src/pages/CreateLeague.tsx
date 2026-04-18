@@ -1148,29 +1148,25 @@ const CreateLeague = () => {
                               {stats.map((stat) => (
                                 <div
                                   key={stat.id}
-                                  className={`flex items-center justify-between p-3 border-b last:border-0 transition-colors ${
+                                  className={`grid grid-cols-[auto_1fr_auto] items-center gap-2 px-3 py-2.5 border-b last:border-0 transition-colors ${
                                     stat.enabled ? 'bg-primary/5' : 'opacity-60'
                                   }`}
                                 >
-                                  <div className="flex items-center gap-3">
-                                    <Switch
-                                      checked={stat.enabled}
-                                      onCheckedChange={() => handleStatToggle(stat.id)}
-                                    />
-                                    <span className={`font-medium ${stat.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                      {stat.name}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs text-muted-foreground">Pts:</span>
-                                    <Select
-                                      value={String(stat.points)}
-                                      onValueChange={(v) => handleStatPointsChange(stat.id, v)}
-                                      disabled={!stat.enabled}
-                                    >
-                                      <SelectTrigger className="h-8 w-24 font-mono">
-                                        <SelectValue />
-                                      </SelectTrigger>
+                                  <Switch
+                                    checked={stat.enabled}
+                                    onCheckedChange={() => handleStatToggle(stat.id)}
+                                  />
+                                  <span className={`text-sm truncate ${stat.enabled ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                                    {stat.name}
+                                  </span>
+                                  <Select
+                                    value={String(stat.points)}
+                                    onValueChange={(v) => handleStatPointsChange(stat.id, v)}
+                                    disabled={!stat.enabled}
+                                  >
+                                    <SelectTrigger className="h-8 w-[72px] font-mono text-xs px-2">
+                                      <SelectValue />
+                                    </SelectTrigger>
                                       <SelectContent>
                                         {(() => {
                                           // Per-stat option sets — sensible ranges around each stat's default
@@ -1201,7 +1197,6 @@ const CreateLeague = () => {
                                         })()}
                                       </SelectContent>
                                     </Select>
-                                  </div>
                                 </div>
                               ))}
                             </div>

@@ -60,6 +60,27 @@ const MobileBottomNav = () => {
           { icon: Newspaper, label: 'News', path: '/news' },
           profileTab,
         ];
+      case 'playoff-bracket-pickem':
+        return [
+          { icon: Trophy, label: 'Pool Home', path: `/pool/playoff-hub?league=${activeLeagueId}` },
+          { icon: Target, label: 'My Picks', path: poolRoute },
+          { icon: BarChart3, label: 'NHL Bracket', path: '/nhl/playoffs' },
+          profileTab,
+        ];
+      case 'playoff-confidence-pool':
+        return [
+          { icon: Trophy, label: 'Pool Home', path: `/pool/playoff-hub?league=${activeLeagueId}` },
+          { icon: Target, label: 'My Picks', path: poolRoute },
+          { icon: BarChart3, label: 'NHL Bracket', path: '/nhl/playoffs' },
+          profileTab,
+        ];
+      case 'playoff-roster-pool':
+        return [
+          { icon: Trophy, label: 'Pool Home', path: `/pool/playoff-hub?league=${activeLeagueId}` },
+          { icon: Users, label: 'My Roster', path: poolRoute },
+          { icon: BarChart3, label: 'NHL Bracket', path: '/nhl/playoffs' },
+          profileTab,
+        ];
       default:
         return [profileTab];
     }
