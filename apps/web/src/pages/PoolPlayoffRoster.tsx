@@ -16,6 +16,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
   Search, Trophy, User, Shield, Star, X, Check, Save, Lock, Users, ArrowLeft,
+  Eye, Calendar, Clock,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
@@ -27,6 +28,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ScoringCalculator, type ScoringSettings } from '@/utils/scoringUtils';
+import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -79,6 +82,20 @@ interface LeagueConfig {
   };
 }
 
+interface TodayGame {
+  game_id: number;
+  game_date: string;
+  game_time: string | null;
+  home_team: string;
+  away_team: string;
+  home_score: number;
+  away_score: number;
+  status: string;
+  period: string | null;
+  period_time: string | null;
+  series_game_number: number | null;
+}
+
 // NHL playoff teams for 2025-26 — will come from API once nhl_playoff_seeds table is populated
 const POSITION_TABS = [
   { key: 'All', label: 'All' },
@@ -101,8 +118,12 @@ const isForward = (pos: string) => ['C', 'LW', 'RW'].includes(normalizePos(pos))
 export default function PoolPlayoffRosterEntry() {
   const [params] = useSearchParams();
   const leagueId = params.get('league') || '';
+  const viewUserId = params.get('view') || '';
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Read-only mode: viewing someone else's roster
+  const isViewMode = !!viewUserId && viewUserId !== user?.id;
 
   const [league, setLeague] = useState<LeagueConfig | null>(null);
   const [players, setPlayers] = useState<PoolPlayer[]>([]);
@@ -119,6 +140,10 @@ export default function PoolPlayoffRosterEntry() {
   // Selected player for the "click to preview, then confirm" flow.
   // Matches draft room UX — click row → preview card at top → Add/Remove button confirms.
   const [selectedPlayer, setSelectedPlayer] = useState<PoolPlayer | null>(null);
+  // View mode: name of the roster owner being viewed
+  const [viewOwnerName, setViewOwnerName] = useState<string>('');
+  // Today's Games
+  const [todayGames, setTodayGames] = useState<TodayGame[]>([]);
 
   // Shorten full name for mobile: "Connor McDavid" -> "C. McDavid"
   const shortName = (full: string): string => {
@@ -162,9 +187,10 @@ export default function PoolPlayoffRosterEntry() {
   // Load data
   useEffect(() => {
     if (!leagueId) return;
+    const targetUserId = viewUserId || user?.id;
     const load = async () => {
       try {
-        const session = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session;
+        const session = (await supabase.auth.getSession()).data.session;
         const headers: Record<string, string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
         const [leagueRes, playersRes, picksRes] = await Promise.all([
           fetch(`/api/leagues/${leagueId}`, { headers }).then(r => r.json()),
@@ -181,14 +207,30 @@ export default function PoolPlayoffRosterEntry() {
         const PLAYOFF_TEAMS = new Set(['BUF','BOS','TBL','MTL','CAR','OTT','PIT','PHI','COL','LAK','DAL','MIN','VGK','UTA','EDM','ANA']);
         const playoffOnly = (playerArr as PoolPlayer[]).filter(p => PLAYOFF_TEAMS.has(p.team));
         setPlayers(playoffOnly);
-        // Restore existing roster picks — match saved player_ids back to player objects
-        if (picksRes && user?.id) {
+        // Restore roster picks — either the current user's or the viewed user's
+        if (picksRes && targetUserId) {
           const rawPicks = picksRes.data?.picks || picksRes.picks || [];
-          const myPicks = (rawPicks as Array<{ player_id: number; user_id: string }>).filter(p => p.user_id === user.id);
-          const savedPlayers = myPicks
+          const targetPicks = (rawPicks as Array<{ player_id: number; user_id: string }>).filter(p => p.user_id === targetUserId);
+          const savedPlayers = targetPicks
             .map(pick => playoffOnly.find(p => parseInt(p.id) === pick.player_id))
             .filter((p): p is PoolPlayer => !!p);
           setRoster(savedPlayers);
+        }
+        // In view mode, fetch the owner's display name
+        if (isViewMode && viewUserId) {
+          try {
+            const { data: profile } = await (supabase as any)
+              .from('profiles')
+              .select('username, first_name, last_name')
+              .eq('id', viewUserId)
+              .single();
+            if (profile) {
+              const name = profile.username || [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Unknown';
+              setViewOwnerName(name);
+            }
+          } catch {
+            logger.warn('Failed to fetch viewed user profile');
+          }
         }
         // Check lock
         const lockAt = leagueData?.settings?.playoffRosterLockedAt;
@@ -199,7 +241,33 @@ export default function PoolPlayoffRosterEntry() {
     };
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leagueId, user?.id]);
+  }, [leagueId, user?.id, viewUserId]);
+
+  // Fetch today's playoff games
+  useEffect(() => {
+    const fetchTodayGames = async () => {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data, error } = await (supabase as any)
+          .from('nhl_games')
+          .select('game_id, game_date, game_time, home_team, away_team, home_score, away_score, status, period, period_time, series_game_number')
+          .eq('game_date', today)
+          .eq('game_type', 'playoff')
+          .order('game_time', { ascending: true });
+        if (error) {
+          logger.error('Failed to fetch today games:', error);
+          return;
+        }
+        setTodayGames((data as TodayGame[]) || []);
+      } catch (err) {
+        logger.error('Error fetching today games:', err);
+      }
+    };
+    fetchTodayGames();
+    // Refresh every 60s for live score updates
+    const interval = setInterval(fetchTodayGames, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Roster IDs set for O(1) lookup
   const rosterIds = useMemo(() => new Set(roster.map(p => p.id)), [roster]);
@@ -286,7 +354,7 @@ export default function PoolPlayoffRosterEntry() {
 
   // Can add this player?
   const canAdd = (p: PoolPlayer): boolean => {
-    if (locked || rosterIds.has(p.id) || roster.length >= rosterSize) return false;
+    if (isViewMode || locked || rosterIds.has(p.id) || roster.length >= rosterSize) return false;
     const norm = normalizePos(p.position);
     if (norm === 'G' && posCounts.G >= posReqs.G) return false;
     if (norm === 'D' && posCounts.D >= posReqs.D) return false;
@@ -342,7 +410,7 @@ export default function PoolPlayoffRosterEntry() {
       if (!loading && roster.length > 0) initialLoadDone.current = true;
       return;
     }
-    if (locked || saving || roster.length === 0 || !leagueId) return;
+    if (isViewMode || locked || saving || roster.length === 0 || !leagueId) return;
 
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(async () => {
@@ -371,6 +439,39 @@ export default function PoolPlayoffRosterEntry() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roster, locked, leagueId]);
 
+  // Cross-reference roster players with today's games
+  const todayGamesWithPlayers = useMemo(() => {
+    if (todayGames.length === 0 || roster.length === 0) return [];
+    const rosterTeams = new Set(roster.map(p => p.team));
+    return todayGames
+      .filter(g => rosterTeams.has(g.home_team) || rosterTeams.has(g.away_team))
+      .map(g => ({
+        ...g,
+        myPlayers: roster.filter(p => p.team === g.home_team || p.team === g.away_team),
+      }));
+  }, [todayGames, roster]);
+
+  // Format game time to ET display
+  const formatGameTime = (gameTime: string | null): string => {
+    if (!gameTime) return 'TBD';
+    try {
+      const d = new Date(gameTime);
+      return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET';
+    } catch {
+      return 'TBD';
+    }
+  };
+
+  const gameStatusLabel = (g: TodayGame): string => {
+    if (g.status === 'final') return 'Final';
+    if (g.status === 'live') {
+      const parts = [g.period];
+      if (g.period_time) parts.push(g.period_time);
+      return parts.filter(Boolean).join(' ');
+    }
+    return formatGameTime(g.game_time);
+  };
+
   if (loading) {
     return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center text-citrus-charcoal/60">Loading pool...</div></>;
   }
@@ -381,9 +482,25 @@ export default function PoolPlayoffRosterEntry() {
     <div className="min-h-screen bg-gradient-to-b from-white to-[#F5F8ED] pb-24 pt-24">
       <div className="max-w-7xl mx-auto px-4 mb-3">
         <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-citrus-sage hover:text-citrus-forest inline-flex items-center gap-1">
-          <ArrowLeft className="h-4 w-4" />Back to Pool Home
+          <ArrowLeft className="h-4 w-4" />{isViewMode ? 'Back to Hub' : 'Back to Pool Home'}
         </Link>
       </div>
+
+      {/* View mode banner */}
+      {isViewMode && (
+        <div className="max-w-7xl mx-auto px-4 mb-3">
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-citrus-orange/10 border border-citrus-orange/30">
+            <Eye className="h-5 w-5 text-citrus-orange flex-shrink-0" />
+            <div>
+              <div className="text-sm font-display font-bold text-citrus-forest">
+                Viewing {viewOwnerName || 'Teammate'}&apos;s Roster
+              </div>
+              <div className="text-[11px] text-citrus-charcoal/60">Read-only — you cannot modify this roster.</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sticky header with roster progress */}
       <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-xl border-b border-fantasy-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3">
@@ -391,23 +508,25 @@ export default function PoolPlayoffRosterEntry() {
             <div>
               <h1 className="text-lg font-varsity font-black uppercase text-citrus-forest flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-citrus-orange" />
-                {league?.name || 'Playoff Roster Pool'}
+                {isViewMode ? `${viewOwnerName || 'Teammate'}'s Roster` : (league?.name || 'Playoff Roster Pool')}
               </h1>
               <div className="flex items-center gap-3 mt-1 text-xs text-citrus-charcoal/70">
                 <span className="font-display font-bold text-citrus-forest">{roster.length}/{rosterSize} players</span>
                 <span>F: {posCounts.F}/{posReqs.F}</span>
                 <span>D: {posCounts.D}/{posReqs.D}</span>
                 <span>G: {posCounts.G}/{posReqs.G}</span>
-                {lastSaved && <span className="text-citrus-sage italic">Saved {lastSaved}</span>}
+                {!isViewMode && lastSaved && <span className="text-citrus-sage italic">Saved {lastSaved}</span>}
               </div>
             </div>
-            <Button
-              onClick={saveRoster}
-              disabled={saving || locked || roster.length < rosterSize}
-              className="bg-citrus-sage hover:bg-citrus-sage/90 text-citrus-forest font-display font-bold"
-            >
-              {locked ? <><Lock className="h-4 w-4 mr-1" />Locked</> : saving ? 'Saving...' : <><Save className="h-4 w-4 mr-1" />Save Roster</>}
-            </Button>
+            {!isViewMode && (
+              <Button
+                onClick={saveRoster}
+                disabled={saving || locked || roster.length < rosterSize}
+                className="bg-citrus-sage hover:bg-citrus-sage/90 text-citrus-forest font-display font-bold"
+              >
+                {locked ? <><Lock className="h-4 w-4 mr-1" />Locked</> : saving ? 'Saving...' : <><Save className="h-4 w-4 mr-1" />Save Roster</>}
+              </Button>
+            )}
           </div>
 
           {/* Roster progress bar */}
@@ -421,9 +540,84 @@ export default function PoolPlayoffRosterEntry() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 pt-4">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4">
-          {/* ─── LEFT: Player Pool ───────────────────────────────────── */}
-          <div className="min-w-0">
+        {/* ─── TODAY'S GAMES ──────────────────────────────────────────── */}
+        {todayGamesWithPlayers.length > 0 && (
+          <Card className="mb-4 border-citrus-orange/30 bg-gradient-to-br from-citrus-orange/5 to-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-citrus-orange" />
+                Today&apos;s Games — {isViewMode ? `${viewOwnerName || 'Their'} Players` : 'Your Players'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {todayGamesWithPlayers.map(g => {
+                  const statusText = gameStatusLabel(g);
+                  const isLive = g.status === 'live';
+                  const isFinal = g.status === 'final';
+                  return (
+                    <div key={g.game_id} className={cn(
+                      'rounded-lg border p-3',
+                      isLive ? 'border-green-400 bg-green-50/30' : isFinal ? 'border-citrus-charcoal/20 bg-muted/20' : 'border-citrus-sage/30 bg-white'
+                    )}>
+                      {/* Game header */}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5 text-sm font-display font-bold text-citrus-forest">
+                          <span>{g.away_team}</span>
+                          <span className="text-citrus-charcoal/40">@</span>
+                          <span>{g.home_team}</span>
+                        </div>
+                        {g.series_game_number && (
+                          <Badge variant="outline" className="text-[9px] border-citrus-sage/40">Game {g.series_game_number}</Badge>
+                        )}
+                      </div>
+                      {/* Score / time */}
+                      <div className={cn(
+                        'text-xs font-display mb-2 flex items-center gap-1.5',
+                        isLive ? 'text-green-700 font-bold' : isFinal ? 'text-citrus-charcoal/60' : 'text-citrus-charcoal/50'
+                      )}>
+                        <Clock className="h-3 w-3" />
+                        {(isLive || isFinal) ? (
+                          <span>{g.away_score} - {g.home_score} {statusText}</span>
+                        ) : (
+                          <span>{statusText}</span>
+                        )}
+                      </div>
+                      {/* My players in this game */}
+                      <div className="space-y-1">
+                        {g.myPlayers.map(p => (
+                          <div key={p.id} className="flex items-center justify-between text-[11px]">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <Badge variant="outline" className={cn(
+                                'text-[8px] px-1 py-0',
+                                normalizePos(p.position) === 'G' ? 'border-purple-300 text-purple-700' : normalizePos(p.position) === 'D' ? 'border-blue-300 text-blue-700' : 'border-citrus-sage text-citrus-forest'
+                              )}>{normalizePos(p.position)}</Badge>
+                              <span className="font-medium truncate">{p.full_name}</span>
+                              <span className="text-citrus-charcoal/40">{p.team}</span>
+                            </div>
+                            {(isLive || isFinal) && normalizePos(p.position) !== 'G' && (
+                              <span className="text-citrus-charcoal/60 flex-shrink-0 ml-1">{p.goals}G {p.assists}A</span>
+                            )}
+                            {(isLive || isFinal) && normalizePos(p.position) === 'G' && (
+                              <span className="text-citrus-charcoal/60 flex-shrink-0 ml-1">{p.saves ?? 0}SV</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className={cn(
+          'grid grid-cols-1 gap-4',
+          !isViewMode && 'lg:grid-cols-[1fr_340px]'
+        )}>
+          {/* ─── LEFT: Player Pool (hidden in view mode) ──────────────── */}
+          {!isViewMode && <div className="min-w-0">
             {/* Search + Position tabs */}
             <div className="flex flex-wrap gap-2 mb-3">
               <div className="relative flex-1 min-w-[180px]">
@@ -802,17 +996,20 @@ export default function PoolPlayoffRosterEntry() {
                 </table>
               </div>
             </Card>
-          </div>
+          </div>}
 
-          {/* ─── RIGHT: Active Roster Builder ────────────────────────── */}
-          <div className="lg:sticky lg:top-[110px] lg:self-start space-y-3">
+          {/* ─── RIGHT: Roster Panel (read-only in view mode) ────────── */}
+          <div className={cn(
+            'space-y-3',
+            !isViewMode && 'lg:sticky lg:top-[110px] lg:self-start'
+          )}>
             {/* Roster card */}
             <Card className="border-fantasy-border bg-white shadow-md">
               <CardHeader className="pb-2 px-4">
                 <CardTitle className="text-sm font-display font-bold text-citrus-forest flex items-center justify-between">
                   <span className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-citrus-orange" />
-                    Your Roster ({roster.length}/{rosterSize})
+                    {isViewMode ? <Eye className="h-4 w-4 text-citrus-orange" /> : <Users className="h-4 w-4 text-citrus-orange" />}
+                    {isViewMode ? `${viewOwnerName || 'Teammate'}'s Roster` : 'Your Roster'} ({roster.length}/{rosterSize})
                   </span>
                 </CardTitle>
               </CardHeader>
@@ -837,7 +1034,7 @@ export default function PoolPlayoffRosterEntry() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-green-700">{calcFpts(p).toFixed(1)}</span>
-                          {!locked && (
+                          {!locked && !isViewMode && (
                             <button onClick={() => removePlayer(p.id)} className="text-red-300 hover:text-red-500">
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -874,7 +1071,7 @@ export default function PoolPlayoffRosterEntry() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-green-700">{calcFpts(p).toFixed(1)}</span>
-                          {!locked && (
+                          {!locked && !isViewMode && (
                             <button onClick={() => removePlayer(p.id)} className="text-red-300 hover:text-red-500">
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -911,7 +1108,7 @@ export default function PoolPlayoffRosterEntry() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-green-700">{calcFpts(p).toFixed(1)}</span>
-                          {!locked && (
+                          {!locked && !isViewMode && (
                             <button onClick={() => removePlayer(p.id)} className="text-red-300 hover:text-red-500">
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -953,18 +1150,26 @@ export default function PoolPlayoffRosterEntry() {
               </CardContent>
             </Card>
 
-            {/* Quick tips */}
-            <Card className="border-fantasy-border bg-citrus-sage/5 px-4 py-3">
-              <div className="text-[10px] font-display font-bold uppercase text-citrus-charcoal/50 mb-1">How it works</div>
-              <ul className="text-[11px] text-citrus-charcoal/70 space-y-0.5 list-disc pl-3">
-                <li>Pick {rosterSize} players from playoff teams</li>
-                {hasCap && <li>Max {maxPerTeam} players per NHL team</li>}
-                {!hasCap && <li>No per-team cap — stack any team if you want</li>}
-                <li>Total fantasy points across all playoff games</li>
-                <li>Click any player row to add them</li>
-                <li>Your FPTS uses your league's custom scoring</li>
-              </ul>
-            </Card>
+            {/* Quick tips (own roster) or Back to Hub (view mode) */}
+            {isViewMode ? (
+              <Button asChild variant="outline" className="w-full border-citrus-sage/40 text-citrus-forest font-display">
+                <Link to={`/pool/playoff-hub?league=${leagueId}`}>
+                  <ArrowLeft className="h-4 w-4 mr-1" />Back to Hub
+                </Link>
+              </Button>
+            ) : (
+              <Card className="border-fantasy-border bg-citrus-sage/5 px-4 py-3">
+                <div className="text-[10px] font-display font-bold uppercase text-citrus-charcoal/50 mb-1">How it works</div>
+                <ul className="text-[11px] text-citrus-charcoal/70 space-y-0.5 list-disc pl-3">
+                  <li>Pick {rosterSize} players from playoff teams</li>
+                  {hasCap && <li>Max {maxPerTeam} players per NHL team</li>}
+                  {!hasCap && <li>No per-team cap — stack any team if you want</li>}
+                  <li>Total fantasy points across all playoff games</li>
+                  <li>Click any player row to add them</li>
+                  <li>Your FPTS uses your league's custom scoring</li>
+                </ul>
+              </Card>
+            )}
           </div>
         </div>
       </div>

@@ -11,10 +11,10 @@
  */
 
 import { useEffect, useState, useMemo } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import {
   Trophy, Users, Clock, Copy, Check, Lock, ChevronRight, Crown, Target,
-  Mail, MessageSquare, Link as LinkIcon,
+  Mail, MessageSquare, Link as LinkIcon, Eye,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,6 +63,7 @@ export default function PoolPlayoffHub() {
   const leagueId = params.get('league') || '';
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [league, setLeague] = useState<League | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -331,8 +332,17 @@ export default function PoolPlayoffHub() {
                     <p className="text-xs text-citrus-charcoal/60 italic">No members yet — invite friends with the join code →</p>
                   ) : (
                     <div className="space-y-1.5">
-                      {teams.map((t) => (
-                        <div key={t.id} className="flex items-center justify-between p-2 rounded border border-citrus-sage/20 bg-white">
+                      {teams.map((t) => {
+                        const isRosterPool = leagueType === 'playoff-roster-pool';
+                        return (
+                        <div
+                          key={t.id}
+                          className={cn(
+                            'flex items-center justify-between p-2 rounded border border-citrus-sage/20 bg-white',
+                            isRosterPool && 'cursor-pointer hover:border-citrus-orange/40 hover:bg-citrus-orange/5 transition-colors'
+                          )}
+                          onClick={isRosterPool ? () => navigate(`/pool/playoff-roster?league=${leagueId}&view=${t.owner_id}`) : undefined}
+                        >
                           <div className="flex items-center gap-2">
                             <div className="h-7 w-7 rounded-full bg-citrus-sage/20 flex items-center justify-center text-xs font-bold text-citrus-forest">
                               {(t.team_name || '?').charAt(0).toUpperCase()}
@@ -347,8 +357,12 @@ export default function PoolPlayoffHub() {
                               )}
                             </div>
                           </div>
+                          {isRosterPool && (
+                            <Eye className="h-4 w-4 text-citrus-charcoal/30" />
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
