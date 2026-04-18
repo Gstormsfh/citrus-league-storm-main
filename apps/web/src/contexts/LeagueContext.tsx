@@ -352,8 +352,23 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
               }
             }
             
-            // Not a member or refresh didn't find it - block access
+            // Not a member. Instead of slamming them with "Access Denied",
+            // try to fetch the league's join_code and redirect to the join
+            // flow. Works for direct pool URLs / old share links that skipped
+            // the proper /auth?redirect=/create-league?tab=join&code=X path.
             logger.warn('[LeagueContext] User attempted to access league not in their list:', urlLeagueId);
+            try {
+              const { league: leagueInfo } = await LeagueService.getLeague(urlLeagueId, user.id);
+              const joinCode = leagueInfo?.join_code;
+              if (joinCode) {
+                navigate(`/create-league?tab=join&code=${joinCode}`, { replace: true });
+                toast({
+                  title: "Almost there!",
+                  description: `Hit "Join League" to join "${leagueInfo.name || 'this league'}".`,
+                });
+                return;
+              }
+            } catch { /* fall through to gm-office */ }
             navigate('/gm-office');
             toast({
               title: "Access Denied",

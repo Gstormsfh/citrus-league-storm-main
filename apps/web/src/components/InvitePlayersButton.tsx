@@ -32,7 +32,11 @@ export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButto
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const inviteLink = `${window.location.origin}/create-league?tab=join&code=${joinCode}`;
+  // Wrap in /auth?redirect= so signed-out invitees go through auth,
+  // then land back on the join page (with code pre-filled + auto-submit).
+  // Signed-in users skip the auth step entirely.
+  const joinPath = `/create-league?tab=join&code=${joinCode}`;
+  const inviteLink = `${window.location.origin}/auth?redirect=${encodeURIComponent(joinPath)}`;
 
   const inviteText = `Join my league "${leagueName}" on Citrus Fantasy Sports!\n\nJoin Code: ${joinCode}\n\nJoin here: ${inviteLink}`;
 
