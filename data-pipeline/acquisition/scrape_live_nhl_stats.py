@@ -120,19 +120,28 @@ def update_game_scores_in_nhl_games(db: SupabaseRest, game_id: int, boxscore: di
                 update_data["period"] = "OT" if num == 4 else "SO" if num > 4 else f"{num}rd" if num == 3 else f"{num}nd" if num == 2 else "1st"
         
         # Clock Time - Extract time remaining in period (e.g., "12:45")
-        # CRITICAL: This enables real-time period/clock display in GameLogosBar
+        # CRITICAL ordering:
+        # 1. Check if game is FINAL first → clear clock.
+        # 2. Check clock.inIntermission flag — when a period ends, the NHL
+        #    API keeps gameState=LIVE but sets clock.inIntermission=true and
+        #    freezes clock.timeRemaining at the moment of the last whistle.
+        #    If we just used timeRemaining, users would see a frozen clock
+        #    during the 18-min break ('10:32 left in 2nd') which looks like
+        #    the broadcast is behind ours by 10 minutes.
+        # 3. gameState=INTERMISSION (legacy) — also show "INT".
+        # 4. Default: show the live clock.
         clock = boxscore.get("clock", {})
-        if clock:
-            time_remaining = clock.get("timeRemaining", "")
-            if time_remaining:
-                update_data["period_time"] = time_remaining
-            # Clear period_time for intermissions or when not running
-            elif game_state == "INTERMISSION":
-                update_data["period_time"] = "INT"  # Show "INT" during intermissions
-        
-        # Clear period info when game is final (no longer live)
+        in_intermission = bool(clock.get("inIntermission"))
+        time_remaining = clock.get("timeRemaining", "")
+
         if status == "final":
-            update_data["period_time"] = None  # Clear clock for finished games
+            update_data["period_time"] = None  # game over, no clock
+        elif in_intermission or game_state == "INTERMISSION":
+            update_data["period_time"] = "INT"  # between periods
+        elif time_remaining:
+            update_data["period_time"] = time_remaining
+        else:
+            update_data["period_time"] = None
         
         db.update("nhl_games", update_data, filters=[("game_id", "eq", game_id)])
         return True
