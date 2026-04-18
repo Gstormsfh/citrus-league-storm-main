@@ -133,7 +133,7 @@ export default function PoolPlayoffRosterEntry() {
   };
 
   // Defaults
-  const rosterSize = league?.settings?.playoffRosterSize ?? 18;
+  const rosterSize = league?.settings?.playoffRosterSize ?? 17;
   const posReqs = league?.settings?.positionRequirements ?? { F: 9, D: 6, G: 2 };
   // 0 or undefined = no cap (draft as many Oilers as you want).
   // Commissioner sets this explicitly if they want a restriction.
@@ -361,7 +361,7 @@ export default function PoolPlayoffRosterEntry() {
             </div>
             <Button
               onClick={saveRoster}
-              disabled={saving || locked || roster.length === 0}
+              disabled={saving || locked || roster.length < rosterSize}
               className="bg-citrus-sage hover:bg-citrus-sage/90 text-citrus-forest font-display font-bold"
             >
               {locked ? <><Lock className="h-4 w-4 mr-1" />Locked</> : saving ? 'Saving...' : <><Save className="h-4 w-4 mr-1" />Save Roster</>}
@@ -917,7 +917,7 @@ export default function PoolPlayoffRosterEntry() {
               <ul className="text-[11px] text-citrus-charcoal/70 space-y-0.5 list-disc pl-3">
                 <li>Pick {rosterSize} players from playoff teams</li>
                 {hasCap && <li>Max {maxPerTeam} players per NHL team</li>}
-                {!hasCap && <li>No per-team cap — draft all 18 from one squad if you want</li>}
+                {!hasCap && <li>No per-team cap — stack any team if you want</li>}
                 <li>Total fantasy points across all playoff games</li>
                 <li>Click any player row to add them</li>
                 <li>Your FPTS uses your league's custom scoring</li>

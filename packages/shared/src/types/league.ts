@@ -229,7 +229,7 @@ export interface LeagueFormatSettings {
   // Confidence
   playoffConfidenceVariant?: 'cumulative' | 'per-round';
   // Roster Pool (team-select style — multiple users can pick same player)
-  playoffRosterSize?: number;            // Total players per roster (e.g., 18)
+  playoffRosterSize?: number;            // Total players per roster (default 17: 9F + 6D + 2G)
   playoffPositionRequirements?: { F: number; D: number; G: number };
   playoffMaxPlayersPerTeam?: number;     // Per-NHL-team cap (e.g., 3)
   playoffRosterLockedAt?: string;        // ISO timestamp — rosters lock at this time
@@ -380,8 +380,8 @@ export function getDefaultSettings(leagueType: LeagueType): LeagueFormatSettings
         teamsCount: 20,
         draftRounds: 0,
         pickTimeLimit: 0,
-        playoffRosterSize: 16,
-        playoffPositionRequirements: { F: 10, D: 4, G: 2 },
+        playoffRosterSize: 17,
+        playoffPositionRequirements: { F: 9, D: 6, G: 2 },
         playoffMaxPlayersPerTeam: 3,
         stats: [],
       };

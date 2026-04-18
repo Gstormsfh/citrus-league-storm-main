@@ -423,8 +423,8 @@ const CreateLeague = () => {
           settings.playoffConfidenceVariant = 'cumulative';
           settings.playoffRosterLockedAt = new Date(playoffLockDeadline).toISOString();
         } else if (leagueType === 'playoff-roster-pool') {
-          settings.playoffRosterSize = 18;
-          settings.playoffPositionRequirements = { F: 10, D: 6, G: 2 };
+          settings.playoffRosterSize = 17;
+          settings.playoffPositionRequirements = { F: 9, D: 6, G: 2 };
           settings.playoffMaxPlayersPerTeam = 3;
           // Commissioner-selected roster lock deadline
           settings.playoffRosterLockedAt = new Date(playoffLockDeadline).toISOString();

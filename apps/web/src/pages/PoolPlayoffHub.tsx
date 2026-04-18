@@ -395,7 +395,7 @@ export default function PoolPlayoffHub() {
                   <ul className="text-[11px] text-citrus-charcoal/70 space-y-1 list-disc pl-3">
                     {leagueType === 'playoff-roster-pool' && (
                       <>
-                        <li>Pick {league.settings?.playoffRosterSize || 18} players from the 16 playoff teams</li>
+                        <li>Pick {league.settings?.playoffRosterSize || 17} players from the 16 playoff teams</li>
                         <li>Max 3 players per NHL team</li>
                         <li>Total fantasy points across all playoff games</li>
                         <li>Scoring uses your league's custom point values</li>
