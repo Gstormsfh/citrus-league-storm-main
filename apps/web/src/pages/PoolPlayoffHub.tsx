@@ -216,14 +216,32 @@ export default function PoolPlayoffHub() {
           return;
         }
 
-        // 3. Player directory + playoff stats in parallel
-        const [pdRes, statsRes] = await Promise.all([
-          sb.from('player_directory').select('player_id, full_name, position, team_abbrev').in('player_id', playerIds),
+        // 3. Fetch players via REST (same as Roster page — PROVEN to work)
+        //    and playoff stats via direct supabase (public read access).
+        const session = (await supabase.auth.getSession()).data.session;
+        const restHeaders: Record<string, string> = session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {};
+        const [playersRes, statsRes] = await Promise.all([
+          fetch('/api/players?limit=1000', { headers: restHeaders })
+            .then(r => r.json())
+            .catch((): { data?: unknown } => ({ data: [] })),
           sb.from('player_playoff_stats').select('*').in('player_id', playerIds),
         ]);
 
-        if (pdRes.error) logger.warn('[Hub] player_directory fetch error', pdRes.error);
         if (statsRes.error) logger.warn('[Hub] player_playoff_stats fetch error', statsRes.error);
+
+        const playerArr: Array<{ id: string | number; full_name: string; position: string; team: string }> =
+          Array.isArray(playersRes.data) ? playersRes.data
+          : Array.isArray(playersRes) ? playersRes : [];
+        const pickedPlayers = playerArr
+          .filter(p => playerIds.includes(typeof p.id === 'string' ? parseInt(p.id) : p.id))
+          .map(p => ({
+            player_id: typeof p.id === 'string' ? parseInt(p.id) : p.id,
+            full_name: p.full_name,
+            position: p.position,
+            team_abbrev: p.team,
+          }));
 
         const statsMap = new Map<number, Record<string, unknown>>();
         for (const s of (statsRes.data ?? []) as Array<Record<string, unknown>>) {
@@ -231,9 +249,7 @@ export default function PoolPlayoffHub() {
         }
 
         const scorer = new ScoringCalculator(league?.scoring_settings ?? null);
-        const ctx: RosterPlayerCtx[] = ((pdRes.data ?? []) as Array<{
-          player_id: number; full_name: string; position: string; team_abbrev: string;
-        }>).map(p => {
+        const ctx: RosterPlayerCtx[] = pickedPlayers.map(p => {
           const s = statsMap.get(p.player_id) ?? {};
           const num = (k: string) => Number(s[k] ?? 0);
           const isGoalie = !!s.is_goalie || p.position === 'G';
