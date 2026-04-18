@@ -252,18 +252,50 @@ export default function PoolPlayoffConfidence() {
                     const isCorrect = locked && pick && s.winner_team_id === pick.picked_team_id;
                     const isWrong = locked && pick && s.winner_team_id && s.winner_team_id !== pick.picked_team_id;
 
+                    // Live game detection — overlay score on the series card
+                    const seriesGame = liveGames.find(g =>
+                      (g.home_team === high?.team_abbrev && g.away_team === low?.team_abbrev) ||
+                      (g.home_team === low?.team_abbrev && g.away_team === high?.team_abbrev)
+                    );
+                    const gameIsLive = seriesGame && seriesGame.status === 'live';
+                    const gameIsFinal = seriesGame && seriesGame.status === 'final';
+
                     return (
                       <div key={s.series_id} className={cn(
-                        'border rounded-lg p-3 space-y-2 transition-colors',
+                        'border rounded-lg p-3 space-y-2 transition-colors relative',
+                        gameIsLive && 'border-red-400 bg-red-50/20 ring-1 ring-red-400/20',
                         isCorrect && 'border-green-400 bg-green-50/50',
                         isWrong && 'border-red-300 bg-red-50/30',
-                        locked && !isCorrect && !isWrong && 'opacity-70 bg-muted/30',
+                        locked && !isCorrect && !isWrong && !gameIsLive && 'opacity-70 bg-muted/30',
                       )}>
+                        {gameIsLive && (
+                          <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-varsity font-black uppercase px-2 py-0.5 rounded-full shadow-md">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
+                            </span>
+                            LIVE
+                          </div>
+                        )}
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] uppercase font-display text-citrus-charcoal/60">Series {s.bracket_slot}</span>
                           {locked && <Badge className="bg-muted text-[9px]"><Lock className="h-3 w-3 mr-1" />Locked</Badge>}
                           {isCorrect && <Badge className="bg-green-500 text-white text-[9px]"><Check className="h-3 w-3 mr-1" />+{pick.confidence_value}</Badge>}
                         </div>
+
+                        {/* Live game score overlay */}
+                        {seriesGame && (gameIsLive || gameIsFinal) && (
+                          <div className={cn(
+                            'flex items-center justify-between px-2 py-1 rounded text-xs',
+                            gameIsLive ? 'bg-red-100/80 border border-red-300' : 'bg-citrus-sage/10 border border-citrus-sage/20'
+                          )}>
+                            <span className="font-mono font-bold">{seriesGame.away_team} {seriesGame.away_score}</span>
+                            <span className={cn('text-[10px]', gameIsLive && 'text-red-700 font-bold animate-pulse')}>
+                              {gameIsLive ? `${seriesGame.period || ''} ${seriesGame.period_time || ''}`.trim() : 'Final'}
+                            </span>
+                            <span className="font-mono font-bold">{seriesGame.home_score} {seriesGame.home_team}</span>
+                          </div>
+                        )}
 
                         {/* Team picks — rich cards with logos + colors */}
                         <div className="grid grid-cols-1 gap-2">
