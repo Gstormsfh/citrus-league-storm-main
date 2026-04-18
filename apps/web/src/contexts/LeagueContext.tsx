@@ -353,18 +353,26 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
             }
             
             // Not a member. Instead of slamming them with "Access Denied",
-            // try to fetch the league's join_code and redirect to the join
-            // flow. Works for direct pool URLs / old share links that skipped
-            // the proper /auth?redirect=/create-league?tab=join&code=X path.
+            // query supabase directly for the league's join_code and redirect
+            // to the join flow. RLS policy "Authenticated users can read
+            // leagues by join code" allows any logged-in user to see leagues,
+            // so this works even if they're not a member yet.
+            // (The /api/leagues/:id server endpoint requires membership,
+            // so we bypass it by going straight to the table.)
             logger.warn('[LeagueContext] User attempted to access league not in their list:', urlLeagueId);
             try {
-              const { league: leagueInfo } = await LeagueService.getLeague(urlLeagueId, user.id);
+              const { supabase } = await import('@/integrations/supabase/client');
+              const { data: leagueInfo } = await supabase
+                .from('leagues')
+                .select('id, name, join_code')
+                .eq('id', urlLeagueId)
+                .maybeSingle();
               const joinCode = leagueInfo?.join_code;
               if (joinCode) {
                 navigate(`/create-league?tab=join&code=${joinCode}`, { replace: true });
                 toast({
                   title: "Almost there!",
-                  description: `Hit "Join League" to join "${leagueInfo.name || 'this league'}".`,
+                  description: `Hit "Join League" to join "${leagueInfo?.name || 'this league'}".`,
                 });
                 return;
               }
