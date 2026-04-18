@@ -632,9 +632,87 @@ export default function PoolPlayoffRosterEntry() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 pt-4">
-        {/* Today's Games widget moved to PoolPlayoffHub ("Pool Home") so
-            users see their live lineup immediately on the hub. The roster
-            page stays focused on picking/editing. */}
+        {/* ─── TODAY'S GAMES (restored — shown on both Hub AND roster page) ─── */}
+        {todayGamesWithPlayers.length > 0 && (
+          <Card className="mb-4 border-2 border-citrus-orange/40 bg-gradient-to-br from-citrus-orange/5 to-white shadow-md">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-citrus-orange" />
+                Today&apos;s Games — {isViewMode ? `${viewOwnerName || 'Their'} Players` : 'Your Players'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {todayGamesWithPlayers.map(g => {
+                  const statusText = gameStatusLabel(g);
+                  const isLive = g.status === 'live';
+                  const isFinal = g.status === 'final';
+                  return (
+                    <div key={g.game_id} className={cn(
+                      'relative rounded-lg border p-3',
+                      isLive ? 'border-red-400 bg-red-50/40 ring-1 ring-red-400/30' :
+                      isFinal ? 'border-citrus-charcoal/20 bg-muted/20' :
+                      'border-citrus-sage/30 bg-white'
+                    )}>
+                      {isLive && (
+                        <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-varsity font-black uppercase px-2 py-0.5 rounded-full shadow-md">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
+                          </span>
+                          LIVE
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5 text-sm font-display font-bold text-citrus-forest">
+                          <span>{g.away_team}</span>
+                          <span className="text-citrus-charcoal/40">@</span>
+                          <span>{g.home_team}</span>
+                        </div>
+                        {g.series_game_number && (
+                          <Badge variant="outline" className="text-[9px] border-citrus-sage/40">Game {g.series_game_number}</Badge>
+                        )}
+                      </div>
+                      <div className={cn(
+                        'text-xs font-display mb-2 flex items-center gap-1.5',
+                        isLive ? 'text-red-700 font-bold' : isFinal ? 'text-citrus-charcoal/60' : 'text-citrus-charcoal/50'
+                      )}>
+                        <Clock className="h-3 w-3" />
+                        {(isLive || isFinal) ? (
+                          <span>{g.away_score} - {g.home_score} · {statusText}</span>
+                        ) : (
+                          <span>{statusText}</span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        {g.myPlayers.map(p => {
+                          const ps = playoffStats.get(parseInt(p.id));
+                          return (
+                            <div key={p.id} className="flex items-center justify-between text-[11px]">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Badge variant="outline" className={cn(
+                                  'text-[8px] px-1 py-0',
+                                  normalizePos(p.position) === 'G' ? 'border-purple-300 text-purple-700' : normalizePos(p.position) === 'D' ? 'border-blue-300 text-blue-700' : 'border-citrus-sage text-citrus-forest'
+                                )}>{normalizePos(p.position)}</Badge>
+                                <span className="font-medium truncate">{shortName(p.full_name)}</span>
+                              </div>
+                              {ps && normalizePos(p.position) !== 'G' && (
+                                <span className="text-citrus-charcoal/70 flex-shrink-0 ml-1 tabular-nums">{ps.goals ?? 0}G {ps.assists ?? 0}A {calcPlayoffFpts(p).toFixed(1)}pts</span>
+                              )}
+                              {ps && normalizePos(p.position) === 'G' && (
+                                <span className="text-citrus-charcoal/70 flex-shrink-0 ml-1 tabular-nums">{ps.saves ?? 0}SV {calcPlayoffFpts(p).toFixed(1)}pts</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ─── VIEW MODE: full-width playoff stats breakdown ─────────── */}
         {isViewMode && (() => {

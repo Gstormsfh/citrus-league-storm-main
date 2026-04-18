@@ -170,50 +170,59 @@ export default function PoolPlayoffHub() {
     if (!leagueId || !user?.id) return;
     if (league?.settings?.leagueType !== 'playoff-roster-pool') return;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+
     const load = async () => {
       try {
         // 1. My roster picks
-        const sb = supabase as unknown as {
-          from: (t: string) => {
-            select: (c: string) => {
-              eq: (k: string, v: unknown) => { eq: (k: string, v: unknown) => Promise<{ data: Array<{ player_id: number }> | null }> };
-              in: (k: string, v: unknown[]) => Promise<{ data: Array<Record<string, unknown>> | null }>;
-              gte: (k: string, v: unknown) => { lte: (k: string, v: unknown) => { eq: (k: string, v: unknown) => { order: (k: string) => Promise<{ data: PlayoffGameRow[] | null }> } } };
-            };
-          };
-        };
-
-        const { data: picksData } = await (supabase as unknown as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: unknown) => { eq: (k: string, v: unknown) => Promise<{ data: Array<{ player_id: number }> | null }> } } } })
+        const picksRes = await sb
           .from('playoff_roster_picks')
           .select('player_id')
           .eq('league_id', leagueId)
           .eq('user_id', user.id);
 
-        const playerIds = (picksData ?? []).map(p => p.player_id).filter(Boolean);
+        if (picksRes.error) {
+          logger.warn('[Hub] roster picks fetch error', picksRes.error);
+        }
+
+        const playerIds: number[] = (picksRes.data ?? [])
+          .map((p: { player_id: number }) => p.player_id)
+          .filter(Boolean);
+
+        // 2. Today's playoff games (always fetch, even if no picks — bracket banner still useful)
+        const today = new Date().toISOString().slice(0, 10);
+        const gamesRes = await sb
+          .from('nhl_games')
+          .select('game_id, game_date, game_time, home_team, away_team, home_score, away_score, status, period, period_time, series_game_number')
+          .eq('game_date', today)
+          .eq('game_type', 'playoff')
+          .order('game_time');
+        setTodayGames((gamesRes.data ?? []) as PlayoffGameRow[]);
+
         if (playerIds.length === 0) {
           setRosterCtx([]);
           return;
         }
 
-        // 2. Player directory (names, positions, current team) + playoff stats in parallel
+        // 3. Player directory + playoff stats in parallel
         const [pdRes, statsRes] = await Promise.all([
-          (supabase as unknown as { from: (t: string) => { select: (c: string) => { in: (k: string, v: unknown[]) => Promise<{ data: Array<{ player_id: number; full_name: string; position: string; team_abbrev: string }> | null }> } } })
-            .from('player_directory')
-            .select('player_id, full_name, position, team_abbrev')
-            .in('player_id', playerIds),
-          (supabase as unknown as { from: (t: string) => { select: (c: string) => { in: (k: string, v: unknown[]) => Promise<{ data: Array<Record<string, unknown>> | null }> } } })
-            .from('player_playoff_stats')
-            .select('*')
-            .in('player_id', playerIds),
+          sb.from('player_directory').select('player_id, full_name, position, team_abbrev').in('player_id', playerIds),
+          sb.from('player_playoff_stats').select('*').in('player_id', playerIds),
         ]);
 
+        if (pdRes.error) logger.warn('[Hub] player_directory fetch error', pdRes.error);
+        if (statsRes.error) logger.warn('[Hub] player_playoff_stats fetch error', statsRes.error);
+
         const statsMap = new Map<number, Record<string, unknown>>();
-        for (const s of statsRes.data ?? []) {
+        for (const s of (statsRes.data ?? []) as Array<Record<string, unknown>>) {
           statsMap.set(s.player_id as number, s);
         }
 
         const scorer = new ScoringCalculator(league?.scoring_settings ?? null);
-        const ctx: RosterPlayerCtx[] = (pdRes.data ?? []).map(p => {
+        const ctx: RosterPlayerCtx[] = ((pdRes.data ?? []) as Array<{
+          player_id: number; full_name: string; position: string; team_abbrev: string;
+        }>).map(p => {
           const s = statsMap.get(p.player_id) ?? {};
           const num = (k: string) => Number(s[k] ?? 0);
           const isGoalie = !!s.is_goalie || p.position === 'G';
@@ -248,18 +257,8 @@ export default function PoolPlayoffHub() {
           };
         });
         setRosterCtx(ctx);
-
-        // 3. Today's playoff games
-        const today = new Date().toISOString().slice(0, 10);
-        const { data: gamesData } = await (supabase as unknown as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: unknown) => { eq: (k: string, v: unknown) => { order: (k: string) => Promise<{ data: PlayoffGameRow[] | null }> } } } } })
-          .from('nhl_games')
-          .select('game_id, game_date, game_time, home_team, away_team, home_score, away_score, status, period, period_time, series_game_number')
-          .eq('game_date', today)
-          .eq('game_type', 'playoff')
-          .order('game_time');
-        setTodayGames((gamesData ?? []) as PlayoffGameRow[]);
       } catch (err) {
-        logger.warn('Failed to load roster context on Hub', err);
+        logger.warn('[Hub] roster context load threw', err);
       }
     };
 
@@ -440,8 +439,12 @@ export default function PoolPlayoffHub() {
                 </CardContent>
               </Card>
 
-              {/* Today's Games + Team Breakdown — roster pools only */}
-              {leagueType === 'playoff-roster-pool' && rosterCtx.length > 0 && (() => {
+              {/* Today's Games + Team Breakdown — roster pools only.
+                  Renders whenever we have EITHER roster context OR at least
+                  one playoff game today, so users who haven't picked yet
+                  still see today's slate and users in an empty-game day
+                  still see their roster totals. */}
+              {leagueType === 'playoff-roster-pool' && (rosterCtx.length > 0 || todayGames.length > 0) && (() => {
                 const gameStatusLabel = (g: PlayoffGameRow) => {
                   if (g.status === 'final') return 'Final';
                   if (g.status === 'live') {
