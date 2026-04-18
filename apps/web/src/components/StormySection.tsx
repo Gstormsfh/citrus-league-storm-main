@@ -108,10 +108,10 @@ const StormySection = () => {
                 <Narwhal className="h-5 w-5 text-primary mr-2" />
                 <span className="text-sm font-medium">Powered by Advanced AI</span>
               </div>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Meet Stormy: Your AI GM Who Actually Watches Hockey</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">Meet Stormy: Your AI GM Who Knows Hockey</h2>
               <p className="text-lg text-foreground/80 max-w-xl">
-                Ask Stormy anything. Start or sit decisions. Trade analysis. Who to grab off waivers. 
-                Unlike those garbage generic AI tools, Stormy knows hockey—and won't tell you to start a healthy scratch.
+                Ask Stormy anything. Start or sit decisions. Trade analysis. Who to grab off waivers.
+                Stormy is plugged into your league — your roster, your scoring, your matchup — so every answer is grounded in your actual team.
               </p>
             </div>
 

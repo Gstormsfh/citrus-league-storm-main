@@ -32,7 +32,7 @@ const Footer = () => {
             </div>
             
             <p className="text-citrus-forest mb-8 max-w-sm font-sans leading-relaxed">
-              Fantasy hockey for people who actually watch hockey. Saturday finishes, live everything, and AI that doesn't give you garbage advice.
+              Fantasy hockey for people who actually watch hockey. Saturday finishes, live everything, and the most accurate NHL projections on earth.
             </p>
             
             {/* Social links removed until real accounts are live. Re-add
