@@ -107,6 +107,33 @@ const Auth = () => {
     const { error } = await signIn(email, password);
 
     if (error) {
+      // If "Invalid credentials", check whether the email actually exists
+      // but was created via OAuth (no password). Industry standard UX.
+      const isInvalidCreds = error.message?.toLowerCase().includes('invalid') || error.message?.toLowerCase().includes('credentials');
+      if (isInvalidCreds) {
+        try {
+          const apiBase = import.meta.env.VITE_API_URL || '';
+          const res = await fetch(`${apiBase}/api/auth/check-method`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          const info = (await res.json())?.data || (await res.json());
+          if (info?.exists && !info.has_password) {
+            const oauthProviders = (info.providers || []).filter((p: string) => p !== 'email');
+            if (oauthProviders.includes('google')) {
+              setError("This email was registered with Google. Click 'Sign in with Google' above to continue.");
+              setLoading(false);
+              return;
+            }
+            if (oauthProviders.length > 0) {
+              setError(`This email was registered with ${oauthProviders[0]}. Use that option above to sign in.`);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch { /* silently fall through to generic error */ }
+      }
       setError(getBetterErrorMessage(error.message));
       setLoading(false);
       return;

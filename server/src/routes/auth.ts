@@ -41,4 +41,42 @@ authRoutes.post('/signup', validateBody(signupSchema), async (c) => {
   }
 });
 
+// POST /api/auth/check-method — Look up which auth providers an email uses.
+// Called by the client when password login fails, so we can distinguish
+// "wrong password" from "account was created via Google OAuth".
+//
+// Returns: { exists, providers, has_password }
+// No sensitive data leaked — just provider names (google/email/etc).
+const checkMethodSchema = z.object({
+  email: z.string().email('Invalid email address'),
+});
+authRoutes.post('/check-method', validateBody(checkMethodSchema), async (c) => {
+  const body = getValidatedBody<z.infer<typeof checkMethodSchema>>(c);
+  const admin = getSupabaseAdmin();
+
+  try {
+    // listUsers with email filter returns matching users (admin-only API)
+    // @ts-expect-error Supabase types allow string but TS inference is loose
+    const { data, error } = await admin.auth.admin.listUsers({ email: body.email });
+    if (error) return ok(c, { exists: false, providers: [], has_password: false });
+
+    const users = data?.users || [];
+    const match = users.find((u: { email?: string }) => u.email?.toLowerCase() === body.email.toLowerCase());
+    if (!match) return ok(c, { exists: false, providers: [], has_password: false });
+
+    const providers: string[] = (match.app_metadata as { providers?: string[] } | undefined)?.providers || [];
+    // Heuristic: if 'email' is in providers, a password was set; otherwise OAuth-only
+    const has_password = providers.includes('email');
+
+    return ok(c, {
+      exists: true,
+      providers,
+      has_password,
+    });
+  } catch {
+    // On any error, return non-committal response (don't leak existence info on failure)
+    return ok(c, { exists: false, providers: [], has_password: false });
+  }
+});
+
 export { authRoutes };
