@@ -383,16 +383,6 @@ export default function PoolPlayoffHub() {
                     <span className="text-lg font-mono font-bold text-citrus-forest tracking-wider">{league.join_code}</span>
                     {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4 text-citrus-charcoal/50" />}
                   </button>
-                  <div className="text-[10px] uppercase font-display text-citrus-charcoal/50 mt-2">Or share link</div>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(shareUrl);
-                      toast({ title: 'Link copied!' });
-                    }}
-                    className="w-full text-left text-[11px] p-2 rounded border border-citrus-sage/20 bg-white hover:bg-citrus-sage/5 break-all"
-                  >
-                    {shareUrl}
-                  </button>
                 </CardContent>
               </Card>
 

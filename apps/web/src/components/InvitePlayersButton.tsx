@@ -38,16 +38,11 @@ export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButto
   const joinPath = `/create-league?tab=join&code=${joinCode}`;
   const inviteLink = `${window.location.origin}/auth?redirect=${encodeURIComponent(joinPath)}`;
 
-  const inviteText = `Join my league "${leagueName}" on Citrus Fantasy Sports!\n\nJoin Code: ${joinCode}\n\nJoin here: ${inviteLink}`;
+  const inviteText = `Join my league "${leagueName}" on Citrus Fantasy Sports!\n\nJoin Code: ${joinCode}\n\nGo to citrusfantasysports.com → Join League → Enter Code`;
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(joinCode);
     toast({ title: 'Copied!', description: 'Join code copied to clipboard' });
-  };
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(inviteLink);
-    toast({ title: 'Copied!', description: 'Invite link copied to clipboard' });
   };
 
   const handleEmail = () => {
