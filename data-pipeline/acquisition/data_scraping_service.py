@@ -761,41 +761,54 @@ if __name__ == "__main__":
                 break
             
             # ADAPTIVE SCHEDULING: Use game state to determine refresh rate
-            # With 100 IPs, we can be MUCH more aggressive during live action
+            # With 100 IPs, we can be MUCH more aggressive during live action.
+            # Widened the "game hours" window from 5pm-11pm MT to 10am-1am MT
+            # to cover playoff afternoon starts (3pm ET = 1pm MT) and West
+            # Coast late games that can run past midnight MT.
             from zoneinfo import ZoneInfo
             now = dt.datetime.now(ZoneInfo("America/Denver"))
-            is_game_hours = 17 <= now.hour <= 23  # 5pm-11pm MT
-            
+            is_game_hours = (now.hour >= 10) or (now.hour <= 1)  # 10am-1am MT
+
             # LIVE GAME MODE - Ultra-safe aggressive refresh (30 seconds)
             if game_state == "LIVE" and live_count > 0:
                 sleep_time = 30  # 30s refresh - bulletproof against rate limits!
                 logger.info(f"[LIVE] {live_count} LIVE GAMES - Aggressive Mode (30s refresh)...")
-            
+
             # INTERMISSION MODE - Moderate refresh (60 seconds)
             elif game_state == "INTERMISSION" and is_game_hours:
                 sleep_time = 60  # Games on break, check every minute
                 logger.info("[INT] Intermission - checking every 60s...")
-            
+
             # ALL FINAL CACHED MODE - All games cached within TTL (30 minutes)
             elif game_state == "ALL_FINAL_CACHED":
                 sleep_time = 1800  # 30 minutes - all cached, minimal monitoring
                 logger.info("[FINAL] All games FINAL (all cached) - extended sleep (30 min)...")
-            
+
             # ALL FINAL MODE - Some games needed TTL refresh (10 minutes)
             elif game_state == "ALL_FINAL":
                 sleep_time = 600  # 10 minutes - checking for stat corrections
                 logger.info("[FINAL] All games FINAL - checking for stat corrections (10 min)...")
-            
+
             # SCHEDULED MODE - Games haven't started yet (2 minutes)
             elif game_state == "SCHEDULED" and is_game_hours:
                 sleep_time = 120  # Check every 2 min for game start
                 logger.info("[SCHED] Pre-game - checking every 2 min...")
-            
+
+            # PRE-GAME detected (any time) — tight poll to catch the flip to LIVE.
+            # Game states from NHL API come back as "PRE"/"FUT" before LIVE.
+            # If the loop returned ("OFF_HOURS", 0) but we're in game hours
+            # and there WERE games in today's slate, poll every 60s instead
+            # of sleeping 5 min — this was the bug where the 3pm ET game
+            # starts but we wait 5 min to notice.
+            elif is_game_hours and live_count == 0:
+                sleep_time = 60
+                logger.info("[GAME HOURS] No live games detected but slate active — polling every 60s for game start...")
+
             # ERROR MODE - Back off exponentially
             elif game_state == "ERROR":
                 sleep_time = min(300, 30 * (2 ** consecutive_failures))  # Max 5 min
                 logger.warning(f"[RECOVERY] ERROR recovery mode - waiting {sleep_time}s...")
-            
+
             # OFF HOURS - Save bandwidth (5 minutes)
             else:
                 sleep_time = 300  # 5 minutes when no games
