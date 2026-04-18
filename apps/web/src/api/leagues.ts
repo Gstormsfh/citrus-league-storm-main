@@ -43,10 +43,16 @@ export const leagueApi = {
     return apiClient.post('/api/leagues', params);
   },
 
-  /** Join a league by invite code */
+  /** Join a league by invite code.
+   *
+   * CRITICAL: retries:0 because this endpoint is NOT idempotent at the
+   * RPC layer — a retried POST that actually succeeded would return
+   * 'already a member' and confuse users. Mobile SMS invite flow used
+   * to trigger this: slow network → client timeout → silent retry →
+   * 'already a member' error shown even though join succeeded. */
   joinLeague(params: { joinCode: string; teamName?: string }) {
     c.invalidate('leagues:');
-    return apiClient.post('/api/leagues/join', params);
+    return apiClient.post('/api/leagues/join', params, { retries: 0 });
   },
 
   /** Update league settings (commissioner only) */

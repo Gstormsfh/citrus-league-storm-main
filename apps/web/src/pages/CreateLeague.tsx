@@ -603,20 +603,26 @@ const CreateLeague = () => {
         /already (a )?member/i.test(errorMessage) ||
         /already joined/i.test(errorMessage);
 
+      // Safety net for older server code or race conditions. With the
+      // idempotent RPC this path shouldn't trigger — a successful retry
+      // returns 200 with the existing team. But if it does, present it
+      // as a normal successful join (no scary toast) so the user just
+      // sees "Joined League!" and lands on the pool page.
       if (isAlreadyMember) {
         try {
           await refreshLeagues();
-          // Look up the league by join code so we can route to the right pool page.
           const { data: leagueRow } = await supabase
             .from('leagues')
-            .select('id, settings')
+            .select('id, name, settings')
             .eq('join_code', effectiveCode)
             .maybeSingle();
 
           setLoading(false);
           toast({
-            title: "Already Joined!",
-            description: "You're already in this league — taking you there now.",
+            title: "Joined League!",
+            description: leagueRow?.name
+              ? `Welcome to ${leagueRow.name}!`
+              : "You're in — taking you to the pool now.",
           });
 
           if (leagueRow?.id) {
