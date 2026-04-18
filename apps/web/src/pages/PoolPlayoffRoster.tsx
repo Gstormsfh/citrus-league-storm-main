@@ -18,6 +18,7 @@ import {
   Search, Trophy, User, Shield, Star, X, Check, Save, Lock, Users, ArrowLeft,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -114,6 +115,14 @@ export default function PoolPlayoffRosterEntry() {
   const [locked, setLocked] = useState(false);
   const [sortBy, setSortBy] = useState<string>('fpts');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [statsModalPlayer, setStatsModalPlayer] = useState<PoolPlayer | null>(null);
+
+  // Shorten full name for mobile: "Connor McDavid" -> "C. McDavid"
+  const shortName = (full: string): string => {
+    const parts = full.trim().split(/\s+/);
+    if (parts.length < 2) return full;
+    return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
+  };
 
   const toggleSort = (col: string) => {
     if (sortBy === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
@@ -123,7 +132,10 @@ export default function PoolPlayoffRosterEntry() {
   // Defaults
   const rosterSize = league?.settings?.playoffRosterSize ?? 18;
   const posReqs = league?.settings?.positionRequirements ?? { F: 9, D: 6, G: 2 };
-  const maxPerTeam = league?.settings?.maxPlayersPerTeam ?? 3;
+  // 0 or undefined = no cap (draft as many Oilers as you want).
+  // Commissioner sets this explicitly if they want a restriction.
+  const maxPerTeam = league?.settings?.maxPlayersPerTeam ?? 0;
+  const hasCap = maxPerTeam > 0;
 
   // Scoring
   const scorer = useMemo(
@@ -276,7 +288,7 @@ export default function PoolPlayoffRosterEntry() {
     if (norm === 'G' && posCounts.G >= posReqs.G) return false;
     if (norm === 'D' && posCounts.D >= posReqs.D) return false;
     if (isForward(p.position) && posCounts.F >= posReqs.F) return false;
-    if ((teamCounts.get(p.team) || 0) >= maxPerTeam) return false;
+    if (hasCap && (teamCounts.get(p.team) || 0) >= maxPerTeam) return false;
     return true;
   };
 
@@ -411,7 +423,7 @@ export default function PoolPlayoffRosterEntry() {
               </button>
               {allTeams.map(team => {
                 const count = teamCounts.get(team) || 0;
-                const atCap = count >= maxPerTeam;
+                const atCap = hasCap && count >= maxPerTeam;
                 return (
                   <button
                     key={team}
@@ -508,7 +520,7 @@ export default function PoolPlayoffRosterEntry() {
                       const addable = canAdd(player);
                       const fpts = calcFpts(player);
                       const norm = normalizePos(player.position);
-                      const teamAtCap = (teamCounts.get(player.team) || 0) >= maxPerTeam;
+                      const teamAtCap = hasCap && (teamCounts.get(player.team) || 0) >= maxPerTeam;
                       return (
                         <tr
                           key={player.id}
@@ -528,9 +540,19 @@ export default function PoolPlayoffRosterEntry() {
                           <td className="px-2 py-1.5">
                             <div className="flex items-center gap-1.5">
                               {onRoster && <Check className="h-3.5 w-3.5 text-citrus-sage flex-shrink-0" />}
-                              <span className={cn('text-sm font-medium truncate', onRoster && 'text-citrus-forest font-bold')}>
-                                {player.full_name}
-                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setStatsModalPlayer(player); }}
+                                className={cn(
+                                  'text-sm font-medium truncate text-left hover:text-citrus-orange hover:underline transition-colors',
+                                  onRoster && 'text-citrus-forest font-bold'
+                                )}
+                                title="View player details"
+                              >
+                                {/* Mobile: "C. McDavid" ; Desktop: "Connor McDavid" */}
+                                <span className="sm:hidden">{shortName(player.full_name)}</span>
+                                <span className="hidden sm:inline">{player.full_name}</span>
+                              </button>
                             </div>
                           </td>
                           <td className="px-2 py-1.5 text-center">
@@ -655,7 +677,14 @@ export default function PoolPlayoffRosterEntry() {
                       <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-citrus-sage/5 rounded border border-citrus-sage/20">
                         <div className="flex items-center gap-2 min-w-0">
                           <Badge variant="outline" className="text-[9px] px-1 border-citrus-sage">{normalizePos(p.position)}</Badge>
-                          <span className="text-xs font-medium truncate">{p.full_name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setStatsModalPlayer(p)}
+                            className="text-xs font-medium truncate text-left hover:text-citrus-orange hover:underline transition-colors"
+                          >
+                            <span className="sm:hidden">{shortName(p.full_name)}</span>
+                            <span className="hidden sm:inline">{p.full_name}</span>
+                          </button>
                           <span className="text-[10px] text-citrus-charcoal/50">{p.team}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -685,7 +714,14 @@ export default function PoolPlayoffRosterEntry() {
                       <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-blue-50/40 rounded border border-blue-200/30">
                         <div className="flex items-center gap-2 min-w-0">
                           <Badge variant="outline" className="text-[9px] px-1 border-blue-300 text-blue-700">D</Badge>
-                          <span className="text-xs font-medium truncate">{p.full_name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setStatsModalPlayer(p)}
+                            className="text-xs font-medium truncate text-left hover:text-citrus-orange hover:underline transition-colors"
+                          >
+                            <span className="sm:hidden">{shortName(p.full_name)}</span>
+                            <span className="hidden sm:inline">{p.full_name}</span>
+                          </button>
                           <span className="text-[10px] text-citrus-charcoal/50">{p.team}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -715,7 +751,14 @@ export default function PoolPlayoffRosterEntry() {
                       <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-purple-50/40 rounded border border-purple-200/30">
                         <div className="flex items-center gap-2 min-w-0">
                           <Badge variant="outline" className="text-[9px] px-1 border-purple-300 text-purple-700">G</Badge>
-                          <span className="text-xs font-medium truncate">{p.full_name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setStatsModalPlayer(p)}
+                            className="text-xs font-medium truncate text-left hover:text-citrus-orange hover:underline transition-colors"
+                          >
+                            <span className="sm:hidden">{shortName(p.full_name)}</span>
+                            <span className="hidden sm:inline">{p.full_name}</span>
+                          </button>
                           <span className="text-[10px] text-citrus-charcoal/50">{p.team}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -750,10 +793,10 @@ export default function PoolPlayoffRosterEntry() {
                             variant="outline"
                             className={cn(
                               'text-[10px]',
-                              count >= maxPerTeam ? 'border-red-300 text-red-700 bg-red-50' : 'border-citrus-sage/30'
+                              hasCap && count >= maxPerTeam ? 'border-red-300 text-red-700 bg-red-50' : 'border-citrus-sage/30'
                             )}
                           >
-                            {team}: {count}/{maxPerTeam}
+                            {team}: {hasCap ? `${count}/${maxPerTeam}` : count}
                           </Badge>
                         ))}
                     </div>
@@ -767,7 +810,8 @@ export default function PoolPlayoffRosterEntry() {
               <div className="text-[10px] font-display font-bold uppercase text-citrus-charcoal/50 mb-1">How it works</div>
               <ul className="text-[11px] text-citrus-charcoal/70 space-y-0.5 list-disc pl-3">
                 <li>Pick {rosterSize} players from playoff teams</li>
-                <li>Max {maxPerTeam} players per NHL team</li>
+                {hasCap && <li>Max {maxPerTeam} players per NHL team</li>}
+                {!hasCap && <li>No per-team cap — draft all 18 from one squad if you want</li>}
                 <li>Total fantasy points across all playoff games</li>
                 <li>Click any player row to add them</li>
                 <li>Your FPTS uses your league's custom scoring</li>
@@ -777,6 +821,34 @@ export default function PoolPlayoffRosterEntry() {
         </div>
       </div>
     </div>
+    {/* Player detail modal — opens when clicking any player name */}
+    <PlayerStatsModal
+      player={statsModalPlayer ? {
+        id: statsModalPlayer.id,
+        full_name: statsModalPlayer.full_name,
+        position: statsModalPlayer.position,
+        team: statsModalPlayer.team,
+        games_played: statsModalPlayer.games_played,
+        goals: statsModalPlayer.goals,
+        assists: statsModalPlayer.assists,
+        points: statsModalPlayer.points,
+        shots: statsModalPlayer.shots,
+        hits: statsModalPlayer.hits,
+        blocks: statsModalPlayer.blocks,
+        pim: statsModalPlayer.pim,
+        ppp: statsModalPlayer.ppp,
+        shp: statsModalPlayer.shp,
+        plus_minus: statsModalPlayer.plus_minus ?? 0,
+        xGoals: statsModalPlayer.xGoals ?? statsModalPlayer.x_goals ?? 0,
+        icetime_seconds: statsModalPlayer.icetime_seconds ?? 0,
+        wins: statsModalPlayer.wins,
+        saves: statsModalPlayer.saves,
+        shutouts: statsModalPlayer.shutouts,
+        goals_against: statsModalPlayer.goals_against,
+      } as unknown as Parameters<typeof PlayerStatsModal>[0]['player'] : null}
+      isOpen={!!statsModalPlayer}
+      onClose={() => setStatsModalPlayer(null)}
+    />
     </>
   );
 }

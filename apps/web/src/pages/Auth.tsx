@@ -42,10 +42,12 @@ const Auth = () => {
   }, []);
 
   // Reactive redirect: once AuthContext commits user state, navigate away.
-  // This replaces imperative navigate('/') calls which raced with setUser.
+  // Honors ?redirect=<path> so share-link flows survive the auth round trip.
   useEffect(() => {
     if (!authLoading && user) {
-      navigate('/', { replace: true });
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect');
+      navigate(redirect && redirect.startsWith('/') ? redirect : '/', { replace: true });
     }
   }, [user, authLoading, navigate]);
 
@@ -122,7 +124,11 @@ const Auth = () => {
           access_token: sessionData.session.access_token,
           refresh_token: sessionData.session.refresh_token,
         });
-        setTimeout(() => navigate('/', { replace: true }), 50);
+        setTimeout(() => {
+          const params = new URLSearchParams(window.location.search);
+          const redirect = params.get('redirect');
+          navigate(redirect && redirect.startsWith('/') ? redirect : '/', { replace: true });
+        }, 50);
         return;
       }
     } catch (sessionError) {
@@ -200,7 +206,11 @@ const Auth = () => {
           refresh_token: data.session.refresh_token,
         });
         // Let the state propagate one tick before redirecting
-        setTimeout(() => navigate('/', { replace: true }), 50);
+        setTimeout(() => {
+          const params = new URLSearchParams(window.location.search);
+          const redirect = params.get('redirect');
+          navigate(redirect && redirect.startsWith('/') ? redirect : '/', { replace: true });
+        }, 50);
       } else {
         navigate('/verify-email', { state: { email }, replace: true });
       }

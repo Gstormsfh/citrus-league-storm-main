@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -215,6 +215,22 @@ const CreateLeague = () => {
       setLeagueType('playoff-bracket-pickem');
     }
   }, [searchParams]);
+
+  // Auto-join if share link has ?code= AND user is logged in.
+  // Previously users clicked an invite link, landed on the join tab with
+  // code pre-filled, and had to hit "Join" manually. Now it fires automatically.
+  const autoJoinFiredRef = useRef(false);
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (code && user && !autoJoinFiredRef.current && !loading) {
+      autoJoinFiredRef.current = true;
+      setJoinCode(code);
+      setDefaultTab('join');
+      // Small delay so state updates settle before firing the join
+      setTimeout(() => handleJoinLeague(), 150);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, searchParams]);
 
   // Reset format settings and smart defaults when league type changes
   useEffect(() => {

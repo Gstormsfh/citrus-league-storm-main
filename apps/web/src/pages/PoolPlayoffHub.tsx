@@ -139,7 +139,11 @@ export default function PoolPlayoffHub() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const shareUrl = `${window.location.origin}/create-league?tab=join&code=${league?.join_code || ''}`;
+  // Shareable invite URL.
+  // /auth honors ?redirect= so if the invitee is signed out, they go through
+  // auth, then come back here and auto-join via the ?code= handler in CreateLeague.
+  const joinPath = `/create-league?tab=join&code=${league?.join_code || ''}`;
+  const shareUrl = `${window.location.origin}/auth?redirect=${encodeURIComponent(joinPath)}`;
 
   if (loading) {
     return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center text-citrus-charcoal/60">Loading pool...</div></>;
