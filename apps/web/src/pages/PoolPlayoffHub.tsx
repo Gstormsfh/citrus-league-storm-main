@@ -302,6 +302,31 @@ export default function PoolPlayoffHub() {
     [rosterCtx],
   );
 
+  // Standings from playoff_pool_standings (real FPTS, not hardcoded 0)
+  const [standings, setStandings] = useState<Array<{ user_id: string; total_points: number; current_rank: number }>>([]);
+
+  useEffect(() => {
+    if (!leagueId) return;
+    const fetchStandings = async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data } = await (supabase as any)
+          .from('playoff_pool_standings')
+          .select('user_id, total_points, current_rank')
+          .eq('league_id', leagueId)
+          .order('current_rank');
+        setStandings((data ?? []).map((r: { user_id: string; total_points: number | string; current_rank: number }) => ({
+          user_id: r.user_id,
+          total_points: Number(r.total_points ?? 0),
+          current_rank: r.current_rank,
+        })));
+      } catch { /* non-critical */ }
+    };
+    fetchStandings();
+    const interval = setInterval(fetchStandings, 60_000);
+    return () => clearInterval(interval);
+  }, [leagueId]);
+
   const leagueType = league?.settings?.leagueType || 'playoff-bracket-pickem';
   const poolLabel = POOL_TYPE_LABELS[leagueType] || 'Playoff Pool';
   const makePicksRoute = POOL_TYPE_ROUTES[leagueType] || '/pool/playoff-bracket';
@@ -874,20 +899,26 @@ export default function PoolPlayoffHub() {
                             </tr>
                           </thead>
                           <tbody>
-                            {teams.map((t, i) => (
+                            {teams
+                              .map(t => {
+                                const s = standings.find(st => st.user_id === t.owner_id);
+                                return { ...t, pts: s?.total_points ?? 0, rank: s?.current_rank ?? 999 };
+                              })
+                              .sort((a, b) => a.rank - b.rank || b.pts - a.pts)
+                              .map((t, i) => (
                               <tr key={t.id} className={cn("border-b border-citrus-sage/10 last:border-b-0", t.owner_id === user?.id && "bg-citrus-sage/5")}>
                                 <td className="px-2 py-1.5 text-xs font-mono text-citrus-charcoal/50">{i + 1}</td>
                                 <td className="px-2 py-1.5 text-sm">
                                   <span className="font-medium">{t.team_name}</span>
                                   {t.owner_id === user?.id && <span className="text-[10px] text-citrus-sage ml-1">(You)</span>}
                                 </td>
-                                <td className="px-2 py-1.5 text-sm text-right font-bold text-citrus-forest">0</td>
+                                <td className="px-2 py-1.5 text-sm text-right font-bold text-citrus-forest tabular-nums">{t.pts.toFixed(1)}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
-                      <p className="text-[10px] text-citrus-charcoal/50 mt-2 italic">Rankings update live as playoff games complete.</p>
+                      <p className="text-[10px] text-citrus-charcoal/50 mt-2 italic">Rankings update every 60 seconds during live games.</p>
                     </>
                   )}
                 </CardContent>
