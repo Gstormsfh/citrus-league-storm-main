@@ -14,6 +14,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
   Trophy, Users, Clock, Copy, Check, Lock, ChevronRight, Crown, Target,
+  Mail, MessageSquare, Link as LinkIcon,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -144,6 +145,35 @@ export default function PoolPlayoffHub() {
   // auth, then come back here and auto-join via the ?code= handler in CreateLeague.
   const joinPath = `/create-league?tab=join&code=${league?.join_code || ''}`;
   const shareUrl = `${window.location.origin}/auth?redirect=${encodeURIComponent(joinPath)}`;
+
+  // Invite template includes BOTH the tappable link AND the raw code as a
+  // fallback for mail clients that strip URLs.
+  const inviteText = league
+    ? `You're invited to join "${league.name}" on Citrus Fantasy Sports!\n\n` +
+      `Tap to join: ${shareUrl}\n\n` +
+      `Or enter this code manually at citrusfantasysports.com:\n` +
+      `${league.join_code}`
+    : '';
+
+  const copyShareLink = () => {
+    navigator.clipboard.writeText(shareUrl);
+    toast({ title: 'Link copied!', description: 'Paste it anywhere to invite friends.' });
+  };
+
+  const emailInvite = () => {
+    if (!league) return;
+    const subject = encodeURIComponent(`Join ${league.name} on Citrus Fantasy Sports`);
+    const body = encodeURIComponent(inviteText);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
+
+  const smsInvite = () => {
+    const body = encodeURIComponent(inviteText);
+    // iOS requires sms:&body= while Android uses sms:?body=
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const separator = isIOS ? '&' : '?';
+    window.location.href = `sms:${separator}body=${body}`;
+  };
 
   if (loading) {
     return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center text-citrus-charcoal/60">Loading pool...</div></>;
@@ -383,6 +413,36 @@ export default function PoolPlayoffHub() {
                     <span className="text-lg font-mono font-bold text-citrus-forest tracking-wider">{league.join_code}</span>
                     {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4 text-citrus-charcoal/50" />}
                   </button>
+
+                  <div className="pt-2 grid grid-cols-1 gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={copyShareLink}
+                      className="w-full justify-start gap-2 text-xs h-8"
+                    >
+                      <LinkIcon className="h-3.5 w-3.5" />
+                      Copy Invite Link
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={emailInvite}
+                      className="w-full justify-start gap-2 text-xs h-8"
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      Send via Email
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={smsInvite}
+                      className="w-full justify-start gap-2 text-xs h-8"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      Send via Text
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 
