@@ -1,7 +1,7 @@
 {
   "projects": {
     "default": "citrus-fantasy-sports",
-    "New": "citrus-fantasy-prod"
+    "prod": "citrus-fantasy-prod"
   },
   "targets": {},
   "etags": {}
