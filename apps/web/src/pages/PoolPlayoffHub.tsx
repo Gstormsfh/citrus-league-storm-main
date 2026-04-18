@@ -483,12 +483,18 @@ export default function PoolPlayoffHub() {
                               key={t.team}
                               variant="outline"
                               className={cn(
-                                'text-[11px] font-mono',
-                                t.game?.status === 'live' && 'border-green-500 bg-green-50 text-green-700',
+                                'text-[11px] font-mono flex items-center gap-1',
+                                t.game?.status === 'live' && 'border-red-500 bg-red-50 text-red-700',
                                 t.game?.status === 'final' && 'border-muted bg-muted/40',
                                 t.game?.status === 'scheduled' && 'border-citrus-sage/50',
                               )}
                             >
+                              {t.game?.status === 'live' && (
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                                </span>
+                              )}
                               {t.team}
                             </Badge>
                           ))}
@@ -499,11 +505,21 @@ export default function PoolPlayoffHub() {
                       <div className="space-y-3">
                         {teamsBreakdown.map(({ team, players, totalFpts, game }) => (
                           <div key={team} className={cn(
-                            'rounded-lg border p-3 transition-colors',
-                            game?.status === 'live' ? 'border-green-400 bg-green-50/40' :
+                            'rounded-lg border p-3 transition-colors relative',
+                            game?.status === 'live' ? 'border-red-400 bg-red-50/40 ring-1 ring-red-400/20' :
                             game?.status === 'final' ? 'border-citrus-charcoal/20 bg-muted/20' :
                             'border-citrus-sage/20 bg-white'
                           )}>
+                            {/* LIVE ribbon — top-right corner badge that pulses */}
+                            {game?.status === 'live' && (
+                              <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-varsity font-black uppercase px-2 py-0.5 rounded-full shadow-md">
+                                <span className="relative flex h-1.5 w-1.5">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
+                                </span>
+                                LIVE
+                              </div>
+                            )}
                             {/* Team header */}
                             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                               <div className="flex items-center gap-2">
@@ -512,14 +528,17 @@ export default function PoolPlayoffHub() {
                               </div>
                               {game ? (
                                 <div className="text-[11px] flex items-center gap-2">
-                                  <span className="font-mono font-semibold">
+                                  <span className={cn(
+                                    'font-mono font-semibold',
+                                    game.status === 'live' && 'text-red-700',
+                                  )}>
                                     {game.away_team} {game.away_score}–{game.home_score} {game.home_team}
                                   </span>
                                   <Badge
                                     variant="outline"
                                     className={cn(
                                       'text-[9px] px-1.5 py-0',
-                                      game.status === 'live' && 'border-green-500 bg-green-500 text-white',
+                                      game.status === 'live' && 'border-red-600 bg-red-600 text-white animate-pulse',
                                       game.status === 'final' && 'border-muted bg-muted/60',
                                       game.status === 'scheduled' && 'border-citrus-sage/50',
                                     )}
@@ -554,6 +573,7 @@ export default function PoolPlayoffHub() {
                                     <th className="text-right py-1 px-1 font-bold">G</th>
                                     <th className="text-right py-1 px-1 font-bold">A</th>
                                     <th className="text-right py-1 px-1 font-bold">PTS</th>
+                                    <th className="text-right py-1 px-1 font-bold hidden sm:table-cell">+/-</th>
                                     <th className="text-right py-1 px-1 font-bold hidden sm:table-cell">SOG</th>
                                     <th className="text-right py-1 px-1 font-bold hidden sm:table-cell">HIT</th>
                                     <th className="text-right py-1 px-1 font-bold hidden sm:table-cell">BLK</th>
@@ -579,6 +599,13 @@ export default function PoolPlayoffHub() {
                                       <td className="py-1.5 px-1 text-right tabular-nums">{p.is_goalie ? '' : p.goals}</td>
                                       <td className="py-1.5 px-1 text-right tabular-nums">{p.is_goalie ? '' : p.assists}</td>
                                       <td className="py-1.5 px-1 text-right tabular-nums font-semibold">{p.is_goalie ? '' : p.points}</td>
+                                      <td className={cn(
+                                        'py-1.5 px-1 text-right tabular-nums hidden sm:table-cell',
+                                        !p.is_goalie && p.plus_minus > 0 && 'text-green-700',
+                                        !p.is_goalie && p.plus_minus < 0 && 'text-red-600',
+                                      )}>
+                                        {p.is_goalie ? '' : (p.plus_minus > 0 ? `+${p.plus_minus}` : p.plus_minus)}
+                                      </td>
                                       <td className="py-1.5 px-1 text-right tabular-nums hidden sm:table-cell">{p.is_goalie ? '' : p.shots}</td>
                                       <td className="py-1.5 px-1 text-right tabular-nums hidden sm:table-cell">{p.is_goalie ? '' : p.hits}</td>
                                       <td className="py-1.5 px-1 text-right tabular-nums hidden sm:table-cell">{p.is_goalie ? '' : p.blocks}</td>
