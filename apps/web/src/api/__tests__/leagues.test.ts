@@ -217,11 +217,11 @@ describe('leagueApi', () => {
   // joinLeague
   // ---------------------------------------------------------------------------
   describe('joinLeague', () => {
-    it('calls apiClient.post with correct path and body', async () => {
+    it('calls apiClient.post with correct path and body and retries:0 (non-idempotent)', async () => {
       const params = { joinCode: 'ABC123', teamName: 'My Team' };
       mockPost.mockReturnValue(resolveWith({ success: true }));
       await leagueApi.joinLeague(params);
-      expect(mockPost).toHaveBeenCalledWith('/api/leagues/join', params);
+      expect(mockPost).toHaveBeenCalledWith('/api/leagues/join', params, { retries: 0 });
     });
 
     it('invalidates user leagues cache', async () => {
