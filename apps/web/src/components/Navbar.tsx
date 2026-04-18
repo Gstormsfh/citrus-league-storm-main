@@ -488,10 +488,6 @@ const Navbar = () => {
                 <Newspaper className="h-4 w-4" />
                 <span className="text-[14px] font-display font-medium">News</span>
               </Link>
-              <Link to="/blog" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-citrus-charcoal/70">
-                <Calendar className="h-4 w-4" />
-                <span className="text-[14px] font-display font-medium">Blog</span>
-              </Link>
               <Link to="/contact" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-citrus-charcoal/70">
                 <Newspaper className="h-4 w-4" />
                 <span className="text-[14px] font-display font-medium">Contact</span>

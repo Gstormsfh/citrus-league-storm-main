@@ -1,5 +1,5 @@
 
-import { Facebook, Twitter, Instagram, Youtube, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Link } from 'react-router-dom';
@@ -35,21 +35,8 @@ const Footer = () => {
               Fantasy hockey for people who actually watch hockey. Saturday finishes, live everything, and AI that doesn't give you garbage advice.
             </p>
             
-            {/* Social Links with Varsity Style */}
-            <div className="flex gap-3">
-              <a href="#" aria-label="Facebook" className="w-11 h-11 bg-citrus-sage/20 dark:bg-muted border-2 border-citrus-sage dark:border-border rounded-varsity flex items-center justify-center hover:bg-citrus-sage hover:shadow-patch hover:-translate-y-0.5 transition-all group">
-                <Facebook size={18} className="text-citrus-forest dark:text-foreground group-hover:text-[#E8EED9] transition-colors" />
-              </a>
-              <a href="#" aria-label="Twitter" className="w-11 h-11 bg-citrus-sage/20 dark:bg-muted border-2 border-citrus-sage dark:border-border rounded-varsity flex items-center justify-center hover:bg-citrus-sage hover:shadow-patch hover:-translate-y-0.5 transition-all group">
-                <Twitter size={18} className="text-citrus-forest dark:text-foreground group-hover:text-[#E8EED9] transition-colors" />
-              </a>
-              <a href="#" aria-label="Instagram" className="w-11 h-11 bg-citrus-sage/20 dark:bg-muted border-2 border-citrus-sage dark:border-border rounded-varsity flex items-center justify-center hover:bg-citrus-sage hover:shadow-patch hover:-translate-y-0.5 transition-all group">
-                <Instagram size={18} className="text-citrus-forest dark:text-foreground group-hover:text-[#E8EED9] transition-colors" />
-              </a>
-              <a href="#" aria-label="YouTube" className="w-11 h-11 bg-citrus-sage/20 dark:bg-muted border-2 border-citrus-sage dark:border-border rounded-varsity flex items-center justify-center hover:bg-citrus-sage hover:shadow-patch hover:-translate-y-0.5 transition-all group">
-                <Youtube size={18} className="text-citrus-forest dark:text-foreground group-hover:text-[#E8EED9] transition-colors" />
-              </a>
-            </div>
+            {/* Social links removed until real accounts are live. Re-add
+                when Facebook / Twitter / Instagram / YouTube are active. */}
           </div>
           
           <div>
