@@ -11,7 +11,6 @@ import { Label } from '@/components/ui/label';
 import { Zap, MessageSquare, Clock, Shield, Settings, Crown, Send, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Narwhal } from '@/components/icons/Narwhal';
 import { isGuestMode } from '@/utils/guestHelpers';
@@ -20,7 +19,8 @@ import { CitrusBackground } from '@/components/CitrusBackground';
 import { CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/CitrusIcons';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
-import { StormyService, fetchLeagueContext, type StormyMessage, type StormyContext } from '@/services/StormyService';
+import { StormyService, fetchLeagueContext, fetchPlayoffPoolContext, type StormyMessage, type StormyContext } from '@/services/StormyService';
+import { isPlayoffPoolLeague, getLeagueTypeFromSettings } from '@/utils/leagueTypeHelpers';
 
 interface ChatMessage {
   id: string;
@@ -39,7 +39,7 @@ const StormyAssistant = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [messagesUsed, setMessagesUsed] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const defaultGreeting = "Hey! I'm Stormy — your Assistant GM powered by our xG projection model. I already know your league settings, roster, and matchup. Let's win your week — what's on your mind?";
+  const defaultGreeting = "Hey! I'm Stormy — your Assistant GM. I already know your league, your picks/roster, and the live playoff bracket. Ask me to review your team, suggest swaps, or break down any matchup. What do you want to tackle?";
   const apiHistoryRef = useRef<StormyMessage[]>((() => {
     try {
       const saved = localStorage.getItem('stormyApiHistory');
@@ -71,11 +71,42 @@ const StormyAssistant = () => {
     try { localStorage.setItem('stormyApiHistory', JSON.stringify(apiHistoryRef.current.slice(-50))); } catch { /* quota */ }
   });
 
+  // Proactively warm the context as soon as the page loads so the user's
+  // first message doesn't wait on a DB roundtrip. Investor feedback: Stormy
+  // should feel instantly useful — no spinner delay on the first question.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, activeTab]);
+    const leagueId = activeLeagueId;
+    const userId = auth?.user?.id;
+    if (!leagueId || !userId || leagueCtxFetchedForRef.current === leagueId) return;
+    (async () => {
+      try {
+        const settingsLeagueType = getLeagueTypeFromSettings(
+          (activeLeague?.settings as Record<string, unknown> | undefined) ?? null,
+        );
+        if (isPlayoffPoolLeague(settingsLeagueType)) {
+          leagueCtxRef.current = await fetchPlayoffPoolContext(
+            leagueId,
+            userId,
+            settingsLeagueType as 'playoff-roster-pool' | 'playoff-bracket-pickem' | 'playoff-confidence-pool',
+          );
+        } else {
+          leagueCtxRef.current = await fetchLeagueContext(leagueId, userId);
+        }
+        leagueCtxFetchedForRef.current = leagueId;
+      } catch { /* non-critical */ }
+    })();
+  }, [activeLeagueId, auth?.user?.id, activeLeague?.settings]);
+
+  // Scroll-to-bottom: wrapped in requestAnimationFrame so DOM has committed
+  // the new message before we measure scrollHeight (iOS Safari race).
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+    const raf = requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [messages, activeTab, isLoading]);
 
   const buildContext = useCallback(async (): Promise<StormyContext> => {
     const ctx: StormyContext = { page: 'Stormy Assistant (full page)' };
@@ -86,13 +117,28 @@ const StormyAssistant = () => {
       }
     }
 
-    // Lazy-fetch full league context (roster, matchup, team, projections) on first message per league
+    // Detect league type — playoff pools need completely different context.
+    // Read settings.leagueType with fallback (activeLeagueFormat may default
+    // to 'fantasy' during initial context hydration).
+    const settingsLeagueType = getLeagueTypeFromSettings(
+      (activeLeague?.settings as Record<string, unknown> | undefined) ?? null,
+    );
+    const isPlayoffPool = isPlayoffPoolLeague(settingsLeagueType);
+
     const leagueId = activeLeagueId;
     const userId = auth?.user?.id;
     if (leagueId && userId) {
       if (leagueCtxFetchedForRef.current !== leagueId) {
         try {
-          leagueCtxRef.current = await fetchLeagueContext(leagueId, userId);
+          if (isPlayoffPool) {
+            leagueCtxRef.current = await fetchPlayoffPoolContext(
+              leagueId,
+              userId,
+              settingsLeagueType as 'playoff-roster-pool' | 'playoff-bracket-pickem' | 'playoff-confidence-pool',
+            );
+          } else {
+            leagueCtxRef.current = await fetchLeagueContext(leagueId, userId);
+          }
           leagueCtxFetchedForRef.current = leagueId;
         } catch {
           // Non-critical — proceed without enriched context
@@ -219,7 +265,7 @@ const StormyAssistant = () => {
 
                   {/* ── Chat Tab ─────────────────────────────────── */}
                   <TabsContent value="chat" className="mt-0">
-                    <Card className="h-[60vh] sm:h-[600px] flex flex-col shadow-[0_8px_0_rgba(27,48,34,0.2)] border-4 border-citrus-forest rounded-[2rem] overflow-hidden corduroy-texture bg-citrus-cream">
+                    <Card className="h-[calc(100vh-12rem)] sm:h-[650px] flex flex-col shadow-[0_8px_0_rgba(27,48,34,0.2)] border-4 border-citrus-forest rounded-[2rem] overflow-hidden corduroy-texture bg-citrus-cream">
                       <CardHeader className="border-b-4 border-citrus-sage bg-gradient-to-r from-citrus-sage/20 to-citrus-orange/20 px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="h-12 w-12 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-2 border-citrus-forest flex items-center justify-center shadow-patch">
@@ -248,7 +294,10 @@ const StormyAssistant = () => {
                       </CardHeader>
 
                       <CardContent className="flex-1 p-0 overflow-hidden bg-citrus-cream/50 relative">
-                        <ScrollArea className="h-full p-6" ref={scrollRef}>
+                        <div
+                          ref={scrollRef}
+                          className="h-full overflow-y-auto overscroll-contain p-4 sm:p-6"
+                        >
                           <div className="space-y-6 max-w-3xl mx-auto">
                             {messages.map((msg) => (
                               <div
@@ -285,7 +334,7 @@ const StormyAssistant = () => {
                               </div>
                             )}
                           </div>
-                        </ScrollArea>
+                        </div>
                       </CardContent>
 
                       <CardFooter className="p-4 border-t-4 border-citrus-sage bg-gradient-to-r from-citrus-sage/10 to-citrus-orange/10">

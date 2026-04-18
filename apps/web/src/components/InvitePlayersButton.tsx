@@ -34,15 +34,28 @@ export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButto
 
   // Wrap in /auth?redirect= so signed-out invitees go through auth,
   // then land back on the join page (with code pre-filled + auto-submit).
-  // Signed-in users skip the auth step entirely.
+  // Signed-in users skip the auth step entirely (Auth.tsx detects session
+  // and redirects immediately).
   const joinPath = `/create-league?tab=join&code=${joinCode}`;
   const inviteLink = `${window.location.origin}/auth?redirect=${encodeURIComponent(joinPath)}`;
 
-  const inviteText = `Join my league "${leagueName}" on Citrus Fantasy Sports!\n\nJoin Code: ${joinCode}\n\nGo to citrusfantasysports.com → Join League → Enter Code`;
+  // Template includes BOTH the clickable link (for anyone who can tap it)
+  // AND the raw join code as a fallback (for users whose mail client
+  // strips links, or who'd rather type the code manually).
+  const inviteText =
+    `You're invited to join "${leagueName}" on Citrus Fantasy Sports!\n\n` +
+    `Tap to join: ${inviteLink}\n\n` +
+    `Or enter this code manually at citrusfantasysports.com:\n` +
+    `${joinCode}`;
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(joinCode);
     toast({ title: 'Copied!', description: 'Join code copied to clipboard' });
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(inviteLink);
+    toast({ title: 'Copied!', description: 'Invite link copied to clipboard' });
   };
 
   const handleEmail = () => {
