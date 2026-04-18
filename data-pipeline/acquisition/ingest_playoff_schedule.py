@@ -40,6 +40,10 @@ NHL_BASE = "https://api-web.nhle.com/v1"
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL") or os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
+# NHL API team IDs that differ from our nhl_teams table.
+# Utah HC: NHL API uses 68 (post-rebrand ID), our DB has 59 (original ARI→UTA migration).
+TEAM_ID_MAP = {68: 59}
+
 
 def fetch_schedule_for_date(date_str: str) -> list[dict]:
     """Fetch all games for a given date from the NHL API."""
@@ -122,8 +126,8 @@ def ingest_playoff_schedule(start_date: str, end_date: str, season: int = 2025) 
                     "game_time": start_time,
                     "home_team": home.get("abbrev", ""),
                     "away_team": away.get("abbrev", ""),
-                    "home_team_id": home.get("id"),
-                    "away_team_id": away.get("id"),
+                    "home_team_id": TEAM_ID_MAP.get(home.get("id"), home.get("id")),
+                    "away_team_id": TEAM_ID_MAP.get(away.get("id"), away.get("id")),
                     "home_score": home.get("score", 0) if status != "scheduled" else 0,
                     "away_score": away.get("score", 0) if status != "scheduled" else 0,
                     "status": status,
