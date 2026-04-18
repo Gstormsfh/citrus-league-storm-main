@@ -16,6 +16,7 @@ export const accountApi = {
       bio: string | null;
       default_team_name: string | null;
       timezone: string | null;
+      avatar_url: string | null;
       created_at: string;
       updated_at: string;
     }>('/api/account/profile');
@@ -45,6 +46,7 @@ export const accountApi = {
     bio?: string;
     default_team_name?: string;
     timezone?: string;
+    avatar_url?: string;
   }) {
     return apiClient.put('/api/account/profile', fields);
   },
