@@ -381,13 +381,46 @@ def run_unified_loop() -> Tuple[str, int]:
         tracker.failed_syncs += 1
         return ("ERROR", 0)
 
-    # 3. Matchup Refresh
+    # 3. Matchup Refresh (regular-season fantasy)
     try:
         from data_pipeline.scoring.calculate_matchup_scores import update_active_matchup_scores
         update_active_matchup_scores(db)
         logger.info("🏆 [MATCHUPS] Scoreboard Balanced.")
     except Exception as e:
         logger.error(f"[WARN] Matchup update failed (non-critical): {e}")
+
+    # 3b. PLAYOFF POOL REFRESH — critical for live playoff scoring.
+    # Whenever any live/recently-final game today is a PLAYOFF game,
+    # re-aggregate playoff stats and re-score all playoff roster pools.
+    # This keeps roster pool standings in sync with the 30s scrape loop
+    # instead of waiting up to 15 min for the GitHub Actions cron.
+    try:
+        has_playoff_game_today = any(
+            str(g.get("game_type", "")).lower() == "playoff"
+            for g in games
+        )
+        if has_playoff_game_today:
+            logger.info("[PLAYOFFS] Live playoff game detected — running playoff aggregate + scoring RPCs...")
+            import os as _os
+            season = int(_os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+            try:
+                db.rpc("aggregate_player_playoff_stats_live", {"p_season": season})
+                logger.info(f"[PLAYOFFS] Aggregated playoff stats for season {season}")
+            except Exception as e:
+                logger.warning(f"[PLAYOFFS] aggregate RPC failed: {e}")
+            try:
+                db.rpc("score_all_playoff_roster_pools", {})
+                logger.info("[PLAYOFFS] Roster pool standings updated")
+            except Exception as e:
+                logger.warning(f"[PLAYOFFS] scoring RPC failed: {e}")
+            # Also update series + bracket/confidence picks on state changes
+            try:
+                db.rpc("update_playoff_series_from_games", {"p_season": season})
+            except Exception:
+                # This RPC is optional — only exists if migration was applied.
+                pass
+    except Exception as e:
+        logger.error(f"[PLAYOFFS] Post-sync refresh failed (non-critical): {e}")
     
     # 4. PERIODIC PPP/SHP SYNC (Every 30 minutes during game hours)
     # Boxscore API doesn't provide PP/SH assists — only goals.
