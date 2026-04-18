@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -68,6 +69,30 @@ export default function PoolPlayoffConfidence() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [h2hMap, setH2hMap] = useState<Record<number, { high_wins: number; low_wins: number; games: number }>>({});
+  const [liveGames, setLiveGames] = useState<Array<{
+    game_id: number; home_team: string; away_team: string;
+    home_score: number; away_score: number; status: string;
+    period: string | null; period_time: string | null;
+    series_game_number: number | null;
+  }>>([]);
+
+  useEffect(() => {
+    const fetchLive = async () => {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data } = await (supabase as any)
+          .from('nhl_games')
+          .select('game_id, home_team, away_team, home_score, away_score, status, period, period_time, series_game_number')
+          .eq('game_date', today)
+          .eq('game_type', 'playoff');
+        setLiveGames(data ?? []);
+      } catch { /* non-critical */ }
+    };
+    fetchLive();
+    const interval = setInterval(fetchLive, 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Total series = available confidence values (cumulative: 1-N)
   const totalSeries = series.length;

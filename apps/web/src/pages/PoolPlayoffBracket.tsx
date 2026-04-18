@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { NHL_TEAMS } from '@/types/captracker';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Seed {
   team_id: number;
@@ -64,6 +65,31 @@ export default function PoolPlayoffBracket() {
   const [dirty, setDirty] = useState(false);
 
   const [h2hMap, setH2hMap] = useState<Record<number, { high_wins: number; low_wins: number; games: number }>>({});
+  const [liveGames, setLiveGames] = useState<Array<{
+    game_id: number; home_team: string; away_team: string;
+    home_score: number; away_score: number; status: string;
+    period: string | null; period_time: string | null;
+    series_game_number: number | null;
+  }>>([]);
+
+  // Fetch today's playoff games for live score overlay (refreshes every 30s)
+  useEffect(() => {
+    const fetchLive = async () => {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data } = await (supabase as any)
+          .from('nhl_games')
+          .select('game_id, home_team, away_team, home_score, away_score, status, period, period_time, series_game_number')
+          .eq('game_date', today)
+          .eq('game_type', 'playoff');
+        setLiveGames(data ?? []);
+      } catch { /* non-critical */ }
+    };
+    fetchLive();
+    const interval = setInterval(fetchLive, 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!leagueId || !user) return;
@@ -248,12 +274,30 @@ export default function PoolPlayoffBracket() {
                       );
                     };
 
+                    // Find today's live game for this series
+                    const seriesGame = liveGames.find(g =>
+                      (g.home_team === high?.team_abbrev && g.away_team === low?.team_abbrev) ||
+                      (g.home_team === low?.team_abbrev && g.away_team === high?.team_abbrev)
+                    );
+                    const gameIsLive = seriesGame && seriesGame.status === 'live';
+                    const gameIsFinal = seriesGame && seriesGame.status === 'final';
+
                     return (
-                      <div key={s.series_id} className={cn('border-2 rounded-xl p-3 space-y-2 bg-white',
-                          isActive && 'border-red-300 bg-red-50/20',
+                      <div key={s.series_id} className={cn('border-2 rounded-xl p-3 space-y-2 bg-white relative',
+                          (isActive || gameIsLive) && 'border-red-400 bg-red-50/20 ring-1 ring-red-400/20',
                           locked && s.series_status === 'final' && 'border-citrus-sage/40 bg-citrus-sage/5',
-                          !locked && !isActive && 'border-fantasy-border',
+                          !locked && !isActive && !gameIsLive && 'border-fantasy-border',
                       )}>
+                        {/* LIVE ribbon */}
+                        {(isActive || gameIsLive) && (
+                          <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-varsity font-black uppercase px-2 py-0.5 rounded-full shadow-md">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
+                            </span>
+                            LIVE
+                          </div>
+                        )}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] uppercase font-display font-bold text-citrus-charcoal/60">Series {String.fromCharCode(64 + s.bracket_slot)}</span>
@@ -263,10 +307,25 @@ export default function PoolPlayoffBracket() {
                               </Badge>
                             )}
                           </div>
-                          {isActive && <Badge className="bg-red-500 text-white text-[9px] animate-pulse">LIVE</Badge>}
-                          {s.series_status === 'final' && <Badge className="bg-citrus-sage text-white text-[9px]">FINAL</Badge>}
-                          {!locked && !isActive && <Badge variant="outline" className="text-[9px]">Pending</Badge>}
+                          {!isActive && !gameIsLive && s.series_status === 'final' && <Badge className="bg-citrus-sage text-white text-[9px]">FINAL</Badge>}
+                          {!isActive && !gameIsLive && !locked && <Badge variant="outline" className="text-[9px]">PENDING</Badge>}
                         </div>
+                        {/* Live game score overlay */}
+                        {seriesGame && (seriesGame.status === 'live' || seriesGame.status === 'final') && (
+                          <div className={cn(
+                            'flex items-center justify-between px-3 py-1.5 rounded-lg text-sm',
+                            gameIsLive ? 'bg-red-100/80 border border-red-300' : 'bg-citrus-sage/10 border border-citrus-sage/20'
+                          )}>
+                            <span className="font-mono font-bold">{seriesGame.away_team} {seriesGame.away_score}</span>
+                            <span className={cn('text-[10px] font-display', gameIsLive && 'text-red-700 font-bold animate-pulse')}>
+                              {gameIsLive ? `${seriesGame.period || ''} ${seriesGame.period_time || ''}`.trim() : 'Final'}
+                            </span>
+                            <span className="font-mono font-bold">{seriesGame.home_score} {seriesGame.home_team}</span>
+                            {seriesGame.series_game_number && (
+                              <Badge variant="outline" className="text-[8px] ml-1">G{seriesGame.series_game_number}</Badge>
+                            )}
+                          </div>
+                        )}
                         <div className="grid grid-cols-1 gap-2">
                           {renderTeamCard(high, highInfo, true)}
                           {renderTeamCard(low, lowInfo, false)}
