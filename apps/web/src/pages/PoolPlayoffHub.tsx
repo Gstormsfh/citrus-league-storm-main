@@ -411,7 +411,7 @@ export default function PoolPlayoffHub() {
     <>
       <Navbar />
       <div className="min-h-screen bg-gradient-to-b from-white to-[#F5F8ED] pt-24 pb-12 px-4">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           {/* Hero */}
           <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
             <div>
@@ -440,7 +440,7 @@ export default function PoolPlayoffHub() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_360px] gap-4 xl:gap-6">
             {/* Main */}
             <div className="space-y-4">
               {/* Your Picks CTA */}
@@ -827,99 +827,85 @@ export default function PoolPlayoffHub() {
                 </Card>
               )}
 
-              {/* Members */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Users className="h-4 w-4 text-citrus-sage" />
-                    Members ({teams.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {teams.length === 0 ? (
-                    <p className="text-xs text-citrus-charcoal/60 italic">No members yet — invite friends with the join code →</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {teams.map((t) => {
-                        const isRosterPool = leagueType === 'playoff-roster-pool';
-                        return (
-                        <div
-                          key={t.id}
-                          className={cn(
-                            'flex items-center justify-between p-2 rounded border border-citrus-sage/20 bg-white',
-                            isRosterPool && 'cursor-pointer hover:border-citrus-orange/40 hover:bg-citrus-orange/5 transition-colors'
-                          )}
-                          onClick={isRosterPool ? () => navigate(`/pool/playoff-roster?league=${leagueId}&view=${t.owner_id}`) : undefined}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="h-7 w-7 rounded-full bg-citrus-sage/20 flex items-center justify-center text-xs font-bold text-citrus-forest">
-                              {(t.team_name || '?').charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium">{t.team_name}</div>
-                              {t.owner_id === league.commissioner_id && (
-                                <div className="text-[10px] text-citrus-orange flex items-center gap-0.5"><Crown className="h-2.5 w-2.5" />Commissioner</div>
-                              )}
-                              {t.owner_id === user?.id && t.owner_id !== league.commissioner_id && (
-                                <div className="text-[10px] text-citrus-sage">You</div>
-                              )}
-                            </div>
-                          </div>
-                          {isRosterPool && (
-                            <Eye className="h-4 w-4 text-citrus-charcoal/30" />
-                          )}
-                        </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Standings — shows all members with current points (0 until games start) */}
+              {/* Leaderboard — members + live standings in ONE table */}
               <Card className="border-citrus-sage/30">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Trophy className="h-4 w-4 text-citrus-orange" />
-                    Standings
+                    Leaderboard
+                    <span className="text-[10px] text-citrus-charcoal/50 font-normal ml-auto">
+                      {teams.length} {teams.length === 1 ? 'member' : 'members'} · updates every 60s
+                    </span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                   {teams.length === 0 ? (
-                    <p className="text-xs text-citrus-charcoal/60 italic">Invite players to populate standings.</p>
+                    <p className="text-xs text-citrus-charcoal/60 italic p-4">No members yet — invite friends with the join code →</p>
                   ) : (
-                    <>
-                      <div className="rounded border border-citrus-sage/20 overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead className="bg-citrus-sage/10 border-b border-citrus-sage/20">
-                            <tr>
-                              <th className="px-2 py-1.5 text-left text-[10px] uppercase font-display font-bold text-citrus-charcoal/60 w-10">#</th>
-                              <th className="px-2 py-1.5 text-left text-[10px] uppercase font-display font-bold text-citrus-charcoal/60">Team</th>
-                              <th className="px-2 py-1.5 text-right text-[10px] uppercase font-display font-bold text-citrus-charcoal/60">Points</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {teams
-                              .map(t => {
-                                const s = standings.find(st => st.user_id === t.owner_id);
-                                return { ...t, pts: s?.total_points ?? 0, rank: s?.current_rank ?? 999 };
-                              })
-                              .sort((a, b) => a.rank - b.rank || b.pts - a.pts)
-                              .map((t, i) => (
-                              <tr key={t.id} className={cn("border-b border-citrus-sage/10 last:border-b-0", t.owner_id === user?.id && "bg-citrus-sage/5")}>
-                                <td className="px-2 py-1.5 text-xs font-mono text-citrus-charcoal/50">{i + 1}</td>
-                                <td className="px-2 py-1.5 text-sm">
-                                  <span className="font-medium">{t.team_name}</span>
-                                  {t.owner_id === user?.id && <span className="text-[10px] text-citrus-sage ml-1">(You)</span>}
-                                </td>
-                                <td className="px-2 py-1.5 text-sm text-right font-bold text-citrus-forest tabular-nums">{t.pts.toFixed(1)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      <p className="text-[10px] text-citrus-charcoal/50 mt-2 italic">Rankings update every 60 seconds during live games.</p>
-                    </>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-citrus-sage/10 border-b border-citrus-sage/20">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-[10px] uppercase font-display font-bold text-citrus-charcoal/60 w-10">#</th>
+                            <th className="px-3 py-2 text-left text-[10px] uppercase font-display font-bold text-citrus-charcoal/60">Team</th>
+                            <th className="px-3 py-2 text-right text-[10px] uppercase font-display font-bold text-citrus-charcoal/60">FPTS</th>
+                            {leagueType === 'playoff-roster-pool' && (
+                              <th className="px-3 py-2 w-10"></th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {teams
+                            .map(t => {
+                              const s = standings.find(st => st.user_id === t.owner_id);
+                              return { ...t, pts: s?.total_points ?? 0, rank: s?.current_rank ?? 999 };
+                            })
+                            .sort((a, b) => a.rank - b.rank || b.pts - a.pts)
+                            .map((t, i) => {
+                              const isRosterPool = leagueType === 'playoff-roster-pool';
+                              const isMe = t.owner_id === user?.id;
+                              const isCommish = t.owner_id === league.commissioner_id;
+                              return (
+                                <tr
+                                  key={t.id}
+                                  className={cn(
+                                    'border-b border-citrus-sage/10 last:border-b-0',
+                                    isMe && 'bg-citrus-sage/5',
+                                    isRosterPool && 'cursor-pointer hover:bg-citrus-orange/5 transition-colors',
+                                  )}
+                                  onClick={isRosterPool ? () => navigate(`/pool/playoff-roster?league=${leagueId}&view=${t.owner_id}`) : undefined}
+                                >
+                                  <td className="px-3 py-2 text-xs font-mono text-citrus-charcoal/50 tabular-nums">
+                                    {i === 0 ? <span className="text-citrus-orange text-base">🏆</span> : i + 1}
+                                  </td>
+                                  <td className="px-3 py-2 text-sm">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-7 w-7 rounded-full bg-citrus-sage/20 flex items-center justify-center text-xs font-bold text-citrus-forest flex-shrink-0">
+                                        {(t.team_name || '?').charAt(0).toUpperCase()}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="font-medium truncate">{t.team_name}</div>
+                                        <div className="flex items-center gap-1.5 text-[10px]">
+                                          {isCommish && <span className="text-citrus-orange flex items-center gap-0.5"><Crown className="h-2.5 w-2.5" />Commissioner</span>}
+                                          {isMe && <span className="text-citrus-sage">You</span>}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-2 text-base text-right font-varsity font-black text-citrus-forest tabular-nums">
+                                    {t.pts.toFixed(1)}
+                                  </td>
+                                  {isRosterPool && (
+                                    <td className="px-3 py-2 text-right">
+                                      <Eye className="h-4 w-4 text-citrus-charcoal/30 inline" />
+                                    </td>
+                                  )}
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
