@@ -22,6 +22,20 @@ jobs:
 
       - run: pip install -r data-pipeline/requirements.txt
 
+      # Step 0: Ingest playoff game schedule into nhl_games so the live
+      # scraper (data_scraping_service.py) picks them up automatically.
+      # Safe to re-run — uses upsert on game_id. Scans 7 days ahead to
+      # catch newly announced games.
+      - name: Ingest playoff game schedule
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          START=$(date -d "today" +%Y-%m-%d)
+          END=$(date -d "+7 days" +%Y-%m-%d)
+          python data-pipeline/acquisition/ingest_playoff_schedule.py --start "$START" --end "$END" --season 2025
+        continue-on-error: true
+
       # Step 1: Refresh bracket seeds + initial series rows (safe to re-run)
       - name: Ingest NHL playoff bracket
         env:

@@ -12,7 +12,7 @@
  * Reuses our proven design tokens: fantasy-primary, citrus-sage/orange/forest.
  */
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
   Search, Trophy, User, Shield, Star, X, Check, Save, Lock, Users, ArrowLeft,
@@ -330,6 +330,47 @@ export default function PoolPlayoffRosterEntry() {
     }
   };
 
+  // Autosave: debounce roster changes by 1.5s, then persist to DB.
+  // Skips the initial mount load (when roster is restored from DB) via a
+  // flag ref so we don't immediately re-save what we just fetched.
+  const initialLoadDone = useRef(false);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!initialLoadDone.current) {
+      if (!loading && roster.length > 0) initialLoadDone.current = true;
+      return;
+    }
+    if (locked || saving || roster.length === 0 || !leagueId) return;
+
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(async () => {
+      setSaving(true);
+      try {
+        const session = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session;
+        const res = await fetch('/api/playoff-pools/roster', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+          body: JSON.stringify({
+            leagueId,
+            picks: roster.map(p => ({
+              player_id: parseInt(p.id),
+              position_slot: normalizePos(p.position) === 'G' ? 'G' : normalizePos(p.position) === 'D' ? 'D' : 'F',
+            })),
+          }),
+        });
+        if (res.ok) {
+          setLastSaved(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        }
+      } catch { /* silent — user can still manually save */ }
+      finally { setSaving(false); }
+    }, 1500);
+
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roster, locked, leagueId]);
+
   if (loading) {
     return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center text-citrus-charcoal/60">Loading pool...</div></>;
   }
@@ -357,6 +398,7 @@ export default function PoolPlayoffRosterEntry() {
                 <span>F: {posCounts.F}/{posReqs.F}</span>
                 <span>D: {posCounts.D}/{posReqs.D}</span>
                 <span>G: {posCounts.G}/{posReqs.G}</span>
+                {lastSaved && <span className="text-citrus-sage italic">Saved {lastSaved}</span>}
               </div>
             </div>
             <Button
