@@ -168,19 +168,24 @@ export default function PoolPlayoffHub() {
   // on a 60s interval so live scores + stats tick forward without a reload.
   useEffect(() => {
     if (!leagueId || !user?.id) return;
-    if (league?.settings?.leagueType !== 'playoff-roster-pool') return;
+    const lgType = league?.settings?.leagueType;
+    // Need SOMETHING playoff-specific to load
+    if (lgType !== 'playoff-roster-pool' && lgType !== 'playoff-bracket-pickem' && lgType !== 'playoff-confidence-pool') return;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
+    const isRosterPool = lgType === 'playoff-roster-pool';
 
     const load = async () => {
       try {
-        // 1. My roster picks
-        const picksRes = await sb
-          .from('playoff_roster_picks')
-          .select('player_id')
-          .eq('league_id', leagueId)
-          .eq('user_id', user.id);
+        // 1. My roster picks (roster pools only)
+        const picksRes = isRosterPool
+          ? await sb
+              .from('playoff_roster_picks')
+              .select('player_id')
+              .eq('league_id', leagueId)
+              .eq('user_id', user.id)
+          : { data: [], error: null };
 
         if (picksRes.error) {
           logger.warn('[Hub] roster picks fetch error', picksRes.error);
@@ -620,6 +625,114 @@ export default function PoolPlayoffHub() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
+              {/* Today's Games — bracket + confidence pools (live scores +
+                  visual indicator for any series that's in progress today) */}
+              {(leagueType === 'playoff-bracket-pickem' || leagueType === 'playoff-confidence-pool') && todayGames.length > 0 && (() => {
+                const gameStatusLabel = (g: PlayoffGameRow) => {
+                  if (g.status === 'final') return 'Final';
+                  if (g.status === 'live') {
+                    const per = g.period ? ` ${g.period}` : '';
+                    const time = g.period_time ? ` ${g.period_time}` : '';
+                    return `Live${per}${time}`;
+                  }
+                  if (g.game_time) {
+                    try {
+                      const d = new Date(g.game_time);
+                      return d.toLocaleTimeString('en-US', {
+                        hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York',
+                      }) + ' ET';
+                    } catch { return 'Scheduled'; }
+                  }
+                  return 'Scheduled';
+                };
+                return (
+                  <Card className="border-2 border-citrus-orange/40 bg-gradient-to-br from-citrus-orange/5 to-white shadow-md">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-citrus-orange" />
+                        Today&apos;s Playoff Games
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {todayGames.map(g => {
+                          const isLive = g.status === 'live';
+                          const isFinal = g.status === 'final';
+                          // Find my pick for the series containing this game
+                          const series = bracketSeries.find(s =>
+                            (s.high_seed_team_id && s.low_seed_team_id) &&
+                            (([g.home_team, g.away_team]).every(t => {
+                              const hi = bracketSeeds.find(x => x.team_id === s.high_seed_team_id);
+                              const lo = bracketSeeds.find(x => x.team_id === s.low_seed_team_id);
+                              return t === hi?.team_abbrev || t === lo?.team_abbrev;
+                            }))
+                          );
+                          const myPick = series ? userPicks.find(p => p.series_slot === series.bracket_slot) : null;
+                          const myPickAbbrev = myPick
+                            ? bracketSeeds.find(x => x.team_id === myPick.picked_team_id)?.team_abbrev
+                            : null;
+
+                          return (
+                            <div key={g.game_id} className={cn(
+                              'relative rounded-lg border p-3 transition-colors',
+                              isLive ? 'border-red-400 bg-red-50/40 ring-1 ring-red-400/30' :
+                              isFinal ? 'border-citrus-charcoal/20 bg-muted/20' :
+                              'border-citrus-sage/30 bg-white'
+                            )}>
+                              {isLive && (
+                                <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-varsity font-black uppercase px-2 py-0.5 rounded-full shadow-md">
+                                  <span className="relative flex h-1.5 w-1.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
+                                  </span>
+                                  LIVE
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-1.5 text-sm font-display font-bold text-citrus-forest">
+                                  <span className={cn(myPickAbbrev === g.away_team && 'underline decoration-citrus-orange decoration-2 underline-offset-4')}>{g.away_team}</span>
+                                  <span className="text-citrus-charcoal/40">@</span>
+                                  <span className={cn(myPickAbbrev === g.home_team && 'underline decoration-citrus-orange decoration-2 underline-offset-4')}>{g.home_team}</span>
+                                </div>
+                                {g.series_game_number && (
+                                  <Badge variant="outline" className="text-[9px] border-citrus-sage/40">Game {g.series_game_number}</Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className={cn(
+                                  'text-sm font-mono font-semibold',
+                                  isLive && 'text-red-700',
+                                  isFinal && 'text-citrus-charcoal/70',
+                                )}>
+                                  {g.away_score}–{g.home_score}
+                                </div>
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'text-[9px] px-1.5 py-0',
+                                    isLive && 'border-red-600 bg-red-600 text-white animate-pulse',
+                                    isFinal && 'border-muted bg-muted/60',
+                                    !isLive && !isFinal && 'border-citrus-sage/50',
+                                  )}
+                                >
+                                  {gameStatusLabel(g)}
+                                </Badge>
+                              </div>
+                              {myPickAbbrev && (
+                                <div className="mt-2 text-[10px] text-citrus-charcoal/60">
+                                  <span className="font-display font-semibold">Your pick:</span>{' '}
+                                  <span className="font-mono font-bold text-citrus-orange">{myPickAbbrev}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </CardContent>
                   </Card>
