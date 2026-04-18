@@ -96,6 +96,26 @@ interface TodayGame {
   series_game_number: number | null;
 }
 
+interface PlayoffStat {
+  player_id: number;
+  games_played: number;
+  goals: number;
+  assists: number;
+  points: number;
+  ppp: number;
+  shp: number;
+  shots: number;
+  hits: number;
+  blocks: number;
+  pim: number;
+  plus_minus: number;
+  wins: number;
+  saves: number;
+  shutouts: number;
+  goals_against: number;
+  is_goalie: boolean;
+}
+
 // NHL playoff teams for 2025-26 — will come from API once nhl_playoff_seeds table is populated
 const POSITION_TABS = [
   { key: 'All', label: 'All' },
@@ -144,6 +164,9 @@ export default function PoolPlayoffRosterEntry() {
   const [viewOwnerName, setViewOwnerName] = useState<string>('');
   // Today's Games
   const [todayGames, setTodayGames] = useState<TodayGame[]>([]);
+  // Playoff stats for every rostered player — source of truth for FPTS
+  // once playoffs have started. Falls back to 0 before games are played.
+  const [playoffStats, setPlayoffStats] = useState<Map<number, PlayoffStat>>(new Map());
 
   // Shorten full name for mobile: "Connor McDavid" -> "C. McDavid"
   const shortName = (full: string): string => {
@@ -171,7 +194,9 @@ export default function PoolPlayoffRosterEntry() {
     [league?.scoring_settings]
   );
 
-  const calcFpts = useCallback(
+  // FPTS from SEASON stats (used by the player pool selection table only,
+  // so commissioners/users can still compare season performance when picking).
+  const calcSeasonFpts = useCallback(
     (p: PoolPlayer): number => {
       const isGoalie = normalizePos(p.position) === 'G';
       return scorer.calculatePoints(
@@ -183,6 +208,43 @@ export default function PoolPlayoffRosterEntry() {
     },
     [scorer]
   );
+
+  // FPTS from PLAYOFF stats — this is what counts for the roster's score.
+  // Returns 0 before a player has any playoff games. Used everywhere on the
+  // roster display (your own roster AND when viewing someone else's).
+  const calcPlayoffFpts = useCallback(
+    (p: PoolPlayer): number => {
+      const pid = parseInt(p.id);
+      const st = playoffStats.get(pid);
+      if (!st || !st.games_played) return 0;
+      const isGoalie = normalizePos(p.position) === 'G' || st.is_goalie;
+      return scorer.calculatePoints(
+        isGoalie
+          ? {
+              wins: st.wins || 0,
+              saves: st.saves || 0,
+              shutouts: st.shutouts || 0,
+              goals_against: st.goals_against || 0,
+            }
+          : {
+              goals: st.goals || 0,
+              assists: st.assists || 0,
+              shots: st.shots || 0,
+              blocks: st.blocks || 0,
+              hits: st.hits || 0,
+              pim: st.pim || 0,
+              ppp: st.ppp || 0,
+              shp: st.shp || 0,
+              plus_minus: st.plus_minus || 0,
+            },
+        isGoalie
+      );
+    },
+    [scorer, playoffStats]
+  );
+
+  // Keep calcFpts as the alias used in the roster card — points at playoff now.
+  const calcFpts = calcPlayoffFpts;
 
   // Load data
   useEffect(() => {
@@ -242,6 +304,36 @@ export default function PoolPlayoffRosterEntry() {
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, user?.id, viewUserId]);
+
+  // Fetch playoff stats for every player on the current roster.
+  // Refreshes every 60s so live-game updates flow through to FPTS.
+  useEffect(() => {
+    const fetchPlayoffStats = async () => {
+      if (roster.length === 0) return;
+      const playerIds = roster.map(p => parseInt(p.id)).filter(n => !isNaN(n) && n > 0);
+      if (playerIds.length === 0) return;
+      try {
+        const { data, error } = await (supabase as any)
+          .from('player_playoff_stats')
+          .select('*')
+          .in('player_id', playerIds);
+        if (error) {
+          logger.warn('Playoff stats fetch failed', error);
+          return;
+        }
+        const map = new Map<number, PlayoffStat>();
+        for (const row of (data ?? []) as PlayoffStat[]) {
+          map.set(row.player_id, row);
+        }
+        setPlayoffStats(map);
+      } catch (err) {
+        logger.warn('Playoff stats fetch exception', err);
+      }
+    };
+    fetchPlayoffStats();
+    const interval = setInterval(fetchPlayoffStats, 60_000);
+    return () => clearInterval(interval);
+  }, [roster]);
 
   // Fetch today's playoff games
   useEffect(() => {
@@ -336,7 +428,7 @@ export default function PoolPlayoffRosterEntry() {
             }
             case 'toi': return p.icetime_seconds && p.games_played ? p.icetime_seconds / p.games_played : 0;
             case 'fpts':
-            default: return calcFpts(p);
+            default: return calcSeasonFpts(p);
           }
         };
         if (sortBy === 'name') {
@@ -350,7 +442,7 @@ export default function PoolPlayoffRosterEntry() {
         const diff = getVal(b) - getVal(a);
         return sortDir === 'desc' ? diff : -diff;
       });
-  }, [players, searchTerm, posFilter, teamFilter, calcFpts, sortBy, sortDir]);
+  }, [players, searchTerm, posFilter, teamFilter, calcSeasonFpts, sortBy, sortDir]);
 
   // Can add this player?
   const canAdd = (p: PoolPlayer): boolean => {
@@ -612,6 +704,133 @@ export default function PoolPlayoffRosterEntry() {
           </Card>
         )}
 
+        {/* ─── VIEW MODE: full-width playoff stats breakdown ─────────── */}
+        {isViewMode && (() => {
+          const totalFpts = roster.reduce((sum, p) => sum + calcPlayoffFpts(p), 0);
+          const totalGP = roster.reduce((sum, p) => sum + (playoffStats.get(parseInt(p.id))?.games_played ?? 0), 0);
+          const totalG = roster.reduce((sum, p) => {
+            const s = playoffStats.get(parseInt(p.id));
+            return sum + (s && !s.is_goalie ? (s.goals ?? 0) : 0);
+          }, 0);
+          const totalA = roster.reduce((sum, p) => {
+            const s = playoffStats.get(parseInt(p.id));
+            return sum + (s && !s.is_goalie ? (s.assists ?? 0) : 0);
+          }, 0);
+
+          type Row = { player: PoolPlayer; stat: PlayoffStat | null; fpts: number };
+          const rowsByGroup: { title: string; rows: Row[] }[] = [
+            { title: `Forwards (${posCounts.F}/${posReqs.F})`, rows: roster.filter(p => isForward(p.position)).map(p => ({ player: p, stat: playoffStats.get(parseInt(p.id)) ?? null, fpts: calcPlayoffFpts(p) })) },
+            { title: `Defense (${posCounts.D}/${posReqs.D})`, rows: roster.filter(p => normalizePos(p.position) === 'D').map(p => ({ player: p, stat: playoffStats.get(parseInt(p.id)) ?? null, fpts: calcPlayoffFpts(p) })) },
+            { title: `Goalies (${posCounts.G}/${posReqs.G})`, rows: roster.filter(p => normalizePos(p.position) === 'G').map(p => ({ player: p, stat: playoffStats.get(parseInt(p.id)) ?? null, fpts: calcPlayoffFpts(p) })) },
+          ];
+
+          return (
+            <div className="space-y-4 mb-6">
+              {/* Total points banner */}
+              <Card className="border-2 border-citrus-orange/40 bg-gradient-to-r from-citrus-orange/10 via-citrus-sage/10 to-white shadow-md">
+                <CardContent className="p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <div className="text-[10px] uppercase font-display font-bold text-citrus-charcoal/60 tracking-wide">Total Playoff FPTS</div>
+                      <div className="text-4xl font-varsity font-black text-citrus-forest leading-none">{totalFpts.toFixed(1)}</div>
+                      <div className="text-xs text-citrus-charcoal/60 mt-1">
+                        Across {roster.length} players · {totalG}G · {totalA}A · {totalGP} player-games played
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-xs border-citrus-sage/40">
+                      <Eye className="h-3 w-3 mr-1" /> Read-only view
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Grouped stat tables by position */}
+              {rowsByGroup.map(group => (
+                <Card key={group.title} className="border-fantasy-border bg-white shadow-sm">
+                  <CardHeader className="pb-2 px-4">
+                    <CardTitle className="text-xs font-display font-bold uppercase text-citrus-charcoal/70 tracking-wide">
+                      {group.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-0 pb-3">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-citrus-sage/20 text-[10px] uppercase font-display text-citrus-charcoal/50">
+                            <th className="text-left py-2 px-4 font-bold">Player</th>
+                            <th className="text-left py-2 px-2 font-bold">Team</th>
+                            <th className="text-right py-2 px-2 font-bold">GP</th>
+                            {group.title.startsWith('Goalies') ? (
+                              <>
+                                <th className="text-right py-2 px-2 font-bold">W</th>
+                                <th className="text-right py-2 px-2 font-bold">SV</th>
+                                <th className="text-right py-2 px-2 font-bold">SO</th>
+                                <th className="text-right py-2 px-2 font-bold">GA</th>
+                              </>
+                            ) : (
+                              <>
+                                <th className="text-right py-2 px-2 font-bold">G</th>
+                                <th className="text-right py-2 px-2 font-bold">A</th>
+                                <th className="text-right py-2 px-2 font-bold">PTS</th>
+                                <th className="text-right py-2 px-2 font-bold">SOG</th>
+                                <th className="text-right py-2 px-2 font-bold hidden sm:table-cell">HIT</th>
+                                <th className="text-right py-2 px-2 font-bold hidden sm:table-cell">BLK</th>
+                              </>
+                            )}
+                            <th className="text-right py-2 px-4 font-bold text-citrus-forest">FPTS</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.rows.length === 0 ? (
+                            <tr><td colSpan={9} className="text-center text-citrus-charcoal/40 italic py-4">No players picked at this position.</td></tr>
+                          ) : group.rows.map(r => {
+                            const s = r.stat;
+                            const isG = group.title.startsWith('Goalies');
+                            return (
+                              <tr key={r.player.id} className="border-b border-citrus-sage/10 hover:bg-citrus-sage/5">
+                                <td className="py-2 px-4">
+                                  <button
+                                    type="button"
+                                    onClick={() => setStatsModalPlayer(r.player)}
+                                    className="font-medium text-left hover:text-citrus-orange hover:underline transition-colors"
+                                  >
+                                    <span className="sm:hidden">{shortName(r.player.full_name)}</span>
+                                    <span className="hidden sm:inline">{r.player.full_name}</span>
+                                  </button>
+                                </td>
+                                <td className="py-2 px-2 text-citrus-charcoal/70">{r.player.team}</td>
+                                <td className="py-2 px-2 text-right tabular-nums">{s?.games_played ?? 0}</td>
+                                {isG ? (
+                                  <>
+                                    <td className="py-2 px-2 text-right tabular-nums">{s?.wins ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums">{s?.saves ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums">{s?.shutouts ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums">{s?.goals_against ?? 0}</td>
+                                  </>
+                                ) : (
+                                  <>
+                                    <td className="py-2 px-2 text-right tabular-nums">{s?.goals ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums">{s?.assists ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums font-semibold">{s?.points ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums">{s?.shots ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{s?.hits ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{s?.blocks ?? 0}</td>
+                                  </>
+                                )}
+                                <td className="py-2 px-4 text-right tabular-nums font-bold text-citrus-forest">{r.fpts.toFixed(1)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          );
+        })()}
+
         <div className={cn(
           'grid grid-cols-1 gap-4',
           !isViewMode && 'lg:grid-cols-[1fr_340px]'
@@ -695,7 +914,7 @@ export default function PoolPlayoffRosterEntry() {
               const onRoster = rosterIds.has(selectedPlayer.id);
               const addable = canAdd(selectedPlayer);
               const norm = normalizePos(selectedPlayer.position);
-              const fpts = calcFpts(selectedPlayer);
+              const fpts = calcSeasonFpts(selectedPlayer);
               return (
                 <Card className="mb-3 border-2 border-citrus-orange/40 bg-gradient-to-r from-citrus-orange/5 to-citrus-sage/5 shadow-md relative">
                   <CardContent className="p-3">
@@ -853,7 +1072,7 @@ export default function PoolPlayoffRosterEntry() {
                     {filteredPlayers.slice(0, 200).map((player, idx) => {
                       const onRoster = rosterIds.has(player.id);
                       const addable = canAdd(player);
-                      const fpts = calcFpts(player);
+                      const fpts = calcSeasonFpts(player);
                       const norm = normalizePos(player.position);
                       const teamAtCap = hasCap && (teamCounts.get(player.team) || 0) >= maxPerTeam;
                       return (
