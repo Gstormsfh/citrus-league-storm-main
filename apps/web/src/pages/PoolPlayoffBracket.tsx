@@ -284,12 +284,12 @@ export default function PoolPlayoffBracket() {
 
                     return (
                       <div key={s.series_id} className={cn('border-2 rounded-xl p-3 space-y-2 bg-white relative',
-                          (isActive || gameIsLive) && 'border-red-400 bg-red-50/20 ring-1 ring-red-400/20',
+                          gameIsLive && 'border-red-400 bg-red-50/20 ring-1 ring-red-400/20',
                           locked && s.series_status === 'final' && 'border-citrus-sage/40 bg-citrus-sage/5',
-                          !locked && !isActive && !gameIsLive && 'border-fantasy-border',
+                          !gameIsLive && !locked && 'border-fantasy-border',
                       )}>
-                        {/* LIVE ribbon */}
-                        {(isActive || gameIsLive) && (
+                        {/* LIVE ribbon — only when a game is ACTUALLY in progress */}
+                        {gameIsLive && (
                           <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-varsity font-black uppercase px-2 py-0.5 rounded-full shadow-md">
                             <span className="relative flex h-1.5 w-1.5">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
@@ -307,8 +307,9 @@ export default function PoolPlayoffBracket() {
                               </Badge>
                             )}
                           </div>
-                          {!isActive && !gameIsLive && s.series_status === 'final' && <Badge className="bg-citrus-sage text-white text-[9px]">FINAL</Badge>}
-                          {!isActive && !gameIsLive && !locked && <Badge variant="outline" className="text-[9px]">PENDING</Badge>}
+                          {s.series_status === 'final' && <Badge className="bg-citrus-sage text-white text-[9px]">SERIES FINAL</Badge>}
+                          {isActive && !gameIsLive && <Badge variant="outline" className="text-[9px] border-citrus-orange text-citrus-orange">{s.high_seed_wins}-{s.low_seed_wins}</Badge>}
+                          {!isActive && !locked && <Badge variant="outline" className="text-[9px]">PENDING</Badge>}
                         </div>
                         {/* Live game score overlay */}
                         {seriesGame && (seriesGame.status === 'live' || seriesGame.status === 'final') && (
