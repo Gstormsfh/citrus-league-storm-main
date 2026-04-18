@@ -68,10 +68,10 @@ const MobileBottomNav = () => {
   const navItems = isPool
     ? getPoolNavItems()
     : [
+        // Playoff-first mobile nav — season-long items accessible via direct URL.
         { icon: Trophy, label: 'Playoffs', path: '/nhl/playoffs' },
-        { icon: Swords, label: 'Matchup', path: activeLeagueId ? `/matchup/${activeLeagueId}` : '/matchup' },
-        { icon: Search, label: 'Players', path: '/free-agents' },
-        { icon: BarChart3, label: 'Standings', path: '/standings' },
+        { icon: Target, label: 'Create', path: '/create-league?type=playoff' },
+        { icon: Newspaper, label: 'News', path: '/news' },
         { icon: User, label: user ? 'Profile' : 'Sign In', path: user ? '/profile' : '/auth' },
       ];
 
