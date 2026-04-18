@@ -782,6 +782,7 @@ export default function PoolPlayoffRosterEntry() {
                                 <th className="text-right py-2 px-2 font-bold">G</th>
                                 <th className="text-right py-2 px-2 font-bold">A</th>
                                 <th className="text-right py-2 px-2 font-bold">PTS</th>
+                                <th className="text-right py-2 px-2 font-bold hidden sm:table-cell">+/-</th>
                                 <th className="text-right py-2 px-2 font-bold">SOG</th>
                                 <th className="text-right py-2 px-2 font-bold hidden sm:table-cell">HIT</th>
                                 <th className="text-right py-2 px-2 font-bold hidden sm:table-cell">BLK</th>
@@ -822,6 +823,13 @@ export default function PoolPlayoffRosterEntry() {
                                     <td className="py-2 px-2 text-right tabular-nums">{s?.goals ?? 0}</td>
                                     <td className="py-2 px-2 text-right tabular-nums">{s?.assists ?? 0}</td>
                                     <td className="py-2 px-2 text-right tabular-nums font-semibold">{s?.points ?? 0}</td>
+                                    <td className={cn(
+                                      'py-2 px-2 text-right tabular-nums hidden sm:table-cell',
+                                      (s?.plus_minus ?? 0) > 0 && 'text-green-700 font-semibold',
+                                      (s?.plus_minus ?? 0) < 0 && 'text-red-600 font-semibold',
+                                    )}>
+                                      {s ? (s.plus_minus > 0 ? `+${s.plus_minus}` : s.plus_minus) : 0}
+                                    </td>
                                     <td className="py-2 px-2 text-right tabular-nums">{s?.shots ?? 0}</td>
                                     <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{s?.hits ?? 0}</td>
                                     <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{s?.blocks ?? 0}</td>
