@@ -178,24 +178,30 @@ export default function PoolPlayoffHub() {
 
     const load = async () => {
       try {
-        // 1. My roster picks (roster pools only)
-        const picksRes = isRosterPool
-          ? await sb
-              .from('playoff_roster_picks')
-              .select('player_id')
-              .eq('league_id', leagueId)
-              .eq('user_id', user.id)
-          : { data: [], error: null };
-
-        if (picksRes.error) {
-          logger.warn('[Hub] roster picks fetch error', picksRes.error);
+        // 1. My roster picks (roster pools only) — use the same REST endpoint
+        // the Roster page uses (proven to work). Direct supabase.from() was
+        // returning empty because the picks RLS path is different per session.
+        let playerIds: number[] = [];
+        if (isRosterPool) {
+          try {
+            const session = (await supabase.auth.getSession()).data.session;
+            const headers: Record<string, string> = session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : {};
+            const picksRes = await fetch(`/api/playoff-pools/${leagueId}/picks?type=roster`, { headers })
+              .then(r => r.json())
+              .catch(() => null);
+            const rawPicks = picksRes?.data?.picks || picksRes?.picks || [];
+            const myPicks = Array.isArray(rawPicks)
+              ? rawPicks.filter((p: { user_id: string }) => p.user_id === user.id)
+              : [];
+            playerIds = myPicks.map((p: { player_id: number }) => p.player_id).filter(Boolean);
+          } catch (err) {
+            logger.warn('[Hub] picks fetch failed', err);
+          }
         }
 
-        const playerIds: number[] = (picksRes.data ?? [])
-          .map((p: { player_id: number }) => p.player_id)
-          .filter(Boolean);
-
-        // 2. Today's playoff games (always fetch, even if no picks — bracket banner still useful)
+        // 2. Today's playoff games (always fetch)
         const today = new Date().toISOString().slice(0, 10);
         const gamesRes = await sb
           .from('nhl_games')
