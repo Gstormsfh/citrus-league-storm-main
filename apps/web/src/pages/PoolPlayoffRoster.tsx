@@ -532,7 +532,7 @@ export default function PoolPlayoffRosterEntry() {
             {/* Top sticky horizontal scrollbar (desktop only — mobile doesn't
                 need it since the table fits the viewport). */}
             <div
-              className="hidden md:block overflow-x-scroll scrollbar-styled mb-1 bg-fantasy-light/40 rounded border border-fantasy-border/40"
+              className="overflow-x-scroll scrollbar-styled mb-1 bg-fantasy-light/40 rounded border border-fantasy-border/40"
               style={{ height: '14px' }}
               onScroll={(e) => {
                 const container = e.currentTarget;
@@ -543,7 +543,7 @@ export default function PoolPlayoffRosterEntry() {
               <div id="roster-scroll-helper-inner" style={{ width: '1100px', height: '1px' }} />
             </div>
             {/* Hint text so users know they can scroll */}
-            <div className="hidden md:block text-[10px] text-citrus-charcoal/50 mb-2 text-center italic">
+            <div className="text-[10px] text-citrus-charcoal/50 mb-2 text-center italic">
               Tip: scroll ↔ to see more stats (xG, TOI, +/-, etc.)
             </div>
 
@@ -566,7 +566,7 @@ export default function PoolPlayoffRosterEntry() {
                 {/* min-width only kicks in at md+ where all columns are visible.
                     On mobile, table naturally shrinks to fit the few visible columns
                     (no dead horizontal space after the player name). */}
-                <table className="w-full text-sm border-collapse md:min-w-[1100px]">
+                <table className="w-full text-sm border-collapse" style={{ minWidth: '1100px' }}>
                   <thead className="bg-fantasy-light sticky top-0 z-10 border-b border-fantasy-border">
                     <tr>
                       <th className="px-2 py-2 text-left text-xs font-display font-bold text-citrus-forest w-8">#</th>
@@ -586,9 +586,9 @@ export default function PoolPlayoffRosterEntry() {
                                 <th onClick={() => toggleSort('g_w')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>W{ind('g_w')}</th>
                                 <th onClick={() => toggleSort('a_sv')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>SV{ind('a_sv')}</th>
                                 <th onClick={() => toggleSort('pts_so')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>SO{ind('pts_so')}</th>
-                                <th onClick={() => toggleSort('sog_ga')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)}>GA{ind('sog_ga')}</th>
-                                <th onClick={() => toggleSort('pm_svpct')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden md:table-cell', cn_sort)}>SV%{ind('pm_svpct')}</th>
-                                <th onClick={() => toggleSort('xg_gaa')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-purple-700 hidden md:table-cell', cn_sort)}>GAA{ind('xg_gaa')}</th>
+                                <th onClick={() => toggleSort('sog_ga')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>GA{ind('sog_ga')}</th>
+                                <th onClick={() => toggleSort('pm_svpct')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>SV%{ind('pm_svpct')}</th>
+                                <th onClick={() => toggleSort('xg_gaa')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-purple-700', cn_sort)}>GAA{ind('xg_gaa')}</th>
                               </>
                             ) : (
                               /* Skater columns — default for All / Forwards / Defense */
@@ -596,17 +596,17 @@ export default function PoolPlayoffRosterEntry() {
                                 <th onClick={() => toggleSort('g_w')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>G{ind('g_w')}</th>
                                 <th onClick={() => toggleSort('a_sv')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>A{ind('a_sv')}</th>
                                 <th onClick={() => toggleSort('pts_so')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>PTS{ind('pts_so')}</th>
-                                <th onClick={() => toggleSort('sog_ga')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)}>SOG{ind('sog_ga')}</th>
-                                <th onClick={() => toggleSort('hit')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)}>HIT{ind('hit')}</th>
-                                <th onClick={() => toggleSort('blk')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden sm:table-cell', cn_sort)}>BLK{ind('blk')}</th>
-                                <th onClick={() => toggleSort('pm_svpct')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden md:table-cell', cn_sort)}>+/-{ind('pm_svpct')}</th>
-                                <th onClick={() => toggleSort('xg_gaa')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-purple-700 hidden md:table-cell', cn_sort)}>xG{ind('xg_gaa')}</th>
+                                <th onClick={() => toggleSort('sog_ga')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>SOG{ind('sog_ga')}</th>
+                                <th onClick={() => toggleSort('hit')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>HIT{ind('hit')}</th>
+                                <th onClick={() => toggleSort('blk')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>BLK{ind('blk')}</th>
+                                <th onClick={() => toggleSort('pm_svpct')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>+/-{ind('pm_svpct')}</th>
+                                <th onClick={() => toggleSort('xg_gaa')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-purple-700', cn_sort)}>xG{ind('xg_gaa')}</th>
                               </>
                             )}
                           </>
                         );
                       })()}
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest hidden lg:table-cell" title="Avg time on ice per game (min:sec)">TOI</th>
+                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest" title="Avg time on ice per game (min:sec)">TOI</th>
                       <th className="px-2 py-2 text-center text-xs font-bold text-green-700 bg-green-50/50">FPTS</th>
                     </tr>
                   </thead>
@@ -693,12 +693,12 @@ export default function PoolPlayoffRosterEntry() {
                               <td className="px-2 py-1.5 text-center text-xs font-semibold">{player.wins || 0}</td>
                               <td className="px-2 py-1.5 text-center text-xs">{player.saves || 0}</td>
                               <td className="px-2 py-1.5 text-center text-xs font-bold">{player.shutouts || 0}</td>
-                              <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.goals_against || 0}</td>
+                              <td className="px-2 py-1.5 text-center text-xs">{player.goals_against || 0}</td>
                               {/* HIT+BLK placeholders only when headers are showing (skater/all filter) */}
                               {posFilter !== 'G' && (
-                                <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell text-citrus-charcoal/30" colSpan={2}>—</td>
+                                <td className="px-2 py-1.5 text-center text-xs text-citrus-charcoal/30" colSpan={2}>—</td>
                               )}
-                              <td className="px-2 py-1.5 text-center text-xs hidden md:table-cell">
+                              <td className="px-2 py-1.5 text-center text-xs">
                                 {(() => {
                                   // Prefer API value (string or number), fall back to computing from saves/shots_faced
                                   let sp = Number(player.save_pct ?? player.save_percentage ?? 0);
@@ -710,7 +710,7 @@ export default function PoolPlayoffRosterEntry() {
                                   return pct.toFixed(1) + '%';
                                 })()}
                               </td>
-                              <td className="px-2 py-1.5 text-center text-xs hidden md:table-cell text-purple-700">
+                              <td className="px-2 py-1.5 text-center text-xs text-purple-700">
                                 {(() => {
                                   let g = Number(player.gaa ?? player.goals_against_average ?? 0);
                                   // Fallback: GAA = goals_against * 60 / (icetime_seconds / 60) = goals_against * 3600 / icetime_seconds
@@ -720,26 +720,26 @@ export default function PoolPlayoffRosterEntry() {
                                   return g > 0 ? g.toFixed(2) : '—';
                                 })()}
                               </td>
-                              <td className="px-2 py-1.5 text-center text-xs hidden lg:table-cell">—</td>
+                              <td className="px-2 py-1.5 text-center text-xs">—</td>
                             </>
                           ) : (
                             <>
                               <td className="px-2 py-1.5 text-center text-xs font-semibold">{player.goals}</td>
                               <td className="px-2 py-1.5 text-center text-xs">{player.assists}</td>
                               <td className="px-2 py-1.5 text-center text-xs font-bold">{player.points}</td>
-                              <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.shots}</td>
-                              <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.hits}</td>
-                              <td className="px-2 py-1.5 text-center text-xs hidden sm:table-cell">{player.blocks}</td>
-                              <td className={cn('px-2 py-1.5 text-center text-xs hidden md:table-cell', (player.plus_minus || 0) > 0 && 'text-green-700', (player.plus_minus || 0) < 0 && 'text-red-600')}>
+                              <td className="px-2 py-1.5 text-center text-xs">{player.shots}</td>
+                              <td className="px-2 py-1.5 text-center text-xs">{player.hits}</td>
+                              <td className="px-2 py-1.5 text-center text-xs">{player.blocks}</td>
+                              <td className={cn('px-2 py-1.5 text-center text-xs', (player.plus_minus || 0) > 0 && 'text-green-700', (player.plus_minus || 0) < 0 && 'text-red-600')}>
                                 {(player.plus_minus ?? 0) > 0 ? '+' : ''}{player.plus_minus ?? 0}
                               </td>
-                              <td className="px-2 py-1.5 text-center text-xs hidden md:table-cell text-purple-700 font-semibold">
+                              <td className="px-2 py-1.5 text-center text-xs text-purple-700 font-semibold">
                                 {(() => {
                                   const xg = player.xGoals ?? player.x_goals ?? 0;
                                   return xg > 0 ? xg.toFixed(1) : '—';
                                 })()}
                               </td>
-                              <td className="px-2 py-1.5 text-center text-xs hidden lg:table-cell text-citrus-charcoal/70">
+                              <td className="px-2 py-1.5 text-center text-xs text-citrus-charcoal/70">
                                 {player.icetime_seconds && player.games_played ? (() => {
                                   const totalSec = Math.round(player.icetime_seconds / player.games_played);
                                   const m = Math.floor(totalSec / 60);
