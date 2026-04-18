@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useLeague } from "@/contexts/LeagueContext";
 import { LeagueService } from "@/services/LeagueService";
+import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -226,8 +227,10 @@ const CreateLeague = () => {
       autoJoinFiredRef.current = true;
       setJoinCode(code);
       setDefaultTab('join');
-      // Small delay so state updates settle before firing the join
-      setTimeout(() => handleJoinLeague(), 150);
+      // Pass the code EXPLICITLY so we don't race with setJoinCode().
+      // Previously handleJoinLeague read joinCode from closure which
+      // could be empty if state hadn't committed yet.
+      setTimeout(() => handleJoinLeague(code), 50);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, searchParams]);
@@ -524,14 +527,15 @@ const CreateLeague = () => {
     }
   };
 
-  const handleJoinLeague = async () => {
+  const handleJoinLeague = async (codeOverride?: string) => {
     if (!user) {
       setError("You must be logged in to join a league");
       navigate("/auth");
       return;
     }
 
-    if (!joinCode.trim()) {
+    const effectiveCode = (codeOverride ?? joinCode).trim();
+    if (!effectiveCode) {
       setError("Join code is required");
       return;
     }
@@ -539,9 +543,33 @@ const CreateLeague = () => {
     setLoading(true);
     setError(null);
 
+    // Shared route-to-pool helper so both success AND "already a member"
+    // paths land the user in the same place.
+    const routeToLeague = (
+      leagueId: string,
+      settings: Record<string, unknown> | null | undefined,
+    ) => {
+      const joinedLeagueType = settings?.leagueType as string | undefined;
+      if (joinedLeagueType === 'pickem') {
+        navigate(`/pool/pickem?league=${leagueId}`);
+      } else if (joinedLeagueType === 'survivor') {
+        navigate(`/pool/survivor?league=${leagueId}`);
+      } else if (joinedLeagueType === 'confidence-pool') {
+        navigate(`/pool/confidence?league=${leagueId}`);
+      } else if (
+        joinedLeagueType === 'playoff-bracket-pickem' ||
+        joinedLeagueType === 'playoff-confidence-pool' ||
+        joinedLeagueType === 'playoff-roster-pool'
+      ) {
+        navigate(`/pool/playoff-hub?league=${leagueId}`);
+      } else {
+        navigate(`/league/${leagueId}?league=${leagueId}`);
+      }
+    };
+
     try {
       const { league, team, error: joinError } = await LeagueService.joinLeagueByCode(
-        joinCode.trim(),
+        effectiveCode,
         user.id,
         teamNameForJoin.trim() || undefined
       );
@@ -557,22 +585,48 @@ const CreateLeague = () => {
       });
 
       setLoading(false);
-
-      // Route to the appropriate page based on the joined league's type
-      const joinedLeagueType = (league.settings as Record<string, unknown>)?.leagueType;
-      if (joinedLeagueType === 'pickem') {
-        navigate(`/pool/pickem?league=${league.id}`);
-      } else if (joinedLeagueType === 'survivor') {
-        navigate(`/pool/survivor?league=${league.id}`);
-      } else if (joinedLeagueType === 'confidence-pool') {
-        navigate(`/pool/confidence?league=${league.id}`);
-      } else if (joinedLeagueType === 'playoff-bracket-pickem' || joinedLeagueType === 'playoff-confidence-pool' || joinedLeagueType === 'playoff-roster-pool') {
-        navigate(`/pool/playoff-hub?league=${league.id}`);
-      } else {
-        navigate(`/league/${league.id}?league=${league.id}`);
-      }
+      routeToLeague(league.id, league.settings as Record<string, unknown> | null);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to join league";
+
+      // "Already a member" is a success case — the first attempt actually
+      // joined (even if the response looked glitchy). Redirect them to the
+      // pool page instead of showing a scary error toast.
+      const isAlreadyMember =
+        /already have a team/i.test(errorMessage) ||
+        /already (a )?member/i.test(errorMessage) ||
+        /already joined/i.test(errorMessage);
+
+      if (isAlreadyMember) {
+        try {
+          await refreshLeagues();
+          // Look up the league by join code so we can route to the right pool page.
+          const { data: leagueRow } = await supabase
+            .from('leagues')
+            .select('id, settings')
+            .eq('join_code', effectiveCode.toUpperCase())
+            .maybeSingle();
+
+          setLoading(false);
+          toast({
+            title: "Already Joined!",
+            description: "You're already in this league — taking you there now.",
+          });
+
+          if (leagueRow?.id) {
+            routeToLeague(
+              leagueRow.id,
+              leagueRow.settings as Record<string, unknown> | null,
+            );
+          } else {
+            navigate('/leagues');
+          }
+          return;
+        } catch {
+          // Fall through to generic error toast below
+        }
+      }
+
       setError(errorMessage);
       setLoading(false);
 
@@ -1828,7 +1882,7 @@ const CreateLeague = () => {
                     <Button
                       size="lg"
                       className="rounded-full px-6 min-w-[160px]"
-                      onClick={handleJoinLeague}
+                      onClick={() => handleJoinLeague()}
                       disabled={loading || !joinCode.trim()}
                     >
                       {loading ? (
