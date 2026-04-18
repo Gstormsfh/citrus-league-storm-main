@@ -55,13 +55,18 @@ const MobileMenuButton = () => {
   const userInitial = displayName.charAt(0).toUpperCase();
 
   const leagueType = league?.activeLeagueFormat?.leagueType;
-  const isPool = isPoolLeague(leagueType);
+  // Prefer activeLeagueFormat, fall back to raw settings JSONB so the nav
+  // doesn't briefly revert during state transitions.
+  const rawLeagueType = (league?.activeLeague?.settings as Record<string, unknown> | undefined)?.leagueType as string | undefined;
+  const effectiveLeagueType = (leagueType && leagueType !== 'fantasy') ? leagueType : (rawLeagueType || leagueType);
+  const isPool = isPoolLeague(effectiveLeagueType);
 
   const getPoolTabs = () => {
     if (!activeLeagueId || !leagueType) return [];
-    const poolRoute = getPoolRoute(leagueType, activeLeagueId);
-    const standingsRoute = getPoolRoute(leagueType, activeLeagueId, 'standings');
-    switch (leagueType) {
+    const resolvedType = effectiveLeagueType || 'fantasy';
+    const poolRoute = getPoolRoute(resolvedType, activeLeagueId);
+    const standingsRoute = getPoolRoute(resolvedType, activeLeagueId, 'standings');
+    switch (effectiveLeagueType) {
       case 'pickem':
         return [
           { label: 'Make Picks', path: poolRoute, icon: Target },
@@ -73,7 +78,7 @@ const MobileMenuButton = () => {
         return [
           { label: 'My Pick', path: poolRoute, icon: Shield },
           { label: 'Standings', path: standingsRoute, icon: BarChart3 },
-          { label: 'Pick History', path: getPoolRoute(leagueType, activeLeagueId, 'history'), icon: TrendingUp },
+          { label: 'Pick History', path: getPoolRoute(resolvedType, activeLeagueId, 'history'), icon: TrendingUp },
           { label: 'News', path: '/news', icon: Newspaper },
         ];
       case 'confidence-pool':

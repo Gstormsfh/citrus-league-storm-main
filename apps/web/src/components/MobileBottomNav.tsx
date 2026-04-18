@@ -26,8 +26,14 @@ const MobileBottomNav = () => {
     };
   }, []);
 
-  // Build paths: adapt for pool vs fantasy leagues
-  const leagueType = league?.activeLeagueFormat?.leagueType;
+  // Build paths: adapt for pool vs fantasy leagues.
+  // Read from activeLeagueFormat first, fall back to raw settings JSONB —
+  // covers the window where activeLeagueFormat resolves stale ('fantasy' default)
+  // while the real settings.leagueType is already set.
+  const leagueType = (league?.activeLeagueFormat?.leagueType && league.activeLeagueFormat.leagueType !== 'fantasy')
+    ? league.activeLeagueFormat.leagueType
+    : ((league?.activeLeague?.settings as Record<string, unknown> | undefined)?.leagueType as string | undefined)
+      ?? league?.activeLeagueFormat?.leagueType;
   const isPool = isPoolLeague(leagueType) && !!activeLeagueId;
 
   // Pool-type-specific mobile tabs
@@ -82,7 +88,13 @@ const MobileBottomNav = () => {
           profileTab,
         ];
       default:
-        return [profileTab];
+        // Unknown pool type — show playoff-friendly tabs instead of just Profile
+        return [
+          { icon: Trophy, label: 'Playoffs', path: '/nhl/playoffs' },
+          { icon: Target, label: 'Picks', path: poolRoute },
+          { icon: BarChart3, label: 'Standings', path: standingsRoute },
+          profileTab,
+        ];
     }
   };
 

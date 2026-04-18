@@ -72,7 +72,10 @@ const Navbar = () => {
   const userInitial = displayName.charAt(0).toUpperCase();
 
   // Navigation tabs — adapt based on league type (fantasy vs pool)
-  const leagueType = league?.activeLeagueFormat?.leagueType;
+  const formatLeagueType = league?.activeLeagueFormat?.leagueType;
+  const rawLeagueType = (league?.activeLeague?.settings as Record<string, unknown> | undefined)?.leagueType as string | undefined;
+  // Prefer format, fall back to raw settings so nav doesn't flash then revert
+  const leagueType = (formatLeagueType && formatLeagueType !== 'fantasy') ? formatLeagueType : (rawLeagueType || formatLeagueType);
   const isPool = isPoolLeague(leagueType);
 
   // Build nav tabs per league type
