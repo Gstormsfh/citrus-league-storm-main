@@ -106,24 +106,52 @@ const Profile = () => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // Validate file type and size (max 2MB)
     if (!file.type.startsWith('image/')) {
       toast({ title: 'Invalid file', description: 'Please select an image file.', variant: 'destructive' });
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ title: 'File too large', description: 'Avatar must be under 2MB.', variant: 'destructive' });
       return;
     }
 
     setUploadingAvatar(true);
     try {
-      const ext = file.name.split('.').pop() || 'png';
-      const filePath = `${user.id}/avatar.${ext}`;
+      // Client-side compression + center-crop to square.
+      // This brings a 10MB phone photo down to ~30-80KB — well under
+      // any storage limit. Also handles the Instagram-style circle
+      // display: crop to square here, CSS border-radius: 50% on
+      // render. No cropping UI needed.
+      const compressedBlob = await new Promise<Blob>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const TARGET = 400; // 400×400 square
+          const canvas = document.createElement('canvas');
+          canvas.width = TARGET;
+          canvas.height = TARGET;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { reject(new Error('No canvas context')); return; }
+
+          // Center-crop: take the largest centered square from the source
+          const side = Math.min(img.width, img.height);
+          const sx = (img.width - side) / 2;
+          const sy = (img.height - side) / 2;
+          ctx.drawImage(img, sx, sy, side, side, 0, 0, TARGET, TARGET);
+
+          canvas.toBlob(
+            (blob) => blob ? resolve(blob) : reject(new Error('Compression failed')),
+            'image/jpeg',
+            0.82 // quality — good balance between size and clarity
+          );
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = URL.createObjectURL(file);
+      });
+
+      const filePath = `${user.id}/avatar.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, compressedBlob, {
+          upsert: true,
+          contentType: 'image/jpeg',
+        });
 
       if (uploadError) throw uploadError;
 
