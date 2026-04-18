@@ -89,6 +89,23 @@ export class LeagueService {
     // Pools don't need drafts
     const effectiveDraftStatus = isPool ? 'completed' : 'not_started';
 
+    // Safeguard: every fantasy-scored league (season-long fantasy + playoff
+    // roster pools) MUST have explicit scoring_settings. Otherwise the RPC
+    // falls back to COALESCE defaults which could surprise commissioners
+    // who thought they configured scoring. If caller didn't provide any,
+    // write the standard default values explicitly so every stat is set.
+    const DEFAULT_SCORING_SETTINGS = {
+      skater: {
+        goals: 3, assists: 2, power_play_points: 1, short_handed_points: 2,
+        shots_on_goal: 0.4, blocks: 0.5, hits: 0.2, penalty_minutes: 0.5,
+        plus_minus: 0,
+      },
+      goalie: { wins: 4, saves: 0.2, shutouts: 3, goals_against: -1 },
+    };
+    const needsFantasyScoring = leagueType === 'fantasy' || leagueType === 'playoff-roster-pool';
+    const effectiveScoringSettings = scoringSettings
+      ?? (needsFantasyScoring ? DEFAULT_SCORING_SETTINGS : null);
+
     // Build the insert row — include waiver columns if provided
     const insertRow: Record<string, unknown> = {
       name,
@@ -98,7 +115,7 @@ export class LeagueService {
       draft_status: effectiveDraftStatus,
       league_size: teamsCount,
       settings: settings || {},
-      scoring_settings: scoringSettings || null,
+      scoring_settings: effectiveScoringSettings,
     };
 
     // Write waiver settings to dedicated columns (fantasy leagues)
