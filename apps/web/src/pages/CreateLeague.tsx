@@ -117,7 +117,7 @@ const CreateLeague = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { data: profile } = useProfile();
-  const { refreshLeagues } = useLeague();
+  const { refreshLeagues, setActiveLeagueId } = useLeague();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -577,7 +577,13 @@ const CreateLeague = () => {
       if (joinError) throw joinError;
       if (!league || !team) throw new Error("Failed to join league");
 
+      // Refresh the league list, THEN pin the newly joined league as the
+      // active one BEFORE navigating. Without this, LeagueContext can
+      // briefly show the user's old league (activeLeague lags the URL),
+      // which is why users reported "joined but got dumped in a different
+      // league / GM Office".
       await refreshLeagues();
+      setActiveLeagueId(league.id);
 
       toast({
         title: "Joined League!",
@@ -604,7 +610,7 @@ const CreateLeague = () => {
           const { data: leagueRow } = await supabase
             .from('leagues')
             .select('id, settings')
-            .eq('join_code', effectiveCode.toUpperCase())
+            .eq('join_code', effectiveCode)
             .maybeSingle();
 
           setLoading(false);
@@ -614,6 +620,7 @@ const CreateLeague = () => {
           });
 
           if (leagueRow?.id) {
+            setActiveLeagueId(leagueRow.id);
             routeToLeague(
               leagueRow.id,
               leagueRow.settings as Record<string, unknown> | null,

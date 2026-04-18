@@ -41,9 +41,20 @@ const AuthCallback = () => {
       if (timeoutId) clearTimeout(timeoutId);
       setStatus('success');
       setMessage(msg);
+      // Pull the redirect that was stashed BEFORE the OAuth handoff —
+      // Google strips query params from the callback URL, so we can't
+      // read ?redirect= here. sessionStorage survives the round trip.
+      let destination = '/';
+      try {
+        const stashed = sessionStorage.getItem('citrus:postAuthRedirect');
+        if (stashed && stashed.startsWith('/')) {
+          destination = stashed;
+          sessionStorage.removeItem('citrus:postAuthRedirect');
+        }
+      } catch { /* storage disabled — default to home */ }
       // Hard redirect — immune to React lifecycle / effect cleanup races.
       // AuthContext will pick up the session from localStorage on reload.
-      setTimeout(() => window.location.replace('/'), 1500);
+      setTimeout(() => window.location.replace(destination), 1500);
     };
 
     const fail = (msg: string) => {

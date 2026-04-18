@@ -364,7 +364,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
               const { supabase } = await import('@/integrations/supabase/client');
               const { data: leagueInfo } = await supabase
                 .from('leagues')
-                .select('id, name, join_code')
+                .select('id, name, join_code, settings')
                 .eq('id', urlLeagueId)
                 .maybeSingle();
               const joinCode = leagueInfo?.join_code;
@@ -376,8 +376,11 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
                 });
                 return;
               }
-            } catch { /* fall through to gm-office */ }
-            navigate('/gm-office');
+            } catch { /* fall through */ }
+            // No safe league destination — send to a neutral page. For
+            // playoff pool users we never dump them on GM Office (a
+            // fantasy-only page). Homepage is the safest fallback.
+            navigate('/');
             toast({
               title: "Access Denied",
               description: "You are not a member of this league.",
@@ -386,7 +389,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
             return;
           } catch (error) {
             logger.error('[LeagueContext] Error verifying membership:', error);
-            navigate('/gm-office');
+            navigate('/');
             toast({
               title: "Error",
               description: "Failed to verify league access.",
@@ -396,17 +399,33 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           }
         }
 
-        // Explicitly verify membership (defense in depth)
+        // Explicitly verify membership (defense in depth). For users who
+        // just joined, the read can lag behind the write — retry once
+        // after a short delay before giving up.
+        const verifyWithRetry = async (): Promise<boolean> => {
+          try {
+            const first = await LeagueMembershipService.verifyMembership(urlLeagueId, user.id);
+            if (first) return true;
+            await new Promise(r => setTimeout(r, 400));
+            return await LeagueMembershipService.verifyMembership(urlLeagueId, user.id);
+          } catch {
+            return false;
+          }
+        };
+
         try {
-          const isMember = await LeagueMembershipService.verifyMembership(urlLeagueId, user.id);
-          
+          const isMember = await verifyWithRetry();
+
           if (isMember) {
             setActiveLeagueIdState(urlLeagueId);
             setActiveLeague(league);
           } else {
-            // Membership check failed - block access
             logger.error('[LeagueContext] Membership verification failed for league:', urlLeagueId);
-            navigate('/gm-office');
+            // Route the user based on league type so pool users don't
+            // land on the fantasy-only GM Office page.
+            const leagueType = (league.settings as Record<string, unknown> | undefined)?.leagueType as string | undefined;
+            const isPool = leagueType && leagueType !== 'fantasy';
+            navigate(isPool ? '/' : '/gm-office');
             toast({
               title: "Access Denied",
               description: "You are not a member of this league.",
@@ -415,7 +434,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           }
         } catch (error) {
           logger.error('[LeagueContext] Error verifying membership:', error);
-          navigate('/gm-office');
+          const leagueType = (league.settings as Record<string, unknown> | undefined)?.leagueType as string | undefined;
+          const isPool = leagueType && leagueType !== 'fantasy';
+          navigate(isPool ? '/' : '/gm-office');
           toast({
             title: "Error",
             description: "Failed to verify league access.",

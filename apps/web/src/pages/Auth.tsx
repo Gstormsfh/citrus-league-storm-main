@@ -277,6 +277,18 @@ const Auth = () => {
     setOauthLoading(provider);
     setError(null);
 
+    // CRITICAL: stash the redirect param in sessionStorage BEFORE the OAuth
+    // handoff. Google redirects back to /auth/callback, which wipes any
+    // query params we had on /auth. Without this stash, invite links
+    // deposit users on the homepage instead of the join flow.
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect');
+      if (redirect && redirect.startsWith('/')) {
+        sessionStorage.setItem('citrus:postAuthRedirect', redirect);
+      }
+    } catch { /* storage may be disabled — fall through */ }
+
     try {
       const { error } = await signInWithOAuth(provider);
       
