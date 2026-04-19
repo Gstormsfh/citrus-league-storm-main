@@ -226,6 +226,13 @@ export interface LeagueFormatSettings {
   // Bracket Pickem
   playoffBracketPointsPerRound?: { r1: number; r2: number; r3: number; scf: number };
   playoffGamesPickBonus?: number;        // +pts for correctly predicting # of games in series
+  /** Bracket pick mode:
+   *  - 'round-by-round' (default) = picks unlock per round as each series starts
+   *  - 'full-bracket' = all 15 picks must be locked in before R1 Game 1 — March
+   *    Madness style. User picks R1 winners, then picks R2 winners FROM the
+   *    teams they chose in R1 (flowing up the bracket), all at once.
+   */
+  playoffBracketPickMode?: 'round-by-round' | 'full-bracket';
   // Confidence
   playoffConfidenceVariant?: 'cumulative' | 'per-round';
   // Roster Pool (team-select style — multiple users can pick same player)

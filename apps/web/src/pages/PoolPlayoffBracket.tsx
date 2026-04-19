@@ -38,6 +38,8 @@ interface Series {
   low_seed_wins: number;
   series_status: 'pending' | 'active' | 'final';
   winner_team_id: number | null;
+  parent_slot_a?: number | null;
+  parent_slot_b?: number | null;
 }
 interface Pick {
   series_slot: number;
@@ -71,6 +73,26 @@ export default function PoolPlayoffBracket() {
     period: string | null; period_time: string | null;
     series_game_number: number | null;
   }>>([]);
+
+  // League settings relevant to bracket pick UI
+  const [pickMode, setPickMode] = useState<'round-by-round' | 'full-bracket'>('round-by-round');
+  const [lockDeadline, setLockDeadline] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!leagueId) return;
+    const fetchLeagueSettings = async () => {
+      try {
+        const session = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session;
+        const headers: Record<string, string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+        const res = await fetch(`/api/leagues/${leagueId}`, { headers }).then(r => r.json()).catch(() => null);
+        const lg = res?.data || res;
+        const settings = lg?.settings || {};
+        setPickMode(settings.playoffBracketPickMode === 'full-bracket' ? 'full-bracket' : 'round-by-round');
+        setLockDeadline(settings.playoffRosterLockedAt || null);
+      } catch { /* non-critical */ }
+    };
+    fetchLeagueSettings();
+  }, [leagueId]);
 
   // Fetch today's playoff games for live score overlay (refreshes every 30s)
   useEffect(() => {
@@ -127,12 +149,60 @@ export default function PoolPlayoffBracket() {
     return m;
   }, [series]);
 
+  // Global lock for full-bracket mode: once the lockDeadline has passed,
+  // NO picks can be changed regardless of series status.
+  const isGloballyLocked = useMemo(() => {
+    if (pickMode !== 'full-bracket' || !lockDeadline) return false;
+    return new Date(lockDeadline).getTime() <= Date.now();
+  }, [pickMode, lockDeadline]);
+
   const handlePick = (slot: number, teamId: number) => {
     const s = series.find(x => x.bracket_slot === slot);
-    if (!s || s.series_status !== 'pending') return;
+    if (!s) return;
+
+    // In full-bracket mode: allow picks for ANY slot before the global
+    // lock deadline, even if the series is 'pending' (R2-R4 with no teams
+    // filled in yet). After lock or after series is final, block.
+    if (pickMode === 'full-bracket') {
+      if (isGloballyLocked || s.series_status === 'final') return;
+    } else {
+      // Round-by-round: legacy behavior — only pick when series is 'pending'
+      if (s.series_status !== 'pending') return;
+    }
+
     const next = new Map(picks);
     const existing = next.get(slot);
     next.set(slot, { ...(existing || {}), series_slot: slot, picked_team_id: teamId });
+
+    // Full-bracket cascade: if the user CHANGES their R1 pick, clear any
+    // downstream picks that depended on the team they just swapped out.
+    // Otherwise a user could have "picked CAR in R1" then "picked OTT in
+    // R2" which is nonsensical.
+    if (pickMode === 'full-bracket') {
+      const childSlots = series.filter(x => x.parent_slot_a === slot || x.parent_slot_b === slot);
+      for (const child of childSlots) {
+        const childPick = next.get(child.bracket_slot);
+        // The child's available teams are whoever the user picked in
+        // parent_slot_a + parent_slot_b. If the child's pick is now
+        // invalid (the team they picked was just swapped OUT of the
+        // parent), clear the child and everything downstream.
+        if (childPick) {
+          const parentA = next.get(child.parent_slot_a!);
+          const parentB = next.get(child.parent_slot_b!);
+          const validTeams = [parentA?.picked_team_id, parentB?.picked_team_id].filter(Boolean);
+          if (!validTeams.includes(childPick.picked_team_id)) {
+            // Recursively clear this and all its descendants
+            const clearChain = (fromSlot: number) => {
+              next.delete(fromSlot);
+              series.filter(x => x.parent_slot_a === fromSlot || x.parent_slot_b === fromSlot)
+                .forEach(descendant => clearChain(descendant.bracket_slot));
+            };
+            clearChain(child.bracket_slot);
+          }
+        }
+      }
+    }
+
     setPicks(next);
     setDirty(true);
   };
@@ -184,10 +254,28 @@ export default function PoolPlayoffBracket() {
             <div className="flex items-center gap-2">
               <Trophy className="h-6 w-6 text-citrus-orange" />
               <h1 className="text-xl sm:text-2xl font-varsity font-black uppercase text-citrus-forest">Bracket Challenge</h1>
+              {pickMode === 'full-bracket' && (
+                <Badge className={cn(
+                  'text-[10px] font-display font-bold',
+                  isGloballyLocked ? 'bg-muted text-muted-foreground' : 'bg-citrus-orange text-white'
+                )}>
+                  {isGloballyLocked ? <><Lock className="h-3 w-3 mr-1" />BRACKET LOCKED</> : 'FULL BRACKET MODE'}
+                </Badge>
+              )}
             </div>
             <p className="text-xs text-citrus-charcoal/70 mt-1">
-              Pick winners & game counts. Points double each round (2 → 4 → 8 → 16).
+              {pickMode === 'full-bracket'
+                ? isGloballyLocked
+                  ? 'Your picks are locked. Track how your bracket survives each round.'
+                  : `Pick ALL 15 series — including the Stanley Cup champion — before the deadline. R2+ matchups fill in based on your R1 picks. Points double each round (2 → 4 → 8 → 16).`
+                : 'Pick winners & game counts. Points double each round (2 → 4 → 8 → 16).'}
             </p>
+            {pickMode === 'full-bracket' && !isGloballyLocked && (
+              <div className="mt-2 text-[11px] font-display text-citrus-charcoal/70">
+                <span className="font-bold">Picks made:</span> {picks.size} / 15
+                {picks.size < 15 && <span className="text-citrus-orange ml-2">· {15 - picks.size} remaining</span>}
+              </div>
+            )}
           </div>
           {dirty && (
             <Button onClick={savePicks} disabled={saving} className="bg-citrus-sage hover:bg-citrus-sage/90 text-citrus-forest font-display font-bold">
@@ -212,12 +300,28 @@ export default function PoolPlayoffBracket() {
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {rs.map(s => {
-                    const high = s.high_seed_team_id ? teamById.get(s.high_seed_team_id) : null;
-                    const low = s.low_seed_team_id ? teamById.get(s.low_seed_team_id) : null;
+                    // In full-bracket mode, R2+ matchups show the teams the
+                    // USER picked in the parent slots (their projected bracket
+                    // flowing forward). In round-by-round mode, only show the
+                    // real matchup once the API fills it in.
+                    let high: Seed | null = s.high_seed_team_id ? teamById.get(s.high_seed_team_id) ?? null : null;
+                    let low: Seed | null = s.low_seed_team_id ? teamById.get(s.low_seed_team_id) ?? null : null;
+                    if (pickMode === 'full-bracket' && s.round > 1 && (!high || !low)) {
+                      const parentAPick = s.parent_slot_a ? picks.get(s.parent_slot_a) : null;
+                      const parentBPick = s.parent_slot_b ? picks.get(s.parent_slot_b) : null;
+                      if (!high && parentAPick) high = teamById.get(parentAPick.picked_team_id) ?? null;
+                      if (!low && parentBPick) low = teamById.get(parentBPick.picked_team_id) ?? null;
+                    }
                     const highInfo = high ? NHL_TEAMS.find(t => t.abbrev === high.team_abbrev) : null;
                     const lowInfo = low ? NHL_TEAMS.find(t => t.abbrev === low.team_abbrev) : null;
                     const myPick = picks.get(s.bracket_slot);
-                    const locked = s.series_status !== 'pending';
+                    // Lock semantics differ by mode:
+                    //   round-by-round: series locks once it starts (status !== 'pending')
+                    //   full-bracket:   series locks at the league's global deadline
+                    //                   (or once series is final — no point changing then)
+                    const locked = pickMode === 'full-bracket'
+                      ? (isGloballyLocked || s.series_status === 'final')
+                      : s.series_status !== 'pending';
                     const isActive = s.series_status === 'active';
 
                     const renderTeamCard = (team: Seed | null, info: typeof NHL_TEAMS[0] | null, isTop: boolean) => {
