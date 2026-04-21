@@ -109,6 +109,21 @@ def upsert_seeds_from_bracket(db: SupabaseRest, bracket: dict, season: int, team
 
 def upsert_series_from_bracket(db: SupabaseRest, bracket: dict, season: int, team_id_map: dict) -> int:
     """Build all 15 series rows from bracket response."""
+    # NHL fixed bracket: series letters A-O map to slots 1-15.
+    # Parent relationships define the advancement tree:
+    #   R2 slot 9  (I) ← winners of slots 1 (A) + 2 (B)
+    #   R2 slot 10 (J) ← winners of slots 3 (C) + 4 (D)
+    #   R2 slot 11 (K) ← winners of slots 5 (E) + 6 (F)
+    #   R2 slot 12 (L) ← winners of slots 7 (G) + 8 (H)
+    #   R3 slot 13 (M) ← winners of slots 9 (I) + 10 (J)  [ECF]
+    #   R3 slot 14 (N) ← winners of slots 11 (K) + 12 (L) [WCF]
+    #   R4 slot 15 (O) ← winners of slots 13 (M) + 14 (N) [SCF]
+    PARENT_SLOTS: dict = {
+        9: (1, 2), 10: (3, 4), 11: (5, 6), 12: (7, 8),
+        13: (9, 10), 14: (11, 12),
+        15: (13, 14),
+    }
+
     rows = []
     slot = 0
     for s in sorted(bracket.get("series", []), key=lambda x: (x.get("roundNumber", 0), x.get("seriesLetter", ""))):
@@ -128,11 +143,16 @@ def upsert_series_from_bracket(db: SupabaseRest, bracket: dict, season: int, tea
         # Derive actual round from bracket position: slots 1-8=R1, 9-12=R2, 13-14=R3, 15=R4.
         actual_round = 1 if slot <= 8 else (2 if slot <= 12 else (3 if slot <= 14 else 4))
 
+        parents = PARENT_SLOTS.get(slot)
+        raw_conf = s.get("conferenceAbbrev") or ""
+        conf_normalized = "Eastern" if raw_conf in ("E", "Eastern") else ("Western" if raw_conf in ("W", "Western") else None)
         rows.append({
             "season": season,
             "round": actual_round,
-            "conference": s.get("conferenceAbbrev"),
+            "conference": conf_normalized,
             "bracket_slot": slot,
+            "parent_slot_a": parents[0] if parents else None,
+            "parent_slot_b": parents[1] if parents else None,
             "high_seed_team_id": high_id,
             "low_seed_team_id": low_id,
             "high_seed_wins": s.get("topSeedWins", 0),

@@ -467,11 +467,25 @@ export default function PoolPlayoffBracket() {
                             <span className="text-[10px] text-citrus-charcoal/50 ml-1">+1 if correct</span>
                           </div>
                         )}
-                        {locked && myPick?.points_earned != null && (
-                          <div className="text-xs text-right">
-                            <span className={cn('font-bold', (myPick.points_earned ?? 0) > 0 ? 'text-citrus-sage' : 'text-citrus-charcoal/50')}>
-                              {myPick.points_earned ?? 0} pts
-                            </span>
+                        {/* Pick summary: always visible when a pick exists */}
+                        {myPick?.picked_team_id && (locked || myPick.predicted_games) && (
+                          <div className="flex items-center justify-between text-xs pt-1 border-t border-fantasy-border/30">
+                            <div className="flex items-center gap-1.5 text-citrus-charcoal/70">
+                              <Check className="h-3 w-3 text-citrus-sage" />
+                              <span className="font-display font-semibold">
+                                {(() => {
+                                  const pickedSeed = teamById.get(myPick.picked_team_id);
+                                  const pickedInfo = pickedSeed ? NHL_TEAMS.find(t => t.abbrev === pickedSeed.team_abbrev) : null;
+                                  return pickedInfo?.name || pickedSeed?.team_abbrev || 'TBD';
+                                })()}
+                                {myPick.predicted_games ? ` in ${myPick.predicted_games}` : ''}
+                              </span>
+                            </div>
+                            {locked && myPick.points_earned != null && (
+                              <span className={cn('font-bold', (myPick.points_earned ?? 0) > 0 ? 'text-citrus-sage' : 'text-citrus-charcoal/50')}>
+                                {myPick.points_earned ?? 0} pts
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
