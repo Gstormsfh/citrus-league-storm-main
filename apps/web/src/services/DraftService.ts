@@ -4,6 +4,7 @@ import { Team, LeagueService } from './LeagueService';
 import { PlayerService } from './PlayerService';
 import { draftApi } from '@/api/draft';
 import { leagueApi } from '@/api/leagues';
+import { draftDebugBus } from '@/utils/draftDebugBus';
 
 export interface DraftPick {
   id: string;
@@ -461,6 +462,13 @@ export const DraftService = {
         { event: 'new_pick' },
         (payload) => {
           const pick = payload.payload?.pick as DraftPick | undefined;
+          draftDebugBus.record('broadcast_received', {
+            leagueId,
+            pickId: pick?.id,
+            playerId: pick?.player_id,
+            pickNumber: pick?.pick_number,
+            deleted: Boolean(pick?.deleted_at),
+          });
           if (pick && !pick.deleted_at) {
             callback(pick);
           }
@@ -480,6 +488,14 @@ export const DraftService = {
         },
         (payload) => {
           const pick = payload.new as DraftPick;
+          draftDebugBus.record('postgres_pick_received', {
+            leagueId,
+            pickId: pick?.id,
+            playerId: pick?.player_id,
+            pickNumber: pick?.pick_number,
+            deleted: Boolean(pick?.deleted_at),
+            event: 'INSERT',
+          });
           if (!pick.deleted_at) {
             callback(pick);
           }
@@ -494,10 +510,20 @@ export const DraftService = {
           filter: `league_id=eq.${leagueId}`,
         },
         (payload) => {
-          callback(payload.new as DraftPick);
+          const pick = payload.new as DraftPick;
+          draftDebugBus.record('postgres_pick_received', {
+            leagueId,
+            pickId: pick?.id,
+            playerId: pick?.player_id,
+            pickNumber: pick?.pick_number,
+            deleted: Boolean(pick?.deleted_at),
+            event: 'UPDATE',
+          });
+          callback(pick);
         }
       )
       .subscribe((status) => {
+        draftDebugBus.record('realtime_status', { leagueId, status, channel: 'draft_picks' });
         if (status === 'SUBSCRIBED') {
           onStatus?.('connected');
           return;

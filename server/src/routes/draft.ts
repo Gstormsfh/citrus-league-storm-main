@@ -29,6 +29,9 @@ function broadcastDraftPick(
   pick: Record<string, unknown>,
   isComplete: boolean,
 ) {
+  const startedAt = Date.now();
+  const pickNumber = pick.pick_number;
+  const pickId = pick.id;
   try {
     const admin = supabaseAdmin;
     const channel = admin.channel(`draft_picks:${leagueId}`, {
@@ -36,18 +39,46 @@ function broadcastDraftPick(
     });
     channel.subscribe((status) => {
       if (status !== 'SUBSCRIBED') return;
+      const subscribedAt = Date.now();
+      logger.info('[draft-debug] broadcast.subscribed', {
+        leagueId,
+        pickId,
+        pickNumber,
+        subscribeMs: subscribedAt - startedAt,
+      });
       channel
         .send({
           type: 'broadcast',
           event: 'new_pick',
           payload: { pick, isComplete },
         })
-        .catch(() => {})
+        .then(() => {
+          logger.info('[draft-debug] broadcast.sent', {
+            leagueId,
+            pickId,
+            pickNumber,
+            totalMs: Date.now() - startedAt,
+          });
+        })
+        .catch((err) => {
+          logger.warn('[draft-debug] broadcast.send_failed', {
+            leagueId,
+            pickId,
+            pickNumber,
+            err: err instanceof Error ? err.message : String(err),
+          });
+        })
         .finally(() => {
           admin.removeChannel(channel);
         });
     });
-  } catch {
+  } catch (err) {
+    logger.warn('[draft-debug] broadcast.threw', {
+      leagueId,
+      pickId,
+      pickNumber,
+      err: err instanceof Error ? err.message : String(err),
+    });
     // Non-critical — postgres_changes delivers the pick as fallback
   }
 }
@@ -187,7 +218,10 @@ draftRoutes.post('/league/:leagueId/pick', membershipMiddleware, validateBody(sc
 
   // Fire-and-forget: update timerStartedAt so all clients reset their countdown.
   // Don't block the response — the client already sets an optimistic timestamp.
+  const pickIdForTiming = (pick as { id?: string } | null)?.id;
+  const pickNumberForTiming = (pick as { pick_number?: number } | null)?.pick_number;
   (async () => {
+    const timerUpdateStart = Date.now();
     try {
       const { data: currentLeague } = await supabase
         .from('leagues')
@@ -199,7 +233,20 @@ draftRoutes.post('/league/:leagueId/pick', membershipMiddleware, validateBody(sc
         .from('leagues')
         .update({ settings: { ...currentSettings, timerStartedAt: new Date().toISOString() } })
         .eq('id', leagueId);
-    } catch {
+      logger.info('[draft-debug] timer_update.completed', {
+        leagueId,
+        pickId: pickIdForTiming,
+        pickNumber: pickNumberForTiming,
+        durationMs: Date.now() - timerUpdateStart,
+      });
+    } catch (err) {
+      logger.warn('[draft-debug] timer_update.failed', {
+        leagueId,
+        pickId: pickIdForTiming,
+        pickNumber: pickNumberForTiming,
+        durationMs: Date.now() - timerUpdateStart,
+        err: err instanceof Error ? err.message : String(err),
+      });
       // Non-critical — timer will resync via realtime or polling
     }
   })();

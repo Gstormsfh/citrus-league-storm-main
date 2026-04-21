@@ -12,6 +12,8 @@ import { leagueApi } from '@/api/leagues';
 import { playerApi } from '@/api/players';
 import { publicApi } from '@/api/public';
 import { logger } from '@/utils/logger';
+import { draftDebugBus } from '@/utils/draftDebugBus';
+import { DraftDebugOverlay } from '@/components/draft/DraftDebugOverlay';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -819,6 +821,13 @@ const DraftRoom = () => {
       user.id,
       async (newPick) => {
       logger.debug('DraftRoom: New pick received via realtime:', newPick);
+      draftDebugBus.record('pick_handler_invoked', {
+        pickId: newPick.id,
+        playerId: newPick.player_id,
+        pickNumber: newPick.pick_number,
+        currentTimerStartedAt: leagueRef.current?.settings?.timerStartedAt ?? null,
+        localHistoryLen: draftHistoryRef.current.length,
+      });
 
       // Ignore own picks — handlePlayerDraft already updated local state optimistically,
       // and reprocessing here would cause double-counting or visual flicker.
@@ -836,6 +845,10 @@ const DraftRoom = () => {
       // ── INSTANT VISUAL UPDATES (all synchronous, no network) ────────
       // 1. Timer reset — all clients see countdown restart immediately
       const optimisticTimerStart = new Date().toISOString();
+      draftDebugBus.record('timer_reset', {
+        source: 'pick_handler_optimistic',
+        optimisticTimerStart,
+      });
       setLeague(prev => prev ? {
         ...prev,
         settings: { ...prev.settings, timerStartedAt: optimisticTimerStart }
@@ -901,9 +914,12 @@ const DraftRoom = () => {
       const now = Date.now();
       if (now - lastReconcileAtRef.current < RECONCILE_MIN_INTERVAL_MS) {
         logger.debug('DraftRoom: skipping reconcile (rate-limited)');
+        draftDebugBus.record('reconcile_started', { skipped: 'rate_limited' });
         return;
       }
       lastReconcileAtRef.current = now;
+      const reconcileStart = Date.now();
+      draftDebugBus.record('reconcile_started', { pickId: newPick.id });
       Promise.all([
         leagueApi.getLeague(leagueId),
         DraftService.getDraftPicks(leagueId, user.id),
@@ -930,7 +946,18 @@ const DraftRoom = () => {
           setDraftHistory(serverPicks);
           setDraftedPlayerIds(new Set(serverPicks.map(p => p.player_id)));
         }
-      }).catch(err => logger.debug('DraftRoom: Background reconciliation error (non-critical):', err));
+        draftDebugBus.record('reconcile_completed', {
+          durationMs: Date.now() - reconcileStart,
+          freshTimerStartedAt: (freshLeague as (League & { settings?: LeagueSettings & { timerStartedAt?: string | null } }) | null)?.settings?.timerStartedAt ?? null,
+          serverPickCount: serverPicks.length,
+        });
+      }).catch(err => {
+        logger.debug('DraftRoom: Background reconciliation error (non-critical):', err);
+        draftDebugBus.record('reconcile_completed', {
+          durationMs: Date.now() - reconcileStart,
+          error: true,
+        });
+      });
       },
       undefined,
       (status) => {
@@ -938,6 +965,7 @@ const DraftRoom = () => {
         // continues regardless, so even 'disconnected' is degraded, not
         // broken — but the user needs to know picks are not instant.
         setRealtimeStatus(status);
+        draftDebugBus.record('realtime_status', { status, source: 'draft_picks_channel' });
       },
     );
 
@@ -966,6 +994,7 @@ const DraftRoom = () => {
     };
 
     const doPoll = async () => {
+      const pollStart = Date.now();
       try {
         // Fetch picks and league in parallel to minimize latency
         const [picksResult, freshLeagueRes] = await Promise.all([
@@ -1038,9 +1067,19 @@ const DraftRoom = () => {
         if (picksChanged) {
           await loadDraftState();
         }
+        draftDebugBus.record('poll_completed', {
+          durationMs: Date.now() - pollStart,
+          picksChanged,
+          serverPickCount: activePicks.length,
+          freshTimerStartedAt: (freshLeagueRes.data as (League & { settings?: LeagueSettings & { timerStartedAt?: string | null } }) | null)?.settings?.timerStartedAt ?? null,
+        });
       } catch (err) {
         // Silent fail - polling is best-effort
         logger.debug('DraftRoom: Poll error (non-critical):', err);
+        draftDebugBus.record('poll_completed', {
+          durationMs: Date.now() - pollStart,
+          error: true,
+        });
       }
       // Schedule next poll (recursive setTimeout with jitter instead of fixed setInterval)
       schedulePoll();
@@ -1216,6 +1255,11 @@ const DraftRoom = () => {
         async (payload) => {
           const updatedLeague = payload.new as League & { settings: LeagueSettings & { timerStartedAt?: string | null; pickTimeLimit?: number } };
           logger.debug('DraftRoom: League status changed via realtime:', updatedLeague.draft_status);
+          draftDebugBus.record('postgres_league_received', {
+            draftStatus: updatedLeague.draft_status,
+            timerStartedAt: updatedLeague.settings?.timerStartedAt ?? null,
+            pickTimeLimit: updatedLeague.settings?.pickTimeLimit ?? null,
+          });
 
           // Update local league state (including settings with timerStartedAt)
           // Use functional updater to avoid stale closure over `league`
@@ -1863,9 +1907,20 @@ const DraftRoom = () => {
     let autoTriggered = false;
 
     // Calculate remaining time from server timestamp every second
+    let lastSampledAt = 0;
     const updateTimer = () => {
       const elapsedSec = Math.floor((Date.now() - timerStartMs) / 1000);
       const remaining = Math.max(0, timeLimit - elapsedSec);
+
+      // Sample at most every 2s to avoid filling the ring buffer with ticks.
+      if (Date.now() - lastSampledAt >= 2000) {
+        lastSampledAt = Date.now();
+        draftDebugBus.record('timer_tick', {
+          remaining,
+          elapsedSec,
+          timerStartedAt: typeof timerStartedAt === 'string' ? timerStartedAt : null,
+        });
+      }
 
       // Prevent cosmetic glitch: if remaining is 0 or negative but this is a
       // stale timerStartedAt (currentPick changed but timerStartedAt hasn't
@@ -3605,6 +3660,15 @@ const DraftRoom = () => {
   // ALWAYS render something - never return null
   return (
     <div className="min-h-screen bg-[#D4E8B8] relative touch-manipulation overflow-x-clip">
+      {/* Commissioner-only debug overlay. Off unless ?draftDebug=1 or
+          localStorage.draftDebug='1'. Shows live event feed + timing
+          summary for the draft sync paths. */}
+      <DraftDebugOverlay
+        show={isCommissioner && draftDebugBus.isEnabled()}
+        timerStartedAt={league?.settings?.timerStartedAt as string | null | undefined}
+        pickTimeLimit={draftSettings.pickTimeLimit}
+        realtimeStatus={realtimeStatus}
+      />
       {/* Realtime connection banner — surfaces when the draft-pick channel
           drops so users know their draft isn't silently stalled.
           'connected' is the quiescent state; we don't render anything. */}
