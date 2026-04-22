@@ -278,20 +278,30 @@ export default function PoolPlayoffRosterEntry() {
             .filter((p): p is PoolPlayer => !!p);
           setRoster(savedPlayers);
         }
-        // In view mode, fetch the owner's display name
+        // In view mode, fetch the owner's team name (preferred) or profile name
         if (isViewMode && viewUserId) {
           try {
-            const { data: profile } = await (supabase as any)
-              .from('profiles')
-              .select('username, first_name, last_name')
-              .eq('id', viewUserId)
+            const { data: team } = await (supabase as any)
+              .from('teams')
+              .select('team_name')
+              .eq('league_id', leagueId)
+              .eq('owner_id', viewUserId)
               .single();
-            if (profile) {
-              const name = profile.username || [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Unknown';
-              setViewOwnerName(name);
+            if (team?.team_name) {
+              setViewOwnerName(team.team_name);
+            } else {
+              const { data: profile } = await (supabase as any)
+                .from('profiles')
+                .select('username, first_name, last_name')
+                .eq('id', viewUserId)
+                .single();
+              if (profile) {
+                const name = profile.username || [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Unknown';
+                setViewOwnerName(name);
+              }
             }
           } catch {
-            logger.warn('Failed to fetch viewed user profile');
+            logger.warn('Failed to fetch viewed user display name');
           }
         }
         // Check lock
