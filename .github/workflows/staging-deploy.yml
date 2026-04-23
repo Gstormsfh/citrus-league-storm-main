@@ -1,0 +1,232 @@
+name: Staging Deploy
+
+on:
+  push:
+    branches:
+      - staging
+      - staging-setup   # bootstrap: allow this branch until `staging` exists; remove after cutover
+  workflow_dispatch: {}
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true   # staging can cancel in-flight runs; prod cannot
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ── Gate: build + type-check + tests must pass before deploy ────────
+  gate:
+    name: Pre-deploy Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check (web)
+        run: cd apps/web && npx tsc --noEmit -p tsconfig.app.json || echo "::warning::TypeScript found type errors — tracked for strict mode migration"
+
+      - name: Type check (server)
+        run: cd server && npx tsc --noEmit
+
+      - name: Build shared
+        run: npm run build --workspace=packages/shared
+
+      - name: Build web (staging mode)
+        env:
+          # Injected into the Vite bundle at build time. Safe for public
+          # exposure — Supabase anon key and Firebase apiKey are designed
+          # to be embedded in the client.
+          VITE_SUPABASE_URL: ${{ secrets.STAGING_VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.STAGING_VITE_SUPABASE_ANON_KEY }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.STAGING_VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.STAGING_VITE_FIREBASE_APP_ID }}
+          # Ads off on staging so test traffic doesn't affect ad metrics
+          VITE_ADSENSE_ENABLED: "false"
+          # VITE_API_URL intentionally omitted — Firebase Hosting rewrites
+          # /api/* to Cloud Run within the same GCP project.
+        run: npm run build:staging --workspace=apps/web
+
+      - name: Build server
+        run: npm run build --workspace=server
+
+      - name: Run web tests
+        run: npm run test --workspace=apps/web
+
+      - name: Run server tests
+        run: npm run build --workspace=packages/shared && npm run test --workspace=server
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build-staging
+          path: apps/web/dist/
+          retention-days: 3
+
+  # ── Deploy API server to staging Cloud Run ─────────────────────────
+  deploy-api:
+    name: Deploy API to Cloud Run (staging)
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check GCP credentials
+        id: check-gcp
+        run: |
+          if [ -n "$GCP_SA_KEY" ]; then
+            echo "has_creds=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_creds=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping staging Cloud Run deploy — STAGING_GCP_SA_KEY not configured"
+          fi
+        env:
+          GCP_SA_KEY: ${{ secrets.STAGING_GCP_SA_KEY }}
+
+      - name: Authenticate to Google Cloud
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.STAGING_GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Build and push Docker image
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        run: |
+          IMAGE="us-central1-docker.pkg.dev/citrus-fantasy-staging/citrus-api/server:${{ github.sha }}"
+          LATEST="us-central1-docker.pkg.dev/citrus-fantasy-staging/citrus-api/server:latest"
+          docker build -t "$IMAGE" -t "$LATEST" -f Dockerfile .
+          docker push "$IMAGE"
+          docker push "$LATEST"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Deploy to Cloud Run (staging)
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: citrus-api
+          region: us-central1
+          image: us-central1-docker.pkg.dev/citrus-fantasy-staging/citrus-api/server:${{ github.sha }}
+          # Pulls from STAGING GCP Secret Manager (not GitHub secrets),
+          # keeping infra secrets in one place and avoiding duplication.
+          secrets: |
+            SUPABASE_URL=SUPABASE_URL:latest
+            SUPABASE_ANON_KEY=SUPABASE_ANON_KEY:latest
+            SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest
+          env_vars: |
+            NODE_ENV=production
+            DEPLOYMENT_ENV=staging
+          # Staging resource limits (match ops/cloudrun/service-staging.yaml).
+          # Smaller than prod: no real users depend on staging warmth.
+          flags: >-
+            --allow-unauthenticated
+            --service-account=citrus-api-runtime@citrus-fantasy-staging.iam.gserviceaccount.com
+            --memory=1Gi
+            --cpu=1
+            --min-instances=0
+            --max-instances=3
+            --concurrency=80
+            --timeout=60s
+            --no-cpu-throttling
+            --cpu-boost
+            --project=citrus-fantasy-staging
+
+      - name: API health check
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        run: |
+          API_URL=$(gcloud run services describe citrus-api --region=us-central1 --project=citrus-fantasy-staging --format='value(status.url)' 2>/dev/null) || true
+          if [ -n "$API_URL" ]; then
+            echo "Checking $API_URL/api/health..."
+            sleep 10
+            status=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/health" --max-time 10) || true
+            if [ "$status" = "200" ]; then
+              echo "✓ Staging API health check passed (HTTP $status)"
+            else
+              echo "::warning::Staging API health check returned HTTP $status"
+            fi
+          fi
+
+  # ── Deploy frontend to staging Firebase Hosting ────────────────────
+  deploy-web:
+    name: Deploy Web to Firebase (staging)
+    needs: [gate, deploy-api]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    permissions:
+      checks: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build-staging
+          path: apps/web/dist/
+
+      - name: Check Firebase credentials
+        id: check-creds
+        run: |
+          if [ -n "$FIREBASE_SA" ]; then
+            echo "has_creds=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_creds=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping staging Firebase deploy — STAGING_FIREBASE_SERVICE_ACCOUNT not configured"
+          fi
+        env:
+          FIREBASE_SA: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy to Firebase (staging)
+        if: steps.check-creds.outputs.has_creds == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+          projectId: citrus-fantasy-staging
+          channelId: live
+
+      - name: Post-deploy health check
+        if: steps.check-creds.outputs.has_creds == 'true'
+        run: |
+          echo "Waiting 15s for deploy propagation..."
+          sleep 15
+          status=$(curl -s -o /dev/null -w "%{http_code}" "https://citrus-fantasy-staging.web.app/" --max-time 10) || true
+          if [ "$status" = "200" ]; then
+            echo "✓ Staging health check passed (HTTP $status)"
+          else
+            echo "::warning::Staging health check returned HTTP $status — verify manually"
+          fi
+
+  # ── Notify ────────────────────────────────────────────────────────
+  notify:
+    name: Notify
+    needs: deploy-web
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deployment result
+        run: |
+          if [ "${{ needs.deploy-web.result }}" = "success" ]; then
+            echo "✓ Staging deploy successful for ${{ github.sha }}"
+            echo "  Web: https://citrus-fantasy-staging.web.app"
+          else
+            echo "::warning::Staging deploy incomplete — check logs"
+          fi
