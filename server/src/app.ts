@@ -43,10 +43,17 @@ export type Env = {
 const app = new Hono<Env>();
 
 // ── CORS origins — environment-aware ─────────────────────────────────
+// Staging origins are allowed from both environments because:
+//   1. Same codebase runs on prod + staging — one allowlist keeps config simple.
+//   2. Cross-environment requests are harmless anyway: different Supabase projects
+//      mean different JWT signing secrets, so a staging-signed token cannot pass
+//      the prod API's auth validation (and vice versa).
 const isProduction = process.env.NODE_ENV === 'production';
 const corsOrigins: string[] = [
   'https://citrusfantasysports.com',
   'https://www.citrusfantasysports.com',
+  'https://citrus-fantasy-staging.web.app',
+  'https://citrus-fantasy-staging.firebaseapp.com',
 ];
 if (!isProduction) {
   corsOrigins.push('http://localhost:8080', 'http://localhost:5173');

@@ -1,6 +1,8 @@
 {
   "projects": {
-    "default": "citrus-fantasy-prod"
+    "default": "citrus-fantasy-prod",
+    "prod": "citrus-fantasy-prod",
+    "staging": "citrus-fantasy-staging"
   },
   "targets": {},
   "etags": {}
