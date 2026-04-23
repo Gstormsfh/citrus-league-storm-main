@@ -52,8 +52,9 @@ spec:
               value: production
             - name: DEPLOYMENT_ENV
               value: staging
-            - name: PORT
-              value: "8080"
+            # NOTE: PORT is a reserved env var on Cloud Run — the platform
+            # sets it automatically (8080 default) and rejects attempts to
+            # specify it via `gcloud run deploy --set-env-vars`. Don't add it.
             - name: SUPABASE_URL
               valueFrom:
                 secretKeyRef:
