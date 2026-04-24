@@ -113,15 +113,17 @@ function parseValues(valStr) {
 }
 
 // ── Batch-insert rows via PostgREST ────────────────────────────────
+// Plain POST (no on_conflict). If you need to re-run, TRUNCATE the
+// target tables first in the Supabase SQL Editor.
 async function upsertBatch(table, rows) {
-  const url = `${SUPABASE_URL}/rest/v1/${table}?on_conflict=`;
+  const url = `${SUPABASE_URL}/rest/v1/${table}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       apikey: SERVICE_ROLE,
       Authorization: `Bearer ${SERVICE_ROLE}`,
       'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates,return=minimal',
+      Prefer: 'return=minimal',
     },
     body: JSON.stringify(rows),
   });
