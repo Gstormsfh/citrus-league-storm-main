@@ -41,9 +41,10 @@ if (!SERVICE_ROLE) {
   process.exit(1);
 }
 
-// ── Default chunk files (small ones only, skip the 34MB one) ──────
+// ── Default chunk files (ALL six tables, including the big one) ──
 const DEFAULT_CHUNKS = [
   'chunk_player_directory.sql',
+  'chunk_player_projected_stats.sql',
   'chunk_player_ros_projections.sql',
   'chunk_player_season_stats.sql',
   'chunk_player_talent_metrics.sql',
