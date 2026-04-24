@@ -62,7 +62,9 @@ function parseInsert(stmt) {
   const m = stmt.match(/^INSERT INTO (?:public\.)?(\w+) \(([^)]+)\) VALUES\s*\((.+)\);\s*$/s);
   if (!m) return null;
   const [, table, colList, valList] = m;
-  const columns = colList.split(',').map(c => c.trim());
+  // Strip surrounding double-quotes: pg_dump quotes columns that clash with
+  // SQL-ish reserved words (e.g. "position"). PostgREST wants the bare name.
+  const columns = colList.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
   const values = parseValues(valList);
   if (values.length !== columns.length) {
     console.warn(`  !! column/value mismatch on ${table}: cols=${columns.length}, vals=${values.length}`);
