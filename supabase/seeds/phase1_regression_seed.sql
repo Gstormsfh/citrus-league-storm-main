@@ -47,7 +47,7 @@ DECLARE
   -- Your staging auth.users id. Find it in Supabase dashboard →
   -- Authentication → Users (UID column). Required: cannot be the
   -- all-zeros default; the seed raises if you forget.
-  v_commissioner_user_id  uuid := '00000000-0000-0000-0000-000000000000';
+  v_commissioner_user_id  uuid := '882b59c9-8882-418b-9450-3fd004d57edd';
 
   -- Deterministic league id. Fixed so re-runs are idempotent and the
   -- cleanup block can find it. Change only if you need multiple
@@ -250,52 +250,176 @@ WHERE l.id = '11111111-1111-1111-1111-111111111111';
 --   scheduled_draft_time ≈ now() + 5 min
 
 -- ════════════════════════════════════════════════════════════════════════
--- Smoke-test commands (paste manually after seeding).
+-- Baseline-capture protocol — PRE-MIGRATION (run BEFORE `supabase db push`)
+-- ════════════════════════════════════════════════════════════════════════
+-- The point of this protocol is to capture, with screenshots and a SQL
+-- snapshot, exactly what v1 looks and behaves like on this seeded league
+-- BEFORE the Phase 1 migration runs. After the migration you re-run the
+-- same protocol; any visual or data divergence is a regression.
+--
+-- ──────────────────────────────────────────────────────────────────────
+-- About v1's autopick behavior on this seed (read this once before
+-- starting — it explains what to expect at each step).
+-- ──────────────────────────────────────────────────────────────────────
+-- The schema constraint `unique(league_id, owner_id)` (see
+-- `supabase/migrations/20250101000001_create_leagues_teams_tables.sql:27`)
+-- prevents one user from owning multiple teams in the same league.
+-- This seed therefore assigns ONLY team 1 to your commissioner UID;
+-- teams 2–12 are unowned (`owner_id = NULL`).
+--
+-- v1 treats unowned teams as "AI teams" (DraftRoom.tsx:1850). When
+-- the next team is unowned and the commissioner's browser is open,
+-- v1 schedules an autopick **1.5 seconds** after the prior pick
+-- commits (DraftRoom.tsx:2193-2199). That means:
+--   - Team 1's turn  → manual pick by you (or v1 timer-expiry autopick).
+--   - Teams 2–12     → AI autopick fires ~1.5s after each prior pick.
+--                      You don't need to "let the timer expire" for
+--                      these — the AI autopick beats the timer.
+--
+-- This is fine for the baseline. We're capturing v1's actual behavior,
+-- including the 1.5s AI-autopick path, which is one of the v1 paths
+-- v2 replaces with a server-authoritative scheduler.
+--
+-- ──────────────────────────────────────────────────────────────────────
+-- Step 1. Lobby snapshot.
+-- ──────────────────────────────────────────────────────────────────────
+--   Sign in to https://staging.citrusfantasysports.com as the
+--   commissioner (882b59c9-…). Navigate to:
+--     /league/11111111-1111-1111-1111-111111111111
+--   Confirm: lobby renders, draft countdown shows ~5 min, all 12
+--   seed teams appear with the right names.
+--   📸  Screenshot: lobby.
+--
+-- ──────────────────────────────────────────────────────────────────────
+-- Step 2. Trigger the draft to start.
+-- ──────────────────────────────────────────────────────────────────────
+--   v1 advances `draft_status` from `'queued'` → `'in_progress'` when
+--   `scheduled_draft_time` passes (or via an explicit start action).
+--   To start immediately, run in the Supabase SQL Editor:
+--
+--     UPDATE leagues
+--        SET scheduled_draft_time = now()
+--      WHERE id = '11111111-1111-1111-1111-111111111111';
+--
+--   Refresh the draft page. Confirm:
+--     - Pick timer is counting down.
+--     - Team 1 ("Seed Team 01") is on the clock.
+--     - Pick #1 shows team 1's name.
+--   📸  Screenshot: draft active, team 1 on clock.
+--
+-- ──────────────────────────────────────────────────────────────────────
+-- Step 3. Manual pick as team 1.
+-- ──────────────────────────────────────────────────────────────────────
+--   Pick a player from the available list — anyone who is clearly
+--   recognizable in the picks list (e.g. McDavid, MacKinnon).
+--   Confirm:
+--     - Pick saves (no toast error).
+--     - Pick #1 appears in the picks list with team 1's name and the
+--       player you chose.
+--     - The clock advances; team 2 ("Seed Team 02") is now on the
+--       clock with a fresh timer.
+--   📸  Screenshot: picks list showing pick #1.
+--
+-- ──────────────────────────────────────────────────────────────────────
+-- Step 4. Observe v1 AI autopick fire for team 2.
+-- ──────────────────────────────────────────────────────────────────────
+--   Do NOTHING. Wait ~1.5–3 seconds. v1's AI autopick path
+--   (DraftRoom.tsx:2196 `setTimeout(..., 1500)`) should fire and
+--   pick a player for team 2 automatically. Confirm:
+--     - Pick #2 appears with team 2's name.
+--     - The picks list shows two rows.
+--     - The clock advances to team 3 with a fresh timer.
+--   📸  Screenshot: picks list showing picks #1 and #2.
+--
+-- ──────────────────────────────────────────────────────────────────────
+-- Step 5. Let v1 AI autopick fire 2–3 more times (teams 3, 4, 5).
+-- ──────────────────────────────────────────────────────────────────────
+--   With teams 3–12 also unowned, AI autopick will continue picking
+--   automatically every ~1.5s. Watch picks #3, #4, #5 land.
+--   Note: this is NOT a manual-pick test — see the "About v1's
+--   autopick behavior" note above for why. We're observing the
+--   AI autopick flow is stable and not stalling.
+--   Confirm:
+--     - Picks #3–#5 land at roughly 1.5–2s intervals.
+--     - No "Pick failed" / "Network error" toasts.
+--     - The picks list stays in pick-number order (1, 2, 3, 4, 5).
+--   📸  Screenshot: picks list after pick #5.
+--
+-- ──────────────────────────────────────────────────────────────────────
+-- Step 6. Capture the data baseline.
+-- ──────────────────────────────────────────────────────────────────────
+--   Run the following in the Supabase SQL Editor and SAVE THE OUTPUT
+--   as `baseline_pre_migration.txt` (or paste into a draft PR comment):
+--
+--     SELECT round_number,
+--            pick_number,
+--            team_id,
+--            player_id,
+--            picked_at
+--     FROM   draft_picks
+--     WHERE  league_id = '11111111-1111-1111-1111-111111111111'
+--     ORDER  BY pick_number;
+--
+--   Note: v1's `draft_picks` does not have a `source` column. The
+--   distinction between "manual" (pick #1) and "autopick" (picks
+--   #2..N) is implicit — we know it from the protocol order, not
+--   the data. v2 captures this in `draft_events.actor.kind`.
+--
+--   This snapshot is the pre-migration baseline.
+--
+-- ════════════════════════════════════════════════════════════════════════
+-- POST-MIGRATION protocol (run AFTER `supabase db push` and the smoke
+-- test in `supabase/tests/draft_engine_v2_phase1_smoke.sql`).
 -- ════════════════════════════════════════════════════════════════════════
 --
--- BEFORE applying the Phase 1 migration:
---   1. Open staging.citrusfantasysports.com signed in as the commissioner.
---   2. Open the seeded league: /league/11111111-1111-1111-1111-111111111111
---   3. Verify the lobby renders, draft countdown shows ~5 min, all 12
---      seed teams appear in the lobby.
---   4. (Optional) Make pick #1 via SQL to confirm v1 RPC works:
+-- Step 7.  Re-seed (cleanup block at the bottom + re-run this seed) to
+--          restore an unstarted "queued" league. The schema migration
+--          should not affect v1, but we want a clean slate so the
+--          comparison is apples-to-apples.
 --
---      SELECT make_draft_pick(
---        p_league_id        => '11111111-1111-1111-1111-111111111111',
---        p_team_id          => '33333333-3333-3333-3333-000000000001',
---        p_player_id        => '8478402',  -- Connor McDavid (NHL API id)
---        p_round_number     => 1,
---        p_pick_number      => 1,
---        p_draft_session_id => '22222222-2222-2222-2222-222222222222'
---      );
+-- Step 8.  Repeat steps 1–6 exactly. Compare each screenshot side-by-side
+--          with its pre-migration counterpart. If anything differs:
+--          colors, labels, button positions, picks-list rendering, the
+--          clock — that is a regression to investigate before approving
+--          Phase 1.
 --
---      Confirm a row appears in `draft_picks`. (You'll want to roll this
---      back before the after-migration test, OR re-seed between runs —
---      see cleanup block below.)
+-- Step 9.  Diff the two SQL outputs from step 6. The picks themselves
+--          will differ (RNG-driven AI selection), but the SHAPE
+--          (5 rows, gap-free pick_numbers 1..5, all team_ids in
+--          {seed team UUIDs}, picked_at monotonic) must be identical.
 --
--- AFTER applying the Phase 1 migration:
---   5. Re-run the same lobby check + same `make_draft_pick(...)` call.
---      Expectation: identical behaviour. The Phase 1 migration adds
---      tables/columns but does not modify v1's path.
---   6. Confirm v2 sync endpoint:
+-- Step 10. Smoke the new v2 sync endpoint:
 --
---      curl -H "Authorization: Bearer $JWT" \
---        https://staging.citrusfantasysports.com/api/draft/v2/league/11111111-1111-1111-1111-111111111111/sync
+--     curl -H "Authorization: Bearer $JWT" \
+--       https://staging.citrusfantasysports.com/api/draft/v2/league/11111111-1111-1111-1111-111111111111/sync
 --
---      Expectation: 200, body matches spec §7.2 shape:
---        { "data": {
---            "server_time": "...",
---            "pick_deadline": null,
---            "current_seq": 0,
---            "current_pick_number": 1,
---            "draft_state": "not_started",
---            "payload_hash": null
---          }
---        }
+--   Expected response (200), spec §7.2 shape:
+--     { "data": {
+--         "server_time":         "2026-04-25T..Z",
+--         "pick_deadline":       null,
+--         "current_seq":         0,
+--         "current_pick_number": 1,
+--         "draft_state":         "not_started",
+--         "payload_hash":        null
+--       }
+--     }
 --
---      Note: `draft_state` is the v2 column (default `not_started`),
---      independent of `draft_status` ('queued' on this seed).
+--   Note: v2's `draft_state` is independent of v1's `draft_status`.
+--   This seed leaves `draft_state` at its default ('not_started')
+--   because Phase 1 doesn't drive any v2 state transitions yet.
+--   Phase 2 lands the RPCs that will do that.
 --
+-- Step 11. Final additivity assertion. Run in the SQL Editor:
+--
+--     SELECT
+--       (SELECT count(*) FROM draft_picks    WHERE league_id = '11111111-1111-1111-1111-111111111111') AS v1_picks,
+--       (SELECT count(*) FROM draft_events   WHERE league_id = '11111111-1111-1111-1111-111111111111') AS v2_events,
+--       (SELECT count(*) FROM draft_picks_v2 WHERE league_id = '11111111-1111-1111-1111-111111111111') AS v2_projection;
+--
+--   Expected: v1_picks > 0 (whatever you ended up with from step 8),
+--             v2_events = 0, v2_projection = 0. v2 is dormant.
+--
+
 -- ════════════════════════════════════════════════════════════════════════
 -- Cleanup. Uncomment and run when you're done with the seeded league.
 -- ════════════════════════════════════════════════════════════════════════
