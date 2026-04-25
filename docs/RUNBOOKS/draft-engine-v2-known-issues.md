@@ -22,7 +22,7 @@ Each row uses these columns:
 | Column | Meaning |
 |---|---|
 | **ID** | `KI-NNN`, monotonically assigned. Reusable as a citation key in code comments and PRs. |
-| **Severity** | `low` / `medium` / `high` / `critical`. High and above block phase exit; medium and below ride along. |
+| **Severity** | `low` / `medium` / `high` / `critical`. **`low` and `medium` ship in the same phase as introduced unless explicitly re-targeted in this file.** **`high` and `critical` block phase exit until resolved.** |
 | **Function / file** | Where the issue lives in the code — file path + symbol or line range. |
 | **Description** | What the issue is, in plain language. |
 | **Why deferred** | Why we didn't fix it in the chunk that surfaced it. |
@@ -53,7 +53,7 @@ Each row uses these columns:
 | **Description** | Each RPC ends with a `RAISE NOTICE 'function_name committed: ...'` line for development debugging. In production, every commit produces a NOTICE log line (4 per pick at peak — submit_pick_v2 + the projection trigger fires + sometimes downstream events). The volume drowns out signal logs and increases Supabase log ingestion cost. |
 | **Why deferred** | Replacing 6 sites with proper structured logging belongs in the observability work scheduled for chunk 9, where the broader `pick_committed`, `autopick_fired`, `safety_net_hit` etc. metric pipeline lands (spec §11.2). Removing them piecemeal before that work is wasted churn. |
 | **Target phase for resolution** | **Phase 2 chunk 9** (observability). Either remove entirely or convert to structured `pg_logical_emit_message` / `INSERT INTO draft_metrics` per spec §11.1. |
-| **Verification test** | `supabase/tests/draft_engine_v2_chunk9_log_volume.sql`: exec one full pick path, count `pg_stat_statements` NOTICE-level emissions for the league, assert ≤1 per logical operation. (Phase 2 itself doesn't have a metrics table yet; the verification can also be a manual log-stream inspection during chunk 9 sign-off.) |
+| **Verification test** | First run `SELECT installed_version FROM pg_available_extensions WHERE name = 'pg_stat_statements'` against the target environment. **If installed:** `supabase/tests/draft_engine_v2_chunk9_log_volume.sql` exec one full pick path, count NOTICE-level emissions for the league via `pg_stat_statements`, assert ≤1 per logical operation. **If not installed:** manual log-stream inspection during chunk 9 sign-off — exec one full pick path, capture the Supabase Functions / Postgres log stream for that minute, grep `RAISE NOTICE` mentions for the test league_id, assert count is the expected number of structured-log emissions (not the current chatty one-per-RPC). |
 
 ---
 
