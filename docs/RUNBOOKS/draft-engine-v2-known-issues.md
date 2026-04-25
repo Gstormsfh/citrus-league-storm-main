@@ -35,6 +35,21 @@ Each row uses these columns:
 
 ### KI-001 — `DraftServiceV2.broadcastEvent` can hang on non-SUBSCRIBED channel status
 
+**RESOLVED** (commit landing this chunk; 2026-04-25). Fix shipped in
+chunk 9c: `BROADCAST_TIMEOUT_MS = 5000` constant, channel.subscribe
+result raced against a `setTimeout`, terminal statuses
+(`SUBSCRIBED`, `CHANNEL_ERROR`, `TIMED_OUT`, `CLOSED`) all resolve
+the outer Promise. Send happens only on `SUBSCRIBED`; any other
+terminal or the timeout logs `broadcast_channel_failed` and skips
+send. Cleanup (`removeChannel`) always runs. Test coverage:
+`DraftServiceV2.test.ts` cases `KI-001: resolves within ~5s when
+channel never reaches SUBSCRIBED`, `terminal CHANNEL_ERROR …`,
+`terminal CLOSED …`. Real-Realtime verification still rides on
+Phase 7 chaos testing as documented in this row's verification
+field below — the mocked tests prove the timeout race is wired
+correctly, not that the production Realtime client behaves as
+modeled.
+
 | | |
 |---|---|
 | **Severity** | medium |
@@ -42,7 +57,7 @@ Each row uses these columns:
 | **Description** | The Promise wrapping `channel.subscribe` only resolves when `status === 'SUBSCRIBED'` fires. Other statuses (`CHANNEL_ERROR`, `TIMED_OUT`, `CLOSED`) cause the inner callback to short-circuit with a bare `return`, leaving the outer Promise unresolved indefinitely. The route handler awaits forever. The same flaw exists in v1's `broadcastDraftPick` (`server/src/routes/draft.ts:37-49`), so this is not a v2 regression — but it should not ship as a v2 feature. |
 | **Why deferred** | Flag surfaced during chunk 7 review. Fix is straightforward (Promise.race against a 5s timeout, or handle all `RealtimeChannelStatus` enum values explicitly), but the broader observability + structured-logging work in chunk 9 is the natural place to do it alongside RAISE NOTICE cleanup, and pulling the fix forward would have delayed chunk 8 (routes) for no scheduling benefit. |
 | **Target phase for resolution** | **Phase 2 chunk 9** (observability). Pair with KI-002 in the same commit. |
-| **Verification test** | `DraftServiceV2.test.ts > broadcastEvent > resolves within 5s when channel never reaches SUBSCRIBED`. Mock the Supabase channel to never emit `SUBSCRIBED`; assert the awaited promise resolves and a `broadcast_channel_failed` log line was emitted. |
+| **Verification test** | `DraftServiceV2.test.ts > broadcastEvent > KI-001: resolves within ~5s when channel never reaches SUBSCRIBED`. Mocked channel that never emits a terminal status; vi fake timers advanced past the 5s timeout; assert send was NOT called and removeChannel WAS called. Plus two complementary tests for terminal `CHANNEL_ERROR` and `CLOSED` statuses. **Real-Realtime verification remains a Phase 7 chaos-test responsibility** — the mocks prove the wiring is correct, not that production Realtime emits these statuses on real network failures. |
 
 ### KI-002 — `RAISE NOTICE` noise in 6 v2 RPCs
 

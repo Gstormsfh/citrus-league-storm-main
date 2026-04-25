@@ -315,4 +315,114 @@ describe('DraftServiceV2.broadcastEvent', () => {
     );
     expect(removeChannel).toHaveBeenCalledWith(channel);
   });
+
+  // ── KI-001 timeout coverage ─────────────────────────────────────────
+  // Mocked channel that never reaches a terminal status. Without the
+  // fix, broadcastEvent would hang forever. With the fix, the 5s
+  // timeout resolves the inner Promise with 'TIMEOUT' and the function
+  // logs broadcast_channel_failed and returns.
+  //
+  // Real-Realtime verification rides on Phase 7 chaos testing
+  // (KI-001 verification-test entry).
+
+  it('KI-001: resolves within ~5s when channel never reaches SUBSCRIBED', async () => {
+    vi.useFakeTimers();
+    const eventRow = { id: 4711, league_id: validParams.leagueId, seq: 1 };
+    const fromChain = {
+      select:  vi.fn().mockReturnThis(),
+      eq:      vi.fn().mockReturnThis(),
+      single:  vi.fn().mockResolvedValue({ data: eventRow, error: null }),
+    };
+    const send = vi.fn();
+    // subscribe callback never fires SUBSCRIBED (or any terminal status).
+    const subscribe = vi.fn(() => ({}));
+    const channel = { subscribe, send };
+    const removeChannel = vi.fn().mockResolvedValue(undefined);
+    const admin = {
+      from:          vi.fn(() => fromChain),
+      channel:       vi.fn(() => channel),
+      removeChannel,
+    } as any;
+    const service = new DraftServiceV2({} as any);
+
+    const broadcastP = service.broadcastEvent({
+      admin,
+      leagueId:     validParams.leagueId,
+      eventId:      4711,
+      wasDuplicate: false,
+    });
+
+    // Advance fake timers past the 5s timeout.
+    await vi.advanceTimersByTimeAsync(5_001);
+    await broadcastP;
+
+    expect(send).not.toHaveBeenCalled();
+    // Cleanup still happens after the timeout.
+    expect(removeChannel).toHaveBeenCalledWith(channel);
+    vi.useRealTimers();
+  });
+
+  it('KI-001: terminal CHANNEL_ERROR status logs failure and skips send', async () => {
+    const eventRow = { id: 4711, league_id: validParams.leagueId, seq: 1 };
+    const fromChain = {
+      select:  vi.fn().mockReturnThis(),
+      eq:      vi.fn().mockReturnThis(),
+      single:  vi.fn().mockResolvedValue({ data: eventRow, error: null }),
+    };
+    const send = vi.fn();
+    const subscribe = vi.fn((cb: (status: string) => void) => {
+      queueMicrotask(() => cb('CHANNEL_ERROR'));
+      return {};
+    });
+    const channel = { subscribe, send };
+    const removeChannel = vi.fn().mockResolvedValue(undefined);
+    const admin = {
+      from:          vi.fn(() => fromChain),
+      channel:       vi.fn(() => channel),
+      removeChannel,
+    } as any;
+    const service = new DraftServiceV2({} as any);
+
+    await service.broadcastEvent({
+      admin,
+      leagueId:     validParams.leagueId,
+      eventId:      4711,
+      wasDuplicate: false,
+    });
+
+    expect(send).not.toHaveBeenCalled();
+    expect(removeChannel).toHaveBeenCalledWith(channel);
+  });
+
+  it('KI-001: terminal CLOSED status logs failure and skips send', async () => {
+    const eventRow = { id: 4711, league_id: validParams.leagueId, seq: 1 };
+    const fromChain = {
+      select:  vi.fn().mockReturnThis(),
+      eq:      vi.fn().mockReturnThis(),
+      single:  vi.fn().mockResolvedValue({ data: eventRow, error: null }),
+    };
+    const send = vi.fn();
+    const subscribe = vi.fn((cb: (status: string) => void) => {
+      queueMicrotask(() => cb('CLOSED'));
+      return {};
+    });
+    const channel = { subscribe, send };
+    const removeChannel = vi.fn().mockResolvedValue(undefined);
+    const admin = {
+      from:          vi.fn(() => fromChain),
+      channel:       vi.fn(() => channel),
+      removeChannel,
+    } as any;
+    const service = new DraftServiceV2({} as any);
+
+    await service.broadcastEvent({
+      admin,
+      leagueId:     validParams.leagueId,
+      eventId:      4711,
+      wasDuplicate: false,
+    });
+
+    expect(send).not.toHaveBeenCalled();
+    expect(removeChannel).toHaveBeenCalledWith(channel);
+  });
 });

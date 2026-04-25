@@ -59,13 +59,13 @@ let mockAdminRemoveChannel: ReturnType<typeof vi.fn>;
 
 vi.mock('../lib/supabase', () => ({
   createUserClient: () => ({
-    rpc: (...args: any[]) => mockUserClientRpc(...args),
+    rpc: (...args: any[]) => (mockUserClientRpc as any)(...args),
     from: (table: string) => mockUserClientFromImpl(table),
   }),
   supabaseAdmin: {
     from:           (table: string) => mockAdminFromImpl(table),
     channel:        (name: string, opts?: any) => mockAdminChannelImpl(name, opts),
-    removeChannel:  (...args: any[]) => mockAdminRemoveChannel(...args),
+    removeChannel:  (...args: any[]) => (mockAdminRemoveChannel as any)(...args),
   },
 }));
 

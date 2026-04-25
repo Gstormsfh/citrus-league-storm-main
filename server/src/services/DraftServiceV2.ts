@@ -74,6 +74,14 @@ export interface DraftEventRow {
 // idempotency_conflict at runtime.
 
 /**
+ * Maximum time `broadcastEvent` will wait for `channel.subscribe` to
+ * reach a terminal status before logging a failure and moving on. See
+ * docs/RUNBOOKS/draft-engine-v2-known-issues.md#KI-001 for the
+ * resolved hang scenario this guards against.
+ */
+const BROADCAST_TIMEOUT_MS = 5_000;
+
+/**
  * Map a Postgres RPC error (raised by submit_pick_v2 via RAISE
  * EXCEPTION) to the appropriate AppError. The RPC's message prefix
  * carries the spec §11.1 error code.
@@ -210,30 +218,59 @@ export class DraftServiceV2 {
       const channel = opts.admin.channel(channelName, {
         config: { broadcast: { self: false } },
       });
-      // TODO(KI-001): wrap this Promise in a 5s race so a non-SUBSCRIBED
-      // channel status (CHANNEL_ERROR / TIMED_OUT / CLOSED) cannot leave
-      // the route handler awaiting indefinitely. See
-      // docs/RUNBOOKS/draft-engine-v2-known-issues.md#KI-001.
-      await new Promise<void>((resolve) => {
-        channel.subscribe(async (status) => {
-          if (status !== 'SUBSCRIBED') return;
-          try {
-            await channel.send({
-              type: 'broadcast',
-              event: 'event',
-              payload: row,
-            });
-          } catch (err) {
-            logger.warn('draft_v2.broadcast_send_failed', {
-              event_id: opts.eventId,
-              err: err instanceof Error ? err.message : String(err),
-            });
-          } finally {
-            await opts.admin.removeChannel(channel);
-            resolve();
+
+      // KI-001 fix: race the channel.subscribe callback against a 5s
+      // timeout. The callback resolves on any terminal status
+      // (SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT, CLOSED). The timeout
+      // resolves with 'TIMEOUT' if no terminal status fires within
+      // BROADCAST_TIMEOUT_MS. Either way, we don't await indefinitely
+      // for SUBSCRIBED-that-never-comes.
+      const subscribeResult: string = await new Promise<string>((resolve) => {
+        const timer = setTimeout(() => resolve('TIMEOUT'), BROADCAST_TIMEOUT_MS);
+        channel.subscribe((status: string) => {
+          if (
+            status === 'SUBSCRIBED'    ||
+            status === 'CHANNEL_ERROR' ||
+            status === 'TIMED_OUT'     ||
+            status === 'CLOSED'
+          ) {
+            clearTimeout(timer);
+            resolve(status);
           }
         });
       });
+
+      if (subscribeResult === 'SUBSCRIBED') {
+        try {
+          await channel.send({
+            type: 'broadcast',
+            event: 'event',
+            payload: row,
+          });
+        } catch (err) {
+          logger.warn('draft_v2.broadcast_send_failed', {
+            event_id: opts.eventId,
+            err: err instanceof Error ? err.message : String(err),
+          });
+        }
+      } else {
+        logger.warn('draft_v2.broadcast_channel_failed', {
+          event_id: opts.eventId,
+          status:   subscribeResult,
+        });
+      }
+
+      // Always clean up the channel. removeChannel itself can throw
+      // (e.g., on a CLOSED channel). Swallow — broadcast errors are
+      // never user-facing.
+      try {
+        await opts.admin.removeChannel(channel);
+      } catch (err) {
+        logger.warn('draft_v2.broadcast_remove_channel_failed', {
+          event_id: opts.eventId,
+          err: err instanceof Error ? err.message : String(err),
+        });
+      }
     } catch (err) {
       logger.warn('draft_v2.broadcast_channel_failed', {
         event_id: opts.eventId,
