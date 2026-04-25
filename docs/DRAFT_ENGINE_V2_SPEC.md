@@ -11,68 +11,66 @@ readiness gate.
 
 > When this spec and the plan disagree, **the spec wins.** Subsequent
 > implementation PRs cite section numbers from this document
-> (e.g. "Phase 2 implements §7.1 and §8.2"). Section numbers are
+> (e.g. "Phase 2 implements §4.1 and §6.2"). Section numbers are
 > stable across spec revisions; if a section is removed, its number
 > is retired, not reused.
+
+### Scope
+
+- **In scope:** snake / linear drafts; server-authoritative timer +
+  autopick scheduling; append-only `draft_events` log as single source
+  of truth; idempotent pick submission via UUID nonce + payload hash;
+  reconnect-safe replay (`/events?since_seq=N`); commissioner
+  pause / resume / extend (v2.0).
+- **Out of scope (deferred):** auction draft (v2.x is snake / linear
+  only); pick-undo and force-pick commissioner overrides (reserved as
+  enum stubs `pick_undone`, `commissioner_override`; RPCs ship in v2.1);
+  removal of v1 code (separate PR after ≥30 clean prod v2 drafts);
+  long-horizon archival of `draft_events` and pgmq archive tables.
+
+### Versioning
+
+- Spec versions follow `vMAJOR.MINOR`. Breaking event-schema changes
+  bump MAJOR; additive changes bump MINOR.
+- `event_version smallint` is recorded on every `draft_events` row so
+  consumers can dispatch on it.
+- This document is **v1.0**. The §13 change log records every revision.
 
 ---
 
 ## Table of Contents
 
-1. Purpose, scope, versioning
-2. Principles
-3. Glossary
-4. Architecture overview
+1. Principles
+2. Glossary
+3. Database schema
+4. RPC signatures
 5. State machines
    - 5.1 Draft lifecycle state machine
    - 5.2 Pick submission state machine
    - 5.3 Autopick decision state machine
-6. Database schema
-7. RPC signatures
-8. Event catalog
-9. Client contract
-10. Invariants (I1–I16)
-11. Observability contract
-12. Error model
-13. Rollout plan
-14. Open questions
-15. Change log
+6. Event catalog
+7. Client contract
+8. Invariants (I1–I16)
+9. Observability contract
+10. Error model
+11. Rollout plan
+12. Open questions
+13. Change log
+
+Appendices:
+- Appendix A — Architecture overview (ASCII diagram)
+- Appendix B — Section-renumber map (v0.1 → v1.0 Rosetta Stone)
+
+> **Note on plan §5.x ambiguity.** `DRAFT_ENGINE_V2_PLAN.md` references
+> "spec §5.2" in two places: Phase 2's pick-submission preflight
+> (which matches §5.2 in this spec) and Phase 4's autopick worker
+> (which is actually §5.3 in this spec). When implementing Phase 4,
+> cite **§5.3**, not §5.2. This is recorded in §12 (Open questions →
+> erratum).
 
 ---
 
-## §1 Purpose, scope, versioning
-
-### §1.1 Purpose
-This document is the **contract** for the v2 live-draft engine. Every
-implementation PR (Phases 1–10 in the plan) must cite a section here
-for any behaviour it claims to implement. Reviews check that the cited
-section permits the change.
-
-### §1.2 In scope
-- Snake and linear drafts.
-- Server-authoritative timer and autopick scheduling.
-- Append-only event log (`draft_events`) as single source of truth.
-- Idempotent pick submission via UUID nonce + payload hash.
-- Reconnect-safe replay (`/events?since_seq=N`).
-- Commissioner pause / resume / extend (v2.0).
-
-### §1.3 Out of scope (deferred)
-- Auction draft (Phase 1–10 covers snake / linear only).
-- Pick-undo and force-pick commissioner overrides — reserved as event
-  enum stubs (`pick_undone`, `commissioner_override`); RPCs ship in v2.1.
-- Removal of v1 code (`make_draft_pick`, client autopick,
-  `broadcastDraftPick`) — separate PR after ≥30 clean prod v2 drafts.
-- Long-horizon archival of `draft_events` and pgmq archive tables.
-
-### §1.4 Versioning
-- Spec versions follow `vMAJOR.MINOR`. Breaking event-schema changes
-  bump MAJOR. Additive changes (new event types, new optional payload
-  fields) bump MINOR.
-- `event_version smallint` is recorded on every `draft_events` row so
-  consumers can dispatch on it.
-- This document is v1.0.
-
-## §2 Principles (non-negotiable)
+## §1 Principles (non-negotiable)
 
 These six principles are load-bearing. A change that violates one of
 them is not an "optimisation" — it is a different system.
@@ -97,7 +95,7 @@ steady-state safety net. Reconnect triggers `/events?since_seq=N`
 replay. The poll is mandatory — broadcast is a latency optimisation,
 never a correctness mechanism.
 
-**P5. Invariants are runtime-checked.** I1–I16 (§10) run every 60s via
+**P5. Invariants are runtime-checked.** I1–I16 (§8) run every 60s via
 `pg_cron`. Violation **pages on-call** immediately. No self-heal.
 
 **P6. Event log + synchronous projection.** `draft_events` is
@@ -108,7 +106,7 @@ transaction as the event insert. `reconstruct_draft_state(...)` is a
 verifies integrity, and recovers after corruption. It is **not** the
 hot-path read. Invariant **I16** is what makes this safe.
 
-## §3 Glossary
+## §2 Glossary
 
 - **Event**: a row in `draft_events`. The unit of progression.
 - **Seq**: per-league monotonic counter, gap-free, sourced from
@@ -125,7 +123,7 @@ hot-path read. Invariant **I16** is what makes this safe.
 - **Payload hash**: sha256 of the canonical JSON form of the event
   payload. Used to detect "same key, different payload" conflicts.
 - **Correlation ID**: UUID grouping all events caused by one logical
-  request. Sources are documented in §8.4.
+  request. Sources are documented in §6.13 (source-of-truth table).
 - **Causation ID**: optional pointer to the event that caused this
   event (e.g. an autopick caused by a deadline-expiry sweep).
 - **Actor**: who/what produced the event. Closed kind enum:
@@ -145,76 +143,353 @@ hot-path read. Invariant **I16** is what makes this safe.
   project ref `jjgspcpvqaiitloglxbb`. **All Phase 0–7 work runs here
   exclusively.**
 
-## §4 Architecture overview
+## §3 Database schema
 
+All v2 tables ship in **Phase 1** except where noted. RLS is enabled
+on every new table. All writes go through SECURITY DEFINER RPCs;
+direct INSERT/UPDATE/DELETE by clients is denied by RLS.
+
+### §3.1 `draft_events` (Phase 1)
+
+```sql
+CREATE TABLE draft_events (
+  id              bigserial PRIMARY KEY,
+  league_id       uuid NOT NULL REFERENCES leagues(id),
+  seq             bigint NOT NULL,         -- gap-free per league
+  event_type      text NOT NULL,           -- §6 catalog (CHECK enum)
+  event_version   smallint NOT NULL DEFAULT 1,
+  payload         jsonb NOT NULL,          -- validated by §4.10
+  payload_hash    text NOT NULL,           -- sha256(canonical JSON)
+  idempotency_key uuid,                    -- partial-unique (NOT NULL)
+  actor           jsonb NOT NULL,          -- {kind, id?, session_id?}
+  causation_id    bigint REFERENCES draft_events(id),
+  correlation_id  uuid NOT NULL,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  CHECK (event_type IN (
+    'pick','pick_undone','autopick_failed',
+    'draft_started','draft_paused','draft_resumed','draft_extended',
+    'draft_completed','draft_cancelled',
+    'commissioner_override','generation_bumped'
+  )),
+  CHECK ((actor->>'kind') IN
+         ('user','autopick','commissioner','shadow','system'))
+);
+CREATE UNIQUE INDEX ON draft_events (league_id, seq);
+CREATE UNIQUE INDEX ON draft_events (idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+CREATE INDEX ON draft_events (league_id, created_at);
+CREATE INDEX ON draft_events (correlation_id);
 ```
-CLIENT (React)              SERVER (Hono)         POSTGRES + SUPABASE
-─────────────               ─────────────         ───────────────────
 
-DraftClock                  GET /sync ×5
-  multi-sample,    ───────► returns {
-  min-RTT offset             server_time,
-  steady-state poll 5s ◄──   pick_deadline,
-                             current_seq,
-                             current_pick_number,
-                             draft_state,
-                             payload_hash }
+**RLS.** SELECT for league members. INSERT/UPDATE/DELETE denied for
+all roles except `service_role` (mediated by the RPCs).
 
-DraftClient                 POST /pick
-  submitPick()              X-Idempotency-Key: uuid
-   key + hash      ───────► submit_pick_v2(...) ──► BEGIN
-                                                    UPDATE leagues
-                                                      SET draft_event_counter
-                                                          = draft_event_counter+1
-                                                      RETURNING seq
-                                                    INSERT draft_events(...)
-                                                      ON CONFLICT (idempotency_key)
-                                                      DO NOTHING RETURNING *
-                                                    AFTER INSERT TRIGGER →
-                                                      INSERT draft_picks_v2
-                                                    UPDATE leagues
-                                                      SET pick_deadline = ...
-                                                    pgmq.send(
-                                                      'draft_deadlines',
-                                                      payload,
-                                                      send_delay = secs)
-                                                    COMMIT
+### §3.2 `draft_picks_v2` (Phase 1, projection of §3.1)
 
-DraftEventStream             realtime broadcast
-  tracks lastSeq    ◄──────  channel: draft_events_v2:${leagueId}
-  reconcile on poll          payload: full event row
-  replay on reconnect:
-   GET /events?since_seq=N ──► SELECT * FROM draft_events
-                               WHERE league_id=$1 AND seq>$2
-                               ORDER BY seq LIMIT 500
-
-                             ┌─ pgmq queue: draft_deadlines ─┐
-                             │                               │
-                             │  Worker (Edge Function,       │
-                             │   long-running ≤150s):        │
-                             │   read(vt=30, qty=10)         │
-                             │   for each msg:               │
-                             │     §5.3 state machine        │
-                             │     submit_pick_v2(           │
-                             │       actor='autopick',       │
-                             │       idempotency_key =       │
-                             │         uuidv5(league,        │
-                             │           pick_number,        │
-                             │           generation,         │
-                             │           'autopick'))        │
-                             │     pgmq.archive(msg_id)      │
-                             │   sleep 5s if loop continues  │
-                             │                               │
-                             │  Keep-alive: pg_cron */2 min  │
-                             │   net.http_post(<edge-url>)   │
-                             │                               │
-                             │  Safety net: pg_cron */10s    │
-                             │   draft_deadline_sweep()      │
-                             │                               │
-                             │  Invariants: pg_cron */60s    │
-                             │   check_draft_invariants()    │
-                             └───────────────────────────────┘
+```sql
+CREATE TABLE draft_picks_v2 (
+  league_id         uuid NOT NULL REFERENCES leagues(id),
+  pick_number       int  NOT NULL,
+  round             int  NOT NULL,
+  team_id           uuid NOT NULL,
+  player_id         int  NOT NULL,
+  picked_at         timestamptz NOT NULL,
+  picked_by_actor   jsonb NOT NULL,
+  source_event_id   bigint NOT NULL REFERENCES draft_events(id),
+  source_seq        bigint NOT NULL,
+  PRIMARY KEY (league_id, pick_number)
+);
+CREATE INDEX ON draft_picks_v2 (league_id, team_id);
+CREATE INDEX ON draft_picks_v2 (league_id, player_id);
 ```
+
+**RLS.** Identical to v1 `draft_picks`. The projection trigger
+(`tg_draft_events_project_pick`) is the only writer.
+
+### §3.3 `leagues` column additions (Phase 1)
+
+```sql
+ALTER TABLE leagues
+  ADD COLUMN draft_event_counter bigint NOT NULL DEFAULT 0,
+  ADD COLUMN pick_deadline       timestamptz,
+  ADD COLUMN draft_state         text NOT NULL DEFAULT 'not_started'
+    CHECK (draft_state IN ('not_started','pre_draft','active',
+                           'paused','completed','cancelled')),
+  ADD COLUMN draft_generation    int  NOT NULL DEFAULT 0,
+  ADD COLUMN draft_shadow_mode   boolean NOT NULL DEFAULT true,
+  ADD COLUMN feature_flags       jsonb NOT NULL DEFAULT '{}'::jsonb;
+```
+
+> **Phase 0 collision check.** Before this migration runs, the runbook
+> verifies that `feature_flags`, `draft_event_counter`, `pick_deadline`,
+> `draft_state`, `draft_generation`, and `draft_shadow_mode` are not
+> already columns on `leagues`. If any are, the resolution is documented
+> in the runbook before Phase 1 begins.
+
+### §3.4 `draft_queues` (Phase 4)
+
+```sql
+CREATE TABLE draft_queues (
+  team_id   uuid NOT NULL,
+  league_id uuid NOT NULL REFERENCES leagues(id),
+  position  smallint NOT NULL,
+  player_id int NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (team_id, player_id),
+  UNIQUE (team_id, position)
+);
+```
+
+**RLS.** Team members can read/write their own team's queue.
+
+### §3.5 `draft_metrics` (Phase 3, partitioned monthly)
+
+```sql
+CREATE TABLE draft_metrics (
+  ts        timestamptz NOT NULL,
+  metric    text NOT NULL,
+  league_id uuid,
+  value     bigint NOT NULL DEFAULT 1,
+  detail    jsonb
+) PARTITION BY RANGE (ts);
+-- migration creates current + next 3 months;
+-- monthly cron creates new + drops >90d old.
+```
+
+A separate `draft_metrics_daily` summary retains downsampled counters
+for long-horizon dashboards.
+
+### §3.6 `autopick_failures` (Phase 4 DLQ)
+
+```sql
+CREATE TABLE autopick_failures (
+  id           bigserial PRIMARY KEY,
+  league_id    uuid NOT NULL,
+  pgmq_msg_id  bigint NOT NULL,
+  payload      jsonb NOT NULL,
+  last_error   text,
+  read_ct      int NOT NULL,
+  failed_at    timestamptz NOT NULL DEFAULT now()
+);
+```
+
+**RLS.** Admin-only. Triggered alert on INSERT.
+
+### §3.7 `draft_invariant_violations` (Phase 6)
+
+```sql
+CREATE TABLE draft_invariant_violations (
+  id          bigserial PRIMARY KEY,
+  invariant   text NOT NULL,         -- 'I1' .. 'I16'
+  league_id   uuid,
+  detected_at timestamptz NOT NULL DEFAULT now(),
+  detail      jsonb NOT NULL
+);
+```
+
+Trigger on INSERT pages on-call.
+
+### §3.8 `draft_shadow_reports` (Phase 8)
+
+```sql
+CREATE TABLE draft_shadow_reports (
+  league_id          uuid PRIMARY KEY,
+  draft_completed_at timestamptz NOT NULL,
+  picks_matched      int  NOT NULL,
+  picks_mismatched   int  NOT NULL,
+  timing_drift_ms    int  NOT NULL,    -- v2.created_at − v1.committed_at
+  detail             jsonb NOT NULL
+);
+```
+
+### §3.9 `shadow_trigger_errors` (Phase 8)
+
+```sql
+CREATE TABLE shadow_trigger_errors (
+  id         bigserial PRIMARY KEY,
+  league_id  uuid NOT NULL,
+  pick_id    uuid,
+  error_code text NOT NULL,
+  detail     jsonb NOT NULL,
+  occurred_at timestamptz NOT NULL DEFAULT now()
+);
+```
+
+Errors caught here are **never propagated up** to v1's transaction —
+shadow-side issues must not abort v1 picks.
+
+## §4 RPC signatures
+
+All RPCs are `SECURITY DEFINER` with `SET search_path = public`.
+Return types are jsonb unless noted. Error handling: every RPC raises
+`RAISE EXCEPTION` with one of the codes in §11. Callers map these to
+HTTP statuses per §11.2.
+
+### §4.1 `submit_pick_v2` (Phase 2)
+
+```sql
+submit_pick_v2(
+  p_league_id        uuid,
+  p_team_id          uuid,
+  p_player_id        int,
+  p_round            int,
+  p_pick_number      int,
+  p_session_id       uuid,
+  p_idempotency_key  uuid,
+  p_payload_hash     text,
+  p_actor            jsonb,
+  p_correlation_id   uuid
+) RETURNS jsonb
+-- {
+--   event_id        bigint,
+--   seq             bigint,
+--   pick_deadline   timestamptz,
+--   was_duplicate   boolean
+-- }
+```
+
+Behavior: see §5.2. Idempotent. Auth: `auth.uid()` must be a member of
+`p_team_id` OR `actor.kind='autopick'` AND caller is `service_role`.
+
+### §4.2 `append_draft_event` (Phase 2)
+
+```sql
+append_draft_event(
+  p_league_id        uuid,
+  p_event_type       text,
+  p_payload          jsonb,
+  p_idempotency_key  uuid,
+  p_payload_hash     text,
+  p_actor            jsonb,
+  p_correlation_id   uuid
+) RETURNS jsonb
+-- { event_id, seq, was_duplicate }
+```
+
+Used for non-pick events (`draft_started`, `draft_paused`, `draft_resumed`,
+`draft_extended`, `draft_completed`, `draft_cancelled`,
+`generation_bumped`, `autopick_failed`). Same seq mechanism, no
+pick-specific preflight. Validates payload shape via §4.10.
+
+### §4.3 `record_shadow_event` (Phase 2; called only by Phase 8 trigger)
+
+```sql
+record_shadow_event(
+  p_league_id        uuid,
+  p_payload          jsonb,
+  p_idempotency_key  uuid,
+  p_payload_hash     text,
+  p_correlation_id   uuid
+) RETURNS jsonb
+-- { event_id, seq, was_duplicate }
+```
+
+**Hard guards** (raise on any violation):
+1. `auth.role() = 'service_role'`.
+2. `p_payload->'actor'->>'kind' = 'shadow'`.
+3. `(SELECT draft_shadow_mode FROM leagues WHERE id = p_league_id) = true`.
+
+Skips state-machine preflight by design. Goes through seq counter +
+idempotency machinery + projection trigger. The diff job (§11)
+catches divergence; this RPC does not validate.
+
+### §4.4 `reconstruct_draft_state` (Phase 2)
+
+```sql
+reconstruct_draft_state(p_league_id uuid) RETURNS jsonb
+-- {
+--   picks                : array of {pick_number, round, team_id, player_id, picked_at},
+--   current_pick_number  : int,
+--   on_the_clock_team_id : uuid | null,
+--   completed_rounds     : int,
+--   draft_state          : text,
+--   generation           : int
+-- }
+```
+
+Reads `draft_events` only. Used as **rebuild/repair**, not hot-path.
+Hot-path read is `SELECT FROM draft_picks_v2 WHERE league_id = $1`.
+
+### §4.5 `draft_pause` (Phase 2)
+
+```sql
+draft_pause(
+  p_league_id  uuid,
+  p_actor      jsonb     -- {kind:'commissioner', id, session_id}
+) RETURNS jsonb           -- { generation, paused_at }
+```
+
+In one txn:
+1. `draft_generation += 1`, emit `generation_bumped`.
+2. `draft_state := 'paused'`, `pick_deadline := NULL`.
+3. Emit `draft_paused`.
+
+Stale pgmq messages no-op at worker read time (see §5.3).
+
+### §4.6 `draft_resume` (Phase 2)
+
+```sql
+draft_resume(
+  p_league_id  uuid,
+  p_actor      jsonb
+) RETURNS jsonb           -- { generation, new_pick_deadline }
+```
+
+In one txn:
+1. `draft_generation += 1`, emit `generation_bumped`.
+2. `draft_state := 'active'`, recompute `pick_deadline` per §5.2.2.
+3. `pgmq.send('draft_deadlines', payload, send_delay)` for the new
+   generation.
+4. Emit `draft_resumed`.
+
+### §4.7 `draft_extend` (Phase 2)
+
+```sql
+draft_extend(
+  p_league_id      uuid,
+  p_extra_seconds  int,
+  p_actor          jsonb
+) RETURNS jsonb           -- { generation, new_pick_deadline }
+```
+
+In one txn:
+1. `draft_generation += 1`, emit `generation_bumped`.
+2. `pick_deadline += p_extra_seconds` (re-rounded per §5.2.2).
+3. `pgmq.send(...)` fresh message at the new delay.
+4. Emit `draft_extended`.
+
+### §4.8 `draft_deadline_sweep` (Phase 3)
+
+```sql
+draft_deadline_sweep() RETURNS int   -- count of messages enqueued
+```
+
+Race-free predicate over `draft_events` (no pgmq introspection); see
+plan §2 / spec §5.3 for the SQL form. Wrapped in
+`pg_try_advisory_xact_lock(hashtext('draft-sweep'))` so overlapping
+runs no-op. Increments `draft_metrics.safety_net_hit` per enqueue.
+
+### §4.9 `check_draft_invariants` (Phase 6)
+
+```sql
+check_draft_invariants() RETURNS int   -- count of violations inserted
+```
+
+Runs each I1–I16 predicate (§8). Inserts violations into
+`draft_invariant_violations`. After-insert trigger pages on-call.
+
+### §4.10 `validate_draft_event_payload` (Phase 1)
+
+```sql
+validate_draft_event_payload(
+  p_event_type text,
+  p_payload    jsonb
+) RETURNS boolean
+```
+
+Validates payload shape per §6 catalog. Called inside
+`submit_pick_v2`, `append_draft_event`, `record_shadow_event` before
+INSERT. Raises `invalid_event_payload` on mismatch.
 
 ## §5 State machines
 
@@ -245,7 +520,7 @@ DraftEventStream             realtime broadcast
   any state ── draft_cancelled ─► cancelled
 ```
 
-Legal transitions are enumerated in invariant **I14** (§10). Any other
+Legal transitions are enumerated in invariant **I14** (§8). Any other
 transition raises `illegal_state_transition` and is logged as a fatal.
 
 **Generation bump rule.** Every entry into `paused`, every exit from
@@ -374,365 +649,18 @@ human submitted a real pick — are no-ops at read time. The
 `(draft_state, generation, pick_number)` checks above are the entire
 cancellation mechanism. `pgmq.delete` is **never** called.
 
-## §6 Database schema
 
-All v2 tables ship in **Phase 1** except where noted. RLS is enabled
-on every new table. All writes go through SECURITY DEFINER RPCs;
-direct INSERT/UPDATE/DELETE by clients is denied by RLS.
-
-### §6.1 `draft_events` (Phase 1)
-
-```sql
-CREATE TABLE draft_events (
-  id              bigserial PRIMARY KEY,
-  league_id       uuid NOT NULL REFERENCES leagues(id),
-  seq             bigint NOT NULL,         -- gap-free per league
-  event_type      text NOT NULL,           -- §8 catalog (CHECK enum)
-  event_version   smallint NOT NULL DEFAULT 1,
-  payload         jsonb NOT NULL,          -- validated by §7.10
-  payload_hash    text NOT NULL,           -- sha256(canonical JSON)
-  idempotency_key uuid,                    -- partial-unique (NOT NULL)
-  actor           jsonb NOT NULL,          -- {kind, id?, session_id?}
-  causation_id    bigint REFERENCES draft_events(id),
-  correlation_id  uuid NOT NULL,
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  CHECK (event_type IN (
-    'pick','pick_undone','autopick_failed',
-    'draft_started','draft_paused','draft_resumed','draft_extended',
-    'draft_completed','draft_cancelled',
-    'commissioner_override','generation_bumped'
-  )),
-  CHECK ((actor->>'kind') IN
-         ('user','autopick','commissioner','shadow','system'))
-);
-CREATE UNIQUE INDEX ON draft_events (league_id, seq);
-CREATE UNIQUE INDEX ON draft_events (idempotency_key)
-  WHERE idempotency_key IS NOT NULL;
-CREATE INDEX ON draft_events (league_id, created_at);
-CREATE INDEX ON draft_events (correlation_id);
-```
-
-**RLS.** SELECT for league members. INSERT/UPDATE/DELETE denied for
-all roles except `service_role` (mediated by the RPCs).
-
-### §6.2 `draft_picks_v2` (Phase 1, projection of §6.1)
-
-```sql
-CREATE TABLE draft_picks_v2 (
-  league_id         uuid NOT NULL REFERENCES leagues(id),
-  pick_number       int  NOT NULL,
-  round             int  NOT NULL,
-  team_id           uuid NOT NULL,
-  player_id         int  NOT NULL,
-  picked_at         timestamptz NOT NULL,
-  picked_by_actor   jsonb NOT NULL,
-  source_event_id   bigint NOT NULL REFERENCES draft_events(id),
-  source_seq        bigint NOT NULL,
-  PRIMARY KEY (league_id, pick_number)
-);
-CREATE INDEX ON draft_picks_v2 (league_id, team_id);
-CREATE INDEX ON draft_picks_v2 (league_id, player_id);
-```
-
-**RLS.** Identical to v1 `draft_picks`. The projection trigger
-(`tg_draft_events_project_pick`) is the only writer.
-
-### §6.3 `leagues` column additions (Phase 1)
-
-```sql
-ALTER TABLE leagues
-  ADD COLUMN draft_event_counter bigint NOT NULL DEFAULT 0,
-  ADD COLUMN pick_deadline       timestamptz,
-  ADD COLUMN draft_state         text NOT NULL DEFAULT 'not_started'
-    CHECK (draft_state IN ('not_started','pre_draft','active',
-                           'paused','completed','cancelled')),
-  ADD COLUMN draft_generation    int  NOT NULL DEFAULT 0,
-  ADD COLUMN draft_shadow_mode   boolean NOT NULL DEFAULT true,
-  ADD COLUMN feature_flags       jsonb NOT NULL DEFAULT '{}'::jsonb;
-```
-
-> **Phase 0 collision check.** Before this migration runs, the runbook
-> verifies that `feature_flags`, `draft_event_counter`, `pick_deadline`,
-> `draft_state`, `draft_generation`, and `draft_shadow_mode` are not
-> already columns on `leagues`. If any are, the resolution is documented
-> in the runbook before Phase 1 begins.
-
-### §6.4 `draft_queues` (Phase 4)
-
-```sql
-CREATE TABLE draft_queues (
-  team_id   uuid NOT NULL,
-  league_id uuid NOT NULL REFERENCES leagues(id),
-  position  smallint NOT NULL,
-  player_id int NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (team_id, player_id),
-  UNIQUE (team_id, position)
-);
-```
-
-**RLS.** Team members can read/write their own team's queue.
-
-### §6.5 `draft_metrics` (Phase 3, partitioned monthly)
-
-```sql
-CREATE TABLE draft_metrics (
-  ts        timestamptz NOT NULL,
-  metric    text NOT NULL,
-  league_id uuid,
-  value     bigint NOT NULL DEFAULT 1,
-  detail    jsonb
-) PARTITION BY RANGE (ts);
--- migration creates current + next 3 months;
--- monthly cron creates new + drops >90d old.
-```
-
-A separate `draft_metrics_daily` summary retains downsampled counters
-for long-horizon dashboards.
-
-### §6.6 `autopick_failures` (Phase 4 DLQ)
-
-```sql
-CREATE TABLE autopick_failures (
-  id           bigserial PRIMARY KEY,
-  league_id    uuid NOT NULL,
-  pgmq_msg_id  bigint NOT NULL,
-  payload      jsonb NOT NULL,
-  last_error   text,
-  read_ct      int NOT NULL,
-  failed_at    timestamptz NOT NULL DEFAULT now()
-);
-```
-
-**RLS.** Admin-only. Triggered alert on INSERT.
-
-### §6.7 `draft_invariant_violations` (Phase 6)
-
-```sql
-CREATE TABLE draft_invariant_violations (
-  id          bigserial PRIMARY KEY,
-  invariant   text NOT NULL,         -- 'I1' .. 'I16'
-  league_id   uuid,
-  detected_at timestamptz NOT NULL DEFAULT now(),
-  detail      jsonb NOT NULL
-);
-```
-
-Trigger on INSERT pages on-call.
-
-### §6.8 `draft_shadow_reports` (Phase 8)
-
-```sql
-CREATE TABLE draft_shadow_reports (
-  league_id          uuid PRIMARY KEY,
-  draft_completed_at timestamptz NOT NULL,
-  picks_matched      int  NOT NULL,
-  picks_mismatched   int  NOT NULL,
-  timing_drift_ms    int  NOT NULL,    -- v2.created_at − v1.committed_at
-  detail             jsonb NOT NULL
-);
-```
-
-### §6.9 `shadow_trigger_errors` (Phase 8)
-
-```sql
-CREATE TABLE shadow_trigger_errors (
-  id         bigserial PRIMARY KEY,
-  league_id  uuid NOT NULL,
-  pick_id    uuid,
-  error_code text NOT NULL,
-  detail     jsonb NOT NULL,
-  occurred_at timestamptz NOT NULL DEFAULT now()
-);
-```
-
-Errors caught here are **never propagated up** to v1's transaction —
-shadow-side issues must not abort v1 picks.
-
-## §7 RPC signatures
-
-All RPCs are `SECURITY DEFINER` with `SET search_path = public`.
-Return types are jsonb unless noted. Error handling: every RPC raises
-`RAISE EXCEPTION` with one of the codes in §13. Callers map these to
-HTTP statuses per §13.2.
-
-### §7.1 `submit_pick_v2` (Phase 2)
-
-```sql
-submit_pick_v2(
-  p_league_id        uuid,
-  p_team_id          uuid,
-  p_player_id        int,
-  p_round            int,
-  p_pick_number      int,
-  p_session_id       uuid,
-  p_idempotency_key  uuid,
-  p_payload_hash     text,
-  p_actor            jsonb,
-  p_correlation_id   uuid
-) RETURNS jsonb
--- {
---   event_id        bigint,
---   seq             bigint,
---   pick_deadline   timestamptz,
---   was_duplicate   boolean
--- }
-```
-
-Behavior: see §5.2. Idempotent. Auth: `auth.uid()` must be a member of
-`p_team_id` OR `actor.kind='autopick'` AND caller is `service_role`.
-
-### §7.2 `append_draft_event` (Phase 2)
-
-```sql
-append_draft_event(
-  p_league_id        uuid,
-  p_event_type       text,
-  p_payload          jsonb,
-  p_idempotency_key  uuid,
-  p_payload_hash     text,
-  p_actor            jsonb,
-  p_correlation_id   uuid
-) RETURNS jsonb
--- { event_id, seq, was_duplicate }
-```
-
-Used for non-pick events (`draft_started`, `draft_paused`, `draft_resumed`,
-`draft_extended`, `draft_completed`, `draft_cancelled`,
-`generation_bumped`, `autopick_failed`). Same seq mechanism, no
-pick-specific preflight. Validates payload shape via §7.10.
-
-### §7.3 `record_shadow_event` (Phase 2; called only by Phase 8 trigger)
-
-```sql
-record_shadow_event(
-  p_league_id        uuid,
-  p_payload          jsonb,
-  p_idempotency_key  uuid,
-  p_payload_hash     text,
-  p_correlation_id   uuid
-) RETURNS jsonb
--- { event_id, seq, was_duplicate }
-```
-
-**Hard guards** (raise on any violation):
-1. `auth.role() = 'service_role'`.
-2. `p_payload->'actor'->>'kind' = 'shadow'`.
-3. `(SELECT draft_shadow_mode FROM leagues WHERE id = p_league_id) = true`.
-
-Skips state-machine preflight by design. Goes through seq counter +
-idempotency machinery + projection trigger. The diff job (§13)
-catches divergence; this RPC does not validate.
-
-### §7.4 `reconstruct_draft_state` (Phase 2)
-
-```sql
-reconstruct_draft_state(p_league_id uuid) RETURNS jsonb
--- {
---   picks                : array of {pick_number, round, team_id, player_id, picked_at},
---   current_pick_number  : int,
---   on_the_clock_team_id : uuid | null,
---   completed_rounds     : int,
---   draft_state          : text,
---   generation           : int
--- }
-```
-
-Reads `draft_events` only. Used as **rebuild/repair**, not hot-path.
-Hot-path read is `SELECT FROM draft_picks_v2 WHERE league_id = $1`.
-
-### §7.5 `draft_pause` (Phase 2)
-
-```sql
-draft_pause(
-  p_league_id  uuid,
-  p_actor      jsonb     -- {kind:'commissioner', id, session_id}
-) RETURNS jsonb           -- { generation, paused_at }
-```
-
-In one txn:
-1. `draft_generation += 1`, emit `generation_bumped`.
-2. `draft_state := 'paused'`, `pick_deadline := NULL`.
-3. Emit `draft_paused`.
-
-Stale pgmq messages no-op at worker read time (see §5.3).
-
-### §7.6 `draft_resume` (Phase 2)
-
-```sql
-draft_resume(
-  p_league_id  uuid,
-  p_actor      jsonb
-) RETURNS jsonb           -- { generation, new_pick_deadline }
-```
-
-In one txn:
-1. `draft_generation += 1`, emit `generation_bumped`.
-2. `draft_state := 'active'`, recompute `pick_deadline` per §5.2.2.
-3. `pgmq.send('draft_deadlines', payload, send_delay)` for the new
-   generation.
-4. Emit `draft_resumed`.
-
-### §7.7 `draft_extend` (Phase 2)
-
-```sql
-draft_extend(
-  p_league_id      uuid,
-  p_extra_seconds  int,
-  p_actor          jsonb
-) RETURNS jsonb           -- { generation, new_pick_deadline }
-```
-
-In one txn:
-1. `draft_generation += 1`, emit `generation_bumped`.
-2. `pick_deadline += p_extra_seconds` (re-rounded per §5.2.2).
-3. `pgmq.send(...)` fresh message at the new delay.
-4. Emit `draft_extended`.
-
-### §7.8 `draft_deadline_sweep` (Phase 3)
-
-```sql
-draft_deadline_sweep() RETURNS int   -- count of messages enqueued
-```
-
-Race-free predicate over `draft_events` (no pgmq introspection); see
-plan §3 / spec §5.3 for the SQL form. Wrapped in
-`pg_try_advisory_xact_lock(hashtext('draft-sweep'))` so overlapping
-runs no-op. Increments `draft_metrics.safety_net_hit` per enqueue.
-
-### §7.9 `check_draft_invariants` (Phase 6)
-
-```sql
-check_draft_invariants() RETURNS int   -- count of violations inserted
-```
-
-Runs each I1–I16 predicate (§10). Inserts violations into
-`draft_invariant_violations`. After-insert trigger pages on-call.
-
-### §7.10 `validate_draft_event_payload` (Phase 1)
-
-```sql
-validate_draft_event_payload(
-  p_event_type text,
-  p_payload    jsonb
-) RETURNS boolean
-```
-
-Validates payload shape per §8 catalog. Called inside
-`submit_pick_v2`, `append_draft_event`, `record_shadow_event` before
-INSERT. Raises `invalid_event_payload` on mismatch.
-
-## §8 Event catalog
+## §6 Event catalog
 
 Every event row in `draft_events` carries an `event_type`, a typed
 payload, an `actor`, a `correlation_id`, an optional `causation_id`,
 and a `payload_hash`. The catalog below specifies the **payload shape
-only** — the envelope is fixed by §6.1.
+only** — the envelope is fixed by §3.1.
 
 Payloads are JSON. Required fields are bold; optional fields are
-italic. Unknown fields are rejected by §7.10 (closed schema, not open).
+italic. Unknown fields are rejected by §4.10 (closed schema, not open).
 
-### §8.1 `pick`
+### §6.1 `pick`
 
 ```jsonc
 {
@@ -746,7 +674,7 @@ italic. Unknown fields are rejected by §7.10 (closed schema, not open).
 }
 ```
 
-### §8.2 `pick_undone` (reserved for v2.1)
+### §6.2 `pick_undone` (reserved for v2.1)
 
 ```jsonc
 {
@@ -759,7 +687,7 @@ Constraint (v2.1): undo is rejected if any subsequent pick has been
 made. No cascading unwind. Audit-trail integrity outweighs
 flexibility.
 
-### §8.3 `autopick_failed`
+### §6.3 `autopick_failed`
 
 ```jsonc
 {
@@ -771,7 +699,7 @@ flexibility.
 }
 ```
 
-### §8.4 `draft_started`
+### §6.4 `draft_started`
 
 ```jsonc
 {
@@ -784,7 +712,7 @@ flexibility.
 }
 ```
 
-### §8.5 `draft_paused`
+### §6.5 `draft_paused`
 
 ```jsonc
 {
@@ -795,7 +723,7 @@ flexibility.
 }
 ```
 
-### §8.6 `draft_resumed`
+### §6.6 `draft_resumed`
 
 ```jsonc
 {
@@ -805,7 +733,7 @@ flexibility.
 }
 ```
 
-### §8.7 `draft_extended`
+### §6.7 `draft_extended`
 
 ```jsonc
 {
@@ -816,7 +744,7 @@ flexibility.
 }
 ```
 
-### §8.8 `draft_completed`
+### §6.8 `draft_completed`
 
 ```jsonc
 {
@@ -825,7 +753,7 @@ flexibility.
 }
 ```
 
-### §8.9 `draft_cancelled`
+### §6.9 `draft_cancelled`
 
 ```jsonc
 {
@@ -835,11 +763,11 @@ flexibility.
 }
 ```
 
-### §8.10 `commissioner_override` (reserved for v2.1)
+### §6.10 `commissioner_override` (reserved for v2.1)
 
 Schema stubbed; RPC ships in v2.1.
 
-### §8.11 `generation_bumped`
+### §6.11 `generation_bumped`
 
 ```jsonc
 {
@@ -849,7 +777,7 @@ Schema stubbed; RPC ships in v2.1.
 }
 ```
 
-### §8.12 Actor envelope (all events)
+### §6.12 Actor envelope (all events)
 
 ```jsonc
 "actor": {
@@ -859,7 +787,7 @@ Schema stubbed; RPC ships in v2.1.
 }
 ```
 
-### §8.13 `correlation_id` source-of-truth table
+### §6.13 `correlation_id` source-of-truth table
 
 | `actor.kind`   | `correlation_id` source                                   |
 |----------------|-----------------------------------------------------------|
@@ -869,7 +797,7 @@ Schema stubbed; RPC ships in v2.1.
 | `shadow`       | Deterministic UUIDv5 over `(league_id, v1_pick_id)`.      |
 | `system`       | Migration ID, or `gen_random_uuid()` for synthetic events.|
 
-### §8.14 Realtime broadcast shape
+### §6.14 Realtime broadcast shape
 
 Channel: `draft_events_v2:${leagueId}`
 Event name: `event`
@@ -883,22 +811,22 @@ layer** (anyone with the league ID can subscribe). RLS on `/events`
 REST is the authoritative read path. Documented as security review
 item in Phase 6.
 
-## §9 Client contract
+## §7 Client contract
 
-### §9.1 Endpoints
+### §7.1 Endpoints
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| GET  | `/api/draft/v2/league/:leagueId/sync`             | member  | Snapshot for clock + state (§9.2) |
-| POST | `/api/draft/v2/league/:leagueId/pick`              | member  | Submit a pick (§9.3) |
-| GET  | `/api/draft/v2/league/:leagueId/events?since_seq=N&limit=500` | member | Replay (§9.4) |
+| GET  | `/api/draft/v2/league/:leagueId/sync`             | member  | Snapshot for clock + state (§7.2) |
+| POST | `/api/draft/v2/league/:leagueId/pick`              | member  | Submit a pick (§7.3) |
+| GET  | `/api/draft/v2/league/:leagueId/events?since_seq=N&limit=500` | member | Replay (§7.4) |
 | GET  | `/api/admin/draft/v2/metrics`                      | admin   | Health dashboard (Phase 6) |
 
 The existing `GET /api/league/:id` response is extended (Phase 5) to
 include `feature_flags` so the client knows whether to render
 `<DraftRoomV2>`. No new endpoint for the flag.
 
-### §9.2 `/sync` response shape
+### §7.2 `/sync` response shape
 
 ```jsonc
 {
@@ -914,7 +842,7 @@ include `feature_flags` so the client knows whether to render
 Cacheable for 100ms server-side; client re-polls every 5s
 (steady-state safety net).
 
-### §9.3 `POST /pick` contract
+### §7.3 `POST /pick` contract
 
 Headers:
 - `X-Idempotency-Key: <uuid>` — **required**.
@@ -952,7 +880,7 @@ Status mapping:
 - 422: `illegal_state` (draft not active).
 - 5xx: retryable; client should retry with the same Idempotency-Key.
 
-### §9.4 `/events` replay
+### §7.4 `/events` replay
 
 Returns events with `seq > since_seq`, ordered by `seq`, cap 500.
 Response includes `next_since_seq` cursor. Cache:
@@ -965,7 +893,7 @@ returned event belongs to a league with `draft_state IN ('completed',
 Client short-circuits replay when `lastSeq === current_seq` from
 `/sync`.
 
-### §9.5 Clock sync (`DraftClock.ts`)
+### §7.5 Clock sync (`DraftClock.ts`)
 
 1. On mount: fire 5 `/sync` requests at 150ms intervals.
 2. For each sample: record `t_send`, `t_recv`, `server_time`, and
@@ -977,7 +905,7 @@ Client short-circuits replay when `lastSeq === current_seq` from
 7. **Drift guard**: if two consecutive 5-minute resyncs show offset
    change >500ms, emit `clock_drift_detected` to telemetry.
 
-### §9.6 Event stream (`DraftEventStream.ts`)
+### §7.6 Event stream (`DraftEventStream.ts`)
 
 1. Subscribe to `draft_events_v2:${leagueId}` realtime channel.
 2. Track `lastSeq` (in-memory + sessionStorage).
@@ -988,7 +916,7 @@ Client short-circuits replay when `lastSeq === current_seq` from
 5. Steady-state poll: every 5s, call `/sync`. If
    `current_seq > lastSeq`, replay.
 
-### §9.7 Engine state ownership
+### §7.7 Engine state ownership
 
 - Engine state lives in a **module-scoped Zustand store**
   (`DraftEngineStore.ts`), NOT React context.
@@ -1001,7 +929,7 @@ Client short-circuits replay when `lastSeq === current_seq` from
 - Teardown is **explicit**: `disposeDraftEngine(leagueId)` on logout
   or navigation away from any `/league/:id/*` route.
 
-### §9.8 Client invariants
+### §7.8 Client invariants
 
 - **CI1.** The client never computes the current pick number from
   wall time; only from the event log.
@@ -1009,14 +937,14 @@ Client short-circuits replay when `lastSeq === current_seq` from
 - **CI3.** The client treats broadcast as advisory; the steady-state
   poll is the correctness mechanism (P4).
 - **CI4.** The client never trusts its own clock; only the
-  server-anchored offset from §9.5.
+  server-anchored offset from §7.5.
 
-## §10 Invariants (I1–I16)
+## §8 Invariants (I1–I16)
 
 Each invariant is a SQL predicate that returns **0 rows when healthy,
-≥1 row when violated**. `check_draft_invariants()` (§7.9) runs all of
+≥1 row when violated**. `check_draft_invariants()` (§4.9) runs all of
 them every 60s and inserts violations into
-`draft_invariant_violations` (§6.7). Violations page on-call. There
+`draft_invariant_violations` (§3.7). Violations page on-call. There
 is no self-heal.
 
 The 16 invariants are grouped under the 7 high-level categories
@@ -1024,7 +952,32 @@ called out in the plan handoff. Each grouping below tells you which
 invariants prove that category holds; each invariant is also
 individually catalogued.
 
-### §10.1 Category-to-invariant mapping
+> **Provenance note (please review).** `DRAFT_ENGINE_V2_PLAN.md`
+> defines **I1–I6** and **I16** explicitly. For **I7–I15** the plan
+> says only "per spec" — meaning the spec author chose them. The
+> selections recorded below are **this spec author's judgment**, not
+> the plan author's:
+> - **I7** — exactly one team on the clock when active.
+> - **I8** — `leagues.draft_event_counter` ↔ `max(seq)`.
+> - **I9** — strictly increasing per-league `seq` (defensive; subsumed
+>   by the unique index).
+> - **I10** — autopick events fire at or after the deadline.
+> - **I11** — `actor.kind` matches the closed enum (defensive;
+>   CHECK-enforced).
+> - **I12** — every autopick event records its pgmq `msg_id` in
+>   payload.
+> - **I13** — `pick_number` ≤ league's max picks.
+> - **I14** — draft-state transitions follow §5.1.
+> - **I15** — `correlation_id` non-null on every event (defensive;
+>   NOT NULL on the column).
+>
+> These are runtime-enforced and will page on-call when violated.
+> Before Phase 1 begins, please confirm the set above matches your
+> mental model of "what could be wrong with a live draft that we
+> should detect within 60 seconds." If any are missing, redundant, or
+> mis-defined, raise it — easier to fix here than in a 3am incident.
+
+### §8.1 Category-to-invariant mapping
 
 | Category               | Invariants                  |
 |------------------------|-----------------------------|
@@ -1036,7 +989,7 @@ individually catalogued.
 | **G6. Eligibility**    | I2 (pick implies team-on-clock), I7 (exactly one team on the clock when active), I11 (actor.kind in closed enum), I13 (pick_number ≤ total picks) |
 | **G7. Ordering**       | I1, I8, I14 (legal state transitions), I6 (active leagues have a sweep watcher) |
 
-### §10.2 Per-invariant catalogue
+### §8.2 Per-invariant catalogue
 
 **I1 — `seq` is gap-free per league.**
 ```sql
@@ -1149,7 +1102,7 @@ WHERE e.actor->>'kind' = 'autopick'
 ```
 
 **I11 — `actor.kind` matches the closed enum.**
-Enforced by CHECK on §6.1; predicate runs as a safety net.
+Enforced by CHECK on §3.1; predicate runs as a safety net.
 ```sql
 SELECT id FROM draft_events
 WHERE (actor->>'kind') NOT IN
@@ -1181,7 +1134,7 @@ adjacent pair is a legal transition. Implementation is a SQL CTE with
 a transition allowlist; emits violation rows for any illegal pair.
 
 **I15 — `correlation_id` is non-null on every event.**
-Enforced by NOT NULL on §6.1; predicate is a safety net.
+Enforced by NOT NULL on §3.1; predicate is a safety net.
 ```sql
 SELECT id FROM draft_events WHERE correlation_id IS NULL;
 ```
@@ -1208,21 +1161,21 @@ WHERE l.expected <> COALESCE(p.actual, 0);
 I16 is the load-bearing invariant for principle P6 (synchronous
 projection). If it ever fires, hot-path reads are no longer
 trustworthy and the projection must be rebuilt from
-`reconstruct_draft_state` (§7.4).
+`reconstruct_draft_state` (§4.4).
 
-### §10.3 What "violation" means
+### §8.3 What "violation" means
 
 - **Page on-call immediately.** No self-heal attempt by the engine.
-- The runbook (§13 + companion staging-preflight runbook) prescribes
+- The runbook (§11 + companion staging-preflight runbook) prescribes
   triage: snapshot the league's events, identify the affected pick
   range, decide whether to pause the draft (`draft_pause`) before
   investigation.
 - During shadow mode (Phase 8), violations on **any** league fail the
   shadow exit criteria.
 
-## §11 Observability contract
+## §9 Observability contract
 
-### §11.1 Structured logs
+### §9.1 Structured logs
 
 Every `submit_pick_v2` invocation emits one structured JSON log line:
 ```jsonc
@@ -1256,7 +1209,7 @@ counters only (no PII):
 - `broadcast_gap_detected`
 - `reconnect_replay_triggered`
 
-### §11.2 Metrics (in `draft_metrics`)
+### §9.2 Metrics (in `draft_metrics`)
 
 | Metric | When emitted |
 |---|---|
@@ -1272,16 +1225,16 @@ counters only (no PII):
 | `replay_rate_limited`        | 429 returned. |
 | `clock_drift_detected`       | Client telemetry. |
 
-### §11.3 Dashboards (Phase 6)
+### §9.3 Dashboards (Phase 6)
 
 - **Live drafts** — `pick_committed` rate, autopick share, p50/p95
   `submit_pick_v2` latency, broadcast vs poll reconciliation count.
 - **Health** — invariant violation counts (last 24h), DLQ depth, sweep
   hit rate, idempotency conflict count.
 
-## §12 Error model
+## §10 Error model
 
-### §12.1 Error codes
+### §10.1 Error codes
 
 | Code                       | HTTP | Raised by | Meaning |
 |----------------------------|------|-----------|---------|
@@ -1292,18 +1245,18 @@ counters only (no PII):
 | `unauthorized`             | 403  | `submit_pick_v2` | `auth.uid()` not on team. |
 | `illegal_state`            | 422  | all RPCs | `draft_state` ≠ allowed for this op. |
 | `illegal_state_transition` | 500  | `append_draft_event` | New state not legal from current. |
-| `invalid_event_payload`    | 400  | §7.10    | Payload fails schema check. |
-| `shadow_guard_violated`    | 500  | `record_shadow_event` | Hard-guard failure (§7.3). |
+| `invalid_event_payload`    | 400  | §4.10    | Payload fails schema check. |
+| `shadow_guard_violated`    | 500  | `record_shadow_event` | Hard-guard failure (§4.3). |
 | `generation_mismatch`      | 500  | worker   | Stale message; worker no-ops, not surfaced to client. |
 
-### §12.2 Retry semantics
+### §10.2 Retry semantics
 
 - Clients retry on 5xx **with the same `Idempotency-Key`**.
 - Clients do NOT retry 4xx — they surface to the user.
 - Workers do not archive on retryable errors; pgmq's vt expires and
   redelivers; `read_ct` increments; §5.3 caps attempts at 3.
 
-## §13 Rollout plan
+## §11 Rollout plan
 
 Reproduces the plan's phase gating for spec-side reference. The
 plan (`DRAFT_ENGINE_V2_PLAN.md`) is the source of truth for the
@@ -1328,9 +1281,9 @@ auditors.
 Calendar gates apply: even if Phase 0 finishes in a day, Phase 1 does
 not start until the spec + runbook have soaked for 48h of review.
 
-## §14 Open questions
+## §12 Open questions
 
-### §14.1 Resolved (decisions captured here)
+### §12.1 Resolved (decisions captured here)
 
 - Worker topology = single long-running Edge Function (≤150s loop),
   re-invoked every 2 min via pg_cron keep-alive.
@@ -1357,7 +1310,7 @@ not start until the spec + runbook have soaked for 48h of review.
   (trigger-fire-order artifact), not a clock-skew bug. Diff job
   buckets accordingly.
 
-### §14.2 Surfaced for user decision before Phase 1
+### §12.2 Surfaced for user decision before Phase 1
 
 - **Realtime concurrency cap on current Supabase tier.** Phase 0
   preflight (companion runbook) measures the actual cap. If Pro
@@ -1370,7 +1323,7 @@ not start until the spec + runbook have soaked for 48h of review.
   user decides between reuse-via-namespacing, rename, or
   inspect-and-migrate. Documented in the runbook.
 
-### §14.3 Deferred beyond Phase 9
+### §12.3 Deferred beyond Phase 9
 
 - Auction-draft adoption of v2.
 - v1 code removal.
@@ -1378,11 +1331,141 @@ not start until the spec + runbook have soaked for 48h of review.
 - Long-horizon retention policy for `draft_events` and the pgmq
   archive.
 
-## §15 Change log
+### §12.4 Errata against `DRAFT_ENGINE_V2_PLAN.md`
+
+This spec is the contract; where the plan and the spec disagree, the
+spec wins (per the front-matter quote-block). Known disagreements:
+
+- **Plan §5.2 / §5.3 ambiguity.** `DRAFT_ENGINE_V2_PLAN.md` references
+  "spec §5.2" in two places that describe different state machines —
+  Phase 2's pick-submission preflight (which is genuinely §5.2 in
+  this spec) and Phase 4's autopick worker (which is **§5.3** in
+  this spec). When implementing Phase 4, cite **§5.3**.
+- **Plan calls the Phase 0 runbook `draft-engine-v2-operations.md`;
+  this spec's companion runbook is `draft-engine-v2-staging-preflight.md`**
+  per the user's task assignment. A shorter `draft-engine-v2-operations.md`
+  stub also exists (created in Phase 0) as a forward-looking ops
+  document filled in across Phases 3–7.
+- **Spec sections vs. plan sections.** This is v1.0; v0.1 used a
+  different numbering. See Appendix B for the Rosetta Stone.
+
+## §13 Change log
 
 - **v1.0 (Phase 0)** — initial spec, incorporating three rounds of
   review fixes from `DRAFT_ENGINE_V2_PLAN.md` (commit a39e4f5).
-  Subsequent versions append entries here with date + summary.
+  Renumbered from v0.1 (initial Phase 0 draft) to align section
+  numbers with the plan's references; see Appendix B for the
+  Rosetta Stone. I7–I15 invariant selections are spec-author
+  judgment and flagged for review in §8. Subsequent versions append
+  entries here with date + summary.
+
+---
+
+## Appendix A — Architecture overview
+
+```
+CLIENT (React)              SERVER (Hono)         POSTGRES + SUPABASE
+─────────────               ─────────────         ───────────────────
+
+DraftClock                  GET /sync ×5
+  multi-sample,    ───────► returns {
+  min-RTT offset             server_time,
+  steady-state poll 5s ◄──   pick_deadline,
+                             current_seq,
+                             current_pick_number,
+                             draft_state,
+                             payload_hash }
+
+DraftClient                 POST /pick
+  submitPick()              X-Idempotency-Key: uuid
+   key + hash      ───────► submit_pick_v2(...) ──► BEGIN
+                                                    UPDATE leagues
+                                                      SET draft_event_counter
+                                                          = draft_event_counter+1
+                                                      RETURNING seq
+                                                    INSERT draft_events(...)
+                                                      ON CONFLICT (idempotency_key)
+                                                      DO NOTHING RETURNING *
+                                                    AFTER INSERT TRIGGER →
+                                                      INSERT draft_picks_v2
+                                                    UPDATE leagues
+                                                      SET pick_deadline = ...
+                                                    pgmq.send(
+                                                      'draft_deadlines',
+                                                      payload,
+                                                      send_delay = secs)
+                                                    COMMIT
+
+DraftEventStream             realtime broadcast
+  tracks lastSeq    ◄──────  channel: draft_events_v2:${leagueId}
+  reconcile on poll          payload: full event row
+  replay on reconnect:
+   GET /events?since_seq=N ──► SELECT * FROM draft_events
+                               WHERE league_id=$1 AND seq>$2
+                               ORDER BY seq LIMIT 500
+
+                             ┌─ pgmq queue: draft_deadlines ─┐
+                             │                               │
+                             │  Worker (Edge Function,       │
+                             │   long-running ≤150s):        │
+                             │   read(vt=30, qty=10)         │
+                             │   for each msg:               │
+                             │     §5.3 state machine        │
+                             │     submit_pick_v2(           │
+                             │       actor='autopick',       │
+                             │       idempotency_key =       │
+                             │         uuidv5(league,        │
+                             │           pick_number,        │
+                             │           generation,         │
+                             │           'autopick'))        │
+                             │     pgmq.archive(msg_id)      │
+                             │   sleep 5s if loop continues  │
+                             │                               │
+                             │  Keep-alive: pg_cron */2 min  │
+                             │   net.http_post(<edge-url>)   │
+                             │                               │
+                             │  Safety net: pg_cron */10s    │
+                             │   draft_deadline_sweep()      │
+                             │                               │
+                             │  Invariants: pg_cron */60s    │
+                             │   check_draft_invariants()    │
+                             └───────────────────────────────┘
+```
+
+---
+
+## Appendix B — Section-renumber map (v0.1 → v1.0)
+
+The first Phase 0 draft of this spec used a different section
+numbering. Subsequent PRs and any chat history that references the
+old numbers should consult this table to translate. **Body content
+is unchanged**; only section numbers moved.
+
+| v0.1 (initial draft) | v1.0 (this version) | Notes |
+|----------------------|---------------------|-------|
+| §1 Purpose, scope, versioning | (front-matter) | Folded into the "Scope" and "Versioning" front-matter sections. |
+| §2 Principles                 | §1 Principles | |
+| §3 Glossary                   | §2 Glossary | |
+| §4 Architecture overview      | Appendix A | Moved to keep §1–§13 aligned with the plan. |
+| §5 State machines             | §5 State machines | Unchanged. Subsections §5.1, §5.2, §5.3 preserved. |
+| §6 Database schema            | §3 Database schema | Subsections §6.1–§6.9 → §3.1–§3.9. |
+| §7 RPC signatures             | §4 RPC signatures | Subsections §7.1–§7.10 → §4.1–§4.10. |
+| §8 Event catalog              | §6 Event catalog | Subsections §8.1–§8.14 → §6.1–§6.14. |
+| §9 Client contract            | §7 Client contract | Subsections §9.1–§9.8 → §7.1–§7.8. |
+| §10 Invariants                | §8 Invariants | Subsections §10.1–§10.3 → §8.1–§8.3. |
+| §11 Observability contract    | §9 Observability contract | Subsections §11.1–§11.3 → §9.1–§9.3. |
+| §12 Error model               | §10 Error model | Subsections §12.1–§12.2 → §10.1–§10.2. |
+| §13 Rollout plan              | §11 Rollout plan | Subsection §13.2 → §11.2. |
+| §14 Open questions            | §12 Open questions | Subsections §14.1–§14.3 → §12.1–§12.3. |
+| §15 Change log                | §13 Change log | |
+
+**Rationale for renumbering.** `DRAFT_ENGINE_V2_PLAN.md` was written
+assuming the spec would be numbered §1–§13 with the layout used in
+v1.0 (e.g. plan Phase 1 cites "spec §3" expecting schemas; plan
+Phase 6 cites "spec §8" expecting invariants). The v0.1 draft
+deviated, which would have caused every implementation PR to either
+cite the wrong section or quietly drift from the spec. v1.0 is the
+contract Phases 1–10 cite by section number.
 
 
 
