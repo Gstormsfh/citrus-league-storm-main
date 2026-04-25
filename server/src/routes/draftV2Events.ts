@@ -48,6 +48,12 @@ const QuerySchema = z.object({
 // ── In-memory rate-limiter ─────────────────────────────────────────────
 // Spec §7.4: 10 req per 30s sliding window per (userId, leagueId).
 // LRU-bounded so the map can't grow without limit.
+//
+// TODO(KI-003): per-instance state means the documented 10/30s rate
+// is multiplied by Cloud Run instance count when session affinity is
+// not enforced. See docs/RUNBOOKS/draft-engine-v2-known-issues.md#KI-003.
+// Resolution: verify session affinity OR move to a shared store
+// (Redis / Postgres-backed bucket). Phase 7 at the latest.
 
 const RATE_WINDOW_MS = 30_000;
 const RATE_MAX       = 10;
