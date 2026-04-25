@@ -629,3 +629,309 @@ $$;
 COMMENT ON FUNCTION public.reconstruct_draft_state(uuid) IS
   'Spec §4.4: rebuild/repair tool. Reads draft_events only; returns derived draft state as JSON. NOT the hot-path read — use draft_picks_v2 for that.';
 
+-- ── 5. submit_pick_v2 — the centerpiece pick RPC ──────────────────────
+-- Spec §4.5, §5.2 (state machine), §5.2.2 (deadline rounding).
+--
+-- One transaction. Steps in order:
+--   1. Idempotency check (BEFORE preflight, per §5.2.1).
+--   2. Preflight: league active, pick_number matches, round sanity,
+--      team on the clock, player not taken, caller authorized.
+--   3. Counter advance + event insert (trigger projects to v2 picks).
+--   4. Compute next pick_deadline (CEIL + 1s pad).
+--   5. UPDATE leagues.pick_deadline.
+--   6. pgmq.send the deadline message with send_delay.
+--   7. Return {event_id, seq, pick_deadline, was_duplicate}.
+--
+-- Auth: actor.kind must be 'user' or 'autopick'.
+--   - 'user'     → auth.uid() must own teams.id = p_team_id.
+--   - 'autopick' → caller role must be service_role / postgres.
+--   - everything else → unauthorized.
+-- Commissioners do NOT have direct pick power in v2; they use the
+-- lifecycle RPCs (draft_pause / draft_resume / draft_extend). Pick
+-- override is reserved for v2.1 (commissioner_override event).
+--
+-- Per-key advisory lock at the top serializes concurrent retries of
+-- the SAME idempotency_key. Different keys serialize on the leagues
+-- row UPDATE (counter advance), preserving gap-free seq (I1).
+
+CREATE OR REPLACE FUNCTION public.submit_pick_v2(
+  p_league_id        uuid,
+  p_team_id          uuid,
+  p_player_id        int,
+  p_round            int,
+  p_pick_number      int,
+  p_session_id       uuid,
+  p_idempotency_key  uuid,
+  p_payload_hash     text,
+  p_actor            jsonb,
+  p_correlation_id   uuid
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_existing_id    bigint;
+  v_existing_seq   bigint;
+  v_existing_hash  text;
+  v_current_dl     timestamptz;
+  v_draft_state    text;
+  v_league_size    int;
+  v_settings       jsonb;
+  v_generation     int;
+  v_pick_count     int;
+  v_expected_round int;
+  v_pick_in_round  int;
+  v_team_order     jsonb;
+  v_expected_team  uuid;
+  v_actor_kind     text;
+  v_team_owner     uuid;
+  v_caller_role    text;
+  v_player_taken   boolean;
+  v_picked_at      timestamptz;
+  v_payload        jsonb;
+  v_new_seq        bigint;
+  v_event_id       bigint;
+  v_correlation_id uuid;
+  v_pick_time      int;
+  v_new_deadline   timestamptz;
+  v_send_delay     int;
+BEGIN
+  IF p_idempotency_key IS NULL THEN
+    RAISE EXCEPTION 'invalid_event_payload: p_idempotency_key required'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- ── Step 1: Idempotency check (spec §5.2.1) ─────────────────────────
+  -- Runs BEFORE preflight. A retry whose state has moved past the
+  -- pick_number is still a valid replay; raising pick_out_of_order on
+  -- a successful original would be a false positive.
+  PERFORM pg_advisory_xact_lock(
+    hashtext('draft_events_idem:' || p_idempotency_key::text)
+  );
+
+  SELECT id, seq, payload_hash
+    INTO v_existing_id, v_existing_seq, v_existing_hash
+    FROM public.draft_events
+   WHERE idempotency_key = p_idempotency_key;
+
+  IF FOUND THEN
+    IF v_existing_hash = p_payload_hash THEN
+      -- Idempotent replay. Return the LIVE pick_deadline so the client
+      -- (which may be retrying after a network blip) sees current state.
+      SELECT pick_deadline INTO v_current_dl
+        FROM public.leagues WHERE id = p_league_id;
+      RETURN jsonb_build_object(
+        'event_id',      v_existing_id,
+        'seq',           v_existing_seq,
+        'pick_deadline', v_current_dl,
+        'was_duplicate', true
+      );
+    ELSE
+      RAISE EXCEPTION 'idempotency_conflict: same key, different payload_hash'
+        USING ERRCODE = 'unique_violation';
+    END IF;
+  END IF;
+
+  -- ── Step 2: Preflight (spec §5.2) ───────────────────────────────────
+
+  -- 2a. League exists + state = 'active'.
+  SELECT draft_state, league_size, settings, draft_generation
+    INTO v_draft_state, v_league_size, v_settings, v_generation
+    FROM public.leagues
+   WHERE id = p_league_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'illegal_state: league % not found', p_league_id
+      USING ERRCODE = 'no_data_found';
+  END IF;
+
+  IF v_draft_state <> 'active' THEN
+    RAISE EXCEPTION 'illegal_state: draft_state is % (expected active)',
+      v_draft_state
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF v_league_size IS NULL OR v_league_size <= 0 THEN
+    RAISE EXCEPTION 'illegal_state: league_size not configured'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- 2b. pick_number must equal current_pick_number (count of v2 picks
+  --     for this league + 1). Hot-path read against the projection
+  --     (P6: draft_picks_v2 is the synchronous trigger-maintained cache).
+  SELECT count(*) INTO v_pick_count
+    FROM public.draft_picks_v2
+   WHERE league_id = p_league_id;
+
+  IF p_pick_number <> v_pick_count + 1 THEN
+    RAISE EXCEPTION 'pick_out_of_order: expected pick % got %',
+      v_pick_count + 1, p_pick_number
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- 2c. round consistency check (sanity vs. derivable round).
+  v_expected_round := ((p_pick_number - 1) / v_league_size) + 1;
+  IF p_round <> v_expected_round THEN
+    RAISE EXCEPTION 'pick_out_of_order: round mismatch (expected % got %)',
+      v_expected_round, p_round
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- 2d. team on the clock — read draft_order for the round.
+  --     Snake reversal is baked into team_order; direct array index works.
+  v_pick_in_round := ((p_pick_number - 1) % v_league_size) + 1;
+
+  SELECT team_order INTO v_team_order
+    FROM public.draft_order
+   WHERE league_id = p_league_id AND round_number = p_round;
+
+  IF v_team_order IS NULL THEN
+    RAISE EXCEPTION 'illegal_state: draft_order missing for round %', p_round
+      USING ERRCODE = 'no_data_found';
+  END IF;
+
+  v_expected_team := (v_team_order ->> (v_pick_in_round - 1))::uuid;
+  IF v_expected_team IS DISTINCT FROM p_team_id THEN
+    RAISE EXCEPTION 'not_on_clock: expected team % got %',
+      v_expected_team, p_team_id
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- 2e. player not already picked in this league.
+  SELECT EXISTS (
+    SELECT 1 FROM public.draft_picks_v2
+     WHERE league_id = p_league_id AND player_id = p_player_id
+  ) INTO v_player_taken;
+
+  IF v_player_taken THEN
+    RAISE EXCEPTION 'player_taken: player % already picked in league %',
+      p_player_id, p_league_id
+      USING ERRCODE = 'unique_violation';
+  END IF;
+
+  -- 2f. caller authorization based on actor.kind.
+  v_actor_kind := p_actor ->> 'kind';
+  v_caller_role := auth.role();
+
+  IF v_actor_kind = 'autopick' THEN
+    -- Workers run as service_role; the Phase 4 worker calls this RPC.
+    -- Direct SECURITY DEFINER triggers (rare) execute as postgres.
+    IF v_caller_role NOT IN ('service_role', 'postgres') THEN
+      RAISE EXCEPTION 'unauthorized: actor.kind=autopick requires service_role (got %)',
+        v_caller_role
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+  ELSIF v_actor_kind = 'user' THEN
+    -- Standard user pick. auth.uid() must own the team.
+    SELECT owner_id INTO v_team_owner
+      FROM public.teams
+     WHERE id = p_team_id AND league_id = p_league_id;
+
+    IF v_team_owner IS NULL THEN
+      RAISE EXCEPTION 'unauthorized: team % is not in league %',
+        p_team_id, p_league_id
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+
+    IF v_team_owner IS DISTINCT FROM auth.uid() THEN
+      RAISE EXCEPTION 'unauthorized: caller % is not owner of team %',
+        auth.uid(), p_team_id
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+  ELSE
+    -- shadow / commissioner / system — not allowed via submit_pick_v2.
+    RAISE EXCEPTION 'unauthorized: actor.kind=% not allowed by submit_pick_v2',
+      COALESCE(v_actor_kind, '<missing>')
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  -- ── Step 3: Build payload, advance counter, insert event ────────────
+  v_picked_at := now();
+  v_payload := jsonb_build_object(
+    'pick_number', p_pick_number,
+    'round',       p_round,
+    'team_id',     p_team_id,
+    'player_id',   p_player_id,
+    'picked_at',   v_picked_at,
+    'is_autopick', (v_actor_kind = 'autopick')
+  );
+
+  -- Defense in depth: payload shape must validate even though we built
+  -- it ourselves. Catches bugs in this RPC if someone edits later.
+  PERFORM public.validate_draft_event_payload('pick', v_payload);
+
+  -- UPDATE leagues row → row lock serializes all writers for this league.
+  UPDATE public.leagues
+     SET draft_event_counter = draft_event_counter + 1
+   WHERE id = p_league_id
+  RETURNING draft_event_counter INTO v_new_seq;
+
+  v_correlation_id := COALESCE(p_correlation_id, gen_random_uuid());
+
+  INSERT INTO public.draft_events (
+    league_id, seq, event_type, payload, payload_hash,
+    idempotency_key, actor, correlation_id
+  )
+  VALUES (
+    p_league_id, v_new_seq, 'pick', v_payload, p_payload_hash,
+    p_idempotency_key, p_actor, v_correlation_id
+  )
+  RETURNING id INTO v_event_id;
+
+  -- AFTER INSERT trigger tg_draft_events_project_pick fires HERE,
+  -- writing the corresponding row into draft_picks_v2.
+
+  -- ── Step 4: Compute next pick_deadline (spec §5.2.2) ────────────────
+  -- Round to whole seconds via CEIL, then pad +1s. Guarantees the
+  -- deadline matches pgmq's integer-second send_delay resolution AND
+  -- that autopick fires AFTER the user-visible timer hits zero.
+  v_pick_time := COALESCE(
+    (v_settings ->> 'pickTimeLimit')::int,
+    90  -- v1 default
+  );
+
+  v_new_deadline := date_trunc('second', now())
+                  + make_interval(secs => ceil(v_pick_time)::int)
+                  + interval '1 second';
+
+  UPDATE public.leagues
+     SET pick_deadline = v_new_deadline
+   WHERE id = p_league_id;
+
+  -- ── Step 5: Enqueue deadline message (spec §5.2 step 6) ─────────────
+  -- send_delay (NOT visibility timeout) is what schedules the message
+  -- for future delivery. Worker sets vt=30s when reading; that's
+  -- the redelivery window only.
+  v_send_delay := GREATEST(
+    0,
+    ceil(EXTRACT(EPOCH FROM (v_new_deadline - now())))::int
+  );
+
+  PERFORM pgmq.send(
+    'draft_deadlines',
+    jsonb_build_object(
+      'league_id',     p_league_id,
+      'pick_number',   p_pick_number + 1,
+      'generation',    v_generation,
+      'scheduled_for', v_new_deadline,
+      'source',        'submit_pick_v2'
+    ),
+    v_send_delay
+  );
+
+  RAISE NOTICE 'submit_pick_v2 committed: event_id=%, seq=%, pick_number=%, next_deadline=%',
+    v_event_id, v_new_seq, p_pick_number, v_new_deadline;
+
+  RETURN jsonb_build_object(
+    'event_id',      v_event_id,
+    'seq',           v_new_seq,
+    'pick_deadline', v_new_deadline,
+    'was_duplicate', false
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.submit_pick_v2(uuid,uuid,int,int,int,uuid,uuid,text,jsonb,uuid) IS
+  'Spec §4.5 / §5.2: the pick path. Idempotent (per-key advisory lock); preflight-checked (state, pick_number, round, on-the-clock, player-taken, auth); writes event + projection (via trigger); advances pick_deadline (CEIL + 1s pad); enqueues pgmq deadline message.';
+
