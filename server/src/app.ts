@@ -7,6 +7,7 @@ import { leagueRoutes } from './routes/leagues';
 import { playerRoutes } from './routes/players';
 import { matchupRoutes } from './routes/matchups';
 import { draftRoutes } from './routes/draft';
+import { draftV2Routes } from './routes/draftV2Sync';
 import { rosterRoutes } from './routes/rosters';
 import { tradeRoutes } from './routes/trades';
 import { waiverRoutes } from './routes/waivers';
@@ -217,6 +218,9 @@ app.route('/api/leagues', leagueRoutes);
 app.route('/api/players', playerRoutes);
 app.route('/api/matchups', matchupRoutes);
 app.route('/api/draft', draftRoutes);
+// Draft Engine v2 — Phase 1 sync endpoint only. v1 above is unaffected.
+// Spec: docs/DRAFT_ENGINE_V2_SPEC.md §7.1 (endpoints), §7.2 (sync shape).
+app.route('/api/draft/v2', draftV2Routes);
 app.route('/api/rosters', rosterRoutes);
 app.route('/api/trades', tradeRoutes);
 app.route('/api/waivers', waiverRoutes);
