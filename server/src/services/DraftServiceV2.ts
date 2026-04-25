@@ -20,10 +20,9 @@
  *     floor (spec principle P4).
  *   - RPC errors are mapped to AppError with HTTP statuses per spec §11.1.
  */
-import { createHash } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { AppError, type ErrorCode } from '../lib/errors';
-import { logger } from '@citrus/shared';
+import { logger, computePickPayloadHash } from '@citrus/shared';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -69,33 +68,10 @@ export interface DraftEventRow {
 }
 
 // ── Internal helpers ────────────────────────────────────────────────
-
-/**
- * Canonical JSON for hashing: keys sorted recursively, no whitespace,
- * no trailing newline. Two payloads with identical logical content
- * always serialize to identical strings.
- */
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return '[' + value.map(canonicalJson).join(',') + ']';
-  }
-  const obj = value as Record<string, unknown>;
-  const keys = Object.keys(obj).sort();
-  return (
-    '{' +
-    keys
-      .map((k) => JSON.stringify(k) + ':' + canonicalJson(obj[k]))
-      .join(',') +
-    '}'
-  );
-}
-
-function sha256Hex(input: string): string {
-  return 'sha256:' + createHash('sha256').update(input).digest('hex');
-}
+// Hash computation lives in @citrus/shared (canonicalJson, sha256Hex,
+// computePickPayloadHash) so the Phase 4 autopick worker can use the
+// SAME canonicalization. Mismatched canonicalization → spurious
+// idempotency_conflict at runtime.
 
 /**
  * Map a Postgres RPC error (raised by submit_pick_v2 via RAISE
@@ -138,22 +114,29 @@ export class DraftServiceV2 {
    * with an admin client AFTER this resolves successfully.
    */
   async submitPick(params: SubmitPickParams): Promise<SubmitPickResult> {
-    // Build the payload-hash input in the SAME shape the RPC builds
-    // server-side (spec §4.1: server computes payload_hash from
-    // canonical JSON; this lets idempotent retries with identical
-    // inputs hit the same hash).
+    // payload_hash is a CLIENT-INTENT signature (NOT a hash of what
+    // the RPC will store). The RPC accepts it as a parameter and
+    // uses it ONLY to detect "same idempotency_key, different
+    // intent" → idempotency_conflict. The RPC itself never computes
+    // a hash.
     //
-    // We deliberately exclude server-assigned fields (picked_at,
-    // is_autopick) from the hash input — the RPC does the same.
-    const hashInput = canonicalJson({
-      league_id:   params.leagueId,
+    // Spec §7.3 fixes the input shape exactly: pick_number, round,
+    // team_id, player_id. No league_id (redundant with the global
+    // unique idempotency_key index). No actor_kind (would cause a
+    // spurious conflict if a user retry escalates to autopick after
+    // the original landed). No server-assigned fields (picked_at,
+    // is_autopick).
+    //
+    // computePickPayloadHash lives in @citrus/shared so the Phase 4
+    // autopick worker uses the SAME canonicalization. Any drift
+    // would break idempotency for autopicks vs user picks at the
+    // same key.
+    const payloadHash = await computePickPayloadHash({
+      pick_number: params.pickNumber,
+      round:       params.round,
       team_id:     params.teamId,
       player_id:   params.playerId,
-      round:       params.round,
-      pick_number: params.pickNumber,
-      actor_kind:  params.actor.kind,
     });
-    const payloadHash = sha256Hex(hashInput);
 
     const { data, error } = await this.supabase.rpc('submit_pick_v2', {
       p_league_id:        params.leagueId,
@@ -227,6 +210,10 @@ export class DraftServiceV2 {
       const channel = opts.admin.channel(channelName, {
         config: { broadcast: { self: false } },
       });
+      // TODO(KI-001): wrap this Promise in a 5s race so a non-SUBSCRIBED
+      // channel status (CHANNEL_ERROR / TIMED_OUT / CLOSED) cannot leave
+      // the route handler awaiting indefinitely. See
+      // docs/RUNBOOKS/draft-engine-v2-known-issues.md#KI-001.
       await new Promise<void>((resolve) => {
         channel.subscribe(async (status) => {
           if (status !== 'SUBSCRIBED') return;
