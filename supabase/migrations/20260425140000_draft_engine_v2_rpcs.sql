@@ -1152,27 +1152,7 @@ BEGIN
          pick_deadline    = v_new_deadline
    WHERE id = p_league_id;
 
-  -- Enqueue a fresh deadline message for the new generation. Any
-  -- pre-pause pgmq messages still in flight will hit the worker's
-  -- generation check and no-op.
-  v_send_delay := GREATEST(
-    0,
-    ceil(EXTRACT(EPOCH FROM (v_new_deadline - now())))::int
-  );
-
-  PERFORM pgmq.send(
-    'draft_deadlines',
-    jsonb_build_object(
-      'league_id',     p_league_id,
-      'pick_number',   v_resumed_pick,
-      'generation',    v_new_gen,
-      'scheduled_for', v_new_deadline,
-      'source',        'draft_resume'
-    ),
-    v_send_delay
-  );
-
-  -- Event 1: generation_bumped.
+  -- Event 1: generation_bumped (spec §5.1: emit before lifecycle event).
   PERFORM public.append_draft_event(
     p_league_id        => p_league_id,
     p_event_type       => 'generation_bumped',
@@ -1200,6 +1180,28 @@ BEGIN
     p_payload_hash     => 'sha256:server-generated',
     p_actor            => p_actor,
     p_correlation_id   => NULL
+  );
+
+  -- Enqueue a fresh deadline message for the new generation, AFTER the
+  -- two events are appended (spec criterion: pgmq.send happens with the
+  -- NEW generation in the payload, after both events are committed).
+  -- Any pre-pause pgmq messages still in flight will hit the worker's
+  -- generation check and no-op.
+  v_send_delay := GREATEST(
+    0,
+    ceil(EXTRACT(EPOCH FROM (v_new_deadline - now())))::int
+  );
+
+  PERFORM pgmq.send(
+    'draft_deadlines',
+    jsonb_build_object(
+      'league_id',     p_league_id,
+      'pick_number',   v_resumed_pick,
+      'generation',    v_new_gen,
+      'scheduled_for', v_new_deadline,
+      'source',        'draft_resume'
+    ),
+    v_send_delay
   );
 
   RAISE NOTICE 'draft_resume: league=%, gen %→%, new_deadline=%',
@@ -1299,27 +1301,7 @@ BEGIN
          pick_deadline    = v_new_deadline
    WHERE id = p_league_id;
 
-  -- Enqueue a fresh message tagged with the new generation. The
-  -- previously queued message becomes a no-op when the worker reads
-  -- it (mismatched generation).
-  v_send_delay := GREATEST(
-    0,
-    ceil(EXTRACT(EPOCH FROM (v_new_deadline - now())))::int
-  );
-
-  PERFORM pgmq.send(
-    'draft_deadlines',
-    jsonb_build_object(
-      'league_id',     p_league_id,
-      'pick_number',   v_pick_number,
-      'generation',    v_new_gen,
-      'scheduled_for', v_new_deadline,
-      'source',        'draft_extend'
-    ),
-    v_send_delay
-  );
-
-  -- Event 1: generation_bumped.
+  -- Event 1: generation_bumped (spec §5.1: emit before lifecycle event).
   PERFORM public.append_draft_event(
     p_league_id        => p_league_id,
     p_event_type       => 'generation_bumped',
@@ -1348,6 +1330,28 @@ BEGIN
     p_payload_hash     => 'sha256:server-generated',
     p_actor            => p_actor,
     p_correlation_id   => NULL
+  );
+
+  -- Enqueue a fresh message tagged with the new generation, AFTER the
+  -- two events are appended (spec criterion: pgmq.send with NEW
+  -- generation, after both events committed). The previously queued
+  -- message becomes a no-op when the worker reads it (mismatched
+  -- generation).
+  v_send_delay := GREATEST(
+    0,
+    ceil(EXTRACT(EPOCH FROM (v_new_deadline - now())))::int
+  );
+
+  PERFORM pgmq.send(
+    'draft_deadlines',
+    jsonb_build_object(
+      'league_id',     p_league_id,
+      'pick_number',   v_pick_number,
+      'generation',    v_new_gen,
+      'scheduled_for', v_new_deadline,
+      'source',        'draft_extend'
+    ),
+    v_send_delay
   );
 
   RAISE NOTICE 'draft_extend: league=%, gen %→%, +%s, new_deadline=%',
