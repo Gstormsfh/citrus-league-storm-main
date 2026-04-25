@@ -348,8 +348,37 @@ submit_pick_v2(
 -- }
 ```
 
-Behavior: see §5.2. Idempotent. Auth: `auth.uid()` must be a member of
-`p_team_id` OR `actor.kind='autopick'` AND caller is `service_role`.
+Behavior: see §5.2. Idempotent.
+
+**Auth:** `auth.uid()` must be a member of `p_team_id` OR
+`actor.kind='autopick'` AND caller is `service_role`. *Implementation
+deviation D2 (see `docs/RUNBOOKS/draft-engine-v2-operations.md`):* the
+`actor.kind='autopick'` branch accepts both `service_role` AND
+`postgres`, mirroring D1's rationale. PostgREST roles (`anon`,
+`authenticated`) remain rejected.
+
+**Commissioner pick power (intentionally absent in v2.0 and v2.1).**
+Commissioners cannot directly submit picks via this RPC. Owner
+absences are handled via `draft_pause` (§4.6) + offline coordination
++ `draft_resume` (§4.7), or by simply waiting for autopick. The v2.1
+`commissioner_override` event is for *override operations on
+existing picks* (force-replace, undo) — not for "commissioner picks
+on behalf of an absent owner." This is a deliberate v1→v2 behavior
+change; v1's commissioner-can-pick-for-anyone path does not exist in
+v2.
+
+**Idempotent retry contract (`was_duplicate=true`).** When the RPC
+returns `was_duplicate=true`, the `pick_deadline` field carries the
+**live** `leagues.pick_deadline` value at the time of the retry, NOT
+the deadline that applied when the original pick committed. If picks
+have happened since the original, the returned deadline is for some
+later pick number. Clients receiving `was_duplicate=true` MUST treat
+it as "your original landed; re-sync state via `/sync` rather than
+acting on the returned `pick_deadline` directly."
+
+**Session ID propagation.** `p_session_id` is written into the event
+payload as `payload.session_id` for tracing; the RPC does not
+otherwise act on it.
 
 ### §4.2 `append_draft_event` (Phase 2)
 
@@ -676,6 +705,9 @@ italic. Unknown fields are rejected by §4.10 (closed schema, not open).
   "player_id": 8478402,       // **int**
   "picked_at": "iso8601",     // **timestamptz**, server-assigned
   "is_autopick": false,       // **bool**
+  "session_id": "uuid",       // *uuid*, optional, propagated from
+                              //          submit_pick_v2 p_session_id
+                              //          for tracing
   "pgmq_msg_id": 12345        // *int*, present only for autopicks
 }
 ```
@@ -1368,6 +1400,18 @@ spec wins (per the front-matter quote-block). Known disagreements:
   alongside service_role; full rationale in
   `docs/RUNBOOKS/draft-engine-v2-operations.md`). No semantic
   change to the contract; the spec just documents what shipped.
+- **v1.0.2 (Phase 2 chunk 5)** — §4.1 expanded:
+  - Auth annotated with deviation D2 (postgres role allowlisted
+    for `actor.kind='autopick'`).
+  - Deviation D3 documented: commissioners have no direct pick
+    power in v2.0 or v2.1; owner absences are handled via
+    pause/resume; v2.1's `commissioner_override` is for
+    overrides of existing picks, not absentee picks.
+  - Idempotent retry contract clarified: `was_duplicate=true`
+    returns LIVE deadline; clients must re-sync, not act on it.
+  - `p_session_id` propagation documented (written to
+    `payload.session_id` for tracing).
+  §6.1 pick payload adds optional `session_id` field.
 
 ---
 

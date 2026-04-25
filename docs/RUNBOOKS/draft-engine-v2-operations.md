@@ -72,6 +72,49 @@ Implementation choices that depart from the literal spec wording, with
 rationale. Any implementer reading the spec should also read this
 section before assuming the code matches verbatim.
 
+### D2 — `submit_pick_v2` accepts `postgres` role for `actor.kind='autopick'`
+
+**Spec section:** §4.1 (Auth bullet, "actor.kind='autopick' AND
+caller is service_role").
+**Implementation:** when `actor.kind='autopick'`,
+`auth.role() NOT IN ('service_role', 'postgres')` raises
+`unauthorized` (insufficient_privilege).
+**Why:** the Phase 4 worker (`supabase/functions/draft-autopick`)
+runs as `service_role` (Supabase Edge Function with the service
+key); but emergency / out-of-band picks driven by manual SQL via the
+Supabase Dashboard run as `postgres`. A strict `service_role`-only
+check would either block emergency operations or force operators to
+issue picks via PostgREST as service_role, which is awkward in
+incident contexts. The deviation is narrow: `postgres` is privileged
+but not client-reachable; PostgREST callers (`anon`,
+`authenticated`) are still rejected. Same rationale as D1.
+**Surfaced in code:** `supabase/migrations/20260425140000_draft_engine_v2_rpcs.sql`
+(submit_pick_v2 step 2f auth dispatch).
+
+### D3 — Commissioners have no direct pick power in v2.0 or v2.1
+
+**Spec section:** §4.1 / §5.2 preflight 2f (auth check).
+**Implementation:** `submit_pick_v2` rejects
+`actor.kind='commissioner'` (and `'shadow'`, `'system'`) with
+`unauthorized`. Only `'user'` and `'autopick'` are accepted.
+**Why:** v1 lets commissioners pick on behalf of any team (often
+used for absent owners). v2 deliberately removes this, replacing it
+with two narrower paths:
+- **Owner absences** — `draft_pause` (§4.6) + offline coordination
+  + `draft_resume` (§4.7), or simply wait for autopick.
+- **Override of an already-committed pick** (force-replace, undo) —
+  reserved for v2.1's `commissioner_override` event.
+This separates "commissioner deciding which player" from
+"commissioner administering the draft." The former conflates the
+draft's audit trail with the commissioner's tools; the latter
+preserves the audit trail by keeping picks attributable to the team
+that actually owns them or to autopick.
+**Operator implication:** any v1 runbook step that says "have the
+commissioner submit the pick" must be rewritten as "pause the
+draft, coordinate offline, resume" before v2.0 ships.
+**Surfaced in code:** `supabase/migrations/20260425140000_draft_engine_v2_rpcs.sql`
+(submit_pick_v2 step 2f, ELSE branch).
+
 ### D1 — `record_shadow_event` accepts `postgres` role in addition to `service_role`
 
 **Spec section:** §4.3 (guard #1, "service_role only").

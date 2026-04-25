@@ -854,7 +854,8 @@ BEGIN
     'team_id',     p_team_id,
     'player_id',   p_player_id,
     'picked_at',   v_picked_at,
-    'is_autopick', (v_actor_kind = 'autopick')
+    'is_autopick', (v_actor_kind = 'autopick'),
+    'session_id',  p_session_id  -- optional: client/worker session for tracing
   );
 
   -- Defense in depth: payload shape must validate even though we built
