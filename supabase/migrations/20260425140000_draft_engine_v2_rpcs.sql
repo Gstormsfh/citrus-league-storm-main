@@ -936,3 +936,431 @@ $$;
 COMMENT ON FUNCTION public.submit_pick_v2(uuid,uuid,int,int,int,uuid,uuid,text,jsonb,uuid) IS
   'Spec §4.5 / §5.2: the pick path. Idempotent (per-key advisory lock); preflight-checked (state, pick_number, round, on-the-clock, player-taken, auth); writes event + projection (via trigger); advances pick_deadline (CEIL + 1s pad); enqueues pgmq deadline message.';
 
+-- ── 6. Commissioner lifecycle RPCs ────────────────────────────────────
+-- Spec §4.6 (draft_pause), §4.7 (draft_resume), §4.8 (draft_extend).
+--
+-- Shared design (spec §5.1, §5.3):
+--   - All three bump leagues.draft_generation.
+--   - Each emits TWO events in order: `generation_bumped` then the
+--     lifecycle event (`draft_paused` / `draft_resumed` / `draft_extended`).
+--   - Auth: caller must be the league commissioner OR service_role/postgres.
+--   - p_actor.kind must be 'commissioner'.
+--   - No queue-side cancellation: stale pgmq messages from before the
+--     bump are no-ops at worker read time (Phase 4 worker checks
+--     msg.generation vs leagues.draft_generation).
+--
+-- Events use append_draft_event (chunk 3) with idempotency_key =
+-- gen_random_uuid() per call. Double-click protection comes from the
+-- state-machine guards (e.g. pause-while-paused fails).
+
+-- Helper: assert caller is the league commissioner OR service_role.
+-- Inlined per-RPC rather than extracted because the failure messages
+-- carry context-specific details we want at the point of failure.
+
+-- ── 6a. draft_pause ───────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.draft_pause(
+  p_league_id  uuid,
+  p_actor      jsonb
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_commissioner   uuid;
+  v_state          text;
+  v_old_gen        int;
+  v_new_gen        int;
+  v_old_deadline   timestamptz;
+  v_pick_count     int;
+  v_remaining      int;
+  v_paused_pick    int;
+  v_paused_at      timestamptz;
+  v_reason         text;
+  v_caller_role    text;
+BEGIN
+  -- Auth: actor.kind must be 'commissioner'.
+  IF (p_actor ->> 'kind') IS DISTINCT FROM 'commissioner' THEN
+    RAISE EXCEPTION 'unauthorized: draft_pause requires actor.kind=commissioner (got %)',
+      COALESCE(p_actor ->> 'kind', '<missing>')
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  -- Auth: caller must be commissioner OR service_role/postgres.
+  SELECT commissioner_id, draft_state, draft_generation, pick_deadline
+    INTO v_commissioner, v_state, v_old_gen, v_old_deadline
+    FROM public.leagues
+   WHERE id = p_league_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'illegal_state: league % not found', p_league_id
+      USING ERRCODE = 'no_data_found';
+  END IF;
+
+  v_caller_role := auth.role();
+  IF v_caller_role NOT IN ('service_role', 'postgres')
+     AND auth.uid() IS DISTINCT FROM v_commissioner
+  THEN
+    RAISE EXCEPTION 'unauthorized: caller % is not the commissioner of league %',
+      auth.uid(), p_league_id
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  -- State-machine guard: pause is only legal from 'active' (spec §5.1).
+  IF v_state <> 'active' THEN
+    RAISE EXCEPTION 'illegal_state_transition: cannot pause from state %', v_state
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- Bump generation + clear deadline + transition state, all in this txn.
+  v_new_gen   := v_old_gen + 1;
+  v_paused_at := now();
+  v_reason    := COALESCE(p_actor ->> 'reason', 'commissioner');
+
+  -- Compute paused_pick_number + remaining_seconds for the event payload.
+  SELECT count(*) INTO v_pick_count
+    FROM public.draft_picks_v2
+   WHERE league_id = p_league_id;
+  v_paused_pick := v_pick_count + 1;
+  v_remaining := GREATEST(
+    0,
+    COALESCE(ceil(EXTRACT(EPOCH FROM (v_old_deadline - now())))::int, 0)
+  );
+
+  UPDATE public.leagues
+     SET draft_generation = v_new_gen,
+         draft_state      = 'paused',
+         pick_deadline    = NULL
+   WHERE id = p_league_id;
+
+  -- Event 1: generation_bumped (spec §5.1: emit before lifecycle event).
+  PERFORM public.append_draft_event(
+    p_league_id        => p_league_id,
+    p_event_type       => 'generation_bumped',
+    p_payload          => jsonb_build_object(
+      'old_generation', v_old_gen,
+      'new_generation', v_new_gen,
+      'reason',         'pause'
+    ),
+    p_idempotency_key  => gen_random_uuid(),
+    p_payload_hash     => 'sha256:server-generated',
+    p_actor            => p_actor,
+    p_correlation_id   => NULL
+  );
+
+  -- Event 2: draft_paused.
+  PERFORM public.append_draft_event(
+    p_league_id        => p_league_id,
+    p_event_type       => 'draft_paused',
+    p_payload          => jsonb_build_object(
+      'paused_at',          v_paused_at,
+      'paused_pick_number', v_paused_pick,
+      'remaining_seconds',  v_remaining,
+      'reason',             v_reason
+    ),
+    p_idempotency_key  => gen_random_uuid(),
+    p_payload_hash     => 'sha256:server-generated',
+    p_actor            => p_actor,
+    p_correlation_id   => NULL
+  );
+
+  RAISE NOTICE 'draft_pause: league=%, gen %→%, remaining=%s',
+    p_league_id, v_old_gen, v_new_gen, v_remaining;
+
+  RETURN jsonb_build_object(
+    'generation', v_new_gen,
+    'paused_at',  v_paused_at
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.draft_pause(uuid, jsonb) IS
+  'Spec §4.6: bumps generation, clears pick_deadline, transitions to paused. Emits generation_bumped then draft_paused. Stale pgmq messages no-op at worker read time.';
+
+-- ── 6b. draft_resume ──────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.draft_resume(
+  p_league_id  uuid,
+  p_actor      jsonb
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_commissioner   uuid;
+  v_state          text;
+  v_old_gen        int;
+  v_new_gen        int;
+  v_settings       jsonb;
+  v_pick_time      int;
+  v_pick_count     int;
+  v_resumed_pick   int;
+  v_new_deadline   timestamptz;
+  v_resumed_at     timestamptz;
+  v_send_delay     int;
+  v_caller_role    text;
+BEGIN
+  -- Auth: actor.kind must be 'commissioner'.
+  IF (p_actor ->> 'kind') IS DISTINCT FROM 'commissioner' THEN
+    RAISE EXCEPTION 'unauthorized: draft_resume requires actor.kind=commissioner (got %)',
+      COALESCE(p_actor ->> 'kind', '<missing>')
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  SELECT commissioner_id, draft_state, draft_generation, settings
+    INTO v_commissioner, v_state, v_old_gen, v_settings
+    FROM public.leagues
+   WHERE id = p_league_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'illegal_state: league % not found', p_league_id
+      USING ERRCODE = 'no_data_found';
+  END IF;
+
+  v_caller_role := auth.role();
+  IF v_caller_role NOT IN ('service_role', 'postgres')
+     AND auth.uid() IS DISTINCT FROM v_commissioner
+  THEN
+    RAISE EXCEPTION 'unauthorized: caller % is not the commissioner of league %',
+      auth.uid(), p_league_id
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  -- Resume is only legal from 'paused' (spec §5.1).
+  IF v_state <> 'paused' THEN
+    RAISE EXCEPTION 'illegal_state_transition: cannot resume from state %', v_state
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  v_new_gen     := v_old_gen + 1;
+  v_resumed_at  := now();
+  v_pick_time   := COALESCE((v_settings ->> 'pickTimeLimit')::int, 90);
+
+  -- Recompute deadline (CEIL + 1s pad, spec §5.2.2).
+  v_new_deadline := date_trunc('second', now())
+                  + make_interval(secs => ceil(v_pick_time)::int)
+                  + interval '1 second';
+
+  SELECT count(*) INTO v_pick_count
+    FROM public.draft_picks_v2
+   WHERE league_id = p_league_id;
+  v_resumed_pick := v_pick_count + 1;
+
+  UPDATE public.leagues
+     SET draft_generation = v_new_gen,
+         draft_state      = 'active',
+         pick_deadline    = v_new_deadline
+   WHERE id = p_league_id;
+
+  -- Enqueue a fresh deadline message for the new generation. Any
+  -- pre-pause pgmq messages still in flight will hit the worker's
+  -- generation check and no-op.
+  v_send_delay := GREATEST(
+    0,
+    ceil(EXTRACT(EPOCH FROM (v_new_deadline - now())))::int
+  );
+
+  PERFORM pgmq.send(
+    'draft_deadlines',
+    jsonb_build_object(
+      'league_id',     p_league_id,
+      'pick_number',   v_resumed_pick,
+      'generation',    v_new_gen,
+      'scheduled_for', v_new_deadline,
+      'source',        'draft_resume'
+    ),
+    v_send_delay
+  );
+
+  -- Event 1: generation_bumped.
+  PERFORM public.append_draft_event(
+    p_league_id        => p_league_id,
+    p_event_type       => 'generation_bumped',
+    p_payload          => jsonb_build_object(
+      'old_generation', v_old_gen,
+      'new_generation', v_new_gen,
+      'reason',         'resume'
+    ),
+    p_idempotency_key  => gen_random_uuid(),
+    p_payload_hash     => 'sha256:server-generated',
+    p_actor            => p_actor,
+    p_correlation_id   => NULL
+  );
+
+  -- Event 2: draft_resumed.
+  PERFORM public.append_draft_event(
+    p_league_id        => p_league_id,
+    p_event_type       => 'draft_resumed',
+    p_payload          => jsonb_build_object(
+      'resumed_at',          v_resumed_at,
+      'resumed_pick_number', v_resumed_pick,
+      'new_pick_deadline',   v_new_deadline
+    ),
+    p_idempotency_key  => gen_random_uuid(),
+    p_payload_hash     => 'sha256:server-generated',
+    p_actor            => p_actor,
+    p_correlation_id   => NULL
+  );
+
+  RAISE NOTICE 'draft_resume: league=%, gen %→%, new_deadline=%',
+    p_league_id, v_old_gen, v_new_gen, v_new_deadline;
+
+  RETURN jsonb_build_object(
+    'generation',        v_new_gen,
+    'new_pick_deadline', v_new_deadline
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.draft_resume(uuid, jsonb) IS
+  'Spec §4.7: bumps generation, recomputes pick_deadline, transitions to active, enqueues fresh pgmq message tagged with new generation. Pre-pause queue messages no-op at worker.';
+
+-- ── 6c. draft_extend ──────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.draft_extend(
+  p_league_id      uuid,
+  p_extra_seconds  int,
+  p_actor          jsonb
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_commissioner   uuid;
+  v_state          text;
+  v_old_gen        int;
+  v_new_gen        int;
+  v_old_deadline   timestamptz;
+  v_new_deadline   timestamptz;
+  v_extended_at    timestamptz;
+  v_pick_count     int;
+  v_pick_number    int;
+  v_send_delay     int;
+  v_caller_role    text;
+BEGIN
+  IF p_extra_seconds IS NULL OR p_extra_seconds <= 0 THEN
+    RAISE EXCEPTION 'invalid_event_payload: p_extra_seconds must be a positive int (got %)',
+      p_extra_seconds
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF (p_actor ->> 'kind') IS DISTINCT FROM 'commissioner' THEN
+    RAISE EXCEPTION 'unauthorized: draft_extend requires actor.kind=commissioner (got %)',
+      COALESCE(p_actor ->> 'kind', '<missing>')
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  SELECT commissioner_id, draft_state, draft_generation, pick_deadline
+    INTO v_commissioner, v_state, v_old_gen, v_old_deadline
+    FROM public.leagues
+   WHERE id = p_league_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'illegal_state: league % not found', p_league_id
+      USING ERRCODE = 'no_data_found';
+  END IF;
+
+  v_caller_role := auth.role();
+  IF v_caller_role NOT IN ('service_role', 'postgres')
+     AND auth.uid() IS DISTINCT FROM v_commissioner
+  THEN
+    RAISE EXCEPTION 'unauthorized: caller % is not the commissioner of league %',
+      auth.uid(), p_league_id
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  -- Extend is only legal from 'active' (spec §5.1).
+  IF v_state <> 'active' THEN
+    RAISE EXCEPTION 'illegal_state_transition: cannot extend from state %', v_state
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF v_old_deadline IS NULL THEN
+    -- Active-but-no-deadline shouldn't happen; surface as illegal_state.
+    RAISE EXCEPTION 'illegal_state: active draft has no pick_deadline (data corruption?)'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  v_new_gen     := v_old_gen + 1;
+  v_extended_at := now();
+
+  -- Push the deadline forward by p_extra_seconds, re-rounded per §5.2.2.
+  v_new_deadline := date_trunc('second', v_old_deadline)
+                  + make_interval(secs => p_extra_seconds);
+
+  -- Determine the pick the extension applies to.
+  SELECT count(*) INTO v_pick_count
+    FROM public.draft_picks_v2
+   WHERE league_id = p_league_id;
+  v_pick_number := v_pick_count + 1;
+
+  UPDATE public.leagues
+     SET draft_generation = v_new_gen,
+         pick_deadline    = v_new_deadline
+   WHERE id = p_league_id;
+
+  -- Enqueue a fresh message tagged with the new generation. The
+  -- previously queued message becomes a no-op when the worker reads
+  -- it (mismatched generation).
+  v_send_delay := GREATEST(
+    0,
+    ceil(EXTRACT(EPOCH FROM (v_new_deadline - now())))::int
+  );
+
+  PERFORM pgmq.send(
+    'draft_deadlines',
+    jsonb_build_object(
+      'league_id',     p_league_id,
+      'pick_number',   v_pick_number,
+      'generation',    v_new_gen,
+      'scheduled_for', v_new_deadline,
+      'source',        'draft_extend'
+    ),
+    v_send_delay
+  );
+
+  -- Event 1: generation_bumped.
+  PERFORM public.append_draft_event(
+    p_league_id        => p_league_id,
+    p_event_type       => 'generation_bumped',
+    p_payload          => jsonb_build_object(
+      'old_generation', v_old_gen,
+      'new_generation', v_new_gen,
+      'reason',         'extend'
+    ),
+    p_idempotency_key  => gen_random_uuid(),
+    p_payload_hash     => 'sha256:server-generated',
+    p_actor            => p_actor,
+    p_correlation_id   => NULL
+  );
+
+  -- Event 2: draft_extended.
+  PERFORM public.append_draft_event(
+    p_league_id        => p_league_id,
+    p_event_type       => 'draft_extended',
+    p_payload          => jsonb_build_object(
+      'extended_at',       v_extended_at,
+      'pick_number',       v_pick_number,
+      'extra_seconds',     p_extra_seconds,
+      'new_pick_deadline', v_new_deadline
+    ),
+    p_idempotency_key  => gen_random_uuid(),
+    p_payload_hash     => 'sha256:server-generated',
+    p_actor            => p_actor,
+    p_correlation_id   => NULL
+  );
+
+  RAISE NOTICE 'draft_extend: league=%, gen %→%, +%s, new_deadline=%',
+    p_league_id, v_old_gen, v_new_gen, p_extra_seconds, v_new_deadline;
+
+  RETURN jsonb_build_object(
+    'generation',        v_new_gen,
+    'new_pick_deadline', v_new_deadline
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.draft_extend(uuid, int, jsonb) IS
+  'Spec §4.8: bumps generation, extends pick_deadline by p_extra_seconds, enqueues fresh pgmq message. Old queued message no-ops at worker (mismatched generation).';
+
+
