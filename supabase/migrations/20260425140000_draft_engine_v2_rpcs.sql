@@ -28,8 +28,10 @@
 -- ── Out of scope for Phase 2 ───────────────────────────────────────────
 -- - Sweep RPC, pg_cron schedules, worker (Phase 3).
 -- - Autopick state machine inside the worker (Phase 4).
--- - draft_metrics table — submit_pick_v2 emits structured RAISE NOTICE
---   logs; metric counters land when Phase 6 wires them.
+-- - draft_metrics table — RPCs are silent on success in Phase 2;
+--   structured metric emission lands when Phase 6 wires them
+--   (spec §11.2). Initial dev-debugging RAISE NOTICEs that lived
+--   in chunks 3/5/6 were removed in chunk 9d (KI-002 resolution).
 -- - pick_undone, commissioner_override RPCs (v2.1, deferred).
 
 -- ── 0. pgmq extension + the deadline queue ────────────────────────────
@@ -325,8 +327,8 @@ BEGIN
   )
   RETURNING id INTO v_event_id;
 
-  RAISE NOTICE 'append_draft_event committed: event_id=%, seq=%, type=%',
-    v_event_id, v_new_seq, p_event_type;
+  -- KI-002 RESOLVED: removed RAISE NOTICE for log-volume reasons.
+  -- Phase 6 wires structured emission into draft_metrics per spec §11.2.
 
   RETURN jsonb_build_object(
     'event_id',      v_event_id,
@@ -480,8 +482,7 @@ BEGIN
   )
   RETURNING id INTO v_event_id;
 
-  RAISE NOTICE 'record_shadow_event committed: event_id=%, seq=%, league_id=%',
-    v_event_id, v_new_seq, p_league_id;
+  -- KI-002 RESOLVED: removed RAISE NOTICE. Phase 6 wires draft_metrics.
 
   RETURN jsonb_build_object(
     'event_id',      v_event_id,
@@ -921,8 +922,7 @@ BEGIN
     v_send_delay
   );
 
-  RAISE NOTICE 'submit_pick_v2 committed: event_id=%, seq=%, pick_number=%, next_deadline=%',
-    v_event_id, v_new_seq, p_pick_number, v_new_deadline;
+  -- KI-002 RESOLVED: removed RAISE NOTICE. Phase 6 wires draft_metrics.
 
   RETURN jsonb_build_object(
     'event_id',      v_event_id,
@@ -1064,8 +1064,7 @@ BEGIN
     p_correlation_id   => NULL
   );
 
-  RAISE NOTICE 'draft_pause: league=%, gen %→%, remaining=%s',
-    p_league_id, v_old_gen, v_new_gen, v_remaining;
+  -- KI-002 RESOLVED: removed RAISE NOTICE. Phase 6 wires draft_metrics.
 
   RETURN jsonb_build_object(
     'generation', v_new_gen,
@@ -1204,8 +1203,7 @@ BEGIN
     v_send_delay
   );
 
-  RAISE NOTICE 'draft_resume: league=%, gen %→%, new_deadline=%',
-    p_league_id, v_old_gen, v_new_gen, v_new_deadline;
+  -- KI-002 RESOLVED: removed RAISE NOTICE. Phase 6 wires draft_metrics.
 
   RETURN jsonb_build_object(
     'generation',        v_new_gen,
@@ -1354,8 +1352,7 @@ BEGIN
     v_send_delay
   );
 
-  RAISE NOTICE 'draft_extend: league=%, gen %→%, +%s, new_deadline=%',
-    p_league_id, v_old_gen, v_new_gen, p_extra_seconds, v_new_deadline;
+  -- KI-002 RESOLVED: removed RAISE NOTICE. Phase 6 wires draft_metrics.
 
   RETURN jsonb_build_object(
     'generation',        v_new_gen,

@@ -61,6 +61,16 @@ modeled.
 
 ### KI-002 — `RAISE NOTICE` noise in 6 v2 RPCs
 
+**RESOLVED** (commit landing this chunk; 2026-04-25). Fix shipped in
+chunk 9d: all 6 `RAISE NOTICE` lines removed from
+`supabase/migrations/20260425140000_draft_engine_v2_rpcs.sql`. Each
+removal site carries a `KI-002 RESOLVED` placeholder comment so the
+audit trail is visible in-place. Proper structured emission into
+`draft_metrics` is deliberately deferred to Phase 6 when that table
++ the metric pipeline land per spec §11.2 — the current Phase 2
+RPCs are silent on success, error paths still raise. No replacement
+wire-up needed for chunk 9d.
+
 | | |
 |---|---|
 | **Severity** | low |
@@ -68,7 +78,7 @@ modeled.
 | **Description** | Each RPC ends with a `RAISE NOTICE 'function_name committed: ...'` line for development debugging. In production, every commit produces a NOTICE log line (4 per pick at peak — submit_pick_v2 + the projection trigger fires + sometimes downstream events). The volume drowns out signal logs and increases Supabase log ingestion cost. |
 | **Why deferred** | Replacing 6 sites with proper structured logging belongs in the observability work scheduled for chunk 9, where the broader `pick_committed`, `autopick_fired`, `safety_net_hit` etc. metric pipeline lands (spec §11.2). Removing them piecemeal before that work is wasted churn. |
 | **Target phase for resolution** | **Phase 2 chunk 9** (observability). Either remove entirely or convert to structured `pg_logical_emit_message` / `INSERT INTO draft_metrics` per spec §11.1. |
-| **Verification test** | First run `SELECT installed_version FROM pg_available_extensions WHERE name = 'pg_stat_statements'` against the target environment. **If installed:** `supabase/tests/draft_engine_v2_chunk9_log_volume.sql` exec one full pick path, count NOTICE-level emissions for the league via `pg_stat_statements`, assert ≤1 per logical operation. **If not installed:** manual log-stream inspection during chunk 9 sign-off — exec one full pick path, capture the Supabase Functions / Postgres log stream for that minute, grep `RAISE NOTICE` mentions for the test league_id, assert count is the expected number of structured-log emissions (not the current chatty one-per-RPC). |
+| **Verification test** | After chunk 9d lands, `grep -c 'RAISE NOTICE' supabase/migrations/20260425140000_draft_engine_v2_rpcs.sql` must return zero matches outside header comments. **Before** chunk 9d: 6 NOTICE sites in function bodies. **After:** zero in function bodies; six placeholder comments naming KI-002. The full structured-logging verification (NOTICE volume during a real pick path) re-targets to Phase 6 when `draft_metrics` lands. |
 
 ### KI-003 — `/events` in-memory rate limiter is per-instance, not per-deployment
 
