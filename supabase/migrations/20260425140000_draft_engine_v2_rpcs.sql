@@ -494,3 +494,138 @@ $$;
 COMMENT ON FUNCTION public.record_shadow_event(uuid,jsonb,uuid,text,uuid) IS
   'Spec §4.3: shadow-mode-only path. Three hard guards (service_role, actor.kind=shadow, leagues.draft_shadow_mode=true). Skips state-machine preflight by design — diff job catches divergence in Phase 8.';
 
+-- ── 4. reconstruct_draft_state — rebuild/repair tool ──────────────────
+-- Spec §4.4. Reads draft_events ONLY. Returns the full derived state
+-- of a league as JSON.
+--
+-- This is NOT the hot-path read. The hot-path read is
+-- SELECT FROM draft_picks_v2 (the synchronous projection maintained
+-- by tg_draft_events_project_pick). This function exists for:
+--   - Seeding draft_picks_v2 from scratch on migration / re-bootstrap.
+--   - Diagnosing invariant I16 violations (projection ↔ log drift).
+--   - Recovery after a corrupted projection.
+--   - Phase 8 shadow-mode diff scripts.
+--
+-- The function is idempotent and side-effect-free: same league →
+-- same JSON output, with only `now()`-derived fields varying.
+
+CREATE OR REPLACE FUNCTION public.reconstruct_draft_state(
+  p_league_id uuid
+) RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_league_size       int;
+  v_draft_state       text;
+  v_generation        int;
+  v_pick_count        int;
+  v_picks_jsonb       jsonb;
+  v_current_pick      int;
+  v_round             int;
+  v_pick_in_round     int;
+  v_team_order        jsonb;
+  v_on_the_clock      uuid;
+  v_completed_rounds  int;
+BEGIN
+  -- League header — needed for size, state, generation.
+  SELECT league_size, draft_state, draft_generation
+    INTO v_league_size, v_draft_state, v_generation
+    FROM public.leagues
+   WHERE id = p_league_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'illegal_state: league % not found', p_league_id
+      USING ERRCODE = 'no_data_found';
+  END IF;
+
+  -- Reconstruct the picks array from events.
+  -- We count `pick` events and subtract any subsequent `pick_undone`
+  -- events that target them. Spec §6.2: undo is rejected if a later
+  -- pick exists, so the undone targets are always at the tail. We
+  -- materialize the survivors here.
+  WITH
+    pick_events AS (
+      SELECT id, payload, actor, seq
+        FROM public.draft_events
+       WHERE league_id = p_league_id
+         AND event_type = 'pick'
+    ),
+    undone_ids AS (
+      SELECT (payload ->> 'target_event_id')::bigint AS target_id
+        FROM public.draft_events
+       WHERE league_id = p_league_id
+         AND event_type = 'pick_undone'
+    ),
+    surviving AS (
+      SELECT *
+        FROM pick_events
+       WHERE id NOT IN (SELECT target_id FROM undone_ids)
+       ORDER BY (payload ->> 'pick_number')::int
+    )
+  SELECT
+    count(*),
+    COALESCE(
+      jsonb_agg(
+        jsonb_build_object(
+          'pick_number', (payload ->> 'pick_number')::int,
+          'round',       (payload ->> 'round')::int,
+          'team_id',     (payload ->> 'team_id')::uuid,
+          'player_id',   (payload ->> 'player_id')::int,
+          'picked_at',   (payload ->> 'picked_at')::timestamptz,
+          'is_autopick', (payload ->> 'is_autopick')::boolean,
+          'actor_kind',  actor ->> 'kind'
+        )
+        ORDER BY (payload ->> 'pick_number')::int
+      ),
+      '[]'::jsonb
+    )
+    INTO v_pick_count, v_picks_jsonb
+    FROM surviving;
+
+  -- Derive the position pointers.
+  v_current_pick := v_pick_count + 1;
+
+  IF v_league_size IS NULL OR v_league_size <= 0 THEN
+    -- Without league_size we can't compute on-the-clock or completed
+    -- rounds. Surface what we have; caller decides how to handle.
+    v_on_the_clock     := NULL;
+    v_completed_rounds := NULL;
+  ELSE
+    v_completed_rounds := v_pick_count / v_league_size;  -- integer division
+    v_round            := ((v_current_pick - 1) / v_league_size) + 1;
+    v_pick_in_round    := ((v_current_pick - 1) % v_league_size) + 1;
+
+    -- on-the-clock is read from draft_order (v1's table; v2 reuses it).
+    -- Snake reversal is BAKED INTO team_order per round, so we can read
+    -- the team_id at index (pick_in_round - 1) directly.
+    SELECT team_order
+      INTO v_team_order
+      FROM public.draft_order
+     WHERE league_id = p_league_id
+       AND round_number = v_round;
+
+    IF v_team_order IS NOT NULL THEN
+      v_on_the_clock := (v_team_order ->> (v_pick_in_round - 1))::uuid;
+    ELSE
+      v_on_the_clock := NULL;  -- draft_order not yet populated for this round
+    END IF;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'picks',                v_picks_jsonb,
+    'pick_count',           v_pick_count,
+    'current_pick_number',  v_current_pick,
+    'on_the_clock_team_id', v_on_the_clock,
+    'completed_rounds',     v_completed_rounds,
+    'draft_state',          v_draft_state,
+    'generation',           v_generation
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.reconstruct_draft_state(uuid) IS
+  'Spec §4.4: rebuild/repair tool. Reads draft_events only; returns derived draft state as JSON. NOT the hot-path read — use draft_picks_v2 for that.';
+
