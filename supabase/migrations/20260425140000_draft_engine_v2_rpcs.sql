@@ -231,3 +231,266 @@ CREATE TRIGGER draft_events_project_pick_trg
 COMMENT ON FUNCTION public.tg_draft_events_project_pick() IS
   'Spec §3.2: sole writer to draft_picks_v2. Synchronous projection of pick events; in-txn with the event insert. Invariant I16 verifies consistency.';
 
+-- ── 3a. append_draft_event — generic non-pick event writer ────────────
+-- Spec §4.2.
+--
+-- Used for lifecycle events (draft_started, draft_paused, draft_resumed,
+-- draft_extended, draft_completed, draft_cancelled) and worker-emitted
+-- events (autopick_failed, generation_bumped). NOT used for picks —
+-- those go through submit_pick_v2 which adds the state-machine preflight.
+--
+-- Concurrency: a transaction-scoped advisory lock keyed on the
+-- idempotency_key serializes concurrent submissions of the same key.
+-- This eliminates the "two threads pass the existence check, both
+-- advance the counter, one's INSERT fails with unique_violation,
+-- counter has advanced but no event landed" race that would create
+-- a gap and violate invariant I1.
+--
+-- When p_idempotency_key IS NULL, no advisory lock is taken and no
+-- existence check is run — caller accepts that retries may double-write.
+-- This is the path lifecycle events use when the caller can guarantee
+-- single-fire semantics (e.g. trigger-driven, single-commissioner).
+
+CREATE OR REPLACE FUNCTION public.append_draft_event(
+  p_league_id        uuid,
+  p_event_type       text,
+  p_payload          jsonb,
+  p_idempotency_key  uuid,
+  p_payload_hash     text,
+  p_actor            jsonb,
+  p_correlation_id   uuid
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_existing_id    bigint;
+  v_existing_seq   bigint;
+  v_existing_hash  text;
+  v_new_seq        bigint;
+  v_event_id       bigint;
+  v_correlation_id uuid;
+BEGIN
+  -- Idempotency replay path: only when caller supplied a key.
+  IF p_idempotency_key IS NOT NULL THEN
+    PERFORM pg_advisory_xact_lock(
+      hashtext('draft_events_idem:' || p_idempotency_key::text)
+    );
+
+    SELECT id, seq, payload_hash
+      INTO v_existing_id, v_existing_seq, v_existing_hash
+      FROM public.draft_events
+     WHERE idempotency_key = p_idempotency_key;
+
+    IF FOUND THEN
+      IF v_existing_hash = p_payload_hash THEN
+        RETURN jsonb_build_object(
+          'event_id',      v_existing_id,
+          'seq',           v_existing_seq,
+          'was_duplicate', true
+        );
+      ELSE
+        -- Spec §11.1: idempotency_conflict.
+        RAISE EXCEPTION 'idempotency_conflict: same key, different payload_hash'
+          USING ERRCODE = 'unique_violation';
+      END IF;
+    END IF;
+  END IF;
+
+  -- Validate payload shape against the §6 catalog.
+  PERFORM public.validate_draft_event_payload(p_event_type, p_payload);
+
+  -- Advance the per-league gap-free seq.
+  UPDATE public.leagues
+     SET draft_event_counter = draft_event_counter + 1
+   WHERE id = p_league_id
+  RETURNING draft_event_counter INTO v_new_seq;
+
+  IF v_new_seq IS NULL THEN
+    RAISE EXCEPTION 'illegal_state: league % not found', p_league_id
+      USING ERRCODE = 'no_data_found';
+  END IF;
+
+  -- Spec §4.5 step 3: correlation_id := COALESCE(supplied, generated).
+  v_correlation_id := COALESCE(p_correlation_id, gen_random_uuid());
+
+  INSERT INTO public.draft_events (
+    league_id, seq, event_type, payload, payload_hash,
+    idempotency_key, actor, correlation_id
+  )
+  VALUES (
+    p_league_id, v_new_seq, p_event_type, p_payload, p_payload_hash,
+    p_idempotency_key, p_actor, v_correlation_id
+  )
+  RETURNING id INTO v_event_id;
+
+  RAISE NOTICE 'append_draft_event committed: event_id=%, seq=%, type=%',
+    v_event_id, v_new_seq, p_event_type;
+
+  RETURN jsonb_build_object(
+    'event_id',      v_event_id,
+    'seq',           v_new_seq,
+    'was_duplicate', false
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.append_draft_event(uuid,text,jsonb,uuid,text,jsonb,uuid) IS
+  'Spec §4.2: writes lifecycle and worker events. Idempotency-keyed callers serialized via per-key advisory lock to keep seq gap-free (invariant I1).';
+
+-- ── 3b. record_shadow_event — shadow-mode-only path ───────────────────
+-- Spec §4.3.
+--
+-- Called EXCLUSIVELY by the Phase 8 v1→v2 trigger that fires on
+-- draft_picks INSERT during shadow mode. Records a 'pick' event in
+-- draft_events SO THE PROJECTION TRIGGER builds draft_picks_v2 — but
+-- skips submit_pick_v2's state-machine preflight by design.
+--
+-- Why preflight is skipped: in shadow mode v1 is the source of truth.
+-- v2 is recording, not validating. submit_pick_v2's preflight (current
+-- pick number, on-the-clock check, not-already-picked, auth) would
+-- reject any time v1's authoritative state diverged — commissioner SQL
+-- fix, error-path retry, batched insert — and shadow mode would break
+-- silently the first time v1 did anything atypical. The diff job
+-- (Phase 8) catches divergence; this RPC must not.
+--
+-- ── Three hard guards (see spec §4.3) ──
+--   #1: auth.role() must be 'service_role'. The Phase 8 trigger runs
+--       as the postgres role; only that role + service_role pass this.
+--       Stops anyone from reaching this RPC via PostgREST.
+--   #2: payload->'actor'->>'kind' must be 'shadow'. The only legal
+--       actor for this RPC. Defends against the trigger being
+--       repurposed or a payload being hand-crafted.
+--   #3: leagues.draft_shadow_mode must be true for this league.
+--       Defends against the trigger firing during the cutover window
+--       when shadow mode has been turned off.
+-- All three RAISE EXCEPTION on violation.
+
+CREATE OR REPLACE FUNCTION public.record_shadow_event(
+  p_league_id        uuid,
+  p_payload          jsonb,
+  p_idempotency_key  uuid,
+  p_payload_hash     text,
+  p_correlation_id   uuid
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor          jsonb;
+  v_shadow_mode    boolean;
+  v_existing_id    bigint;
+  v_existing_seq   bigint;
+  v_existing_hash  text;
+  v_new_seq        bigint;
+  v_event_id       bigint;
+  v_correlation_id uuid;
+BEGIN
+  -- ── Guard #1: service_role only.
+  -- auth.role() returns 'service_role' for service-key callers and
+  -- 'postgres' for direct DB connections (e.g., a SECURITY DEFINER
+  -- trigger). Both are acceptable; anything else (anon, authenticated)
+  -- is rejected.
+  IF auth.role() NOT IN ('service_role', 'postgres') THEN
+    RAISE EXCEPTION 'shadow_guard_violated: caller role % is not service_role',
+      auth.role()
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  -- ── Guard #2: actor.kind must be 'shadow'.
+  v_actor := p_payload -> 'actor';
+  IF v_actor IS NULL OR (v_actor ->> 'kind') IS DISTINCT FROM 'shadow' THEN
+    RAISE EXCEPTION 'shadow_guard_violated: payload.actor.kind must be ''shadow'' (got %)',
+      COALESCE(v_actor ->> 'kind', '<missing>')
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- ── Guard #3: leagues.draft_shadow_mode must be true.
+  SELECT draft_shadow_mode INTO v_shadow_mode
+    FROM public.leagues
+   WHERE id = p_league_id;
+
+  IF v_shadow_mode IS NULL THEN
+    RAISE EXCEPTION 'shadow_guard_violated: league % not found', p_league_id
+      USING ERRCODE = 'no_data_found';
+  END IF;
+
+  IF v_shadow_mode = false THEN
+    RAISE EXCEPTION 'shadow_guard_violated: leagues.draft_shadow_mode is false for league %',
+      p_league_id
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- All three guards passed. Now run the same seq + idempotency
+  -- machinery as append_draft_event, but with event_type hardcoded
+  -- to 'pick' and NO state-machine preflight.
+
+  IF p_idempotency_key IS NULL THEN
+    RAISE EXCEPTION 'shadow_guard_violated: p_idempotency_key is required'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(
+    hashtext('draft_events_idem:' || p_idempotency_key::text)
+  );
+
+  SELECT id, seq, payload_hash
+    INTO v_existing_id, v_existing_seq, v_existing_hash
+    FROM public.draft_events
+   WHERE idempotency_key = p_idempotency_key;
+
+  IF FOUND THEN
+    IF v_existing_hash = p_payload_hash THEN
+      -- v1's trigger may re-fire under transaction retry. Same payload
+      -- → no-op return. Spec §4.3 final paragraph: "re-fires are no-ops
+      -- at record_shadow_event's ON CONFLICT".
+      RETURN jsonb_build_object(
+        'event_id',      v_existing_id,
+        'seq',           v_existing_seq,
+        'was_duplicate', true
+      );
+    ELSE
+      -- Different payload under same key. The trigger logs this to
+      -- shadow_trigger_errors (Phase 8) and does NOT propagate up to
+      -- v1's transaction.
+      RAISE EXCEPTION 'idempotency_conflict: same shadow key, different payload_hash'
+        USING ERRCODE = 'unique_violation';
+    END IF;
+  END IF;
+
+  -- Validate payload shape (event_type = 'pick'; required fields per §6.1).
+  PERFORM public.validate_draft_event_payload('pick', p_payload);
+
+  UPDATE public.leagues
+     SET draft_event_counter = draft_event_counter + 1
+   WHERE id = p_league_id
+  RETURNING draft_event_counter INTO v_new_seq;
+
+  v_correlation_id := COALESCE(p_correlation_id, gen_random_uuid());
+
+  INSERT INTO public.draft_events (
+    league_id, seq, event_type, payload, payload_hash,
+    idempotency_key, actor, correlation_id
+  )
+  VALUES (
+    p_league_id, v_new_seq, 'pick', p_payload, p_payload_hash,
+    p_idempotency_key, v_actor, v_correlation_id
+  )
+  RETURNING id INTO v_event_id;
+
+  RAISE NOTICE 'record_shadow_event committed: event_id=%, seq=%, league_id=%',
+    v_event_id, v_new_seq, p_league_id;
+
+  RETURN jsonb_build_object(
+    'event_id',      v_event_id,
+    'seq',           v_new_seq,
+    'was_duplicate', false
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.record_shadow_event(uuid,jsonb,uuid,text,uuid) IS
+  'Spec §4.3: shadow-mode-only path. Three hard guards (service_role, actor.kind=shadow, leagues.draft_shadow_mode=true). Skips state-machine preflight by design — diff job catches divergence in Phase 8.';
+
