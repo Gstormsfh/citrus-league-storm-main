@@ -386,6 +386,12 @@ record_shadow_event(
 
 **Hard guards** (raise on any violation):
 1. `auth.role() = 'service_role'`.
+   *Implementation deviation D1 (see
+   `docs/RUNBOOKS/draft-engine-v2-operations.md`):* the Phase 2 RPC
+   accepts `auth.role() IN ('service_role', 'postgres')` so the
+   Phase 8 SECURITY DEFINER trigger and manual SQL surgery via the
+   Supabase Dashboard both pass. PostgREST roles (`anon`,
+   `authenticated`) remain rejected.
 2. `p_payload->'actor'->>'kind' = 'shadow'`.
 3. `(SELECT draft_shadow_mode FROM leagues WHERE id = p_league_id) = true`.
 
@@ -1356,8 +1362,12 @@ spec wins (per the front-matter quote-block). Known disagreements:
   Renumbered from v0.1 (initial Phase 0 draft) to align section
   numbers with the plan's references; see Appendix B for the
   Rosetta Stone. I7–I15 invariant selections are spec-author
-  judgment and flagged for review in §8. Subsequent versions append
-  entries here with date + summary.
+  judgment and flagged for review in §8.
+- **v1.0.1 (Phase 2 implementation)** — §4.3 guard #1 annotated
+  with implementation deviation D1 (postgres role allowlisted
+  alongside service_role; full rationale in
+  `docs/RUNBOOKS/draft-engine-v2-operations.md`). No semantic
+  change to the contract; the spec just documents what shipped.
 
 ---
 

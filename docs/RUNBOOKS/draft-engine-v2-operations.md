@@ -66,6 +66,34 @@ that introduces the relevant runtime surface.
 - Global feature-flag rollback.
 - Communication template for affected commissioners.
 
+## Documented deviations from spec
+
+Implementation choices that depart from the literal spec wording, with
+rationale. Any implementer reading the spec should also read this
+section before assuming the code matches verbatim.
+
+### D1 — `record_shadow_event` accepts `postgres` role in addition to `service_role`
+
+**Spec section:** §4.3 (guard #1, "service_role only").
+**Implementation:** `auth.role() NOT IN ('service_role', 'postgres')`
+raises `shadow_guard_violated`.
+**Why:** the Phase 8 v1→v2 trigger fires inside Postgres itself
+(SECURITY DEFINER trigger executing as the table owner — typically
+`postgres`), and manual SQL surgery via the Supabase Dashboard SQL
+Editor also runs as `postgres`. A strict `service_role` check would
+either:
+1. Reject the trigger outright, breaking shadow mode end-to-end, or
+2. Force the trigger to be rewritten as a service-role HTTP callout,
+   which couples shadow recording to network availability and adds
+   latency to v1's commit path.
+The deviation is narrow: `postgres` is a privileged DB role, not a
+client-reachable one. PostgREST callers are still restricted to
+`anon` / `authenticated` and would still be rejected by this guard.
+**Alternatives considered:** strict `service_role` only (rejected —
+breaks the trigger), broad allowlist (rejected — too lax).
+**Surfaced in code:** `supabase/migrations/20260425140000_draft_engine_v2_rpcs.sql`
+(record_shadow_event guard #1 comment).
+
 ## Add-only convention
 
 Append-only. Old playbooks stay, even after the underlying issue is
