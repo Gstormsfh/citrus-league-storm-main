@@ -76,6 +76,34 @@ export default {
 					charcoal: '#5C5C5C',    // Soft charcoal
 					forest: '#4A5F4D',      // Soft forest - NOT too dark
 				},
+				// ==========================================
+				// PREMIUM REDESIGN TOKENS — additive, do not modify existing citrus-* or fantasy-* tokens
+				// Used by /preview-redesign route only. Slapshot Editorial design system.
+				// ==========================================
+				premium: {
+					// Surface hierarchy — forest-black with subtle green undertone (preserves Citrus brand memory)
+					bg: '#0F1411',           // surface — base canvas
+					'bg-deep': '#0A0F0C',    // surface-container-lowest — utility bars
+					surface: '#181D1A',      // surface-container-low — sectioning
+					'surface-high': '#1C211D', // surface-container — primary cards
+					'surface-higher': '#262B28', // surface-container-high — interactive elements
+					'surface-highest': '#313632', // surface-container-highest — active states
+					'surface-bright': '#353A37',  // bright variant
+					// Text & content
+					text: '#DFE4DE',         // on-surface — primary text
+					'text-muted': '#A8B0A6', // secondary text
+					'text-dim': '#6B7368',   // tertiary text
+					// The signature accent — citrus orange
+					orange: '#FF6B1A',       // primary-container — surgical laser
+					'orange-soft': '#FFB596', // primary — softer variant
+					'orange-deep': '#581E00', // on-primary — text on orange
+					// Cool data accent for opposing/comparison data
+					ice: '#8DCDFF',          // tertiary
+					'ice-deep': '#00A2EB',   // tertiary-container
+					// Border / outline
+					border: 'rgba(255, 255, 255, 0.08)',     // ghost border default
+					'border-strong': 'rgba(255, 255, 255, 0.15)', // ghost border accessible
+				},
 				// Citrus fantasy sports theme colors - High-Contrast Citrus Palette
 				fantasy: {
 					primary: '#F9E076',     // Bright Lemon Peel (Center)
@@ -157,6 +185,10 @@ export default {
 				display: ['Montserrat', 'sans-serif'],               // Secondary headers
 				varsity: ['Graduate', 'Alfa Slab One', 'serif'],     // Bold varsity lettering
 				script: ['Pacifico', 'Bangers', 'cursive'],          // Surfer script accent
+				// Premium redesign — additive, used only on /preview-redesign
+				'editorial': ['"Playfair Display"', 'Georgia', 'serif'],   // Editorial serif headlines
+				'caps': ['"Bebas Neue"', '"Arial Narrow"', 'sans-serif'],   // Condensed caps section labels
+				'premium-body': ['Inter', 'system-ui', 'sans-serif'],      // Premium body text (Inter at heavier weights)
 			}
 		}
 	},

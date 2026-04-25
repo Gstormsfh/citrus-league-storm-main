@@ -103,6 +103,7 @@ const PoolPlayoffRoster = lazyWithErrorHandling(() => import("./pages/PoolPlayof
 const PoolPlayoffConfidence = lazyWithErrorHandling(() => import("./pages/PoolPlayoffConfidence"));
 const PoolPlayoffHub = lazyWithErrorHandling(() => import("./pages/PoolPlayoffHub"));
 const Admin = lazyWithErrorHandling(() => import("./pages/Admin"));
+const PreviewRedesign = lazyWithErrorHandling(() => import("./pages/PreviewRedesign"));
 
 // Use the picturesque LoadingScreen as the Suspense fallback for lazy-loaded routes
 const PageLoader = () => <LoadingScreen />;
@@ -203,6 +204,8 @@ const App = () => {
                 <Route path="/pool/playoff-roster" element={<ProtectedRoute><ErrorBoundary><PoolPlayoffRoster /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/pool/playoff-confidence" element={<ProtectedRoute><ErrorBoundary><PoolPlayoffConfidence /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/pool/playoff-hub" element={<ProtectedRoute><ErrorBoundary><PoolPlayoffHub /></ErrorBoundary></ProtectedRoute>} />
+                {/* Hidden preview route for redesign work — not linked from anywhere in production nav */}
+                <Route path="/preview-redesign" element={<PreviewRedesign />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
