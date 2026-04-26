@@ -33,6 +33,45 @@ Each row uses these columns:
 
 ## Registry
 
+### Phase 2 closeout (2026-04-26)
+
+Phase 2 substantively complete. All 8 Phase 2 RPCs deployed to staging
+(`submit_pick_v2`, `append_draft_event`, `record_shadow_event`,
+`reconstruct_draft_state`, `draft_pause`, `draft_resume`, `draft_extend`,
+`validate_draft_event_payload`) plus the `tg_draft_events_project_pick`
+projection trigger and the `pgmq` extension + `draft_deadlines` queue.
+TypeScript surface (`DraftServiceV2`, `/api/draft/v2/league/:id/sync`,
+`/pick`, `/events`) deployed to staging. Verification:
+
+- 484/484 vitest cases pass (service unit, route HTTP, KI-001 timeout).
+- 28 SQL integration scenarios pass on staging
+  (`supabase/tests/draft_engine_v2_phase2_integration.sql`):
+  - 5 happy path + idempotency (SC-001..SC-005)
+  - 6 preflight + state machine (SC-006..SC-011)
+  - 7 auth + shadow guards (SC-012..SC-018)
+  - 4 lifecycle pause/resume/extend (SC-019..SC-022)
+  - 6 invariants + schema + trigger + validator (SC-023..SC-028)
+- Residue check after each suite run: all four counts = 0
+  (proves savepoint cleanup is sound).
+
+Deviations documented:
+- **D1** — `record_shadow_event` accepts `postgres` alongside
+  `service_role` (Phase 8 trigger context).
+- **D2** — `submit_pick_v2` accepts `postgres` alongside
+  `service_role` for `actor.kind='autopick'` (Phase 4 worker
+  + emergency SQL operations).
+- **D3** — Commissioners have no direct pick power in v2.0/v2.1;
+  owner absences handled via pause/resume.
+
+Open issues at end of Phase 2:
+- **KI-003** open (rate limiter session-affinity gap; target Phase 7).
+- **KI-001 / KI-002** RESOLVED in chunks 9c / 9d.
+
+Phase 3 begins next: pgmq scheduler RPC (`draft_deadline_sweep`),
+pg_cron sub-minute schedule, worker scaffold (Edge Function stub).
+
+---
+
 ### KI-001 — `DraftServiceV2.broadcastEvent` can hang on non-SUBSCRIBED channel status
 
 **RESOLVED** (commit landing this chunk; 2026-04-25). Fix shipped in
