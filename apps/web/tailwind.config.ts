@@ -104,6 +104,25 @@ export default {
 					border: 'rgba(255, 255, 255, 0.08)',     // ghost border default
 					'border-strong': 'rgba(255, 255, 255, 0.15)', // ghost border accessible
 				},
+				// ==========================================
+				// PASTEL VIBRANT TOKENS — additive, for /preview-redesign only
+				// Citrus brand: warm cream/peach pastel base, vibrant orange punches.
+				// Glossier × Casper × Notion register.
+				// ==========================================
+				pastel: {
+					cream: '#FFF8F0',           // base bg upper
+					'cream-warm': '#FFEDDB',    // base bg mid
+					peach: '#FFE0CC',           // base bg lower / soft accent
+					'peach-deep': '#FFB591',    // deeper peach accent
+					sage: '#84A57D',            // sage green for live/success
+					'sage-soft': '#C8DCC4',     // pale sage for chips/borders
+					forest: '#1B3022',          // deep forest text
+					'forest-soft': '#3E5A3E',   // muted forest text
+					'forest-dim': '#6B7B6B',    // tertiary text
+					orange: '#FF6B1A',          // vibrant primary CTA
+					'orange-soft': '#FF9F66',   // softer warm orange
+					'orange-deep': '#C04A0E',   // deep orange (text on light)
+				},
 				// Citrus fantasy sports theme colors - High-Contrast Citrus Palette
 				fantasy: {
 					primary: '#F9E076',     // Bright Lemon Peel (Center)
@@ -170,6 +189,14 @@ export default {
         "bounce-subtle": {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-5px)" }
+        },
+        "float-slow": {
+          "0%, 100%": { transform: "translateY(0px) rotate(0deg)" },
+          "50%": { transform: "translateY(-12px) rotate(1.5deg)" }
+        },
+        "float-medium": {
+          "0%, 100%": { transform: "translateY(0px) rotate(0deg)" },
+          "50%": { transform: "translateY(-8px) rotate(-1deg)" }
         }
 			},
 			animation: {
@@ -178,7 +205,9 @@ export default {
 				"fade-in": "fade-in 0.6s ease-out",
         "slide-in": "slide-in 0.4s ease-out",
         "slide-down": "slide-down 0.4s ease-out",
-        "bounce-subtle": "bounce-subtle 2s ease-in-out infinite"
+        "bounce-subtle": "bounce-subtle 2s ease-in-out infinite",
+        "float-slow": "float-slow 7s ease-in-out infinite",
+        "float-medium": "float-medium 5s ease-in-out infinite"
 			},
 			fontFamily: {
 				sans: ['Inter', 'Montserrat', 'sans-serif'],         // Clean body text
@@ -189,6 +218,9 @@ export default {
 				'editorial': ['"Playfair Display"', 'Georgia', 'serif'],   // Editorial serif headlines
 				'caps': ['"Bebas Neue"', '"Arial Narrow"', 'sans-serif'],   // Condensed caps section labels
 				'premium-body': ['Inter', 'system-ui', 'sans-serif'],      // Premium body text (Inter at heavier weights)
+				// Pastel-vibrant redesign — Citrus warm-character serif + clean body + tabular mono
+				'calistoga': ['Calistoga', 'Georgia', 'serif'],            // Warm display serif — Citrus voice with human warmth
+				'jbmono': ['"JetBrains Mono"', 'ui-monospace', 'monospace'], // Tabular numbers + mono labels
 			}
 		}
 	},
