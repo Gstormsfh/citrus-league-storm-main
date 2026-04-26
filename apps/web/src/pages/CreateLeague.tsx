@@ -169,6 +169,9 @@ const CreateLeague = () => {
   const [tiebreaker, setTiebreaker] = useState<'none' | 'total-points' | 'most-upsets'>('none');
   const [allowRepeatTeams, setAllowRepeatTeams] = useState(false);
   const [poolVisibility, setPoolVisibility] = useState<'private' | 'public'>('private');
+  // Bracket pickem: round-by-round (picks unlock per round) vs full-bracket
+  // (all picks locked in before R1 Game 1, March Madness style).
+  const [bracketPickMode, setBracketPickMode] = useState<'round-by-round' | 'full-bracket'>('round-by-round');
 
   // ---- Waiver Settings ----
   const [waiverSettings, setWaiverSettings] = useState({
@@ -417,6 +420,7 @@ const CreateLeague = () => {
         } else if (leagueType === 'playoff-bracket-pickem') {
           settings.playoffBracketPointsPerRound = { r1: 2, r2: 4, r3: 8, scf: 16 };
           settings.playoffGamesPickBonus = 1;
+          settings.playoffBracketPickMode = bracketPickMode;
           // Commissioner-selected pick lock deadline (ISO string)
           settings.playoffRosterLockedAt = new Date(playoffLockDeadline).toISOString();
         } else if (leagueType === 'playoff-confidence-pool') {
@@ -836,6 +840,56 @@ const CreateLeague = () => {
                               ? 'After this time, rosters lock and players cannot be swapped. Default is Round 1 Game 1 puck drop.'
                               : 'After this time, picks lock. Typically set to just before the first playoff game.'}
                           </p>
+                        </div>
+                      )}
+
+                      {/* Bracket Pick Mode — bracket-pickem only */}
+                      {leagueType === 'playoff-bracket-pickem' && (
+                        <div className="space-y-3">
+                          <Label className="text-base flex items-center gap-2">
+                            <Trophy className="h-4 w-4 text-citrus-orange" />
+                            Bracket Pick Mode
+                          </Label>
+                          <RadioGroup
+                            value={bracketPickMode}
+                            onValueChange={(v) => setBracketPickMode(v as 'round-by-round' | 'full-bracket')}
+                            className="grid grid-cols-1 gap-3"
+                          >
+                            <label
+                              htmlFor="mode-rbr"
+                              className={cn(
+                                'flex items-start gap-3 rounded-lg border-2 p-4 cursor-pointer transition-colors',
+                                bracketPickMode === 'round-by-round'
+                                  ? 'border-citrus-orange bg-citrus-orange/5'
+                                  : 'border-border hover:border-citrus-orange/40'
+                              )}
+                            >
+                              <RadioGroupItem value="round-by-round" id="mode-rbr" className="mt-1" />
+                              <div className="flex-1">
+                                <div className="font-display font-bold text-sm mb-1">Round by Round</div>
+                                <p className="text-xs text-muted-foreground">
+                                  Members pick each round&apos;s winners as it starts. You can only pick Round 2 after Round 1 finishes. Forgiving format — no need to predict upsets upfront.
+                                </p>
+                              </div>
+                            </label>
+                            <label
+                              htmlFor="mode-full"
+                              className={cn(
+                                'flex items-start gap-3 rounded-lg border-2 p-4 cursor-pointer transition-colors',
+                                bracketPickMode === 'full-bracket'
+                                  ? 'border-citrus-orange bg-citrus-orange/5'
+                                  : 'border-border hover:border-citrus-orange/40'
+                              )}
+                            >
+                              <RadioGroupItem value="full-bracket" id="mode-full" className="mt-1" />
+                              <div className="flex-1">
+                                <div className="font-display font-bold text-sm mb-1">Full Bracket (March Madness style)</div>
+                                <p className="text-xs text-muted-foreground">
+                                  Members pick ALL 15 series — including Stanley Cup champion — before Round 1 Game 1 puck drop. One shot, live with it. Classic playoff pool format.
+                                </p>
+                              </div>
+                            </label>
+                          </RadioGroup>
                         </div>
                       )}
 
