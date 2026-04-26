@@ -1579,4 +1579,429 @@ BEGIN
 END
 $sc018$;
 
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-019 — draft_pause happy path
+-- ════════════════════════════════════════════════════════════════════════
+-- Seed (active, generation=0, deadline set). Call draft_pause as
+-- commissioner. Verify:
+--   - leagues.draft_state = 'paused'.
+--   - leagues.draft_generation = 1 (bumped from 0).
+--   - leagues.pick_deadline IS NULL.
+--   - exactly 2 events landed: generation_bumped + draft_paused.
+--   - generation_bumped came BEFORE draft_paused (lower seq).
+--   - generation_bumped payload has reason='pause', old/new gen.
+--   - draft_paused payload has paused_at, paused_pick_number,
+--     remaining_seconds, reason.
+--   - NO pgmq messages enqueued (pause does NOT enqueue).
+--
+-- Spec refs: §4.6 draft_pause; §5.1 lifecycle; §5.3 generation
+-- ordering rule.
+
+DO $sc019$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_result       jsonb;
+  v_gen          int;
+  v_state        text;
+  v_deadline     timestamptz;
+  v_event_count  int;
+  v_gen_seq      bigint;
+  v_pause_seq    bigint;
+  v_gen_payload  jsonb;
+  v_pause_payload jsonb;
+  v_pgmq_count   int;
+BEGIN
+  RAISE NOTICE 'SC-019 starting: draft_pause happy path';
+  BEGIN  -- savepoint
+
+  v_seed      := _v2_test._seed_active_league(
+                   '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id := (v_seed ->> 'league_id')::uuid;
+
+  v_result := draft_pause(
+    p_league_id => v_league_id,
+    p_actor     => jsonb_build_object(
+      'kind', 'commissioner',
+      'id',   '882b59c9-8882-418b-9450-3fd004d57edd',
+      'session_id', gen_random_uuid()
+    )
+  );
+
+  PERFORM _v2_test._assert((v_result ->> 'generation')::int = 1,
+    'SC-019 result.generation should be 1, got ' || (v_result ->> 'generation'));
+  PERFORM _v2_test._assert(v_result ->> 'paused_at' IS NOT NULL,
+    'SC-019 result.paused_at must be set');
+
+  -- League state.
+  SELECT draft_state, draft_generation, pick_deadline
+    INTO v_state, v_gen, v_deadline
+    FROM leagues WHERE id = v_league_id;
+
+  PERFORM _v2_test._assert(v_state = 'paused',
+    'SC-019 leagues.draft_state should be paused, got ' || v_state);
+  PERFORM _v2_test._assert(v_gen = 1,
+    'SC-019 leagues.draft_generation should be 1, got ' || v_gen);
+  PERFORM _v2_test._assert(v_deadline IS NULL,
+    'SC-019 leagues.pick_deadline should be NULL after pause');
+
+  -- Two events landed, in correct order.
+  SELECT count(*) INTO v_event_count FROM draft_events WHERE league_id = v_league_id;
+  PERFORM _v2_test._assert(v_event_count = 2,
+    'SC-019 should have exactly 2 events (gen_bumped + draft_paused), got ' || v_event_count);
+
+  SELECT seq, payload INTO v_gen_seq, v_gen_payload
+    FROM draft_events
+   WHERE league_id = v_league_id AND event_type = 'generation_bumped';
+  SELECT seq, payload INTO v_pause_seq, v_pause_payload
+    FROM draft_events
+   WHERE league_id = v_league_id AND event_type = 'draft_paused';
+
+  PERFORM _v2_test._assert(v_gen_seq < v_pause_seq,
+    'SC-019 generation_bumped (seq=' || v_gen_seq ||
+    ') must precede draft_paused (seq=' || v_pause_seq || ')');
+
+  -- generation_bumped payload.
+  PERFORM _v2_test._assert((v_gen_payload ->> 'old_generation')::int = 0,
+    'SC-019 generation_bumped.old_generation should be 0');
+  PERFORM _v2_test._assert((v_gen_payload ->> 'new_generation')::int = 1,
+    'SC-019 generation_bumped.new_generation should be 1');
+  PERFORM _v2_test._assert(v_gen_payload ->> 'reason' = 'pause',
+    'SC-019 generation_bumped.reason should be ''pause''');
+
+  -- draft_paused payload required fields.
+  PERFORM _v2_test._assert(v_pause_payload ? 'paused_at',
+    'SC-019 draft_paused.paused_at must be set');
+  PERFORM _v2_test._assert(v_pause_payload ? 'paused_pick_number',
+    'SC-019 draft_paused.paused_pick_number must be set');
+  PERFORM _v2_test._assert(v_pause_payload ? 'remaining_seconds',
+    'SC-019 draft_paused.remaining_seconds must be set');
+  PERFORM _v2_test._assert(v_pause_payload ? 'reason',
+    'SC-019 draft_paused.reason must be set');
+
+  -- No pgmq messages from pause.
+  SELECT count(*) INTO v_pgmq_count
+    FROM pgmq.q_draft_deadlines
+    WHERE (message ->> 'league_id')::uuid = v_league_id;
+  PERFORM _v2_test._assert(v_pgmq_count = 0,
+    'SC-019 pause should NOT enqueue pgmq messages, got ' || v_pgmq_count);
+
+  RAISE NOTICE 'SC-019 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc019$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-020 — draft_resume happy path
+-- ════════════════════════════════════════════════════════════════════════
+-- Seed → draft_pause → draft_resume. Verify after resume:
+--   - leagues.draft_state = 'active'.
+--   - leagues.draft_generation = 2 (bumped twice: once by pause, once by resume).
+--   - leagues.pick_deadline IS NOT NULL and > now() (recomputed per §5.2.2).
+--   - 2 NEW events from resume: generation_bumped + draft_resumed.
+--   - generation_bumped came BEFORE draft_resumed (lower seq).
+--   - exactly 1 NEW pgmq message after resume (the fresh enqueue).
+--   - pgmq message payload has the new generation (2).
+--   - pgmq.send happened AFTER both events (chunk 6 criterion-4 fix):
+--     the message is in pgmq, AND both events have lower seqs than
+--     the order this is observable in.
+--
+-- Spec refs: §4.7 draft_resume; §5.2.2 deadline; §5.3 generation
+-- + the chunk 6 criterion-4 ordering fix.
+
+DO $sc020$
+DECLARE
+  v_seed          jsonb;
+  v_league_id     uuid;
+  v_result        jsonb;
+  v_gen           int;
+  v_state         text;
+  v_deadline      timestamptz;
+  v_resume_events int;
+  v_gen_seq       bigint;
+  v_resumed_seq   bigint;
+  v_pgmq_count    int;
+  v_pgmq_payload  jsonb;
+BEGIN
+  RAISE NOTICE 'SC-020 starting: draft_resume happy path';
+  BEGIN  -- savepoint
+
+  v_seed      := _v2_test._seed_active_league(
+                   '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id := (v_seed ->> 'league_id')::uuid;
+
+  -- Pause first.
+  PERFORM draft_pause(
+    p_league_id => v_league_id,
+    p_actor     => jsonb_build_object(
+      'kind', 'commissioner',
+      'id',   '882b59c9-8882-418b-9450-3fd004d57edd',
+      'session_id', gen_random_uuid()
+    )
+  );
+
+  -- Now resume.
+  v_result := draft_resume(
+    p_league_id => v_league_id,
+    p_actor     => jsonb_build_object(
+      'kind', 'commissioner',
+      'id',   '882b59c9-8882-418b-9450-3fd004d57edd',
+      'session_id', gen_random_uuid()
+    )
+  );
+
+  PERFORM _v2_test._assert((v_result ->> 'generation')::int = 2,
+    'SC-020 result.generation should be 2, got ' || (v_result ->> 'generation'));
+  PERFORM _v2_test._assert(v_result ->> 'new_pick_deadline' IS NOT NULL,
+    'SC-020 result.new_pick_deadline must be set');
+
+  -- League state.
+  SELECT draft_state, draft_generation, pick_deadline
+    INTO v_state, v_gen, v_deadline
+    FROM leagues WHERE id = v_league_id;
+
+  PERFORM _v2_test._assert(v_state = 'active',
+    'SC-020 leagues.draft_state should be active, got ' || v_state);
+  PERFORM _v2_test._assert(v_gen = 2,
+    'SC-020 leagues.draft_generation should be 2, got ' || v_gen);
+  PERFORM _v2_test._assert(v_deadline > now(),
+    'SC-020 leagues.pick_deadline should be in the future');
+
+  -- Two events from resume specifically (filter by reason='resume').
+  -- generation_bumped from PAUSE has reason='pause'; from RESUME has reason='resume'.
+  SELECT seq INTO v_gen_seq
+    FROM draft_events
+   WHERE league_id = v_league_id
+     AND event_type = 'generation_bumped'
+     AND payload ->> 'reason' = 'resume';
+  SELECT seq INTO v_resumed_seq
+    FROM draft_events
+   WHERE league_id = v_league_id
+     AND event_type = 'draft_resumed';
+
+  PERFORM _v2_test._assert(v_gen_seq IS NOT NULL,
+    'SC-020 generation_bumped (reason=resume) must exist');
+  PERFORM _v2_test._assert(v_resumed_seq IS NOT NULL,
+    'SC-020 draft_resumed must exist');
+  PERFORM _v2_test._assert(v_gen_seq < v_resumed_seq,
+    'SC-020 resume''s generation_bumped (' || v_gen_seq ||
+    ') must precede draft_resumed (' || v_resumed_seq || ')');
+
+  -- Exactly one pgmq message for this league, with new generation.
+  SELECT count(*) INTO v_pgmq_count
+    FROM pgmq.q_draft_deadlines
+   WHERE (message ->> 'league_id')::uuid = v_league_id;
+  PERFORM _v2_test._assert(v_pgmq_count = 1,
+    'SC-020 resume should enqueue 1 pgmq message, got ' || v_pgmq_count);
+
+  SELECT message INTO v_pgmq_payload
+    FROM pgmq.q_draft_deadlines
+   WHERE (message ->> 'league_id')::uuid = v_league_id
+   LIMIT 1;
+  PERFORM _v2_test._assert((v_pgmq_payload ->> 'generation')::int = 2,
+    'SC-020 pgmq message generation should be 2, got ' || (v_pgmq_payload ->> 'generation'));
+  PERFORM _v2_test._assert(v_pgmq_payload ->> 'source' = 'draft_resume',
+    'SC-020 pgmq message source should be draft_resume');
+
+  RAISE NOTICE 'SC-020 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc020$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-021 — draft_extend happy path
+-- ════════════════════════════════════════════════════════════════════════
+-- Seed (active, gen=0, deadline = now()+90s). Call draft_extend with
+-- p_extra_seconds=60. Verify:
+--   - leagues.draft_state stays 'active'.
+--   - leagues.draft_generation = 1 (bumped from 0).
+--   - leagues.pick_deadline pushed forward roughly 60s past the
+--     original deadline.
+--   - 2 events: generation_bumped (reason='extend') + draft_extended.
+--   - draft_extended payload has extended_at, pick_number,
+--     extra_seconds, new_pick_deadline.
+--   - 1 fresh pgmq message tagged with new generation (1) and
+--     source='draft_extend'.
+--
+-- Spec refs: §4.8 draft_extend.
+
+DO $sc021$
+DECLARE
+  v_seed          jsonb;
+  v_league_id     uuid;
+  v_old_deadline  timestamptz;
+  v_result        jsonb;
+  v_gen           int;
+  v_state         text;
+  v_new_deadline  timestamptz;
+  v_extended_payload jsonb;
+  v_pgmq_count    int;
+  v_pgmq_payload  jsonb;
+BEGIN
+  RAISE NOTICE 'SC-021 starting: draft_extend happy path';
+  BEGIN  -- savepoint
+
+  v_seed      := _v2_test._seed_active_league(
+                   '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id := (v_seed ->> 'league_id')::uuid;
+
+  -- Capture the seed's deadline for comparison.
+  SELECT pick_deadline INTO v_old_deadline FROM leagues WHERE id = v_league_id;
+
+  v_result := draft_extend(
+    p_league_id     => v_league_id,
+    p_extra_seconds => 60,
+    p_actor         => jsonb_build_object(
+      'kind', 'commissioner',
+      'id',   '882b59c9-8882-418b-9450-3fd004d57edd',
+      'session_id', gen_random_uuid()
+    )
+  );
+
+  PERFORM _v2_test._assert((v_result ->> 'generation')::int = 1,
+    'SC-021 result.generation should be 1, got ' || (v_result ->> 'generation'));
+
+  SELECT draft_state, draft_generation, pick_deadline
+    INTO v_state, v_gen, v_new_deadline
+    FROM leagues WHERE id = v_league_id;
+
+  PERFORM _v2_test._assert(v_state = 'active',
+    'SC-021 state should stay active, got ' || v_state);
+  PERFORM _v2_test._assert(v_gen = 1,
+    'SC-021 generation should be 1, got ' || v_gen);
+  PERFORM _v2_test._assert(v_new_deadline > v_old_deadline,
+    'SC-021 new deadline must be later than old');
+  -- Allow ±2s tolerance for the rounding in §5.2.2.
+  PERFORM _v2_test._assert(
+    v_new_deadline >= v_old_deadline + interval '58 seconds'
+    AND v_new_deadline <= v_old_deadline + interval '62 seconds',
+    'SC-021 new deadline should be old + ~60s; old=' || v_old_deadline ||
+    ' new=' || v_new_deadline
+  );
+
+  -- draft_extended payload required fields.
+  SELECT payload INTO v_extended_payload
+    FROM draft_events
+   WHERE league_id = v_league_id AND event_type = 'draft_extended';
+  PERFORM _v2_test._assert(v_extended_payload ? 'extended_at',
+    'SC-021 draft_extended.extended_at must be set');
+  PERFORM _v2_test._assert(v_extended_payload ? 'pick_number',
+    'SC-021 draft_extended.pick_number must be set');
+  PERFORM _v2_test._assert((v_extended_payload ->> 'extra_seconds')::int = 60,
+    'SC-021 draft_extended.extra_seconds should be 60');
+  PERFORM _v2_test._assert(v_extended_payload ? 'new_pick_deadline',
+    'SC-021 draft_extended.new_pick_deadline must be set');
+
+  -- Fresh pgmq message at new generation.
+  SELECT count(*) INTO v_pgmq_count
+    FROM pgmq.q_draft_deadlines
+   WHERE (message ->> 'league_id')::uuid = v_league_id;
+  PERFORM _v2_test._assert(v_pgmq_count = 1,
+    'SC-021 extend should enqueue 1 pgmq message, got ' || v_pgmq_count);
+
+  SELECT message INTO v_pgmq_payload
+    FROM pgmq.q_draft_deadlines
+   WHERE (message ->> 'league_id')::uuid = v_league_id
+   LIMIT 1;
+  PERFORM _v2_test._assert((v_pgmq_payload ->> 'generation')::int = 1,
+    'SC-021 pgmq message generation should be 1');
+  PERFORM _v2_test._assert(v_pgmq_payload ->> 'source' = 'draft_extend',
+    'SC-021 pgmq message source should be draft_extend');
+
+  RAISE NOTICE 'SC-021 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc021$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-022 — illegal_state_transition guards (pause/resume/extend)
+-- ════════════════════════════════════════════════════════════════════════
+-- Per spec §5.1, only specific transitions are legal:
+--   pause:  must be 'active'.
+--   resume: must be 'paused'.
+--   extend: must be 'active'.
+-- Each illegal transition must raise illegal_state_transition
+-- (sqlstate check_violation).
+--
+-- This scenario consolidates three sub-cases into one DO block,
+-- using a sub-block per sub-case so each can independently catch
+-- and assert. Outer savepoint rolls back at the end.
+
+DO $sc022$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_actor        jsonb := jsonb_build_object(
+                            'kind', 'commissioner',
+                            'id',   '882b59c9-8882-418b-9450-3fd004d57edd',
+                            'session_id', gen_random_uuid()
+                          );
+  v_caught_msg   text;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-022 starting: illegal_state_transition guards';
+  BEGIN  -- savepoint (outer)
+
+  v_seed      := _v2_test._seed_active_league(
+                   '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id := (v_seed ->> 'league_id')::uuid;
+
+  -- ── Sub-case A: resume from active → illegal_state_transition ────
+  BEGIN
+    PERFORM draft_resume(p_league_id => v_league_id, p_actor => v_actor);
+    RAISE EXCEPTION 'SC-022 sub-A: expected illegal_state_transition but resume returned';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-022 sub-A sqlstate should be 23514, got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'illegal_state_transition%',
+    'SC-022 sub-A message should start with illegal_state_transition, got: ' || v_caught_msg);
+
+  -- ── Sub-case B: pause to set up paused state, then pause again ───
+  PERFORM draft_pause(p_league_id => v_league_id, p_actor => v_actor);
+
+  BEGIN
+    PERFORM draft_pause(p_league_id => v_league_id, p_actor => v_actor);
+    RAISE EXCEPTION 'SC-022 sub-B: expected illegal_state_transition but pause-while-paused returned';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-022 sub-B sqlstate should be 23514, got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'illegal_state_transition%',
+    'SC-022 sub-B message should start with illegal_state_transition');
+
+  -- ── Sub-case C: extend while paused → illegal_state_transition ───
+  BEGIN
+    PERFORM draft_extend(
+      p_league_id     => v_league_id,
+      p_extra_seconds => 30,
+      p_actor         => v_actor
+    );
+    RAISE EXCEPTION 'SC-022 sub-C: expected illegal_state_transition but extend-while-paused returned';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-022 sub-C sqlstate should be 23514, got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'illegal_state_transition%',
+    'SC-022 sub-C message should start with illegal_state_transition');
+
+  RAISE NOTICE 'SC-022 PASS (3 sub-cases: resume/pause/extend illegal transitions)';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc022$;
+
 
