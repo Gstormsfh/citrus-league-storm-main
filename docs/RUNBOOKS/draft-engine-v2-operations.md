@@ -30,10 +30,95 @@ The sections below are placeholders. Each is filled in by the phase
 that introduces the relevant runtime surface.
 
 ### Phase 3 additions (scheduler + sweep)
-- Reading `draft_metrics.safety_net_hit` rates.
-- Pausing the keep-alive cron job.
-- Draining a stuck `draft_deadlines` queue manually.
-- DLQ inspection (`autopick_failures`).
+- Reading `draft_metrics.safety_net_hit` rates. *(deferred to chunk 10f)*
+- Draining a stuck `draft_deadlines` queue manually. *(deferred to chunk 10f)*
+- DLQ inspection (`autopick_failures`). *(deferred to Phase 4)*
+
+#### Provisioning the `draft-autopick-token` Vault secret (chunk 10d)
+
+The keep-alive cron job (`draft-autopick-keepalive`, every 2 min)
+reads its bearer token from a Vault secret named
+`draft-autopick-token`. Without this secret, the cron fires but the
+Edge Function rejects each invocation with 401 (visible as
+`auth_failed` log lines on the Edge Function and 401 rows in
+`net.http_response`). The sweep cron is unaffected.
+
+To provision (run as `postgres` in the Supabase Dashboard SQL
+Editor — the value MUST NOT be committed to git):
+
+```sql
+SELECT vault.create_secret(
+  '<paste SUPABASE_SERVICE_ROLE_KEY here>',
+  'draft-autopick-token',
+  'Bearer token used by draft-autopick-keepalive cron to invoke the
+   draft-autopick Edge Function. Matches the Edge Function''s timing-
+   safe compare against SUPABASE_SERVICE_ROLE_KEY (chunk 10c follow-
+   up commit). Rotate when the project service-role key rotates.'
+);
+```
+
+Verify:
+
+```sql
+SELECT name, description FROM vault.decrypted_secrets
+ WHERE name = 'draft-autopick-token';
+-- expect 1 row; do NOT log the secret value.
+```
+
+To rotate (after the project service-role key is rotated):
+
+```sql
+-- Vault has no UPDATE; delete + recreate.
+SELECT vault.update_secret(
+  (SELECT id FROM vault.decrypted_secrets WHERE name = 'draft-autopick-token'),
+  '<paste new SUPABASE_SERVICE_ROLE_KEY>'
+);
+-- The next keep-alive cron tick (within 2 min) picks up the new token.
+```
+
+#### Pausing / resuming the keep-alive cron
+
+Use this when a buggy worker deploy is draining real `submit_pick_v2`
+messages and you need to halt it without redeploying the Edge
+Function.
+
+```sql
+-- Pause: keep-alive stops; sweep continues to enqueue safety-net msgs.
+-- Pgmq messages accumulate in q_draft_deadlines until resumed.
+UPDATE cron.job SET active = false WHERE jobname = 'draft-autopick-keepalive';
+
+-- Resume.
+UPDATE cron.job SET active = true  WHERE jobname = 'draft-autopick-keepalive';
+```
+
+To pause both sweep AND keep-alive (full Phase 3 stop, only do this
+if you know what you're doing — accumulated expired deadlines will
+NOT be picked up until the sweep resumes):
+
+```sql
+UPDATE cron.job SET active = false
+ WHERE jobname IN ('draft-deadline-sweep', 'draft-autopick-keepalive');
+```
+
+#### Forcing an out-of-band keep-alive (chunk 10d)
+
+When the keep-alive's 2-min cadence is too slow during an incident
+and you want to invoke the worker immediately:
+
+```sql
+SELECT net.http_post(
+  url := 'https://jjgspcpvqaiitloglxbb.supabase.co/functions/v1/draft-autopick',
+  headers := jsonb_build_object(
+    'Authorization', 'Bearer ' || vault.read_secret('draft-autopick-token'),
+    'Content-Type', 'application/json'
+  ),
+  body := '{}'::jsonb,
+  timeout_milliseconds := 150000
+);
+-- Returns a request_id (bigint). Inspect net.http_response for the
+-- response when it arrives (~140s later for a busy worker, ~30s
+-- if the queue is idle and the worker exits early).
+```
 
 ### Phase 4 additions (worker)
 - Reading the `draft-autopick` Edge Function logs.
