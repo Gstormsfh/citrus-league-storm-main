@@ -1100,4 +1100,483 @@ BEGIN
 END
 $sc011$;
 
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-012 — actor.kind='user', owner matches → success
+-- ════════════════════════════════════════════════════════════════════════
+-- Sets request.jwt.claims so auth.uid() returns the commissioner UID.
+-- Submits a pick for team[0] (commissioner-owned) with actor.kind='user'.
+-- Should succeed.
+--
+-- Why this matters: the rest of the suite uses actor.kind='autopick'
+-- to bypass auth complexity. This is the one scenario that proves the
+-- 'user' code path actually works (auth.uid() matching team_owner).
+--
+-- SET LOCAL is transactional: when the savepoint rolls back at the
+-- end, the JWT claims revert too. No state leaks.
+--
+-- Spec refs: §4.1 Auth bullet, §5.2 preflight 2f.
+
+DO $sc012$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_team_ids     uuid[];
+  v_first_team   uuid;
+  v_result       jsonb;
+BEGIN
+  RAISE NOTICE 'SC-012 starting: actor.kind=user, owner matches → success';
+  BEGIN  -- savepoint
+
+  -- Make auth.uid() return the commissioner. Supabase's auth.uid()
+  -- reads from the JWT claims setting; SET LOCAL applies for the
+  -- current txn only.
+  SET LOCAL "request.jwt.claims" =
+    '{"sub":"882b59c9-8882-418b-9450-3fd004d57edd","role":"authenticated"}';
+
+  v_seed       := _v2_test._seed_active_league(
+                    '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id  := (v_seed ->> 'league_id')::uuid;
+  v_team_ids   := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+  v_first_team := v_team_ids[1];
+
+  v_result := submit_pick_v2(
+    p_league_id => v_league_id, p_team_id => v_first_team, p_player_id => 12001,
+    p_round => 1, p_pick_number => 1,
+    p_session_id => gen_random_uuid(),
+    p_idempotency_key => gen_random_uuid(),
+    p_payload_hash => 'sha256:' || md5('SC012'),
+    p_actor => jsonb_build_object(
+      'kind', 'user',
+      'id',   '882b59c9-8882-418b-9450-3fd004d57edd',
+      'session_id', gen_random_uuid()
+    ),
+    p_correlation_id => NULL
+  );
+
+  PERFORM _v2_test._assert((v_result ->> 'was_duplicate')::boolean = false,
+    'SC-012 was_duplicate should be false');
+  PERFORM _v2_test._assert((v_result ->> 'seq')::bigint = 1,
+    'SC-012 seq should be 1');
+
+  RAISE NOTICE 'SC-012 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc012$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-013 — actor.kind='user', owner mismatch → unauthorized
+-- ════════════════════════════════════════════════════════════════════════
+-- Re-owns team[0] to a DIFFERENT auth.users id, then attempts a pick
+-- with actor.kind='user' and auth.uid() = commissioner. The owner
+-- mismatch must raise unauthorized (sqlstate insufficient_privilege).
+--
+-- Skips gracefully if only the commissioner exists in auth.users
+-- (can't construct an owner_id that's both real and not the
+-- commissioner).
+--
+-- Spec refs: §5.2 preflight 2f, second branch.
+
+DO $sc013$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_team_ids     uuid[];
+  v_first_team   uuid;
+  v_other_user   uuid;
+  v_caught_msg   text;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-013 starting: user-path owner mismatch → unauthorized';
+
+  SELECT id INTO v_other_user
+    FROM auth.users
+    WHERE id <> '882b59c9-8882-418b-9450-3fd004d57edd'
+    LIMIT 1;
+
+  IF v_other_user IS NULL THEN
+    RAISE NOTICE 'SC-013 SKIPPED: need ≥ 2 auth.users on staging; only commissioner found';
+    RETURN;
+  END IF;
+
+  BEGIN  -- savepoint
+  SET LOCAL "request.jwt.claims" =
+    '{"sub":"882b59c9-8882-418b-9450-3fd004d57edd","role":"authenticated"}';
+
+  v_seed       := _v2_test._seed_active_league(
+                    '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id  := (v_seed ->> 'league_id')::uuid;
+  v_team_ids   := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+  v_first_team := v_team_ids[1];
+
+  -- Re-own team[0] to a different real auth.users id.
+  UPDATE teams SET owner_id = v_other_user WHERE id = v_first_team;
+
+  BEGIN
+    PERFORM submit_pick_v2(
+      p_league_id => v_league_id, p_team_id => v_first_team, p_player_id => 13001,
+      p_round => 1, p_pick_number => 1,
+      p_session_id => gen_random_uuid(),
+      p_idempotency_key => gen_random_uuid(),
+      p_payload_hash => 'sha256:' || md5('SC013'),
+      p_actor => jsonb_build_object(
+        'kind', 'user',
+        'id',   '882b59c9-8882-418b-9450-3fd004d57edd',
+        'session_id', gen_random_uuid()
+      ),
+      p_correlation_id => NULL
+    );
+    RAISE EXCEPTION 'SC-013 expected unauthorized but RPC returned without raising';
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '42501',
+    'SC-013 sqlstate should be 42501, got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'unauthorized%',
+    'SC-013 message should start with unauthorized, got: ' || v_caught_msg);
+
+  RAISE NOTICE 'SC-013 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc013$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-014 — actor.kind='user' on unowned team → unauthorized
+-- ════════════════════════════════════════════════════════════════════════
+-- Submit with actor.kind='user' but team_id = team[1] (unowned;
+-- owner_id IS NULL per the seed). The IF v_team_owner IS NULL branch
+-- in submit_pick_v2 fires.
+--
+-- NOTE: this also exercises the on-the-clock check ordering — pick 1
+-- must go to team[0] per snake order, but our test uses team[1]. The
+-- not_on_clock check (preflight 2c) fires BEFORE the auth check
+-- (preflight 2f), so this scenario actually catches not_on_clock
+-- first, not unauthorized. To isolate the unauthorized branch, we
+-- submit pick 2 (where team[1] IS on the clock per snake) — but pick
+-- 2 requires pick 1 to exist. So we submit pick 1 (autopick) first,
+-- then attempt pick 2 as user on unowned team[1].
+--
+-- Spec refs: §5.2 preflight 2f, first branch ('team is not in league').
+
+DO $sc014$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_team_ids     uuid[];
+  v_caught_msg   text;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-014 starting: user-path on unowned team → unauthorized';
+  BEGIN  -- savepoint
+
+  v_seed       := _v2_test._seed_active_league(
+                    '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id  := (v_seed ->> 'league_id')::uuid;
+  v_team_ids   := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+
+  -- Pick 1 as autopick to advance state to pick 2 (where team[1] is
+  -- on the clock per snake order).
+  PERFORM submit_pick_v2(
+    p_league_id => v_league_id, p_team_id => v_team_ids[1], p_player_id => 14001,
+    p_round => 1, p_pick_number => 1,
+    p_session_id => gen_random_uuid(),
+    p_idempotency_key => gen_random_uuid(),
+    p_payload_hash => 'sha256:' || md5('SC014-pick1'),
+    p_actor => jsonb_build_object('kind', 'autopick'),
+    p_correlation_id => NULL
+  );
+
+  -- Now attempt pick 2 as user on team[1] (unowned).
+  SET LOCAL "request.jwt.claims" =
+    '{"sub":"882b59c9-8882-418b-9450-3fd004d57edd","role":"authenticated"}';
+
+  BEGIN
+    PERFORM submit_pick_v2(
+      p_league_id => v_league_id, p_team_id => v_team_ids[2], p_player_id => 14002,
+      p_round => 1, p_pick_number => 2,
+      p_session_id => gen_random_uuid(),
+      p_idempotency_key => gen_random_uuid(),
+      p_payload_hash => 'sha256:' || md5('SC014-pick2'),
+      p_actor => jsonb_build_object(
+        'kind', 'user',
+        'id',   '882b59c9-8882-418b-9450-3fd004d57edd',
+        'session_id', gen_random_uuid()
+      ),
+      p_correlation_id => NULL
+    );
+    RAISE EXCEPTION 'SC-014 expected unauthorized but RPC returned without raising';
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '42501',
+    'SC-014 sqlstate should be 42501, got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'unauthorized%',
+    'SC-014 message should start with unauthorized, got: ' || v_caught_msg);
+
+  RAISE NOTICE 'SC-014 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc014$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-015 — actor.kind='commissioner' → unauthorized (deviation D3)
+-- ════════════════════════════════════════════════════════════════════════
+-- Spec deviation D3 (docs/RUNBOOKS/draft-engine-v2-known-issues.md):
+-- commissioners do NOT have direct pick power in v2.0 or v2.1.
+-- submit_pick_v2 only accepts actor.kind in ('user', 'autopick').
+-- Anything else hits the ELSE branch and raises unauthorized.
+--
+-- This scenario locks in that deviation: a future contributor who
+-- adds 'commissioner' to the allowed kinds would break this test.
+
+DO $sc015$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_team_ids     uuid[];
+  v_caught_msg   text;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-015 starting: actor.kind=commissioner → unauthorized (D3)';
+  BEGIN  -- savepoint
+
+  v_seed       := _v2_test._seed_active_league(
+                    '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id  := (v_seed ->> 'league_id')::uuid;
+  v_team_ids   := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+
+  BEGIN
+    PERFORM submit_pick_v2(
+      p_league_id => v_league_id, p_team_id => v_team_ids[1], p_player_id => 15001,
+      p_round => 1, p_pick_number => 1,
+      p_session_id => gen_random_uuid(),
+      p_idempotency_key => gen_random_uuid(),
+      p_payload_hash => 'sha256:' || md5('SC015'),
+      p_actor => jsonb_build_object(
+        'kind', 'commissioner',
+        'id',   '882b59c9-8882-418b-9450-3fd004d57edd',
+        'session_id', gen_random_uuid()
+      ),
+      p_correlation_id => NULL
+    );
+    RAISE EXCEPTION 'SC-015 expected unauthorized (D3) but RPC returned without raising';
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '42501',
+    'SC-015 sqlstate should be 42501, got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'unauthorized%',
+    'SC-015 message should start with unauthorized, got: ' || v_caught_msg);
+  PERFORM _v2_test._assert(v_caught_msg LIKE '%commissioner%',
+    'SC-015 message should mention commissioner, got: ' || v_caught_msg);
+
+  RAISE NOTICE 'SC-015 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc015$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-016 — record_shadow_event guard #1: non-service role
+-- ════════════════════════════════════════════════════════════════════════
+-- Set the JWT role to 'authenticated' so auth.role() returns
+-- something other than service_role/postgres. record_shadow_event
+-- guard #1 must fire.
+--
+-- Spec refs: §4.3 guard #1; deviation D1 (postgres also accepted,
+-- not 'authenticated').
+
+DO $sc016$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_caught_msg   text;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-016 starting: record_shadow_event guard #1 (non-service role)';
+  BEGIN  -- savepoint
+
+  v_seed      := _v2_test._seed_active_league(
+                   '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id := (v_seed ->> 'league_id')::uuid;
+
+  -- Enable shadow mode on the seeded league so guard #3 doesn't
+  -- fire first (we're isolating guard #1 here).
+  UPDATE leagues SET draft_shadow_mode = true WHERE id = v_league_id;
+
+  -- Set role to 'authenticated' (the typical user JWT role).
+  SET LOCAL "request.jwt.claims" =
+    '{"sub":"882b59c9-8882-418b-9450-3fd004d57edd","role":"authenticated"}';
+
+  BEGIN
+    PERFORM record_shadow_event(
+      p_league_id        => v_league_id,
+      p_payload          => jsonb_build_object(
+        'pick_number', 1,
+        'round',       1,
+        'team_id',     gen_random_uuid(),
+        'player_id',   16001,
+        'picked_at',   now(),
+        'is_autopick', false,
+        'actor',       jsonb_build_object('kind', 'shadow', 'id', null)
+      ),
+      p_idempotency_key  => gen_random_uuid(),
+      p_payload_hash     => 'sha256:' || md5('SC016'),
+      p_correlation_id   => gen_random_uuid()
+    );
+    RAISE EXCEPTION 'SC-016 expected shadow_guard_violated (#1) but RPC returned';
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '42501',
+    'SC-016 sqlstate should be 42501, got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'shadow_guard_violated%',
+    'SC-016 message should start with shadow_guard_violated, got: ' || v_caught_msg);
+  PERFORM _v2_test._assert(v_caught_msg LIKE '%service_role%',
+    'SC-016 message should mention service_role, got: ' || v_caught_msg);
+
+  RAISE NOTICE 'SC-016 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc016$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-017 — record_shadow_event guard #2: actor.kind != 'shadow'
+-- ════════════════════════════════════════════════════════════════════════
+-- Caller IS service_role (default in SQL Editor) and shadow_mode IS
+-- true on the league, but the payload's actor.kind is 'user' instead
+-- of 'shadow'. Guard #2 must fire.
+
+DO $sc017$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_caught_msg   text;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-017 starting: record_shadow_event guard #2 (actor.kind != shadow)';
+  BEGIN  -- savepoint
+
+  v_seed      := _v2_test._seed_active_league(
+                   '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id := (v_seed ->> 'league_id')::uuid;
+
+  -- Enable shadow mode so guard #3 doesn't fire first.
+  UPDATE leagues SET draft_shadow_mode = true WHERE id = v_league_id;
+
+  BEGIN
+    PERFORM record_shadow_event(
+      p_league_id        => v_league_id,
+      p_payload          => jsonb_build_object(
+        'pick_number', 1,
+        'round',       1,
+        'team_id',     gen_random_uuid(),
+        'player_id',   17001,
+        'picked_at',   now(),
+        'is_autopick', false,
+        'actor',       jsonb_build_object('kind', 'user', 'id', null)  -- WRONG
+      ),
+      p_idempotency_key  => gen_random_uuid(),
+      p_payload_hash     => 'sha256:' || md5('SC017'),
+      p_correlation_id   => gen_random_uuid()
+    );
+    RAISE EXCEPTION 'SC-017 expected shadow_guard_violated (#2) but RPC returned';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-017 sqlstate should be 23514, got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'shadow_guard_violated%',
+    'SC-017 message should start with shadow_guard_violated, got: ' || v_caught_msg);
+  PERFORM _v2_test._assert(v_caught_msg LIKE '%actor.kind%',
+    'SC-017 message should mention actor.kind, got: ' || v_caught_msg);
+
+  RAISE NOTICE 'SC-017 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc017$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-018 — record_shadow_event guard #3: draft_shadow_mode=false
+-- ════════════════════════════════════════════════════════════════════════
+-- Caller IS service_role and actor.kind='shadow' (guards #1 and #2
+-- pass), but the league has draft_shadow_mode=false (the seed default).
+-- Guard #3 must fire.
+--
+-- This is the cutover-protection guard: even if a stale shadow trigger
+-- fires after shadow_mode was turned off, the RPC refuses.
+
+DO $sc018$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_caught_msg   text;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-018 starting: record_shadow_event guard #3 (draft_shadow_mode=false)';
+  BEGIN  -- savepoint
+
+  v_seed      := _v2_test._seed_active_league(
+                   '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id := (v_seed ->> 'league_id')::uuid;
+
+  -- The seed already sets draft_shadow_mode=false; this is the
+  -- natural-default scenario for guard #3.
+
+  BEGIN
+    PERFORM record_shadow_event(
+      p_league_id        => v_league_id,
+      p_payload          => jsonb_build_object(
+        'pick_number', 1,
+        'round',       1,
+        'team_id',     gen_random_uuid(),
+        'player_id',   18001,
+        'picked_at',   now(),
+        'is_autopick', false,
+        'actor',       jsonb_build_object('kind', 'shadow', 'id', null)
+      ),
+      p_idempotency_key  => gen_random_uuid(),
+      p_payload_hash     => 'sha256:' || md5('SC018'),
+      p_correlation_id   => gen_random_uuid()
+    );
+    RAISE EXCEPTION 'SC-018 expected shadow_guard_violated (#3) but RPC returned';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-018 sqlstate should be 23514, got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'shadow_guard_violated%',
+    'SC-018 message should start with shadow_guard_violated, got: ' || v_caught_msg);
+  PERFORM _v2_test._assert(v_caught_msg LIKE '%draft_shadow_mode%',
+    'SC-018 message should mention draft_shadow_mode, got: ' || v_caught_msg);
+
+  RAISE NOTICE 'SC-018 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc018$;
+
 
