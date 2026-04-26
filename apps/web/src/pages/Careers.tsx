@@ -1,89 +1,68 @@
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Briefcase, Code, LineChart, Megaphone } from "lucide-react";
+import { ArrowRight, Briefcase, Code, LineChart, Megaphone } from 'lucide-react';
+import { DarkLayout, HockeyNav, HockeyFooter, SectionHeader } from '@/components/citrus2';
 
-const Careers = () => {
-  const positions = [
-    {
-      title: "Senior Frontend Engineer",
-      department: "Engineering",
-      location: "Remote",
-      icon: Code,
-      type: "Full-time"
-    },
-    {
-      title: "Data Scientist (AI/ML)",
-      department: "Data",
-      location: "Remote",
-      icon: LineChart,
-      type: "Full-time"
-    },
-    {
-      title: "Product Marketing Manager",
-      department: "Marketing",
-      location: "New York / Remote",
-      icon: Megaphone,
-      type: "Full-time"
-    },
-    {
-      title: "Product Designer",
-      department: "Design",
-      location: "Remote",
-      icon: Briefcase,
-      type: "Contract"
-    }
-  ];
+const POSITIONS = [
+  { title: 'Senior Frontend Engineer', department: 'Engineering', location: 'Remote', icon: Code, type: 'Full-time' },
+  { title: 'Data Scientist (AI/ML)', department: 'Data', location: 'Remote', icon: LineChart, type: 'Full-time' },
+  { title: 'Product Marketing Manager', department: 'Marketing', location: 'New York / Remote', icon: Megaphone, type: 'Full-time' },
+  { title: 'Product Designer', department: 'Design', location: 'Remote', icon: Briefcase, type: 'Contract' },
+];
 
+export default function Careers() {
   return (
-    <div className="min-h-screen bg-[#D4E8B8] flex flex-col">
-      <Navbar />
-      <main className="flex-grow pt-16 lg:pt-24 px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
-        <div className="container mx-auto max-w-5xl py-12">
-          <div className="text-center mb-16">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 citrus-gradient-text">Join the Team</h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Help us build the future of fantasy sports. We're looking for passionate individuals to join our growing team.
-            </p>
-          </div>
+    <DarkLayout>
+      <HockeyNav />
 
-          <div className="grid gap-6">
-            <h2 className="text-2xl font-bold mb-4">Open Positions</h2>
-            {positions.map((job, index) => (
-              <Card key={index} className="hover:shadow-md transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <job.icon className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl">{job.title}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{job.department} • {job.location}</p>
-                    </div>
-                  </div>
-                  <Button variant="outline">Apply Now</Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="mt-2 text-sm font-medium px-2 py-1 bg-secondary inline-block rounded">
-                    {job.type}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      <main className="relative max-w-[1100px] mx-auto px-6 pt-16 pb-24">
+        <div className="text-center mb-12">
+          <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">
+            Careers
           </div>
-          
-          <div className="mt-16 text-center">
-            <p className="text-muted-foreground">
-              Don't see a role that fits? Send your resume to <a href="mailto:careers@citrussports.com" className="text-primary hover:underline">careers@citrussports.com</a>
-            </p>
-          </div>
+          <h1 className="font-sans font-black text-[3rem] md:text-[4.25rem] leading-tight tracking-[-0.03em] text-pastel-cream mb-5">
+            Join the <span className="text-pastel-orange">team</span>.
+          </h1>
+          <p className="text-[16px] text-white/65 max-w-xl mx-auto leading-relaxed">
+            Help us build the most accurate fantasy hockey platform on the planet. We're looking
+            for hockey heads who care about projections, design, and great product.
+          </p>
+        </div>
+
+        <SectionHeader eyebrow="Open Positions" title="Where we're hiring." />
+        <div className="space-y-3">
+          {POSITIONS.map((job) => (
+            <article
+              key={job.title}
+              className="bg-[#1A2A20] border border-white/10 rounded-2xl p-5 flex items-center gap-5 flex-wrap hover:border-pastel-orange/40 transition-colors"
+            >
+              <div className="w-12 h-12 rounded-xl bg-pastel-orange/15 ring-1 ring-pastel-orange/30 flex items-center justify-center text-pastel-orange-soft flex-shrink-0">
+                <job.icon className="w-5 h-5" strokeWidth={2} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-sans font-bold text-[16px] text-pastel-cream mb-1">{job.title}</h3>
+                <div className="flex items-center gap-2 font-jbmono text-[10px] tracking-wider uppercase text-white/45">
+                  <span>{job.department}</span>
+                  <span className="text-white/20">·</span>
+                  <span>{job.location}</span>
+                  <span className="text-white/20">·</span>
+                  <span className="text-pastel-sage-soft">{job.type}</span>
+                </div>
+              </div>
+              <button className="inline-flex items-center gap-1.5 text-[13px] font-bold text-pastel-cream hover:text-pastel-orange-soft transition-colors px-4 h-10 rounded-md ring-1 ring-white/15 hover:ring-white/30">
+                Apply <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </button>
+            </article>
+          ))}
+        </div>
+
+        <div className="mt-12 text-center font-jbmono text-[12px] text-white/55">
+          Don't see a role that fits? Send a resume to{' '}
+          <a href="mailto:careers@citrussports.com" className="text-pastel-orange-soft hover:text-pastel-orange transition-colors">
+            careers@citrussports.com
+          </a>
         </div>
       </main>
-      <Footer />
-    </div>
+
+      <HockeyFooter />
+    </DarkLayout>
   );
-};
-
-export default Careers;
-
+}

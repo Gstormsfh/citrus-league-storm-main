@@ -1,48 +1,38 @@
 // Standalone Waitlist Page - Shareable link for social media signups
-import { Link } from 'react-router-dom';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import WaitlistSignup from '@/components/WaitlistSignup';
-import { CitrusBackground } from '@/components/CitrusBackground';
-import { CitrusLogo } from '@/components/icons/CitrusIcons';
-import { Narwhal } from '@/components/icons/Narwhal';
-import { ArrowRight, Zap, BarChart3, Trophy, Users, Star } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { DarkLayout, HockeyNav, HockeyFooter, MascotAvatar } from '@/components/citrus2';
 
 const Waitlist = () => {
   return (
-    <div className="min-h-screen relative bg-[#D4E8B8]">
-      <CitrusBackground density="medium" animated={true} />
-      <Navbar />
+    <DarkLayout>
+      <HockeyNav />
 
-      <main className="pt-[92px] pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-20">
+      <main className="relative pt-12 pb-20">
         {/* Hero Section */}
         <section className="relative overflow-hidden">
-          <div className="container mx-auto px-4 py-16 md:py-24">
+          <div className="max-w-[1100px] mx-auto px-6 py-16 md:py-24">
             <div className="max-w-3xl mx-auto text-center">
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2 bg-citrus-orange/30 border-2 border-citrus-orange rounded-varsity px-5 py-2.5 mb-8">
-                <CitrusLogo className="w-5 h-5" />
-                <span className="font-display font-bold text-xs uppercase tracking-wider text-citrus-forest">
-                  Coming Soon • Be First In Line
+              <div className="flex justify-center mb-6">
+                <MascotAvatar id="stormy" size="xl" />
+              </div>
+              <div className="inline-flex items-center gap-2 mb-7 px-3 py-1.5 rounded-md bg-pastel-orange/15 ring-1 ring-pastel-orange/30">
+                <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft leading-none font-bold">
+                  🏒 Coming Soon · Be First In Line
                 </span>
               </div>
 
-              {/* Headline */}
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-varsity font-black leading-none uppercase mb-6 text-citrus-forest tracking-tight drop-shadow-[0_2px_2px_rgba(255,255,255,0.3)]">
+              <h1 className="font-sans font-black text-[3rem] md:text-[4.5rem] lg:text-[5.5rem] leading-[0.95] tracking-[-0.035em] text-pastel-cream mb-6">
                 Fantasy Hockey<br />
-                <span className="text-citrus-green-dark drop-shadow-[0_2px_4px_rgba(255,255,255,0.5)]">
-                  Reimagined
-                </span>
+                <span className="text-pastel-orange">Reimagined</span>
               </h1>
 
-              <p className="text-lg md:text-xl text-citrus-forest/90 max-w-xl mx-auto mb-4 font-sans font-medium leading-relaxed">
-                Citrus Fantasy Sports is building the next generation of fantasy hockey — 
-                powered by real-time xG projections, AI-driven insights, and a platform designed for fans who actually watch the games.
+              <p className="text-[17px] md:text-[19px] leading-relaxed text-white/65 max-w-xl mx-auto mb-4">
+                Citrus is building the next generation of fantasy hockey — real-time xG projections,
+                Stormy AI as your assistant GM, and a platform designed by people who actually watch the games.
               </p>
 
-              <p className="text-base text-citrus-forest/70 max-w-lg mx-auto mb-10 font-sans leading-relaxed">
-                We're currently in testing. Join the waitlist to be the first to know when full multiplayer leagues launch.
+              <p className="text-[14px] text-white/55 max-w-lg mx-auto mb-10 leading-relaxed">
+                We're currently in testing. Join the waitlist to be first when full multiplayer leagues launch.
               </p>
 
               {/* Waitlist Signup - The Main Event */}
@@ -131,19 +121,24 @@ const Waitlist = () => {
         </section>
 
         {/* Bottom CTA */}
-        <section className="container mx-auto px-4 py-12">
+        <section className="max-w-[1100px] mx-auto px-6 py-12">
           <div className="max-w-lg mx-auto text-center">
-            <h3 className="font-varsity text-2xl text-citrus-forest uppercase mb-4">Don't Miss the Launch</h3>
-            <p className="text-sm text-citrus-forest/70 mb-6 font-sans">
-              Be among the first to create real multiplayer leagues when we go live.
+            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">
+              Don't Miss the Drop
+            </div>
+            <h3 className="font-sans font-black text-[1.75rem] text-pastel-cream mb-4 tracking-[-0.02em]">
+              Be among the first.
+            </h3>
+            <p className="text-[14px] text-white/60 mb-6">
+              Be first to create real multiplayer leagues when we go live.
             </p>
             <WaitlistSignup source="waitlist_page_bottom" variant="default" />
           </div>
         </section>
       </main>
 
-      <Footer />
-    </div>
+      <HockeyFooter />
+    </DarkLayout>
   );
 };
 

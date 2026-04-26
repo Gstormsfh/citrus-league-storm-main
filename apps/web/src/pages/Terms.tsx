@@ -1,72 +1,68 @@
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import { DarkLayout, HockeyNav, HockeyFooter } from '@/components/citrus2';
 
-const Terms = () => {
+const SECTIONS = [
+  {
+    n: 1,
+    title: 'Acceptance of Terms',
+    body: 'By accessing or using Citrus, you agree to be bound by these Terms of Service. If you do not agree, you may not access or use the service.',
+  },
+  {
+    n: 2,
+    title: 'Description of Service',
+    body: 'Citrus provides a fantasy sports platform that allows users to create leagues, draft players, and compete based on real-world NHL statistics.',
+  },
+  {
+    n: 3,
+    title: 'User Accounts',
+    body: 'You are responsible for maintaining the confidentiality of your account and password. You agree to accept responsibility for all activities under your account.',
+  },
+  {
+    n: 4,
+    title: 'Prohibited Conduct',
+    body: 'You agree not to use the service for any unlawful purpose or in any way that interrupts, damages, or impairs the service. This includes transmitting any viruses or malicious code.',
+  },
+  {
+    n: 5,
+    title: 'Termination',
+    body: 'We reserve the right to terminate or suspend your account at our discretion, without notice, for conduct that violates these Terms or is harmful to other users, us, or third parties.',
+  },
+  {
+    n: 6,
+    title: 'Changes to Terms',
+    body: 'We reserve the right to modify these terms at any time. We will provide notice of significant changes by posting the new Terms on this page.',
+  },
+];
+
+export default function Terms() {
   return (
-    <div className="min-h-screen bg-[#D4E8B8] flex flex-col">
-      <Navbar />
-      <main className="flex-grow pt-16 lg:pt-24 px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
-        <div className="container mx-auto max-w-3xl py-12">
-          <h1 className="text-3xl md:text-4xl font-bold mb-8">Terms of Service</h1>
-          
-          <div className="prose dark:prose-invert max-w-none space-y-6">
-            <p className="text-sm text-muted-foreground">Last updated: November 26, 2025</p>
-            
-            <section>
-              <h2 className="text-xl font-semibold mb-3">1. Acceptance of Terms</h2>
-              <p>
-                By accessing or using CitrusSports, you agree to be bound by these Terms of Service. If you do not agree 
-                to these terms, you may not access or use the service.
-              </p>
-            </section>
+    <DarkLayout>
+      <HockeyNav />
 
-            <section>
-              <h2 className="text-xl font-semibold mb-3">2. Description of Service</h2>
-              <p>
-                CitrusSports provides a fantasy sports platform that allows users to create leagues, draft players, 
-                and compete against other users based on real-world sports statistics.
-              </p>
-            </section>
+      <main className="relative max-w-[820px] mx-auto px-6 pt-16 pb-24">
+        <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">
+          Legal
+        </div>
+        <h1 className="font-sans font-black text-[2.5rem] md:text-[3.25rem] leading-tight tracking-[-0.03em] text-pastel-cream mb-3">
+          Terms of Service
+        </h1>
+        <p className="font-jbmono text-[11px] tracking-wider uppercase text-white/45 mb-12">
+          Last updated: November 26, 2025
+        </p>
 
-            <section>
-              <h2 className="text-xl font-semibold mb-3">3. User Accounts</h2>
-              <p>
-                You are responsible for maintaining the confidentiality of your account and password. You agree to accept 
-                responsibility for all activities that occur under your account.
-              </p>
+        <div className="space-y-8">
+          {SECTIONS.map((s) => (
+            <section key={s.n}>
+              <h2 className="font-sans font-bold text-[1.25rem] text-pastel-cream mb-3">
+                <span className="text-pastel-orange-soft mr-2">{s.n}.</span>
+                {s.title}
+              </h2>
+              <p className="text-[15px] text-white/70 leading-relaxed">{s.body}</p>
             </section>
-
-            <section>
-              <h2 className="text-xl font-semibold mb-3">4. Prohibited Conduct</h2>
-              <p>
-                You agree not to use the service for any unlawful purpose or in any way that interrupts, damages, or 
-                impairs the service. This includes transmitting any viruses or other malicious code.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-xl font-semibold mb-3">5. Termination</h2>
-              <p>
-                We reserve the right to terminate or suspend your account and access to the service at our sole discretion, 
-                without notice, for conduct that we believe violates these Terms of Service or is harmful to other users, 
-                us, or third parties, or for any other reason.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-xl font-semibold mb-3">6. Changes to Terms</h2>
-              <p>
-                We reserve the right to modify these terms at any time. We will provide notice of any significant changes 
-                by posting the new Terms of Service on this page.
-              </p>
-            </section>
-          </div>
+          ))}
         </div>
       </main>
-      <Footer />
-    </div>
+
+      <HockeyFooter />
+    </DarkLayout>
   );
-};
-
-export default Terms;
-
+}

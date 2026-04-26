@@ -1,114 +1,170 @@
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check } from "lucide-react";
+import { Link } from 'react-router-dom';
+import { ArrowRight, Check, Sparkles, Crown } from 'lucide-react';
+import {
+  DarkLayout,
+  HockeyNav,
+  HockeyFooter,
+  SectionHeader,
+  CtaBanner,
+  Faq,
+  type FaqEntry,
+} from '@/components/citrus2';
 
-const Pricing = () => {
-  const tiers = [
-    {
-      name: "Free",
-      price: "$0",
-      description: "Everything you need to play in a standard league.",
-      features: [
-        "Unlimited Leagues",
-        "Live Scoring",
-        "Mobile App Access",
-        "Standard Player News",
-        "Ad-Supported"
-      ],
-      buttonText: "Get Started",
-      popular: false
-    },
-    {
-      name: "Pro",
-      price: "$4.99",
-      period: "/month",
-      description: "Advanced tools for serious fantasy managers.",
-      features: [
-        "Everything in Free",
-        "Ad-Free Experience",
-        "Stormy AI Assistant (Basic)",
-        "Advanced Analytics",
-        "Trade Analyzer"
-      ],
-      buttonText: "Upgrade to Pro",
-      popular: true
-    },
-    {
-      name: "Commissioner",
-      price: "$9.99",
-      period: "/month",
-      description: "Ultimate control and insights for league leaders.",
-      features: [
-        "Everything in Pro",
-        "Stormy AI (Unlimited)",
-        "Commissioner Tools",
-        "Custom League Branding",
-        "Priority Support"
-      ],
-      buttonText: "Go Commish",
-      popular: false
-    }
-  ];
+const FREE_FEATURES = [
+  'Unlimited fantasy leagues',
+  'Snake, auction, and salary cap drafts',
+  'Live shift-level scoring',
+  '31-feature xG projections',
+  'Stormy AI assistant GM',
+  'Pickem, Survivor, Confidence pools',
+  'Stanley Cup brackets',
+  'Mock drafts (12-team vs AI)',
+  'League chat',
+  'Trade analyzer',
+  'No ads, no paywalls',
+];
 
+const PRO_TEASE = [
+  'Everything in Free',
+  'Stormy Pro — priority answers, deeper analysis',
+  'Custom scoring presets',
+  'Advanced commish tools',
+  'Multi-league dashboard',
+  'Early access to new features',
+];
+
+const FAQ: FaqEntry[] = [
+  {
+    q: 'Is it really free during launch?',
+    a: "Yes. Every feature on Citrus today is free — no credit card, no trial expiration, no upsell. We're building the brand and the user base first. Monetization comes later.",
+  },
+  {
+    q: 'What does "founders pricing locked in" mean?',
+    a: "Anyone who creates an account during the free launch period gets a permanent discount on whatever paid tiers we eventually launch. If Stormy Pro ends up at $5/mo for new users, founders will pay less for life. Exact discount TBD but always favorable.",
+  },
+  {
+    q: "What's coming in the paid tiers?",
+    a: "We're working on Stormy Pro (faster, deeper AI answers), advanced commish tools (custom rules, branded leagues, deeper standings analytics), and a multi-league dashboard for managers in 5+ leagues. None of these are launched yet — just teasing what's on the roadmap.",
+  },
+  {
+    q: 'Will the free tier get worse when paid launches?',
+    a: "No. Everything that ships free today stays free forever. Paid tiers add new things, they don't remove existing ones. We hate the bait-and-switch playbook as much as you do.",
+  },
+];
+
+export default function Pricing() {
   return (
-    <div className="min-h-screen bg-[#D4E8B8] flex flex-col">
-      <Navbar />
-      <main className="flex-grow pt-16 lg:pt-24 px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
-        <div className="container mx-auto py-12">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 citrus-gradient-text">
-              Simple, Transparent Pricing
-            </h1>
-            <p className="text-xl text-muted-foreground">
-              Choose the plan that fits your competitive fantasy hockey needs.
+    <DarkLayout>
+      <HockeyNav promo="🍊 Free during launch · Founders pricing locked in for early users" />
+
+      <main>
+        {/* Hero */}
+        <section className="relative max-w-[1280px] mx-auto px-6 pt-20 pb-16 text-center">
+          <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-4 font-bold">
+            Pricing
+          </div>
+          <h1 className="font-sans font-black text-[3rem] md:text-[4.5rem] leading-[0.98] tracking-[-0.035em] text-pastel-cream mb-6 max-w-3xl mx-auto">
+            Free during launch.<br />
+            <span className="text-pastel-orange">Founders pricing for life.</span>
+          </h1>
+          <p className="text-[16px] md:text-[18px] leading-relaxed text-white/65 max-w-xl mx-auto">
+            Every feature on Citrus is free today. Sign up now and you'll lock in founders pricing
+            on whatever paid tiers launch later — for as long as you keep your account.
+          </p>
+        </section>
+
+        {/* Two-card pricing */}
+        <section className="relative max-w-[1100px] mx-auto px-6 pb-20 grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Free / Launch tier */}
+          <article className="bg-[#1A2A20] border-2 border-pastel-orange/40 rounded-3xl p-8 relative">
+            <div className="absolute -top-3 left-8 px-3 py-1 rounded-md bg-pastel-orange text-white font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold">
+              Available Now
+            </div>
+            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-2 font-bold">
+              Launch Tier
+            </div>
+            <h2 className="font-sans font-black text-[2.5rem] text-pastel-cream leading-none mb-1">
+              Free
+            </h2>
+            <div className="font-jbmono text-[11px] text-white/45 mb-6">
+              Forever for founding managers
+            </div>
+            <p className="text-[14px] text-white/65 leading-relaxed mb-6">
+              Everything Citrus ships today, no paywall. Lock in founders pricing on future paid
+              tiers by signing up now.
             </p>
-          </div>
+            <ul className="space-y-2.5 mb-8">
+              {FREE_FEATURES.map((f) => (
+                <li key={f} className="flex items-start gap-2.5">
+                  <Check className="w-4 h-4 text-pastel-sage flex-shrink-0 mt-0.5" strokeWidth={2.5} />
+                  <span className="text-[14px] text-pastel-cream leading-snug">{f}</span>
+                </li>
+              ))}
+            </ul>
+            <Link
+              to="/create-league"
+              className="w-full inline-flex items-center justify-center gap-2 bg-pastel-orange text-white text-[14px] font-bold px-5 rounded-md hover:bg-pastel-orange-deep transition-colors"
+              style={{ height: '48px' }}
+            >
+              Drop the Puck <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
+            </Link>
+          </article>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {tiers.map((tier, index) => (
-              <Card 
-                key={index} 
-                className={`flex flex-col relative ${tier.popular ? 'border-primary shadow-xl scale-105 z-10' : 'border-border shadow-md'}`}
-              >
-                {tier.popular && (
-                  <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold">
-                    Most Popular
-                  </div>
-                )}
-                <CardHeader>
-                  <CardTitle className="text-2xl">{tier.name}</CardTitle>
-                  <CardDescription>{tier.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <div className="mb-6">
-                    <span className="text-4xl font-bold">{tier.price}</span>
-                    {tier.period && <span className="text-muted-foreground">{tier.period}</span>}
-                  </div>
-                  <ul className="space-y-3">
-                    {tier.features.map((feature, i) => (
-                      <li key={i} className="flex items-center gap-2">
-                        <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
-                        <span className="text-sm">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full" variant={tier.popular ? "default" : "outline"}>
-                    {tier.buttonText}
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-        </div>
+          {/* Pro tease */}
+          <article className="bg-[#1A2A20] border border-white/10 rounded-3xl p-8 relative opacity-90">
+            <div className="absolute -top-3 left-8 px-3 py-1 rounded-md bg-white/10 text-white/65 font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold ring-1 ring-white/15">
+              Coming Soon
+            </div>
+            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-sage-soft mb-2 font-bold flex items-center gap-2">
+              <Crown className="w-3 h-3" strokeWidth={2.5} /> Stormy Pro + Commish
+            </div>
+            <h2 className="font-sans font-black text-[2.5rem] text-pastel-cream/85 leading-none mb-1">
+              TBD
+            </h2>
+            <div className="font-jbmono text-[11px] text-white/45 mb-6">
+              Founders pricing locked in
+            </div>
+            <p className="text-[14px] text-white/65 leading-relaxed mb-6">
+              Power-user tier launching later this year. Founders get a permanent discount —
+              exact pricing not set yet, but always favorable for early users.
+            </p>
+            <ul className="space-y-2.5 mb-8">
+              {PRO_TEASE.map((f) => (
+                <li key={f} className="flex items-start gap-2.5">
+                  <Sparkles className="w-4 h-4 text-pastel-orange-soft flex-shrink-0 mt-0.5" strokeWidth={2.5} />
+                  <span className="text-[14px] text-pastel-cream/80 leading-snug">{f}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              disabled
+              className="w-full inline-flex items-center justify-center gap-2 bg-white/5 text-white/55 text-[14px] font-bold px-5 rounded-md cursor-not-allowed ring-1 ring-white/10"
+              style={{ height: '48px' }}
+            >
+              Coming soon — sign up to lock in
+            </button>
+          </article>
+        </section>
+
+        {/* FAQ */}
+        <section className="relative max-w-[860px] mx-auto px-6 pb-24">
+          <SectionHeader eyebrow="FAQ" title="Pricing, answered." align="center" />
+          <Faq entries={FAQ} />
+        </section>
+
+        <CtaBanner
+          title={
+            <>
+              Free today. <span className="text-pastel-orange">Founders forever.</span>
+            </>
+          }
+          sub="No credit card · No trial expiration · No bait and switch"
+          ctaLabel="Create your account"
+          ctaHref="/auth"
+        />
       </main>
-      <Footer />
-    </div>
+
+      <HockeyFooter />
+    </DarkLayout>
   );
-};
-
-export default Pricing;
-
+}

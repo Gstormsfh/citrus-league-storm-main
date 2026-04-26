@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Mail, Lock, HelpCircle, Chrome, CheckCircle2 } from 'lucide-react';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
 import { Separator } from '@/components/ui/separator';
+import { DarkLayout, HockeyNav, MascotAvatar } from '@/components/citrus2';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -314,13 +315,19 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/20">
-      <main className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">Welcome to Citrus</CardTitle>
-            <CardDescription className="text-center">
-              Sign in to your account or create a new one
+    <DarkLayout>
+      <HockeyNav showLogin={false} />
+      <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
+        <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
+          <CardHeader className="space-y-3 text-center">
+            <div className="flex justify-center mb-2">
+              <MascotAvatar id="stormy" size="lg" />
+            </div>
+            <CardTitle className="text-2xl font-black text-pastel-cream tracking-[-0.02em]">
+              Welcome to <span className="text-pastel-orange">Citrus</span>
+            </CardTitle>
+            <CardDescription className="text-white/60">
+              Sign in or create an account · Lock in founders pricing
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -612,7 +619,7 @@ const Auth = () => {
           </CardContent>
         </Card>
       </main>
-    </div>
+    </DarkLayout>
   );
 };
 
