@@ -96,8 +96,10 @@ INGEST_PLAYOFF_SCRIPT = str(DATA_PIPELINE_DIR / "acquisition" / "ingest_playoff_
 def _try_self_heal_schedule(today_str: str) -> bool:
     """
     Shell out to ingest_playoff_schedule.py to backfill today's slate.
-    Returns True if the ingest reported any games upserted (caller should
-    retry the DB query immediately). Rate-limited to one attempt every
+    Returns True if the caller should re-query the DB (any date in the
+    window upserted, even if other dates failed) — non-zero exit alone
+    is not a reason to skip the re-query, since today might have landed
+    while a future date FK-rejected. Rate-limited to one attempt every
     SCHEDULE_INGEST_INTERVAL seconds so we don't hammer NHL on every tick.
     """
     global last_schedule_ingest_time
@@ -124,22 +126,18 @@ def _try_self_heal_schedule(today_str: str) -> bool:
             capture_output=True, text=True, timeout=300,
         )
         # The ingest logs "  YYYY-MM-DD: upserted N playoff game(s)" per date
-        # and "Total playoff games upserted: N" at the end.
+        # and "Total playoff games upserted: N" at the end. Non-zero exit
+        # means at least one date failed, but partial success is still a
+        # valid recovery — re-query and let the DB tell us the truth.
         out = (result.stdout or "") + "\n" + (result.stderr or "")
         for line in out.strip().split("\n"):
             if line.strip():
                 logger.info(f"[SELF-HEAL]   {line.strip()}")
         if result.returncode != 0:
-            logger.error(f"[SELF-HEAL] ingest exited {result.returncode}")
-            return False
-        # Did anything actually land?
-        if "Total playoff games upserted: 0" in out or "No playoff games found" in out:
-            logger.warning(
-                "[SELF-HEAL] NHL API returned no playoff games for the window. "
-                "Either the schedule isn't published yet, the API shape changed, "
-                "or every team_id is mapped wrong (FK reject). Check above lines."
+            logger.error(
+                f"[SELF-HEAL] ingest exited {result.returncode} — partial failure. "
+                f"Re-querying anyway in case today landed."
             )
-            return False
         return True
     except subprocess.TimeoutExpired:
         logger.error("[SELF-HEAL] ingest timed out after 5 min")
