@@ -1190,13 +1190,18 @@ DECLARE
 BEGIN
   RAISE NOTICE 'SC-013 starting: user-path owner mismatch → unauthorized';
 
-  SELECT id INTO v_other_user
-    FROM auth.users
-    WHERE id <> '882b59c9-8882-418b-9450-3fd004d57edd'
+  -- teams.owner_id REFERENCES profiles(id), NOT auth.users(id)
+  -- directly. On staging some auth.users rows were created without
+  -- going through the trigger that auto-creates profiles, so we must
+  -- require BOTH to exist for the candidate user.
+  SELECT u.id INTO v_other_user
+    FROM auth.users u
+    JOIN public.profiles p ON p.id = u.id
+    WHERE u.id <> '882b59c9-8882-418b-9450-3fd004d57edd'
     LIMIT 1;
 
   IF v_other_user IS NULL THEN
-    RAISE NOTICE 'SC-013 SKIPPED: need ≥ 2 auth.users on staging; only commissioner found';
+    RAISE NOTICE 'SC-013 SKIPPED: need ≥ 2 (auth.users ∩ profiles) on staging; only commissioner found';
     RETURN;
   END IF;
 
