@@ -100,6 +100,43 @@ UPDATE cron.job SET active = false
  WHERE jobname IN ('draft-deadline-sweep', 'draft-autopick-keepalive');
 ```
 
+**Propagation delay (~1 min).** pg_cron's launcher rechecks
+`cron.job` once per minute. The `active = false` flip takes effect at
+the **next launcher poll**, not the next scheduled tick. Worst case,
+one keep-alive can still fire after your UPDATE commits (a 30–90s
+window). For a clean cutoff, wait ~1 min after the UPDATE before
+assuming the cron is silent.
+
+**Verifying the pause took effect.** Two queries:
+
+```sql
+-- 1. Confirm the active flag flipped.
+SELECT jobname, schedule, active
+  FROM cron.job
+ WHERE jobname = 'draft-autopick-keepalive';
+-- expect: active = false
+```
+
+```sql
+-- 2. Confirm no firings since the pause. Run ~3 min after the UPDATE
+--    to span at least one would-have-been-fired tick.
+SELECT jobname, status, start_time, return_message
+  FROM cron.job_run_details
+ WHERE jobname = 'draft-autopick-keepalive'
+ ORDER BY start_time DESC
+ LIMIT 5;
+-- expect: most recent start_time pre-dates your UPDATE commit.
+```
+
+**Note on accumulation while paused.** With keep-alive paused but
+sweep still running, any active draft whose deadline expires
+produces a `safety_net_hit` row + a pgmq message in
+`q_draft_deadlines`. Messages accumulate until the keep-alive
+resumes (or until manually drained — see chunk 10f for the drain
+recipe). On staging during Phase 3 with no active drafts, expected
+accumulation is zero; verify with
+`SELECT count(*) FROM pgmq.q_draft_deadlines;` before resuming.
+
 #### Forcing an out-of-band keep-alive (chunk 10d)
 
 When the keep-alive's 2-min cadence is too slow during an incident
