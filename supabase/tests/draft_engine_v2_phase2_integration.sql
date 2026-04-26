@@ -2009,4 +2009,395 @@ BEGIN
 END
 $sc022$;
 
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-023 — Invariant I8: leagues.draft_event_counter = max(seq) per league
+-- ════════════════════════════════════════════════════════════════════════
+-- After any number of writes, the counter on the leagues row must
+-- equal the highest seq number ever assigned to a draft_events row
+-- for that league. If they diverge, gap-free seq is broken (or the
+-- counter advance happened without an INSERT).
+--
+-- Phase 6 will run this check as part of check_draft_invariants();
+-- here we inline it for one league after a few writes.
+--
+-- Spec refs: §10 invariant I8.
+
+DO $sc023$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_team_ids     uuid[];
+  v_actor        jsonb := jsonb_build_object('kind','autopick');
+  v_counter      bigint;
+  v_max_seq      bigint;
+BEGIN
+  RAISE NOTICE 'SC-023 starting: invariant I8 (counter = max(seq))';
+  BEGIN  -- savepoint
+
+  v_seed      := _v2_test._seed_active_league(
+                   '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id := (v_seed ->> 'league_id')::uuid;
+  v_team_ids  := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+
+  -- Mix pick events with a lifecycle event for variety.
+  PERFORM submit_pick_v2(
+    p_league_id => v_league_id, p_team_id => v_team_ids[1], p_player_id => 23001,
+    p_round => 1, p_pick_number => 1,
+    p_session_id => gen_random_uuid(),
+    p_idempotency_key => gen_random_uuid(),
+    p_payload_hash => 'sha256:' || md5('SC023-1'),
+    p_actor => v_actor, p_correlation_id => NULL
+  );
+  PERFORM submit_pick_v2(
+    p_league_id => v_league_id, p_team_id => v_team_ids[2], p_player_id => 23002,
+    p_round => 1, p_pick_number => 2,
+    p_session_id => gen_random_uuid(),
+    p_idempotency_key => gen_random_uuid(),
+    p_payload_hash => 'sha256:' || md5('SC023-2'),
+    p_actor => v_actor, p_correlation_id => NULL
+  );
+  PERFORM draft_pause(p_league_id => v_league_id, p_actor => jsonb_build_object(
+    'kind', 'commissioner', 'id', '882b59c9-8882-418b-9450-3fd004d57edd',
+    'session_id', gen_random_uuid()
+  ));
+  -- After 2 picks + pause (which emits 2 events), seq goes 1..4.
+
+  SELECT draft_event_counter INTO v_counter FROM leagues WHERE id = v_league_id;
+  SELECT max(seq) INTO v_max_seq FROM draft_events WHERE league_id = v_league_id;
+
+  PERFORM _v2_test._assert(v_counter = v_max_seq,
+    'SC-023 I8 violation: counter=' || v_counter || ', max(seq)=' || v_max_seq);
+  PERFORM _v2_test._assert(v_counter = 4,
+    'SC-023 expected counter=4 (2 picks + 2 pause events), got ' || v_counter);
+
+  RAISE NOTICE 'SC-023 PASS (I8: counter=%, max(seq)=%)', v_counter, v_max_seq;
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc023$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-024 — Invariant I16: projection ↔ event-log consistency
+-- ════════════════════════════════════════════════════════════════════════
+-- Per spec §10 / §3.2: count of pick events (minus pick_undone)
+-- must equal count of draft_picks_v2 rows for each league. The
+-- projection trigger writes synchronously, so this should ALWAYS
+-- hold immediately after a submit_pick_v2 commit.
+--
+-- Spec refs: §10 invariant I16; §3.2 trigger ownership.
+
+DO $sc024$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_team_ids     uuid[];
+  v_actor        jsonb := jsonb_build_object('kind','autopick');
+  v_event_picks  int;
+  v_proj_picks   int;
+  v_pn           int;
+  v_round        int;
+  v_pick_in_round int;
+  v_team         uuid;
+BEGIN
+  RAISE NOTICE 'SC-024 starting: invariant I16 (projection ↔ events)';
+  BEGIN  -- savepoint
+
+  v_seed      := _v2_test._seed_active_league(
+                   '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id := (v_seed ->> 'league_id')::uuid;
+  v_team_ids  := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+
+  -- Submit 4 picks across snake order.
+  FOR v_pn IN 1..4 LOOP
+    v_round         := ((v_pn - 1) / 3) + 1;
+    v_pick_in_round := ((v_pn - 1) % 3) + 1;
+    IF v_round % 2 = 1 THEN
+      v_team := v_team_ids[v_pick_in_round];
+    ELSE
+      v_team := v_team_ids[3 - v_pick_in_round + 1];
+    END IF;
+
+    PERFORM submit_pick_v2(
+      p_league_id => v_league_id, p_team_id => v_team, p_player_id => 24000 + v_pn,
+      p_round => v_round, p_pick_number => v_pn,
+      p_session_id => gen_random_uuid(),
+      p_idempotency_key => gen_random_uuid(),
+      p_payload_hash => 'sha256:' || md5(format('SC024-%s', v_pn)),
+      p_actor => v_actor, p_correlation_id => NULL
+    );
+  END LOOP;
+
+  -- I16 check.
+  SELECT count(*) INTO v_event_picks
+    FROM draft_events
+   WHERE league_id = v_league_id AND event_type = 'pick';
+  SELECT count(*) INTO v_proj_picks
+    FROM draft_picks_v2
+   WHERE league_id = v_league_id;
+
+  PERFORM _v2_test._assert(v_event_picks = v_proj_picks,
+    'SC-024 I16 violation: ' || v_event_picks || ' pick events vs ' ||
+    v_proj_picks || ' projection rows');
+  PERFORM _v2_test._assert(v_event_picks = 4,
+    'SC-024 expected 4 picks, got ' || v_event_picks);
+
+  RAISE NOTICE 'SC-024 PASS (I16: events=%, projection=%)', v_event_picks, v_proj_picks;
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc024$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-025 — CHECK constraint on draft_events.event_type
+-- ════════════════════════════════════════════════════════════════════════
+-- Direct INSERT (bypassing RPCs, which we can do as service_role)
+-- with an event_type outside the closed enum must fail with
+-- check_violation. This is the database-side defense in depth: even
+-- if some future code bypasses validate_draft_event_payload, the
+-- CHECK constraint stops illegal types from landing.
+--
+-- Spec refs: §3.1 event_type CHECK; §6 catalog (closed enum).
+
+DO $sc025$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-025 starting: event_type CHECK constraint';
+  BEGIN  -- savepoint
+
+  v_seed      := _v2_test._seed_active_league(
+                   '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id := (v_seed ->> 'league_id')::uuid;
+
+  BEGIN
+    INSERT INTO draft_events (
+      league_id, seq, event_type, payload, payload_hash,
+      actor, correlation_id
+    ) VALUES (
+      v_league_id, 1, 'totally_fabricated_event_type',
+      '{}'::jsonb, 'sha256:bypass',
+      jsonb_build_object('kind','system'), gen_random_uuid()
+    );
+    RAISE EXCEPTION 'SC-025 expected check_violation but INSERT succeeded';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-025 sqlstate should be 23514, got ' || v_caught_state);
+
+  RAISE NOTICE 'SC-025 PASS (event_type CHECK rejects bogus value)';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc025$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-026 — CHECK constraint on draft_events.actor.kind
+-- ════════════════════════════════════════════════════════════════════════
+-- event_type IS valid ('pick'), but actor.kind is outside the closed
+-- enum {user, autopick, commissioner, shadow, system}. Must fail
+-- with check_violation.
+--
+-- Spec refs: §3.1 actor CHECK.
+
+DO $sc026$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-026 starting: actor.kind CHECK constraint';
+  BEGIN  -- savepoint
+
+  v_seed      := _v2_test._seed_active_league(
+                   '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id := (v_seed ->> 'league_id')::uuid;
+
+  BEGIN
+    INSERT INTO draft_events (
+      league_id, seq, event_type, payload, payload_hash,
+      actor, correlation_id
+    ) VALUES (
+      v_league_id, 1, 'pick',
+      '{}'::jsonb, 'sha256:bypass',
+      jsonb_build_object('kind','rogue_robot'),  -- invalid kind
+      gen_random_uuid()
+    );
+    RAISE EXCEPTION 'SC-026 expected check_violation but INSERT succeeded';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-026 sqlstate should be 23514, got ' || v_caught_state);
+
+  RAISE NOTICE 'SC-026 PASS (actor.kind CHECK rejects bogus value)';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc026$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-027 — Synchronous projection trigger semantics
+-- ════════════════════════════════════════════════════════════════════════
+-- The projection trigger (tg_draft_events_project_pick) fires
+-- AFTER INSERT inside the same transaction as the event insert.
+-- That means: from the same connection, IMMEDIATELY after
+-- submit_pick_v2 returns, the corresponding draft_picks_v2 row is
+-- already readable. No async lag, no eventual consistency.
+--
+-- This scenario reads draft_picks_v2 right after submit_pick_v2 and
+-- asserts the row matches the event payload byte-for-byte where it
+-- matters (pick_number, team_id, player_id).
+--
+-- Spec refs: §3.2 trigger ownership; principle P6.
+
+DO $sc027$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_team_ids     uuid[];
+  v_first_team   uuid;
+  v_result       jsonb;
+  v_proj_row     record;
+BEGIN
+  RAISE NOTICE 'SC-027 starting: synchronous projection trigger';
+  BEGIN  -- savepoint
+
+  v_seed       := _v2_test._seed_active_league(
+                    '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id  := (v_seed ->> 'league_id')::uuid;
+  v_team_ids   := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+  v_first_team := v_team_ids[1];
+
+  v_result := submit_pick_v2(
+    p_league_id => v_league_id, p_team_id => v_first_team, p_player_id => 27001,
+    p_round => 1, p_pick_number => 1,
+    p_session_id => gen_random_uuid(),
+    p_idempotency_key => gen_random_uuid(),
+    p_payload_hash => 'sha256:' || md5('SC027'),
+    p_actor => jsonb_build_object('kind','autopick'),
+    p_correlation_id => NULL
+  );
+
+  -- Read the projection IMMEDIATELY in the same txn. If the trigger
+  -- were async, this would return 0 rows.
+  SELECT pick_number, round, team_id, player_id, source_event_id, source_seq
+    INTO v_proj_row
+    FROM draft_picks_v2
+   WHERE league_id = v_league_id;
+
+  PERFORM _v2_test._assert(v_proj_row.pick_number = 1,
+    'SC-027 projection.pick_number should be 1, got ' || v_proj_row.pick_number);
+  PERFORM _v2_test._assert(v_proj_row.round = 1,
+    'SC-027 projection.round should be 1');
+  PERFORM _v2_test._assert(v_proj_row.team_id = v_first_team,
+    'SC-027 projection.team_id should match the picking team');
+  PERFORM _v2_test._assert(v_proj_row.player_id = 27001,
+    'SC-027 projection.player_id should be 27001');
+  PERFORM _v2_test._assert(v_proj_row.source_event_id = (v_result ->> 'event_id')::bigint,
+    'SC-027 projection.source_event_id should match RPC return');
+  PERFORM _v2_test._assert(v_proj_row.source_seq = (v_result ->> 'seq')::bigint,
+    'SC-027 projection.source_seq should match RPC return');
+
+  RAISE NOTICE 'SC-027 PASS (projection row visible immediately after RPC commit)';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc027$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-028 — validate_draft_event_payload rejects malformed payloads
+-- ════════════════════════════════════════════════════════════════════════
+-- Direct call to the validator with a payload missing required
+-- fields per spec §6 catalog. Must raise check_violation with
+-- 'invalid_event_payload'.
+--
+-- Two sub-cases in one DO block:
+--   A. Unknown event_type → 'invalid_event_payload: unknown event_type'.
+--   B. 'pick' missing required field → 'invalid_event_payload: pick missing required field "..."'.
+--
+-- Spec refs: §4.10 validator; §6 catalog.
+
+DO $sc028$
+DECLARE
+  v_caught_msg   text;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-028 starting: validate_draft_event_payload guards';
+  BEGIN  -- savepoint
+
+  -- Sub-case A: unknown event_type.
+  BEGIN
+    PERFORM validate_draft_event_payload('madeupkind', '{}'::jsonb);
+    RAISE EXCEPTION 'SC-028 sub-A: expected check_violation but validator returned';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-028 sub-A sqlstate should be 23514');
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'invalid_event_payload%',
+    'SC-028 sub-A message should start with invalid_event_payload, got: ' || v_caught_msg);
+  PERFORM _v2_test._assert(v_caught_msg LIKE '%unknown event_type%',
+    'SC-028 sub-A message should mention "unknown event_type"');
+
+  -- Sub-case B: 'pick' missing required field.
+  BEGIN
+    PERFORM validate_draft_event_payload(
+      'pick',
+      '{"pick_number": 1}'::jsonb     -- missing round, team_id, player_id, etc.
+    );
+    RAISE EXCEPTION 'SC-028 sub-B: expected check_violation but validator returned';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-028 sub-B sqlstate should be 23514');
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'invalid_event_payload%',
+    'SC-028 sub-B message should start with invalid_event_payload');
+  PERFORM _v2_test._assert(v_caught_msg LIKE '%missing required field%',
+    'SC-028 sub-B message should mention "missing required field", got: ' || v_caught_msg);
+
+  RAISE NOTICE 'SC-028 PASS (2 sub-cases: unknown type + missing required)';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc028$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- End of Phase 2 integration suite — 28 scenarios total
+-- ════════════════════════════════════════════════════════════════════════
+-- Coverage summary:
+--   9e1b SC-001..SC-005 — happy path, idempotency, structural race-freedom
+--   9e2  SC-006..SC-011 — preflight ordering + state-machine guards
+--   9e3  SC-012..SC-018 — auth (user path) + record_shadow_event guards
+--   9e4  SC-019..SC-022 — pause / resume / extend lifecycle
+--   9e5  SC-023..SC-028 — invariants I8/I16, schema CHECKs, trigger
+--                          semantics, payload validator
+--
+-- After running, re-run the residue check:
+--   SELECT
+--     (SELECT count(*) FROM draft_events)                            AS events,
+--     (SELECT count(*) FROM draft_picks_v2)                          AS picks,
+--     (SELECT count(*) FROM pgmq.q_draft_deadlines)                  AS pgmq_msgs,
+--     (SELECT count(*) FROM leagues
+--       WHERE name LIKE '\_v2\_test seed %' ESCAPE '\')              AS leagues;
+--   All four must return 0 — proves the savepoint pattern cleaned
+--   up every scenario.
+--
+-- Cleanup (optional — safe to leave installed for re-runs):
+--   DROP SCHEMA IF EXISTS _v2_test CASCADE;
+
+
 
