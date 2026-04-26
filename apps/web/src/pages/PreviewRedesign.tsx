@@ -1,5 +1,9 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
+import PremiumFeatures from '@/components/premium/PremiumFeatures';
+import PremiumStormy from '@/components/premium/PremiumStormy';
+import PremiumCTA from '@/components/premium/PremiumCTA';
+import PremiumFooter from '@/components/premium/PremiumFooter';
 
 const MAX_PROJECTION = 18;
 
@@ -244,16 +248,10 @@ export default function PreviewRedesign() {
         </div>
       </section>
 
-      <section className="max-w-[1400px] mx-auto px-6 py-20 text-center">
-        <div className="inline-block px-4 py-2 border border-premium-border-strong">
-          <p className="font-caps text-[11px] tracking-[0.2em] text-premium-text-muted uppercase">
-            Hero Preview · v1
-          </p>
-        </div>
-        <p className="font-premium-body text-sm text-premium-text-dim mt-6 max-w-md mx-auto">
-          Features grid, Stormy AI showcase, final CTA, and footer come next — once you've signed off on the hero direction.
-        </p>
-      </section>
+      <PremiumFeatures />
+      <PremiumStormy />
+      <PremiumCTA />
+      <PremiumFooter />
     </div>
   );
 }
