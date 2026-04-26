@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { useAuth } from '@/contexts/AuthContext';
+import { DarkLayout, HockeyNav, HockeyFooter } from '@/components/citrus2';
 import { adminApi } from '@/api/admin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -120,23 +119,23 @@ const Admin = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <main className="container mx-auto py-12 px-4">
-          <div className="text-center text-muted-foreground">Loading admin panel...</div>
+      <DarkLayout>
+        <HockeyNav />
+        <main className="max-w-[1280px] mx-auto py-12 px-6">
+          <div className="text-center font-jbmono text-[12px] tracking-wider uppercase text-white/45">Loading admin panel...</div>
         </main>
-      </div>
+      </DarkLayout>
     );
   }
 
   if (!authorized) return null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="container mx-auto py-8 px-4 space-y-6">
+    <DarkLayout>
+      <HockeyNav />
+      <main className="relative max-w-[1280px] mx-auto py-8 px-6 space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <h1 className="font-sans font-black text-[2.25rem] tracking-[-0.025em] text-pastel-cream">Admin Dashboard</h1>
           <Badge variant="outline" className="text-xs">
             {health?.status === 'ok' ? 'API Healthy' : 'API Degraded'}
           </Badge>
@@ -286,8 +285,8 @@ const Admin = () => {
           </TabsContent>
         </Tabs>
       </main>
-      <Footer />
-    </div>
+      <HockeyFooter />
+    </DarkLayout>
   );
 };
 
