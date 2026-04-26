@@ -14,7 +14,7 @@ Self-healing: uses upsert on (game_id) to avoid duplicates.
 Run daily via playoff-sync cron or manually before Round 1 starts.
 
 NHL API Schedule endpoint:
-  https://api-web.nhle.com/v1/schedule/{YYYYMMDD}
+  https://api-web.nhle.com/v1/schedule/{YYYY-MM-DD}   (hyphens required!)
   gameType: 2 = regular, 3 = playoff
 """
 
@@ -55,8 +55,13 @@ def fetch_schedule_for_date(date_str: str) -> list[dict]:
     Raises FetchError on transport / HTTP failures so the caller can record
     the date as failed. An empty list means "API succeeded, no games" —
     that's a valid answer (off day) and must not be conflated with failure.
+
+    NHL endpoint expects YYYY-MM-DD with hyphens. Stripping them returns
+    404 for every date — that's the bug that meant Round 1 games never
+    actually came from this script (they were manually inserted via the
+    Supabase Management API in c93f15c).
     """
-    url = f"{NHL_BASE}/schedule/{date_str.replace('-', '')}"
+    url = f"{NHL_BASE}/schedule/{date_str}"
     try:
         resp = citrus_request(url, timeout=15)
         resp.raise_for_status()
