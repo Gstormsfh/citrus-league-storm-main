@@ -41,6 +41,7 @@
 //   SUPABASE_SERVICE_ROLE_KEY
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { timingSafeEqual } from "https://deno.land/std@0.168.0/crypto/timing_safe_equal.ts";
 import { createServiceRoleClient } from "../_shared/supabaseClient.ts";
 
 const SERVICE_NAME = "draft-autopick";
@@ -91,7 +92,12 @@ serve(async (req: Request) => {
     ? authHeader.slice("Bearer ".length)
     : "";
 
-  if (presented !== expectedToken) {
+  // Constant-time bearer compare. Deno std's timingSafeEqual returns
+  // false (does not throw) when input lengths differ, so it doubles as
+  // the length check.
+  const presentedBytes = new TextEncoder().encode(presented);
+  const expectedBytes = new TextEncoder().encode(expectedToken);
+  if (!timingSafeEqual(presentedBytes, expectedBytes)) {
     console.warn(
       JSON.stringify({
         service: SERVICE_NAME,
