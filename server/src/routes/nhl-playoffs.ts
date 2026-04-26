@@ -148,6 +148,31 @@ nhlPlayoffsRoutes.get('/h2h', async (c) => {
   }
 });
 
+// GET /api/nhl-playoffs/live-games?season=2025 — playoff games currently in progress
+// Used by the public bracket viewer to show a LIVE badge ONLY when a game is
+// actually live, instead of conflating "series has started" with "game live now".
+nhlPlayoffsRoutes.get('/live-games', async (c) => {
+  const seasonParam = c.req.query('season');
+  const season = seasonParam ? parseInt(seasonParam, 10) : CURRENT_SEASON;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('nhl_games')
+      .select('game_id, home_team, away_team, home_score, away_score, status, period, period_time, series_game_number')
+      .eq('season', season)
+      .eq('game_type', 'playoff')
+      .in('status', ['live', 'in_progress']);
+
+    if (error) return handleError(c, error, 'Failed to fetch live games');
+
+    // Short cache — live data should refresh quickly
+    c.header('Cache-Control', 'public, max-age=15');
+    return ok(c, { games: data || [] });
+  } catch (err) {
+    return handleError(c, err as Error, 'Failed to fetch live games');
+  }
+});
+
 // GET /api/nhl-playoffs/meta — data freshness for stale-data UI badge
 nhlPlayoffsRoutes.get('/meta', async (c) => {
   try {
