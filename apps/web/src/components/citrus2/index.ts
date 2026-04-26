@@ -16,6 +16,26 @@ export { TeamChip, TeamColorBar } from './TeamChip';
 export { MascotAvatar, MascotPortrait } from './MascotAvatar';
 export { LivePulse, Eyebrow } from './LivePulse';
 
+// Custom hockey iconography (replaces generic lucide icons in cards)
+export {
+  PuckIcon,
+  StickIcon,
+  CrossedSticksIcon,
+  NetIcon,
+  CupIcon,
+  FaceoffIcon,
+  MaskIcon,
+  ScoreboardIcon,
+  SlateIcon,
+  XGModelIcon,
+  ShiftIcon,
+  RangeIcon,
+  BracketIcon,
+  SurvivorIcon,
+  PickemIcon,
+  DraftIcon,
+} from './HockeyIcons';
+
 // Page chrome
 export { DarkLayout } from './DarkLayout';
 export { HockeyNav } from './HockeyNav';

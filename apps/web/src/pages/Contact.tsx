@@ -1,11 +1,12 @@
 
 import { useState } from 'react';
+import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { DarkLayout, HockeyNav, HockeyFooter } from '@/components/citrus2';
+import { DarkLayout, HockeyFooter } from '@/components/citrus2';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -52,7 +53,9 @@ const Contact = () => {
 
   return (
     <DarkLayout>
-      <HockeyNav />
+
+
+      <Navbar />
       <main className="relative max-w-[1100px] mx-auto px-6 pt-16 pb-24">
         <div className="text-center mb-12">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">

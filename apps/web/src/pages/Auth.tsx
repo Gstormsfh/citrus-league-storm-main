@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import Navbar from '@/components/Navbar';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Mail, Lock, HelpCircle, Chrome, CheckCircle2 } from 'lucide-react';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
 import { Separator } from '@/components/ui/separator';
-import { DarkLayout, HockeyNav, MascotAvatar } from '@/components/citrus2';
+import { DarkLayout, MascotAvatar } from '@/components/citrus2';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -316,7 +317,7 @@ const Auth = () => {
 
   return (
     <DarkLayout>
-      <HockeyNav showLogin={false} />
+      <Navbar />
       <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
         <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
           <CardHeader className="space-y-3 text-center">
@@ -450,12 +451,12 @@ const Auth = () => {
                                     <>
                                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                       Sending...
-                                    </>
+
                                   ) : (
                                     'Send Reset Link'
                                   )}
                                 </Button>
-                              </>
+
                             )}
                           </div>
                         </DialogContent>
@@ -483,7 +484,7 @@ const Auth = () => {
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Signing in...
-                      </>
+
                     ) : (
                       'Sign In'
                     )}
@@ -608,7 +609,7 @@ const Auth = () => {
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Creating account...
-                      </>
+
                     ) : (
                       'Sign Up'
                     )}

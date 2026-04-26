@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
+import Navbar from '@/components/Navbar';
 import { ArrowRight, Check, Sparkles, Crown } from 'lucide-react';
 import {
   DarkLayout,
-  HockeyNav,
   HockeyFooter,
   SectionHeader,
   CtaBanner,
@@ -55,7 +55,8 @@ const FAQ: FaqEntry[] = [
 export default function Pricing() {
   return (
     <DarkLayout>
-      <HockeyNav promo="🍊 Free during launch · Founders pricing locked in for early users" />
+
+      <Navbar />      <promo="🍊 Free during launch · Founders pricing locked in for early users" />
 
       <main>
         {/* Hero */}
@@ -156,7 +157,7 @@ export default function Pricing() {
           title={
             <>
               Free today. <span className="text-pastel-orange">Founders forever.</span>
-            </>
+
           }
           sub="No credit card · No trial expiration · No bait and switch"
           ctaLabel="Create your account"

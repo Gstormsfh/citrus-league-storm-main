@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
+import Navbar from '@/components/Navbar';
 import { ArrowRight } from 'lucide-react';
 import {
   DarkLayout,
-  HockeyNav,
   HockeyFooter,
   SectionHeader,
   CtaBanner,
@@ -13,8 +13,8 @@ import { MASCOT_LIST } from '@/constants/mascots';
 export default function About() {
   return (
     <DarkLayout>
-      <HockeyNav promo="🍊 Free during launch · Founders pricing locked in for early users" />
 
+      <Navbar />
       <main>
         {/* Hero */}
         <section className="relative max-w-[860px] mx-auto px-6 pt-20 pb-16 text-center">
@@ -105,7 +105,7 @@ export default function About() {
           title={
             <>
               Built different. <span className="text-pastel-orange">Play different.</span>
-            </>
+
           }
           sub="Free during launch · Founders pricing locked in for early users"
           ctaLabel="Create your league"

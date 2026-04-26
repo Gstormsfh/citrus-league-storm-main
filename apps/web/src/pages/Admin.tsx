@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import Navbar from '@/components/Navbar';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { DarkLayout, HockeyNav, HockeyFooter } from '@/components/citrus2';
+import { DarkLayout, HockeyFooter } from '@/components/citrus2';
 import { adminApi } from '@/api/admin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -120,8 +121,10 @@ const Admin = () => {
   if (loading) {
     return (
       <DarkLayout>
-        <HockeyNav />
-        <main className="max-w-[1280px] mx-auto py-12 px-6">
+
+
+      <Navbar />
+      <main className="max-w-[1280px] mx-auto py-12 px-6">
           <div className="text-center font-jbmono text-[12px] tracking-wider uppercase text-white/45">Loading admin panel...</div>
         </main>
       </DarkLayout>
@@ -132,7 +135,9 @@ const Admin = () => {
 
   return (
     <DarkLayout>
-      <HockeyNav />
+
+
+      <Navbar />
       <main className="relative max-w-[1280px] mx-auto py-8 px-6 space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="font-sans font-black text-[2.25rem] tracking-[-0.025em] text-pastel-cream">Admin Dashboard</h1>

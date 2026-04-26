@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DarkLayout, HockeyNav, HockeyFooter } from '@/components/citrus2';
+import { DarkLayout, HockeyFooter } from '@/components/citrus2';
 
 // Sample blog posts data
 const blogPosts = [
@@ -92,7 +93,9 @@ const Blog = () => {
   
   return (
     <DarkLayout>
-      <HockeyNav />
+
+
+      <Navbar />
       <main className="relative max-w-[1280px] mx-auto px-6 pt-12 pb-16">
         <div className="text-center mb-10">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">

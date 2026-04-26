@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Navbar from '@/components/Navbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -7,7 +8,7 @@ import { Loader2, Search, Newspaper, ExternalLink, Clock, TrendingUp, Trophy, Al
 import { getNewsArticles, NEWS_CATEGORIES, NewsArticle } from '@/services/NewsService';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { DarkLayout, HockeyNav, HockeyFooter } from '@/components/citrus2';
+import { DarkLayout, HockeyFooter } from '@/components/citrus2';
 
 const categoryIcons: Record<string, React.ReactNode> = {
   top: <TrendingUp className="h-3.5 w-3.5" />,
@@ -59,8 +60,9 @@ const News = () => {
 
   return (
     <DarkLayout>
-      <HockeyNav />
 
+
+      <Navbar />
       <main className="relative max-w-[1280px] mx-auto px-6 pt-12 pb-16">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">

@@ -7,13 +7,13 @@
  */
 
 import { useEffect, useState } from 'react';
+import Navbar from '@/components/Navbar';
 import { Link } from 'react-router-dom';
 import { Trophy, Clock, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NHL_TEAMS } from '@/types/captracker';
 import {
   DarkLayout,
-  HockeyNav,
   HockeyFooter,
   TeamColorBar,
   LivePulse,
@@ -97,7 +97,9 @@ export default function NHLPlayoffBracket() {
   if (loading) {
     return (
       <DarkLayout>
-        <HockeyNav />
+
+
+      <Navbar />
         <div className="min-h-[60vh] flex items-center justify-center">
           <div className="font-jbmono text-[12px] tracking-[0.22em] uppercase text-white/45 font-bold flex items-center gap-2">
             <LivePulse size="xs" />
@@ -110,8 +112,9 @@ export default function NHLPlayoffBracket() {
 
   return (
     <DarkLayout>
-      <HockeyNav />
 
+
+      <Navbar />
       <main className="relative max-w-[1280px] mx-auto px-6 pt-12 pb-16">
         {/* Hero */}
         <div className="text-center mb-10">
@@ -276,7 +279,7 @@ export default function NHLPlayoffBracket() {
         title={
           <>
             Lift the <span className="text-pastel-orange">Cup</span>.
-          </>
+
         }
         sub="Free during launch · Confidence-weighted scoring · Bragging rights for life"
         ctaLabel="Build Your Bracket"

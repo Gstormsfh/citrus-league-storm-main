@@ -6,23 +6,11 @@
  */
 
 import { Link } from 'react-router-dom';
-import {
-  ArrowRight,
-  Trophy,
-  Activity,
-  Sparkles,
-  Flame,
-  Zap,
-  BarChart,
-  Calendar,
-  MessageSquare,
-  FileText,
-  TrendingUp,
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import Navbar from '@/components/Navbar';
 import { MASCOT_LIST } from '@/constants/mascots';
 import {
   DarkLayout,
-  HockeyNav,
   HockeyFooter,
   RotatingHero,
   SectionHeader,
@@ -39,6 +27,18 @@ import {
   SurvivorTile,
   BracketTile,
   MascotAvatar,
+  // Real hockey iconography — replaces generic lucide
+  CupIcon,
+  PickemIcon,
+  SurvivorIcon,
+  BracketIcon,
+  DraftIcon,
+  CrossedSticksIcon,
+  XGModelIcon,
+  SlateIcon,
+  ShiftIcon,
+  ScoreboardIcon,
+  RangeIcon,
   type HeroSlide,
   type FaqEntry,
   type AccentName,
@@ -135,62 +135,61 @@ function getHeroSlides(): HeroSlide[] {
 // SECTION DATA
 // =============================================================================
 
-const NAV_LINKS = [
-  { label: 'Pickem', to: '/pool/pickem' },
-  { label: 'Survivor', to: '/pool/survivor' },
-  { label: 'Brackets', to: '/nhl/playoffs' },
-  { label: 'Stormy', to: '/gm-office/stormy' },
-  { label: 'Features', to: '/features' },
-];
-
 const GAME_MODES: Array<{
   label: string;
   sub: string;
   badge: string;
   accent: AccentName;
-  icon: typeof Trophy;
+  icon: React.ComponentType<{ className?: string }>;
+  to: string;
 }> = [
   {
     label: 'Fantasy Hockey',
     sub: 'Snake, auction, or salary cap. Custom scoring, commish tools, live draft rooms.',
     badge: 'Free',
     accent: 'orange',
-    icon: Trophy,
+    icon: CrossedSticksIcon,
+    to: '/create-league',
   },
   {
     label: 'Daily Pickem',
     sub: "Pick tonight's winners. Settled when the final horn sounds.",
     badge: 'Daily',
     accent: 'sage',
-    icon: Flame,
+    icon: PickemIcon,
+    to: '/pool/pickem',
   },
   {
     label: 'Survivor Pool',
     sub: "One pick a week. Win or you're in the sin bin. Last manager standing takes it.",
     badge: 'Weekly',
     accent: 'butter',
-    icon: Activity,
+    icon: SurvivorIcon,
+    to: '/pool/survivor',
   },
   {
     label: 'Confidence Pool',
     sub: 'Weighted weekly picks. Rank your confidence, multiply your edge.',
     badge: 'Weekly',
     accent: 'peach',
-    icon: BarChart,
+    icon: ScoreboardIcon,
+    to: '/pool/confidence',
   },
   {
     label: 'Stanley Cup Brackets',
     sub: 'Predict the entire playoff run. Confidence-weighted scoring all the way to the Cup.',
     badge: 'Apr–Jun',
     accent: 'orange',
-    icon: Sparkles,
+    icon: CupIcon,
+    to: '/nhl/playoffs',
   },
   {
     label: 'Mock Draft',
     sub: 'Spin up a 12-team mock against AI managers. No signup, instant draft room.',
     badge: 'Anytime',
     accent: 'sage',
-    icon: Zap,
+    icon: DraftIcon,
+    to: '/draft',
   },
 ];
 
@@ -198,62 +197,77 @@ const ONBOARDING_CARDS: Array<{
   title: string;
   body: string;
   cta: string;
-  icon: typeof Trophy;
+  icon: React.ComponentType<{ className?: string }>;
   accent: AccentName;
+  to: string;
 }> = [
   {
     title: 'Drop the Puck',
     body: 'Snake, auction, or salary cap. Pick your scoring, drop the invite in the group chat, draft this weekend.',
     cta: 'Start a league',
-    icon: Trophy,
+    icon: CrossedSticksIcon,
     accent: 'orange',
+    to: '/create-league',
   },
   {
     title: 'Run a Mock',
     body: 'A 12-team mock against AI managers. No signup, instant draft room — see the projections rip live.',
     cta: 'Mock now',
-    icon: Zap,
+    icon: DraftIcon,
     accent: 'sage',
+    to: '/draft',
   },
   {
     title: 'Chirp at Stormy',
-    body: 'Ask the bench coach anything — a roster move, a matchup edge, a trade. She cites xGF%, Corsi, TOI before answering.',
+    body: 'Ask the assistant GM anything — a roster move, a matchup edge, a trade. She cites xGF%, Corsi, TOI before answering.',
     cta: 'Open Stormy',
-    icon: Sparkles,
+    icon: ShiftIcon,
     accent: 'butter',
+    to: '/gm-office/stormy',
   },
 ];
 
-const REAL_FEATURES = [
+const REAL_FEATURES: Array<{
+  label: string;
+  desc: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: AccentName;
+}> = [
   {
     label: '31-Feature xG Model',
     desc: 'XGBoost projections using xGF%, deployment, line chemistry, and Bayesian shrinkage.',
-    icon: TrendingUp,
+    icon: XGModelIcon,
+    accent: 'orange',
   },
   {
     label: 'Saturday Slate',
     desc: 'Sun–Sat weeks. Your matchup ends with 12 games on the ice, not Sunday morning when 3 teams play.',
-    icon: Calendar,
+    icon: SlateIcon,
+    accent: 'sage',
   },
   {
     label: 'Live Shift Scoring',
     desc: 'Every goal, apple, hit, block updates your matchup in real time as the play unfolds.',
-    icon: Zap,
+    icon: ShiftIcon,
+    accent: 'butter',
   },
   {
     label: 'Stormy · Assistant GM',
     desc: 'Plugged into your roster, scoring, and matchup. Real hockey advice, not generic boilerplate.',
-    icon: MessageSquare,
+    icon: ScoreboardIcon,
+    accent: 'peach',
   },
   {
     label: 'Advanced Metrics',
     desc: 'xGF%, Corsi, PP1 share, deployment splits, zone entry rates — built in, no extra subscription.',
-    icon: BarChart,
+    icon: XGModelIcon,
+    accent: 'sage',
   },
   {
     label: 'Monte Carlo Ranges',
     desc: 'Floor / median / ceiling per skater per night. See the upside, not just a single number.',
-    icon: FileText,
+    icon: RangeIcon,
+    accent: 'orange',
   },
 ];
 
@@ -295,10 +309,18 @@ export function Homepage() {
 
   return (
     <DarkLayout>
-      <HockeyNav
-        links={NAV_LINKS}
-        promo="🍊 Free during launch · Founders pricing locked in for early users"
-      />
+      {/* Legacy Navbar — preserves league switcher, notifications, profile dropdown,
+          and playoff bracket access. Sits above the dark page. */}
+      <Navbar />
+
+      {/* Promo banner below the nav */}
+      <div className="relative z-10 bg-gradient-to-r from-pastel-orange/15 via-pastel-orange/25 to-pastel-orange/15 border-y border-pastel-orange/30">
+        <div className="max-w-[1280px] mx-auto px-6 py-2 text-center">
+          <span className="font-jbmono text-[11px] tracking-[0.18em] uppercase text-pastel-orange-soft font-bold">
+            🍊 Free during launch · Founders pricing locked in for early users
+          </span>
+        </div>
+      </div>
 
       <RotatingHero slides={slides} />
 

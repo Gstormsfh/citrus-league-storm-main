@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import Navbar from '@/components/Navbar';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Mail, CheckCircle2, Loader2 } from 'lucide-react';
-import { DarkLayout, HockeyNav, MascotAvatar } from '@/components/citrus2';
+import { DarkLayout, MascotAvatar } from '@/components/citrus2';
 
 const VerifyEmail = () => {
   const navigate = useNavigate();
@@ -46,7 +47,7 @@ const VerifyEmail = () => {
 
   return (
     <DarkLayout>
-      <HockeyNav showLogin={false} />
+      <Navbar />
       <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
         <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
           <CardHeader className="text-center">
@@ -101,17 +102,17 @@ const VerifyEmail = () => {
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Sending...
-                  </>
+
                 ) : success ? (
                   <>
                     <CheckCircle2 className="mr-2 h-4 w-4" />
                     Email Sent
-                  </>
+
                 ) : (
                   <>
                     <Mail className="mr-2 h-4 w-4" />
                     Resend Verification Email
-                  </>
+
                 )}
               </Button>
 

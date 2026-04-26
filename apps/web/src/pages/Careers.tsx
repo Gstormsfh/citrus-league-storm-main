@@ -1,5 +1,6 @@
 import { ArrowRight, Briefcase, Code, LineChart, Megaphone } from 'lucide-react';
-import { DarkLayout, HockeyNav, HockeyFooter, SectionHeader } from '@/components/citrus2';
+import Navbar from '@/components/Navbar';
+import { DarkLayout, HockeyFooter, SectionHeader } from '@/components/citrus2';
 
 const POSITIONS = [
   { title: 'Senior Frontend Engineer', department: 'Engineering', location: 'Remote', icon: Code, type: 'Full-time' },
@@ -11,8 +12,9 @@ const POSITIONS = [
 export default function Careers() {
   return (
     <DarkLayout>
-      <HockeyNav />
 
+
+      <Navbar />
       <main className="relative max-w-[1100px] mx-auto px-6 pt-16 pb-24">
         <div className="text-center mb-12">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">

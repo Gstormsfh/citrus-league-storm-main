@@ -1,13 +1,14 @@
 // Standalone Waitlist Page - Shareable link for social media signups
 import WaitlistSignup from '@/components/WaitlistSignup';
-import { DarkLayout, HockeyNav, HockeyFooter, MascotAvatar } from '@/components/citrus2';
+import Navbar from '@/components/Navbar';
+import { DarkLayout, HockeyFooter, MascotAvatar } from '@/components/citrus2';
 
 const Waitlist = () => {
   return (
     <DarkLayout>
-      <HockeyNav />
 
-      <main className="relative pt-12 pb-20">
+
+      <Navbar />      <main className="relative pt-12 pb-20">
         {/* Hero Section */}
         <section className="relative overflow-hidden">
           <div className="max-w-[1100px] mx-auto px-6 py-16 md:py-24">

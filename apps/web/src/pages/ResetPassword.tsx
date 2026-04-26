@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Navbar from '@/components/Navbar';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Lock, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
-import { DarkLayout, HockeyNav } from '@/components/citrus2';
+import { DarkLayout } from '@/components/citrus2';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -100,7 +101,7 @@ const ResetPassword = () => {
   if (!hasToken) {
     return (
       <DarkLayout>
-        <HockeyNav showLogin={false} />
+        <Navbar />
         <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
           <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
             <CardHeader>
@@ -123,7 +124,7 @@ const ResetPassword = () => {
 
   return (
     <DarkLayout>
-      <HockeyNav showLogin={false} />
+      <Navbar />
       <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
         <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
           <CardHeader>
@@ -177,7 +178,7 @@ const ResetPassword = () => {
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Updating password...
-                </>
+
               ) : (
                 'Update Password'
               )}

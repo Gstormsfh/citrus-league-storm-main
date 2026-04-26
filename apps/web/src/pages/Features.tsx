@@ -1,59 +1,71 @@
 import { Link } from 'react-router-dom';
-import {
-  ArrowRight,
-  TrendingUp,
-  Calendar,
-  Zap,
-  MessageSquare,
-  BarChart,
-  FileText,
-  Trophy,
-  Activity,
-  Sparkles,
-  Flame,
-} from 'lucide-react';
+import { ArrowRight, Shield, Users, CheckCircle } from 'lucide-react';
+import Navbar from '@/components/Navbar';
 import {
   DarkLayout,
-  HockeyNav,
   HockeyFooter,
   SectionHeader,
   CtaBanner,
   FeatureCard,
   GameModeCard,
   MascotAvatar,
+  // Hockey iconography — replaces generic lucide
+  ScoreboardIcon,
+  ShiftIcon,
+  CrossedSticksIcon,
+  CupIcon,
+  DraftIcon,
+  PickemIcon,
+  SurvivorIcon,
   type AccentName,
 } from '@/components/citrus2';
 
-const CORE_FEATURES = [
+/**
+ * Original 6 features from legacy Features.tsx — preserved verbatim per
+ * "nothing changes structurally" rule. Just given the citrus2 visual treatment
+ * with custom hockey iconography instead of generic lucide.
+ */
+const CORE_FEATURES: Array<{
+  label: string;
+  desc: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: AccentName;
+}> = [
   {
-    label: '31-Feature xG Model',
-    desc: 'XGBoost projections using xGF%, deployment patterns, line chemistry, PP1 share, zone entry rates, and Bayesian shrinkage for low-sample players. The most accurate fantasy hockey projections on the planet.',
-    icon: TrendingUp,
+    label: 'Stormy AI Assistant',
+    desc: 'Data-driven draft advice, trade analysis, and lineup optimization powered by advanced AI and industry-leading projections. Plugged into your roster, scoring, and matchup.',
+    icon: ScoreboardIcon,
+    accent: 'orange',
   },
   {
-    label: 'Saturday Slate',
-    desc: 'Fantasy weeks run Sunday through Saturday. Your matchup ends with 12 games on the ice — not Sunday morning when 3 teams are playing and your opponent already won. Drama where it should be.',
-    icon: Calendar,
+    label: 'Live Scoring Updates',
+    desc: 'Real-time scoring updates with live stats and advanced metrics during games. Watch your matchup shift with every shot, hit, block, and save.',
+    icon: ShiftIcon,
+    accent: 'sage',
   },
   {
-    label: 'Live Shift Scoring',
-    desc: 'Every goal, apple, hit, block, and save updates your matchup in real time as the play unfolds. Shift-level precision, not minute-by-minute polling.',
-    icon: Zap,
+    label: 'League Customization',
+    desc: 'Deep customization options for scoring, rosters, and playoffs to match your league\'s style. Snake, auction, salary cap — all formats supported.',
+    icon: CrossedSticksIcon,
+    accent: 'butter',
   },
   {
-    label: 'Stormy · Assistant GM',
-    desc: 'Plugged into your roster, scoring, and matchup. Cites real metrics (xGF%, TOI, PP1 share, save%) instead of "monitor the situation" boilerplate. The assistant GM you wish your team had.',
-    icon: MessageSquare,
+    label: 'Secure & Reliable',
+    desc: 'Enterprise-grade security ensures your league data and personal information are always safe. Row-level security on every table, audit logs on every action.',
+    icon: Shield,
+    accent: 'peach',
   },
   {
-    label: 'Advanced Metrics Built In',
-    desc: 'xGF%, Corsi, PP1 share, deployment splits, zone entry rates, line combo data — all built into player pages. No subscription to a separate site, no spreadsheet exports.',
-    icon: BarChart,
+    label: 'Dynasty Support',
+    desc: 'Built-in tools for keeper and dynasty leagues, including future draft pick trading, contract years, and prospect rankings.',
+    icon: CupIcon,
+    accent: 'orange',
   },
   {
-    label: 'Monte Carlo Ranges',
-    desc: 'Floor / median / ceiling projections per skater per night. Visualized as range bars so you see the upside, not just a single number. Know who has the highest ceiling and who has the safest floor.',
-    icon: FileText,
+    label: 'Draft Tools',
+    desc: 'Mock drafts against AI managers, cheat sheets, ADP rankings, and live draft rooms with chat. Build your championship team with confidence.',
+    icon: DraftIcon,
+    accent: 'sage',
   },
 ];
 
@@ -62,54 +74,59 @@ const FORMATS: Array<{
   sub: string;
   badge: string;
   accent: AccentName;
-  icon: typeof Trophy;
+  icon: React.ComponentType<{ className?: string }>;
+  to: string;
 }> = [
   {
     label: 'Snake / Auction / Salary',
     sub: 'Run any league format. Custom scoring, commish tools, live draft rooms.',
     badge: 'Fantasy',
     accent: 'orange',
-    icon: Trophy,
+    icon: CrossedSticksIcon,
+    to: '/create-league',
   },
   {
     label: 'Daily Pickem',
     sub: 'Pick the winner of every NHL game. Straight up — no spreads, no over-unders.',
     badge: 'Daily',
     accent: 'sage',
-    icon: Flame,
+    icon: PickemIcon,
+    to: '/pool/pickem',
   },
   {
     label: 'Survivor Pool',
-    sub: 'One pick a week, can\'t reuse teams. Lose once and you\'re in the sin bin.',
+    sub: "One pick a week, can't reuse teams. Lose once and you're in the sin bin.",
     badge: 'Weekly',
     accent: 'butter',
-    icon: Activity,
+    icon: SurvivorIcon,
+    to: '/pool/survivor',
   },
   {
     label: 'Stanley Cup Brackets',
     sub: 'Predict the entire playoff run. Confidence-weighted scoring all the way to the Cup.',
     badge: 'Apr–Jun',
     accent: 'peach',
-    icon: Sparkles,
+    icon: CupIcon,
+    to: '/nhl/playoffs',
   },
 ];
 
 export default function Features() {
   return (
     <DarkLayout>
-      <HockeyNav promo="🍊 Free during launch · Founders pricing locked in for early users" />
+      <Navbar />
 
       <main>
         {/* Hero */}
-        <section className="relative max-w-[1280px] mx-auto px-6 pt-20 pb-16 text-center">
+        <section className="relative max-w-[1280px] mx-auto px-6 pt-12 pb-12 md:pt-20 md:pb-16 text-center">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-4 font-bold">
             Features
           </div>
-          <h1 className="font-sans font-black text-[3rem] md:text-[4.5rem] leading-[0.98] tracking-[-0.035em] text-pastel-cream mb-6 max-w-3xl mx-auto">
+          <h1 className="font-sans font-black text-[2.5rem] sm:text-[3rem] md:text-[4.5rem] leading-[0.98] tracking-[-0.035em] text-pastel-cream mb-6 max-w-3xl mx-auto">
             Every tool a hockey head{' '}
             <span className="text-pastel-orange">actually wants</span>.
           </h1>
-          <p className="text-[16px] md:text-[18px] leading-relaxed text-white/65 max-w-xl mx-auto mb-10">
+          <p className="text-[15px] md:text-[18px] leading-relaxed text-white/65 max-w-xl mx-auto mb-8 md:mb-10 px-4">
             Citrus is built for people who watch every game, refresh every box score, and care
             about xGF%. Here's everything that ships in the platform — no upsells, no premium
             tier you have to unlock.
@@ -125,11 +142,11 @@ export default function Features() {
         </section>
 
         {/* Core platform features */}
-        <section className="relative max-w-[1280px] mx-auto px-6 pb-24">
+        <section className="relative max-w-[1280px] mx-auto px-6 pb-16 md:pb-24">
           <SectionHeader
             eyebrow="Core platform"
             title="The data that wins championships."
-            sub="Six things every fantasy hockey manager needs. All free during launch."
+            sub="Six pillars of the Citrus platform. All free during launch, founders pricing locked in for early users."
             align="center"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -140,7 +157,7 @@ export default function Features() {
         </section>
 
         {/* League formats */}
-        <section className="relative max-w-[1280px] mx-auto px-6 pb-24">
+        <section className="relative max-w-[1280px] mx-auto px-6 pb-16 md:pb-24">
           <SectionHeader
             eyebrow="League Formats"
             title="Every way to play hockey."
@@ -155,8 +172,8 @@ export default function Features() {
         </section>
 
         {/* Stormy callout */}
-        <section className="relative max-w-[1280px] mx-auto px-6 pb-24">
-          <div className="bg-[#1A2A20] border border-white/10 rounded-3xl p-10 md:p-14 grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-8 items-center">
+        <section className="relative max-w-[1280px] mx-auto px-6 pb-16 md:pb-24">
+          <div className="bg-[#1A2A20] border border-white/10 rounded-3xl p-6 md:p-10 lg:p-14 grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-6 lg:gap-8 items-center">
             <div className="flex justify-center lg:justify-start">
               <MascotAvatar id="stormy" size="xl" />
             </div>
@@ -164,10 +181,10 @@ export default function Features() {
               <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-2 font-bold">
                 Stormy · Assistant GM
               </div>
-              <h2 className="font-sans font-black text-[2rem] md:text-[2.5rem] tracking-[-0.025em] text-pastel-cream leading-tight mb-4">
+              <h2 className="font-sans font-black text-[1.75rem] md:text-[2.5rem] tracking-[-0.025em] text-pastel-cream leading-tight mb-4">
                 Your AI assistant GM, in every league.
               </h2>
-              <p className="text-[15px] text-white/65 leading-relaxed mb-6 max-w-2xl">
+              <p className="text-[14px] md:text-[15px] text-white/65 leading-relaxed mb-6 max-w-2xl">
                 Stormy is plugged into your roster, your scoring settings, and your matchup. Ask
                 start/sit, trade analysis, waiver targets — she answers in real hockey advanced
                 stats: xGF%, Corsi, TOI, PP1 share, save%. Trained on every shift since 2007.
@@ -184,6 +201,7 @@ export default function Features() {
 
         <CtaBanner
           eyebrow="🏒 Stanley Cup Playoffs · Live now"
+          eyebrowPulse
           title={
             <>
               Get on the ice <span className="text-pastel-orange">tonight</span>.

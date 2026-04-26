@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Navbar from '@/components/Navbar';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
@@ -9,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, User, Mail, Phone, MapPin } from 'lucide-react';
 import { accountApi } from '@/api/account';
-import { DarkLayout, HockeyNav, MascotAvatar } from '@/components/citrus2';
+import { DarkLayout, MascotAvatar } from '@/components/citrus2';
 
 const ProfileSetup = () => {
   const navigate = useNavigate();
@@ -112,7 +113,7 @@ const ProfileSetup = () => {
 
   return (
     <DarkLayout>
-      <HockeyNav showLogin={false} />
+      <Navbar />
       <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
         <Card className="w-full max-w-2xl bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
           <CardHeader className="space-y-3 text-center">
@@ -232,7 +233,7 @@ const ProfileSetup = () => {
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Saving...
-                  </>
+
                 ) : (
                   'Complete Setup'
                 )}

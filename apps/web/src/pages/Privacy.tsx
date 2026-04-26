@@ -1,10 +1,12 @@
-import { DarkLayout, HockeyNav, HockeyFooter } from '@/components/citrus2';
+import { DarkLayout, HockeyFooter } from '@/components/citrus2';
+import Navbar from '@/components/Navbar';
 
 const Privacy = () => {
   return (
     <DarkLayout>
-      <HockeyNav />
-      <main className="relative max-w-[820px] mx-auto px-6 pt-16 pb-24">
+
+
+      <Navbar />      <main className="relative max-w-[820px] mx-auto px-6 pt-16 pb-24">
         <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">
           Legal
         </div>
