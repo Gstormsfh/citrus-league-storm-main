@@ -130,6 +130,17 @@ wire-up needed for chunk 9d.
 | **Target phase for resolution** | **Phase 7** at the latest (load testing — that's when actual rate-limit behavior gets measured). Could land earlier if a separate decision on shared rate-limit infrastructure (Redis vs. Postgres-backed bucket) is made independently. |
 | **Verification test** | Spin up ≥2 Cloud Run instances on staging. From a single client, hammer `/api/draft/v2/league/$ID/events` at 30 req/s for 60s. Count actual responses by status code. **Pass** = (200 count + 429 count) corresponds to the documented 10/30s rate (so 10 successes per 30s window, all others 429). **Fail** = success count exceeds 10/30s by more than the documented limit × instance count. Alternative if shared store lands first: integration test against a multi-instance simulated dispatch confirming the rate limit holds. |
 
+### KI-004 — Phase 3 keep-alive cron's `net.http_post` URL is hardcoded to staging
+
+| | |
+|---|---|
+| **Severity** | medium |
+| **Function / file** | `supabase/migrations/20260426150000_draft_engine_v2_phase3_cron_vault.sql`, the `draft-autopick-keepalive` cron command body (search-string `STAGING_PROJECT_REF`). |
+| **Description** | The cron's `net.http_post(url := 'https://jjgspcpvqaiitloglxbb.supabase.co/functions/v1/draft-autopick', ...)` call has the staging Supabase project ref baked in as a string literal. There is no environment variable available at SQL apply time, and pg_cron stores the literal command text in `cron.job.command`. The same migration file applied verbatim to a prod project would still POST to staging — which means prod's safety-net deadlines would never reach a prod worker. |
+| **Why deferred** | Phase 3 is staging-only by spec (Phase 8a is the prod cutover). Parameterizing the URL via Vault now would require a second Vault secret (`draft_autopick_worker_url` or similar), additional provisioning steps in the operations runbook, and a `COALESCE`-based fallback for the case where the URL secret is missing — all overhead for a problem that does not yet exist. The simpler fix is to ship a prod-flavored cutover migration in Phase 8a that reads URL from Vault from day one, alongside the existing `draft-autopick-token` provisioning. |
+| **Target phase for resolution** | **Phase 8a** (prod cutover). The prod cutover migration replaces the literal URL with `'https://' \|\| vault.read_secret('draft_autopick_worker_url') \|\| '/functions/v1/draft-autopick'` (or equivalent). Same Vault provisioning recipe as `draft-autopick-token`; same rotation procedure. The runbook's "STAGING_PROJECT_REF" marker comment in the chunk 10d migration flags the line that must change. |
+| **Verification test** | After the Phase 8a cutover migration applies on prod: `SELECT count(*) FROM cron.job WHERE jobname = 'draft-autopick-keepalive' AND command LIKE '%jjgspcpvqaiitloglxbb%';` must return **0** (no staging ref leaked into prod). Plus the positive assertion `SELECT count(*) FROM cron.job WHERE jobname = 'draft-autopick-keepalive' AND command LIKE '%vault.read_secret%';` must return **1** (URL is Vault-resolved). Both assertions fail-loud during the cutover smoke test. |
+
 ---
 
 ## How to add a row
