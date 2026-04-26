@@ -22,6 +22,7 @@ interface Seed {
   seed: number;
   wins?: number;
   losses?: number;
+  ot_losses?: number;
   points?: number;
 }
 
