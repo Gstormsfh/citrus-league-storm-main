@@ -19,7 +19,9 @@ export { LivePulse, Eyebrow } from './LivePulse';
 // Page chrome
 export { DarkLayout } from './DarkLayout';
 export { HockeyNav } from './HockeyNav';
+export type { NavLink } from './HockeyNav';
 export { HockeyFooter } from './HockeyFooter';
+export type { FooterLink, FooterColumn } from './HockeyFooter';
 
 // Sections
 export { SectionHeader } from './SectionHeader';

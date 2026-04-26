@@ -1,18 +1,35 @@
 import { Link } from 'react-router-dom';
 
+export interface NavLink {
+  label: string;
+  to: string;
+}
+
+const DEFAULT_LINKS: NavLink[] = [
+  { label: 'Features', to: '/features' },
+  { label: 'Pickem', to: '/pool/pickem' },
+  { label: 'Brackets', to: '/nhl/playoffs' },
+  { label: 'Stormy', to: '/gm-office/stormy' },
+  { label: 'Pricing', to: '/pricing' },
+];
+
 /**
  * Sticky dark nav with optional promo banner above. Used at the top of every
  * citrus2 page. Coexists with the legacy `Navbar.tsx` so unmigrated pages keep
  * their current shell.
+ *
+ * All links use React Router so route transitions stay client-side. Default
+ * `links` point to real public routes — pages can override with their own
+ * link sets.
  */
 export function HockeyNav({
-  links = ['Fantasy', 'Pickem', 'Survivor', 'Brackets', 'Stormy'],
+  links = DEFAULT_LINKS,
   promo,
   ctaLabel = 'Get the App',
   ctaHref = '/create-league',
   showLogin = true,
 }: {
-  links?: string[];
+  links?: NavLink[];
   /** Optional promo banner content above the nav */
   promo?: React.ReactNode;
   ctaLabel?: string;
@@ -38,14 +55,14 @@ export function HockeyNav({
               <span aria-hidden="true" className="block w-1.5 h-1.5 bg-pastel-orange rounded-full animate-pulse" />
             </Link>
             <nav className="hidden md:flex items-center gap-7">
-              {links.map((label) => (
-                <a
-                  key={label}
-                  href="#"
+              {links.map((link) => (
+                <Link
+                  key={link.label}
+                  to={link.to}
                   className="text-[14px] font-medium text-white/65 hover:text-pastel-cream transition-colors"
                 >
-                  {label}
-                </a>
+                  {link.label}
+                </Link>
               ))}
             </nav>
           </div>

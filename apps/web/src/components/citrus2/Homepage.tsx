@@ -135,7 +135,13 @@ function getHeroSlides(): HeroSlide[] {
 // SECTION DATA
 // =============================================================================
 
-const NAV_LINKS = ['Fantasy', 'Pickem', 'Survivor', 'Brackets', 'Stormy'];
+const NAV_LINKS = [
+  { label: 'Pickem', to: '/pool/pickem' },
+  { label: 'Survivor', to: '/pool/survivor' },
+  { label: 'Brackets', to: '/nhl/playoffs' },
+  { label: 'Stormy', to: '/gm-office/stormy' },
+  { label: 'Features', to: '/features' },
+];
 
 const GAME_MODES: Array<{
   label: string;
