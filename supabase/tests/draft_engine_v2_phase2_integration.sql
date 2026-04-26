@@ -710,3 +710,394 @@ BEGIN
 END
 $sc005$;
 
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-006 — Idempotency check fires BEFORE preflight (spec §5.2.1)
+-- ════════════════════════════════════════════════════════════════════════
+-- This is the critical ordering test. Spec §5.2.1: "A retry whose
+-- state has moved past the pick_number is still a valid replay;
+-- raising pick_out_of_order would be a false positive on retry."
+--
+-- Setup:
+--   - Seed; submit pick 1 with key K1, hash H1.
+--   - Submit pick 2 (different key K2) so state moves past pick 1.
+--   - Retry submit_pick_v2 with key K1 + hash H1 + everything else
+--     identical to the first call.
+-- Assert:
+--   - Third call returns was_duplicate=true.
+--   - Returned event_id and seq match the FIRST call exactly.
+--   - draft_events still has 2 rows (no third event landed).
+-- This proves the idempotency lookup happens BEFORE pick_number
+-- preflight; otherwise the third call would raise pick_out_of_order
+-- (because pick_number=1 is no longer current; current is pick 3).
+
+DO $sc006$
+DECLARE
+  v_seed         jsonb;
+  v_league_id    uuid;
+  v_team_ids     uuid[];
+  v_session_id   uuid;
+  v_idem_k1      uuid := gen_random_uuid();
+  v_idem_k2      uuid := gen_random_uuid();
+  v_hash_1       text := 'sha256:' || md5('SC006-pick-1');
+  v_hash_2       text := 'sha256:' || md5('SC006-pick-2');
+  v_first_result jsonb;
+  v_retry_result jsonb;
+  v_event_count  int;
+BEGIN
+  RAISE NOTICE 'SC-006 starting: idempotency BEFORE preflight ordering';
+  BEGIN  -- savepoint
+
+  v_seed       := _v2_test._seed_active_league(
+                    '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id  := (v_seed ->> 'league_id')::uuid;
+  v_team_ids   := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+  v_session_id := (v_seed ->> 'session_id')::uuid;
+
+  -- Pick 1: team[0], player 6001, key K1.
+  v_first_result := submit_pick_v2(
+    p_league_id => v_league_id, p_team_id => v_team_ids[1], p_player_id => 6001,
+    p_round => 1, p_pick_number => 1,
+    p_session_id => v_session_id,
+    p_idempotency_key => v_idem_k1, p_payload_hash => v_hash_1,
+    p_actor => jsonb_build_object('kind', 'autopick'),
+    p_correlation_id => NULL
+  );
+  PERFORM _v2_test._assert((v_first_result ->> 'was_duplicate')::boolean = false,
+    'SC-006 pick 1 should be a fresh commit');
+
+  -- Pick 2: team[1], player 6002, key K2. State now past pick 1.
+  PERFORM submit_pick_v2(
+    p_league_id => v_league_id, p_team_id => v_team_ids[2], p_player_id => 6002,
+    p_round => 1, p_pick_number => 2,
+    p_session_id => v_session_id,
+    p_idempotency_key => v_idem_k2, p_payload_hash => v_hash_2,
+    p_actor => jsonb_build_object('kind', 'autopick'),
+    p_correlation_id => NULL
+  );
+
+  -- Retry pick 1 with key K1. pick_number=1 is now stale (current is 3).
+  -- Spec §5.2.1: must return was_duplicate=true, NOT raise.
+  v_retry_result := submit_pick_v2(
+    p_league_id => v_league_id, p_team_id => v_team_ids[1], p_player_id => 6001,
+    p_round => 1, p_pick_number => 1,
+    p_session_id => v_session_id,
+    p_idempotency_key => v_idem_k1, p_payload_hash => v_hash_1,
+    p_actor => jsonb_build_object('kind', 'autopick'),
+    p_correlation_id => NULL
+  );
+
+  PERFORM _v2_test._assert((v_retry_result ->> 'was_duplicate')::boolean = true,
+    'SC-006 retry: was_duplicate must be true (NOT pick_out_of_order)');
+  PERFORM _v2_test._assert(
+    (v_retry_result ->> 'event_id') = (v_first_result ->> 'event_id'),
+    'SC-006 retry: event_id must match the first call'
+  );
+  PERFORM _v2_test._assert(
+    (v_retry_result ->> 'seq') = (v_first_result ->> 'seq'),
+    'SC-006 retry: seq must match the first call'
+  );
+
+  -- No third event was inserted.
+  SELECT count(*) INTO v_event_count FROM draft_events WHERE league_id = v_league_id;
+  PERFORM _v2_test._assert(v_event_count = 2,
+    'SC-006 should still have 2 events after the retry, got ' || v_event_count);
+
+  RAISE NOTICE 'SC-006 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc006$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-007 — Draft not active → illegal_state
+-- ════════════════════════════════════════════════════════════════════════
+-- Seed → UPDATE leagues SET draft_state='paused'. submit_pick_v2 must
+-- raise illegal_state (sqlstate check_violation) with a message
+-- starting with 'illegal_state'.
+--
+-- Spec refs: §5.2 preflight 2a; §11.1 illegal_state → 422.
+
+DO $sc007$
+DECLARE
+  v_seed        jsonb;
+  v_league_id   uuid;
+  v_team_ids    uuid[];
+  v_caught_msg   text;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-007 starting: draft not active → illegal_state';
+  BEGIN  -- savepoint
+
+  v_seed       := _v2_test._seed_active_league(
+                    '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id  := (v_seed ->> 'league_id')::uuid;
+  v_team_ids   := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+
+  -- Force-pause the seeded league via direct UPDATE (bypassing
+  -- draft_pause RPC, which is tested separately in 9e4).
+  UPDATE leagues SET draft_state = 'paused' WHERE id = v_league_id;
+
+  BEGIN
+    PERFORM submit_pick_v2(
+      p_league_id => v_league_id, p_team_id => v_team_ids[1], p_player_id => 7001,
+      p_round => 1, p_pick_number => 1,
+      p_session_id => gen_random_uuid(),
+      p_idempotency_key => gen_random_uuid(),
+      p_payload_hash => 'sha256:' || md5('SC007'),
+      p_actor => jsonb_build_object('kind', 'autopick'),
+      p_correlation_id => NULL
+    );
+    RAISE EXCEPTION 'SC-007 expected illegal_state but RPC returned without raising';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-007 sqlstate should be 23514 (check_violation), got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'illegal_state%',
+    'SC-007 error message should start with illegal_state, got: ' || v_caught_msg);
+
+  RAISE NOTICE 'SC-007 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc007$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-008 — pick_number out of order → pick_out_of_order
+-- ════════════════════════════════════════════════════════════════════════
+-- Seed (no picks yet → expected pick_number is 1). Submit with
+-- pick_number=5. Must raise pick_out_of_order.
+--
+-- Spec refs: §5.2 preflight 2b; §11.1 pick_out_of_order → 409.
+
+DO $sc008$
+DECLARE
+  v_seed        jsonb;
+  v_league_id   uuid;
+  v_team_ids    uuid[];
+  v_caught_msg   text;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-008 starting: pick_number out of order → pick_out_of_order';
+  BEGIN  -- savepoint
+
+  v_seed       := _v2_test._seed_active_league(
+                    '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id  := (v_seed ->> 'league_id')::uuid;
+  v_team_ids   := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+
+  BEGIN
+    PERFORM submit_pick_v2(
+      p_league_id => v_league_id, p_team_id => v_team_ids[1], p_player_id => 8001,
+      p_round => 2,                          -- consistent with pick 5 in 3-team
+      p_pick_number => 5,                    -- expected was 1
+      p_session_id => gen_random_uuid(),
+      p_idempotency_key => gen_random_uuid(),
+      p_payload_hash => 'sha256:' || md5('SC008'),
+      p_actor => jsonb_build_object('kind', 'autopick'),
+      p_correlation_id => NULL
+    );
+    RAISE EXCEPTION 'SC-008 expected pick_out_of_order but RPC returned without raising';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-008 sqlstate should be 23514, got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'pick_out_of_order%',
+    'SC-008 message should start with pick_out_of_order, got: ' || v_caught_msg);
+
+  RAISE NOTICE 'SC-008 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc008$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-009 — Wrong team on the clock → not_on_clock
+-- ════════════════════════════════════════════════════════════════════════
+-- Seed. team[0] is on the clock for pick 1 (round 1, snake). Submit
+-- with team_id = team[1]. Must raise not_on_clock.
+--
+-- Spec refs: §5.2 preflight 2c; §11.1 not_on_clock → 409.
+
+DO $sc009$
+DECLARE
+  v_seed        jsonb;
+  v_league_id   uuid;
+  v_team_ids    uuid[];
+  v_caught_msg   text;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-009 starting: wrong team on the clock → not_on_clock';
+  BEGIN  -- savepoint
+
+  v_seed       := _v2_test._seed_active_league(
+                    '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id  := (v_seed ->> 'league_id')::uuid;
+  v_team_ids   := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+
+  BEGIN
+    PERFORM submit_pick_v2(
+      p_league_id => v_league_id,
+      p_team_id => v_team_ids[2],            -- team B; team A is on the clock
+      p_player_id => 9001,
+      p_round => 1, p_pick_number => 1,
+      p_session_id => gen_random_uuid(),
+      p_idempotency_key => gen_random_uuid(),
+      p_payload_hash => 'sha256:' || md5('SC009'),
+      p_actor => jsonb_build_object('kind', 'autopick'),
+      p_correlation_id => NULL
+    );
+    RAISE EXCEPTION 'SC-009 expected not_on_clock but RPC returned without raising';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-009 sqlstate should be 23514, got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'not_on_clock%',
+    'SC-009 message should start with not_on_clock, got: ' || v_caught_msg);
+
+  RAISE NOTICE 'SC-009 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc009$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-010 — Player already picked → player_taken
+-- ════════════════════════════════════════════════════════════════════════
+-- Seed. Submit pick 1 with player 10001 → success. Then submit pick
+-- 2 (correct on-the-clock team per snake) but with the SAME player
+-- 10001. Must raise player_taken.
+--
+-- Spec refs: §5.2 preflight 2d; §11.1 player_taken → 409.
+
+DO $sc010$
+DECLARE
+  v_seed        jsonb;
+  v_league_id   uuid;
+  v_team_ids    uuid[];
+  v_caught_msg   text;
+  v_caught_state text;
+  v_event_count int;
+BEGIN
+  RAISE NOTICE 'SC-010 starting: player already picked → player_taken';
+  BEGIN  -- savepoint
+
+  v_seed       := _v2_test._seed_active_league(
+                    '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id  := (v_seed ->> 'league_id')::uuid;
+  v_team_ids   := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+
+  -- Pick 1: team[0], player 10001.
+  PERFORM submit_pick_v2(
+    p_league_id => v_league_id, p_team_id => v_team_ids[1], p_player_id => 10001,
+    p_round => 1, p_pick_number => 1,
+    p_session_id => gen_random_uuid(),
+    p_idempotency_key => gen_random_uuid(),
+    p_payload_hash => 'sha256:' || md5('SC010-pick1'),
+    p_actor => jsonb_build_object('kind', 'autopick'),
+    p_correlation_id => NULL
+  );
+
+  -- Pick 2: team[1] (next on the clock), SAME player 10001.
+  BEGIN
+    PERFORM submit_pick_v2(
+      p_league_id => v_league_id, p_team_id => v_team_ids[2], p_player_id => 10001,
+      p_round => 1, p_pick_number => 2,
+      p_session_id => gen_random_uuid(),
+      p_idempotency_key => gen_random_uuid(),
+      p_payload_hash => 'sha256:' || md5('SC010-pick2'),
+      p_actor => jsonb_build_object('kind', 'autopick'),
+      p_correlation_id => NULL
+    );
+    RAISE EXCEPTION 'SC-010 expected player_taken but RPC returned without raising';
+  EXCEPTION WHEN unique_violation THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '23505',
+    'SC-010 sqlstate should be 23505 (unique_violation), got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'player_taken%',
+    'SC-010 message should start with player_taken, got: ' || v_caught_msg);
+
+  -- Confirm the projection still has only the first pick.
+  SELECT count(*) INTO v_event_count FROM draft_picks_v2 WHERE league_id = v_league_id;
+  PERFORM _v2_test._assert(v_event_count = 1,
+    'SC-010 projection should have 1 row (pick 1) after the conflict, got ' || v_event_count);
+
+  RAISE NOTICE 'SC-010 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc010$;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- SC-011 — Round mismatch (sanity) → pick_out_of_order
+-- ════════════════════════════════════════════════════════════════════════
+-- Seed. pick_number=1 in a 3-team league derives to round=1. Submit
+-- with pick_number=1 but round=2. Must raise pick_out_of_order with
+-- a 'round mismatch' message.
+--
+-- Spec refs: §5.2 preflight 2c (round consistency).
+
+DO $sc011$
+DECLARE
+  v_seed        jsonb;
+  v_league_id   uuid;
+  v_team_ids    uuid[];
+  v_caught_msg   text;
+  v_caught_state text;
+BEGIN
+  RAISE NOTICE 'SC-011 starting: round mismatch → pick_out_of_order';
+  BEGIN  -- savepoint
+
+  v_seed       := _v2_test._seed_active_league(
+                    '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
+  v_league_id  := (v_seed ->> 'league_id')::uuid;
+  v_team_ids   := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
+
+  BEGIN
+    PERFORM submit_pick_v2(
+      p_league_id => v_league_id, p_team_id => v_team_ids[1], p_player_id => 11001,
+      p_round => 2,                          -- WRONG — derived round = 1
+      p_pick_number => 1,
+      p_session_id => gen_random_uuid(),
+      p_idempotency_key => gen_random_uuid(),
+      p_payload_hash => 'sha256:' || md5('SC011'),
+      p_actor => jsonb_build_object('kind', 'autopick'),
+      p_correlation_id => NULL
+    );
+    RAISE EXCEPTION 'SC-011 expected pick_out_of_order (round mismatch) but RPC returned';
+  EXCEPTION WHEN check_violation THEN
+    v_caught_msg   := SQLERRM;
+    v_caught_state := SQLSTATE;
+  END;
+
+  PERFORM _v2_test._assert(v_caught_state = '23514',
+    'SC-011 sqlstate should be 23514, got ' || v_caught_state);
+  PERFORM _v2_test._assert(v_caught_msg LIKE 'pick_out_of_order%',
+    'SC-011 message should start with pick_out_of_order, got: ' || v_caught_msg);
+  PERFORM _v2_test._assert(v_caught_msg LIKE '%round mismatch%',
+    'SC-011 message should mention "round mismatch", got: ' || v_caught_msg);
+
+  RAISE NOTICE 'SC-011 PASS';
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;
+  END;
+END
+$sc011$;
+
+
