@@ -46,6 +46,15 @@ const ROUND_NAMES: Record<number, string> = {
   4: 'Stanley Cup Final',
 };
 
+interface LiveGame {
+  game_id: number;
+  home_team: string;
+  away_team: string;
+  home_score: number;
+  away_score: number;
+  status: string;
+}
+
 export default function NHLPlayoffBracket() {
   const [season] = useState<number>(2025);
   const [seeds, setSeeds] = useState<Seed[]>([]);
@@ -53,6 +62,7 @@ export default function NHLPlayoffBracket() {
   const [loading, setLoading] = useState(true);
   const [meta, setMeta] = useState<{ oldest_refresh: string | null } | null>(null);
   const [h2hMap, setH2hMap] = useState<Record<number, { high_wins: number; low_wins: number; games: number }>>({});
+  const [liveGames, setLiveGames] = useState<LiveGame[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -76,6 +86,20 @@ export default function NHLPlayoffBracket() {
     };
     load();
     const interval = setInterval(load, 60000); // refresh every 60s
+    return () => clearInterval(interval);
+  }, [season]);
+
+  // Live games refresh on a tighter cadence — drives the LIVE badge
+  useEffect(() => {
+    const fetchLive = async () => {
+      try {
+        const res = await fetch(`/api/nhl-playoffs/live-games?season=${season}`);
+        const json = await res.json();
+        setLiveGames(json.data?.games || json.games || []);
+      } catch { /* non-critical */ }
+    };
+    fetchLive();
+    const interval = setInterval(fetchLive, 30_000);
     return () => clearInterval(interval);
   }, [season]);
 
@@ -140,7 +164,10 @@ export default function NHLPlayoffBracket() {
                     const highInfo = high ? NHL_TEAMS.find(t => t.abbrev === high.team_abbrev) : null;
                     const lowInfo = low ? NHL_TEAMS.find(t => t.abbrev === low.team_abbrev) : null;
                     const isFinal = s.series_status === 'final';
-                    const isActive = s.series_status === 'active';
+                    const gameIsLive = !!liveGames.find(g =>
+                      (g.home_team === high?.team_abbrev && g.away_team === low?.team_abbrev) ||
+                      (g.home_team === low?.team_abbrev && g.away_team === high?.team_abbrev)
+                    );
                     const h2h = h2hMap[s.bracket_slot];
 
                     const renderTeamRow = (team: Seed | null, info: typeof NHL_TEAMS[0] | null, wins: number) => {
@@ -189,8 +216,8 @@ export default function NHLPlayoffBracket() {
                       <Card key={s.series_id} className={cn(
                         'p-3 border-2 transition-colors',
                         isFinal && 'border-citrus-orange bg-orange-50/50',
-                        isActive && 'border-red-300 bg-red-50/30',
-                        s.series_status === 'pending' && 'border-citrus-sage/30',
+                        gameIsLive && 'border-red-300 bg-red-50/30',
+                        !isFinal && !gameIsLive && 'border-citrus-sage/30',
                       )}>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-1.5">
@@ -201,7 +228,7 @@ export default function NHLPlayoffBracket() {
                               </Badge>
                             )}
                           </div>
-                          {isActive && <Badge className="bg-red-500 text-white text-[9px] px-1.5 py-0 animate-pulse">LIVE</Badge>}
+                          {gameIsLive && <Badge className="bg-red-500 text-white text-[9px] px-1.5 py-0 animate-pulse">LIVE</Badge>}
                           {isFinal && <Badge className="bg-citrus-sage text-white text-[9px] px-1.5 py-0">FINAL</Badge>}
                         </div>
                         {renderTeamRow(high, highInfo, s.high_seed_wins)}
