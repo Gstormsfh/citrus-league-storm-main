@@ -85,6 +85,69 @@ game_state_cache = {}  # {game_id: {"state": "FINAL", "last_check": timestamp}}
 last_ppp_sync_time = 0.0  # epoch timestamp of last sync
 PPP_SYNC_INTERVAL = 1800  # 30 minutes in seconds
 
+# Schedule self-heal tracking — when the slate is empty during game hours,
+# we shell out to ingest_playoff_schedule.py to backfill instead of waiting
+# for the GitHub Actions cron (which can silently fail / get disabled).
+last_schedule_ingest_time = 0.0
+SCHEDULE_INGEST_INTERVAL = 600  # 10 min between self-heal attempts
+INGEST_PLAYOFF_SCRIPT = str(DATA_PIPELINE_DIR / "acquisition" / "ingest_playoff_schedule.py")
+
+
+def _try_self_heal_schedule(today_str: str) -> bool:
+    """
+    Shell out to ingest_playoff_schedule.py to backfill today's slate.
+    Returns True if the ingest reported any games upserted (caller should
+    retry the DB query immediately). Rate-limited to one attempt every
+    SCHEDULE_INGEST_INTERVAL seconds so we don't hammer NHL on every tick.
+    """
+    global last_schedule_ingest_time
+    now = time.time()
+    if now - last_schedule_ingest_time < SCHEDULE_INGEST_INTERVAL:
+        return False
+    last_schedule_ingest_time = now
+
+    season = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+    end_date = (dt.date.fromisoformat(today_str) + dt.timedelta(days=7)).isoformat()
+    logger.warning(
+        f"[SELF-HEAL] Slate empty for {today_str} — running ingest_playoff_schedule.py "
+        f"(window {today_str}..{end_date}, season {season})..."
+    )
+    try:
+        import subprocess
+        result = subprocess.run(
+            [
+                sys.executable, INGEST_PLAYOFF_SCRIPT,
+                "--start", today_str,
+                "--end", end_date,
+                "--season", str(season),
+            ],
+            capture_output=True, text=True, timeout=300,
+        )
+        # The ingest logs "  YYYY-MM-DD: upserted N playoff game(s)" per date
+        # and "Total playoff games upserted: N" at the end.
+        out = (result.stdout or "") + "\n" + (result.stderr or "")
+        for line in out.strip().split("\n"):
+            if line.strip():
+                logger.info(f"[SELF-HEAL]   {line.strip()}")
+        if result.returncode != 0:
+            logger.error(f"[SELF-HEAL] ingest exited {result.returncode}")
+            return False
+        # Did anything actually land?
+        if "Total playoff games upserted: 0" in out or "No playoff games found" in out:
+            logger.warning(
+                "[SELF-HEAL] NHL API returned no playoff games for the window. "
+                "Either the schedule isn't published yet, the API shape changed, "
+                "or every team_id is mapped wrong (FK reject). Check above lines."
+            )
+            return False
+        return True
+    except subprocess.TimeoutExpired:
+        logger.error("[SELF-HEAL] ingest timed out after 5 min")
+        return False
+    except Exception as e:
+        logger.error(f"[SELF-HEAL] ingest crashed: {e}")
+        return False
+
 # Graceful shutdown flag
 shutdown_requested = False
 
@@ -316,6 +379,7 @@ def run_unified_loop() -> Tuple[str, int]:
             # Diagnostic: query a +/- 2 day window so the log tells us whether
             # this is timezone drift, a missing playoff-schedule ingest, or a
             # genuinely empty slate. Without this it's invisible from logs.
+            nearby_count = 0
             try:
                 window_start = (now_mt.date() - dt.timedelta(days=2)).isoformat()
                 window_end = (now_mt.date() + dt.timedelta(days=2)).isoformat()
@@ -327,6 +391,7 @@ def run_unified_loop() -> Tuple[str, int]:
                         ("game_date", "lte", window_end),
                     ],
                 ) or []
+                nearby_count = len(nearby)
                 if nearby:
                     by_date: Dict[str, int] = {}
                     for g in nearby:
@@ -342,20 +407,52 @@ def run_unified_loop() -> Tuple[str, int]:
                     logger.warning(
                         f"[WARN] No games for MT date {today} and nhl_games is "
                         f"empty for {window_start}..{window_end}. "
-                        f"Playoff schedule ingest likely failed — check the "
-                        f"playoff-sync workflow / run ingest_playoff_schedule.py."
+                        f"Playoff schedule ingest likely failed — attempting self-heal."
                     )
             except Exception as diag_err:
                 logger.warning(
                     f"[WARN] No games found in DB schedule for MT {today} "
                     f"(diagnostic query failed: {diag_err})."
                 )
-            # Clear cache if no games today
-            if game_state_cache:
-                game_state_cache.clear()
-            tracker.total_syncs += 1
-            tracker.last_sync_duration = time.time() - sync_start
-            return ("OFF_HOURS", 0)  # Return state info for smart scheduling
+
+            # SELF-HEAL: invoke ingest_playoff_schedule.py and re-query.
+            # The GitHub Actions cron is the normal path, but it has
+            # `continue-on-error: true` and can silently fail (FK rejects,
+            # disabled workflow, NHL API hiccup). Don't make a live game
+            # day depend on it — backfill ourselves and pick up the games
+            # on this same tick.
+            if _try_self_heal_schedule(today):
+                try:
+                    raw_games = db.select(
+                        "nhl_games",
+                        filters=[("game_date", "in", [today, yesterday])],
+                    ) or []
+                    games = [
+                        g for g in raw_games
+                        if g.get("game_date") == today
+                        or str(g.get("status", "")).lower() not in ("final", "off")
+                    ]
+                    if games:
+                        logger.info(
+                            f"[SELF-HEAL] Recovered {len(games)} games for {today} — "
+                            f"resuming normal processing."
+                        )
+                    else:
+                        logger.warning(
+                            f"[SELF-HEAL] Ingest reported success but query still empty. "
+                            f"Likely an FK reject on a team_id not in TEAM_ID_MAP — "
+                            f"check the [SELF-HEAL] log lines above for `upsert failed`."
+                        )
+                except Exception as e:
+                    logger.error(f"[SELF-HEAL] Re-query after ingest failed: {e}")
+
+            if not games:
+                # Clear cache if no games today
+                if game_state_cache:
+                    game_state_cache.clear()
+                tracker.total_syncs += 1
+                tracker.last_sync_duration = time.time() - sync_start
+                return ("OFF_HOURS", 0)  # Return state info for smart scheduling
 
         # Smart cache management: Remove cached games not in today's schedule
         game_ids_today = {g['game_id'] for g in games}
