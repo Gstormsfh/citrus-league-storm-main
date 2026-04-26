@@ -137,6 +137,30 @@ breaks the trigger), broad allowlist (rejected — too lax).
 **Surfaced in code:** `supabase/migrations/20260425140000_draft_engine_v2_rpcs.sql`
 (record_shadow_event guard #1 comment).
 
+### D4 — `draft_metrics` PK includes synthetic `id` column
+
+**Spec section:** §3.5 (`draft_metrics` schema; spec lists no PK).
+**Implementation:** `draft_metrics` has `id bigserial NOT NULL` and
+`PRIMARY KEY (ts, id)`.
+**Why:** PostgreSQL range partitioning requires the partition key
+(`ts`) to be part of any PK or UNIQUE constraint declared on the
+partitioned table. The spec literal omits a PK entirely, but one is
+needed both for partitioning and for standard hygiene (replication
+identity, `ON CONFLICT` targets, distinguishing same-timestamp rows).
+A PK on `ts` alone would force every metric write to a strictly unique
+timestamp — fine in low-volume periods, but during a draft burst
+(multiple `pick_committed` rows in the same microsecond) the second
+insert would silently fail. `(ts, id)` with a `bigserial` `id` column
+avoids the collision and preserves time-ordering. The `bigserial`
+sequence is shared across partitions, so ids are globally unique even
+though the PK is per-partition-enforced.
+**Operator implication:** queries that read `draft_metrics` should
+project `metric, ts, league_id, value, detail` and treat `id` as a
+row-identity column with no semantic meaning — do not expose it in
+dashboards or alerts.
+**Surfaced in code:** `supabase/migrations/20260426120000_draft_engine_v2_phase3_metrics.sql`
+(table definition, "deviation D4" comment).
+
 ## Add-only convention
 
 Append-only. Old playbooks stay, even after the underlying issue is
