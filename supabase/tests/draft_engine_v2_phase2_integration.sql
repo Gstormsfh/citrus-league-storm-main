@@ -241,8 +241,30 @@ $verify$;
 --
 -- ── Conventions ────────────────────────────────────────────────────────
 --
--- 1. Each scenario is its own BEGIN ... ROLLBACK block. Helper funcs
---    in _v2_test survive across scenarios (created outside any txn).
+-- 1. Each scenario uses the SAVEPOINT pattern (inner BEGIN/EXCEPTION
+--    block) for cleanup, NOT explicit ROLLBACK statements. The
+--    Supabase SQL Editor (and most SQL clients) wrap pasted input in
+--    an outer transaction; explicit ROLLBACK from inside a DO block
+--    in that context fails with `invalid transaction termination`.
+--    The savepoint pattern is universal — works whether the outer
+--    txn is implicit or explicit.
+--
+--    Pattern:
+--      DO $scNNN$
+--      DECLARE ...
+--      BEGIN
+--        BEGIN  -- savepoint
+--          ... test setup + RPC calls + assertions ...
+--          RAISE NOTICE 'SC-NNN PASS';
+--          RAISE EXCEPTION 'cleanup' USING ERRCODE='P0001';
+--        EXCEPTION WHEN SQLSTATE 'P0001' THEN
+--          NULL; -- forced cleanup; ignore.
+--        END;
+--      END
+--      $scNNN$;
+--
+--    Helper funcs in _v2_test survive across scenarios (created
+--    outside any txn).
 --
 -- 2. Test calls use actor.kind='autopick' uniformly. The SQL Editor
 --    runs as service_role with auth.uid()=NULL, which fails the
@@ -262,9 +284,10 @@ $verify$;
 --    (per the Phase 1 regression seed). Confirmed to exist in
 --    auth.users on staging.
 --
--- 5. NOTICE messages mark scenario start / pass. ERROR (RAISE
---    EXCEPTION) marks failure and aborts that scenario's txn — but
---    BEGIN/ROLLBACK still cleans up.
+-- 5. NOTICE messages mark scenario start / pass. Assertion failures
+--    raise EXCEPTION (not SQLSTATE 'P0001') and propagate up out of
+--    the DO block — the savepoint still rolls back the test setup,
+--    and the failure surfaces as a SQL error to the operator.
 --
 -- ════════════════════════════════════════════════════════════════════════
 -- SC-001 — Single-pick happy path
@@ -297,6 +320,7 @@ DECLARE
   v_event_row    record;
 BEGIN
   RAISE NOTICE 'SC-001 starting: single-pick happy path';
+  BEGIN  -- savepoint
 
   -- Seed.
   v_seed       := _v2_test._seed_active_league(
@@ -365,7 +389,9 @@ BEGIN
   PERFORM _v2_test._assert(v_pgmq_count = 1, 'SC-001 expected 1 pgmq message, got ' || v_pgmq_count);
 
   RAISE NOTICE 'SC-001 PASS';
-  ROLLBACK;
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;  -- forced cleanup
+  END;
 END
 $sc001$;
 
@@ -397,6 +423,7 @@ DECLARE
   v_pick_count  int;
 BEGIN
   RAISE NOTICE 'SC-002 starting: idempotent replay';
+  BEGIN  -- savepoint
 
   v_seed       := _v2_test._seed_active_league(
                     '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
@@ -445,7 +472,9 @@ BEGIN
   PERFORM _v2_test._assert(v_pick_count  = 1, 'SC-002 projection should still be 1, got ' || v_pick_count);
 
   RAISE NOTICE 'SC-002 PASS';
-  ROLLBACK;
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;  -- forced cleanup
+  END;
 END
 $sc002$;
 
@@ -475,6 +504,7 @@ DECLARE
   v_event_count int;
 BEGIN
   RAISE NOTICE 'SC-003 starting: idempotency conflict';
+  BEGIN  -- savepoint
 
   v_seed       := _v2_test._seed_active_league(
                     '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
@@ -524,7 +554,9 @@ BEGIN
     'SC-003 should still have only 1 event row after conflict, got ' || v_event_count);
 
   RAISE NOTICE 'SC-003 PASS';
-  ROLLBACK;
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;  -- forced cleanup
+  END;
 END
 $sc003$;
 
@@ -559,6 +591,7 @@ DECLARE
   v_pick_seqs   bigint[];
 BEGIN
   RAISE NOTICE 'SC-004 starting: counter gap-free across 6 sequential picks';
+  BEGIN  -- savepoint
 
   v_seed       := _v2_test._seed_active_league(
                     '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 3, 3);
@@ -613,7 +646,9 @@ BEGIN
   PERFORM _v2_test._assert(v_event_count = 6, 'SC-004 projection should have 6 rows, got ' || v_event_count);
 
   RAISE NOTICE 'SC-004 PASS';
-  ROLLBACK;
+  RAISE EXCEPTION 'sc_cleanup' USING ERRCODE='P0001';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN NULL;  -- forced cleanup
+  END;
 END
 $sc004$;
 
