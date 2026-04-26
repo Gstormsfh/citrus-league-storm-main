@@ -168,7 +168,10 @@ export const strictRateLimit = rateLimitMiddleware({ maxRequests: 10, windowMs: 
 /** Auth rate limit — 5 req/min per IP (brute force protection) */
 export const authRateLimit = rateLimitMiddleware({ maxRequests: 5, windowMs: 60_000, perUser: false });
 
-/** Standard API rate limit — 300 req/min per IP, 600 per user
- *  Bumped from 100 because the SPA fires many parallel schedule/league
- *  calls on page load until caching/dedup is added. */
-export const standardRateLimit = rateLimitMiddleware({ maxRequests: 300 });
+/** Standard API rate limit — 600 req/min per IP, 1200 per user
+ *  Bumped from 300 because users with multiple tabs open (common on
+ *  playoff night — watching game + managing roster) + Realtime
+ *  subscriptions + react-query refetches can legitimately push past
+ *  300 in a burst. This is per-IP so shared-household cases (family
+ *  on same router) also benefit. */
+export const standardRateLimit = rateLimitMiddleware({ maxRequests: 600, maxUserRequests: 1200 });

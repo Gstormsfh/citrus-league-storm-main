@@ -232,8 +232,13 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
           });
         }
 
-        // Also refresh unread count to ensure accuracy
-        get().updateUnreadCount(leagueId, userId);
+        // NOTE: Previously we also called get().updateUnreadCount here as a
+        // belt-and-suspenders re-fetch. That caused a runaway rate-limit
+        // storm when a burst of notifications arrived (each event triggered
+        // a separate /api/notifications/unread-count request, each failed
+        // with 429, each retried 3x via apiClient backoff → 429 cascade).
+        // The local increment above is accurate; if it ever drifts, the
+        // next loadNotifications() call will reconcile it.
       }
     );
 
