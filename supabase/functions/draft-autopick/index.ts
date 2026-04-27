@@ -528,39 +528,67 @@ async function processMessage(
   );
 
   if (submitErr) {
-    const errMsg = submitErr.message ?? "";
-    // Spec §10.1 error codes detected by substring; PostgREST
-    // surfaces the raw RAISE EXCEPTION message.
-    if (errMsg.includes("idempotency_conflict")) {
-      logEvent("info", invocationId, "autopick_human_picked_just_in_time", {
-        ...baseLog,
-        team_id: teamId,
-        pick_number: currentPick,
-      });
-      await archive("replay");
-      return;
-    }
-    if (
-      errMsg.includes("pick_out_of_order") ||
-      errMsg.includes("not_on_clock") ||
-      errMsg.includes("player_taken") ||
-      errMsg.includes("illegal_state")
-    ) {
-      // Stale slot — race after our gates. Safe to archive.
+    const errMsg  = submitErr.message ?? "";
+    const errCode = submitErr.code ?? "";
+
+    // Outcome routing by SQLSTATE first, with a substring tiebreaker
+    // for the one ambiguous code. Phase 2's submit_pick_v2 raises:
+    //   23505 unique_violation:    idempotency_conflict OR player_taken
+    //   23514 check_violation:     pick_out_of_order, not_on_clock,
+    //                              illegal_state (state/size variants)
+    //   02000 no_data_found:       illegal_state (league not found,
+    //                              draft_order missing)
+    //   42501 insufficient_priv:   unauthorized — should never happen
+    //                              in the autopick path; falls through
+    //                              to retryable→DLQ as a misconfig signal.
+    if (errCode === "23505") {
+      // 23505 collision: idempotency_conflict (expected race; replay)
+      // vs player_taken (preflight race; skip). Substring disambig
+      // is bounded to this branch only.
+      if (errMsg.includes("idempotency_conflict")) {
+        logEvent("info", invocationId, "autopick_human_picked_just_in_time", {
+          ...baseLog,
+          team_id: teamId,
+          pick_number: currentPick,
+        });
+        await archive("replay");
+        return;
+      }
+      // Default 23505 (player_taken, or any future 23505 from the RPC)
+      // → preflight race. Safe to archive.
       logEvent("info", invocationId, "worker_skip_post_preflight", {
         ...baseLog,
         team_id: teamId,
         pick_number: currentPick,
+        err_code: errCode,
         error: errMsg,
       });
       await archive("skip");
       return;
     }
-    // Anything else → retryable; don't archive.
+    if (errCode === "23514" || errCode === "02000") {
+      // 23514: pick_out_of_order / not_on_clock / illegal_state
+      // (state/size). 02000: illegal_state (league not found /
+      // draft_order missing). All stale-slot or no-recovery
+      // conditions; archive.
+      logEvent("info", invocationId, "worker_skip_post_preflight", {
+        ...baseLog,
+        team_id: teamId,
+        pick_number: currentPick,
+        err_code: errCode,
+        error: errMsg,
+      });
+      await archive("skip");
+      return;
+    }
+    // Anything else (42501 unauthorized misconfig, 5xx, network,
+    // unknown SQLSTATE) → retryable; pgmq vt expires, redelivers,
+    // read_ct increments toward DLQ threshold.
     logEvent("error", invocationId, "submit_pick_v2_retryable", {
       ...baseLog,
       team_id: teamId,
       pick_number: currentPick,
+      err_code: errCode,
       error: errMsg,
     });
     return;
