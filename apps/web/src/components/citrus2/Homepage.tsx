@@ -200,6 +200,7 @@ const ONBOARDING_CARDS: Array<{
   icon: React.ComponentType<{ className?: string }>;
   accent: AccentName;
   to: string;
+  mascotPeek?: 'stormy' | 'lemon' | 'kiwi' | 'pineapple';
 }> = [
   {
     title: 'Drop the Puck',
@@ -208,6 +209,7 @@ const ONBOARDING_CARDS: Array<{
     icon: CrossedSticksIcon,
     accent: 'orange',
     to: '/create-league',
+    mascotPeek: 'lemon',
   },
   {
     title: 'Run a Mock',
@@ -216,6 +218,7 @@ const ONBOARDING_CARDS: Array<{
     icon: DraftIcon,
     accent: 'sage',
     to: '/draft',
+    mascotPeek: 'kiwi',
   },
   {
     title: 'Chirp at Stormy',
@@ -224,6 +227,7 @@ const ONBOARDING_CARDS: Array<{
     icon: ShiftIcon,
     accent: 'butter',
     to: '/gm-office/stormy',
+    mascotPeek: 'stormy',
   },
 ];
 

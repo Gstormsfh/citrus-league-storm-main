@@ -16,6 +16,13 @@ export { TeamChip, TeamColorBar } from './TeamChip';
 export { MascotAvatar, MascotPortrait } from './MascotAvatar';
 export { LivePulse, Eyebrow } from './LivePulse';
 
+// Brand mark
+export { CitrusLogo, CitrusWordmark } from './CitrusLogo';
+
+// Glow wrapper for premium hover states + mascot peek-out for brand layering
+export { GlowCard } from './GlowCard';
+export { MascotPeek } from './MascotPeek';
+
 // Custom hockey iconography (replaces generic lucide icons in cards)
 export {
   PuckIcon,
