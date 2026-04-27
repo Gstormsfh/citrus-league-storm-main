@@ -393,14 +393,13 @@ BEGIN
 
   -- Insert a pick event for slot 1 with created_at AFTER the deadline.
   INSERT INTO public.draft_events (
-    league_id, seq, event_type, schema_version,
+    league_id, seq, event_type,
     payload, payload_hash, idempotency_key,
     correlation_id, actor, created_at
   ) VALUES (
     v_league_id,
     1,
     'pick',
-    1,
     jsonb_build_object(
       'pick_number', 1,
       'team_id',     v_team_id,
@@ -463,14 +462,13 @@ BEGIN
    WHERE id = v_league_id;
 
   INSERT INTO public.draft_events (
-    league_id, seq, event_type, schema_version,
+    league_id, seq, event_type,
     payload, payload_hash, idempotency_key,
     correlation_id, actor, created_at
   ) VALUES (
     v_league_id,
     1,
     'autopick_failed',
-    1,
     jsonb_build_object(
       'pick_number',   1,
       'generation',    0,
