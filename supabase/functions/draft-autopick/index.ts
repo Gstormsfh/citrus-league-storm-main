@@ -634,6 +634,25 @@ serve(async (req: Request) => {
     ? authHeader.slice("Bearer ".length)
     : "";
 
+  // SMOKE-ONLY DIAGNOSTIC (claude/phase4-auth-debug throwaway branch):
+  // log token shape (length + 5-char prefix + 5-char suffix only —
+  // never the middle of a JWT) so we can compare what the platform's
+  // SUPABASE_SERVICE_ROLE_KEY auto-injects against what pg_net is
+  // sending from Vault. Revert before merging back to Phase 4 branch.
+  // See chunk 11e auth-failed diagnosis hypothesis 2.
+  console.info(
+    JSON.stringify({
+      service: SERVICE_NAME,
+      event: "auth_debug",
+      expected_len:    expectedToken.length,
+      expected_prefix: expectedToken.slice(0, 5),
+      expected_suffix: expectedToken.slice(-5),
+      presented_len:    presented.length,
+      presented_prefix: presented.slice(0, 5),
+      presented_suffix: presented.slice(-5),
+    }),
+  );
+
   // Constant-time bearer compare. Deno std's timingSafeEqual returns
   // false (does not throw) when input lengths differ, so it doubles as
   // the length check.
