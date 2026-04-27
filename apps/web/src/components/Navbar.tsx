@@ -7,7 +7,7 @@ import {
   Swords, Newspaper, Sparkles, Settings, DollarSign,
   Target, Shield, TrendingUp
 } from 'lucide-react';
-import { CitrusLogo } from '@/components/icons/CitrusIcons';
+import { CitrusLogo } from '@/components/citrus2';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
@@ -139,46 +139,47 @@ const Navbar = () => {
       ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-[#D4E8B8]/95 max-lg:dark:bg-background/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-citrus-sage/20">
+    <header className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-[#0F1F15]/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-white/10">
       {/* ===== ROW 1: Brand bar ===== */}
-      <div className="hidden lg:block bg-citrus-forest">
+      <div className="hidden lg:block bg-[#0F1F15] border-b border-white/5">
         <div className="w-full px-6 h-12 flex items-center justify-between">
           {/* Left: Logo + League switcher */}
           <div className="flex items-center gap-6">
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <CitrusLogo className="w-8 h-8 drop-shadow-sm group-hover:rotate-12 transition-transform duration-200" />
-              <span className="font-varsity font-black text-base uppercase text-citrus-cream tracking-tight">
+            <Link to="/" className="flex items-center gap-2 group">
+              <CitrusLogo className="w-7 h-7 group-hover:scale-110 transition-transform duration-300" variant="on-dark" />
+              <span className="font-calistoga text-[20px] text-pastel-cream group-hover:text-pastel-orange-soft transition-colors">
                 Citrus
               </span>
+              <span className="block w-1.5 h-1.5 bg-pastel-orange rounded-full animate-pulse" />
             </Link>
 
             {/* League switcher */}
             {user && !leagueLoading && userLeagues.length === 0 && (
               <button
                 onClick={() => navigate('/create-league')}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/40 transition-all"
               >
-                <UserPlus className="h-4 w-4 text-citrus-orange" />
-                <span className="text-sm font-display font-semibold text-citrus-cream">
+                <UserPlus className="h-4 w-4 text-pastel-orange" />
+                <span className="text-[13px] font-bold text-pastel-cream">
                   Create / Join League
                 </span>
               </button>
             )}
             {user && leagueLoading && (
               <div className="flex items-center gap-2 px-3 py-1.5">
-                <Trophy className="h-4 w-4 text-citrus-orange" />
-                <div className="h-4 w-32 bg-white/20 rounded animate-pulse" />
+                <Trophy className="h-4 w-4 text-pastel-orange" />
+                <div className="h-4 w-32 bg-white/10 rounded animate-pulse" />
               </div>
             )}
             {userLeagues.length > 0 && !leagueLoading && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
-                    <Trophy className="h-4 w-4 text-citrus-orange" />
-                    <span className="text-sm font-display font-semibold text-citrus-cream max-w-[200px] truncate">
+                  <button className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/40 transition-all">
+                    <Trophy className="h-4 w-4 text-pastel-orange" />
+                    <span className="text-[13px] font-bold text-pastel-cream max-w-[200px] truncate">
                       {activeLeague?.name || 'Select League'}
                     </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-citrus-cream/60" />
+                    <ChevronDown className="h-3.5 w-3.5 text-white/45" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-64">
@@ -235,12 +236,12 @@ const Navbar = () => {
                 {/* Notifications */}
                 <button
                   onClick={() => activeLeagueId && navigate(`/matchup/${activeLeagueId}`)}
-                  className="relative p-2.5 rounded-lg hover:bg-white/10 transition-colors"
+                  className="relative p-2.5 rounded-md hover:bg-white/5 transition-colors"
                   aria-label="Notifications"
                 >
-                  <Bell className="h-5 w-5 text-citrus-cream/80" />
+                  <Bell className="h-5 w-5 text-white/70" />
                   {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-citrus-orange text-[9px] font-bold text-white">
+                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-pastel-orange text-[9px] font-bold text-white">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
@@ -249,12 +250,12 @@ const Navbar = () => {
                 {/* User menu */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
-                      <div className="h-7 w-7 rounded-full bg-citrus-orange flex items-center justify-center text-white text-xs font-varsity font-bold">
+                    <button className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/5 transition-colors">
+                      <div className="h-7 w-7 rounded-full bg-pastel-orange flex items-center justify-center text-white text-xs font-bold">
                         {userInitial}
                       </div>
-                      <span className="text-sm font-display font-medium text-citrus-cream hidden xl:inline">{displayName}</span>
-                      <ChevronDown className="h-3.5 w-3.5 text-citrus-cream/60 hidden xl:block" />
+                      <span className="text-[13px] font-bold text-pastel-cream hidden xl:inline">{displayName}</span>
+                      <ChevronDown className="h-3.5 w-3.5 text-white/45 hidden xl:block" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
@@ -283,7 +284,7 @@ const Navbar = () => {
       </div>
 
       {/* ===== ROW 2: Tab bar ===== */}
-      <div className="hidden lg:block bg-[#D4E8B8] dark:bg-background/90 border-b border-citrus-sage/30">
+      <div className="hidden lg:block bg-[#152821] border-b border-white/5">
         <div className="w-full px-6">
           <nav className="flex items-center gap-0 h-11 -mb-px">
             {navTabs.map((tab) => {
@@ -293,10 +294,10 @@ const Navbar = () => {
                   key={tab.label}
                   to={tab.path}
                   className={cn(
-                    "flex items-center gap-2 px-5 h-11 text-[15px] font-display font-semibold transition-colors border-b-2 whitespace-nowrap",
+                    "flex items-center gap-2 px-5 h-11 text-[13px] font-bold transition-all border-b-2 whitespace-nowrap",
                     active
-                      ? "border-citrus-forest text-citrus-forest"
-                      : "border-transparent text-citrus-charcoal/70 hover:text-citrus-forest hover:border-citrus-sage/50"
+                      ? "border-pastel-orange text-pastel-cream"
+                      : "border-transparent text-white/55 hover:text-pastel-cream hover:border-pastel-orange/40"
                   )}
                 >
                   <tab.icon className="h-4 w-4" />
@@ -310,10 +311,10 @@ const Navbar = () => {
               <Link
                 to="/news"
                 className={cn(
-                  "flex items-center gap-2 px-4 h-11 text-[14px] font-display font-medium transition-colors border-b-2 whitespace-nowrap",
+                  "flex items-center gap-2 px-4 h-11 text-[13px] font-bold transition-all border-b-2 whitespace-nowrap",
                   isTabActive('/news')
-                    ? "border-citrus-forest text-citrus-forest"
-                    : "border-transparent text-citrus-charcoal/50 hover:text-citrus-forest"
+                    ? "border-pastel-orange text-pastel-cream"
+                    : "border-transparent text-white/45 hover:text-pastel-cream"
                 )}
               >
                 <Newspaper className="h-4 w-4" />
@@ -322,10 +323,10 @@ const Navbar = () => {
               <Link
                 to="/contact"
                 className={cn(
-                  "flex items-center gap-2 px-4 h-11 text-[14px] font-display font-medium transition-colors border-b-2 whitespace-nowrap",
+                  "flex items-center gap-2 px-4 h-11 text-[13px] font-bold transition-all border-b-2 whitespace-nowrap",
                   isTabActive('/contact')
-                    ? "border-citrus-forest text-citrus-forest"
-                    : "border-transparent text-citrus-charcoal/50 hover:text-citrus-forest"
+                    ? "border-pastel-orange text-pastel-cream"
+                    : "border-transparent text-white/45 hover:text-pastel-cream"
                 )}
               >
                 Contact
@@ -339,13 +340,14 @@ const Navbar = () => {
       <div className="lg:hidden container mx-auto px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Link to="/" className="flex items-center gap-1.5 flex-shrink-0">
-              <CitrusLogo className="w-8 h-8 drop-shadow-sm" />
+            <Link to="/" className="flex items-center gap-2 flex-shrink-0 group">
+              <CitrusLogo className="w-7 h-7 group-hover:scale-110 transition-transform duration-300" variant="on-dark" />
+              <span className="font-calistoga text-[16px] text-pastel-cream">Citrus</span>
             </Link>
             {leagueLoading ? (
-              <div className="h-3 w-20 bg-citrus-forest/15 rounded animate-pulse" />
+              <div className="h-3 w-20 bg-white/10 rounded animate-pulse ml-1" />
             ) : activeLeague?.name ? (
-              <span className="text-[11px] font-display font-semibold text-citrus-forest/60 truncate max-w-[140px]">
+              <span className="font-jbmono text-[10px] uppercase tracking-wider text-white/50 truncate max-w-[120px] ml-2">
                 {activeLeague.name}
               </span>
             ) : null}
@@ -354,20 +356,20 @@ const Navbar = () => {
           <div className="flex items-center gap-1">
             {user && (
               <button
-                className="p-3 rounded-xl text-citrus-forest relative"
+                className="p-3 rounded-md text-pastel-cream/80 hover:text-pastel-cream relative transition-colors"
                 onClick={() => activeLeagueId && navigate(`/matchup/${activeLeagueId}`)}
                 aria-label="Notifications"
               >
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-citrus-orange text-[9px] font-bold text-white">
+                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-pastel-orange text-[9px] font-bold text-white">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </button>
             )}
             <button
-              className="p-3 rounded-xl text-citrus-forest"
+              className="p-3 rounded-md text-pastel-cream/80 hover:text-pastel-cream transition-colors"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
               aria-expanded={mobileMenuOpen}
@@ -380,38 +382,38 @@ const Navbar = () => {
 
       {/* ===== MOBILE: Slide-in menu ===== */}
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-white/95 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-citrus-sage/20">
-          <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3 bg-gradient-to-b from-white to-[#F5F8ED]">
+        <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-[#0F1F15]/98 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
+          <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3">
             {/* League context + switcher */}
             {user && !leagueLoading && userLeagues.length === 0 && (
               <div className="mb-3">
                 <button
                   onClick={() => { navigate('/create-league'); closeMobileMenu(); }}
-                  className="flex items-center gap-3 px-3 py-2.5 bg-citrus-sage/10 rounded-xl w-full hover:bg-citrus-sage/20 transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 bg-white/5 ring-1 ring-pastel-orange/30 rounded-md w-full hover:bg-pastel-orange/10 hover:ring-pastel-orange/50 transition-all"
                 >
-                  <UserPlus className="h-4 w-4 text-citrus-sage flex-shrink-0" />
-                  <span className="text-sm font-display font-semibold text-citrus-forest">
+                  <UserPlus className="h-4 w-4 text-pastel-orange flex-shrink-0" />
+                  <span className="text-[13px] font-bold text-pastel-cream">
                     Create / Join League
                   </span>
                 </button>
               </div>
             )}
             {user && leagueLoading && (
-              <div className="mb-3 flex items-center gap-3 px-3 py-2.5 bg-citrus-forest/5 rounded-xl">
-                <Trophy className="h-4 w-4 text-citrus-orange flex-shrink-0" />
-                <div className="h-4 w-32 bg-citrus-forest/15 rounded animate-pulse" />
+              <div className="mb-3 flex items-center gap-3 px-3 py-2.5 bg-white/5 rounded-md">
+                <Trophy className="h-4 w-4 text-pastel-orange flex-shrink-0" />
+                <div className="h-4 w-32 bg-white/10 rounded animate-pulse" />
               </div>
             )}
             {userLeagues.length > 0 && !leagueLoading && (
               <div className="mb-3">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-3 px-3 py-2.5 bg-citrus-forest/5 rounded-xl w-full hover:bg-citrus-forest/10 transition-colors">
-                      <Trophy className="h-4 w-4 text-citrus-orange flex-shrink-0" />
-                      <span className="text-sm font-display font-semibold text-citrus-forest truncate flex-1 text-left">
+                    <button className="flex items-center gap-3 px-3 py-2.5 bg-white/5 ring-1 ring-white/10 rounded-md w-full hover:bg-white/10 hover:ring-pastel-orange/40 transition-all">
+                      <Trophy className="h-4 w-4 text-pastel-orange flex-shrink-0" />
+                      <span className="text-[13px] font-bold text-pastel-cream truncate flex-1 text-left">
                         {activeLeague?.name || 'Select League'}
                       </span>
-                      <ChevronDown className="h-3.5 w-3.5 text-citrus-charcoal/50 flex-shrink-0" />
+                      <ChevronDown className="h-3.5 w-3.5 text-white/45 flex-shrink-0" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-w-[320px]">
@@ -472,53 +474,55 @@ const Navbar = () => {
                     to={tab.path}
                     onClick={closeMobileMenu}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-3 rounded-xl transition-colors",
-                      active ? "bg-citrus-sage/20 text-citrus-forest" : "text-citrus-charcoal/80"
+                      "flex items-center gap-3 px-3 py-3 rounded-md transition-all",
+                      active
+                        ? "bg-pastel-orange/15 text-pastel-cream ring-1 ring-pastel-orange/30"
+                        : "text-white/70 hover:text-pastel-cream hover:bg-white/5"
                     )}
                   >
                     <tab.icon className="h-5 w-5" />
-                    <span className="text-[15px] font-display font-medium">{tab.label}</span>
-                    {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-citrus-orange" />}
+                    <span className="text-[14px] font-bold">{tab.label}</span>
+                    {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-pastel-orange" />}
                   </Link>
                 );
               })}
 
               {/* Divider */}
-              <div className="h-px bg-citrus-sage/20 my-3" />
+              <div className="h-px bg-white/10 my-3" />
 
               {/* Secondary links */}
-              <Link to="/news" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-citrus-charcoal/70">
+              <Link to="/news" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
                 <Newspaper className="h-4 w-4" />
-                <span className="text-[14px] font-display font-medium">News</span>
+                <span className="text-[13px] font-bold">News</span>
               </Link>
-              <Link to="/contact" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-citrus-charcoal/70">
+              <Link to="/contact" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
                 <Newspaper className="h-4 w-4" />
-                <span className="text-[14px] font-display font-medium">Contact</span>
+                <span className="text-[13px] font-bold">Contact</span>
               </Link>
             </nav>
 
             {/* User footer */}
-            <div className="border-t border-citrus-sage/20 pt-3 mt-2 pb-safe">
+            <div className="border-t border-white/10 pt-3 mt-2 pb-safe">
               {user ? (
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-citrus-orange flex items-center justify-center text-white text-sm font-varsity font-bold">
+                  <div className="h-10 w-10 rounded-full bg-pastel-orange flex items-center justify-center text-white text-sm font-bold">
                     {userInitial}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-citrus-forest truncate">{displayName}</p>
-                    <p className="text-xs text-citrus-charcoal/60 truncate">{user.email}</p>
+                    <p className="text-[13px] font-bold text-pastel-cream truncate">{displayName}</p>
+                    <p className="text-[11px] text-white/45 truncate">{user.email}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Link to="/profile" onClick={closeMobileMenu} className="p-2 rounded-lg bg-citrus-sage/10">
-                      <CircleUser className="h-4 w-4 text-citrus-forest" />
+                    <Link to="/profile" onClick={closeMobileMenu} className="p-2 rounded-md bg-white/5 hover:bg-white/10 transition-colors">
+                      <CircleUser className="h-4 w-4 text-pastel-cream" />
                     </Link>
-                    <button onClick={handleSignOut} className="p-2 rounded-lg bg-red-50" aria-label="Sign out">
-                      <LogOut className="h-4 w-4 text-red-500" />
+                    <button onClick={handleSignOut} className="p-2 rounded-md bg-red-500/10 hover:bg-red-500/20 transition-colors" aria-label="Sign out">
+                      <LogOut className="h-4 w-4 text-red-400" />
                     </button>
                   </div>
                 </div>
               ) : (
-                <Button className="w-full h-11 font-display font-bold rounded-xl bg-citrus-sage text-citrus-forest" asChild>
+                <Button className="w-full h-11 font-bold rounded-md bg-pastel-orange text-white hover:bg-pastel-orange-deep" asChild>
                   <Link to="/auth" onClick={closeMobileMenu}>Sign In</Link>
                 </Button>
               )}
