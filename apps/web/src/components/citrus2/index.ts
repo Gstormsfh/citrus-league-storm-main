@@ -23,6 +23,9 @@ export { CitrusLogo, CitrusWordmark } from './CitrusLogo';
 export { GlowCard } from './GlowCard';
 export { MascotPeek } from './MascotPeek';
 
+// On-brand loading state
+export { StormyLoading } from './StormyLoading';
+
 // Custom hockey iconography (replaces generic lucide icons in cards)
 export {
   PuckIcon,
