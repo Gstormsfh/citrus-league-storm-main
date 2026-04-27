@@ -167,7 +167,6 @@ const Guides = () => {
               </button>
             </div>
           </div>
-        </div>
       </main>
       <HockeyFooter />
     </DarkLayout>

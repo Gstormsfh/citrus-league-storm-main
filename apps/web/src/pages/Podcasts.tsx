@@ -169,7 +169,6 @@ const Podcasts = () => {
           <div className="text-center animated-element">
             <Button className="btn-vibrant-orange">View All Episodes</Button>
           </div>
-        </div>
       </main>
       <HockeyFooter />
     </DarkLayout>
