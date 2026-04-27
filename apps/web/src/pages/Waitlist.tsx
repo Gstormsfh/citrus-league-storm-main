@@ -1,7 +1,11 @@
 // Standalone Waitlist Page - Shareable link for social media signups
+import { Link } from 'react-router-dom';
+import { ArrowRight, BarChart3, Zap, Trophy, Users, Star } from 'lucide-react';
 import WaitlistSignup from '@/components/WaitlistSignup';
 import Navbar from '@/components/Navbar';
-import { DarkLayout, HockeyFooter, MascotAvatar } from '@/components/citrus2';
+import { Button } from '@/components/ui/button';
+import { Narwhal } from '@/components/icons/Narwhal';
+import { DarkLayout, HockeyFooter, MascotAvatar, CitrusLogo } from '@/components/citrus2';
 
 const Waitlist = () => {
   return (
