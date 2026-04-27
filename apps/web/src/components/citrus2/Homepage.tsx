@@ -142,9 +142,11 @@ const GAME_MODES: Array<{
   accent: AccentName;
   icon: React.ComponentType<{ className?: string }>;
   to: string;
+  scene?: string;
 }> = [
   {
     label: 'Fantasy Hockey',
+    scene: '/mascots/scene-squad.webp',
     sub: 'Snake, auction, or salary cap. Custom scoring, commish tools, live draft rooms.',
     badge: 'Free',
     accent: 'orange',
@@ -153,6 +155,7 @@ const GAME_MODES: Array<{
   },
   {
     label: 'Daily Pickem',
+    scene: '/mascots/scene-pickem.webp',
     sub: "Pick tonight's winners. Settled when the final horn sounds.",
     badge: 'Daily',
     accent: 'sage',
@@ -161,6 +164,7 @@ const GAME_MODES: Array<{
   },
   {
     label: 'Survivor Pool',
+    scene: '/mascots/scene-survivor.webp',
     sub: "One pick a week. Win or you're in the sin bin. Last manager standing takes it.",
     badge: 'Weekly',
     accent: 'butter',
@@ -169,6 +173,7 @@ const GAME_MODES: Array<{
   },
   {
     label: 'Confidence Pool',
+    scene: '/mascots/scene-confidence.webp',
     sub: 'Weighted weekly picks. Rank your confidence, multiply your edge.',
     badge: 'Weekly',
     accent: 'peach',
@@ -177,6 +182,7 @@ const GAME_MODES: Array<{
   },
   {
     label: 'Stanley Cup Brackets',
+    scene: '/mascots/scene-cup.webp',
     sub: 'Predict the entire playoff run. Confidence-weighted scoring all the way to the Cup.',
     badge: 'Apr–Jun',
     accent: 'orange',
@@ -185,6 +191,7 @@ const GAME_MODES: Array<{
   },
   {
     label: 'Mock Draft',
+    scene: '/mascots/scene-draft.webp',
     sub: 'Spin up a 12-team mock against AI managers. No signup, instant draft room.',
     badge: 'Anytime',
     accent: 'sage',
@@ -236,9 +243,11 @@ const REAL_FEATURES: Array<{
   desc: string;
   icon: React.ComponentType<{ className?: string }>;
   accent: AccentName;
+  scene?: string;
 }> = [
   {
     label: '31-Feature xG Model',
+    scene: '/mascots/scene-xg-model.webp',
     desc: 'XGBoost projections using xGF%, deployment, line chemistry, and Bayesian shrinkage.',
     icon: XGModelIcon,
     accent: 'orange',
@@ -251,12 +260,14 @@ const REAL_FEATURES: Array<{
   },
   {
     label: 'Live Shift Scoring',
+    scene: '/mascots/scene-livescoring.webp',
     desc: 'Every goal, apple, hit, block updates your matchup in real time as the play unfolds.',
     icon: ShiftIcon,
     accent: 'butter',
   },
   {
     label: 'Stormy · Assistant GM',
+    scene: '/mascots/scene-stormy-ai.webp',
     desc: 'Plugged into your roster, scoring, and matchup. Real hockey advice, not generic boilerplate.',
     icon: ScoreboardIcon,
     accent: 'peach',
