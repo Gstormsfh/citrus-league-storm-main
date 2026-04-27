@@ -1016,8 +1016,8 @@ $sc405$;
 --
 -- HARD PREREQUISITES (checked at start; failure = NOTICE skip + exit):
 --   - draft-autopick Edge Function deployed
---   - vault.read_secret('draft-autopick-token') returns the
---     service-role bearer
+--   - vault.decrypted_secrets has a 'draft-autopick-token' row whose
+--     decrypted_secret is the service-role bearer
 --   - pg_net's net.http_post is available
 --
 -- Cleanup: explicit DELETE-by-test-league-id at the end. Does NOT use
@@ -1104,7 +1104,7 @@ BEGIN
   SELECT net.http_post(
     url := 'https://jjgspcpvqaiitloglxbb.supabase.co/functions/v1/draft-autopick',
     headers := jsonb_build_object(
-      'Authorization', 'Bearer ' || vault.read_secret('draft-autopick-token'),
+      'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'draft-autopick-token'),
       'Content-Type',  'application/json'
     ),
     body := '{}'::jsonb,
@@ -1267,7 +1267,7 @@ BEGIN
     SELECT net.http_post(
       url := 'https://jjgspcpvqaiitloglxbb.supabase.co/functions/v1/draft-autopick',
       headers := jsonb_build_object(
-        'Authorization', 'Bearer ' || vault.read_secret('draft-autopick-token'),
+        'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'draft-autopick-token'),
         'Content-Type',  'application/json'
       ),
       body := '{}'::jsonb,

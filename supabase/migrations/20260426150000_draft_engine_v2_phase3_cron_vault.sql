@@ -99,11 +99,21 @@ END $cron_sweep$;
 -- (every 10s) catches any expired deadlines and re-enqueues them for
 -- the next worker invocation.
 --
--- Authorization header: 'Bearer ' || vault.read_secret(...). The
+-- Authorization header: 'Bearer ' || (SELECT decrypted_secret FROM
+-- vault.decrypted_secrets WHERE name = 'draft-autopick-token'). The
 -- COALESCE guard surfaces a missing secret as a clearly-broken token
 -- ('Bearer MISSING_SECRET_PROVISION_VIA_VAULT') rather than a NULL
 -- header, making the failure mode obvious in Edge Function auth_failed
 -- logs.
+--
+-- Vault read API note: Supabase Vault does NOT expose a
+-- vault.read_secret(text) function. Reading by name uses the
+-- vault.decrypted_secrets view. An earlier draft of this migration
+-- had `vault.read_secret('draft-autopick-token')` and would have
+-- raised `function vault.read_secret(unknown) does not exist` at
+-- every cron fire — caught only because the cron is paused on staging
+-- per the Phase 3 sign-off discipline. Fix landed in the chunk 11e
+-- vault-fix follow-up commit.
 --
 -- timeout_milliseconds: 150000 matches the Edge Function ceiling so
 -- pg_net doesn't kill a still-running worker.
@@ -119,7 +129,8 @@ BEGIN
         url := 'https://jjgspcpvqaiitloglxbb.supabase.co/functions/v1/draft-autopick',
         headers := jsonb_build_object(
           'Authorization', 'Bearer ' || COALESCE(
-            vault.read_secret('draft-autopick-token'),
+            (SELECT decrypted_secret FROM vault.decrypted_secrets
+              WHERE name = 'draft-autopick-token'),
             'MISSING_SECRET_PROVISION_VIA_VAULT'
           ),
           'Content-Type', 'application/json'

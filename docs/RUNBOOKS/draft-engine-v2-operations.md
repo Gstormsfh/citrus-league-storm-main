@@ -262,7 +262,7 @@ and you want to invoke the worker immediately:
 SELECT net.http_post(
   url := 'https://jjgspcpvqaiitloglxbb.supabase.co/functions/v1/draft-autopick',
   headers := jsonb_build_object(
-    'Authorization', 'Bearer ' || vault.read_secret('draft-autopick-token'),
+    'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'draft-autopick-token'),
     'Content-Type', 'application/json'
   ),
   body := '{}'::jsonb,
