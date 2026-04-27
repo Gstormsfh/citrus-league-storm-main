@@ -401,10 +401,12 @@ BEGIN
     1,
     'pick',
     jsonb_build_object(
-      'pick_number', 1,
-      'team_id',     v_team_id,
-      'player_id',   1001,
-      'round',       1
+      'pick_number',  1,
+      'team_id',      v_team_id,
+      'player_id',    1001,
+      'round',        1,
+      'picked_at',    (now() - interval '3 seconds')::text,
+      'is_autopick',  true
     ),
     'sha256:' || md5('SC304-pick-1'),
     gen_random_uuid(),
