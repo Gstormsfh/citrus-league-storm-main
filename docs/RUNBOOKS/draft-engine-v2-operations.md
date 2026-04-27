@@ -30,9 +30,125 @@ The sections below are placeholders. Each is filled in by the phase
 that introduces the relevant runtime surface.
 
 ### Phase 3 additions (scheduler + sweep)
-- Reading `draft_metrics.safety_net_hit` rates. *(deferred to chunk 10f)*
-- Draining a stuck `draft_deadlines` queue manually. *(deferred to chunk 10f)*
-- DLQ inspection (`autopick_failures`). *(deferred to Phase 4)*
+- Reading `draft_metrics.safety_net_hit` rates.
+- Draining a stuck `draft_deadlines` queue manually.
+- DLQ inspection (`autopick_failures`). *(deferred to Phase 4 — table is empty until the Phase 4 worker writes the first row)*
+
+> ⚠️ **Both Phase 3 cron jobs are currently PAUSED on staging** and
+> must remain paused until Phase 4 completes. The Phase 3 worker is
+> archive-only — if the keep-alive fires against real
+> `submit_pick_v2`-enqueued messages, picks are silently dropped.
+> See "Phase 4 prerequisites (must land before unpausing Phase 3
+> crons)" below.
+
+#### Reading `safety_net_hit` rates
+
+The sweep writes one row per affected league per run (Q3 lock-in).
+Steady-state on a healthy production system: a handful per draft
+day at most. Spikes mean either a worker is wedged or
+`submit_pick_v2`'s pgmq enqueue is failing.
+
+```sql
+-- Last 24h of safety-net hits, by league.
+SELECT
+  m.league_id,
+  count(*)                                       AS hits,
+  min(m.ts)                                      AS first_hit,
+  max(m.ts)                                      AS last_hit,
+  max((m.detail ->> 'expired_by_sec')::int)      AS worst_expired_by_sec,
+  max((m.detail ->> 'generation')::int)          AS max_generation
+FROM public.draft_metrics m
+WHERE m.metric = 'safety_net_hit'
+  AND m.ts > now() - interval '24 hours'
+GROUP BY m.league_id
+ORDER BY hits DESC;
+```
+
+```sql
+-- Per-hour rate over the last 6h, all leagues.
+SELECT
+  date_trunc('hour', ts) AS hour,
+  count(*)               AS hits
+FROM public.draft_metrics
+WHERE metric = 'safety_net_hit'
+  AND ts > now() - interval '6 hours'
+GROUP BY date_trunc('hour', ts)
+ORDER BY hour;
+```
+
+**Interpretation guide:**
+- **0–1 hits/league/draft**: healthy. Expected when a client misses
+  the deadline by milliseconds and the sweep beats `submit_pick_v2`'s
+  own enqueue.
+- **5–10 hits/league/draft**: investigate. Usually means the worker
+  is repeatedly failing to commit a pick (check `autopick_failures`
+  + Edge Function logs).
+- **`expired_by_sec` > 30**: the keep-alive isn't catching the
+  message in time, OR the worker is timing out. Check
+  `cron.job_run_details` for keep-alive failures and
+  `net.http_response` for non-200 statuses.
+
+#### Draining the `draft_deadlines` queue manually
+
+Use this when the queue has accumulated messages while the
+keep-alive was paused (or the worker was misbehaving) and you want
+to clear them BEFORE re-enabling the keep-alive. The Phase 3
+archive-only worker would discard them anyway, but doing it
+explicitly via SQL leaves a clearer audit trail and avoids a
+sudden burst of Edge Function invocations on resume.
+
+```sql
+-- 1. See what's in the queue.
+SELECT msg_id, read_ct, enqueued_at, vt,
+       message ->> 'league_id' AS league_id,
+       message ->> 'pick_number' AS pick_number,
+       message ->> 'source' AS source
+  FROM pgmq.q_draft_deadlines
+ ORDER BY enqueued_at
+ LIMIT 50;
+```
+
+```sql
+-- 2. Drain. pgmq.purge_queue removes ALL messages at once and is
+--    transactional — wrap in BEGIN/ROLLBACK if you want to inspect
+--    counts before committing.
+BEGIN;
+SELECT count(*) AS before_count FROM pgmq.q_draft_deadlines;
+SELECT pgmq.purge_queue('draft_deadlines') AS purged_count;
+SELECT count(*) AS after_count FROM pgmq.q_draft_deadlines;
+-- If the counts look right:
+COMMIT;
+-- If something looks wrong:
+-- ROLLBACK;
+```
+
+```sql
+-- 3. Alternative: drain selectively (e.g. only safety_net source,
+--    keeping any submit_pick_v2 happy-path messages). pgmq has no
+--    predicate-delete; use archive in a loop. Slower but auditable.
+DO $drain$
+DECLARE
+  v_msg record;
+  v_archived int := 0;
+BEGIN
+  FOR v_msg IN
+    SELECT msg_id
+      FROM pgmq.q_draft_deadlines
+     WHERE message ->> 'source' = 'safety_net'
+  LOOP
+    PERFORM pgmq.archive('draft_deadlines', v_msg.msg_id);
+    v_archived := v_archived + 1;
+  END LOOP;
+  RAISE NOTICE 'Drained % safety_net messages.', v_archived;
+END
+$drain$;
+```
+
+**After draining:** verify with
+`SELECT count(*) FROM pgmq.q_draft_deadlines;` (or
+`WHERE message ->> 'source' = 'safety_net'` for the selective case).
+Drained messages move to `pgmq.a_draft_deadlines` (the per-queue
+archive) for forensic inspection — they are NOT permanently deleted.
 
 #### Provisioning the `draft-autopick-token` Vault secret (chunk 10d)
 
@@ -156,6 +272,81 @@ SELECT net.http_post(
 -- response when it arrives (~140s later for a busy worker, ~30s
 -- if the queue is idle and the worker exits early).
 ```
+
+#### Phase 4 prerequisites (must land before unpausing Phase 3 crons)
+
+Phase 3 ships the scheduler + queue + worker scaffold. The crons
+are paused on staging because the worker is **archive-only** — it
+reads pgmq messages, logs them, and discards them without doing
+the actual autopick work. Unpausing the crons in this state would
+silently drop every pick that goes through the autopick path
+(deadline expiries on real drafts).
+
+The crons stay paused until Phase 4 ships ALL of the following:
+
+1. **Real autopick state machine in `supabase/functions/draft-
+   autopick/index.ts`** (replaces the chunk 10c
+   `phase3_noop_archive` block):
+   - Read pgmq message via `draft_autopick_read(vt=30, qty=10)`.
+   - Stale-message no-ops: `state != 'active'`, `generation
+     mismatch`, `now() < pick_deadline` (premature), `pick_number
+     != current` (advanced). All four archive + log + continue.
+   - Reconstruct draft state via `reconstruct_draft_state(league_id)`.
+   - Determine on-the-clock team from snake order + current pick #.
+   - Read `draft_queues` for that team; fall back to in-function
+     heuristic (FPTS × positional need, ported from
+     `DraftRoom.tsx:2410-2524`) if no queue is set.
+   - Call `submit_pick_v2(actor.kind='autopick', idempotency_key=
+     uuid_v5(league_id, pick_number, generation, 'autopick'))`.
+   - On success: `draft_autopick_archive(msg_id)`. Metric:
+     `autopick_fired`.
+   - On `idempotency_conflict`: archive + log "already picked"
+     (human submitted just in time — expected, not an error).
+   - On retryable error: do NOT archive; pgmq `vt` expires,
+     redelivers, `read_ct++`.
+
+2. **3-strikes-and-DLQ pattern** at the top of each message
+   processing pass:
+   - If `msg.read_ct >= 3`: insert row into `autopick_failures`
+     (chunk 10a's table) with `league_id, pgmq_msg_id, payload,
+     last_error, read_ct`. Emit `autopick_failed` event into
+     `draft_events` (so SC-305-style sweep predicate skip works).
+     Archive the pgmq message. Page on-call via the existing
+     alerts trigger pattern.
+
+3. **Player-selection logic with no-queue fallback.** Spec §5.2.2
+   step 5: read `draft_queues` for the on-the-clock team; if no
+   row, run the heuristic. The heuristic is ported from v1
+   (`DraftRoom.tsx:2410-2524`) and lives in
+   `supabase/functions/draft-autopick/heuristic.ts`. Unit-tested
+   per branch (FPTS leader, positional need adjustment, scarcity
+   tiebreak).
+
+4. **Phase 4 integration scenarios** appended to a NEW file
+   `supabase/tests/draft_engine_v2_phase4_integration.sql`. At
+   minimum: SC-401 (worker autopicks a single message end-to-end);
+   SC-402 (stale-message no-ops — all four branches); SC-403
+   (3-strikes DLQ insert + `autopick_failed` event); SC-404
+   (idempotency conflict on race); SC-405 (no-queue heuristic
+   fallback); SC-406 (full unattended-draft completion: 12×15
+   draft completes with no clients).
+
+5. **Confirmation that the chunk 10c follow-up `timingSafeEqual`
+   compare still holds end-to-end** when the cron's keep-alive
+   bearer roundtrips through Vault → `net.http_post` → Edge
+   Function. (Spot-check expected to pass; guarded against
+   regression by adding a Phase 4 deploy-time smoke test.)
+
+Once all five items land and the SC-401..406 suite passes on
+staging, unpause both crons:
+
+```sql
+UPDATE cron.job SET active = true
+ WHERE jobname IN ('draft-deadline-sweep', 'draft-autopick-keepalive');
+```
+
+…and verify the keep-alive's first invocation succeeds (200 row in
+`net.http_response`) before declaring Phase 4 complete.
 
 ### Phase 4 additions (worker)
 - Reading the `draft-autopick` Edge Function logs.

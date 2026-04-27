@@ -70,6 +70,71 @@ Open issues at end of Phase 2:
 Phase 3 begins next: pgmq scheduler RPC (`draft_deadline_sweep`),
 pg_cron sub-minute schedule, worker scaffold (Edge Function stub).
 
+### Phase 3 closeout (2026-04-27)
+
+> ⚠️ **CURRENTLY PAUSED ON STAGING.** Both Phase 3 cron jobs —
+> `draft-deadline-sweep` and `draft-autopick-keepalive` — are
+> deliberately paused (`active = false` in `cron.job`) and **must
+> remain paused until Phase 4 completes.** The Phase 3 worker is
+> archive-only; if the keep-alive fires against real
+> `submit_pick_v2`-enqueued messages, picks would be silently
+> dropped. "Phase 3 done" ≠ "Phase 3 enabled." See the operations
+> runbook section "Phase 4 prerequisites (must land before
+> unpausing Phase 3 crons)" for the gating list.
+
+Phase 3 substantively complete. All Phase 3 surfaces deployed to
+staging:
+
+- **Schema (chunk 10a):** `draft_metrics` (partitioned monthly,
+  Apr–Jul 2026 initial partitions), `draft_metrics_daily` (rollup),
+  `autopick_failures` (DLQ), and `manage_draft_metrics_partitions()`
+  with monthly pg_cron schedule.
+- **Sweep RPC (chunk 10b):** `draft_deadline_sweep()` — race-free
+  `draft_events` predicate, `pg_try_advisory_xact_lock`-guarded,
+  per-league `safety_net_hit` writes per locked Q3.
+- **Edge Function scaffold (chunk 10c):** `supabase/functions/
+  draft-autopick/index.ts` (≤140s loop, 30s idle exit, archive-only,
+  timing-safe bearer compare) + pgmq wrappers
+  (`draft_autopick_read`, `draft_autopick_archive`) + shared
+  service-role client factory.
+- **Cron + Vault (chunk 10d):** `draft-deadline-sweep` (every 10s)
+  and `draft-autopick-keepalive` (every 2 min). Vault secret
+  `draft-autopick-token` provisioning recipe in operations runbook.
+- **Integration scenarios (chunk 10e):** 12 SC-3xx scenarios
+  (`supabase/tests/draft_engine_v2_phase3_integration.sql`) all
+  passing on staging — predicate correctness, 2s back-buffer
+  boundary, advisory-lock reentry, pgmq wrapper roundtrip, partition
+  manager idempotence, plus the load-bearing SC-301
+  BEGIN/ROLLBACK harness verification.
+
+Verification:
+- 12/12 SC-3xx scenarios pass on staging.
+- `draft_deadline_sweep()` smoke test from SQL Editor returns 0 with
+  zero residue (no pgmq messages, no `safety_net_hit` rows).
+- Edge Function `auth_failed` 401 path confirmed via wrong-bearer
+  curl test.
+- Cron jobs registered in `cron.job` with correct schedules; both
+  paused immediately after apply per spec ("Phase 3 done and
+  currently disabled until Phase 4").
+
+Deviations documented:
+- **D4** — `draft_metrics` PK includes synthetic `id` column
+  (operations runbook).
+
+Open issues at end of Phase 3:
+- **KI-003** still open (Phase 2 carryover; target Phase 7 load
+  testing).
+- **KI-004** open — Phase 3 keep-alive cron's `net.http_post` URL
+  is hardcoded to staging project ref `jjgspcpvqaiitloglxbb`.
+  Target: Phase 8a prod cutover (re-parameterize via Vault).
+- KI-001 / KI-002 RESOLVED in Phase 2.
+
+Phase 4 begins next: real autopick state machine in
+`draft-autopick/index.ts` (read pgmq → `submit_pick_v2(actor.kind=
+'autopick')` → archive on success), 3-strikes-and-DLQ pattern via
+`autopick_failures` insert, player-selection logic (queue lookup
+with FPTS+positional-need fallback), Phase 4 integration scenarios.
+
 ---
 
 ### KI-001 — `DraftServiceV2.broadcastEvent` can hang on non-SUBSCRIBED channel status
