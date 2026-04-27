@@ -182,11 +182,11 @@ const Navbar = () => {
                     <ChevronDown className="h-3.5 w-3.5 text-white/45" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-64">
-                  <DropdownMenuLabel className="text-xs font-display uppercase text-citrus-forest">
+                <DropdownMenuContent align="start" className="w-64 bg-[#1A2A20] border-white/10 text-pastel-cream">
+                  <DropdownMenuLabel className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">
                     My Leagues ({userLeagues.length})
                   </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
+                  <DropdownMenuSeparator className="bg-white/10" />
                   {userLeagues.map((l) => {
                     const lType = getLeagueTypeFromSettings(l.settings as Record<string, unknown>);
                     return (
@@ -207,21 +207,21 @@ const Navbar = () => {
                         }
                       }}
                       className={cn(
-                        "cursor-pointer",
-                        activeLeagueId === l.id && "bg-citrus-sage/20 font-semibold"
+                        "cursor-pointer text-pastel-cream focus:bg-white/5 focus:text-pastel-cream",
+                        activeLeagueId === l.id && "bg-pastel-orange/15 font-bold ring-1 ring-pastel-orange/30"
                       )}
                     >
-                      <Trophy className="h-4 w-4 mr-2" />
-                      <div className="flex-1">
-                        <div className="font-medium truncate">{l.name}</div>
-                        <div className="text-xs text-muted-foreground">
+                      <Trophy className="h-4 w-4 mr-2 text-pastel-orange" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold truncate">{l.name}</div>
+                        <div className="text-[10px] font-jbmono uppercase tracking-wider text-white/45">
                           {isPoolLeague(lType) ? getPoolLabel(lType) + ' Pool' : (l.draft_status === 'completed' ? 'Season Active' : 'Draft Pending')}
                         </div>
                       </div>
                     </DropdownMenuItem>
                   );})}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => navigate('/create-league')} className="text-citrus-sage font-medium">
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem onSelect={() => navigate('/create-league')} className="text-pastel-orange-soft font-bold focus:bg-pastel-orange/10 focus:text-pastel-orange">
                     <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -258,24 +258,24 @@ const Navbar = () => {
                       <ChevronDown className="h-3.5 w-3.5 text-white/45 hidden xl:block" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuLabel className="text-sm">{displayName}</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link to="/profile"><CircleUser className="h-4 w-4 mr-2" /> Profile</Link>
+                  <DropdownMenuContent align="end" className="w-48 bg-[#1A2A20] border-white/10 text-pastel-cream">
+                    <DropdownMenuLabel className="text-[13px] font-bold text-pastel-cream">{displayName}</DropdownMenuLabel>
+                    <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuItem asChild className="text-pastel-cream focus:bg-white/5 focus:text-pastel-cream">
+                      <Link to="/profile"><CircleUser className="h-4 w-4 mr-2 text-pastel-orange" /> Profile</Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link to="/profile?tab=settings"><Settings className="h-4 w-4 mr-2" /> Settings</Link>
+                    <DropdownMenuItem asChild className="text-pastel-cream focus:bg-white/5 focus:text-pastel-cream">
+                      <Link to="/profile?tab=settings"><Settings className="h-4 w-4 mr-2 text-pastel-orange" /> Settings</Link>
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={handleSignOut} className="text-destructive focus:text-destructive">
+                    <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuItem onSelect={handleSignOut} className="text-red-300 focus:bg-red-500/10 focus:text-red-200">
                       <LogOut className="h-4 w-4 mr-2" /> Log out
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>
             ) : (
-              <Button size="sm" className="h-9 px-6 text-sm font-display font-bold bg-citrus-sage hover:bg-citrus-sage/80 text-citrus-forest border-0 rounded-lg" asChild>
+              <Button size="sm" className="h-9 px-6 text-[13px] font-bold bg-pastel-orange hover:bg-pastel-orange-deep text-white border-0 rounded-md shadow-[0_4px_12px_-4px_rgba(255,107,26,0.4)]" asChild>
                 <Link to="/auth">Sign In</Link>
               </Button>
             )}
@@ -416,11 +416,11 @@ const Navbar = () => {
                       <ChevronDown className="h-3.5 w-3.5 text-white/45 flex-shrink-0" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-w-[320px]">
-                    <DropdownMenuLabel className="text-xs font-display uppercase text-citrus-forest">
+                  <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-w-[320px] bg-[#1A2A20] border-white/10 text-pastel-cream">
+                    <DropdownMenuLabel className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">
                       My Leagues ({userLeagues.length})
                     </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
+                    <DropdownMenuSeparator className="bg-white/10" />
                     {userLeagues.map((l) => {
                       const lType = getLeagueTypeFromSettings(l.settings as Record<string, unknown>);
                       return (
@@ -442,21 +442,21 @@ const Navbar = () => {
                           closeMobileMenu();
                         }}
                         className={cn(
-                          "cursor-pointer",
-                          activeLeagueId === l.id && "bg-citrus-sage/20 font-semibold"
+                          "cursor-pointer text-pastel-cream focus:bg-white/5 focus:text-pastel-cream",
+                          activeLeagueId === l.id && "bg-pastel-orange/15 font-bold ring-1 ring-pastel-orange/30"
                         )}
                       >
-                        <Trophy className="h-4 w-4 mr-2" />
-                        <div className="flex-1">
-                          <div className="font-medium truncate">{l.name}</div>
-                          <div className="text-xs text-muted-foreground">
+                        <Trophy className="h-4 w-4 mr-2 text-pastel-orange" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold truncate">{l.name}</div>
+                          <div className="text-[10px] font-jbmono uppercase tracking-wider text-white/45">
                             {isPoolLeague(lType) ? getPoolLabel(lType) + ' Pool' : (l.draft_status === 'completed' ? 'Season Active' : 'Draft Pending')}
                           </div>
                         </div>
                       </DropdownMenuItem>
                     );})}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => { navigate('/create-league'); closeMobileMenu(); }} className="text-citrus-sage font-medium">
+                    <DropdownMenuSeparator className="bg-white/10" />
+                    <DropdownMenuItem onSelect={() => { navigate('/create-league'); closeMobileMenu(); }} className="text-pastel-orange-soft font-bold focus:bg-pastel-orange/10 focus:text-pastel-orange">
                       <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
                     </DropdownMenuItem>
                   </DropdownMenuContent>

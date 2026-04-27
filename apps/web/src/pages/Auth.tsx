@@ -1,22 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
-import Navbar from '@/components/Navbar';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { UserAccountService } from '@/services/UserAccountService';
 import { logger } from '@citrus/shared';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Mail, Lock, HelpCircle, Chrome, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, HelpCircle, Chrome, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
-import { Separator } from '@/components/ui/separator';
-import { DarkLayout, MascotAvatar } from '@/components/citrus2';
+import Navbar from '@/components/Navbar';
+import {
+  DarkLayout,
+  CitrusCard,
+  CitrusButton,
+  StormyWelcomeScene,
+} from '@/components/citrus2';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -315,310 +316,355 @@ const Auth = () => {
     }
   };
 
+  // Shared input styling for the dark theme — applied via className so the
+  // shadcn Input keeps its forwardRef + hookform wiring intact.
+  const darkInputClass =
+    'bg-[#0F1F15] border-white/10 text-pastel-cream placeholder:text-white/35 focus-visible:ring-pastel-orange/40 focus-visible:border-pastel-orange/50 h-11';
+
   return (
     <DarkLayout>
       <Navbar />
-      <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
-        <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
-          <CardHeader className="space-y-3 text-center">
-            <div className="flex justify-center mb-2">
-              <MascotAvatar id="stormy" size="lg" />
-            </div>
-            <CardTitle className="text-2xl font-black text-pastel-cream tracking-[-0.02em]">
-              Welcome to <span className="text-pastel-orange">Citrus</span>
-            </CardTitle>
-            <CardDescription className="text-white/60">
-              Sign in or create an account · Lock in founders pricing
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="signin" className="space-y-4">
-                {/* OAuth Buttons */}
-                <div className="space-y-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleOAuthSignIn('google')}
-                    disabled={loading || oauthLoading !== null}
-                  >
-                    {oauthLoading === 'google' ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Chrome className="mr-2 h-4 w-4" />
-                    )}
-                    Sign in with Google
-                  </Button>
-                </div>
+      <main className="relative w-full max-w-[1280px] mx-auto px-4 sm:px-6 pt-24 pb-16 lg:py-16 min-h-[calc(100vh-92px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-6 lg:gap-10 items-stretch">
+          {/* LEFT — Stormy welcome scene (full hero, not a corner peek) */}
+          <div className="order-1 lg:order-1">
+            <StormyWelcomeScene size="xl" className="h-full" />
+          </div>
 
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <Separator />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
-                  </div>
+          {/* RIGHT — sign in / sign up form */}
+          <div className="order-2 lg:order-2 flex items-center">
+            <div className="w-full">
+              <div className="mb-6">
+                <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-2 font-bold">
+                  Get on the ice
                 </div>
+                <h1 className="font-sans font-black text-[2rem] md:text-[2.5rem] tracking-[-0.025em] text-pastel-cream leading-[1.05]">
+                  Welcome to <span className="text-pastel-orange">Citrus</span>.
+                </h1>
+                <p className="text-[14px] text-white/55 mt-2 leading-relaxed">
+                  Sign in or create an account · Lock in founders pricing
+                </p>
+              </div>
 
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signin-email"
-                        type="email"
-                        placeholder="you@example.com"
-                        value={email}
-                        onChange={(e) => {
-                          setEmail(e.target.value);
-                          setError(null);
-                        }}
-                        className="pl-10"
-                        required
-                      />
+              <CitrusCard padding="spacious" accent="orange">
+                <Tabs defaultValue="signin" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 bg-[#0F1F15] h-11 ring-1 ring-white/10 mb-6">
+                    <TabsTrigger
+                      value="signin"
+                      className="text-[13px] font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/55"
+                    >
+                      Sign In
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="signup"
+                      className="text-[13px] font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/55"
+                    >
+                      Sign Up
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* ── SIGN IN ─────────────────────────────────────── */}
+                  <TabsContent value="signin" className="space-y-4 mt-0">
+                    <CitrusButton
+                      type="button"
+                      variant="secondary"
+                      size="lg"
+                      fullWidth
+                      onClick={() => handleOAuthSignIn('google')}
+                      disabled={loading || oauthLoading !== null}
+                      loading={oauthLoading === 'google'}
+                    >
+                      {oauthLoading !== 'google' && <Chrome className="w-4 h-4" />}
+                      Sign in with Google
+                    </CitrusButton>
+
+                    <div className="relative py-2">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full h-px bg-white/10" />
+                      </div>
+                      <div className="relative flex justify-center">
+                        <span className="bg-[#1A2A20] px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45">
+                          or continue with email
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="signin-password">Password</Label>
-                      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-                        <DialogTrigger asChild>
-                          <button
-                            type="button"
-                            className="text-xs text-primary hover:underline flex items-center gap-1"
-                            onClick={() => {
-                              setResetEmail(email);
-                              setResetSuccess(false);
+
+                    <form onSubmit={handleSignIn} className="space-y-4">
+                      {error && (
+                        <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200">
+                          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                          <span className="text-[13px] font-medium leading-snug">{error}</span>
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="signin-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">
+                          Email
+                        </Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                          <Input
+                            id="signin-email"
+                            type="email"
+                            placeholder="you@example.com"
+                            value={email}
+                            onChange={(e) => {
+                              setEmail(e.target.value);
                               setError(null);
                             }}
-                          >
-                            <HelpCircle className="h-3 w-3" />
-                            Forgot password?
-                          </button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Reset Password</DialogTitle>
-                            <DialogDescription>
-                              Enter your email address and we'll send you a link to reset your password.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                            {resetSuccess ? (
-                              <Alert>
-                                <AlertDescription>
-                                  Password reset email sent! Check your inbox and click the link to reset your password.
-                                </AlertDescription>
-                              </Alert>
-                            ) : (
-                              <>
-                                <div className="space-y-2">
-                                  <Label htmlFor="reset-email">Email</Label>
-                                  <Input
-                                    id="reset-email"
-                                    type="email"
-                                    placeholder="you@example.com"
-                                    value={resetEmail}
-                                    onChange={(e) => setResetEmail(e.target.value)}
-                                    required
-                                  />
-                                </div>
-                                {error && (
-                                  <Alert variant="destructive">
-                                    <AlertDescription>{error}</AlertDescription>
-                                  </Alert>
+                            className={`${darkInputClass} pl-10`}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="signin-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">
+                            Password
+                          </Label>
+                          <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+                            <DialogTrigger asChild>
+                              <button
+                                type="button"
+                                className="text-[11px] text-pastel-orange-soft hover:text-pastel-orange transition-colors flex items-center gap-1 font-bold"
+                                onClick={() => {
+                                  setResetEmail(email);
+                                  setResetSuccess(false);
+                                  setError(null);
+                                }}
+                              >
+                                <HelpCircle className="h-3 w-3" strokeWidth={2.5} />
+                                Forgot password?
+                              </button>
+                            </DialogTrigger>
+                            <DialogContent className="bg-[#1A2A20] border-white/10 text-pastel-cream">
+                              <DialogHeader>
+                                <DialogTitle className="font-sans font-black text-[1.5rem] tracking-[-0.02em] text-pastel-cream">
+                                  Reset <span className="text-pastel-orange">password</span>
+                                </DialogTitle>
+                                <DialogDescription className="text-white/65">
+                                  Enter your email address and we'll send you a link to reset your password.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 py-2">
+                                {resetSuccess ? (
+                                  <div className="flex items-start gap-2 px-3 py-3 rounded-md bg-pastel-sage/15 ring-1 ring-pastel-sage/40 text-pastel-sage-soft">
+                                    <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                                    <span className="text-[13px] font-medium leading-snug">
+                                      Password reset email sent. Check your inbox and click the link to reset.
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="space-y-1.5">
+                                      <Label htmlFor="reset-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">
+                                        Email
+                                      </Label>
+                                      <Input
+                                        id="reset-email"
+                                        type="email"
+                                        placeholder="you@example.com"
+                                        value={resetEmail}
+                                        onChange={(e) => setResetEmail(e.target.value)}
+                                        className={darkInputClass}
+                                        required
+                                      />
+                                    </div>
+                                    {error && (
+                                      <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200">
+                                        <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                                        <span className="text-[13px] font-medium leading-snug">{error}</span>
+                                      </div>
+                                    )}
+                                    <CitrusButton
+                                      type="button"
+                                      variant="primary"
+                                      size="lg"
+                                      fullWidth
+                                      onClick={handleForgotPassword}
+                                      loading={resetLoading}
+                                    >
+                                      {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                                    </CitrusButton>
+                                  </>
                                 )}
-                                <Button
-                                  onClick={handleForgotPassword}
-                                  disabled={resetLoading}
-                                  className="w-full"
-                                >
-                                  {resetLoading ? (
-                                    <>
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                      Sending...
-                                    </>
-                                  ) : (
-                                    'Send Reset Link'
-                                  )}
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signin-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          setError(null);
-                        }}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                          <Input
+                            id="signin-password"
+                            type="password"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => {
+                              setPassword(e.target.value);
+                              setError(null);
+                            }}
+                            className={`${darkInputClass} pl-10`}
+                            required
+                          />
+                        </div>
+                      </div>
 
-                  <Button type="submit" className="w-full" disabled={loading || oauthLoading !== null}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing in...
-                      </>
-                    ) : (
-                      'Sign In'
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-              
-              <TabsContent value="signup" className="space-y-4">
-                {/* OAuth Buttons */}
-                <div className="space-y-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleOAuthSignIn('google')}
-                    disabled={loading || oauthLoading !== null}
-                  >
-                    {oauthLoading === 'google' ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Chrome className="mr-2 h-4 w-4" />
-                    )}
-                    Sign up with Google
-                  </Button>
-                </div>
+                      <CitrusButton
+                        type="submit"
+                        variant="primary"
+                        size="lg"
+                        fullWidth
+                        loading={loading}
+                        disabled={oauthLoading !== null}
+                        arrow={!loading}
+                      >
+                        {loading ? 'Signing in...' : 'Sign In'}
+                      </CitrusButton>
+                    </form>
+                  </TabsContent>
 
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <Separator />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
-                  </div>
-                </div>
+                  {/* ── SIGN UP ─────────────────────────────────────── */}
+                  <TabsContent value="signup" className="space-y-4 mt-0">
+                    <CitrusButton
+                      type="button"
+                      variant="secondary"
+                      size="lg"
+                      fullWidth
+                      onClick={() => handleOAuthSignIn('google')}
+                      disabled={loading || oauthLoading !== null}
+                      loading={oauthLoading === 'google'}
+                    >
+                      {oauthLoading !== 'google' && <Chrome className="w-4 h-4" />}
+                      Sign up with Google
+                    </CitrusButton>
 
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="you@example.com"
-                        value={email}
-                        onChange={(e) => {
-                          setEmail(e.target.value);
-                          setError(null);
-                        }}
-                        className="pl-10"
-                        required
-                      />
+                    <div className="relative py-2">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full h-px bg-white/10" />
+                      </div>
+                      <div className="relative flex justify-center">
+                        <span className="bg-[#1A2A20] px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45">
+                          or continue with email
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          setError(null);
-                        }}
-                        className="pl-10"
-                        required
-                        minLength={8}
-                      />
-                    </div>
-                    {password && <PasswordStrength password={password} />}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="confirm-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={confirmPassword}
-                        onChange={(e) => {
-                          setConfirmPassword(e.target.value);
-                          setError(null);
-                        }}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
 
-                  <div className="flex items-start space-x-2">
-                    <Checkbox
-                      id="tos-accept"
-                      checked={tosAccepted}
-                      onCheckedChange={(checked) => setTosAccepted(checked as boolean)}
-                    />
-                    <Label htmlFor="tos-accept" className="text-sm font-normal cursor-pointer leading-tight">
-                      I agree to the{' '}
-                      <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                        Terms of Service
-                      </a>{' '}
-                      and{' '}
-                      <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                        Privacy Policy
-                      </a>
-                    </Label>
-                  </div>
+                    <form onSubmit={handleSignUp} className="space-y-4">
+                      {error && (
+                        <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200">
+                          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                          <span className="text-[13px] font-medium leading-snug">{error}</span>
+                        </div>
+                      )}
 
-                  <Button type="submit" className="w-full" disabled={loading || oauthLoading !== null || !tosAccepted}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating account...
-                      </>
-                    ) : (
-                      'Sign Up'
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="signup-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">
+                          Email
+                        </Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                          <Input
+                            id="signup-email"
+                            type="email"
+                            placeholder="you@example.com"
+                            value={email}
+                            onChange={(e) => {
+                              setEmail(e.target.value);
+                              setError(null);
+                            }}
+                            className={`${darkInputClass} pl-10`}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="signup-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">
+                          Password
+                        </Label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                          <Input
+                            id="signup-password"
+                            type="password"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => {
+                              setPassword(e.target.value);
+                              setError(null);
+                            }}
+                            className={`${darkInputClass} pl-10`}
+                            required
+                            minLength={8}
+                          />
+                        </div>
+                        {password && <PasswordStrength password={password} />}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="confirm-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">
+                          Confirm Password
+                        </Label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                          <Input
+                            id="confirm-password"
+                            type="password"
+                            placeholder="••••••••"
+                            value={confirmPassword}
+                            onChange={(e) => {
+                              setConfirmPassword(e.target.value);
+                              setError(null);
+                            }}
+                            className={`${darkInputClass} pl-10`}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2.5 pt-1">
+                        <Checkbox
+                          id="tos-accept"
+                          checked={tosAccepted}
+                          onCheckedChange={(checked) => setTosAccepted(checked as boolean)}
+                          className="mt-0.5 border-white/30 data-[state=checked]:bg-pastel-orange data-[state=checked]:border-pastel-orange data-[state=checked]:text-white"
+                        />
+                        <Label htmlFor="tos-accept" className="text-[12px] font-normal cursor-pointer leading-snug text-white/65">
+                          I agree to the{' '}
+                          <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="text-pastel-orange-soft hover:text-pastel-orange font-bold underline-offset-4 hover:underline">
+                            Terms of Service
+                          </a>{' '}
+                          and{' '}
+                          <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-pastel-orange-soft hover:text-pastel-orange font-bold underline-offset-4 hover:underline">
+                            Privacy Policy
+                          </a>
+                        </Label>
+                      </div>
+
+                      <CitrusButton
+                        type="submit"
+                        variant="primary"
+                        size="lg"
+                        fullWidth
+                        loading={loading}
+                        disabled={oauthLoading !== null || !tosAccepted}
+                        arrow={!loading}
+                      >
+                        {loading ? 'Creating account...' : 'Sign Up'}
+                      </CitrusButton>
+                    </form>
+                  </TabsContent>
+                </Tabs>
+              </CitrusCard>
+
+              {/* Trust line under the form */}
+              <p className="text-center text-[11px] font-jbmono uppercase tracking-[0.22em] text-white/35 mt-5">
+                Free during launch · Founders pricing locked in
+              </p>
+            </div>
+          </div>
+        </div>
       </main>
     </DarkLayout>
   );

@@ -23,6 +23,31 @@ export { CitrusLogo, CitrusWordmark } from './CitrusLogo';
 export { GlowCard } from './GlowCard';
 export { MascotPeek } from './MascotPeek';
 
+// Canonical surface + action primitives — replaces shadcn Card/Button on
+// migrated pages so layout, spacing, and rhythm stay consistent.
+export {
+  CitrusCard,
+  CitrusCardEyebrow,
+  CitrusCardTitle,
+  CitrusCardDescription,
+} from './CitrusCard';
+export type { CitrusCardProps } from './CitrusCard';
+
+export { CitrusButton } from './CitrusButton';
+export type {
+  CitrusButtonProps,
+  CitrusLinkButtonProps,
+  CitrusAnchorButtonProps,
+} from './CitrusButton';
+
+// Hero mascot scenes — full environmental compositions, NOT corner peeks.
+// Use these as the primary visual on Auth, empty states, error pages.
+export {
+  StormyWelcomeScene,
+  PineappleStandbyScene,
+  LemonOnTheBoardsScene,
+} from './MascotScene';
+
 // On-brand loading state
 export { StormyLoading } from './StormyLoading';
 
