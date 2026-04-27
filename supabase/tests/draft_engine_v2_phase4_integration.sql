@@ -134,15 +134,22 @@ BEGIN
 END;
 $$;
 
--- Sanity: known test vector. RFC 4122 Appendix B.
+-- Sanity: known test vector. Verifies the SQL implementation produces
+-- the canonical UUIDv5 output for a well-known input pair. This is a
+-- structural sanity check on _v2_test._uuidv5 only — the cross-runtime
+-- SQL ↔ TS parity check is SC-404 itself, which computes the key in
+-- SQL via this helper, then asserts that submit_pick_v2 idempotency
+-- replay finds the SAME key the worker would produce in TS.
 DO $verify_uuidv5$
 DECLARE
   v_actual   uuid;
-  v_expected uuid := '74738ff5-5367-5958-9aee-98fffdcd1876';
+  v_expected uuid := '2ed6657d-e927-568b-95e1-2665a8aea6a2';
 BEGIN
-  -- DNS namespace UUIDv5 of "www.example.com" per RFC 4122 reference
-  -- vector. If our implementation produces this, the bit-twiddling
-  -- is correct.
+  -- UUIDv5 of "www.example.com" under the standard DNS namespace.
+  -- Cross-checked against Python's uuid.uuid5(uuid.NAMESPACE_DNS, ...)
+  -- and raw SHA-1: SHA-1(NS_DNS_BYTES || "www.example.com") =
+  -- 2ed6657de927468b55e12665a8aea6a22dee3e35; first 16 bytes after
+  -- version-5 + variant-10 bit-set = 2ed6657d-e927-568b-95e1-2665a8aea6a2.
   v_actual := _v2_test._uuidv5(
     '6ba7b810-9dad-11d1-80b4-00c04fd430c8'::uuid,  -- DNS namespace
     'www.example.com'
