@@ -154,6 +154,39 @@ BEGIN
 END
 $verify_uuidv5$;
 
+-- ── Helper: _v2_test._purge_test_league(uuid) ─────────────────────────
+-- Cascade-delete every Phase 2/3/4 row associated with a single
+-- test_league_id. Used by SC-406 / SC-406b in both the success path
+-- AND the EXCEPTION arm (cleanup-on-failure wrapper) so failed
+-- real-worker scenarios don't leak orphaned debug data.
+--
+-- Order matters: foreign-key children (draft_picks_v2, draft_events,
+-- autopick_failures, draft_order, teams) before parents (leagues).
+-- pgmq tables drained last by message payload league_id.
+--
+-- Idempotent: calling it on a non-existent league_id is a no-op.
+
+CREATE OR REPLACE FUNCTION _v2_test._purge_test_league(
+  p_league_id uuid
+) RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  DELETE FROM public.draft_metrics       WHERE league_id = p_league_id;
+  DELETE FROM public.draft_picks_v2      WHERE league_id = p_league_id;
+  DELETE FROM public.draft_events        WHERE league_id = p_league_id;
+  DELETE FROM public.autopick_failures   WHERE league_id = p_league_id;
+  DELETE FROM public.draft_queues        WHERE league_id = p_league_id;
+  DELETE FROM public.draft_order         WHERE league_id = p_league_id;
+  DELETE FROM public.teams               WHERE league_id = p_league_id;
+  DELETE FROM public.leagues             WHERE id        = p_league_id;
+  DELETE FROM pgmq.q_draft_deadlines
+   WHERE (message ->> 'league_id')::uuid = p_league_id;
+  DELETE FROM pgmq.a_draft_deadlines
+   WHERE (message ->> 'league_id')::uuid = p_league_id;
+END;
+$$;
+
 -- ── Scenarios ──────────────────────────────────────────────────────────
 -- Conventions (inherited from phase2/phase3):
 --   - Test commissioner UID 882b59c9-8882-418b-9450-3fd004d57edd.
@@ -1021,31 +1054,39 @@ BEGIN
   v_test_league_id := (v_seed ->> 'league_id')::uuid;
   v_team_ids := ARRAY(SELECT jsonb_array_elements_text(v_seed -> 'team_ids'))::uuid[];
 
-  UPDATE public.teams SET owner_id = NULL WHERE league_id = v_test_league_id;
-  UPDATE public.leagues
-     SET pick_deadline    = now() - interval '5 seconds',
-         settings         = jsonb_set(
-                              COALESCE(settings, '{}'::jsonb),
-                              '{pickTimeLimit}', '5'::jsonb
-                            ),
-         scoring_settings = COALESCE(scoring_settings, '{}'::jsonb)
-   WHERE id = v_test_league_id;
+  -- ── Cleanup-on-failure wrapper ──
+  -- Inner BEGIN/EXCEPTION ensures _v2_test._purge_test_league runs
+  -- whether the body succeeds (normal flow) OR raises any exception
+  -- (assertion failure, RPC error, polling timeout). Without this
+  -- wrapper, a mid-poll failure leaks a half-built league + dangling
+  -- pgmq messages.
+  BEGIN
+    UPDATE public.teams SET owner_id = NULL WHERE league_id = v_test_league_id;
+    UPDATE public.leagues
+       SET pick_deadline    = now() - interval '5 seconds',
+           settings         = jsonb_set(
+                                COALESCE(settings, '{}'::jsonb),
+                                '{pickTimeLimit}', '5'::jsonb
+                              ),
+           scoring_settings = COALESCE(scoring_settings, '{}'::jsonb)
+     WHERE id = v_test_league_id;
 
-  -- Manually enqueue the first deadline message (mocking what the
-  -- sweep cron would do for an expired league). The worker takes it
-  -- from there: each successful submit_pick_v2 enqueues the NEXT
-  -- pick's deadline message via Phase 2's pgmq.send call (spec §5.2.2).
-  PERFORM pgmq.send(
-    'draft_deadlines',
-    jsonb_build_object(
-      'league_id',     v_test_league_id,
-      'pick_number',   1,
-      'generation',    0,
-      'scheduled_for', now() - interval '5 seconds',
-      'source',        'safety_net'
-    ),
-    0
-  );
+    -- Manually enqueue the first deadline message (mocking what the
+    -- sweep cron would do for an expired league). The worker takes
+    -- it from there: each successful submit_pick_v2 enqueues the
+    -- NEXT pick's deadline message via Phase 2's pgmq.send call
+    -- (spec §5.2.2).
+    PERFORM pgmq.send(
+      'draft_deadlines',
+      jsonb_build_object(
+        'league_id',     v_test_league_id,
+        'pick_number',   1,
+        'generation',    0,
+        'scheduled_for', now() - interval '5 seconds',
+        'source',        'safety_net'
+      ),
+      0
+    );
 
   -- Invoke the worker. With submit_pick_v2 chaining the next pgmq
   -- enqueue, ONE invocation should drive all 12 picks of round 1
@@ -1104,22 +1145,18 @@ BEGIN
     )
   );
 
-  RAISE NOTICE 'SC-406b PASS — % picks committed in % polls (~%s)',
-    v_picks_after, v_poll_attempts, v_poll_attempts;
+    RAISE NOTICE 'SC-406b PASS — % picks committed in % polls (~%s)',
+      v_picks_after, v_poll_attempts, v_poll_attempts;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'SC-406b FAILED: % (running cleanup before re-raising)', SQLERRM;
+    PERFORM _v2_test._purge_test_league(v_test_league_id);
+    RAISE;
+  END;
 
-  -- Explicit cleanup. Order matters: foreign-key children first.
-  DELETE FROM public.draft_metrics       WHERE league_id = v_test_league_id;
-  DELETE FROM public.draft_picks_v2      WHERE league_id = v_test_league_id;
-  DELETE FROM public.draft_events        WHERE league_id = v_test_league_id;
-  DELETE FROM public.autopick_failures   WHERE league_id = v_test_league_id;
-  DELETE FROM public.draft_order         WHERE league_id = v_test_league_id;
-  DELETE FROM public.teams               WHERE league_id = v_test_league_id;
-  DELETE FROM public.leagues             WHERE id        = v_test_league_id;
-  -- pgmq queue: drain any messages tagged with this league_id.
-  DELETE FROM pgmq.q_draft_deadlines
-   WHERE (message ->> 'league_id')::uuid = v_test_league_id;
-  DELETE FROM pgmq.a_draft_deadlines
-   WHERE (message ->> 'league_id')::uuid = v_test_league_id;
+  -- Success-path cleanup. Helper is idempotent so this is safe even
+  -- if the EXCEPTION arm above already ran (it can't — RAISE exits
+  -- the function — but safety is cheap).
+  PERFORM _v2_test._purge_test_league(v_test_league_id);
 END
 $sc406b$;
 
@@ -1185,7 +1222,14 @@ BEGIN
     '882b59c9-8882-418b-9450-3fd004d57edd'::uuid, 12, 15);
   v_test_league_id := (v_seed ->> 'league_id')::uuid;
 
-  UPDATE public.teams SET owner_id = NULL WHERE league_id = v_test_league_id;
+  -- ── Cleanup-on-failure wrapper ──
+  -- Same pattern as SC-406b. Inner BEGIN/EXCEPTION ensures
+  -- _v2_test._purge_test_league runs whether the body succeeds or
+  -- raises. Especially valuable here: SC-406's ~5min budget plus
+  -- 8-invocation re-drive loop has many failure points (network,
+  -- worker timeout, gap-free seq violation).
+  BEGIN
+    UPDATE public.teams SET owner_id = NULL WHERE league_id = v_test_league_id;
   UPDATE public.leagues
      SET pick_deadline    = now() - interval '5 seconds',
          settings         = jsonb_set(
@@ -1273,21 +1317,16 @@ BEGIN
     )
   );
 
-  RAISE NOTICE 'SC-406 PASS — % picks in % invocations / ~%s seconds',
-    v_picks_after, v_invocations, v_poll_secs;
+    RAISE NOTICE 'SC-406 PASS — % picks in % invocations / ~%s seconds',
+      v_picks_after, v_invocations, v_poll_secs;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'SC-406 FAILED: % (running cleanup before re-raising)', SQLERRM;
+    PERFORM _v2_test._purge_test_league(v_test_league_id);
+    RAISE;
+  END;
 
-  -- Explicit cleanup.
-  DELETE FROM public.draft_metrics       WHERE league_id = v_test_league_id;
-  DELETE FROM public.draft_picks_v2      WHERE league_id = v_test_league_id;
-  DELETE FROM public.draft_events        WHERE league_id = v_test_league_id;
-  DELETE FROM public.autopick_failures   WHERE league_id = v_test_league_id;
-  DELETE FROM public.draft_order         WHERE league_id = v_test_league_id;
-  DELETE FROM public.teams               WHERE league_id = v_test_league_id;
-  DELETE FROM public.leagues             WHERE id        = v_test_league_id;
-  DELETE FROM pgmq.q_draft_deadlines
-   WHERE (message ->> 'league_id')::uuid = v_test_league_id;
-  DELETE FROM pgmq.a_draft_deadlines
-   WHERE (message ->> 'league_id')::uuid = v_test_league_id;
+  -- Success-path cleanup.
+  PERFORM _v2_test._purge_test_league(v_test_league_id);
 END
 $sc406$;
 
