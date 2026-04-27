@@ -18,6 +18,8 @@ import {
   TeamColorBar,
   LivePulse,
   CtaBanner,
+  MascotPeek,
+  StormyLoading,
 } from '@/components/citrus2';
 
 interface Seed {
@@ -97,15 +99,8 @@ export default function NHLPlayoffBracket() {
   if (loading) {
     return (
       <DarkLayout>
-
-
-      <Navbar />
-        <div className="min-h-[60vh] flex items-center justify-center">
-          <div className="font-jbmono text-[12px] tracking-[0.22em] uppercase text-white/45 font-bold flex items-center gap-2">
-            <LivePulse size="xs" />
-            Loading bracket...
-          </div>
-        </div>
+        <Navbar />
+        <StormyLoading message="Loading the playoff bracket..." />
       </DarkLayout>
     );
   }
@@ -133,9 +128,10 @@ export default function NHLPlayoffBracket() {
           </p>
         </div>
 
-        {/* Inline pool CTA */}
-        <div className="mb-10 bg-[#1A2A20] border border-pastel-orange/30 rounded-2xl p-5 flex items-center justify-between gap-4 flex-wrap">
-          <div>
+        {/* Inline pool CTA — with Pineapple peeking (he presides over the playoffs) */}
+        <div className="group relative mb-10 bg-[#1A2A20] border border-pastel-orange/30 rounded-2xl p-5 flex items-center justify-between gap-4 flex-wrap overflow-hidden hover:border-pastel-orange/60 transition-colors duration-300">
+          <MascotPeek id="pineapple" position="top-right" size="sm" />
+          <div className="relative z-10">
             <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft mb-1 font-bold">
               Build your pool
             </div>
@@ -146,10 +142,10 @@ export default function NHLPlayoffBracket() {
               Free playoff pools. Confidence-weighted scoring. Built into Citrus.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="relative z-10 flex items-center gap-2">
             <Link
               to="/create-league?type=playoff"
-              className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[14px] font-bold px-5 h-11 rounded-md hover:bg-pastel-orange-deep transition-colors"
+              className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[14px] font-bold px-5 h-11 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 active:scale-95 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.4)]"
             >
               Create Pool <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
             </Link>
@@ -186,7 +182,12 @@ export default function NHLPlayoffBracket() {
                       <article
                         key={s.series_id}
                         className={cn(
-                          'bg-[#1A2A20] border rounded-2xl p-4 transition-colors',
+                          'bg-[#1A2A20] border rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5',
+                          isActive
+                            ? 'hover:shadow-[0_16px_40px_-12px_rgba(255,107,26,0.4)]'
+                            : isFinal
+                            ? 'hover:shadow-[0_16px_40px_-12px_rgba(132,165,125,0.3)]'
+                            : 'hover:shadow-[0_16px_40px_-12px_rgba(255,255,255,0.1)]',
                           isActive
                             ? 'border-pastel-orange/40'
                             : isFinal

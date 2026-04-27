@@ -58,7 +58,7 @@ export default function Pricing() {
   return (
     <DarkLayout>
 
-      <Navbar />      <promo="🍊 Free during launch · Founders pricing locked in for early users" />
+      <Navbar />
 
       <main>
         {/* Hero */}
@@ -165,7 +165,7 @@ export default function Pricing() {
           title={
             <>
               Free today. <span className="text-pastel-orange">Founders forever.</span>
-
+            </>
           }
           sub="No credit card · No trial expiration · No bait and switch"
           ctaLabel="Create your account"

@@ -121,7 +121,7 @@ export default function About() {
           title={
             <>
               Built different. <span className="text-pastel-orange">Play different.</span>
-
+            </>
           }
           sub="Free during launch · Founders pricing locked in for early users"
           ctaLabel="Create your league"
