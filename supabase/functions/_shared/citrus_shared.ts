@@ -28,3 +28,5 @@ export {
 } from '../../../packages/shared/src/utils/draftHash.ts';
 
 export { AUTOPICK_NAMESPACE_UUID } from '../../../packages/shared/src/constants/autopickConstants.ts';
+
+export { CURRENT_SEASON } from '../../../packages/shared/src/constants/season.ts';
