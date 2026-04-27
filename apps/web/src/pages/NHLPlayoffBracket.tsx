@@ -280,7 +280,7 @@ export default function NHLPlayoffBracket() {
         title={
           <>
             Lift the <span className="text-pastel-orange">Cup</span>.
-
+          </>
         }
         sub="Free during launch · Confidence-weighted scoring · Bragging rights for life"
         ctaLabel="Build Your Bracket"
