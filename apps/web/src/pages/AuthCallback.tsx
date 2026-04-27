@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DarkLayout, MascotAvatar } from '@/components/citrus2';
 
 /**
  * Auth Callback Page
@@ -124,34 +125,39 @@ const AuthCallback = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/20 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {status === 'loading' && <Loader2 className="h-5 w-5 animate-spin" />}
-            {status === 'success' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
-            {status === 'error' && <XCircle className="h-5 w-5 text-red-500" />}
-            {status === 'loading' && 'Signing In'}
-            {status === 'success' && 'Success'}
-            {status === 'error' && 'Sign-In Failed'}
-          </CardTitle>
-          <CardDescription>{message}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {status === 'loading' && (
-            <div className="flex flex-col items-center gap-4">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Please wait...</p>
+    <DarkLayout>
+      <main className="min-h-screen flex items-center justify-center p-4 relative">
+        <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-3">
+              <MascotAvatar id="stormy" size="lg" />
             </div>
-          )}
-          {status === 'error' && (
-            <div className="flex flex-col items-center gap-4">
-              <p className="text-sm text-muted-foreground">You will be redirected to the sign-in page.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            <CardTitle className="flex items-center justify-center gap-2 text-pastel-cream">
+              {status === 'loading' && <Loader2 className="h-5 w-5 animate-spin text-pastel-orange-soft" />}
+              {status === 'success' && <CheckCircle2 className="h-5 w-5 text-pastel-sage" />}
+              {status === 'error' && <XCircle className="h-5 w-5 text-pastel-orange" />}
+              {status === 'loading' && 'Signing In'}
+              {status === 'success' && 'Welcome to Citrus'}
+              {status === 'error' && 'Sign-In Failed'}
+            </CardTitle>
+            <CardDescription className="text-white/60">{message}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {status === 'loading' && (
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-pastel-orange-soft" />
+                <p className="text-sm text-white/55">Stormy is checking you in...</p>
+              </div>
+            )}
+            {status === 'error' && (
+              <div className="flex flex-col items-center gap-4">
+                <p className="text-sm text-white/55">You will be redirected to the sign-in page.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </main>
+    </DarkLayout>
   );
 };
 

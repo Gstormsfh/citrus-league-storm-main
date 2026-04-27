@@ -26,6 +26,11 @@ jobs:
       # scraper (data_scraping_service.py) picks them up automatically.
       # Safe to re-run — uses upsert on game_id. Scans 7 days ahead to
       # catch newly announced games.
+      #
+      # NO continue-on-error here. If this step fails, every downstream
+      # job operates on stale/missing schedule data and the live scraper
+      # spins on "No games found in DB schedule" until someone notices
+      # by hand. Fail the run loudly so GitHub emails about it.
       - name: Ingest playoff game schedule
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -34,7 +39,6 @@ jobs:
           START=$(date -d "today" +%Y-%m-%d)
           END=$(date -d "+7 days" +%Y-%m-%d)
           python data-pipeline/acquisition/ingest_playoff_schedule.py --start "$START" --end "$END" --season 2025
-        continue-on-error: true
 
       # Step 1: Refresh bracket seeds + initial series rows (safe to re-run)
       - name: Ingest NHL playoff bracket

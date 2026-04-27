@@ -1,8 +1,7 @@
-
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
+import Navbar from '@/components/Navbar';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { DarkLayout, HockeyFooter } from '@/components/citrus2';
 
 const podcastEpisodes = [
   {
@@ -41,13 +40,17 @@ const podcastEpisodes = [
 
 const Podcasts = () => {
   return (
-    <div className="min-h-screen">
+    <DarkLayout>
+
+
       <Navbar />
-      <main className="pt-16 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center mb-10 animated-element">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 vibrant-gradient-2 bg-clip-text text-transparent">
-              CitrusSports Podcasts
+      <main className="relative max-w-[1280px] mx-auto px-6 pt-12 pb-16">
+        <div className="text-center mb-10">
+          <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">
+            On Air
+          </div>
+          <h1 className="font-sans font-black text-[3rem] md:text-[4rem] leading-tight tracking-[-0.03em] text-pastel-cream mb-4">
+            Citrus <span className="text-pastel-orange">Podcasts</span>
             </h1>
             <p className="text-lg text-muted-foreground">
               Expert analysis, interviews, and advice for your fantasy sports journey
@@ -168,8 +171,8 @@ const Podcasts = () => {
           </div>
         </div>
       </main>
-      <Footer />
-    </div>
+      <HockeyFooter />
+    </DarkLayout>
   );
 };
 

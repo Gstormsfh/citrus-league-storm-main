@@ -1,23 +1,26 @@
-
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import Navbar from '@/components/Navbar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DarkLayout, HockeyFooter } from '@/components/citrus2';
 
 const Guides = () => {
   return (
-    <div className="min-h-screen">
+    <DarkLayout>
+
+
       <Navbar />
-      <main className="pt-16 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center mb-10 animated-element">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 vibrant-gradient-1 bg-clip-text text-transparent">
-              Strategy Guides
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              Comprehensive resources to help you dominate your fantasy league
-            </p>
+      <main className="relative max-w-[1280px] mx-auto px-6 pt-12 pb-16">
+        <div className="text-center mb-10">
+          <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">
+            Behind the Bench
           </div>
+          <h1 className="font-sans font-black text-[3rem] md:text-[4rem] leading-tight tracking-[-0.03em] text-pastel-cream mb-4">
+            Strategy <span className="text-pastel-orange">guides</span>.
+          </h1>
+          <p className="text-[16px] text-white/65 max-w-xl mx-auto leading-relaxed">
+            Comprehensive resources to help you dominate your league. From draft to playoffs.
+          </p>
+        </div>
           
           <Tabs defaultValue="beginner" className="mb-10 animated-element">
             <div className="flex justify-center mb-6">
@@ -166,8 +169,8 @@ const Guides = () => {
           </div>
         </div>
       </main>
-      <Footer />
-    </div>
+      <HockeyFooter />
+    </DarkLayout>
   );
 };
 

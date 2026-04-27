@@ -105,6 +105,17 @@ const PoolPlayoffHub = lazyWithErrorHandling(() => import("./pages/PoolPlayoffHu
 const Admin = lazyWithErrorHandling(() => import("./pages/Admin"));
 const PreviewRedesign = lazyWithErrorHandling(() => import("./pages/PreviewRedesign"));
 const PreviewMockups = lazyWithErrorHandling(() => import("./pages/PreviewMockups"));
+const PreviewIndex = lazyWithErrorHandling(() => import("./pages/PreviewIndex"));
+const PreviewAlmanac = lazyWithErrorHandling(() => import("./pages/PreviewAlmanac"));
+const PreviewSunlight = lazyWithErrorHandling(() => import("./pages/PreviewSunlight"));
+const PreviewPress = lazyWithErrorHandling(() => import("./pages/PreviewPress"));
+const PreviewStadium = lazyWithErrorHandling(() => import("./pages/PreviewStadium"));
+const PreviewPulse = lazyWithErrorHandling(() => import("./pages/PreviewPulse"));
+const PreviewSquad = lazyWithErrorHandling(() => import("./pages/PreviewSquad"));
+const PreviewArena = lazyWithErrorHandling(() => import("./pages/PreviewArena"));
+const PreviewRink = lazyWithErrorHandling(() => import("./pages/PreviewRink"));
+const PreviewBoards = lazyWithErrorHandling(() => import("./pages/PreviewBoards"));
+const PreviewClone = lazyWithErrorHandling(() => import("./pages/PreviewClone"));
 
 // Use the picturesque LoadingScreen as the Suspense fallback for lazy-loaded routes
 const PageLoader = () => <LoadingScreen />;
@@ -208,6 +219,17 @@ const App = () => {
                 {/* Hidden preview routes for redesign work — not linked from anywhere in production nav */}
                 <Route path="/preview-redesign" element={<PreviewRedesign />} />
                 <Route path="/preview-mockups" element={<PreviewMockups />} />
+                <Route path="/previews" element={<PreviewIndex />} />
+                <Route path="/preview-almanac" element={<PreviewAlmanac />} />
+                <Route path="/preview-sunlight" element={<PreviewSunlight />} />
+                <Route path="/preview-press" element={<PreviewPress />} />
+                <Route path="/preview-stadium" element={<PreviewStadium />} />
+                <Route path="/preview-pulse" element={<PreviewPulse />} />
+                <Route path="/preview-squad" element={<PreviewSquad />} />
+                <Route path="/preview-arena" element={<PreviewArena />} />
+                <Route path="/preview-rink" element={<PreviewRink />} />
+                <Route path="/preview-boards" element={<PreviewBoards />} />
+                <Route path="/preview-clone" element={<PreviewClone />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

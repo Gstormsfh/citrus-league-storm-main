@@ -1,12 +1,12 @@
 
 import { useState } from 'react';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { DarkLayout, HockeyFooter } from '@/components/citrus2';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -52,14 +52,22 @@ const Contact = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <DarkLayout>
+
+
       <Navbar />
-      <main className="pt-16 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
-        <div className="container mx-auto px-4 max-w-6xl">
-          <div className="max-w-3xl mx-auto text-center mb-10 animated-element">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 vibrant-gradient-3 bg-clip-text text-transparent">Contact Us</h1>
-            <p className="text-lg text-muted-foreground">We'd love to hear from you! Reach out with any questions or feedback.</p>
+      <main className="relative max-w-[1100px] mx-auto px-6 pt-16 pb-24">
+        <div className="text-center mb-12">
+          <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">
+            Contact
           </div>
+          <h1 className="font-sans font-black text-[3rem] md:text-[4rem] leading-tight tracking-[-0.03em] text-pastel-cream mb-4">
+            Get in <span className="text-pastel-orange">touch</span>.
+          </h1>
+          <p className="text-[16px] text-white/65 max-w-xl mx-auto leading-relaxed">
+            Questions, feedback, or just want to chirp at us? Drop a line — we read every message.
+          </p>
+        </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
             <div className="md:col-span-2">
@@ -178,11 +186,10 @@ const Contact = () => {
                 </CardContent>
               </Card>
             </div>
-          </div>
         </div>
       </main>
-      <Footer />
-    </div>
+      <HockeyFooter />
+    </DarkLayout>
   );
 };
 
