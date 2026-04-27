@@ -451,12 +451,12 @@ const Auth = () => {
                                     <>
                                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                       Sending...
-
+                                    </>
                                   ) : (
                                     'Send Reset Link'
                                   )}
                                 </Button>
-
+                              </>
                             )}
                           </div>
                         </DialogContent>
@@ -484,7 +484,7 @@ const Auth = () => {
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Signing in...
-
+                      </>
                     ) : (
                       'Sign In'
                     )}
@@ -609,7 +609,7 @@ const Auth = () => {
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Creating account...
-
+                      </>
                     ) : (
                       'Sign Up'
                     )}

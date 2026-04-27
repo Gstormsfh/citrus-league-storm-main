@@ -102,17 +102,17 @@ const VerifyEmail = () => {
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Sending...
-
+                  </>
                 ) : success ? (
                   <>
                     <CheckCircle2 className="mr-2 h-4 w-4" />
                     Email Sent
-
+                  </>
                 ) : (
                   <>
                     <Mail className="mr-2 h-4 w-4" />
                     Resend Verification Email
-
+                  </>
                 )}
               </Button>
 
