@@ -43,6 +43,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { timingSafeEqual } from "https://deno.land/std@0.168.0/crypto/timing_safe_equal.ts";
 import { createServiceRoleClient } from "../_shared/supabaseClient.ts";
+// SMOKE-ONLY: verify Supabase CLI bundles the _shared/citrus_shared
+// re-export shim (which traverses outside supabase/ to packages/shared/).
+// Revert this import + the console.log below after the deploy succeeds.
+import { AUTOPICK_NAMESPACE_UUID } from "../_shared/citrus_shared.ts";
+console.info(
+  JSON.stringify({
+    service: "draft-autopick",
+    event: "shim_smoke",
+    autopick_namespace_uuid: AUTOPICK_NAMESPACE_UUID,
+  }),
+);
 
 const SERVICE_NAME = "draft-autopick";
 const LOOP_BUDGET_MS = 140_000; // 10s headroom under the 150s Edge Function ceiling
