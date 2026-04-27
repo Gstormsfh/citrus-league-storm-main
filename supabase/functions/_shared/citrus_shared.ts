@@ -1,32 +1,37 @@
 // Re-export Citrus shared utilities for Deno-runtime consumers
-// (Supabase Edge Functions). Single source of truth lives in
-// `packages/shared/`; this shim avoids duplicating code in
-// `supabase/functions/` while keeping the import path local
-// (`../_shared/citrus_shared.ts`).
+// (Supabase Edge Functions). Imports from `./_vendored/` — verbatim
+// copies of the canonical files in `packages/shared/`.
 //
-// IMPORTANT: keep this file as RE-EXPORTS ONLY. No re-implementations.
-// If a shared util ever drifts between Node and Deno, the bug class is
-// "different code paths produce different outputs" — the exact thing
-// the @citrus/shared single-source-of-truth pattern exists to prevent.
+// HISTORICAL CONTEXT (KI-007):
+// The original chunk 11b shim re-exported directly from
+// `../../../packages/shared/src/...` — relative paths traversing OUT
+// of the supabase/ tree. The chunk 11b smoke deploy succeeded with
+// that pattern (one constant), but chunk 11d's expanded imports
+// (scoring.ts, season.ts, draftHash.ts, autopickConstants.ts)
+// triggered a Supabase CLI bundler bug on Windows: the bundler
+// resolves relative paths Unix-style and fails on Windows hosts when
+// the path crosses out of supabase/. Vendoring keeps every Edge
+// Function import inside the supabase/ tree.
 //
-// Bundling note: Supabase Edge Functions deploy via the Supabase CLI
-// bundles all relative file imports, including those that traverse
-// outside the `supabase/` directory. The relative paths below are
-// resolved at deploy time, not at runtime.
+// MAINTENANCE: the vendored files in _shared/_vendored/ MUST stay
+// in sync with packages/shared/. Phase 7 adds a CI check that diffs
+// canonical vs vendored bodies (ignoring sync-on-change headers) and
+// fails on drift. Until that CI check lands, vigilance is the only
+// safeguard — see KI-007 verification protocol.
 
 export {
   ScoringCalculator,
   DEFAULT_SCORING,
   type ScoringSettings,
-} from '../../../packages/shared/src/utils/scoring.ts';
+} from './_vendored/scoring.ts';
 
 export {
   computePickPayloadHash,
   canonicalJson,
   sha256Hex,
   type PickHashInput,
-} from '../../../packages/shared/src/utils/draftHash.ts';
+} from './_vendored/draftHash.ts';
 
-export { AUTOPICK_NAMESPACE_UUID } from '../../../packages/shared/src/constants/autopickConstants.ts';
+export { AUTOPICK_NAMESPACE_UUID } from './_vendored/autopickConstants.ts';
 
-export { CURRENT_SEASON } from '../../../packages/shared/src/constants/season.ts';
+export { CURRENT_SEASON } from './_vendored/season.ts';
