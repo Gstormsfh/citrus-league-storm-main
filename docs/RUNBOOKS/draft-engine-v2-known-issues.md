@@ -70,6 +70,71 @@ Open issues at end of Phase 2:
 Phase 3 begins next: pgmq scheduler RPC (`draft_deadline_sweep`),
 pg_cron sub-minute schedule, worker scaffold (Edge Function stub).
 
+### Phase 3 closeout (2026-04-27)
+
+> ⚠️ **CURRENTLY PAUSED ON STAGING.** Both Phase 3 cron jobs —
+> `draft-deadline-sweep` and `draft-autopick-keepalive` — are
+> deliberately paused (`active = false` in `cron.job`) and **must
+> remain paused until Phase 4 completes.** The Phase 3 worker is
+> archive-only; if the keep-alive fires against real
+> `submit_pick_v2`-enqueued messages, picks would be silently
+> dropped. "Phase 3 done" ≠ "Phase 3 enabled." See the operations
+> runbook section "Phase 4 prerequisites (must land before
+> unpausing Phase 3 crons)" for the gating list.
+
+Phase 3 substantively complete. All Phase 3 surfaces deployed to
+staging:
+
+- **Schema (chunk 10a):** `draft_metrics` (partitioned monthly,
+  Apr–Jul 2026 initial partitions), `draft_metrics_daily` (rollup),
+  `autopick_failures` (DLQ), and `manage_draft_metrics_partitions()`
+  with monthly pg_cron schedule.
+- **Sweep RPC (chunk 10b):** `draft_deadline_sweep()` — race-free
+  `draft_events` predicate, `pg_try_advisory_xact_lock`-guarded,
+  per-league `safety_net_hit` writes per locked Q3.
+- **Edge Function scaffold (chunk 10c):** `supabase/functions/
+  draft-autopick/index.ts` (≤140s loop, 30s idle exit, archive-only,
+  timing-safe bearer compare) + pgmq wrappers
+  (`draft_autopick_read`, `draft_autopick_archive`) + shared
+  service-role client factory.
+- **Cron + Vault (chunk 10d):** `draft-deadline-sweep` (every 10s)
+  and `draft-autopick-keepalive` (every 2 min). Vault secret
+  `draft-autopick-token` provisioning recipe in operations runbook.
+- **Integration scenarios (chunk 10e):** 12 SC-3xx scenarios
+  (`supabase/tests/draft_engine_v2_phase3_integration.sql`) all
+  passing on staging — predicate correctness, 2s back-buffer
+  boundary, advisory-lock reentry, pgmq wrapper roundtrip, partition
+  manager idempotence, plus the load-bearing SC-301
+  BEGIN/ROLLBACK harness verification.
+
+Verification:
+- 12/12 SC-3xx scenarios pass on staging.
+- `draft_deadline_sweep()` smoke test from SQL Editor returns 0 with
+  zero residue (no pgmq messages, no `safety_net_hit` rows).
+- Edge Function `auth_failed` 401 path confirmed via wrong-bearer
+  curl test.
+- Cron jobs registered in `cron.job` with correct schedules; both
+  paused immediately after apply per spec ("Phase 3 done and
+  currently disabled until Phase 4").
+
+Deviations documented:
+- **D4** — `draft_metrics` PK includes synthetic `id` column
+  (operations runbook).
+
+Open issues at end of Phase 3:
+- **KI-003** still open (Phase 2 carryover; target Phase 7 load
+  testing).
+- **KI-004** open — Phase 3 keep-alive cron's `net.http_post` URL
+  is hardcoded to staging project ref `jjgspcpvqaiitloglxbb`.
+  Target: Phase 8a prod cutover (re-parameterize via Vault).
+- KI-001 / KI-002 RESOLVED in Phase 2.
+
+Phase 4 begins next: real autopick state machine in
+`draft-autopick/index.ts` (read pgmq → `submit_pick_v2(actor.kind=
+'autopick')` → archive on success), 3-strikes-and-DLQ pattern via
+`autopick_failures` insert, player-selection logic (queue lookup
+with FPTS+positional-need fallback), Phase 4 integration scenarios.
+
 ---
 
 ### KI-001 — `DraftServiceV2.broadcastEvent` can hang on non-SUBSCRIBED channel status
@@ -129,6 +194,17 @@ wire-up needed for chunk 9d.
 | **Why deferred** | Two viable fixes, both larger than a chunk-9 cleanup: **(a)** verify Cloud Run session affinity is configured AND holds across deploys (operational change + monitoring); **(b)** move rate-limiter state to a shared store (Redis, Postgres). Either warrants its own design decision and review, not a wedge fix. |
 | **Target phase for resolution** | **Phase 7** at the latest (load testing — that's when actual rate-limit behavior gets measured). Could land earlier if a separate decision on shared rate-limit infrastructure (Redis vs. Postgres-backed bucket) is made independently. |
 | **Verification test** | Spin up ≥2 Cloud Run instances on staging. From a single client, hammer `/api/draft/v2/league/$ID/events` at 30 req/s for 60s. Count actual responses by status code. **Pass** = (200 count + 429 count) corresponds to the documented 10/30s rate (so 10 successes per 30s window, all others 429). **Fail** = success count exceeds 10/30s by more than the documented limit × instance count. Alternative if shared store lands first: integration test against a multi-instance simulated dispatch confirming the rate limit holds. |
+
+### KI-004 — Phase 3 keep-alive cron's `net.http_post` URL is hardcoded to staging
+
+| | |
+|---|---|
+| **Severity** | medium |
+| **Function / file** | `supabase/migrations/20260426150000_draft_engine_v2_phase3_cron_vault.sql`, the `draft-autopick-keepalive` cron command body (search-string `STAGING_PROJECT_REF`). |
+| **Description** | The cron's `net.http_post(url := 'https://jjgspcpvqaiitloglxbb.supabase.co/functions/v1/draft-autopick', ...)` call has the staging Supabase project ref baked in as a string literal. There is no environment variable available at SQL apply time, and pg_cron stores the literal command text in `cron.job.command`. The same migration file applied verbatim to a prod project would still POST to staging — which means prod's safety-net deadlines would never reach a prod worker. |
+| **Why deferred** | Phase 3 is staging-only by spec (Phase 8a is the prod cutover). Parameterizing the URL via Vault now would require a second Vault secret (`draft_autopick_worker_url` or similar), additional provisioning steps in the operations runbook, and a `COALESCE`-based fallback for the case where the URL secret is missing — all overhead for a problem that does not yet exist. The simpler fix is to ship a prod-flavored cutover migration in Phase 8a that reads URL from Vault from day one, alongside the existing `draft-autopick-token` provisioning. |
+| **Target phase for resolution** | **Phase 8a** (prod cutover). The prod cutover migration replaces the literal URL with `'https://' \|\| vault.read_secret('draft_autopick_worker_url') \|\| '/functions/v1/draft-autopick'` (or equivalent). Same Vault provisioning recipe as `draft-autopick-token`; same rotation procedure. The runbook's "STAGING_PROJECT_REF" marker comment in the chunk 10d migration flags the line that must change. |
+| **Verification test** | After the Phase 8a cutover migration applies on prod: `SELECT count(*) FROM cron.job WHERE jobname = 'draft-autopick-keepalive' AND command LIKE '%jjgspcpvqaiitloglxbb%';` must return **0** (no staging ref leaked into prod). Plus the positive assertion `SELECT count(*) FROM cron.job WHERE jobname = 'draft-autopick-keepalive' AND command LIKE '%vault.read_secret%';` must return **1** (URL is Vault-resolved). Both assertions fail-loud during the cutover smoke test. |
 
 ---
 
