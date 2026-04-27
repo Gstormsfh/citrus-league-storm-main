@@ -288,16 +288,57 @@ The crons stay paused until Phase 4 ships ALL of the following:
    autopick/index.ts`** (replaces the chunk 10c
    `phase3_noop_archive` block):
    - Read pgmq message via `draft_autopick_read(vt=30, qty=10)`.
-   - Stale-message no-ops: `state != 'active'`, `generation
-     mismatch`, `now() < pick_deadline` (premature), `pick_number
-     != current` (advanced). All four archive + log + continue.
+   - **Stale-message no-ops.** Read fresh `leagues` row
+     (`draft_state, draft_generation, pick_deadline, league_size,
+     settings`) once per message. Then four archive-and-continue
+     gates, in order:
+       - `league.draft_state != 'active'` → archive, log
+         `worker_skip_state`.
+       - `msg.message.generation != league.draft_generation` →
+         archive, log `worker_skip_generation`. **This is the
+         pause/resume/extend invariant** — every lifecycle event
+         that bumps `leagues.draft_generation` (spec §5.1) instantly
+         invalidates every in-flight pgmq message. The worker MUST
+         compare these two integers and discard mismatches before
+         doing anything else; otherwise a paused-then-resumed draft
+         could autopick at the old deadline.
+       - `now() < league.pick_deadline` → archive, log
+         `worker_skip_premature` (deadline was extended after
+         enqueue).
+       - `msg.message.pick_number != current_pick` (where
+         `current_pick = count(picks)+1` from the event log) →
+         archive, log `worker_skip_pick_advanced` (a human picked
+         between enqueue and read).
    - Reconstruct draft state via `reconstruct_draft_state(league_id)`.
    - Determine on-the-clock team from snake order + current pick #.
    - Read `draft_queues` for that team; fall back to in-function
      heuristic (FPTS × positional need, ported from
      `DraftRoom.tsx:2410-2524`) if no queue is set.
-   - Call `submit_pick_v2(actor.kind='autopick', idempotency_key=
-     uuid_v5(league_id, pick_number, generation, 'autopick'))`.
+   - **Compute `payload_hash` via the shared helper** —
+     `import { computePickPayloadHash } from '@citrus/shared'`
+     (same module the Phase 2 server-side pick path uses). The
+     worker MUST NOT roll its own canonicalization; using the
+     shared helper preserves the cross-runtime hash agreement set
+     up in Phase 2 chunk 7. A divergent hash would surface as
+     spurious `idempotency_conflict` errors when a human and the
+     worker race on the same pick.
+   - **Call `submit_pick_v2`** with:
+       - `p_actor = jsonb_build_object('kind', 'autopick')`. The
+         autopick path is gated by the spec gap-fill in deviation
+         **D2** (operations runbook): `auth.role() NOT IN
+         ('service_role', 'postgres')` raises `unauthorized`. The
+         Phase 4 worker runs as `service_role` (Edge Function with
+         the platform-provided service-role key); both halves of
+         D2 must be honored — `actor.kind='autopick'` AND a caller
+         role that the gate accepts.
+       - `p_idempotency_key = uuid_v5(<namespace>, league_id ||
+         pick_number || generation || 'autopick')`. Generation
+         from the pgmq message payload makes post-pause/resume
+         keys fresh even at the same pick_number.
+       - `p_payload_hash` from the shared helper above.
+       - `p_correlation_id = crypto.randomUUID()` per message-
+         processing pass; `payload.pgmq_msg_id` carries the
+         queue-side ID for trace joins.
    - On success: `draft_autopick_archive(msg_id)`. Metric:
      `autopick_fired`.
    - On `idempotency_conflict`: archive + log "already picked"
