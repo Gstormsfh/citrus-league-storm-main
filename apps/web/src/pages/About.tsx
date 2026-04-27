@@ -90,12 +90,28 @@ export default function About() {
           />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
             {MASCOT_LIST.map((m) => (
-              <div key={m.id} className="text-center">
-                <MascotPortrait id={m.id} className="mb-3" />
-                <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold mb-1">
-                  {m.position}
+              <div key={m.id} className="group text-center cursor-pointer">
+                <div className="relative mb-3">
+                  {/* Ambient glow that intensifies on hover */}
+                  <div
+                    aria-hidden="true"
+                    className="absolute inset-0 -m-3 rounded-full opacity-0 group-hover:opacity-60 blur-2xl transition-opacity duration-500"
+                    style={{ background: 'radial-gradient(circle, #FF6B1A 0%, transparent 60%)' }}
+                  />
+                  <MascotPortrait
+                    id={m.id}
+                    className="relative ring-2 ring-white/10 group-hover:ring-pastel-orange/50 group-hover:scale-105 transition-all duration-300"
+                  />
                 </div>
-                <div className="font-calistoga text-[20px] text-pastel-cream">{m.name}</div>
+                <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold mb-1 group-hover:text-pastel-orange transition-colors">
+                  {m.position}{m.number ? ` · #${m.number}` : ''}
+                </div>
+                <div className="font-calistoga text-[20px] text-pastel-cream group-hover:text-pastel-orange-soft transition-colors">
+                  {m.name}
+                </div>
+                <div className="text-[12px] text-white/45 leading-snug mt-1 max-w-[200px] mx-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  {m.tagline}
+                </div>
               </div>
             ))}
           </div>

@@ -7,6 +7,8 @@ import {
   SectionHeader,
   CtaBanner,
   Faq,
+  GlowCard,
+  MascotPeek,
   type FaqEntry,
 } from '@/components/citrus2';
 
@@ -74,77 +76,83 @@ export default function Pricing() {
           </p>
         </section>
 
-        {/* Two-card pricing */}
+        {/* Two-card pricing — with mascot anchors per Sleeper brand layering */}
         <section className="relative max-w-[1100px] mx-auto px-6 pb-20 grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Free / Launch tier */}
-          <article className="bg-[#1A2A20] border-2 border-pastel-orange/40 rounded-3xl p-8 relative">
-            <div className="absolute -top-3 left-8 px-3 py-1 rounded-md bg-pastel-orange text-white font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold">
-              Available Now
-            </div>
-            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-2 font-bold">
-              Launch Tier
-            </div>
-            <h2 className="font-sans font-black text-[2.5rem] text-pastel-cream leading-none mb-1">
-              Free
-            </h2>
-            <div className="font-jbmono text-[11px] text-white/45 mb-6">
-              Forever for founding managers
-            </div>
-            <p className="text-[14px] text-white/65 leading-relaxed mb-6">
-              Everything Citrus ships today, no paywall. Lock in founders pricing on future paid
-              tiers by signing up now.
-            </p>
-            <ul className="space-y-2.5 mb-8">
-              {FREE_FEATURES.map((f) => (
-                <li key={f} className="flex items-start gap-2.5">
-                  <Check className="w-4 h-4 text-pastel-sage flex-shrink-0 mt-0.5" strokeWidth={2.5} />
-                  <span className="text-[14px] text-pastel-cream leading-snug">{f}</span>
-                </li>
-              ))}
-            </ul>
-            <Link
-              to="/create-league"
-              className="w-full inline-flex items-center justify-center gap-2 bg-pastel-orange text-white text-[14px] font-bold px-5 rounded-md hover:bg-pastel-orange-deep transition-colors"
-              style={{ height: '48px' }}
-            >
-              Drop the Puck <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
-            </Link>
-          </article>
+          {/* Free / Launch tier — Lemon (the scorer) anchors this one */}
+          <GlowCard accent="orange">
+            <article className="p-8 relative">
+              <MascotPeek id="lemon" position="top-right" size="md" />
+              <div className="absolute -top-3 left-8 px-3 py-1 rounded-md bg-pastel-orange text-white font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold z-10">
+                Available Now
+              </div>
+              <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-2 font-bold relative z-10">
+                Launch Tier
+              </div>
+              <h2 className="font-sans font-black text-[2.5rem] text-pastel-cream leading-none mb-1 relative z-10">
+                Free
+              </h2>
+              <div className="font-jbmono text-[11px] text-white/45 mb-6 relative z-10">
+                Forever for founding managers
+              </div>
+              <p className="text-[14px] text-white/65 leading-relaxed mb-6 relative z-10">
+                Everything Citrus ships today, no paywall. Lock in founders pricing on future paid
+                tiers by signing up now.
+              </p>
+              <ul className="space-y-2.5 mb-8 relative z-10">
+                {FREE_FEATURES.map((f) => (
+                  <li key={f} className="flex items-start gap-2.5">
+                    <Check className="w-4 h-4 text-pastel-sage flex-shrink-0 mt-0.5" strokeWidth={2.5} />
+                    <span className="text-[14px] text-pastel-cream leading-snug">{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                to="/create-league"
+                className="w-full inline-flex items-center justify-center gap-2 bg-pastel-orange text-white text-[14px] font-bold px-5 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 active:scale-95 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)] relative z-10"
+                style={{ height: '48px' }}
+              >
+                Drop the Puck <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
+              </Link>
+            </article>
+          </GlowCard>
 
-          {/* Pro tease */}
-          <article className="bg-[#1A2A20] border border-white/10 rounded-3xl p-8 relative opacity-90">
-            <div className="absolute -top-3 left-8 px-3 py-1 rounded-md bg-white/10 text-white/65 font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold ring-1 ring-white/15">
-              Coming Soon
-            </div>
-            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-sage-soft mb-2 font-bold flex items-center gap-2">
-              <Crown className="w-3 h-3" strokeWidth={2.5} /> Stormy Pro + Commish
-            </div>
-            <h2 className="font-sans font-black text-[2.5rem] text-pastel-cream/85 leading-none mb-1">
-              TBD
-            </h2>
-            <div className="font-jbmono text-[11px] text-white/45 mb-6">
-              Founders pricing locked in
-            </div>
-            <p className="text-[14px] text-white/65 leading-relaxed mb-6">
-              Power-user tier launching later this year. Founders get a permanent discount —
-              exact pricing not set yet, but always favorable for early users.
-            </p>
-            <ul className="space-y-2.5 mb-8">
-              {PRO_TEASE.map((f) => (
-                <li key={f} className="flex items-start gap-2.5">
-                  <Sparkles className="w-4 h-4 text-pastel-orange-soft flex-shrink-0 mt-0.5" strokeWidth={2.5} />
-                  <span className="text-[14px] text-pastel-cream/80 leading-snug">{f}</span>
-                </li>
-              ))}
-            </ul>
-            <button
-              disabled
-              className="w-full inline-flex items-center justify-center gap-2 bg-white/5 text-white/55 text-[14px] font-bold px-5 rounded-md cursor-not-allowed ring-1 ring-white/10"
-              style={{ height: '48px' }}
-            >
-              Coming soon — sign up to lock in
-            </button>
-          </article>
+          {/* Pro tease — Stormy anchors this one (her Pro tier) */}
+          <GlowCard accent="sage">
+            <article className="p-8 relative">
+              <MascotPeek id="stormy" position="top-right" size="md" />
+              <div className="absolute -top-3 left-8 px-3 py-1 rounded-md bg-white/10 text-white/65 font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold ring-1 ring-white/15 z-10">
+                Coming Soon
+              </div>
+              <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-sage-soft mb-2 font-bold flex items-center gap-2 relative z-10">
+                <Crown className="w-3 h-3" strokeWidth={2.5} /> Stormy Pro + Commish
+              </div>
+              <h2 className="font-sans font-black text-[2.5rem] text-pastel-cream/85 leading-none mb-1 relative z-10">
+                TBD
+              </h2>
+              <div className="font-jbmono text-[11px] text-white/45 mb-6 relative z-10">
+                Founders pricing locked in
+              </div>
+              <p className="text-[14px] text-white/65 leading-relaxed mb-6 relative z-10">
+                Power-user tier launching later this year. Founders get a permanent discount —
+                exact pricing not set yet, but always favorable for early users.
+              </p>
+              <ul className="space-y-2.5 mb-8 relative z-10">
+                {PRO_TEASE.map((f) => (
+                  <li key={f} className="flex items-start gap-2.5">
+                    <Sparkles className="w-4 h-4 text-pastel-orange-soft flex-shrink-0 mt-0.5" strokeWidth={2.5} />
+                    <span className="text-[14px] text-pastel-cream/80 leading-snug">{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                disabled
+                className="w-full inline-flex items-center justify-center gap-2 bg-white/5 text-white/55 text-[14px] font-bold px-5 rounded-md cursor-not-allowed ring-1 ring-white/10 relative z-10"
+                style={{ height: '48px' }}
+              >
+                Coming soon — sign up to lock in
+              </button>
+            </article>
+          </GlowCard>
         </section>
 
         {/* FAQ */}
