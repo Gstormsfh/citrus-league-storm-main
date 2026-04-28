@@ -78,6 +78,27 @@ The principles below (event sourcing, idempotency, server-owned time, etc.) are 
 
 Any conflict between the performance mandate and the principles below is resolved in favor of the performance mandate.
 
+## §0.5 Architectural Approach
+
+Per **ADR-001** (`docs/adr/ADR-001-elixir-phoenix-draft-engine.md`), the live draft engine is a **separate Elixir/Phoenix service** that holds per-draft state in memory (one persistent `DraftServer` GenServer per active draft) and communicates with clients via **Phoenix Channels over WebSocket**. The rest of the Citrus application — leagues, rosters, matchups, scoring dashboards, AI Assistant, public pages — remains on the existing **Node.js / Next.js / Supabase** stack.
+
+The Phase 0–4 architectural primitives below (event log as source of truth, idempotency keys, payload hashes, projection trigger, pgmq sweep, server-owned time, runtime-checked invariants) are **unchanged**. The Elixir engine writes to Postgres through the existing RPCs (`submit_pick_v2`, `append_draft_event`, `record_shadow_event`, `reconstruct_draft_state`, `draft_pause`, `draft_resume`, `draft_extend`, `validate_draft_event_payload`); it reads the event log via Ecto; the projection trigger fires synchronously inside the same transaction the engine commits. From Postgres's perspective, the Elixir engine looks like another well-behaved RPC caller with a fresh `correlation_id` per pass.
+
+What the Elixir engine adds:
+
+- **Persistent in-memory state per draft.** Candidate pool, current pick, timer, per-team queues, connected-clients set, last broadcast seq — held in the `DraftServer` process for the duration of the draft. No per-action Postgres reads on the hot path.
+- **WebSocket transport for the live experience.** Picks, broadcasts, timer ticks, chat, presence. Sub-200ms broadcast fanout to all connected clients (per the Performance Mandate, §0).
+- **Sub-1s autopick.** Deadline expiry → in-memory candidate selection → `submit_pick_v2` write → broadcast. The 11.7s/pick latency observed in Phase 4's Edge Function-based autopick is unacceptable; the Elixir engine targets p95 ≤ 1000ms (Performance Mandate §0).
+- **Reconnection and snapshot recovery.** Mobile network blips, page refreshes, brief drops — clients resync within 2s without losing draft progress (Performance Mandate §0). The Elixir engine emits state snapshots on reconnect; clients reconcile against `since_seq`.
+
+What the Elixir engine **does not** add:
+
+- A new source of truth. `draft_events` remains authoritative. The engine's in-memory state is a derivation of the event log; on `DraftServer` startup it rebuilds via `reconstruct_draft_state(...)`. If the engine crashes, a new instance recovers state from Postgres and resumes.
+- A second idempotency-key namespace. The same `AUTOPICK_NAMESPACE_UUID` and the same UUIDv5 derivation `(league_id, pick_number, generation, 'autopick')` apply. The cross-runtime contract is the integration boundary; it does not change without an ADR.
+- A replacement for the pgmq sweep + keep-alive cron. Those remain as the **disaster-recovery safety net**. If the Elixir engine is unavailable mid-draft (deploy, crash, network partition), the existing Edge Function autopick path still commits picks (slowly but correctly). The Edge Function's role demotes from "hot-path worker" to "fallback worker."
+
+Phase 4.5 (`docs/PHASE_4_5_PLAN.md`) is the chunk-by-chunk plan for building the Elixir engine. Phase 5 (UI client work) MUST consume the Phase 4.5 architecture; it cannot be built against the Phase 0–4 architecture alone (per Performance Mandate §0, "Recovery from prior decisions").
+
 ## §1 Principles (non-negotiable)
 
 These six principles are load-bearing. A change that violates one of

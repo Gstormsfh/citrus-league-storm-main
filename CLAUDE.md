@@ -59,6 +59,34 @@ This document is the source of truth on this. If a future plan contradicts it, t
 
 ---
 
+# Tech Stack
+
+## Hybrid runtime: Node.js/Next.js main app + Elixir/Phoenix draft engine
+
+Per **ADR-001** (`docs/adr/ADR-001-elixir-phoenix-draft-engine.md`), the live draft engine is built as a separate Elixir/Phoenix service holding per-draft state in memory and communicating via WebSocket transport. The rest of the application — leagues, rosters, matchups, scoring dashboards, AI assistant, public pages — remains on the existing Node.js / Next.js / Supabase stack.
+
+This is a deliberate hybrid. The driver was the Performance Mandate above: the existing Node.js + Edge Function architecture cannot meet sub-1s autopick latency or sub-200ms broadcast fanout at scale. The Elixir/Phoenix runtime — the same architectural pattern Sleeper, Discord, and other real-time multiplayer systems converge on — meets those targets natively via persistent BEAM processes and Phoenix Channels.
+
+### What runs where
+
+- **Node.js / Next.js / Supabase** (existing): apps/web (React SPA), server (Hono API), packages/shared, data-pipeline (Python NHL ingest), supabase/migrations, supabase/functions/* except draft-autopick. All non-draft features. All durability storage (Postgres event log, projection tables, RLS).
+- **Elixir / Phoenix** (new, Phase 4.5+): the live draft engine. Persistent `DraftServer` GenServers — one per active draft — hold candidate pool, current pick, timer, and per-team queue in memory. Phoenix Channels deliver picks/broadcasts/timer ticks over WebSocket. The Elixir service writes durably to Postgres via the existing `submit_pick_v2` RPC and reads the event log via Ecto.
+- **Edge Function `draft-autopick`** (existing, role changes): demoted from hot-path autopick worker to fallback-only. The pgmq sweep + keep-alive cron remain as the disaster-recovery safety net — if the Elixir engine is unavailable mid-draft, the Edge Function path still commits picks (slowly but correctly). No code is deleted; the wiring changes.
+
+### Working in this codebase
+
+- **Sessions touching the draft engine** (anything under `elixir/` once it lands; or anything in supabase/migrations or server/ that interacts with `submit_pick_v2`, `draft_events`, `draft_picks_v2`, `pgmq` queues, or `draft-autopick`) MUST use Elixir patterns where the runtime is Elixir, and MUST honor the existing event-log + idempotency-key + payload-hash contracts where the runtime is Node/Postgres. The cross-runtime contract (RPC signatures, payload shapes, idempotency-key derivation) is the integration boundary; it does not change without an ADR.
+- **Sessions touching the main app** (apps/web, server/ routes that aren't draft, packages/shared, data-pipeline, public pages, AI Assistant) continue with the existing TypeScript/Node patterns documented under "Engineering Standards" below. No Elixir.
+- **Sessions touching shared utilities** (`packages/shared/`) need to consider whether the change affects the cross-runtime contract. Changes to `computePickPayloadHash`, `AUTOPICK_NAMESPACE_UUID`, `ScoringSettings`, or anything in the draft hot path require coordinated updates to the Elixir engine. Other shared utilities are Node/TS only.
+
+### See also
+
+- `docs/adr/ADR-001-elixir-phoenix-draft-engine.md` — full ADR with research, alternatives, and consequences.
+- `docs/PHASE_4_5_PLAN.md` — chunk-by-chunk plan for the Elixir engine build-out.
+- `docs/REGISTRY.md` — project-wide known-issues registry. KI-008 (architectural pivot) and KI-009 (operational complexity of dual runtimes) live here.
+
+---
+
 # Citrus Fantasy Sports — Engineering Standards
 
 ## Project Overview
