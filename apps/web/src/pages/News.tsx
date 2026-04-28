@@ -63,7 +63,7 @@ const News = () => {
 
 
       <Navbar />
-      <main className="relative max-w-[1280px] mx-auto px-6 pt-12 pb-16">
+      <main className="relative max-w-[1280px] mx-auto px-6 pt-24 pb-16">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>

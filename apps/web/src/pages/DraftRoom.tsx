@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { LeagueService, League, Team, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
@@ -14,7 +15,6 @@ import { publicApi } from '@/api/public';
 import { logger } from '@/utils/logger';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { DraftLobby } from '@/components/draft/DraftLobby';
 import { DraftBoard } from '@/components/draft/DraftBoard';
 import { PlayerPool } from '@/components/draft/PlayerPool';
@@ -3604,7 +3604,7 @@ const DraftRoom = () => {
 
   // ALWAYS render something - never return null
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative touch-manipulation overflow-x-clip">
+    <div className="min-h-screen bg-[#0F1F15] relative touch-manipulation overflow-x-clip">
       {/* Realtime connection banner — surfaces when the draft-pick channel
           drops so users know their draft isn't silently stalled.
           'connected' is the quiescent state; we don't render anything. */}
@@ -3619,9 +3619,9 @@ const DraftRoom = () => {
         </div>
       )}
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Draft Room</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">Draft Room</h1>
         </div>
       </div>
 
@@ -4721,7 +4721,7 @@ const DraftRoom = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
       
       {/* Player Stats Modal */}
       <PlayerStatsModal

@@ -3,12 +3,12 @@ import { cn } from '@/lib/utils';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useSearchParams, useLocation, Navigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague, isDemoLeague } from '@/contexts/LeagueContext';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { LeagueCreationCTA, InlineCTA } from '@/components/LeagueCreationCTA';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -2944,7 +2944,7 @@ const Roster = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] text-foreground relative">
+    <div className="min-h-screen bg-[#0F1F15] text-foreground relative">
       {/* Loading overlay during league switch - non-blocking */}
       {showLoadingOverlay && (
         <div className="fixed inset-0 bg-[#D4E8B8]/90 backdrop-blur-lg z-[100] flex items-center justify-center">
@@ -2966,7 +2966,7 @@ const Roster = () => {
       </div>
       
       {/* MOBILE: Compact sticky header with roster context + hamburger menu */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-sm font-varsity font-bold text-citrus-forest truncate">
@@ -3957,7 +3957,7 @@ const Roster = () => {
       
       {/* Footer - Hidden on mobile */}
       <div className="hidden lg:block">
-        <Footer />
+        <HockeyFooter />
       </div>
     </div>
   );

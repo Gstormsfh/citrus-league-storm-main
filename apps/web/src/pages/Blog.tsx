@@ -96,7 +96,7 @@ const Blog = () => {
 
 
       <Navbar />
-      <main className="relative max-w-[1280px] mx-auto px-6 pt-12 pb-16">
+      <main className="relative max-w-[1280px] mx-auto px-6 pt-24 pb-16">
         <div className="text-center mb-10">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">
             Blog

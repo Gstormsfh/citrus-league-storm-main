@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { LeagueService, League, Team } from '@/services/LeagueService';
@@ -7,7 +8,6 @@ import { WaiverService } from '@/services/WaiverService';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -608,7 +608,7 @@ const LeagueDashboard = () => {
             </CardContent>
           </Card>
         </main>
-        <Footer />
+        <HockeyFooter />
       </div>
     );
   }
@@ -616,9 +616,9 @@ const LeagueDashboard = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 dark:bg-background/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">League</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">League</h1>
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
@@ -1646,7 +1646,7 @@ Your Commissioner`);
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };

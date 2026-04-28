@@ -8,7 +8,6 @@ import {
   CtaBanner,
   Faq,
   GlowCard,
-  MascotPeek,
   type FaqEntry,
 } from '@/components/citrus2';
 
@@ -62,7 +61,7 @@ export default function Pricing() {
 
       <main>
         {/* Hero */}
-        <section className="relative max-w-[1280px] mx-auto px-6 pt-20 pb-16 text-center">
+        <section className="relative max-w-[1280px] mx-auto px-6 pt-28 pb-16 text-center">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-4 font-bold">
             Pricing
           </div>
@@ -80,11 +79,15 @@ export default function Pricing() {
         <section className="relative max-w-[1100px] mx-auto px-6 pb-20 grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* Free / Launch tier — Lemon (the scorer) anchors this one */}
           <GlowCard accent="orange">
-            <article className="p-8 relative">
-              <MascotPeek id="lemon" position="top-right" size="md" />
-              <div className="absolute -top-3 left-8 px-3 py-1 rounded-md bg-pastel-orange text-white font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold z-10">
-                Available Now
+            <article className="relative overflow-hidden">
+              <div className="relative w-full aspect-[16/9] overflow-hidden">
+                <img src="/mascots/scene-squad.webp" alt="The Citrus Squad on the bench" className="w-full h-full object-cover scale-105 group-hover:scale-110 transition-transform duration-500" loading="lazy" />
+                <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-16 pointer-events-none" style={{ background: 'linear-gradient(to bottom, transparent 0%, #1A2A20 100%)' }} />
+                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-pastel-orange text-white font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold ring-1 ring-pastel-orange/40 backdrop-blur-md">
+                  Available Now
+                </div>
               </div>
+              <div className="p-6 sm:p-8">
               <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-2 font-bold relative z-10">
                 Launch Tier
               </div>
@@ -113,16 +116,21 @@ export default function Pricing() {
               >
                 Drop the Puck <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
               </Link>
+              </div>
             </article>
           </GlowCard>
 
           {/* Pro tease — Stormy anchors this one (her Pro tier) */}
           <GlowCard accent="sage">
-            <article className="p-8 relative">
-              <MascotPeek id="stormy" position="top-right" size="md" />
-              <div className="absolute -top-3 left-8 px-3 py-1 rounded-md bg-white/10 text-white/65 font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold ring-1 ring-white/15 z-10">
-                Coming Soon
+            <article className="relative overflow-hidden">
+              <div className="relative w-full aspect-[16/9] overflow-hidden">
+                <img src="/mascots/scene-stormy-ai.webp" alt="Stormy with coach playbook and lineup board" className="w-full h-full object-cover scale-105 group-hover:scale-110 transition-transform duration-500" loading="lazy" />
+                <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-16 pointer-events-none" style={{ background: 'linear-gradient(to bottom, transparent 0%, #1A2A20 100%)' }} />
+                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-white/10 text-white/65 font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold ring-1 ring-white/15 backdrop-blur-md">
+                  Coming Soon
+                </div>
               </div>
+              <div className="p-6 sm:p-8">
               <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-sage-soft mb-2 font-bold flex items-center gap-2 relative z-10">
                 <Crown className="w-3 h-3" strokeWidth={2.5} /> Stormy Pro + Commish
               </div>
@@ -151,6 +159,7 @@ export default function Pricing() {
               >
                 Coming soon — sign up to lock in
               </button>
+              </div>
             </article>
           </GlowCard>
         </section>

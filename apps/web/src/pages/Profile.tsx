@@ -4,6 +4,7 @@ import { useLeague } from '@/contexts/LeagueContext';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { Link, useSearchParams } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { accountApi } from '@/api/account';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
@@ -12,7 +13,6 @@ import { LeagueService } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { WaiverService } from '@/services/WaiverService';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -952,7 +952,7 @@ const Profile = () => {
             </div>
           </div>
         </main>
-        <Footer />
+        <HockeyFooter />
       </div>
     );
   }
@@ -2180,7 +2180,7 @@ const Profile = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };

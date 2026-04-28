@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { HockeyFooter } from '@/components/citrus2';
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -7,7 +8,6 @@ import { useLeague } from "@/contexts/LeagueContext";
 import { LeagueService } from "@/services/LeagueService";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -673,15 +673,15 @@ const CreateLeague = () => {
   // RENDER
   // ============================================================================
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative">
+    <div className="min-h-screen bg-[#0F1F15] relative">
       {/* Decorative Background */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
 
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Create League</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">Create League</h1>
         </div>
       </div>
 
@@ -1985,7 +1985,7 @@ const CreateLeague = () => {
 
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };

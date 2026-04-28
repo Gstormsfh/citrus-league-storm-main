@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams, Navigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -491,11 +491,11 @@ const TradeAnalyzer = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 flex flex-col">
+    <div className="min-h-screen bg-[#0F1F15] flex flex-col">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Trade Center</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">Trade Center</h1>
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
@@ -1165,7 +1165,7 @@ const TradeAnalyzer = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };

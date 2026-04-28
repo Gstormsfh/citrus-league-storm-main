@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,14 +9,21 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { PoolService, PickemPick, PickemStanding } from '@/services/PoolService';
 import { NHLGame } from '@/services/ScheduleService';
-import { Loader2, CheckCircle2, XCircle, Target, ChevronLeft, ChevronRight, Lock, Calendar, Check } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Lock, Calendar, Check } from 'lucide-react';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
-import LoadingScreen from '@/components/LoadingScreen';
 import { logger } from '@/utils/logger';
 import { getTeamInfo } from '@/types/captracker';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { InvitePlayersButton } from '@/components/InvitePlayersButton';
 import { PoolLeagueHub } from '@/components/PoolLeagueHub';
+import {
+  DarkLayout,
+  HockeyFooter,
+  StormyLoading,
+  GlowCard,
+  LivePulse,
+  PickemIcon,
+} from '@/components/citrus2';
 
 function getInfo(a: string) {
   return getTeamInfo(a) || { abbrev: a, name: a, fullName: a, primaryColor: '#666', secondaryColor: '#999' };
@@ -86,9 +91,9 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
   const homeStreak = hr?.streak || '-';
 
   return (
-    <div className={`grid grid-cols-[1fr_auto_1fr] rounded-xl overflow-hidden transition-all duration-150 ${
-      locked && !isLive ? 'opacity-60' : ''
-    } ${picked ? 'shadow-md' : 'hover:shadow-md'} bg-white`}>
+    <div className={`grid grid-cols-[1fr_auto_1fr] rounded-xl overflow-hidden transition-all duration-200 bg-[#1A2A20] ring-1 ${
+      picked ? 'ring-pastel-orange/40 shadow-[0_8px_24px_-12px_rgba(255,107,26,0.3)]' : 'ring-white/10 hover:ring-white/20'
+    } ${locked && !isLive ? 'opacity-60' : ''}`}>
 
       {/* ═══ COLUMN 1: AWAY TEAM ═══ */}
       <button
@@ -97,88 +102,88 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         } ${pickedAway ? '' : picked ? 'opacity-30' : ''}`}
         style={{
           borderLeft: `3px solid ${away.primaryColor}`,
-          background: pickedAway ? `${away.primaryColor}15` : undefined,
+          background: pickedAway ? `${away.primaryColor}25` : undefined,
         }}
-        onMouseEnter={(e) => { if (!locked && !pickedAway) e.currentTarget.style.background = `${away.primaryColor}0a`; }}
+        onMouseEnter={(e) => { if (!locked && !pickedAway) e.currentTarget.style.background = `${away.primaryColor}12`; }}
         onMouseLeave={(e) => { if (!locked && !pickedAway) e.currentTarget.style.background = ''; }}
         onClick={() => !locked && onPick(gid, game.away_team)}
         disabled={!!locked}
       >
         {/* Monogram */}
-        <div className="w-8 h-8 rounded-full flex items-center justify-center font-varsity font-black text-white text-[9px] shrink-0 shadow-sm"
+        <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-[9px] shrink-0 shadow-sm"
           style={{ background: away.primaryColor }}>
           {game.away_team}
         </div>
         {/* Name + record */}
         <div className="flex-1 text-right min-w-0">
-          <div className={`font-display font-bold text-xs truncate ${awayWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
+          <div className={`font-bold text-xs truncate ${awayWon ? 'text-pastel-cream' : isFinal ? 'text-white/35' : 'text-pastel-cream'}`}>
             {away.name}
           </div>
-          <div className="text-[10px] font-display text-slate-400 truncate">
+          <div className="text-[10px] font-jbmono text-white/45 truncate">
             {ar ? `${ar.w}-${ar.l}-${ar.otl}` : ''}
             {awayStreak && awayStreak !== '-' ? ` ${awayStreak}` : ''}
           </div>
         </div>
         {/* Odds */}
         {!isFinal && !isLive && ar && hr && (
-          <div className={`font-varsity font-black text-base leading-none shrink-0 ${awayPct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
+          <div className={`font-bold text-base leading-none shrink-0 tabular-nums ${awayPct >= 50 ? 'text-pastel-sage-soft' : 'text-white/35'}`}>
             {awayPct}%
           </div>
         )}
         {isFinal && (
-          <span className={`font-varsity text-lg shrink-0 ${awayWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.away_score}</span>
+          <span className={`font-bold text-lg shrink-0 tabular-nums ${awayWon ? 'text-pastel-cream' : 'text-white/30'}`}>{game.away_score}</span>
         )}
-        {isLive && <span className="font-varsity text-lg shrink-0 text-red-600 font-black">{game.away_score}</span>}
+        {isLive && <span className="font-bold text-lg shrink-0 text-pastel-orange tabular-nums">{game.away_score}</span>}
         {pickedAway && !isFinal && !isLive && (
           <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: away.primaryColor }}>
             <Check className="w-2.5 h-2.5 text-white" />
           </div>
         )}
-        {existingPick?.picked_team === game.away_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
-        {existingPick?.picked_team === game.away_team && existingPick.is_correct === false && <XCircle className="w-4 h-4 text-red-500 shrink-0" />}
+        {existingPick?.picked_team === game.away_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-pastel-sage shrink-0" />}
+        {existingPick?.picked_team === game.away_team && existingPick.is_correct === false && <XCircle className="w-4 h-4 text-red-400 shrink-0" />}
       </button>
 
       {/* ═══ COLUMN 2: CENTER STATS ═══ */}
-      <div className="flex flex-col items-center justify-center w-16 sm:w-24 md:w-28 2xl:w-24 bg-slate-50/70 border-x border-slate-100 py-1.5 px-0.5 sm:px-1">
+      <div className="flex flex-col items-center justify-center w-16 sm:w-24 md:w-28 2xl:w-24 bg-black/20 border-x border-white/5 py-1.5 px-0.5 sm:px-1">
         {/* Row 1: Time or Score */}
         <div className="text-center">
           {isFinal ? (
-            <span className="text-[10px] font-display font-bold text-slate-400 uppercase">Final</span>
+            <span className="text-[10px] font-jbmono font-bold text-white/45 uppercase tracking-wider">Final</span>
           ) : isLive ? (
-            <span className="flex items-center gap-1 text-[10px] font-display font-bold text-red-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> Live
+            <span className="flex items-center gap-1 text-[10px] font-jbmono font-bold text-pastel-orange uppercase tracking-wider">
+              <LivePulse size="xs" /> Live
             </span>
           ) : locked ? (
-            <span className="flex items-center gap-0.5 text-[10px] text-slate-400"><Lock className="w-2.5 h-2.5" /> Locked</span>
+            <span className="flex items-center gap-0.5 text-[10px] font-jbmono text-white/45"><Lock className="w-2.5 h-2.5" /> Locked</span>
           ) : (
-            <span className="text-xs font-display font-bold text-citrus-forest">{fmtTime(game)}</span>
+            <span className="text-xs font-jbmono font-bold text-pastel-cream tabular-nums">{fmtTime(game)}</span>
           )}
         </div>
 
         {/* Row 2: H2H */}
-        <div className="text-[9px] font-display text-slate-400 mt-0.5">
+        <div className="text-[9px] font-jbmono text-white/45 mt-0.5">
           {h2hGames > 0 ? (
             <span>
               H2H:{' '}
-              <span className="font-bold" style={{ color: awayH2HWins > homeH2HWins ? away.primaryColor : '#94a3b8' }}>{awayH2HWins}</span>
+              <span className="font-bold" style={{ color: awayH2HWins > homeH2HWins ? away.primaryColor : 'rgba(255,255,255,0.35)' }}>{awayH2HWins}</span>
               {'-'}
-              <span className="font-bold" style={{ color: homeH2HWins > awayH2HWins ? home.primaryColor : '#94a3b8' }}>{homeH2HWins}</span>
+              <span className="font-bold" style={{ color: homeH2HWins > awayH2HWins ? home.primaryColor : 'rgba(255,255,255,0.35)' }}>{homeH2HWins}</span>
             </span>
           ) : (
-            <span className="text-amber-500">★ 1st meeting</span>
+            <span className="text-pastel-orange-soft">★ 1st meeting</span>
           )}
         </div>
 
         {/* Row 3: Venue */}
         {game.venue && (
-          <div className="text-[8px] font-display text-slate-300 mt-0.5 truncate max-w-full">
+          <div className="text-[8px] font-jbmono text-white/30 mt-0.5 truncate max-w-full">
             {game.venue}
           </div>
         )}
 
         {/* Row 4: Home ice */}
         {!isFinal && (
-          <div className="text-[9px] font-display text-slate-400 mt-0.5">
+          <div className="text-[9px] font-jbmono text-white/45 mt-0.5">
             @ {home.fullName}
           </div>
         )}
@@ -191,42 +196,42 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         } ${pickedHome ? '' : picked ? 'opacity-30' : ''}`}
         style={{
           borderRight: `3px solid ${home.primaryColor}`,
-          background: pickedHome ? `${home.primaryColor}15` : undefined,
+          background: pickedHome ? `${home.primaryColor}25` : undefined,
         }}
-        onMouseEnter={(e) => { if (!locked && !pickedHome) e.currentTarget.style.background = `${home.primaryColor}0a`; }}
+        onMouseEnter={(e) => { if (!locked && !pickedHome) e.currentTarget.style.background = `${home.primaryColor}12`; }}
         onMouseLeave={(e) => { if (!locked && !pickedHome) e.currentTarget.style.background = ''; }}
         onClick={() => !locked && onPick(gid, game.home_team)}
         disabled={!!locked}
       >
-        <div className="w-8 h-8 rounded-full flex items-center justify-center font-varsity font-black text-white text-[9px] shrink-0 shadow-sm"
+        <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-[9px] shrink-0 shadow-sm"
           style={{ background: home.primaryColor }}>
           {game.home_team}
         </div>
         <div className="flex-1 text-left min-w-0">
-          <div className={`font-display font-bold text-xs truncate ${homeWon ? 'text-slate-900' : isFinal ? 'text-slate-400' : 'text-slate-700'}`}>
+          <div className={`font-bold text-xs truncate ${homeWon ? 'text-pastel-cream' : isFinal ? 'text-white/35' : 'text-pastel-cream'}`}>
             {home.name}
           </div>
-          <div className="text-[10px] font-display text-slate-400 truncate">
+          <div className="text-[10px] font-jbmono text-white/45 truncate">
             {hr ? `${hr.w}-${hr.l}-${hr.otl}` : ''}
             {homeStreak && homeStreak !== '-' ? ` ${homeStreak}` : ''}
           </div>
         </div>
         {!isFinal && !isLive && ar && hr && (
-          <div className={`font-varsity font-black text-base leading-none shrink-0 ${homePct >= 50 ? 'text-emerald-600' : 'text-slate-400'}`}>
+          <div className={`font-bold text-base leading-none shrink-0 tabular-nums ${homePct >= 50 ? 'text-pastel-sage-soft' : 'text-white/35'}`}>
             {homePct}%
           </div>
         )}
         {isFinal && (
-          <span className={`font-varsity text-lg shrink-0 ${homeWon ? 'text-slate-900 font-black' : 'text-slate-300'}`}>{game.home_score}</span>
+          <span className={`font-bold text-lg shrink-0 tabular-nums ${homeWon ? 'text-pastel-cream' : 'text-white/30'}`}>{game.home_score}</span>
         )}
-        {isLive && <span className="font-varsity text-lg shrink-0 text-red-600 font-black">{game.home_score}</span>}
+        {isLive && <span className="font-bold text-lg shrink-0 text-pastel-orange tabular-nums">{game.home_score}</span>}
         {pickedHome && !isFinal && !isLive && (
           <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: home.primaryColor }}>
             <Check className="w-2.5 h-2.5 text-white" />
           </div>
         )}
-        {existingPick?.picked_team === game.home_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
-        {existingPick?.picked_team === game.home_team && existingPick.is_correct === false && <XCircle className="w-4 h-4 text-red-500 shrink-0" />}
+        {existingPick?.picked_team === game.home_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-pastel-sage shrink-0" />}
+        {existingPick?.picked_team === game.home_team && existingPick.is_correct === false && <XCircle className="w-4 h-4 text-red-400 shrink-0" />}
       </button>
     </div>
   );
@@ -301,7 +306,12 @@ const PoolPickem = () => {
     finally { setSubmitting(false); }
   };
 
-  if (loading) return <LoadingScreen character="narwhal" message="Loading Pick'em Pool..." />;
+  if (loading) return (
+    <DarkLayout>
+      <Navbar />
+      <StormyLoading message="Loading Pick'em Pool..." />
+    </DarkLayout>
+  );
 
   const byDate = groupByDate(games);
   const ls = (activeLeague?.settings as Record<string, unknown>) || {};
@@ -310,15 +320,10 @@ const PoolPickem = () => {
   const pct = required > 0 ? Math.min((picks.size / required) * 100, 100) : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#D4E8B8] via-[#D0E4B4] to-[#C8DEB0]">
-      <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Pick'em Pool</h1>
-        </div>
-      </div>
+    <DarkLayout>
+      <Navbar />
 
-      <main className="w-full pt-16 lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className="w-full pt-20 lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="flex lg:gap-0">
         {/* Main picks column — centered with padding */}
         <div className="flex-1 min-w-0 px-3 sm:px-4 lg:px-8 xl:px-12">
@@ -328,29 +333,52 @@ const PoolPickem = () => {
             </div>
           )}
 
+          {/* Hero banner — mascot acting in domain */}
+          <div className="relative mb-6 mt-4 w-full aspect-[21/9] sm:aspect-[24/9] rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+            <img
+              src="/mascots/scene-pickem.webp"
+              alt="Lemon picking between two NHL teams"
+              className="w-full h-full object-cover"
+              loading="eager"
+            />
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 pointer-events-none"
+              style={{ background: 'linear-gradient(to top, rgba(15,31,21,0.85) 0%, transparent 45%)' }}
+            />
+            <div className="absolute bottom-4 left-5 sm:bottom-6 sm:left-8 z-10 max-w-[80%]">
+              <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-1.5 font-bold flex items-center gap-2">
+                <PickemIcon className="w-3 h-3" /> Daily Pickem
+              </div>
+              <h1 className="font-sans font-black text-[1.5rem] sm:text-[2rem] md:text-[2.5rem] tracking-[-0.025em] text-pastel-cream leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+                Pick the winners. <span className="text-pastel-orange">Stack the points.</span>
+              </h1>
+            </div>
+          </div>
+
           {/* Header — STICKY below navbar */}
-          <div className="sticky top-12 sm:top-[92px] z-30 bg-[#D4E8B8]/95 backdrop-blur-sm py-2 sm:py-3 mb-4 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-citrus-sage/15">
+          <div className="sticky top-[92px] z-30 bg-[#0F1F15]/95 backdrop-blur-md py-2 sm:py-3 mb-4 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex items-center bg-white/80 rounded-xl border border-citrus-sage/20 overflow-hidden">
-                <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
+              <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
+                <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <div className="px-2 sm:px-3 text-center border-x border-citrus-sage/10">
-                  <div className="text-[8px] sm:text-[9px] font-display text-citrus-charcoal/40 uppercase tracking-widest leading-none">Week</div>
-                  <div className="text-base sm:text-lg font-varsity font-black text-citrus-forest leading-none">{currentWeek}</div>
+                <div className="px-2 sm:px-3 text-center border-x border-white/10">
+                  <div className="text-[8px] sm:text-[9px] font-jbmono text-white/45 uppercase tracking-widest leading-none">Week</div>
+                  <div className="text-base sm:text-lg font-bold text-pastel-cream leading-none tabular-nums">{currentWeek}</div>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none" onClick={() => setCurrentWeek(w => w + 1)}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
                   <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
 
               {/* Progress pill */}
-              <div className="hidden sm:flex items-center gap-2 bg-white/60 rounded-full px-3 py-1.5 border border-citrus-sage/15">
-                <div className="w-16 h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                  <div className="h-full bg-citrus-sage rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+              <div className="hidden sm:flex items-center gap-2 bg-[#1A2A20] rounded-full px-3 py-1.5 ring-1 ring-white/10">
+                <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full bg-pastel-orange rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                 </div>
-                <span className="text-xs font-display font-semibold text-citrus-forest/70">{picks.size}/{required}</span>
+                <span className="text-xs font-bold text-pastel-cream tabular-nums">{picks.size}/{required}</span>
               </div>
             </div>
 
@@ -359,10 +387,10 @@ const PoolPickem = () => {
                 <span className="hidden sm:inline-flex"><InvitePlayersButton joinCode={activeLeague.join_code} leagueName={activeLeague.name} /></span>
               )}
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="bg-white/80 h-8 sm:h-9">
-                  <TabsTrigger value="picks" className="text-xs sm:text-sm px-2 sm:px-3">Picks</TabsTrigger>
-                  <TabsTrigger value="standings" className="text-xs sm:text-sm px-2 sm:px-3">Standings</TabsTrigger>
-                  <TabsTrigger value="league" className="text-xs sm:text-sm px-2 sm:px-3">League</TabsTrigger>
+                <TabsList className="bg-[#1A2A20] h-8 sm:h-9 ring-1 ring-white/10">
+                  <TabsTrigger value="picks" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Picks</TabsTrigger>
+                  <TabsTrigger value="standings" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Standings</TabsTrigger>
+                  <TabsTrigger value="league" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">League</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -373,24 +401,25 @@ const PoolPickem = () => {
           {activeTab === 'picks' && (
             <>
               {games.length === 0 ? (
-                <Card className="border-none shadow-lg bg-white">
-                  <CardContent className="py-16 text-center text-slate-400">
-                    <Target className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                    <p className="font-medium text-lg">No games this week</p>
-                  </CardContent>
-                </Card>
+                <GlowCard accent="orange">
+                  <div className="py-16 text-center">
+                    <PickemIcon className="w-12 h-12 mx-auto mb-4 text-white/30" />
+                    <p className="font-bold text-lg text-pastel-cream">No games this week</p>
+                    <p className="text-[13px] text-white/45 mt-1">Check back when the slate drops.</p>
+                  </div>
+                </GlowCard>
               ) : (
                 <div className="space-y-6">
                   {Array.from(byDate.entries()).map(([dateKey, dateGames]) => (
                     <div key={dateKey}>
                       {/* Date header */}
                       <div className="flex items-center gap-2 mb-2 px-1">
-                        <Calendar className="w-3.5 h-3.5 text-citrus-forest/40" />
-                        <span className="text-xs font-display font-bold text-citrus-forest/60 uppercase tracking-wider">
+                        <Calendar className="w-3.5 h-3.5 text-pastel-orange-soft" />
+                        <span className="text-xs font-jbmono font-bold text-pastel-orange-soft uppercase tracking-[0.22em]">
                           {fmtDate(dateKey)}
                         </span>
-                        <div className="flex-1 h-px bg-citrus-sage/15" />
-                        <span className="text-[10px] font-display text-citrus-charcoal/30">{dateGames.length} games</span>
+                        <div className="flex-1 h-px bg-white/10" />
+                        <span className="text-[10px] font-jbmono text-white/35 tabular-nums">{dateGames.length} games</span>
                       </div>
 
                       {/* Game rows — 2 columns on xl to reduce empty space */}
@@ -411,16 +440,16 @@ const PoolPickem = () => {
                   ))}
 
                   {/* Submit bar */}
-                  <div className="sticky bottom-20 lg:bottom-4 bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-2xl py-3 px-4 flex items-center justify-between shadow-xl">
+                  <div className="sticky bottom-20 lg:bottom-4 bg-[#1A2A20]/95 backdrop-blur-md ring-1 ring-pastel-orange/30 rounded-2xl py-3 px-4 flex items-center justify-between shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)]">
                     <div className="flex items-center gap-2">
-                      <div className="w-20 h-2 rounded-full bg-slate-100 overflow-hidden">
-                        <div className="h-full bg-citrus-sage rounded-full transition-all" style={{ width: `${pct}%` }} />
+                      <div className="w-20 h-2 rounded-full bg-white/10 overflow-hidden">
+                        <div className="h-full bg-pastel-orange rounded-full transition-all" style={{ width: `${pct}%` }} />
                       </div>
-                      <span className="text-sm text-slate-500 font-display">
+                      <span className="text-sm text-pastel-cream font-bold">
                         {picks.size === 0 ? 'Tap a team' : `${picks.size}/${required} picked`}
                       </span>
                     </div>
-                    <Button onClick={handleSubmit} disabled={picks.size === 0 || submitting} size="lg" className="font-varsity uppercase">
+                    <Button onClick={handleSubmit} disabled={picks.size === 0 || submitting} size="lg" className="font-bold uppercase tracking-wider bg-pastel-orange hover:bg-pastel-orange-deep text-white border-0 active:scale-95 transition-all">
                       {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                       Submit
                     </Button>
@@ -432,48 +461,52 @@ const PoolPickem = () => {
 
           {/* ── Standings ── */}
           {activeTab === 'standings' && (
-            <Card className="border-none shadow-lg overflow-hidden bg-white">
-              <CardContent className="p-0">
+            <GlowCard accent="orange">
+              <div>
                 {standings.length === 0 ? (
-                  <div className="text-center py-16 text-slate-400">
-                    <Target className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                    <p className="font-medium">No standings yet</p>
+                  <div className="text-center py-16">
+                    <PickemIcon className="w-12 h-12 mx-auto mb-4 text-white/30" />
+                    <p className="font-bold text-pastel-cream">No standings yet</p>
+                    <p className="text-[13px] text-white/45 mt-1">Standings populate after the first slate.</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-slate-50">
-                          <TableHead className="w-12 text-center">#</TableHead>
-                          <TableHead>Player</TableHead>
-                          <TableHead className="text-center">Correct</TableHead>
-                          <TableHead className="text-center hidden sm:table-cell">Total</TableHead>
-                          <TableHead className="text-right">Pct</TableHead>
+                        <TableRow className="bg-black/20 border-white/10 hover:bg-black/20">
+                          <TableHead className="w-12 text-center text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">#</TableHead>
+                          <TableHead className="text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Player</TableHead>
+                          <TableHead className="text-center text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Correct</TableHead>
+                          <TableHead className="text-center hidden sm:table-cell text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Total</TableHead>
+                          <TableHead className="text-right text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Pct</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {standings.map((s, i) => (
-                          <TableRow key={s.user_id} className={s.user_id === user?.id ? 'bg-citrus-sage/5' : ''}>
+                          <TableRow key={s.user_id} className={`border-white/5 hover:bg-white/5 transition-colors ${s.user_id === user?.id ? 'bg-pastel-orange/10' : ''}`}>
                             <TableCell className="text-center">
                               <span className={`inline-flex w-7 h-7 rounded-full items-center justify-center text-xs font-bold ${
-                                i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-slate-300 text-slate-700' : i === 2 ? 'bg-amber-600 text-white' : 'text-slate-400'
+                                i === 0 ? 'bg-pastel-orange text-white' :
+                                i === 1 ? 'bg-white/20 text-pastel-cream' :
+                                i === 2 ? 'bg-pastel-orange/40 text-white' :
+                                'text-white/45'
                               }`}>{i + 1}</span>
                             </TableCell>
-                            <TableCell className="font-medium">
+                            <TableCell className="font-bold text-pastel-cream">
                               {s.display_name}
-                              {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-xs">YOU</Badge>}
+                              {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-[9px] font-jbmono uppercase tracking-wider border-pastel-orange text-pastel-orange-soft">YOU</Badge>}
                             </TableCell>
-                            <TableCell className="text-center font-bold text-citrus-forest">{s.correct_picks}</TableCell>
-                            <TableCell className="text-center text-slate-400 hidden sm:table-cell">{s.total_picks}</TableCell>
-                            <TableCell className="text-right font-semibold">{s.accuracy.toFixed(1)}%</TableCell>
+                            <TableCell className="text-center font-bold text-pastel-cream tabular-nums">{s.correct_picks}</TableCell>
+                            <TableCell className="text-center text-white/55 hidden sm:table-cell tabular-nums">{s.total_picks}</TableCell>
+                            <TableCell className="text-right font-bold text-pastel-orange-soft tabular-nums">{s.accuracy.toFixed(1)}%</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </GlowCard>
           )}
 
           {/* ── League tab ── */}
@@ -484,7 +517,7 @@ const PoolPickem = () => {
 
         {/* Chat sidebar — pinned to right edge */}
         {activeLeagueId && (
-          <div className="hidden lg:block w-72 xl:w-80 shrink-0 border-l border-citrus-sage/15 bg-white/40">
+          <div className="hidden lg:block w-72 xl:w-80 shrink-0 border-l border-white/5 bg-black/20">
             <div className="sticky top-24 h-[calc(100vh-6rem)] flex flex-col">
               <LeagueNotifications leagueId={activeLeagueId} />
             </div>
@@ -492,8 +525,8 @@ const PoolPickem = () => {
         )}
         </div>
       </main>
-      <div className="hidden lg:block"><Footer /></div>
-    </div>
+      <HockeyFooter />
+    </DarkLayout>
   );
 };
 

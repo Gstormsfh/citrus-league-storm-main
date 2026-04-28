@@ -6,11 +6,11 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Navbar from '@/components/Navbar';
 import MobileMenuButton from '@/components/MobileMenuButton';
-import Footer from '@/components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeftRight, Users, TrendingUp, Calendar, FileText, BarChart3, ListChecks, Bell, Target, History, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { Narwhal } from '@/components/icons/Narwhal';
 import { isPoolLeague, getPoolRoute, getPoolLabel } from '@/utils/leagueTypeHelpers';
 import { usePlayoffChampion } from '@/hooks/usePlayoffChampion';
@@ -148,17 +148,17 @@ const GMOffice = () => {
     'Lineup Manager',
   ]);
   return (
-    <div className="min-h-screen bg-[#D4E8B8] text-foreground relative">
+    <div className="min-h-screen bg-[#0F1F15] text-foreground relative">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
       </div>
 
       {/* MOBILE: Compact sticky header */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">GM's Office</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">GM's Office</h1>
           <MobileMenuButton />
         </div>
       </div>
@@ -337,7 +337,7 @@ const GMOffice = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };

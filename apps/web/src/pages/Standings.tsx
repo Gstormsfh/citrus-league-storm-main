@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
 import MobileMenuButton from '@/components/MobileMenuButton';
-import Footer from '@/components/Footer';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -470,16 +470,16 @@ const Standings = () => {
   // Force render content if we have teams, regardless of loading state
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative">
+    <div className="min-h-screen bg-[#0F1F15] relative">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
       </div>
 
       {/* MOBILE: Compact header with league context */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Standings</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">Standings</h1>
           <div className="flex items-center gap-1">
             {(activeLeague?.name || leagueTeams.length > 0) && (
               <span className="text-xs font-display text-citrus-charcoal/50 truncate max-w-[120px]">
@@ -925,7 +925,7 @@ const Standings = () => {
       </main>
       {/* Footer - Hidden on mobile */}
       <div className="hidden lg:block">
-        <Footer />
+        <HockeyFooter />
       </div>
     </div>
   );

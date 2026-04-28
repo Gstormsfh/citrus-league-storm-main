@@ -14,7 +14,7 @@ const NotFound = () => {
 
   return (
     <DarkLayout>
-      <main className="min-h-screen flex items-center justify-center p-4 relative">
+      <main className="min-h-screen flex items-center justify-center p-4 pt-24 relative">
         <div className="text-center max-w-md relative z-10">
           <div className="flex justify-center mb-6">
             <MascotAvatar id="pineapple" size="xl" />

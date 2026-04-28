@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -556,7 +556,7 @@ const OtherTeam = () => {
 
   if (!team) {
     return (
-      <div className="min-h-screen bg-[#D4E8B8] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0F1F15] flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Team Not Found</h1>
           <Button onClick={() => navigate('/standings')}>Back to Standings</Button>
@@ -572,11 +572,11 @@ const OtherTeam = () => {
 
   return (
     <ErrorBoundary>
-    <div className="min-h-screen bg-[#D4E8B8]">
+    <div className="min-h-screen bg-[#0F1F15]">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Team View</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">Team View</h1>
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
@@ -686,7 +686,7 @@ const OtherTeam = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
     </ErrorBoundary>
   );
