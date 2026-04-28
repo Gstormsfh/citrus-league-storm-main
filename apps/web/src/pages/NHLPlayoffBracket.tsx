@@ -112,7 +112,30 @@ export default function NHLPlayoffBracket() {
 
       <Navbar />
       <main className="relative max-w-[1280px] mx-auto px-6 pt-12 pb-16">
-        {/* Hero */}
+        {/* Hero — Pineapple lifting the Cup scene banner */}
+        <div className="relative mb-8 w-full aspect-[21/9] sm:aspect-[24/9] rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+          <img
+            src="/mascots/scene-cup.webp"
+            alt="Pineapple lifting the Stanley Cup with arena spotlight"
+            className="w-full h-full object-cover"
+            loading="eager"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'linear-gradient(to top, rgba(15,31,21,0.85) 0%, transparent 45%)' }}
+          />
+          <div className="absolute bottom-4 left-5 sm:bottom-6 sm:left-8 z-10 max-w-[80%]">
+            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-1.5 font-bold flex items-center gap-2">
+              <LivePulse size="xs" /> Stanley Cup Playoffs
+            </div>
+            <h1 className="font-sans font-black text-[1.5rem] sm:text-[2rem] md:text-[2.5rem] tracking-[-0.025em] text-pastel-cream leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+              Lift the <span className="text-pastel-orange">Cup</span>.
+            </h1>
+          </div>
+        </div>
+
+        {/* Hero text — refresh status under the banner */}
         <div className="text-center mb-10">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold flex items-center justify-center gap-2">
             <LivePulse size="xs" />
