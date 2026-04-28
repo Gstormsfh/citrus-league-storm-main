@@ -366,12 +366,12 @@ export function Homepage() {
         </div>
       </section>
 
-      {/* Popular on Citrus — game mode horizontal carousel */}
+      {/* Game Modes — horizontal carousel of all available formats */}
       <section className="relative max-w-[1280px] mx-auto px-6 pb-24">
         <div className="flex items-baseline justify-between mb-8 gap-4 flex-wrap">
           <div>
             <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-2 font-bold">
-              Popular on Citrus
+              ✦ Game Modes
             </div>
             <h2 className="font-sans font-black text-[2.25rem] md:text-[2.75rem] tracking-[-0.025em] text-pastel-cream leading-tight">
               Every way to play hockey.
