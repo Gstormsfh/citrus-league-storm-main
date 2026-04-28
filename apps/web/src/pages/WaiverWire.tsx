@@ -18,10 +18,18 @@ import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import { waiverApi } from '@/api/waivers';
 import { useToast } from '@/hooks/use-toast';
-import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { HockeyFooter } from '@/components/citrus2';
+import {
+  HockeyFooter,
+  WaiverWireScene,
+  ShiftIcon,
+  PuckIcon,
+  CrossedSticksIcon,
+  MaskIcon,
+  RangeIcon,
+  MascotAvatar,
+} from '@/components/citrus2';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { formatWaiverProcessTime, formatMoment, computeNextWaiverProcessMoment } from '@/utils/timezoneUtils';
@@ -404,10 +412,16 @@ const WaiverWire = () => {
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-2 lg:px-4 order-1 lg:order-2">
+
+              {/* HERO — Kiwi at the wire */}
+              <div className="mb-6 lg:mb-8">
+                <WaiverWireScene size="lg" />
+              </div>
+
               <div className="text-left mb-8 relative">
                 <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 flex items-center gap-2">
-                  <Trophy className="w-3.5 h-3.5" />
-                  ✦ Waiver Wire
+                  <ShiftIcon className="w-3.5 h-3.5" strokeWidth={2} />
+                  ✦ Off the Wire
                 </div>
                 <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none">
                   {isFAAB ? 'Bid on the difference-maker.' : 'Claim before kickoff.'}
@@ -415,10 +429,33 @@ const WaiverWire = () => {
                 <p className="text-sm text-white/55 mt-2">
                   {isFAAB ? 'Place FAAB bids on free agents' : 'Manage waiver claims and priorities'}
                 </p>
+
+                {/* FAAB Budget Meter — real visualization, not just a number pill.
+                    Bar fills with pastel-orange at the remaining budget; the
+                    "spent" portion shows the white track. Tabular numerals for
+                    the readout below. Only renders for FAAB leagues. */}
                 {isFAAB && faabBudget !== null && (
-                  <div className="mt-4 inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-pastel-orange/15 ring-1 ring-pastel-orange/40 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]">
-                    <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft">FAAB Budget</span>
-                    <span className="font-calistoga text-2xl text-pastel-orange tabular-nums leading-none">${faabBudget}</span>
+                  <div className="mt-4 max-w-md bg-[#1A2A20] ring-1 ring-pastel-orange/40 rounded-2xl p-4 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]">
+                    <div className="flex items-baseline justify-between mb-2">
+                      <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft">
+                        FAAB Budget Remaining
+                      </span>
+                      <span className="font-calistoga text-2xl text-pastel-orange tabular-nums leading-none">
+                        ${faabBudget}
+                        <span className="text-sm text-white/40 ml-1">/ $100</span>
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-pastel-orange to-pastel-orange-soft rounded-full transition-all duration-500"
+                        style={{ width: `${Math.max(0, Math.min(100, faabBudget))}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between mt-2 font-jbmono text-[9px] tracking-[0.18em] uppercase text-white/55 font-bold">
+                      <span>$0</span>
+                      <span>$50</span>
+                      <span>$100</span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -866,8 +903,32 @@ const WaiverWire = () => {
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <AdSpace size="300x250" label="Waiver Sponsor" />
-                <AdSpace size="300x250" label="Fantasy Partner" />
+                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+                  <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-pastel-sage/15 rounded-full blur-3xl pointer-events-none" />
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-3">
+                      <MascotAvatar id="kiwi" size="sm" />
+                      <div className="min-w-0">
+                        <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold">Kiwi says</div>
+                        <div className="font-bold text-sm text-pastel-cream truncate">Off the wire</div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-white/70 leading-relaxed">
+                      Trending pickups process when the waiver clock runs out. Bid your max if you need the player tonight, save FAAB if it's a depth add.
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <RangeIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Pickup strategy</div>
+                  </div>
+                  <ul className="text-[11px] text-white/70 space-y-1.5 leading-relaxed">
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Stack high game-count weeks first</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Goalie streamers beat forward streamers if behind</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Save 30%+ FAAB for trade deadline pickups</li>
+                  </ul>
+                </div>
               </div>
             </aside>
 
