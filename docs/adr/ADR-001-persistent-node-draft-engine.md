@@ -223,43 +223,45 @@ The chunk 11g.8 commit verifies that nothing else in the codebase depends on the
 
 ## Validation Gates
 
-The pivot is bounded by two explicit go/no-go review points where solo-founder time and architectural fit get evaluated against measured reality.
+The implementation is gated by chunk-level go/no-go review points in `docs/PHASE_4_5_PLAN.md`. Each chunk's acceptance criteria reference the relevant Performance Mandate target; failures fix forward, not in a follow-up chunk.
 
-### Week 1 — "Is Elixir workable for me?"
+### Chunk 11g.0 — "Does the existing server tolerate a WebSocket layer?"
 
-End of week 1 of Phase 4.5. Sign-off criteria:
+**The first gate.** Before any draft engine code lands, chunk 11g.0 audits the existing Node server's `package.json`, runtime config, build pipeline, and middleware stack for compatibility with a WebSocket library and HTTP-upgrade handling. Output is binary: "all clean, proceed to 11g.1" or a specific list of conflicts.
 
-- I (the solo founder) can read and write basic Elixir / GenServer code without copy-pasting from blog posts. I understand the actor model well enough to design a simple state machine in it.
-- I have run the Phoenix `mix phx.new` chat tutorial (or equivalent) end-to-end, including modifying a channel, adding presence, and connecting via a JS WebSocket client. I understand what's happening at the BEAM, Phoenix, and JS layers.
-- The development loop (edit, recompile, test) feels productive, not painful. iex REPL works. ExUnit tests pass. Tooling is set up.
-- I have a credible mental model of how `DraftServer` will work — even if no production code is written yet.
+**Fail mode.** If conflicts exist that can't be cleanly resolved (e.g., the existing Hono setup or middleware materially conflicts with WebSocket upgrades and patching it is high risk), the documented fall-back is alternative (a) — a separate Cloud Run service. That's a deploy-surface change, not an architectural rewrite; the `DraftRoom` class and WebSocket protocol from chunks 11g.1+ are unaffected. KI-009's "refactor not rewrite" framing is the binding promise.
 
-**Pass:** proceed to Phase 4.5 chunks. **Fail:** stop and revisit. The fall-back is **Go** (see Alternatives above) — same architectural shape (one goroutine + struct per draft, gorilla/websocket transport, Postgres persistence), different runtime, ~3-week shorter learning curve. KI-010 tracks this gate explicitly. Sunk cost at this point is one week of learning, which is acceptable.
+### Chunk 11g.3 — "Does the WebSocket pick path commit and broadcast?"
 
-### Week 3 — "Does it actually meet the targets?"
+End of chunk 11g.3. First end-to-end pick path: client opens WebSocket, submits a pick, server validates against in-memory state, calls `submit_pick_v2`, broadcasts to all clients in the room.
 
-End of week 3 of Phase 4.5. Sign-off criteria — these gate Phase 4.6 entry:
+- Pick committed via `submit_pick_v2`; projection trigger fires; `draft_picks_v2` row appears.
+- Idempotency-key derivation matches the existing TypeScript path (UUIDv5, `AUTOPICK_NAMESPACE_UUID`).
+- **Manual pick p95 ≤ 300ms** over 100 trial picks, measured end-to-end. **First hard performance gate.**
 
-- A single-draft `DraftServer` is running on staging. Picks submitted via WebSocket commit to Postgres via `submit_pick_v2`. Broadcast fanout works.
-- **Latency benchmark suite passes.** Manual pick p95 ≤ 300ms (mandate target), autopick p95 ≤ 1000ms (mandate target), broadcast fanout p95 ≤ 200ms. Measured end-to-end on staging, not in unit tests.
-- The cross-runtime contract works: Phoenix engine writes via the existing `submit_pick_v2` RPC, the projection trigger fires, `draft_picks_v2` projection is consistent, the event log is gap-free, the same `idempotency_key` derivation produces the same UUIDv5 in both runtimes.
-- **Operational gotchas understood.** I have a deploy runbook, a "what to do when the engine crashes" runbook draft, a logs-from-Elixir-into-our-existing-aggregation pipeline. The Phase 4.6 work is now scope-bounded and de-risked.
-- The Elixir codebase is maintainable. Specifically: it's not a pile of `IO.inspect` calls and one massive `handle_call`. The patterns I'm using look like they'd survive 6 months of adding features.
+### Chunk 11g.6 — "Does crash recovery work?"
 
-**Pass:** proceed to Phase 4.6 (production-readiness). **Fail:** stop and review. Possible outcomes: targeted optimization within Elixir, scope cut on Phase 4.5 (e.g., defer multi-instance coordination to Phase 5), or, in the worst case, pivot back to Path 1 with the lessons learned from the Phase 4.5 prototype informing what we now know we need from the Node implementation. Sunk cost at this point is three weeks; uncomfortable but recoverable.
+End of chunk 11g.6. Worker is killed and restarted; on boot it loads all active drafts from `draft_events` + `draft_picks_v2`, rebuilds in-memory state, resumes timers. Connected clients reconnect via the chunk 11g.4 `last_seen_id` resume protocol; no picks lost; no duplicates. Per-draft reload p95 ≤ 1500ms (Mandate target).
 
-### Beyond Week 3
+### Chunk 11g.9 — "Does it meet every Mandate target end-to-end?"
 
-Phase 4.6 (weeks 4–7) is production-readiness — reconnection protocol, multi-instance coordination, hosting, observability. No new gates beyond the Phase 4.6 sign-off itself, which is the precondition for Phase 5 (UI work) starting.
+End of chunk 11g.9. Performance instrumentation harness runs against the deployed server. **This is the Phase 5 entry gate.** Sign-off requires every Mandate target met: manual pick p95 ≤ 300ms / p99 ≤ 500ms; autopick p95 ≤ 1000ms / p99 ≤ 2000ms; broadcast fanout p95 ≤ 200ms; draft state load p95 ≤ 1500ms; reconnection recovery p95 ≤ 2000ms; timer drift < 100ms.
+
+**Pass:** Phase 5 (UI client work) unblocks. **Fail:** any target missed by more than 10% triggers a design revisit before Phase 5 starts.
+
+### Reversibility
+
+The architectural pattern (persistent state holder per draft + WebSocket transport + in-memory state + event log replay) is unchanged across any plausible future re-evaluation. If v1 scale outgrows the in-server model, splitting the engine out into a separate Cloud Run service is a deployment refactor; the `DraftRoom` class, WebSocket protocol, and integration boundary all carry forward. KI-009 binds.
 
 ---
 
 ## Cross-references
 
-- `CLAUDE.md` § Citrus Draft Performance Mandate (commit `1427b18`) — the binding targets this ADR enables.
-- `docs/DRAFT_ENGINE_V2_SPEC.md` § §0 (commit `b2354d7`) and § §0.5 — spec-side reference to this ADR.
-- `docs/PHASE_4_5_PLAN.md` — chunk-by-chunk implementation plan.
-- `docs/REGISTRY.md` KI-008 (architectural pivot), KI-009 (dual-runtime ops cost), KI-010 (learning-curve risk + Week 1 gate).
-- `docs/RUNBOOKS/draft-engine-v2-known-issues.md` — Phase 0–4 KI registry, all entries still apply.
+- `CLAUDE.md` § Citrus Draft Performance Mandate — the binding targets this ADR enables.
+- `CLAUDE.md` § Tech Stack — the in-server engine documentation.
+- `docs/DRAFT_ENGINE_V2_SPEC.md` § §0 + §0.5 — spec-side reference to this ADR.
+- `docs/PHASE_4_5_PLAN.md` — chunks 11g.0–11g.9 implementation plan.
+- `docs/REGISTRY.md` KI-008 (architectural pivot from Edge Functions), KI-009 (Edge Function infrastructure removed entirely; refactor-not-rewrite framing for future service separation), KI-010 (Tier 1 perf optimizations baked in from start).
+- `docs/RUNBOOKS/draft-engine-v2-known-issues.md` — Phase 0–4 KI registry. KI-001..KI-005 still apply; KI-006 likely RESOLVED at chunk 11g.7; **KI-007 RESOLVED at chunk 11g.8** when vendored shared code is deleted.
 
-This ADR is **accepted**. Implementation begins in `docs/PHASE_4_5_PLAN.md`. Future ADRs that supersede or modify this decision must reference this number explicitly.
+This ADR is **accepted**. Implementation begins in `docs/PHASE_4_5_PLAN.md` chunk 11g.0. Future ADRs that supersede or modify this decision must reference this number explicitly.
