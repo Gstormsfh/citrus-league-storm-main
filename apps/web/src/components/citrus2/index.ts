@@ -50,6 +50,7 @@ export {
   ScheduleSlateScene,
   AnalyticsConsoleScene,
   WaiverWireScene,
+  CreateLeagueScene,
 } from './MascotScene';
 
 // On-brand loading state
