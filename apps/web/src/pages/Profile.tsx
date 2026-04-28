@@ -928,23 +928,27 @@ const Profile = () => {
   // If user is not logged in, show signup prompt
   if (!user) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
         <Navbar />
         <main className="pt-16 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
           <div className="container mx-auto px-3 sm:px-4">
             <div className="max-w-2xl mx-auto">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Sign In Required</CardTitle>
-                  <CardDescription>
-                    Please sign in or create an account to view your profile
+              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_24px_60px_-16px_rgba(255,168,87,0.25)] relative overflow-hidden">
+                <div aria-hidden="true" className="absolute top-0 right-0 w-64 h-64 bg-pastel-orange/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+                <CardHeader className="relative z-10">
+                  <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5">
+                    ✦ Sign In Required
+                  </div>
+                  <CardTitle className="font-calistoga text-2xl text-pastel-cream">Welcome to your profile.</CardTitle>
+                  <CardDescription className="text-white/55 mt-2">
+                    Please sign in or create an account to view your profile.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button asChild className="w-full">
+                <CardContent className="space-y-3 relative z-10">
+                  <Button asChild className="w-full bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
                     <Link to="/auth">Sign In / Sign Up</Link>
                   </Button>
-                  <Button asChild variant="outline" className="w-full">
+                  <Button asChild variant="outline" className="w-full bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold">
                     <Link to="/">Go to Homepage</Link>
                   </Button>
                 </CardContent>
@@ -958,7 +962,7 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
       <Navbar />
       <main className="pt-16 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
         <div className="container mx-auto px-3 sm:px-4">
@@ -967,9 +971,9 @@ const Profile = () => {
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-4">
                 <div className="flex items-center gap-3 lg:gap-4 animated-element">
                   <div className="relative group">
-                    <Avatar className="h-16 w-16 lg:h-24 lg:w-24 border-4 border-primary/20">
+                    <Avatar className="h-16 w-16 lg:h-24 lg:w-24 ring-2 ring-pastel-orange/40">
                       <AvatarImage src={profile?.avatar_url || ''} alt={getDisplayName()} />
-                      <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
+                      <AvatarFallback className="text-2xl font-bold bg-pastel-orange/20 text-pastel-orange-soft">
                         {getInitials()}
                       </AvatarFallback>
                     </Avatar>
@@ -981,13 +985,13 @@ const Profile = () => {
                       onChange={handleAvatarUpload}
                     />
                     <div
-                      className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                      className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                       onClick={() => avatarInputRef.current?.click()}
                     >
                       {uploadingAvatar ? (
-                        <Loader2 className="h-6 w-6 text-white animate-spin" />
+                        <Loader2 className="h-6 w-6 text-pastel-cream animate-spin" />
                       ) : (
-                        <Camera className="h-6 w-6 text-white" />
+                        <Camera className="h-6 w-6 text-pastel-cream" />
                       )}
                     </div>
                   </div>
@@ -997,7 +1001,7 @@ const Profile = () => {
                         <Input
                           value={displayNameInput}
                           onChange={(e) => setDisplayNameInput(e.target.value)}
-                          className="text-xl font-bold h-10 w-64"
+                          className="text-xl font-bold h-10 w-64 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
                           placeholder="Your display name"
                           autoFocus
                           onKeyDown={(e) => {
@@ -1005,32 +1009,32 @@ const Profile = () => {
                             if (e.key === 'Escape') { setIsEditingDisplayName(false); setDisplayNameInput(profile?.display_name || ''); }
                           }}
                         />
-                        <Button size="sm" onClick={handleSaveDisplayName} disabled={savingDisplayName}>
+                        <Button size="sm" onClick={handleSaveDisplayName} disabled={savingDisplayName} className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold disabled:opacity-50">
                           {savingDisplayName ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => { setIsEditingDisplayName(false); setDisplayNameInput(profile?.display_name || ''); }}>
+                        <Button size="sm" variant="ghost" onClick={() => { setIsEditingDisplayName(false); setDisplayNameInput(profile?.display_name || ''); }} className="text-white/55 hover:text-pastel-cream hover:bg-white/5">
                           Cancel
                         </Button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 group">
-                        <h1 className="text-xl lg:text-3xl font-bold">{getDisplayName()}</h1>
+                        <h1 className="font-calistoga text-2xl lg:text-4xl text-pastel-cream leading-none">{getDisplayName()}</h1>
                         <button
                           onClick={() => { setDisplayNameInput(profile?.display_name || getDisplayName()); setIsEditingDisplayName(true); }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-accent"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/5"
                           title="Edit display name"
                         >
-                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                          <Pencil className="h-4 w-4 text-white/55" />
                         </button>
                       </div>
                     )}
-                    <p className="text-xs lg:text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                    <p className="text-xs lg:text-sm text-white/55 flex items-center gap-2 mt-2">
                       <Users className="h-3.5 w-3.5 lg:h-4 lg:w-4 flex-shrink-0" />
-                      <span className="truncate">{formData.teamName || 'No team yet'} • Since {getMemberSince()}</span>
+                      <span className="truncate">{formData.teamName || 'No team yet'} · Since {getMemberSince()}</span>
                     </p>
                     {userStats.championships > 0 && (
                       <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="secondary" className="bg-primary/10 text-primary border-0">
+                        <Badge variant="secondary" className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft border-0 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold">
                           <Trophy className="h-3 w-3 mr-1" />
                           {userStats.championships}x Champion
                         </Badge>
@@ -1038,12 +1042,12 @@ const Profile = () => {
                     )}
                   </div>
                 </div>
-                
-                <TabsList className="animated-element w-full lg:w-auto grid grid-cols-4 lg:flex">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="stats">Statistics</TabsTrigger>
-                  <TabsTrigger value="achievements">Trophies</TabsTrigger>
-                  <TabsTrigger value="settings">Settings</TabsTrigger>
+
+                <TabsList className="animated-element w-full lg:w-auto grid grid-cols-4 lg:flex bg-[#1A2A20] ring-1 ring-white/10 p-1 rounded-xl">
+                  <TabsTrigger value="overview" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Overview</TabsTrigger>
+                  <TabsTrigger value="stats" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Statistics</TabsTrigger>
+                  <TabsTrigger value="achievements" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Trophies</TabsTrigger>
+                  <TabsTrigger value="settings" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Settings</TabsTrigger>
                 </TabsList>
               </div>
 
@@ -1051,19 +1055,20 @@ const Profile = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Profile Info */}
                   <div className="lg:col-span-2 space-y-6">
-                    <Card className="animated-element">
+                    <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                       <CardHeader className="flex flex-row items-center justify-between">
                         <div>
-                          <CardTitle className="flex items-center gap-2">
-                            <User className="h-5 w-5" />
+                          <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                            <User className="h-5 w-5 text-pastel-orange" />
                             Personal Information
                           </CardTitle>
-                          <CardDescription>Your basic profile details</CardDescription>
+                          <CardDescription className="text-white/55">Your basic profile details</CardDescription>
                         </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setIsEditing(!isEditing)}
+                          className="bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold"
                         >
                           <Edit3 className="h-4 w-4 mr-2" />
                           {isEditing ? 'Cancel' : 'Edit'}
@@ -1072,120 +1077,122 @@ const Profile = () => {
                       <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <Label htmlFor="firstName">First Name</Label>
+                            <Label htmlFor="firstName" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">First Name</Label>
                             {isEditing ? (
                               <Input
                                 id="firstName"
                                 value={formData.firstName}
                                 onChange={(e) => handleInputChange('firstName', e.target.value)}
+                                className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 mt-1.5"
                               />
                             ) : (
-                              <p className="text-sm text-muted-foreground mt-1">{formData.firstName}</p>
+                              <p className="text-sm text-white/70 mt-1.5">{formData.firstName}</p>
                             )}
                           </div>
                           <div>
-                            <Label htmlFor="lastName">Last Name</Label>
+                            <Label htmlFor="lastName" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Last Name</Label>
                             {isEditing ? (
                               <Input
                                 id="lastName"
                                 value={formData.lastName}
                                 onChange={(e) => handleInputChange('lastName', e.target.value)}
+                                className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 mt-1.5"
                               />
                             ) : (
-                              <p className="text-sm text-muted-foreground mt-1">{formData.lastName}</p>
+                              <p className="text-sm text-white/70 mt-1.5">{formData.lastName}</p>
                             )}
                           </div>
                         </div>
-                        
+
                         <div className="space-y-3">
                           <div className="flex items-center gap-2 text-sm">
-                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            <Mail className="h-4 w-4 text-pastel-orange shrink-0" />
                             {isEditing ? (
-                              <Input 
-                                value={formData.email} 
+                              <Input
+                                value={formData.email}
                                 onChange={(e) => handleInputChange('email', e.target.value)}
-                                className="h-8"
+                                className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
                               />
                             ) : (
-                              <span>{formData.email}</span>
+                              <span className="text-white/70">{formData.email}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 text-sm">
-                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <Phone className="h-4 w-4 text-pastel-orange shrink-0" />
                             {isEditing ? (
-                              <Input 
-                                value={formData.phone} 
+                              <Input
+                                value={formData.phone}
                                 onChange={(e) => handleInputChange('phone', e.target.value)}
-                                className="h-8"
+                                className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
                               />
                             ) : (
-                              <span>{formData.phone}</span>
+                              <span className="text-white/70">{formData.phone}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 text-sm">
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            <MapPin className="h-4 w-4 text-pastel-orange shrink-0" />
                             {isEditing ? (
-                              <Input 
-                                value={formData.location} 
+                              <Input
+                                value={formData.location}
                                 onChange={(e) => handleInputChange('location', e.target.value)}
-                                className="h-8"
+                                className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
                               />
                             ) : (
-                              <span>{formData.location}</span>
+                              <span className="text-white/70">{formData.location}</span>
                             )}
                           </div>
                         </div>
 
-                        <Separator />
+                        <Separator className="bg-white/10" />
 
                         <div>
-                          <Label htmlFor="bio">Bio</Label>
+                          <Label htmlFor="bio" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Bio</Label>
                           {isEditing ? (
                             <Textarea
                               id="bio"
                               value={formData.bio}
                               onChange={(e) => handleInputChange('bio', e.target.value)}
-                              className="w-full min-h-[80px] mt-1"
+                              className="w-full min-h-[80px] mt-1.5 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
                             />
                           ) : (
-                            <p className="text-sm text-muted-foreground mt-1">{formData.bio}</p>
+                            <p className="text-sm text-white/70 mt-1.5">{formData.bio}</p>
                           )}
                         </div>
 
                         {isEditing && (
                           <div className="flex gap-2 pt-4">
-                            <Button onClick={handleSave}>Save Changes</Button>
-                            <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+                            <Button onClick={handleSave} className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Save Changes</Button>
+                            <Button variant="outline" onClick={() => setIsEditing(false)} className="bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold">Cancel</Button>
                           </div>
                         )}
                       </CardContent>
                     </Card>
 
-                    <Card className="animated-element">
+                    <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                       <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <History className="h-5 w-5" />
+                        <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                          <History className="h-5 w-5 text-pastel-orange" />
                           Recent Activity
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
                         {recentActivity.length > 0 ? (
-                          <div className="space-y-4">
+                          <div className="space-y-2">
                             {recentActivity.map((activity, index) => (
-                              <div key={index} className="flex items-start gap-3 p-3 rounded-lg hover:bg-accent/5 transition-colors">
-                                <div className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium">{activity.action}</p>
+                              <div key={index} className="flex items-start gap-3 p-3 rounded-xl bg-white/5 ring-1 ring-white/10 hover:bg-white/[0.07] transition-colors">
+                                <div className="h-2 w-2 rounded-full bg-pastel-orange mt-2 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-bold text-pastel-cream">{activity.action}</p>
                                   {activity.points && (
-                                    <p className="text-sm text-primary font-medium">{activity.points}</p>
+                                    <p className="text-sm text-pastel-orange font-bold tabular-nums">{activity.points}</p>
                                   )}
-                                  <p className="text-xs text-muted-foreground">{activity.date}</p>
+                                  <p className="text-xs text-white/55 mt-0.5">{activity.date}</p>
                                 </div>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-muted-foreground text-center py-8">
+                          <p className="text-sm text-white/55 text-center py-8">
                             No recent activity. Join a league to get started!
                           </p>
                         )}
@@ -1195,54 +1202,54 @@ const Profile = () => {
 
                   {/* Quick Stats Sidebar */}
                   <div className="space-y-6">
-                    <Card className="animated-element">
+                    <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                       <CardHeader>
-                        <CardTitle className="text-lg">Season Summary</CardTitle>
+                        <CardTitle className="font-calistoga text-lg text-pastel-cream">Season Summary</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="text-center p-3 rounded-lg bg-primary/5">
-                            <div className="text-2xl font-bold text-primary">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="text-center p-3 rounded-xl bg-pastel-orange/10 ring-1 ring-pastel-orange/30">
+                            <div className="font-calistoga text-2xl text-pastel-orange tabular-nums leading-none">
                               {userStats.currentRank ?? '—'}
                             </div>
-                            <div className="text-xs text-muted-foreground">Current Rank</div>
+                            <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1">Current Rank</div>
                           </div>
-                          <div className="text-center p-3 rounded-lg bg-green-500/5">
-                            <div className="text-2xl font-bold text-green-600">{userStats.championships}</div>
-                            <div className="text-xs text-muted-foreground">Championships</div>
+                          <div className="text-center p-3 rounded-xl bg-pastel-sage/10 ring-1 ring-pastel-sage/30">
+                            <div className="font-calistoga text-2xl text-pastel-sage-soft tabular-nums leading-none">{userStats.championships}</div>
+                            <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1">Championships</div>
                           </div>
                         </div>
-                        <Separator />
+                        <Separator className="bg-white/10" />
                         <div className="space-y-3">
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Total Seasons</span>
-                            <span className="font-medium">{userStats.totalSeasons}</span>
+                            <span className="text-white/55">Total Seasons</span>
+                            <span className="font-bold text-pastel-cream tabular-nums">{userStats.totalSeasons}</span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Playoff Apps</span>
-                            <span className="font-medium">{userStats.playoffAppearances}</span>
+                            <span className="text-white/55">Playoff Apps</span>
+                            <span className="font-bold text-pastel-cream tabular-nums">{userStats.playoffAppearances}</span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Overall Record</span>
-                            <span className="font-medium">{userStats.overallRecord}</span>
+                            <span className="text-white/55">Overall Record</span>
+                            <span className="font-bold text-pastel-cream tabular-nums">{userStats.overallRecord}</span>
                           </div>
                         </div>
                       </CardContent>
                     </Card>
 
-                    <Card className="animated-element">
+                    <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                       <CardHeader>
-                        <CardTitle className="text-lg">Team Info</CardTitle>
+                        <CardTitle className="font-calistoga text-lg text-pastel-cream">Team Info</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div>
-                          <Label className="text-xs text-muted-foreground">Fantasy Team</Label>
-                          <p className="font-medium">{formData.teamName || 'No team yet'}</p>
+                          <Label className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Fantasy Team</Label>
+                          <p className="font-bold text-pastel-cream mt-1">{formData.teamName || 'No team yet'}</p>
                         </div>
                         {formData.favoriteTeam && (
                           <div>
-                            <Label className="text-xs text-muted-foreground">Favorite NHL Team</Label>
-                            <p className="font-medium">{formData.favoriteTeam}</p>
+                            <Label className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Favorite NHL Team</Label>
+                            <p className="font-bold text-pastel-cream mt-1">{formData.favoriteTeam}</p>
                           </div>
                         )}
                       </CardContent>
@@ -1253,68 +1260,68 @@ const Profile = () => {
 
               <TabsContent value="stats" className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card className="animated-element">
+                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-6 text-center">
-                      <Calendar className="h-8 w-8 mx-auto mb-2 text-yellow-500" />
-                      <div className="text-2xl font-bold">{userStats.totalSeasons}</div>
-                      <div className="text-sm text-muted-foreground">Leagues</div>
+                      <Calendar className="h-8 w-8 mx-auto mb-2 text-amber-300" />
+                      <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.totalSeasons}</div>
+                      <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">Leagues</div>
                     </CardContent>
                   </Card>
-                  <Card className="animated-element">
+                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-6 text-center">
-                      <Target className="h-8 w-8 mx-auto mb-2 text-blue-500" />
-                      <div className="text-2xl font-bold">{userStats.overallRecord}</div>
-                      <div className="text-sm text-muted-foreground">W-L Record</div>
+                      <Target className="h-8 w-8 mx-auto mb-2 text-blue-300" />
+                      <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.overallRecord}</div>
+                      <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">W-L Record</div>
                     </CardContent>
                   </Card>
-                  <Card className="animated-element">
+                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-6 text-center">
-                      <TrendingUp className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                      <div className="text-2xl font-bold">{userStats.totalPoints.toLocaleString()}</div>
-                      <div className="text-sm text-muted-foreground">Total Points</div>
+                      <TrendingUp className="h-8 w-8 mx-auto mb-2 text-pastel-sage-soft" />
+                      <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.totalPoints.toLocaleString()}</div>
+                      <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">Total Points</div>
                     </CardContent>
                   </Card>
-                  <Card className="animated-element">
+                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-6 text-center">
-                      <Medal className="h-8 w-8 mx-auto mb-2 text-purple-500" />
-                      <div className="text-2xl font-bold">{userStats.avgPointsPerGame || '—'}</div>
-                      <div className="text-sm text-muted-foreground">Avg Pts/Week</div>
+                      <Medal className="h-8 w-8 mx-auto mb-2 text-pastel-orange" />
+                      <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.avgPointsPerGame || '—'}</div>
+                      <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">Avg Pts/Week</div>
                     </CardContent>
                   </Card>
                 </div>
 
-                <Card className="animated-element">
+                <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <CardHeader>
-                    <CardTitle>Performance History</CardTitle>
-                    <CardDescription>Your matchup results across all leagues</CardDescription>
+                    <CardTitle className="font-calistoga text-xl text-pastel-cream">Performance History</CardTitle>
+                    <CardDescription className="text-white/55">Your matchup results across all leagues</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {userStats.statsLoaded && userStats.totalSeasons > 0 ? (
                       <div className="space-y-4">
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                          <div className="p-4 rounded-lg bg-green-500/10">
-                            <div className="text-2xl font-bold text-green-600">{userStats.wins}</div>
-                            <div className="text-xs text-muted-foreground">Wins</div>
+                        <div className="grid grid-cols-3 gap-3 text-center">
+                          <div className="p-4 rounded-xl bg-pastel-sage/15 ring-1 ring-pastel-sage/30">
+                            <div className="font-calistoga text-2xl text-pastel-sage-soft tabular-nums leading-none">{userStats.wins}</div>
+                            <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">Wins</div>
                           </div>
-                          <div className="p-4 rounded-lg bg-red-500/10">
-                            <div className="text-2xl font-bold text-red-600">{userStats.losses}</div>
-                            <div className="text-xs text-muted-foreground">Losses</div>
+                          <div className="p-4 rounded-xl bg-red-400/15 ring-1 ring-red-400/30">
+                            <div className="font-calistoga text-2xl text-red-300 tabular-nums leading-none">{userStats.losses}</div>
+                            <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">Losses</div>
                           </div>
-                          <div className="p-4 rounded-lg bg-gray-500/10">
-                            <div className="text-2xl font-bold text-gray-600">{userStats.ties}</div>
-                            <div className="text-xs text-muted-foreground">Ties</div>
+                          <div className="p-4 rounded-xl bg-white/5 ring-1 ring-white/10">
+                            <div className="font-calistoga text-2xl text-white/70 tabular-nums leading-none">{userStats.ties}</div>
+                            <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">Ties</div>
                           </div>
                         </div>
                         {(userStats.wins + userStats.losses + userStats.ties) > 0 && (
                           <div className="flex items-center gap-2 pt-2">
-                            <div className="text-xs text-muted-foreground">Win Rate</div>
-                            <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                            <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold">Win Rate</div>
+                            <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
                               <div
-                                className="h-full bg-green-500 rounded-full transition-all"
+                                className="h-full bg-pastel-sage rounded-full transition-all"
                                 style={{ width: `${Math.round((userStats.wins / (userStats.wins + userStats.losses + userStats.ties)) * 100)}%` }}
                               />
                             </div>
-                            <div className="text-xs font-medium">
+                            <div className="text-xs font-bold text-pastel-cream tabular-nums">
                               {Math.round((userStats.wins / (userStats.wins + userStats.losses + userStats.ties)) * 100)}%
                             </div>
                           </div>
@@ -1322,23 +1329,24 @@ const Profile = () => {
                       </div>
                     ) : userStats.statsLoaded ? (
                       <div className="text-center py-12">
-                        <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                        <h3 className="text-lg font-semibold mb-2">No Performance History</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
+                        <TrendingUp className="h-12 w-12 mx-auto mb-4 text-pastel-orange/30" />
+                        <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">✦ Empty</div>
+                        <h3 className="font-calistoga text-xl text-pastel-cream mb-2">No Performance History</h3>
+                        <p className="text-sm text-white/55 mb-4">
                           {userLeagueState === 'active-user'
                             ? 'Complete a matchup week to see your performance history here.'
                             : 'Join a league and complete a season to see your performance history here.'}
                         </p>
                         {userLeagueState !== 'active-user' && (
-                          <Button asChild>
+                          <Button asChild className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
                             <Link to="/create-league">Create or Join a League</Link>
                           </Button>
                         )}
                       </div>
                     ) : (
                       <div className="text-center py-8">
-                        <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">Loading stats...</p>
+                        <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin text-pastel-orange/60" />
+                        <p className="text-sm text-white/55">Loading stats…</p>
                       </div>
                     )}
                   </CardContent>
@@ -1349,19 +1357,19 @@ const Profile = () => {
                 {achievements.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {achievements.map((achievement, index) => (
-                      <Card key={index} className="animated-element hover:shadow-md transition-shadow">
+                      <Card key={index} className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 hover:ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] hover:shadow-[0_24px_60px_-16px_rgba(255,168,87,0.2)] transition-all">
                         <CardContent className="p-6">
                           <div className="flex items-start gap-4">
-                            <div className={`p-3 rounded-lg bg-accent/10`}>
+                            <div className="p-3 rounded-xl bg-pastel-orange/15 ring-1 ring-pastel-orange/30 shrink-0">
                               <achievement.icon className={`h-6 w-6 ${achievement.color}`} />
                             </div>
-                            <div className="flex-1">
-                              <h3 className="font-semibold mb-1">{achievement.title}</h3>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-calistoga text-lg text-pastel-cream mb-1">{achievement.title}</h3>
                               {achievement.description && (
-                                <p className="text-sm text-muted-foreground mb-2">{achievement.description}</p>
+                                <p className="text-sm text-white/55 mb-2 leading-relaxed">{achievement.description}</p>
                               )}
                               {achievement.year && (
-                                <Badge variant="secondary" className="text-xs">{achievement.year}</Badge>
+                                <Badge variant="secondary" className="text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold bg-white/5 ring-1 ring-white/10 text-white/70 hover:bg-white/10 border-0">{achievement.year}</Badge>
                               )}
                             </div>
                           </div>
@@ -1370,17 +1378,18 @@ const Profile = () => {
                     ))}
                   </div>
                 ) : (
-                  <Card>
+                  <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-12 text-center">
-                      <Trophy className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                      <h3 className="text-lg font-semibold mb-2">No Achievements Yet</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
+                      <Trophy className="h-12 w-12 mx-auto mb-4 text-pastel-orange/30" />
+                      <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">✦ Empty</div>
+                      <h3 className="font-calistoga text-xl text-pastel-cream mb-2">No Achievements Yet</h3>
+                      <p className="text-sm text-white/55 mb-4">
                         {userLeagueState === 'active-user'
                           ? 'Keep competing to earn achievements!'
                           : 'Join a league and start competing to earn achievements!'}
                       </p>
                       {userLeagueState !== 'active-user' && (
-                        <Button asChild>
+                        <Button asChild className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
                           <Link to="/create-league">Create or Join a League</Link>
                         </Button>
                       )}
@@ -1391,57 +1400,58 @@ const Profile = () => {
 
               <TabsContent value="settings" className="space-y-6">
                 {settingsMessage && (
-                  <div className={`p-3 rounded-lg text-sm ${settingsMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'}`}>
+                  <div className={`p-3 rounded-xl text-sm ring-1 ${settingsMessage.type === 'success' ? 'bg-pastel-sage/15 ring-pastel-sage/40 text-pastel-sage-soft' : 'bg-red-400/15 ring-red-400/40 text-red-300'}`}>
                     {settingsMessage.text}
                   </div>
                 )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Display Name & Account Info */}
-                  <Card className="animated-element lg:col-span-2">
+                  <Card className="animated-element lg:col-span-2 bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <User className="h-5 w-5" />
+                      <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                        <User className="h-5 w-5 text-pastel-orange" />
                         Account Information
                       </CardTitle>
-                      <CardDescription>Your identity and account details</CardDescription>
+                      <CardDescription className="text-white/55">Your identity and account details</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-4">
                           <div className="space-y-2">
-                            <Label htmlFor="settings-display-name">Display Name</Label>
+                            <Label htmlFor="settings-display-name" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Display Name</Label>
                             <div className="flex gap-2">
                               <Input
                                 id="settings-display-name"
                                 value={displayNameInput}
                                 onChange={(e) => setDisplayNameInput(e.target.value)}
                                 placeholder="Choose a display name"
+                                className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
                               />
                               <Button
                                 onClick={handleSaveDisplayName}
                                 disabled={savingDisplayName || displayNameInput.trim() === (profile?.display_name || '')}
                                 size="sm"
-                                className="shrink-0"
+                                className="shrink-0 bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold disabled:opacity-50"
                               >
                                 {savingDisplayName ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
                               </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">This is the name shown to other users across the platform.</p>
+                            <p className="text-xs text-white/55">This is the name shown to other users across the platform.</p>
                           </div>
                           <div className="space-y-2">
-                            <Label>Email Address</Label>
-                            <div className="flex items-center gap-2 p-2 rounded-md bg-muted text-sm">
-                              <Mail className="h-4 w-4 text-muted-foreground" />
-                              {user?.email}
+                            <Label className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Email Address</Label>
+                            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 ring-1 ring-white/10 text-sm">
+                              <Mail className="h-4 w-4 text-pastel-orange shrink-0" />
+                              <span className="text-white/70 truncate">{user?.email}</span>
                             </div>
                           </div>
                         </div>
 
                         <div className="space-y-4">
                           <div className="space-y-2">
-                            <Label className="flex items-center gap-2">
-                              <Sun className="h-4 w-4" />
+                            <Label className="flex items-center gap-2 text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">
+                              <Sun className="h-3.5 w-3.5" />
                               Appearance
                             </Label>
                             <div className="flex gap-2">
@@ -1454,7 +1464,9 @@ const Profile = () => {
                                   key={value}
                                   variant={theme === value ? 'default' : 'outline'}
                                   onClick={() => setTheme(value)}
-                                  className="flex-1"
+                                  className={`flex-1 font-bold ${theme === value
+                                    ? 'bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]'
+                                    : 'bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50'}`}
                                   size="sm"
                                 >
                                   <Icon className="mr-1.5 h-3.5 w-3.5" />
@@ -1469,18 +1481,18 @@ const Profile = () => {
                   </Card>
 
                   {/* Change Password */}
-                  <Card className="animated-element">
+                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Lock className="h-5 w-5" />
+                      <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                        <Lock className="h-5 w-5 text-pastel-orange" />
                         Change Password
                       </CardTitle>
-                      <CardDescription>Update your account password</CardDescription>
+                      <CardDescription className="text-white/55">Update your account password</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <form onSubmit={handleChangePasswordReal} className="space-y-4">
                         <div className="space-y-2">
-                          <Label htmlFor="settings-newPassword">New Password</Label>
+                          <Label htmlFor="settings-newPassword" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">New Password</Label>
                           <Input
                             id="settings-newPassword"
                             type="password"
@@ -1488,10 +1500,11 @@ const Profile = () => {
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
                             disabled={changePasswordLoading}
+                            className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 disabled:opacity-50"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="settings-confirmPassword">Confirm New Password</Label>
+                          <Label htmlFor="settings-confirmPassword" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Confirm New Password</Label>
                           <Input
                             id="settings-confirmPassword"
                             type="password"
@@ -1499,15 +1512,16 @@ const Profile = () => {
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             disabled={changePasswordLoading}
+                            className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 disabled:opacity-50"
                           />
                         </div>
                         <Button
                           type="submit"
                           disabled={changePasswordLoading || !newPassword || !confirmPassword}
-                          className="w-full"
+                          className="w-full bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
                         >
                           {changePasswordLoading ? (
-                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Updating...</>
+                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Updating…</>
                           ) : (
                             'Update Password'
                           )}
@@ -1517,78 +1531,80 @@ const Profile = () => {
                   </Card>
 
                   {/* Team Settings */}
-                  <Card className="animated-element">
+                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Shield className="h-5 w-5" />
+                      <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                        <Shield className="h-5 w-5 text-pastel-orange" />
                         Team Settings
                       </CardTitle>
-                      <CardDescription>Customize your team identity</CardDescription>
+                      <CardDescription className="text-white/55">Customize your team identity</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="team-name">Team Name</Label>
-                        <Input 
-                          id="team-name" 
-                          value={formData.teamName} 
+                        <Label htmlFor="team-name" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Team Name</Label>
+                        <Input
+                          id="team-name"
+                          value={formData.teamName}
                           onChange={(e) => handleInputChange('teamName', e.target.value)}
+                          className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="team-abbr">Abbreviation (3-4 chars)</Label>
-                        <Input 
-                          id="team-abbr" 
-                          value={formData.teamAbbr} 
+                        <Label htmlFor="team-abbr" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Abbreviation (3-4 chars)</Label>
+                        <Input
+                          id="team-abbr"
+                          value={formData.teamAbbr}
                           maxLength={4}
                           onChange={(e) => handleInputChange('teamAbbr', e.target.value)}
+                          className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="team-desc">Team Slogan/Bio</Label>
-                        <Textarea 
-                          id="team-desc" 
-                          value={formData.teamDescription} 
+                        <Label htmlFor="team-desc" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Team Slogan/Bio</Label>
+                        <Textarea
+                          id="team-desc"
+                          value={formData.teamDescription}
                           onChange={(e) => handleInputChange('teamDescription', e.target.value)}
-                          className="min-h-[80px]"
+                          className="min-h-[80px] bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
                         />
                       </div>
-                      <Button onClick={handleSaveTeamName}>Save Team Details</Button>
+                      <Button onClick={handleSaveTeamName} className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Save Team Details</Button>
                     </CardContent>
                   </Card>
 
                   {/* League Reset (Commissioner Only) */}
                   {commissionerLeagues.length > 0 && (
-                    <Card className="animated-element border-destructive/20">
+                    <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-red-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(248,113,113,0.15)]">
                       <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-destructive">
+                        <CardTitle className="flex items-center gap-2 font-calistoga text-red-300">
                           <RotateCcw className="h-5 w-5" />
                           League Draft Reset
                         </CardTitle>
-                        <CardDescription>
+                        <CardDescription className="text-white/55">
                           Reset draft data for leagues you commission. This permanently deletes all draft picks and orders.
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         {loadingLeagues ? (
-                          <p className="text-sm text-muted-foreground">Loading leagues...</p>
+                          <p className="text-sm text-white/55">Loading leagues…</p>
                         ) : (
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             {commissionerLeagues.map((league) => (
-                              <div 
-                                key={league.id} 
-                                className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                              <div
+                                key={league.id}
+                                className="flex items-center justify-between p-3 ring-1 ring-white/10 rounded-xl bg-white/5"
                               >
-                                <div className="flex-1">
-                                  <p className="font-semibold">{league.name}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Status: <span className="capitalize">{league.draft_status.replace('_', ' ')}</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-pastel-cream truncate">{league.name}</p>
+                                  <p className="text-xs text-white/55 mt-0.5">
+                                    Status: <span className="capitalize text-white/70">{league.draft_status.replace('_', ' ')}</span>
                                   </p>
                                 </div>
                                 <Button
-                                  variant="destructive"
                                   size="sm"
                                   onClick={() => handleResetLeagueDraft(league.id, league.name)}
                                   disabled={league.draft_status === 'not_started'}
+                                  className="bg-red-400/20 ring-1 ring-red-400/40 text-red-300 hover:bg-red-400/30 font-bold disabled:opacity-40 shrink-0"
                                 >
                                   <RotateCcw className="h-4 w-4 mr-2" />
                                   Reset Draft
@@ -1596,16 +1612,16 @@ const Profile = () => {
                               </div>
                             ))}
                             {commissionerLeagues.length === 0 && (
-                              <p className="text-sm text-muted-foreground text-center py-4">
+                              <p className="text-sm text-white/55 text-center py-4">
                                 You are not a commissioner of any leagues.
                               </p>
                             )}
                           </div>
                         )}
-                        <div className="flex items-start gap-2 p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
-                          <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-                          <p className="text-xs text-destructive/80">
-                            <strong>Warning:</strong> Resetting a draft will permanently delete all draft picks and draft order data. 
+                        <div className="flex items-start gap-2 p-3 bg-red-400/10 ring-1 ring-red-400/30 rounded-xl">
+                          <AlertTriangle className="h-4 w-4 text-red-300 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-red-300/90 leading-relaxed">
+                            <strong className="text-red-300">Warning:</strong> Resetting a draft will permanently delete all draft picks and draft order data.
                             This action cannot be undone. Only reset if you need to start the draft completely fresh.
                           </p>
                         </div>
@@ -1615,25 +1631,25 @@ const Profile = () => {
 
                   {/* Commissioner League Settings — Full Settings Panel */}
                   {commissionerLeagues.length > 0 && (
-                    <Card className="animated-element lg:col-span-2 border-primary/20">
+                    <Card className="animated-element lg:col-span-2 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)]">
                       <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Crown className="h-5 w-5 text-primary" />
+                        <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                          <Crown className="h-5 w-5 text-pastel-orange" />
                           Commissioner League Settings
                         </CardTitle>
-                        <CardDescription>
+                        <CardDescription className="text-white/55">
                           Configure waivers, scoring, draft, and rosters for leagues you commission. Changes will notify all league members.
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-6">
                         {/* League Selector */}
                         <div className="space-y-2">
-                          <Label>Select League</Label>
+                          <Label className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Select League</Label>
                           <Select
                             value={selectedSettingsLeagueId || ''}
                             onValueChange={(value) => setSelectedSettingsLeagueId(value)}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="bg-white/5 border-white/10 text-pastel-cream focus:ring-pastel-orange/40">
                               <SelectValue placeholder="Select a league to configure" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1645,33 +1661,33 @@ const Profile = () => {
                             </SelectContent>
                           </Select>
                         </div>
-                        
+
                         {loadingCommSettings ? (
                           <div className="text-center py-8">
-                            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                            <p className="text-sm text-muted-foreground mt-2">Loading league settings...</p>
+                            <Loader2 className="h-6 w-6 animate-spin mx-auto text-pastel-orange/60" />
+                            <p className="text-sm text-white/55 mt-2">Loading league settings…</p>
                           </div>
                         ) : selectedSettingsLeagueId && selectedLeagueData ? (
                           <Tabs value={commSettingsTab} onValueChange={setCommSettingsTab} className="w-full">
-                            <TabsList className="grid w-full grid-cols-4">
-                              <TabsTrigger value="waivers">Waivers</TabsTrigger>
-                              <TabsTrigger value="scoring">Scoring</TabsTrigger>
-                              <TabsTrigger value="draft">Draft</TabsTrigger>
-                              <TabsTrigger value="rosters">Rosters</TabsTrigger>
+                            <TabsList className="grid w-full grid-cols-4 bg-[#0F1F15] ring-1 ring-white/10 p-1 rounded-xl">
+                              <TabsTrigger value="waivers" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Waivers</TabsTrigger>
+                              <TabsTrigger value="scoring" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Scoring</TabsTrigger>
+                              <TabsTrigger value="draft" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Draft</TabsTrigger>
+                              <TabsTrigger value="rosters" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Rosters</TabsTrigger>
                             </TabsList>
 
                             {/* Waiver Settings Tab */}
                             <TabsContent value="waivers" className="space-y-6 py-4">
                               <div className="space-y-2">
-                                <Label className="flex items-center gap-2">
-                                  <Clock className="h-4 w-4" />
+                                <Label className="flex items-center gap-2 text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">
+                                  <Clock className="h-3.5 w-3.5" />
                                   Waiver Process Time (MT)
                                 </Label>
                                 <Select
                                   value={commWaiverSettings.waiver_process_time}
                                   onValueChange={(value) => setCommWaiverSettings(prev => ({ ...prev, waiver_process_time: value }))}
                                 >
-                                  <SelectTrigger>
+                                  <SelectTrigger className="bg-white/5 border-white/10 text-pastel-cream focus:ring-pastel-orange/40">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1683,19 +1699,19 @@ const Profile = () => {
                                     <SelectItem value="12:00:00">12:00 PM (Noon)</SelectItem>
                                   </SelectContent>
                                 </Select>
-                                <p className="text-xs text-muted-foreground">Time when waiver claims are processed daily (Mountain Time)</p>
+                                <p className="text-xs text-white/55">Time when waiver claims are processed daily (Mountain Time)</p>
                               </div>
 
                               <div className="space-y-2">
-                                <Label className="flex items-center gap-2">
-                                  <RefreshCw className="h-4 w-4" />
+                                <Label className="flex items-center gap-2 text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">
+                                  <RefreshCw className="h-3.5 w-3.5" />
                                   Waiver Period (Hours)
                                 </Label>
                                 <Select
                                   value={commWaiverSettings.waiver_period_hours.toString()}
                                   onValueChange={(value) => setCommWaiverSettings(prev => ({ ...prev, waiver_period_hours: parseInt(value) }))}
                                 >
-                                  <SelectTrigger>
+                                  <SelectTrigger className="bg-white/5 border-white/10 text-pastel-cream focus:ring-pastel-orange/40">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1704,19 +1720,19 @@ const Profile = () => {
                                     <SelectItem value="72">72 hours (3 days)</SelectItem>
                                   </SelectContent>
                                 </Select>
-                                <p className="text-xs text-muted-foreground">How long dropped players stay on waivers</p>
+                                <p className="text-xs text-white/55">How long dropped players stay on waivers</p>
                               </div>
 
                               <div className="space-y-2">
-                                <Label className="flex items-center gap-2">
-                                  <Trophy className="h-4 w-4" />
+                                <Label className="flex items-center gap-2 text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">
+                                  <Trophy className="h-3.5 w-3.5" />
                                   Waiver Type
                                 </Label>
                                 <Select
                                   value={commWaiverSettings.waiver_type}
                                   onValueChange={(value: 'rolling' | 'faab' | 'reverse_standings') => setCommWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
                                 >
-                                  <SelectTrigger>
+                                  <SelectTrigger className="bg-white/5 border-white/10 text-pastel-cream focus:ring-pastel-orange/40">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1725,16 +1741,16 @@ const Profile = () => {
                                     <SelectItem value="faab">FAAB (Bidding)</SelectItem>
                                   </SelectContent>
                                 </Select>
-                                <p className="text-xs text-muted-foreground">Rolling: Priority moves after claim. Reverse: Worst team gets priority.</p>
+                                <p className="text-xs text-white/55">Rolling: Priority moves after claim. Reverse: Worst team gets priority.</p>
                               </div>
 
-                              <div className="flex items-center justify-between">
+                              <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
                                 <div className="space-y-0.5">
-                                  <Label className="flex items-center gap-2">
-                                    <Shield className="h-4 w-4" />
+                                  <Label className="flex items-center gap-2 text-sm font-bold text-pastel-cream">
+                                    <Shield className="h-4 w-4 text-pastel-orange" />
                                     Game Lock
                                   </Label>
-                                  <p className="text-xs text-muted-foreground">Lock players during/after their games</p>
+                                  <p className="text-xs text-white/55">Lock players during/after their games</p>
                                 </div>
                                 <Switch
                                   checked={commWaiverSettings.waiver_game_lock}
@@ -1742,13 +1758,13 @@ const Profile = () => {
                                 />
                               </div>
 
-                              <div className="flex items-center justify-between">
+                              <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
                                 <div className="space-y-0.5">
-                                  <Label className="flex items-center gap-2">
-                                    <RefreshCw className="h-4 w-4" />
+                                  <Label className="flex items-center gap-2 text-sm font-bold text-pastel-cream">
+                                    <RefreshCw className="h-4 w-4 text-pastel-orange" />
                                     Allow Trades During Games
                                   </Label>
-                                  <p className="text-xs text-muted-foreground">Players can be traded even if game-locked</p>
+                                  <p className="text-xs text-white/55">Players can be traded even if game-locked</p>
                                 </div>
                                 <Switch
                                   checked={commWaiverSettings.allow_trades_during_games}
@@ -1757,25 +1773,25 @@ const Profile = () => {
                               </div>
 
                               {/* Manual Waiver Processing & Sync Rosters */}
-                              <div className="border-t pt-4 mt-4 space-y-4">
-                                <div className="flex items-center justify-between">
+                              <div className="border-t border-white/10 pt-4 mt-4 space-y-3">
+                                <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
                                   <div className="space-y-0.5">
-                                    <Label className="flex items-center gap-2">
-                                      <Play className="h-4 w-4" />
+                                    <Label className="flex items-center gap-2 text-sm font-bold text-pastel-cream">
+                                      <Play className="h-4 w-4 text-pastel-orange" />
                                       Process Waivers Now
                                     </Label>
-                                    <p className="text-xs text-muted-foreground">Manually process all pending waiver claims</p>
+                                    <p className="text-xs text-white/55">Manually process all pending waiver claims</p>
                                   </div>
                                   <Button
-                                    variant="secondary"
                                     size="sm"
                                     onClick={handleCommProcessWaivers}
                                     disabled={processingWaivers}
+                                    className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/30 font-bold disabled:opacity-50 shrink-0"
                                   >
                                     {processingWaivers ? (
                                       <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Processing...
+                                        Processing…
                                       </>
                                     ) : (
                                       <>
@@ -1786,24 +1802,24 @@ const Profile = () => {
                                   </Button>
                                 </div>
 
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
                                   <div className="space-y-0.5">
-                                    <Label className="flex items-center gap-2">
-                                      <RefreshCw className="h-4 w-4" />
+                                    <Label className="flex items-center gap-2 text-sm font-bold text-pastel-cream">
+                                      <RefreshCw className="h-4 w-4 text-pastel-orange" />
                                       Sync Rosters from Draft
                                     </Label>
-                                    <p className="text-xs text-muted-foreground">Re-sync roster assignments from draft picks</p>
+                                    <p className="text-xs text-white/55">Re-sync roster assignments from draft picks</p>
                                   </div>
                                   <Button
-                                    variant="secondary"
                                     size="sm"
                                     onClick={handleCommSyncRosters}
                                     disabled={syncingRosters}
+                                    className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/30 font-bold disabled:opacity-50 shrink-0"
                                   >
                                     {syncingRosters ? (
                                       <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Syncing...
+                                        Syncing…
                                       </>
                                     ) : (
                                       <>
@@ -1818,9 +1834,9 @@ const Profile = () => {
 
                             {/* Scoring Settings Tab */}
                             <TabsContent value="scoring" className="space-y-6 py-4">
-                              <div className="space-y-4">
+                              <div className="space-y-6">
                                 <div>
-                                  <h3 className="text-lg font-semibold mb-2">Skater Scoring</h3>
+                                  <h3 className="font-calistoga text-lg text-pastel-cream mb-3">Skater Scoring</h3>
                                   <div className="grid grid-cols-2 gap-4">
                                     {[
                                       { key: 'goals', label: 'Goals', default: 3 },
@@ -1833,7 +1849,7 @@ const Profile = () => {
                                       { key: 'penalty_minutes', label: 'Penalty Minutes', default: 0.5 },
                                     ].map(stat => (
                                       <div key={stat.key} className="space-y-2">
-                                        <Label>{stat.label}</Label>
+                                        <Label className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">{stat.label}</Label>
                                         <Input
                                           type="number"
                                           step="0.1"
@@ -1842,6 +1858,7 @@ const Profile = () => {
                                             ...prev,
                                             skater: { ...prev.skater, [stat.key]: parseFloat(e.target.value) || 0 }
                                           }))}
+                                          className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 tabular-nums"
                                         />
                                       </div>
                                     ))}
@@ -1849,7 +1866,7 @@ const Profile = () => {
                                 </div>
 
                                 <div>
-                                  <h3 className="text-lg font-semibold mb-2">Goalie Scoring</h3>
+                                  <h3 className="font-calistoga text-lg text-pastel-cream mb-3">Goalie Scoring</h3>
                                   <div className="grid grid-cols-2 gap-4">
                                     {[
                                       { key: 'wins', label: 'Wins', default: 4 },
@@ -1858,7 +1875,7 @@ const Profile = () => {
                                       { key: 'goals_against', label: 'Goals Against', default: -1 },
                                     ].map(stat => (
                                       <div key={stat.key} className="space-y-2">
-                                        <Label>{stat.label}</Label>
+                                        <Label className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">{stat.label}</Label>
                                         <Input
                                           type="number"
                                           step="0.1"
@@ -1867,6 +1884,7 @@ const Profile = () => {
                                             ...prev,
                                             goalie: { ...prev.goalie, [stat.key]: parseFloat(e.target.value) || 0 }
                                           }))}
+                                          className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 tabular-nums"
                                         />
                                       </div>
                                     ))}
@@ -1879,7 +1897,7 @@ const Profile = () => {
                             <TabsContent value="draft" className="space-y-6 py-4">
                               <div className="space-y-4">
                                 <div className="space-y-2">
-                                  <Label>Draft Rounds</Label>
+                                  <Label className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Draft Rounds</Label>
                                   <Input
                                     type="number"
                                     value={commDraftSettings.draft_rounds}
@@ -1888,13 +1906,14 @@ const Profile = () => {
                                       draft_rounds: parseInt(e.target.value) || 21
                                     }))}
                                     disabled={selectedLeagueData?.draft_status === 'completed'}
+                                    className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 tabular-nums disabled:opacity-50"
                                   />
                                   {selectedLeagueData?.draft_status === 'completed' && (
-                                    <p className="text-xs text-muted-foreground">Draft is completed — rounds cannot be changed</p>
+                                    <p className="text-xs text-white/55">Draft is completed — rounds cannot be changed</p>
                                   )}
                                 </div>
                                 <div className="space-y-2">
-                                  <Label>Pick Time Limit (seconds)</Label>
+                                  <Label className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Pick Time Limit (seconds)</Label>
                                   <Input
                                     type="number"
                                     value={commDraftSettings.pickTimeLimit}
@@ -1903,9 +1922,10 @@ const Profile = () => {
                                       pickTimeLimit: parseInt(e.target.value) || 90
                                     }))}
                                     disabled={selectedLeagueData?.draft_status === 'completed'}
+                                    className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 tabular-nums disabled:opacity-50"
                                   />
                                   {selectedLeagueData?.draft_status === 'completed' && (
-                                    <p className="text-xs text-muted-foreground">Draft is completed — time limit cannot be changed</p>
+                                    <p className="text-xs text-white/55">Draft is completed — time limit cannot be changed</p>
                                   )}
                                 </div>
                               </div>
@@ -1914,26 +1934,26 @@ const Profile = () => {
                             {/* Roster Overview Tab */}
                             <TabsContent value="rosters" className="space-y-6 py-4">
                               <div className="space-y-4">
-                                <h3 className="text-lg font-semibold">Team Rosters</h3>
+                                <h3 className="font-calistoga text-lg text-pastel-cream">Team Rosters</h3>
                                 {loadingRosterCounts ? (
                                   <div className="text-center py-4">
-                                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                                    <p className="text-sm text-muted-foreground mt-2">Loading roster counts...</p>
+                                    <Loader2 className="h-4 w-4 animate-spin mx-auto text-pastel-orange/60" />
+                                    <p className="text-sm text-white/55 mt-2">Loading roster counts…</p>
                                   </div>
                                 ) : (
                                   <div className="space-y-2 max-h-[400px] overflow-y-auto">
                                     {selectedLeagueTeams.map((team) => (
-                                      <div key={team.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                        <div>
-                                          <div className="font-medium">{team.team_name}</div>
-                                          <div className="text-sm text-muted-foreground">
+                                      <div key={team.id} className="flex items-center justify-between p-3 ring-1 ring-white/10 bg-white/5 rounded-xl">
+                                        <div className="min-w-0">
+                                          <div className="font-bold text-pastel-cream truncate">{team.team_name}</div>
+                                          <div className="text-xs text-white/55 mt-0.5 tabular-nums">
                                             {commRosterCounts[team.id] ?? 0} players
                                           </div>
                                         </div>
                                       </div>
                                     ))}
                                     {selectedLeagueTeams.length === 0 && (
-                                      <p className="text-sm text-muted-foreground text-center py-4">No teams in this league yet.</p>
+                                      <p className="text-sm text-white/55 text-center py-4">No teams in this league yet.</p>
                                     )}
                                   </div>
                                 )}
@@ -1941,17 +1961,17 @@ const Profile = () => {
                             </TabsContent>
                           </Tabs>
                         ) : (
-                          <p className="text-sm text-muted-foreground text-center py-4">Select a league above to configure its settings.</p>
+                          <p className="text-sm text-white/55 text-center py-4">Select a league above to configure its settings.</p>
                         )}
 
                         {/* Save Button */}
                         {selectedSettingsLeagueId && selectedLeagueData && commSettingsTab !== 'rosters' && (
-                          <div className="flex justify-end gap-2 border-t pt-4">
-                            <Button onClick={handleSaveCommSettings} disabled={savingCommSettings}>
+                          <div className="flex justify-end gap-2 border-t border-white/10 pt-4">
+                            <Button onClick={handleSaveCommSettings} disabled={savingCommSettings} className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50">
                               {savingCommSettings ? (
                                 <>
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Saving...
+                                  Saving…
                                 </>
                               ) : (
                                 'Save Settings'
@@ -1964,19 +1984,19 @@ const Profile = () => {
                   )}
 
                   {/* Game Preferences */}
-                  <Card className="animated-element">
+                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Settings className="h-5 w-5" />
+                      <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                        <Settings className="h-5 w-5 text-pastel-orange" />
                         Game Preferences
                       </CardTitle>
-                      <CardDescription>Manage automation and gameplay</CardDescription>
+                      <CardDescription className="text-white/55">Manage automation and gameplay</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="flex items-center justify-between">
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
                         <div className="space-y-0.5">
-                          <Label className="text-base">Email Notifications</Label>
-                          <p className="text-sm text-muted-foreground">
+                          <Label className="text-sm font-bold text-pastel-cream">Email Notifications</Label>
+                          <p className="text-xs text-white/55">
                             Receive weekly summaries and alerts
                           </p>
                         </div>
@@ -1985,10 +2005,10 @@ const Profile = () => {
                           onCheckedChange={(c) => handlePreferenceChange('emailNotifications', c)}
                         />
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
                         <div className="space-y-0.5">
-                          <Label className="text-base">Push Notifications</Label>
-                          <p className="text-sm text-muted-foreground">
+                          <Label className="text-sm font-bold text-pastel-cream">Push Notifications</Label>
+                          <p className="text-xs text-white/55">
                             Live scoring and injury alerts
                           </p>
                         </div>
@@ -2001,53 +2021,52 @@ const Profile = () => {
                   </Card>
 
                   {/* Legal & Privacy */}
-                  <Card className="animated-element">
+                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
+                      <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                        <FileText className="h-5 w-5 text-pastel-orange" />
                         Legal & Privacy
                       </CardTitle>
-                      <CardDescription>Review our policies and terms</CardDescription>
+                      <CardDescription className="text-white/55">Review our policies and terms</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="space-y-2">
                       <a
                         href="/privacy-policy.html"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/50 transition-colors group"
+                        className="flex items-center justify-between p-3 rounded-xl bg-white/5 ring-1 ring-white/10 hover:bg-white/[0.07] hover:ring-pastel-orange/30 transition-all group"
                       >
-                        <span className="font-medium group-hover:text-primary">Privacy Policy</span>
-                        <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                        <span className="font-bold text-pastel-cream group-hover:text-pastel-orange">Privacy Policy</span>
+                        <ExternalLink className="h-4 w-4 text-white/55 group-hover:text-pastel-orange" />
                       </a>
-                      <Separator />
                       <a
                         href="/terms-of-service.html"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/50 transition-colors group"
+                        className="flex items-center justify-between p-3 rounded-xl bg-white/5 ring-1 ring-white/10 hover:bg-white/[0.07] hover:ring-pastel-orange/30 transition-all group"
                       >
-                        <span className="font-medium group-hover:text-primary">Terms of Service</span>
-                        <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                        <span className="font-bold text-pastel-cream group-hover:text-pastel-orange">Terms of Service</span>
+                        <ExternalLink className="h-4 w-4 text-white/55 group-hover:text-pastel-orange" />
                       </a>
                     </CardContent>
                   </Card>
 
                   {/* Data Export */}
-                  <Card className="animated-element">
+                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Download className="h-5 w-5" />
+                      <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                        <Download className="h-5 w-5 text-pastel-orange" />
                         Your Data
                       </CardTitle>
-                      <CardDescription>Export a copy of all your data</CardDescription>
+                      <CardDescription className="text-white/55">Export a copy of all your data</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4">
+                      <p className="text-sm text-white/55 mb-4 leading-relaxed">
                         Download a JSON file containing all your account data, including your profile, teams, leagues, transactions, and draft history.
                       </p>
-                      <Button variant="outline" onClick={handleExportData} disabled={exportLoading} className="w-full">
+                      <Button variant="outline" onClick={handleExportData} disabled={exportLoading} className="w-full bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold disabled:opacity-50">
                         {exportLoading ? (
-                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Exporting...</>
+                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Exporting…</>
                         ) : (
                           <><Download className="mr-2 h-4 w-4" />Export My Data</>
                         )}
@@ -2056,66 +2075,67 @@ const Profile = () => {
                   </Card>
 
                   {/* Subscription Plan */}
-                  <Card className="animated-element lg:col-span-2">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Crown className="h-5 w-5 text-primary" />
+                  <Card className="animated-element lg:col-span-2 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)] relative overflow-hidden">
+                    <div aria-hidden="true" className="absolute top-0 right-0 w-64 h-64 bg-pastel-orange/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+                    <CardHeader className="relative z-10">
+                      <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                        <Crown className="h-5 w-5 text-pastel-orange" />
                         Subscription Plan
                       </CardTitle>
-                      <CardDescription>Manage your membership</CardDescription>
+                      <CardDescription className="text-white/55">Manage your membership</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <div className="bg-primary/5 rounded-lg p-6 border border-primary/20 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <CardContent className="relative z-10">
+                      <div className="bg-pastel-orange/10 rounded-xl p-6 ring-1 ring-pastel-orange/30 flex flex-col md:flex-row items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                          <div className="h-12 w-12 rounded-2xl bg-pastel-orange/20 ring-1 ring-pastel-orange/40 flex items-center justify-center text-pastel-orange shrink-0">
                             <Crown className="h-6 w-6" />
                           </div>
                           <div>
-                            <h3 className="text-lg font-bold flex items-center gap-2">
+                            <h3 className="font-calistoga text-xl text-pastel-cream flex items-center gap-2 flex-wrap">
                               Free Plan
-                              <span className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded-full">Premium Coming Soon</span>
+                              <span className="bg-white/10 ring-1 ring-white/20 text-white/70 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold px-2 py-0.5 rounded-full">Premium Coming Soon</span>
                             </h3>
-                            <p className="text-sm text-muted-foreground">All features are free during the beta period</p>
+                            <p className="text-sm text-white/55 mt-1">All features are free during the beta period</p>
                           </div>
                         </div>
                       </div>
 
                       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-primary mt-0.5" />
-                          <span>Advanced Stats <span className="text-xs text-muted-foreground">(Free during Beta)</span></span>
+                          <Check className="h-4 w-4 text-pastel-orange mt-0.5 shrink-0" />
+                          <span className="text-pastel-cream">Advanced Stats <span className="text-xs text-white/55">(Free during Beta)</span></span>
                         </div>
                         <div className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-primary mt-0.5" />
-                          <span>Ad-free Experience <span className="text-xs text-muted-foreground">(Free during Beta)</span></span>
+                          <Check className="h-4 w-4 text-pastel-orange mt-0.5 shrink-0" />
+                          <span className="text-pastel-cream">Ad-free Experience <span className="text-xs text-white/55">(Free during Beta)</span></span>
                         </div>
                         <div className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-primary mt-0.5" />
-                          <span>Priority Support <span className="text-xs text-muted-foreground">(Free during Beta)</span></span>
+                          <Check className="h-4 w-4 text-pastel-orange mt-0.5 shrink-0" />
+                          <span className="text-pastel-cream">Priority Support <span className="text-xs text-white/55">(Free during Beta)</span></span>
                         </div>
                         <div className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-primary mt-0.5" />
-                          <span>Trade Analyzer <span className="text-xs text-muted-foreground">(Free during Beta)</span></span>
+                          <Check className="h-4 w-4 text-pastel-orange mt-0.5 shrink-0" />
+                          <span className="text-pastel-cream">Trade Analyzer <span className="text-xs text-white/55">(Free during Beta)</span></span>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
 
                   {/* Delete Account */}
-                  <Card className="animated-element lg:col-span-2 border-destructive/20 bg-destructive/5">
+                  <Card className="animated-element lg:col-span-2 bg-[#1A2A20] border-0 ring-1 ring-red-400/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(248,113,113,0.2)]">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-destructive">
+                      <CardTitle className="flex items-center gap-2 font-calistoga text-red-300">
                         <Trash2 className="h-5 w-5" />
                         Delete Account
                       </CardTitle>
-                      <CardDescription className="text-destructive/80">
+                      <CardDescription className="text-red-300/80">
                         Permanently delete your account and all associated data
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="bg-background p-4 rounded-lg border border-destructive/20">
-                        <h4 className="font-semibold text-destructive mb-2">This action cannot be undone</h4>
-                        <ul className="text-sm text-destructive/80 space-y-1 ml-4 list-disc">
+                      <div className="bg-red-400/10 p-4 rounded-xl ring-1 ring-red-400/30">
+                        <h4 className="font-bold text-red-300 mb-2">This action cannot be undone</h4>
+                        <ul className="text-sm text-red-300/80 space-y-1 ml-4 list-disc marker:text-red-300/60 leading-relaxed">
                           <li>Your account and authentication credentials will be permanently deleted</li>
                           <li>All your fantasy teams and league data will be removed</li>
                           <li>If you're a league commissioner, your leagues may be orphaned</li>
@@ -2125,42 +2145,47 @@ const Profile = () => {
 
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="destructive" className="w-full">
+                          <Button className="w-full bg-red-400/20 ring-1 ring-red-400/40 text-red-300 hover:bg-red-400/30 font-bold">
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete My Account
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent>
+                        <AlertDialogContent className="bg-[#1A2A20] border-0 ring-1 ring-red-400/40 text-pastel-cream">
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                            <AlertDialogDescription className="space-y-4">
+                            <AlertDialogTitle className="font-calistoga text-pastel-cream">Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription className="space-y-4 text-white/70">
                               <p>
                                 This will permanently delete your account and all associated data.
                                 This action cannot be undone.
                               </p>
                               <div>
-                                <Label htmlFor="deleteConfirmation" className="text-sm font-medium">
-                                  Type <span className="font-bold text-destructive">DELETE</span> to confirm:
+                                <Label htmlFor="deleteConfirmation" className="text-sm font-bold text-pastel-cream">
+                                  Type <span className="font-bold text-red-300">DELETE</span> to confirm:
                                 </Label>
                                 <Input
                                   id="deleteConfirmation"
                                   value={deleteConfirmation}
                                   onChange={(e) => setDeleteConfirmation(e.target.value)}
                                   placeholder="DELETE"
-                                  className="mt-2"
+                                  className="mt-2 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-red-400/50"
                                 />
                               </div>
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel onClick={() => setDeleteConfirmation('')}>Cancel</AlertDialogCancel>
+                            <AlertDialogCancel
+                              onClick={() => setDeleteConfirmation('')}
+                              className="bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:text-pastel-cream hover:border-pastel-cream/50 font-bold"
+                            >
+                              Cancel
+                            </AlertDialogCancel>
                             <AlertDialogAction
                               onClick={handleDeleteAccount}
                               disabled={deleteConfirmation !== 'DELETE' || deleteAccountLoading}
-                              className="bg-destructive hover:bg-destructive/90"
+                              className="bg-red-400/20 ring-1 ring-red-400/40 text-red-300 hover:bg-red-400/30 font-bold disabled:opacity-50"
                             >
                               {deleteAccountLoading ? (
-                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</>
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting…</>
                               ) : (
                                 'Delete Account'
                               )}
@@ -2171,8 +2196,8 @@ const Profile = () => {
                     </CardContent>
                   </Card>
 
-                  <div className="lg:col-span-2 text-center text-sm text-muted-foreground">
-                    <p>Need help? Contact us at <a href="mailto:CitrusFantasySports@Gmail.com" className="text-primary hover:underline">CitrusFantasySports@Gmail.com</a></p>
+                  <div className="lg:col-span-2 text-center text-sm text-white/55">
+                    <p>Need help? Contact us at <a href="mailto:CitrusFantasySports@Gmail.com" className="text-pastel-orange hover:text-pastel-orange-soft hover:underline">CitrusFantasySports@Gmail.com</a></p>
                   </div>
                 </div>
               </TabsContent>
