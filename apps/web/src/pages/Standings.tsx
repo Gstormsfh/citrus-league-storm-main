@@ -482,7 +482,7 @@ const Standings = () => {
           <h1 className="text-lg font-bold text-pastel-cream">Standings</h1>
           <div className="flex items-center gap-1">
             {(activeLeague?.name || leagueTeams.length > 0) && (
-              <span className="text-xs font-display text-citrus-charcoal/50 truncate max-w-[120px]">
+              <span className="text-xs font-jbmono text-white/45 truncate max-w-[120px]">
                 {activeLeague?.name}{leagueTeams.length > 0 ? ` \u2022 ${leagueTeams.length} teams` : ''}
               </span>
             )}
@@ -500,6 +500,31 @@ const Standings = () => {
               ? "lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px]"
               : "lg:grid-cols-[200px_1fr] xl:grid-cols-[220px_1fr]"
           )}>
+            {/* Scene hero — Lemon at the top of the league standings */}
+            <div className="lg:col-start-2 lg:col-span-1 px-3 lg:px-6 pt-4 lg:pt-2 mb-6 order-0">
+              <div className="relative w-full aspect-[24/9] sm:aspect-[28/9] rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+                <img
+                  src="/mascots/scene-standings.webp"
+                  alt="Lemon raising both arms on the championship podium with a leaderboard floating beside him"
+                  className="w-full h-full object-cover"
+                  loading="eager"
+                />
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ background: 'linear-gradient(to top, rgba(15,31,21,0.85) 0%, transparent 45%)' }}
+                />
+                <div className="absolute bottom-4 left-5 sm:bottom-6 sm:left-8 z-10 max-w-[80%]">
+                  <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-1.5 font-bold">
+                    ✦ League Standings
+                  </div>
+                  <h1 className="font-sans font-black text-[1.5rem] sm:text-[2rem] md:text-[2.5rem] tracking-[-0.025em] text-pastel-cream leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+                    Climb the <span className="text-pastel-orange">leaderboard</span>.
+                  </h1>
+                </div>
+              </div>
+            </div>
+
             {/* Main Content */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-3 lg:px-6 order-1 lg:order-2">
           
@@ -514,12 +539,12 @@ const Standings = () => {
           
           <div className="flex flex-col md:flex-row items-center justify-between max-w-5xl mx-auto mb-8">
             <div className="mb-4 md:mb-0 animated-element animate">
-              <h2 className="text-2xl font-bold text-foreground">
+              <h2 className="text-2xl font-bold text-pastel-cream">
                 {userLeagueState === 'active-user' && selectedLeague ? selectedLeague.name : 'CitrusSports League'}
               </h2>
-              <p className="text-muted-foreground">
+              <p className="text-white/55">
                 {leagueFormat.scoringFormat !== 'h2h-points' && (
-                  <span className="inline-flex items-center gap-1.5 mr-2 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                  <span className="inline-flex items-center gap-1.5 mr-2 px-2 py-0.5 rounded-full text-xs font-bold bg-pastel-orange/15 text-pastel-orange-soft ring-1 ring-pastel-orange/30">
                     {SCORING_FORMAT_LABELS[leagueFormat.scoringFormat]}
                   </span>
                 )}
@@ -531,7 +556,7 @@ const Standings = () => {
             <div className="flex items-center space-x-4 animated-element animate">
               <div className="w-40">
                 <Select defaultValue={season} onValueChange={setSeason}>
-                  <SelectTrigger className="w-full bg-background rounded-full border-primary/20 hover:border-primary/50 transition-colors">
+                  <SelectTrigger className="w-full bg-[#1A2A20] rounded-full border-white/15 text-pastel-cream hover:border-pastel-orange/40 transition-colors">
                     <SelectValue placeholder="Select Season" />
                   </SelectTrigger>
                   <SelectContent className="z-[9999]">
@@ -543,10 +568,10 @@ const Standings = () => {
               </div>
               
               {userLeagueState === 'active-user' && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-white/15 bg-[#1A2A20] text-pastel-cream hover:bg-pastel-orange/10 hover:border-pastel-orange/40 hover:text-pastel-orange-soft"
                   onClick={async () => {
                     setLoading(true);
                     try {
@@ -572,7 +597,7 @@ const Standings = () => {
                   Refresh
                 </Button>
               )}
-              <Button variant="outline" size="sm" className="rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary">
+              <Button variant="outline" size="sm" className="rounded-full border-white/15 bg-[#1A2A20] text-pastel-cream hover:bg-pastel-orange/10 hover:border-pastel-orange/40 hover:text-pastel-orange-soft">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>
@@ -581,42 +606,42 @@ const Standings = () => {
             </div>
           </div>
           
-          <Card className="max-w-5xl mx-auto overflow-hidden animated-element animate card-citrus p-0 border-none shadow-lg" style={{ visibility: 'visible', opacity: 1 }}>
+          <Card className="max-w-5xl mx-auto overflow-hidden bg-[#1A2A20] !border-white/10 ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] p-0" style={{ visibility: 'visible', opacity: 1 }}>
             <div className="overflow-x-auto" style={{ visibility: 'visible', opacity: 1 }}>
               <Table style={{ visibility: 'visible', opacity: 1 }}>
-                <thead className="bg-muted/30 border-b border-border/50">
+                <thead className="bg-black/20 border-b border-white/10">
                   <tr className="text-left">
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Rank</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Team</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Rank</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Team</th>
                     {hasMatchups && (
                       <>
-                        <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-center">
                           {isCategories ? 'Cat W-L-T' : 'Record'}
                         </th>
-                        <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Win %</th>
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-center">Win %</th>
                       </>
                     )}
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-right">
                       {isRoto ? 'Roto Pts' : isCategories ? 'Total PF' : 'PF'}
                     </th>
                     {hasMatchups && (
-                      <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PA</th>
+                      <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-right">PA</th>
                     )}
                     {isSeasonPoints && (
-                      <th className="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">PPG</th>
+                      <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-right">PPG</th>
                     )}
                     {hasMatchups && (
                       <>
-                        <th className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Streak</th>
-                        <th className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center">Last 5</th>
+                        <th className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-center">Streak</th>
+                        <th className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-center">Last 5</th>
                       </>
                     )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/40" style={{ visibility: 'visible', opacity: 1 }}>
+                <tbody className="divide-y divide-white/5" style={{ visibility: 'visible', opacity: 1 }}>
                   {sortedTeams.length === 0 ? (
                     <tr style={{ visibility: 'visible', opacity: 1 }}>
-                      <td colSpan={hasMatchups ? 8 : (isSeasonPoints ? 4 : 3)} className="px-3 sm:px-6 py-12 text-center text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                      <td colSpan={hasMatchups ? 8 : (isSeasonPoints ? 4 : 3)} className="px-3 sm:px-6 py-12 text-center text-white/55" style={{ visibility: 'visible', opacity: 1 }}>
                         No teams found in this league.
                       </td>
                     </tr>
@@ -626,51 +651,51 @@ const Standings = () => {
                       const isUserTeam = user && leagueTeams.some(t => t.id === team.id && t.owner_id === user.id);
                     
                     return (
-                      <tr 
-                        key={team.id} 
-                        className={`${isUserTeam ? 'bg-primary/5' : 'hover:bg-muted/30 cursor-pointer'} transition-colors`}
+                      <tr
+                        key={team.id}
+                        className={`${isUserTeam ? 'bg-pastel-orange/10 ring-1 ring-pastel-orange/20' : 'hover:bg-white/5 cursor-pointer'} transition-colors`}
                         style={{ visibility: 'visible', opacity: 1 }}
                         onClick={() => navigate(`/team/${team.id}`)}
                       >
                         <td className="px-3 sm:px-6 py-3 sm:py-4 font-medium">
                           <div className="flex items-center gap-2">
-                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${(hasMatchups && index < leagueFormat.playoffTeams) ? 'bg-primary text-white' : 'text-muted-foreground bg-muted'}`}>
+                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold tabular-nums ${(hasMatchups && index < leagueFormat.playoffTeams) ? 'bg-pastel-orange text-white' : 'text-white/45 bg-white/5'}`}>
                               {index + 1}
                             </span>
                             {hasMatchups && index < leagueFormat.playoffTeams && (() => {
                               const ppTeam = playoffPictureTeams.find(p => p.team_id === team.id);
                               if (ppTeam?.clinch_status === 'clinched') {
-                                return <span className="text-xs font-bold text-green-600 tracking-tight" title="Clinched playoff berth">x</span>;
+                                return <span className="text-xs font-bold text-pastel-sage-soft tracking-tight" title="Clinched playoff berth">x</span>;
                               }
-                              return <span className="text-xs font-bold text-primary tracking-tight">PO</span>;
+                              return <span className="text-xs font-bold text-pastel-orange-soft tracking-tight">PO</span>;
                             })()}
                             {hasMatchups && index >= leagueFormat.playoffTeams && (() => {
                               const ppTeam = playoffPictureTeams.find(p => p.team_id === team.id);
                               if (ppTeam?.clinch_status === 'eliminated') {
-                                return <span className="text-xs font-bold text-red-500 tracking-tight" title="Eliminated from playoff contention">e</span>;
+                                return <span className="text-xs font-bold text-red-400 tracking-tight" title="Eliminated from playoff contention">e</span>;
                               }
                               return null;
                             })()}
                             {/* Roto: Co-champion label when tied at 1st */}
                             {isRoto && index === 0 && sortedTeams.length > 1 && sortedTeams[1].points === team.points && (
-                              <span className="text-[10px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">CO-CHAMP</span>
+                              <span className="text-[10px] font-bold text-pastel-orange-soft bg-pastel-orange/15 ring-1 ring-pastel-orange/30 px-1.5 py-0.5 rounded font-jbmono uppercase tracking-wider">CO-CHAMP</span>
                             )}
                             {isRoto && index > 0 && sortedTeams[0].points === team.points && (
-                              <span className="text-[10px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">CO-CHAMP</span>
+                              <span className="text-[10px] font-bold text-pastel-orange-soft bg-pastel-orange/15 ring-1 ring-pastel-orange/30 px-1.5 py-0.5 rounded font-jbmono uppercase tracking-wider">CO-CHAMP</span>
                             )}
                           </div>
                         </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-4" style={{ visibility: 'visible', opacity: 1 }}>
                           <div className="flex items-center gap-3" style={{ visibility: 'visible', opacity: 1 }}>
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center text-xs font-bold text-muted-foreground border border-white/20 shadow-sm" style={{ visibility: 'visible', opacity: 1 }}>
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center text-xs font-bold text-pastel-cream ring-1 ring-white/15 shadow-sm" style={{ visibility: 'visible', opacity: 1 }}>
                               {team.logo}
                             </div>
                             <div style={{ visibility: 'visible', opacity: 1 }}>
-                              <div className={`font-semibold ${isUserTeam ? 'text-primary' : 'text-foreground'}`} style={{ visibility: 'visible', opacity: 1, color: isUserTeam ? undefined : 'inherit' }}>
+                              <div className={`font-bold ${isUserTeam ? 'text-pastel-orange' : 'text-pastel-cream'}`} style={{ visibility: 'visible', opacity: 1, color: isUserTeam ? undefined : 'inherit' }}>
                                 {team.name}
-                                {isUserTeam && <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">YOU</span>}
+                                {isUserTeam && <span className="ml-2 text-[9px] bg-pastel-orange/20 text-pastel-orange-soft ring-1 ring-pastel-orange/40 px-1.5 py-0.5 rounded-md font-jbmono uppercase tracking-wider font-bold">YOU</span>}
                               </div>
-                              <div className="text-xs text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>{team.owner}</div>
+                              <div className="text-xs text-white/45" style={{ visibility: 'visible', opacity: 1 }}>{team.owner}</div>
                             </div>
                           </div>
                         </td>
@@ -679,7 +704,7 @@ const Standings = () => {
                             <td className="px-3 sm:px-6 py-3 sm:py-4 text-center font-medium" style={{ visibility: 'visible', opacity: 1 }}>
                               {team.record.wins}-{team.record.losses}{team.record.ties > 0 ? `-${team.record.ties}` : ''}
                             </td>
-                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-center text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-center text-white/55 tabular-nums" style={{ visibility: 'visible', opacity: 1 }}>
                               {(team.winPercentage ?? 0).toFixed(1)}%
                             </td>
                           </>
@@ -688,12 +713,12 @@ const Standings = () => {
                           {team.pointsFor.toFixed(1)}
                         </td>
                         {hasMatchups && (
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-right font-medium tabular-nums text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-right font-medium tabular-nums text-white/55" style={{ visibility: 'visible', opacity: 1 }}>
                             {team.pointsAgainst.toFixed(1)}
                           </td>
                         )}
                         {isSeasonPoints && (
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-right font-medium tabular-nums text-muted-foreground" style={{ visibility: 'visible', opacity: 1 }}>
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-right font-medium tabular-nums text-white/55" style={{ visibility: 'visible', opacity: 1 }}>
                             {team.pointsFor > 0
                               ? (team.pointsFor / Math.max(1, team.gamesPlayed || (team.record.wins + team.record.losses + team.record.ties) || 1)).toFixed(1)
                               : '0.0'}
@@ -704,15 +729,15 @@ const Standings = () => {
                             <td className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 text-center" style={{ visibility: 'visible', opacity: 1 }}>
                               <span className={`inline-flex px-2.5 py-1 text-xs font-bold rounded-full border ${
                                 team.streak.startsWith('W')
-                                  ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
+                                  ? 'bg-pastel-sage/20 text-pastel-sage-soft border-pastel-sage/30'
                                   : team.streak.startsWith('L')
-                                  ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
-                                  : 'bg-muted text-muted-foreground border-border'
+                                  ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                                  : 'bg-white/5 text-white/55 border-white/10'
                               }`} style={{ visibility: 'visible', opacity: 1 }}>
                                 {team.streak}
                               </span>
                             </td>
-                            <td className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 text-center text-muted-foreground font-medium" style={{ visibility: 'visible', opacity: 1 }}>
+                            <td className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 text-center text-white/55 font-medium tabular-nums" style={{ visibility: 'visible', opacity: 1 }}>
                               {team.last5.wins}-{team.last5.losses}{team.last5.ties > 0 ? `-${team.last5.ties}` : ''}
                             </td>
                           </>
@@ -728,43 +753,43 @@ const Standings = () => {
           
           {/* Per-Category Roto Breakdown */}
           {isRoto && leagueCategories.length > 0 && sortedTeams.some(t => t.categoryRanks) && (
-            <Card className="max-w-5xl mx-auto mt-6 overflow-hidden animated-element animate card-citrus p-0 border-none shadow-md">
-              <CardHeader className="bg-primary/5 pb-3 border-b border-border/40">
-                <CardTitle className="text-sm font-bold">Category Rankings</CardTitle>
+            <Card className="max-w-5xl mx-auto mt-6 overflow-hidden bg-[#1A2A20] !border-white/10 ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-0">
+              <CardHeader className="bg-pastel-orange/10 pb-3 border-b border-white/10">
+                <CardTitle className="text-sm font-bold text-pastel-cream">Category Rankings</CardTitle>
               </CardHeader>
               <div className="overflow-x-auto">
                 <Table>
-                  <thead className="bg-muted/30 border-b border-border/50">
+                  <thead className="bg-black/20 border-b border-white/10">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-left">Team</th>
+                      <th className="px-4 py-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-left">Team</th>
                       {leagueCategories.map(cat => {
                         const catDef = AVAILABLE_CATEGORIES.find(c => c.id === cat);
                         return (
-                          <th key={cat} className="px-3 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center" title={catDef?.name}>
+                          <th key={cat} className="px-3 py-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-center" title={catDef?.name}>
                             {catDef?.abbreviation || cat}
                           </th>
                         );
                       })}
-                      <th className="px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">Total</th>
+                      <th className="px-4 py-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-right">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/40">
+                  <tbody className="divide-y divide-white/5">
                     {sortedTeams.map((team) => {
                       const isUserTeam = user && leagueTeams.some(t => t.id === team.id && t.owner_id === user.id);
                       return (
-                        <tr key={team.id} className={isUserTeam ? 'bg-primary/5' : 'hover:bg-muted/30'}>
-                          <td className="px-4 py-2 text-sm font-medium truncate max-w-[140px]">{team.name}</td>
+                        <tr key={team.id} className={isUserTeam ? 'bg-pastel-orange/10' : 'hover:bg-white/5'}>
+                          <td className="px-4 py-2 text-sm font-bold truncate max-w-[140px] text-pastel-cream">{team.name}</td>
                           {leagueCategories.map(cat => {
                             const rank = team.categoryRanks?.[cat];
                             const maxRank = sortedTeams.length;
                             const isTop = rank !== undefined && rank >= maxRank - 0.5;
                             return (
-                              <td key={cat} className={`px-3 py-2 text-center text-sm tabular-nums ${isTop ? 'font-bold text-primary' : 'text-muted-foreground'}`}>
+                              <td key={cat} className={`px-3 py-2 text-center text-sm tabular-nums ${isTop ? 'font-bold text-pastel-orange' : 'text-white/55'}`}>
                                 {rank !== undefined ? rank.toFixed(1) : '-'}
                               </td>
                             );
                           })}
-                          <td className="px-4 py-2 text-right text-sm font-bold tabular-nums">{team.pointsFor.toFixed(1)}</td>
+                          <td className="px-4 py-2 text-right text-sm font-bold tabular-nums text-pastel-cream">{team.pointsFor.toFixed(1)}</td>
                         </tr>
                       );
                     })}
@@ -775,14 +800,14 @@ const Standings = () => {
           )}
 
           <div className="max-w-5xl mx-auto mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="animated-element animate card-citrus p-0 border-none shadow-md overflow-hidden h-full">
-              <CardHeader className="bg-primary/5 pb-4 border-b border-border/40">
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">🏆</span>
+            <Card className="bg-[#1A2A20] !border-white/10 ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-0 overflow-hidden h-full">
+              <CardHeader className="bg-pastel-orange/10 pb-4 border-b border-white/10">
+                <CardTitle className="text-lg font-bold text-pastel-cream flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-full bg-pastel-orange/15 ring-1 ring-pastel-orange/30 flex items-center justify-center text-pastel-orange">🏆</span>
                   {hasMatchups ? 'Playoff Picture' : 'Top Contenders'}
                   {playoffBracket && (
                     <span
-                      className="ml-auto text-xs font-bold text-primary cursor-pointer hover:underline"
+                      className="ml-auto text-xs font-bold text-pastel-orange-soft hover:text-pastel-orange cursor-pointer hover:underline transition-colors"
                       onClick={() => activeLeagueId && navigate(`/league/${activeLeagueId}/playoffs`)}
                     >
                       View Bracket →
@@ -790,7 +815,7 @@ const Standings = () => {
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6">
+              <CardContent className="pt-6 bg-[#1A2A20]">
                 <div className="space-y-2">
                   {/* Use playoff picture data if available, otherwise fall back to sorted teams */}
                   {(playoffPictureLoaded && playoffPictureTeams.length > 0 ? playoffPictureTeams : sortedTeams.map((t, idx) => ({
@@ -815,29 +840,29 @@ const Standings = () => {
                         key={team.team_id}
                         className={cn(
                           'flex items-center justify-between p-2.5 rounded-lg transition-colors',
-                          isInPlayoffZone ? 'bg-green-50/50 dark:bg-green-950/10 hover:bg-green-100/50 dark:hover:bg-green-950/20' : 'bg-muted/10 hover:bg-muted/20',
-                          isBubble && 'border-l-2 border-amber-400',
-                          clinchStatus === 'clinched' && 'bg-green-100/50 dark:bg-green-900/20 border-l-2 border-green-500',
-                          clinchStatus === 'eliminated' && 'bg-red-50/30 dark:bg-red-950/10 opacity-60',
-                          i === leagueFormat.playoffTeams - 1 && hasMatchups && 'border-b-2 border-dashed border-primary/30 rounded-b-none pb-3 mb-1',
+                          isInPlayoffZone ? 'bg-pastel-sage/15 hover:bg-pastel-sage/25 ring-1 ring-pastel-sage/25' : 'bg-white/[0.03] hover:bg-white/5',
+                          isBubble && 'border-l-2 border-pastel-orange/60',
+                          clinchStatus === 'clinched' && 'bg-pastel-sage/20 border-l-2 border-pastel-sage',
+                          clinchStatus === 'eliminated' && 'bg-red-500/10 opacity-60',
+                          i === leagueFormat.playoffTeams - 1 && hasMatchups && 'border-b-2 border-dashed border-pastel-orange/40 rounded-b-none pb-3 mb-1',
                         )}
                       >
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <div className={cn(
-                            'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0',
-                            isInPlayoffZone ? 'bg-primary text-white' : 'text-muted-foreground bg-muted',
+                            'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 tabular-nums',
+                            isInPlayoffZone ? 'bg-pastel-orange text-white' : 'text-white/55 bg-white/10',
                           )}>
                             {i + 1}
                           </div>
-                          <div className="font-semibold text-sm truncate">{team.team_name}</div>
+                          <div className="font-bold text-sm truncate text-pastel-cream">{team.team_name}</div>
                           {/* Clinch/elimination badges */}
                           {clinchStatus === 'clinched' && (
-                            <span className="text-[9px] font-bold text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400 px-1.5 py-0.5 rounded shrink-0">
+                            <span className="text-[9px] font-bold text-pastel-sage-soft bg-pastel-sage/15 ring-1 ring-pastel-sage/30 px-1.5 py-0.5 rounded shrink-0 font-jbmono uppercase tracking-wider">
                               CLINCHED
                             </span>
                           )}
                           {clinchStatus === 'eliminated' && (
-                            <span className="text-[9px] font-bold text-red-600 bg-red-100 dark:bg-red-900/40 dark:text-red-400 px-1.5 py-0.5 rounded shrink-0">
+                            <span className="text-[9px] font-bold text-red-300 bg-red-500/15 ring-1 ring-red-500/30 px-1.5 py-0.5 rounded shrink-0 font-jbmono uppercase tracking-wider">
                               ELIMINATED
                             </span>
                           )}
@@ -845,11 +870,11 @@ const Standings = () => {
                         <div className="flex items-center gap-2 shrink-0">
                           {/* Magic number */}
                           {hasMatchups && clinchStatus === 'in_contention' && magicNum > 0 && isInPlayoffZone && (
-                            <span className="text-[10px] font-bold text-amber-600 bg-amber-100/80 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded" title="Magic number to clinch">
+                            <span className="text-[10px] font-bold text-pastel-orange-soft bg-pastel-orange/15 ring-1 ring-pastel-orange/30 px-1.5 py-0.5 rounded" title="Magic number to clinch">
                               M{magicNum}
                             </span>
                           )}
-                          <div className="text-xs font-bold bg-[#E8EED9]/60 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm border border-citrus-sage/20 tabular-nums">
+                          <div className="text-xs font-bold bg-[#0F1F15] ring-1 ring-white/15 text-pastel-cream px-2 py-1 rounded-md tabular-nums">
                             {hasMatchups
                               ? `${team.wins}-${team.losses}${team.ties > 0 ? `-${team.ties}` : ''}`
                               : `${team.pf?.toFixed?.(1) ?? '0.0'} pts`}
@@ -858,15 +883,15 @@ const Standings = () => {
                       </div>
                     );
                   })}
-                  <div className="mt-3 pt-3 border-t border-border/40">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="mt-3 pt-3 border-t border-white/10">
+                    <div className="flex items-center justify-between text-xs text-white/55">
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                        <div className="w-2 h-2 rounded-full bg-pastel-orange animate-pulse"></div>
                         {hasMatchups ? `Top ${leagueFormat.playoffTeams} qualify` : `Ranked by ${isRoto ? 'roto points' : 'total points'}`}
                       </div>
                       {hasMatchups && activeLeagueId && (
                         <button
-                          className="font-medium text-primary hover:underline"
+                          className="font-bold text-pastel-orange-soft hover:text-pastel-orange hover:underline transition-colors"
                           onClick={() => navigate(`/league/${activeLeagueId}/playoffs`)}
                         >
                           Bracket →
@@ -878,24 +903,24 @@ const Standings = () => {
               </CardContent>
             </Card>
             
-            <Card className="animated-element animate card-citrus p-0 border-none shadow-md overflow-hidden h-full">
-              <CardHeader className="bg-[hsl(var(--vibrant-orange))]/5 pb-4 border-b border-border/40">
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-full bg-[hsl(var(--vibrant-orange))]/10 flex items-center justify-center text-[hsl(var(--vibrant-orange))]">🔥</span>
+            <Card className="bg-[#1A2A20] !border-white/10 ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-0 overflow-hidden h-full">
+              <CardHeader className="bg-pastel-orange/10 pb-4 border-b border-white/10">
+                <CardTitle className="text-lg font-bold text-pastel-cream flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-full bg-pastel-orange/15 ring-1 ring-pastel-orange/30 flex items-center justify-center text-pastel-orange">🔥</span>
                   Points Leaders
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6">
+              <CardContent className="pt-6 bg-[#1A2A20]">
                 <div className="space-y-3">
-                  {[...teams].sort((a, b) => b.points - a.points).slice(0, 5).map((team, i) => (
-                    <div key={team.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/20 hover:bg-muted/40 transition-colors border border-transparent hover:border-[hsl(var(--vibrant-orange))]/10">
+                  {[...teams].sort((a, b) => b.points - a.points).slice(0, 5).map((team) => (
+                    <div key={team.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors ring-1 ring-transparent hover:ring-pastel-orange/30">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground border border-white/40">
+                        <div className="w-8 h-8 rounded-full bg-white/10 ring-1 ring-white/15 flex items-center justify-center text-[10px] font-bold text-pastel-cream">
                           {team.logo}
                         </div>
-                        <div className="font-semibold text-sm">{team.name}</div>
+                        <div className="font-bold text-sm text-pastel-cream">{team.name}</div>
                       </div>
-                      <div className="font-bold text-[hsl(var(--vibrant-orange))]">{team.points.toLocaleString()}</div>
+                      <div className="font-bold text-pastel-orange tabular-nums">{team.points.toLocaleString()}</div>
                     </div>
                   ))}
                 </div>
@@ -915,7 +940,7 @@ const Standings = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>
