@@ -409,42 +409,81 @@ async function processMessage(
 
   // 6b: heuristic fallback.
   if (pickedPlayerId === null) {
-    const { data: candidatesData, error: candErr } = await supabase
+    // Two-query fetch + in-memory join.
+    //
+    // We can't use PostgREST's !inner embedded join because there's
+    // no foreign key between player_directory and player_season_stats
+    // — the schema decouples them by design (player_directory is the
+    // curated fantasy-relevant set, player_season_stats is raw league-
+    // wide stat ingestion). Adding an FK would break the model and
+    // exclude orphan stat rows that are intentionally tracked.
+    //
+    // Two separate queries keyed by (season, player_id), joined in TS
+    // via a Map. Slightly more network bytes than the embedded join
+    // (~938 + ~1066 rows for the current season vs ~938 with !inner),
+    // but bounded. KI-006's O(N×M) latency target still applies.
+    const { data: directoryData, error: dirErr } = await supabase
       .from("player_directory")
-      .select(
-        `player_id, position_code,
-         player_season_stats!inner(goals, primary_assists, secondary_assists, shots_on_goal, blocks, hits, pim, ppp, shp, wins, saves, shutouts, goals_against)`,
-      )
-      .eq("season", CURRENT_SEASON)
-      .eq("player_season_stats.season", CURRENT_SEASON);
-    if (candErr || !candidatesData) {
-      logEvent("error", invocationId, "candidates_read_failed", {
+      .select("player_id, position_code")
+      .eq("season", CURRENT_SEASON);
+    if (dirErr || !directoryData) {
+      logEvent("error", invocationId, "directory_read_failed", {
         ...baseLog,
-        error: candErr?.message ?? "no data",
+        error: dirErr?.message ?? "no data",
       });
       return; // retryable
     }
+
+    const { data: statsData, error: statsErr } = await supabase
+      .from("player_season_stats")
+      .select(
+        "player_id, goals, primary_assists, secondary_assists, shots_on_goal, blocks, hits, pim, ppp, shp, wins, saves, shutouts, goals_against",
+      )
+      .eq("season", CURRENT_SEASON);
+    if (statsErr || !statsData) {
+      logEvent("error", invocationId, "stats_read_failed", {
+        ...baseLog,
+        error: statsErr?.message ?? "no data",
+      });
+      return; // retryable
+    }
+
     interface CandStats {
+      player_id: number;
       goals: number; primary_assists: number; secondary_assists: number;
       shots_on_goal: number; blocks: number; hits: number; pim: number;
       ppp: number; shp: number;
       wins: number; saves: number; shutouts: number; goals_against: number;
     }
-    interface CandRow {
+    interface DirRow {
       player_id: number;
       position_code: string | null;
-      player_season_stats: CandStats | CandStats[];
     }
+
+    // Build a stats lookup keyed by player_id for O(1) join.
+    const statsByPlayer = new Map<number, CandStats>();
+    for (const s of statsData as CandStats[]) {
+      statsByPlayer.set(s.player_id, s);
+    }
+
     const undraftedPlayers: HeuristicPlayer[] = [];
-    for (const r of candidatesData as CandRow[]) {
-      if (draftedSet.has(r.player_id)) continue;
-      const s = Array.isArray(r.player_season_stats)
-        ? r.player_season_stats[0]
-        : r.player_season_stats;
-      if (!s) continue;
+    for (const d of directoryData as DirRow[]) {
+      if (draftedSet.has(d.player_id)) continue;
+      const s = statsByPlayer.get(d.player_id);
+      if (!s) {
+        // Directory entry without a stats row — rare (mostly preseason
+        // call-ups) but possible. Log for ops visibility on data gaps,
+        // then skip.
+        logEvent("info", invocationId, "directory_player_unstatted", {
+          ...baseLog,
+          player_id: d.player_id,
+          season:    CURRENT_SEASON,
+        });
+        continue;
+      }
       undraftedPlayers.push({
-        id:       r.player_id,
-        position: r.position_code,
+        id:       d.player_id,
+        position: d.position_code,
         goals:    s.goals,
         assists:  s.primary_assists + s.secondary_assists,
         shots:    s.shots_on_goal,
