@@ -101,15 +101,46 @@ This is not a novel architecture for Citrus to invent. It is the architecture th
 
 ## Decision
 
-**Citrus adopts a hybrid architecture (Path 3).** The live draft engine is rebuilt as a **separate Elixir/Phoenix service** that holds per-draft state in memory in persistent GenServer processes ("DraftServer per draft"), communicates with browser clients via Phoenix Channels over WebSocket, and writes durably to the existing Postgres database via the Phase 2 RPCs (`submit_pick_v2`, `append_draft_event`, etc.). The rest of the Citrus application — leagues, rosters, matchups, scoring dashboards, Stormy AI assistant, public pages, data pipeline — remains on the existing Node.js / Next.js / Supabase stack.
+**Citrus builds the live draft engine as persistent code inside the existing Node.js / Hono server on Cloud Run.** Not a separate service. Not Elixir. Not Edge Functions. The engine is a new module set in `server/` consisting of:
+
+- A `DraftRoom` class holding **per-draft in-memory state** (one instance per active draft).
+- A **WebSocket layer** added to the existing Hono server, accepting connections from browser clients for picks, broadcasts, timer ticks, presence.
+- An **autopick scheduler** driven by `setTimeout` per draft.
+- A **recovery path that replays the event log on server startup** — on boot, the server queries `draft_events` for active drafts, rebuilds in-memory `DraftRoom` state, and resumes timers. Connected clients reconnect via the WebSocket resume protocol with `last_seen_id`.
+
+Writes go to Postgres via the existing Phase 2 RPCs (`submit_pick_v2`, `append_draft_event`, `record_shadow_event`, `reconstruct_draft_state`, `draft_pause`, `draft_resume`, `draft_extend`, `validate_draft_event_payload`). The integration boundary is the existing RPC surface; it does not change without an ADR.
+
+**The Edge Function infrastructure is removed entirely** in chunk 11g.8 — not retained as a safety net. The Deno code at `supabase/functions/draft-autopick/`, the pg_cron jobs (`draft-deadline-sweep`, `draft-autopick-keepalive`), the pgmq queue (`draft_deadlines`) and its archive, the vendored shared code at `supabase/functions/_shared/_vendored/`, and the cross-runtime hash-agreement infrastructure (Node-side hashing is sufficient now) all get deleted. Recovery via event log replay on Cloud Run restart is sufficient (KI-009).
 
 Phase 0–4 work is **preserved**, not replaced:
 
 - The append-only `draft_events` log remains the source of truth and the durability substrate.
-- Idempotency-key + payload-hash semantics, projection trigger, RPC contracts, RLS policies, validators — all unchanged. The Elixir engine is a new caller of these surfaces, not a replacement for them.
-- The pgmq sweep + keep-alive cron + Edge Function `draft-autopick` remain as the **disaster-recovery fallback path**. If the Elixir engine is unavailable mid-draft (deploy, crash, network partition between the engine and Postgres, or any other outage), the existing autopick path still commits picks. Degraded latency, but correct outcome, no data loss.
+- Idempotency-key + payload-hash semantics, projection trigger, RPC contracts, RLS policies, validators — all unchanged. The in-server engine is a new caller of these surfaces.
 
-The engine cutover is the only architectural change. Everything underneath stays.
+The engine moves into the existing server. Everything underneath stays.
+
+## Decision History
+
+This ADR records three accepted decisions in close succession. The audit trail matters because reviewers will see the renames and prior commits and need to understand the path.
+
+### 2026-04-27 — Elixir/Phoenix accepted (superseded)
+
+The first version of this ADR adopted Elixir/Phoenix as a separate service alongside the existing Node main app. Rationale: Sleeper, Discord, Figma all run persistent state holder per "room" + WebSocket transport, and Sleeper specifically runs Elixir/Phoenix. OTP supervision trees mapped cleanly onto "one process per active draft." Reversed the next day after CTO consultation on solo-founder execution risk: a new language + new runtime + new framework + new deploy target + new observability surface, all simultaneously, against a 16-week timeline. The architectural pattern carries; the language is implementation detail.
+
+### 2026-04-28 (morning) — Persistent Node on Cloud Run as a separate service (superseded same day)
+
+Replaced Elixir with persistent Node on Cloud Run. Same architectural pattern, fewer net-new variables (kept TypeScript, npm, Vitest). Edge Functions retained as a cron-driven disaster-recovery safety net. Reversed later the same day on the simplification call below.
+
+### 2026-04-28 (final) — Persistent Node code inside the existing server, Edge Functions removed entirely
+
+Two further simplifications, made together:
+
+1. **The engine lives inside the existing Node server, not a separate Cloud Run service.** A separate service would add a deployment unit, a CI pipeline, an observability surface, and a routing layer for marginal architectural benefit at v1 scale. The existing Hono server already runs on Cloud Run; adding a WebSocket layer + a `DraftRoom` class to it is a code change, not an infrastructure change. **If future scale demands service separation, splitting out the draft engine is a refactor, not a rewrite — Phase 0–4 primitives don't change.**
+2. **Edge Function infrastructure is removed entirely**, not retained as a safety net. Recovery via event log replay on Cloud Run restart (chunk 11g.6) is sufficient. The pgmq scheduler, pg_cron jobs, vendored shared code, and the Deno autopick worker were a Phase 0–4 correctness scaffold; once the in-server engine carries the hot path and event log replay carries recovery, the scaffold isn't pulling its weight. Per CTO ethos of operational simplicity: the simplest thing that works.
+
+What carries forward from the prior decision-day work: the Performance Mandate, the Phase 0–4 primitives (event log, idempotency, projection trigger, RPCs), and the architectural pattern (persistent state holder per draft + WebSocket transport + in-memory state + event log underneath). No code from those decision days was committed; only documentation. The simplification reduces deployment surface, observability surface, and conceptual surface without giving up the architectural pattern.
+
+
 
 ## Alternatives Considered
 
