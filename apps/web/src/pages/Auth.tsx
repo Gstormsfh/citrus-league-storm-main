@@ -105,23 +105,31 @@ const Auth = () => {
       setLoading(false);
       return;
     }
-    signInSafetyTimeoutRef.current = setTimeout(async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
+    // On success: explicitly verify the session and navigate.
+    // Do not rely solely on the useEffect watching user — onAuthStateChange
+    // can race with the redirect, leaving users in guest mode briefly and
+    // forcing them to sign in again.
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session) {
+        // Re-set the session to force the listener to fire, then navigate.
+        await supabase.auth.setSession({
+          access_token: sessionData.session.access_token,
+          refresh_token: sessionData.session.refresh_token,
+        });
+        setTimeout(() => {
           const params = new URLSearchParams(window.location.search);
           const redirect = params.get('redirect');
           navigate(redirect && redirect.startsWith('/') ? redirect : '/', { replace: true });
-        } else {
-          setError('Sign-in succeeded but session is taking longer than expected. Try refreshing.');
-          setLoading(false);
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Unexpected error establishing session.';
-        setError(msg);
-        setLoading(false);
+        }, 50);
+        return;
       }
-    }, 3000);
+    } catch { /* fall through to safety timeout */ }
+
+    // Safety: if somehow we got here without a session, re-enable the button
+    signInSafetyTimeoutRef.current = setTimeout(() => {
+      setLoading(false);
+    }, 4000);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
