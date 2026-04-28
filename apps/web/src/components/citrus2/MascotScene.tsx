@@ -252,6 +252,38 @@ export function AnalyticsConsoleScene({ size = 'xl', className = '' }: SceneProp
 }
 
 /* ──────────────────────────────────────────────────────────────────────
+ * SCENE: LEAGUE LIVE — center-ice puck drop (Stormy vs Lemon)
+ * Hero asset: /mascots/scene-league-live.webp
+ * Stormy as captain at the faceoff dot, Lemon across, Kiwi at the
+ * boards, Pineapple in the crease at the far net. CITRUS LEAGUE
+ * jumbotron live in the rafters, fans as cream silhouettes.
+ * ────────────────────────────────────────────────────────────────────── */
+
+export function LeagueLiveScene({ size = 'lg', className = '' }: SceneProps & { leagueName?: string }) {
+  const sz = SIZE[size];
+  return (
+    <div
+      className={`relative overflow-hidden bg-[#0F1F15] rounded-3xl ring-1 ring-white/10 ${sz.container} ${sz.minHeight} ${className}`}
+      role="img"
+      aria-label="Stormy faces off Lemon at center ice. Kiwi watches from the boards, Pineapple guards the far net. The Citrus League jumbotron lights up overhead."
+    >
+      <img src="/mascots/scene-league-live.webp" alt="" className="absolute inset-0 w-full h-full object-cover" loading="eager" />
+      <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(15,31,21,0.55) 0%, transparent 22%, transparent 65%, rgba(15,31,21,0.92) 100%)' }} />
+      <div className="absolute top-5 left-5 sm:top-6 sm:left-6 z-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#0F1F15]/70 ring-1 ring-pastel-orange/40 backdrop-blur-md">
+          <LivePulse size="xs" />
+          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold">League · Live</span>
+        </div>
+      </div>
+      <div className="absolute bottom-5 left-5 sm:bottom-6 sm:left-6 z-10 max-w-md">
+        <div className="font-calistoga text-[26px] sm:text-[34px] text-pastel-cream leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">Drop the puck.</div>
+        <div className="font-jbmono text-[9px] sm:text-[10px] uppercase tracking-[0.32em] text-white/70 mt-1.5">Standings · Matchup · Roster · Pulse</div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────
  * SCENE: CREATE LEAGUE — OPENING NIGHT (Stormy + the squad)
  * Hero asset: /mascots/scene-create-league.webp
  * Stormy on a podium with COMMISSIONER sash, Lemon/Kiwi/Pineapple
