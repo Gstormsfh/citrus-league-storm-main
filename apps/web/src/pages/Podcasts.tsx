@@ -55,7 +55,7 @@ const Podcasts = () => {
   return (
     <DarkLayout>
       <Navbar />
-      <main className="relative max-w-[1280px] mx-auto px-6 pt-20 pb-16">
+      <main className="relative max-w-[1280px] mx-auto px-6 pt-28 pb-16">
         {/* Hero — Lemon mascot peek (the loud one — voice on the mic) */}
         <section className="relative max-w-[860px] mx-auto px-2 pb-12 text-center">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-4 font-bold flex items-center justify-center gap-2">

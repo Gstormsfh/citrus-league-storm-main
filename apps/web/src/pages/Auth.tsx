@@ -209,7 +209,7 @@ const Auth = () => {
         className="fixed inset-0 pointer-events-none z-0"
         style={{ background: 'radial-gradient(ellipse 50% 40% at 80% 15%, rgba(255,107,26,0.08) 0%, transparent 60%)' }}
       />
-      <main className="relative z-10 flex items-center justify-center px-4 py-12 lg:py-20 min-h-[calc(100vh-92px)]">
+      <main className="relative z-10 flex items-center justify-center px-4 pt-24 pb-12 lg:pt-28 lg:pb-20 min-h-[calc(100vh-92px)]">
         <div className="w-full max-w-[440px]">
           <div className="flex flex-col items-center mb-6">
             <CitrusLogo className="w-10 h-10 mb-3" variant="on-dark" />

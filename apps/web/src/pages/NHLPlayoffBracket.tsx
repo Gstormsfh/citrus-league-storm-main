@@ -111,7 +111,7 @@ export default function NHLPlayoffBracket() {
 
 
       <Navbar />
-      <main className="relative max-w-[1280px] mx-auto px-6 pt-12 pb-16">
+      <main className="relative max-w-[1280px] mx-auto px-6 pt-24 pb-16">
         {/* Hero — Pineapple lifting the Cup scene banner */}
         <div className="relative mb-8 w-full aspect-[21/9] sm:aspect-[24/9] rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
           <img

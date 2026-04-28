@@ -17,7 +17,7 @@ export default function About() {
       <Navbar />
       <main>
         {/* Hero */}
-        <section className="relative max-w-[860px] mx-auto px-6 pt-20 pb-16 text-center">
+        <section className="relative max-w-[860px] mx-auto px-6 pt-28 pb-16 text-center">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-4 font-bold">
             About Citrus
           </div>

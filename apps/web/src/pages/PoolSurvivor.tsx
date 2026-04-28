@@ -104,7 +104,7 @@ const PoolSurvivor = () => {
     <DarkLayout>
       <Navbar />
 
-      <main className="w-full pt-2 lg:pt-2 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className="w-full pt-20 lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="flex lg:gap-0">
         <div className="flex-1 min-w-0 px-3 sm:px-4 lg:px-8 xl:px-12">
           {userLeagueState === 'logged-in-no-league' && (
