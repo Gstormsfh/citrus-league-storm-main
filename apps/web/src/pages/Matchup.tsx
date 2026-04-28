@@ -5058,7 +5058,7 @@ const Matchup = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative w-full">
+    <div className="min-h-screen bg-[#0F1F15] relative w-full">
       {/* Citrus Background - Floating citrus elements - Hidden on mobile for performance */}
       <div className="hidden lg:block">
         <CitrusBackground density="light" animated={true} />

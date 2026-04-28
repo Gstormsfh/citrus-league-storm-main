@@ -470,7 +470,7 @@ const Standings = () => {
   // Force render content if we have teams, regardless of loading state
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative">
+    <div className="min-h-screen bg-[#0F1F15] relative">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />

@@ -56,7 +56,7 @@ const ArmchairGM = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#E8EED9] via-[#F0F4E8] to-[#E8EED9]">
+    <div className="min-h-screen flex flex-col bg-[#0F1F15]">
       <Navbar />
 
       <main className="flex-1 w-full pt-[var(--header-height)] pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-12">

@@ -148,7 +148,7 @@ const GMOffice = () => {
     'Lineup Manager',
   ]);
   return (
-    <div className="min-h-screen bg-[#D4E8B8] text-foreground relative">
+    <div className="min-h-screen bg-[#0F1F15] text-foreground relative">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />

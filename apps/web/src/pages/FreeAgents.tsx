@@ -1229,7 +1229,7 @@ const FreeAgents = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative">
+    <div className="min-h-screen bg-[#0F1F15] relative">
       <CitrusBackground density="light" />
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">

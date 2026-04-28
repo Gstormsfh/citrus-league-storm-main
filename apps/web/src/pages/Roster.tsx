@@ -2944,7 +2944,7 @@ const Roster = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] text-foreground relative">
+    <div className="min-h-screen bg-[#0F1F15] text-foreground relative">
       {/* Loading overlay during league switch - non-blocking */}
       {showLoadingOverlay && (
         <div className="fixed inset-0 bg-[#D4E8B8]/90 backdrop-blur-lg z-[100] flex items-center justify-center">

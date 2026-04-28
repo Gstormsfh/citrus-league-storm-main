@@ -3604,7 +3604,7 @@ const DraftRoom = () => {
 
   // ALWAYS render something - never return null
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative touch-manipulation overflow-x-clip">
+    <div className="min-h-screen bg-[#0F1F15] relative touch-manipulation overflow-x-clip">
       {/* Realtime connection banner — surfaces when the draft-pick channel
           drops so users know their draft isn't silently stalled.
           'connected' is the quiescent state; we don't render anything. */}

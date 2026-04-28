@@ -556,7 +556,7 @@ const OtherTeam = () => {
 
   if (!team) {
     return (
-      <div className="min-h-screen bg-[#D4E8B8] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0F1F15] flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Team Not Found</h1>
           <Button onClick={() => navigate('/standings')}>Back to Standings</Button>
@@ -572,7 +572,7 @@ const OtherTeam = () => {
 
   return (
     <ErrorBoundary>
-    <div className="min-h-screen bg-[#D4E8B8]">
+    <div className="min-h-screen bg-[#0F1F15]">
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
