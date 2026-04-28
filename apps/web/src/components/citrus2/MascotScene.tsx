@@ -163,3 +163,119 @@ export function LemonOnTheBoardsScene({ size = 'lg', className = '', message }: 
     </div>
   );
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+ * SCENE: GM OFFICE COMMAND CENTER (Stormy)
+ * Hero asset: /mascots/scene-gm-office.webp
+ * ────────────────────────────────────────────────────────────────────── */
+
+export function GMOfficeCommandScene({ size = 'xl', className = '' }: SceneProps) {
+  const sz = SIZE[size];
+  return (
+    <div
+      className={`relative overflow-hidden bg-[#0F1F15] rounded-3xl ring-1 ring-white/10 ${sz.container} ${sz.minHeight} ${className}`}
+      role="img"
+      aria-label="Stormy the narwhal, in his GM blazer and headset, runs a hockey command center surrounded by holographic stat panels."
+    >
+      <img src="/mascots/scene-gm-office.webp" alt="" className="absolute inset-0 w-full h-full object-cover" loading="eager" />
+      <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(15,31,21,0.55) 0%, transparent 22%, transparent 65%, rgba(15,31,21,0.92) 100%)' }} />
+      <div className="absolute top-5 left-5 sm:top-6 sm:left-6 z-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#0F1F15]/70 ring-1 ring-pastel-orange/40 backdrop-blur-md">
+          <LivePulse size="xs" />
+          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold">Stormy · Assistant GM</span>
+        </div>
+      </div>
+      <div className="absolute bottom-5 left-5 sm:bottom-6 sm:left-6 z-10 max-w-md">
+        <div className="font-calistoga text-[26px] sm:text-[34px] text-pastel-cream leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">The war room.</div>
+        <div className="font-jbmono text-[9px] sm:text-[10px] uppercase tracking-[0.32em] text-white/70 mt-1.5">Trades · Waivers · Lineup · Analytics — one tap each</div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * SCENE: SCHEDULE SLATE (Pineapple)
+ * Hero asset: /mascots/scene-schedule.webp
+ * ────────────────────────────────────────────────────────────────────── */
+
+export function ScheduleSlateScene({ size = 'lg', className = '' }: SceneProps) {
+  const sz = SIZE[size];
+  return (
+    <div
+      className={`relative overflow-hidden bg-[#0F1F15] rounded-3xl ring-1 ring-white/10 ${sz.container} ${sz.minHeight} ${className}`}
+      role="img"
+      aria-label="Pineapple the goalie scans a holographic week-at-a-glance schedule wall on hockey ice."
+    >
+      <img src="/mascots/scene-schedule.webp" alt="" className="absolute inset-0 w-full h-full object-cover" loading="eager" />
+      <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(15,31,21,0.55) 0%, transparent 22%, transparent 65%, rgba(15,31,21,0.92) 100%)' }} />
+      <div className="absolute top-5 left-5 sm:top-6 sm:left-6 z-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#0F1F15]/70 ring-1 ring-pastel-sage/40 backdrop-blur-md">
+          <LivePulse size="xs" />
+          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-sage-soft font-bold">Pineapple · In the Crease</span>
+        </div>
+      </div>
+      <div className="absolute bottom-5 left-5 sm:bottom-6 sm:left-6 z-10 max-w-md">
+        <div className="font-calistoga text-[26px] sm:text-[34px] text-pastel-cream leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">Read the slate.</div>
+        <div className="font-jbmono text-[9px] sm:text-[10px] uppercase tracking-[0.32em] text-white/70 mt-1.5">7-day game density · Back-to-backs flagged</div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * SCENE: ANALYTICS CONSOLE (Lemon)
+ * Hero asset: /mascots/scene-analytics.webp
+ * ────────────────────────────────────────────────────────────────────── */
+
+export function AnalyticsConsoleScene({ size = 'xl', className = '' }: SceneProps) {
+  const sz = SIZE[size];
+  return (
+    <div
+      className={`relative overflow-hidden bg-[#0F1F15] rounded-3xl ring-1 ring-white/10 ${sz.container} ${sz.minHeight} ${className}`}
+      role="img"
+      aria-label="Lemon the center forward studies real fantasy hockey data on three floating holographic panels at an executive analytics console."
+    >
+      <img src="/mascots/scene-analytics.webp" alt="" className="absolute inset-0 w-full h-full object-cover" loading="eager" />
+      <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(15,31,21,0.55) 0%, transparent 22%, transparent 65%, rgba(15,31,21,0.92) 100%)' }} />
+      <div className="absolute top-5 left-5 sm:top-6 sm:left-6 z-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#0F1F15]/70 ring-1 ring-pastel-orange/40 backdrop-blur-md">
+          <LivePulse size="xs" />
+          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold">Lemon · #9 Center · Studying Tape</span>
+        </div>
+      </div>
+      <div className="absolute bottom-5 left-5 sm:bottom-6 sm:left-6 z-10 max-w-md">
+        <div className="font-calistoga text-[26px] sm:text-[34px] text-pastel-cream leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">Tape doesn&rsquo;t lie.</div>
+        <div className="font-jbmono text-[9px] sm:text-[10px] uppercase tracking-[0.32em] text-white/70 mt-1.5">Positional grades · vs league avg · stat impact</div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * SCENE: WAIVER WIRE (Kiwi)
+ * Hero asset: /mascots/scene-waivers.webp
+ * ────────────────────────────────────────────────────────────────────── */
+
+export function WaiverWireScene({ size = 'lg', className = '' }: SceneProps) {
+  const sz = SIZE[size];
+  return (
+    <div
+      className={`relative overflow-hidden bg-[#0F1F15] rounded-3xl ring-1 ring-white/10 ${sz.container} ${sz.minHeight} ${className}`}
+      role="img"
+      aria-label="Kiwi the scrappy forward leaps to grab a player card off a glowing free-agents board, with FAAB budget and claims countdown floating beside."
+    >
+      <img src="/mascots/scene-waivers.webp" alt="" className="absolute inset-0 w-full h-full object-cover" loading="eager" />
+      <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(15,31,21,0.55) 0%, transparent 22%, transparent 65%, rgba(15,31,21,0.92) 100%)' }} />
+      <div className="absolute top-5 left-5 sm:top-6 sm:left-6 z-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#0F1F15]/70 ring-1 ring-pastel-sage/40 backdrop-blur-md">
+          <LivePulse size="xs" />
+          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-sage-soft font-bold">Kiwi · #22 · Off the Wire</span>
+        </div>
+      </div>
+      <div className="absolute bottom-5 left-5 sm:bottom-6 sm:left-6 z-10 max-w-md">
+        <div className="font-calistoga text-[26px] sm:text-[34px] text-pastel-cream leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">Snag the difference-maker.</div>
+        <div className="font-jbmono text-[9px] sm:text-[10px] uppercase tracking-[0.32em] text-white/70 mt-1.5">Trending pickups · FAAB budget · Claim countdown</div>
+      </div>
+    </div>
+  );
+}

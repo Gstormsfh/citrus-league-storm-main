@@ -6,11 +6,22 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Navbar from '@/components/Navbar';
 import MobileMenuButton from '@/components/MobileMenuButton';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeftRight, Users, TrendingUp, Calendar, FileText, BarChart3, ListChecks, Bell, Target, History, Trophy } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { HockeyFooter } from '@/components/citrus2';
+import {
+  HockeyFooter,
+  GMOfficeCommandScene,
+  StormyChatTile,
+  CrossedSticksIcon,
+  SlateIcon,
+  XGModelIcon,
+  ShiftIcon,
+  ScoreboardIcon,
+  PuckIcon,
+  CupIcon,
+  PickemIcon,
+} from '@/components/citrus2';
 import { Narwhal } from '@/components/icons/Narwhal';
 import { isPoolLeague, getPoolRoute, getPoolLabel } from '@/utils/leagueTypeHelpers';
 import { usePlayoffChampion } from '@/hooks/usePlayoffChampion';
@@ -18,99 +29,96 @@ import { HeadlinesBanner } from '@/components/gm-office/HeadlinesBanner';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
-import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
-import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge, CitrusBurst } from '@/components/icons/CitrusIcons';
-import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 interface GMAction {
   title: string;
   description: string;
   icon: React.ElementType;
-  citrusIcon: React.ElementType;
-  gradient: string;
   link: string;
   hasNewInsight?: boolean;
+  /**
+   * Optional micro-copy chip that sits in the top-right of the card.
+   * Render shape: { label: short caps text, tone: 'orange' | 'sage' | 'cream' }
+   */
+  chip?: { label: string; tone: 'orange' | 'sage' | 'cream' };
 }
 
 const gmActions: GMAction[] = [
   {
     title: "Stormy AI Assistant",
-    description: "Get personalized advice and insights from your AI GM",
+    description: "Get personalized advice and insights from your AI GM.",
     icon: Narwhal,
-    citrusIcon: CitrusSparkle,
-    gradient: "from-citrus-sage to-citrus-green-medium",
     link: "/gm-office/stormy",
-    hasNewInsight: false // Will be dynamic later
+    hasNewInsight: false,
+    chip: { label: 'Always-on', tone: 'orange' },
   },
   {
     title: "Make a Trade",
     description: "Propose, negotiate, and view pending offers with league managers.",
-    icon: ArrowLeftRight,
-    citrusIcon: CitrusWedge,
-    gradient: "from-citrus-green-light to-citrus-sage",
-    link: "/trade-analyzer"
+    icon: CrossedSticksIcon,
+    link: "/trade-analyzer",
+    chip: { label: 'Trade deck', tone: 'cream' },
   },
   {
     title: "Free Agents",
-    description: "Browse and claim players. View Top 5 Adds.",
-    icon: Users,
-    citrusIcon: CitrusSlice,
-    gradient: "from-citrus-sage to-citrus-green-light",
-    link: "/free-agents"
+    description: "Browse and claim players. View this week's Top 5 Adds.",
+    icon: SlateIcon,
+    link: "/free-agents",
+    chip: { label: 'Slate', tone: 'sage' },
   },
   {
     title: "Team Analytics",
-    description: "Deep dive into your team's performance metrics",
-    icon: BarChart3,
-    citrusIcon: CitrusBurst,
-    gradient: "from-citrus-sage to-citrus-green-medium",
-    link: "/team-analytics"
+    description: "Positional grades, stat impact, and matchup outlook.",
+    icon: XGModelIcon,
+    link: "/team-analytics",
+    chip: { label: 'xG model', tone: 'orange' },
   },
   {
     title: "Waiver Wire",
-    description: "Manage waiver claims and priorities",
-    icon: TrendingUp,
-    citrusIcon: CitrusLeaf,
-    gradient: "from-citrus-sage to-citrus-green-medium",
-    link: "/waiver-wire"
+    description: "Manage waiver claims, FAAB bids, and priorities.",
+    icon: ShiftIcon,
+    link: "/waiver-wire",
+    chip: { label: 'Wire', tone: 'sage' },
   },
   {
     title: "Lineup Manager",
-    description: "Set your daily lineups and plan for positional limits.",
-    icon: Calendar,
-    citrusIcon: CitrusWedge,
-    gradient: "from-citrus-peach to-citrus-sage",
-    link: "/schedule-manager"
+    description: "Set daily lineups and plan around positional limits.",
+    icon: ScoreboardIcon,
+    link: "/schedule-manager",
+    chip: { label: 'Lineup', tone: 'cream' },
   }
 ];
 
 const getPoolActions = (leagueType: string, leagueId: string): GMAction[] => [
   {
     title: "Make Picks",
-    description: `Submit your ${getPoolLabel(leagueType)} picks for this week`,
-    icon: Target,
-    citrusIcon: CitrusSparkle,
-    gradient: "from-citrus-sage to-citrus-green-medium",
+    description: `Submit your ${getPoolLabel(leagueType)} picks for this week.`,
+    icon: PickemIcon,
     link: getPoolRoute(leagueType, leagueId),
+    chip: { label: 'This week', tone: 'orange' },
   },
   {
     title: "Standings",
-    description: "See how you stack up against the competition",
-    icon: Trophy,
-    citrusIcon: CitrusBurst,
-    gradient: "from-citrus-green-light to-citrus-sage",
+    description: "See how you stack up against the competition.",
+    icon: CupIcon,
     link: getPoolRoute(leagueType, leagueId, 'standings'),
+    chip: { label: 'Leaderboard', tone: 'cream' },
   },
   {
     title: "Stormy AI Assistant",
-    description: "Get personalized advice and insights from your AI GM",
+    description: "Get personalized advice and insights from your AI GM.",
     icon: Narwhal,
-    citrusIcon: CitrusSparkle,
-    gradient: "from-citrus-sage to-citrus-green-medium",
     link: "/gm-office/stormy",
+    chip: { label: 'Always-on', tone: 'orange' },
   },
 ];
+
+const chipClasses = {
+  orange: 'bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft',
+  sage: 'bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft',
+  cream: 'bg-white/10 ring-1 ring-white/20 text-pastel-cream',
+};
 
 const GMOffice = () => {
   const { userLeagueState, activeLeagueId, activeLeagueFormat } = useLeague();
@@ -147,6 +155,7 @@ const GMOffice = () => {
     'Waiver Wire',
     'Lineup Manager',
   ]);
+
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
       {/* Desktop Navbar - Hidden on mobile */}
@@ -173,30 +182,24 @@ const GMOffice = () => {
           )}>
             {/* Main Content - Appears first on mobile */}
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
-              {/* Compact page header */}
-              <div className="hidden lg:block max-w-5xl mx-auto mb-4">
-                <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5">
-                  ✦ Command Center
-                </div>
-                <h1 className="font-calistoga text-3xl text-pastel-cream leading-none">
-                  {isPool ? `${getPoolLabel(leagueType!)} Pool Hub` : "GM's Office"}
-                </h1>
-                <p className="text-sm text-white/55 mt-2">
-                  {isPool ? 'Your pool command center' : 'Your command center for team management and strategy'}
-                </p>
+
+              {/* HERO — Stormy command-center scene */}
+              <div className="max-w-5xl mx-auto mb-6 lg:mb-8">
+                <GMOfficeCommandScene size="xl" />
               </div>
-              
+
               {/* Demo Mode Banner */}
               {isGuestMode(userLeagueState) && (
                 <div className="max-w-3xl mx-auto mb-4">
-                  <LeagueCreationCTA 
+                  <LeagueCreationCTA
                     title="You're viewing demo GM Office"
                     description="Sign up to access all GM tools and manage your team."
                     variant="compact"
                   />
                 </div>
               )}
-              
+
+              {/* Champion / playoffs / season-complete banners */}
               {playoffChampion.status === 'completed' && activeLeagueId && (
                 <div className="max-w-3xl mx-auto mb-4">
                   <Link
@@ -247,85 +250,146 @@ const GMOffice = () => {
                 </div>
               )}
 
-              <div className="max-w-3xl mx-auto mb-4">
+              {/* Headlines Banner — kept */}
+              <div className="max-w-5xl mx-auto mb-6">
                 <HeadlinesBanner />
               </div>
-              
-              <CitrusSectionDivider />
-              
+
+              {/* Section eyebrow — replaces the old CitrusSectionDivider with
+                  something on-brand for citrus2 */}
+              <div className="max-w-5xl mx-auto mb-4 flex items-center gap-3">
+                <PuckIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
+                <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">
+                  ✦ Command Stack
+                </div>
+                <div className="flex-1 h-px bg-gradient-to-r from-pastel-orange/40 to-transparent" />
+              </div>
+
+              {/* Action grid — six command-stack cards. Custom hockey
+                  iconography, animated underglow on hover, optional caps chip
+                  in the top-right. */}
               <TooltipProvider>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto mt-4">
-                {actions.map((action, index) => {
-                  const isLocked = seasonComplete && LOCKED_ACTION_TITLES.has(action.title);
-                  const cardInner = (
-                    <Card className={cn(
-                      "h-full border-0 ring-1 ring-white/10 overflow-hidden relative bg-[#1A2A20] rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]",
-                      isLocked
-                        ? "opacity-50 cursor-not-allowed grayscale"
-                        : "transition-all duration-300 hover:-translate-y-0.5 hover:ring-pastel-orange/40 hover:shadow-[0_24px_60px_-16px_rgba(255,168,87,0.25)] cursor-pointer",
-                    )}>
-                      {/* Decorative gradient corner glow */}
-                      <div aria-hidden="true" className="absolute top-0 right-0 w-56 h-56 bg-pastel-orange/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none transition-opacity duration-300 group-hover:bg-pastel-orange/20" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto mt-4">
+                  {actions.map((action, index) => {
+                    const isLocked = seasonComplete && LOCKED_ACTION_TITLES.has(action.title);
+                    const ActionIcon = action.icon;
+                    const cardInner = (
+                      <div className={cn(
+                        "h-full relative overflow-hidden rounded-2xl bg-[#1A2A20] ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]",
+                        isLocked
+                          ? "opacity-50 cursor-not-allowed grayscale"
+                          : "transition-all duration-300 hover:-translate-y-0.5 hover:ring-pastel-orange/40 hover:shadow-[0_24px_60px_-16px_rgba(255,168,87,0.25)] cursor-pointer",
+                      )}>
+                        {/* Decorative orange glow corner — brightens on hover */}
+                        <div aria-hidden="true" className="absolute -top-12 -right-12 w-44 h-44 bg-pastel-orange/10 rounded-full blur-3xl pointer-events-none transition-opacity duration-300 group-hover:bg-pastel-orange/25" />
 
-                      {/* Floating citrus icon — subtle */}
-                      <action.citrusIcon aria-hidden="true" className="absolute top-3 right-3 w-10 h-10 text-pastel-orange/15 rotate-12 transition-all duration-300 group-hover:text-pastel-orange/30 group-hover:rotate-6" />
+                        {/* Sage accent corner — adds subtle dimensional warmth */}
+                        <div aria-hidden="true" className="absolute -bottom-12 -left-12 w-40 h-40 bg-pastel-sage/8 rounded-full blur-3xl pointer-events-none" />
 
-                      <CardHeader className="relative z-10 p-6">
-                        <div className="relative mb-4">
-                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pastel-orange/30 to-pastel-orange/10 ring-1 ring-pastel-orange/30 flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:ring-pastel-orange/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                            <action.icon className="h-7 w-7 text-pastel-orange" strokeWidth={2} />
+                        {/* Top-right chip — micro-copy that frames the card's intent */}
+                        {action.chip && (
+                          <div className="absolute top-4 right-4 z-10">
+                            <span className={cn(
+                              'px-2 py-0.5 rounded-md text-[9px] font-jbmono uppercase tracking-[0.18em] font-bold',
+                              chipClasses[action.chip.tone]
+                            )}>
+                              {action.chip.label}
+                            </span>
                           </div>
-                          {action.hasNewInsight && (
-                            <Badge className="absolute -top-1.5 -right-1.5 bg-pastel-orange ring-1 ring-pastel-orange/40 text-[#0F1F15] text-[9px] font-jbmono uppercase tracking-[0.18em] font-bold px-2 py-0.5">
-                              New
-                            </Badge>
+                        )}
+
+                        <div className="relative z-10 p-6 flex flex-col h-full">
+                          {/* Hockey icon block — the visual centerpiece, NOT a
+                              tinted square with a generic lucide. Custom SVG. */}
+                          <div className="relative mb-5 inline-block">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pastel-orange/30 to-pastel-orange/10 ring-1 ring-pastel-orange/40 flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:ring-pastel-orange/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                              <ActionIcon className="h-7 w-7 text-pastel-orange" strokeWidth={1.75} />
+                            </div>
+                            {action.hasNewInsight && (
+                              <span className="absolute -top-1.5 -right-1.5 bg-pastel-orange ring-2 ring-[#1A2A20] text-[#0F1F15] text-[8px] font-jbmono uppercase tracking-[0.18em] font-bold px-1.5 py-0.5 rounded-md">
+                                New
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="font-calistoga text-xl text-pastel-cream leading-tight transition-colors group-hover:text-pastel-orange mb-2">
+                            {action.title}
+                          </h3>
+                          <p className="text-sm text-white/55 leading-relaxed">
+                            {action.description}
+                          </p>
+
+                          {/* Subtle "tap to open" footer that only appears on hover */}
+                          {!isLocked && (
+                            <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                              <span className="font-jbmono text-[9px] uppercase tracking-[0.32em] text-white/40 group-hover:text-pastel-orange-soft transition-colors">
+                                Tap to open
+                              </span>
+                              <span className="text-pastel-orange/60 group-hover:text-pastel-orange group-hover:translate-x-0.5 transition-all" aria-hidden="true">
+                                →
+                              </span>
+                            </div>
                           )}
                         </div>
-                        <CardTitle className="font-calistoga text-xl text-pastel-cream leading-tight transition-colors group-hover:text-pastel-orange">{action.title}</CardTitle>
-                        <CardDescription className="text-sm mt-2 text-white/55 leading-relaxed">
-                          {action.description}
-                        </CardDescription>
-                      </CardHeader>
-                    </Card>
-                  );
-                  if (isLocked) {
-                    return (
-                      <Tooltip key={action.title}>
-                        <TooltipTrigger asChild>
-                          <div
-                            aria-disabled="true"
-                            className="group"
-                            style={{ animationDelay: `${index * 50}ms` }}
-                          >
-                            {cardInner}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Season complete — roster locked
-                        </TooltipContent>
-                      </Tooltip>
+                      </div>
                     );
-                  }
-                  return (
-                    <Link
-                      key={action.title}
-                      to={action.link}
-                      className="group"
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      {cardInner}
-                    </Link>
-                  );
-                })}
-              </div>
+                    if (isLocked) {
+                      return (
+                        <Tooltip key={action.title}>
+                          <TooltipTrigger asChild>
+                            <div
+                              aria-disabled="true"
+                              className="group"
+                              style={{ animationDelay: `${index * 50}ms` }}
+                            >
+                              {cardInner}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Season complete — roster locked
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    }
+                    return (
+                      <Link
+                        key={action.title}
+                        to={action.link}
+                        className="group"
+                        style={{ animationDelay: `${index * 50}ms` }}
+                      >
+                        {cardInner}
+                      </Link>
+                    );
+                  })}
+                </div>
               </TooltipProvider>
             </div>
 
-            {/* Left Sidebar - At bottom on mobile, left on desktop - Extends to edge */}
+            {/* Left Sidebar — TeamIntelHub kept; AdSpace REMOVED in favor of
+                a Stormy mascot peek tile that sells the brand instead of
+                renting it out. */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-6">
                 <TeamIntelHub />
-                <AdSpace size="300x250" label="GM Sponsor" />
+                {/* Stormy preview tile — replaces the legacy AdSpace placeholder
+                    with a real on-brand sample exchange. Tapping anywhere in
+                    the rail's footer link drops you into the full assistant. */}
+                <div className="space-y-3">
+                  <StormyChatTile
+                    variant="compact"
+                    exchange={{
+                      question: 'Should I bench McDavid for a back-to-back?',
+                      answer: 'Almost never — even on B2Bs his projection floor still beats most starts. Bench only if he is flagged or facing two elite goalies.',
+                    }}
+                  />
+                  <Link
+                    to="/gm-office/stormy"
+                    className="block text-center px-4 py-2.5 rounded-xl bg-pastel-orange/15 ring-1 ring-pastel-orange/30 hover:bg-pastel-orange/25 hover:ring-pastel-orange/50 transition-all font-jbmono text-[10px] uppercase tracking-[0.22em] font-bold text-pastel-orange-soft"
+                  >
+                    Open Full Assistant →
+                  </Link>
+                </div>
               </div>
             </aside>
 

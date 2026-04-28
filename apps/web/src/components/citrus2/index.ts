@@ -46,6 +46,10 @@ export {
   StormyWelcomeScene,
   PineappleStandbyScene,
   LemonOnTheBoardsScene,
+  GMOfficeCommandScene,
+  ScheduleSlateScene,
+  AnalyticsConsoleScene,
+  WaiverWireScene,
 } from './MascotScene';
 
 // On-brand loading state
