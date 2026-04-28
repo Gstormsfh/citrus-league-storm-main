@@ -1,11 +1,11 @@
-# ADR-001: Elixir/Phoenix Draft Engine (Hybrid Architecture)
+# ADR-001: Persistent Node Draft Engine in Existing Server
 
 | | |
 |---|---|
-| **Status** | Accepted (2026-04-27) |
+| **Status** | Accepted (2026-04-28). |
 | **Authority** | Supersedes the Phase 0–4 architecture for the live draft hot path. |
-| **Binding constraints** | `CLAUDE.md` § Citrus Draft Performance Mandate (commit `1427b18`); `docs/DRAFT_ENGINE_V2_SPEC.md` § §0 (commit `b2354d7`). |
-| **Companion docs** | `docs/PHASE_4_5_PLAN.md` (chunk-by-chunk implementation plan); `docs/REGISTRY.md` KI-008 / KI-009 (architectural pivot + dual-runtime ops cost). |
+| **Binding constraints** | `CLAUDE.md` § Citrus Draft Performance Mandate; `docs/DRAFT_ENGINE_V2_SPEC.md` § §0. |
+| **Companion docs** | `docs/PHASE_4_5_PLAN.md` (chunks 11g.0–11g.9); `docs/REGISTRY.md` KI-008 (architectural pivot), KI-009 (Edge Function infrastructure removed entirely), KI-010 (Tier 1 perf optimizations baked in from start). |
 
 ## Context
 
