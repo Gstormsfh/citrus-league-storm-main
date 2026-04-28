@@ -70,6 +70,14 @@ Appendices:
 
 ---
 
+## §0: Performance Mandate
+
+Citrus must be competitive with Yahoo/ESPN on live draft feel. See CLAUDE.md > Citrus Draft Performance Mandate for binding targets and architectural requirements.
+
+The principles below (event sourcing, idempotency, server-owned time, etc.) are necessary but not sufficient for competitive parity. The persistent-worker architecture introduced in Phase 4.5 is required to meet the performance mandate.
+
+Any conflict between the performance mandate and the principles below is resolved in favor of the performance mandate.
+
 ## §1 Principles (non-negotiable)
 
 These six principles are load-bearing. A change that violates one of
