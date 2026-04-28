@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { LeagueService, League, Team, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
@@ -14,7 +15,6 @@ import { publicApi } from '@/api/public';
 import { logger } from '@/utils/logger';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { DraftLobby } from '@/components/draft/DraftLobby';
 import { DraftBoard } from '@/components/draft/DraftBoard';
 import { PlayerPool } from '@/components/draft/PlayerPool';
@@ -4721,7 +4721,7 @@ const DraftRoom = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
       
       {/* Player Stats Modal */}
       <PlayerStatsModal

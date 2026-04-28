@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { LeagueService, League, Team } from '@/services/LeagueService';
@@ -7,7 +8,6 @@ import { WaiverService } from '@/services/WaiverService';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -608,7 +608,7 @@ const LeagueDashboard = () => {
             </CardContent>
           </Card>
         </main>
-        <Footer />
+        <HockeyFooter />
       </div>
     );
   }
@@ -1646,7 +1646,7 @@ Your Commissioner`);
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };

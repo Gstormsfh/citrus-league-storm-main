@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
 import MobileMenuButton from '@/components/MobileMenuButton';
-import Footer from '@/components/Footer';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -925,7 +925,7 @@ const Standings = () => {
       </main>
       {/* Footer - Hidden on mobile */}
       <div className="hidden lg:block">
-        <Footer />
+        <HockeyFooter />
       </div>
     </div>
   );

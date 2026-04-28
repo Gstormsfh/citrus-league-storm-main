@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import { HockeyFooter } from '@/components/citrus2';
 import TeamSelector from '@/components/armchair-gm/TeamSelector';
 import CapSummaryBar from '@/components/armchair-gm/CapSummaryBar';
 import RosterLineupView from '@/components/armchair-gm/RosterLineupView';
@@ -209,7 +209,7 @@ const ArmchairGM = () => {
         </div>
       </main>
 
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };

@@ -3,7 +3,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { leagueApi } from '@/api/leagues';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +21,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import LoadingScreen from '@/components/LoadingScreen';
 import { logger } from '@/utils/logger';
 import { Navigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 
 interface PositionStats {
@@ -447,7 +447,7 @@ const TeamAnalytics = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };

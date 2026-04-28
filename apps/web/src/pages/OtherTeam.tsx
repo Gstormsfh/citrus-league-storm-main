@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -686,7 +686,7 @@ const OtherTeam = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
     </ErrorBoundary>
   );

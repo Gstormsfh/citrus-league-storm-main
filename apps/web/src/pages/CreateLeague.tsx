@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { HockeyFooter } from '@/components/citrus2';
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -7,7 +8,6 @@ import { useLeague } from "@/contexts/LeagueContext";
 import { LeagueService } from "@/services/LeagueService";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1985,7 +1985,7 @@ const CreateLeague = () => {
 
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };

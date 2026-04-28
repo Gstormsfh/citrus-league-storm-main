@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +16,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { format } from 'date-fns';
 import { logger } from '@/utils/logger';
 import { Navigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { getTodayMST, getTodayMSTDate, formatDateToString } from '@/utils/timezoneUtils';
 
@@ -315,7 +315,7 @@ const ScheduleManager = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };
