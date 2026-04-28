@@ -81,6 +81,18 @@ const STORMY_EXCHANGE = {
     'Aho. xGF% 58.2% last 10, 2:30 PP1 time. Pettersson dropped to 18:45 TOI after the line shuffle. Easy call.',
 };
 
+
+// Inline component to render a mascot action scene as a slide visual. Uses
+// the same scene assets that drive the GameModeCard hero zone — mascots
+// doing the thing each slide describes.
+function SceneVisual({ src, alt }: { src: string; alt: string }) {
+  return (
+    <div className="relative w-full aspect-square max-w-[480px] mx-auto rounded-3xl overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+      <img src={src} alt={alt} className="w-full h-full object-cover" loading="eager" />
+    </div>
+  );
+}
+
 function getHeroSlides(): HeroSlide[] {
   return [
     {
@@ -90,7 +102,7 @@ function getHeroSlides(): HeroSlide[] {
       sub: 'Predict the entire Stanley Cup playoffs round-by-round — First Round, Second Round, Conference Finals, Cup Final. Live bracket updates every 60 seconds. Build yours before puck drop.',
       primary: { label: 'Build Your Bracket', to: '/nhl/playoffs' },
       secondary: { label: 'View live bracket →', to: '/nhl/playoffs' },
-      visual: <BracketTile east={EAST_SERIES} west={WEST_SERIES} cupPick="EDM" />,
+      visual: <SceneVisual src="/mascots/scene-cup.webp" alt="Pineapple lifting the Stanley Cup" />,
     },
     {
       id: 'pickem',
@@ -99,7 +111,7 @@ function getHeroSlides(): HeroSlide[] {
       sub: 'Pick the winner of every NHL game on the slate. Straight up — no spreads, no over-unders. Locks at puck drop, settled at the final horn. Climb the league leaderboard.',
       primary: { label: 'Drop In', to: '/pool/pickem' },
       secondary: { label: "Tonight's slate →", to: '/pool/pickem' },
-      visual: <PickemTile games={PICKEM_GAMES} picksMade={3} totalGames={7} />,
+      visual: <SceneVisual src="/mascots/scene-pickem.webp" alt="Lemon picking between EDM and COL" />,
     },
     {
       id: 'survivor',
@@ -108,7 +120,7 @@ function getHeroSlides(): HeroSlide[] {
       sub: "Pick one team to win each week. Use any team only once all season. Lose your pick and you're in the sin bin — eliminated. Last manager standing takes the pool.",
       primary: { label: 'Last One Standing', to: '/pool/survivor' },
       secondary: { label: 'How it works →', to: '/pool/survivor' },
-      visual: <SurvivorTile picks={SURVIVOR_PICKS} alive={247} totalEntered={1894} />,
+      visual: <SceneVisual src="/mascots/scene-survivor.webp" alt="Kiwi alone in the spotlight" />,
     },
     {
       id: 'stormy',
@@ -117,7 +129,7 @@ function getHeroSlides(): HeroSlide[] {
       sub: 'Stormy is plugged into your roster, scoring, and matchup. She cites xGF%, TOI, PP1 share, save% — never generic boilerplate. The AI assistant GM you wish your team had.',
       primary: { label: 'Talk to Stormy', to: '/gm-office/stormy' },
       secondary: { label: 'See an example →', to: '#stormy' },
-      visual: <StormyHeroTile exchange={STORMY_EXCHANGE} />,
+      visual: <SceneVisual src="/mascots/scene-stormy-ai.webp" alt="Stormy with coach playbook and lineup board" />,
     },
     {
       id: 'fantasy',
@@ -126,7 +138,7 @@ function getHeroSlides(): HeroSlide[] {
       sub: 'A 31-feature xG model. Live shift-level scoring. Snake, auction, or salary-cap drafts. Built by hockey heads, for hockey heads. Lock in founders pricing now.',
       primary: { label: 'Drop the Puck', to: '/create-league' },
       secondary: { label: 'Try a mock draft →', to: '/draft' },
-      visual: <HeroCardStack />,
+      visual: <SceneVisual src="/mascots/scene-squad.webp" alt="The Citrus Squad on the bench" />,
     },
   ];
 }

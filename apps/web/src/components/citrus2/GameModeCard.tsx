@@ -40,7 +40,7 @@ export function GameModeCard({
   );
 
   return (
-    <div className="flex-shrink-0 w-[300px] sm:w-[340px] snap-start h-full">
+    <div className="flex-shrink-0 w-[240px] sm:w-[260px] snap-start h-full">
       <GlowCard accent={accent} className="h-full">
         <article className="flex flex-col h-full overflow-hidden">
           {scene ? (
@@ -65,7 +65,7 @@ export function GameModeCard({
               )}
             </div>
           ) : (
-            <div className="px-6 pt-6">
+            <div className="px-4 pt-4">
               <div className="flex items-center justify-between mb-5">
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center ring-1 ${a.bg} ${a.ring} ${a.text} group-hover:scale-110 transition-transform duration-300`}>
                   <Icon className="w-7 h-7" />
@@ -79,11 +79,11 @@ export function GameModeCard({
             </div>
           )}
 
-          <div className="px-6 pb-6 pt-2 flex flex-col flex-1">
-            <h3 className="font-sans font-bold text-[1.35rem] leading-snug text-pastel-cream mb-2">
+          <div className="px-4 pb-4 pt-2 flex flex-col flex-1">
+            <h3 className="font-sans font-bold text-[1.1rem] leading-snug text-pastel-cream mb-1.5">
               {label}
             </h3>
-            <p className="text-[13px] text-white/55 leading-relaxed mb-5 flex-grow">
+            <p className="text-[12px] text-white/55 leading-snug mb-4 flex-grow">
               {sub}
             </p>
             {to ? <Link to={to} className="contents">{button}</Link> : button}
