@@ -1,12 +1,12 @@
-# Phase 4.5 + 4.6 — Elixir/Phoenix Draft Engine Implementation Plan
+# Phase 4.5 — Persistent Node Draft Engine in Existing Server (Chunks 11g.0–11g.9)
 
 | | |
 |---|---|
-| **Status** | Plan accepted (2026-04-27). Implementation not yet started. |
-| **Authority** | `docs/adr/ADR-001-elixir-phoenix-draft-engine.md` (the architectural decision); `CLAUDE.md` § Citrus Draft Performance Mandate (the binding performance targets). |
+| **Status** | Plan accepted (2026-04-28). Implementation not yet started. |
+| **Authority** | `docs/adr/ADR-001-persistent-node-draft-engine.md` (the architectural decision: persistent code inside the existing Node.js / Hono server on Cloud Run; Edge Functions removed entirely); `CLAUDE.md` § Citrus Draft Performance Mandate (binding performance targets). |
 | **Predecessor** | Phase 4 closeout, with autopick latency ~11.7s/pick measured on staging — non-competitive per the Mandate. |
-| **Successor** | Phase 5 (UI client work) is **blocked** until Phase 4.6 sign-off. |
-| **Estimated solo-founder timeline** | Phase 4.5 (foundation) ~3 weeks; Phase 4.6 (production-ready) ~4 weeks; ~16 weeks realistic with cushion for unknowns and the KI-010 learning-curve risk. |
+| **Successor** | Phase 5 (UI client work) is **blocked** until chunk 11g.9 sign-off. |
+| **Estimated solo-founder timeline** | Chunks 11g.0–11g.9 ≈ 3–5 weeks of solo-founder work assisted by Claude Code, including cushion for unknowns. No new language or runtime; the engine ships inside the existing server. |
 
 ## Working discipline (carried forward from Phase 0–4)
 
@@ -14,11 +14,12 @@
 - **Pause for review at every chunk gate.** No silent drift between chunks.
 - **No deferral lands without a registry row.** New issues that surface during the build go into `docs/REGISTRY.md` (project-wide concerns) or `docs/RUNBOOKS/draft-engine-v2-known-issues.md` (draft-engine-specific) at commit time.
 - **Performance Mandate is the binding constraint for every chunk.** Any chunk that introduces a new latency-sensitive surface must measure it; any chunk that fails a target either fixes it before the next chunk starts or registers a KI- with a bounded resolution timeline.
-- **Cross-runtime contract is the integration boundary.** Elixir engine ↔ Postgres uses the existing Phase 2 RPCs; Elixir engine ↔ browser clients uses Phoenix Channels. Both contracts are documented at the chunk that establishes them and don't change without an ADR.
+- **Tier 1 perf optimizations are baked in, not deferred (KI-010).** Parallel async via `Promise.all`, candidate pool cached at draft start, byte-limited delta broadcasts, per-room fanout protection — all land in chunk 11g.7 with code-comment evidence.
+- **Integration boundary is the existing Postgres RPC surface plus the WebSocket message protocol.** RPC surface (`submit_pick_v2`, `append_draft_event`, `reconstruct_draft_state`, etc.) doesn't change without an ADR. WebSocket message protocol is the chunk 11g.1 deliverable; same governance discipline.
 
 ## Performance targets (binding, from `CLAUDE.md` § Citrus Draft Performance Mandate)
 
-These are the constraints every chunk's acceptance criteria reference:
+Every chunk's acceptance criteria reference these:
 
 - Manual pick submission: p95 ≤ 300ms, p99 ≤ 500ms
 - Autopick latency: p95 ≤ 1000ms, p99 ≤ 2000ms
@@ -27,11 +28,36 @@ These are the constraints every chunk's acceptance criteria reference:
 - Pick-to-broadcast fanout: p95 ≤ 200ms
 - Reconnection recovery: p95 ≤ 2000ms
 
-A chunk's "performance gate" is a measured-on-staging assertion against these targets, scoped to whatever surface the chunk introduces.
+A chunk's "performance gate" is a measured-on-staging assertion against these targets, scoped to whatever surface the chunk introduces. The full target set is verified end-to-end at chunk 11g.9 — that's the Phase 5 entry gate.
 
 ---
 
-## Phase 4.5 — Foundation (weeks 1–3)
+## Phase 4.5 — Build the in-server engine, remove the Edge Function infrastructure
+
+### Chunk 11g.0 — Dependency compatibility verification
+
+**Deliverable.** A pre-flight audit on the existing Node server before any draft-engine code lands. The chunk's commit produces a single document — pass/fail with specifics — and zero application code. Audit scope:
+
+- Existing `server/package.json` dependencies vs. a candidate WebSocket library (`ws` first, `socket.io` as fallback). Confirm the WebSocket library installs cleanly into the workspace, peer-deps and types resolve, no version conflicts.
+- Hono's HTTP-upgrade handling. Confirm Hono routes can coexist with a WebSocket upgrade handler on the same port, or document the specific Hono version + adapter combination required.
+- TypeScript build pipeline. Confirm `tsc` / `tsx` build path handles both the existing routes and the new WebSocket code without configuration churn.
+- Existing middleware (auth, JWT, RLS context). Confirm the middleware stack extends cleanly to WebSocket connections — auth on the upgrade handshake, league-membership check before `DraftRoom` join.
+- Async patterns and event loop. Confirm the existing server's existing background tasks, cron callers, and request handlers won't conflict with long-lived WebSocket connections holding the event loop.
+
+**Output.** A short writeup committed at `docs/PHASE_4_5_CHUNK_11g_0_compat_audit.md`: either "all clean, proceed to 11g.1" with the specific library + version pinned, or a numbered list of conflicts with proposed resolutions.
+
+**Dependencies.** None.
+
+**Acceptance criteria.**
+- The audit document exists at the path above and answers each scope item with a definite yes/no/conflict.
+- A scratch branch demonstrates the WebSocket library installing into `server/` cleanly and Hono accepting a WebSocket upgrade on a test endpoint. The scratch branch is committed but not merged into `staging-setup` — its purpose is evidence, not deployable code.
+- If conflicts exist that can't be cleanly resolved, the chunk **escalates** before proceeding. The documented fall-back is alternative (a) from ADR-001 — a separate Cloud Run service. KI-009's "refactor not rewrite" framing is the binding promise; the architectural pattern carries either way.
+
+**Performance targets.** None.
+
+**Estimated effort.** 1–2 days. Mostly install + a tiny prototype to prove the upgrade path works on the existing Hono setup.
+
+---
 
 The goal of Phase 4.5 is a **single working draft running end-to-end on staging**, with measured performance meeting the Mandate, integration with Postgres clean, and the solo founder's Elixir productivity confirmed.
 
