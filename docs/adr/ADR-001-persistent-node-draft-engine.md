@@ -44,60 +44,30 @@ Optimization within the existing structure can shave ~30–50% off the per-pick 
 
 ## Research
 
-Web research into how successful real-time multiplayer / live-collaboration systems are actually built revealed a convergent architectural pattern. The convergence is striking: independent teams, working in different domains (chat, design, fantasy sports), with different team sizes and different scaling pressures, arrived at the same approximate shape.
-
-### Sleeper — Elixir for fantasy at scale
-
-Sleeper is the obvious comparable: a fantasy sports app whose live-draft UX is the gold standard in the space. Their engineering writeups document Elixir as the runtime for the user-facing live components.
-
-- **"The Story of Sleeper"** ([draftkick.com/blog/story-of-sleeper](https://draftkick.com/blog/story-of-sleeper/)) — narrative on Sleeper's stack choices. Elixir + Phoenix for the live experience.
-- **ScyllaDB case study** ([scylladb.com/2020/10/22/sleeper-app-using-scylla-to-level-the-playing-field](https://www.scylladb.com/2020/10/22/sleeper-app-using-scylla-to-level-the-playing-field/)) — Sleeper's engineering team discussing scaling pressures, persistent process model, low-latency reads. Confirms Elixir/Phoenix as the live-draft runtime and surfaces the data-layer thinking around hot-path reads vs. durability.
-
-The takeaway: a directly-comparable competitor in our exact domain converged on Elixir/Phoenix for the same reason we are about to. This is not a speculative bet on an unproven runtime; it's the runtime our most credible reference point already runs.
-
-### Discord — Elixir at billion-message-per-day scale
-
-Discord runs a substantial portion of its real-time gateway and chat fanout on Elixir. The case for Elixir as a credible production runtime at hyperscale is well-documented:
-
-- **"Architecting for Hyperscale: An In-Depth Analysis of Discord's Billion-Message-Per-Day Infrastructure"** ([d4dummies.com/architecting-for-hyperscale-an-in-depth-analysis-of-discords-billion-message-per-day-infrastructure](https://d4dummies.com/architecting-for-hyperscale-an-in-depth-analysis-of-discords-billion-message-per-day-infrastructure/)) — the case study of Discord's real-time gateway. Persistent processes, Phoenix Channels, BEAM-level scheduling, fault-tolerant supervision trees.
-
-Discord's pattern is the "single-tenant guild process" — one BEAM process per guild, holding presence/channel/permission state in memory, handling fanout. The pattern translates almost exactly to "one DraftServer process per active draft" for Citrus. The scaling envelope (Discord runs millions of guilds; we will run thousands of drafts at peak) is comfortably within what the Discord case studies demonstrate.
-
-### Figma — persistent-process multiplayer
-
-Figma's collaborative editor is the closest non-fantasy reference for the architectural pattern. Their engineering blog has two relevant pieces:
-
-- **"How Figma's Multiplayer Technology Works"** ([figma.com/blog/how-figmas-multiplayer-technology-works](https://www.figma.com/blog/how-figmas-multiplayer-technology-works/)) — the per-document persistent-server pattern, in-memory state, WebSocket transport, conflict resolution. Figma is not Elixir (they're in Rust now), but the architectural pattern is what we're adopting; the language is implementation detail.
-- **"Making Multiplayer More Reliable"** ([figma.com/blog/making-multiplayer-more-reliable](https://www.figma.com/blog/making-multiplayer-more-reliable/)) — the operational lessons on reconnection, snapshot recovery, partition handling. Directly informs the Phase 4.6 reconnection/resume protocol.
-
-Takeaway from Figma: the persistent-process + WebSocket pattern is generalizable beyond chat. It works for any user-perceived "live multi-user editing" experience. A live draft is exactly that.
-
-### Phoenix Channels — the framework
-
-The Phoenix framework's WebSocket abstraction (Phoenix Channels) is the specific tool we'll use for the bidirectional transport between clients and the Elixir engine.
-
-- **Phoenix Channels documentation** ([hexdocs.pm/phoenix/channels.html](https://hexdocs.pm/phoenix/channels.html)) — canonical reference for join/leave/broadcast/push primitives, presence, channel-level authorization, and the BEAM-level message routing that makes sub-200ms fanout achievable without per-message Postgres round-trips.
-
-Phoenix Channels is _the_ tool for what we're doing. Sleeper uses it. Many smaller production systems use it. The framework's abstractions map almost trivially to a "draft room" mental model: a channel per active draft, joined by every connected participant, with broadcast/push primitives for picks and timer ticks.
-
-### Elixir in production — the honest retrospective
-
-Adopting a new language and runtime carries real cost. The most credible voice on what actually happens after three years of running an Elixir service in production:
-
-- **"Elixir Three Years in Production"** ([ryanrasti.com/blog/elixir-three-years-production](https://ryanrasti.com/blog/elixir-three-years-production/)) — a balanced retrospective covering wins (per-process supervision, hot-code-reload, low operational overhead per service, GenServer-as-state-machine fitting domain models cleanly) and friction (smaller hiring pool than Node; some libraries less mature; deployment tooling has improved but isn't as turnkey as JS; type system limitations vs. TypeScript). The piece is explicit that Elixir's per-runtime ops cost is _lower_ than Node's, but adopting it as a _second_ runtime alongside an existing stack is more overhead than running one stack regardless of which one. That observation is the basis for KI-009.
-
-This retrospective informed the choice of Path 3 (hybrid) over Path 2 (full rewrite) — see Alternatives below.
+The architectural pattern was the deliverable of the research, not the language. The convergence across the live-multiplayer space is what made the decision tractable; the language choice happens inside that pattern.
 
 ### The convergent pattern
 
-Across Sleeper, Discord, Figma, and the broader live-multiplayer space, the architectural shape we're adopting recurs:
+Across the relevant reference systems — Sleeper, Discord, Figma, Yahoo Fantasy, ESPN Fantasy — the same architectural shape recurs for live multiplayer state:
 
 1. **One persistent server process per "room" / "doc" / "draft" / "guild."** State held in memory for the duration of the session.
 2. **Bidirectional WebSocket transport** between clients and that process.
-3. **Durability layer** (database, event log, blob storage) for crash recovery and historical access — **not** on the hot path of action → broadcast.
+3. **Durability layer** (database, event log) for crash recovery and historical access — **not** on the hot path of action → broadcast.
 4. **Reconnection via snapshot or event-replay** so brief network drops don't lose state.
 
-This is not a novel architecture for Citrus to invent. It is the architecture that the relevant reference systems all converge on. Choosing it for Phase 4.5 brings Citrus's draft engine into the same architectural neighborhood as the systems users are unconsciously comparing it to.
+This is the architecture Citrus's draft engine adopts. Languages and runtimes vary (Sleeper/Discord on Elixir/BEAM, Figma on Rust, Yahoo/ESPN on assorted JVM/Java stacks); the pattern is what makes them work.
+
+### Reference reading
+
+- **Sleeper** — directly comparable fantasy product. Engineering writeups document Elixir/Phoenix for the live-experience layer: ["The Story of Sleeper"](https://draftkick.com/blog/story-of-sleeper/); [ScyllaDB case study](https://www.scylladb.com/2020/10/22/sleeper-app-using-scylla-to-level-the-playing-field/).
+- **Discord** — billion-message-per-day persistent-process model: ["Architecting for Hyperscale"](https://d4dummies.com/architecting-for-hyperscale-an-in-depth-analysis-of-discords-billion-message-per-day-infrastructure/). The "one process per guild" pattern translates to "one `DraftRoom` per active draft."
+- **Figma** — non-fantasy reference, same pattern in Rust: ["How Figma's Multiplayer Technology Works"](https://www.figma.com/blog/how-figmas-multiplayer-technology-works/); ["Making Multiplayer More Reliable"](https://www.figma.com/blog/making-multiplayer-more-reliable/) (informs the chunk 11g.4 reconnection protocol).
+
+### Why Node delivers the pattern
+
+The pattern doesn't require a specific runtime — it requires *persistent code with in-memory state and WebSocket transport*. Node delivers all three. A single Node process holds long-lived `DraftRoom` instances in memory across requests; the `ws` (or `socket.io`) library handles WebSocket upgrades on the existing Hono server; `setTimeout` drives per-draft autopick timers in-process. At v1 scale (~50 concurrent drafts at peak), the V8 event loop handles the pick + broadcast workload comfortably inside the Mandate's tail-latency targets.
+
+The language choice was settled by execution risk and ecosystem fit, not architectural fit — see § Decision History for the full path. The pattern carries to any future runtime if scale ever justifies revisiting.
 
 ## Decision
 
