@@ -79,14 +79,9 @@ const ScheduleManager = () => {
     loadScheduleData();
   }, [loadScheduleData]);
 
-  // Redirect pool leagues to their pool page
-  const _poolType = activeLeagueFormat?.leagueType;
-  if (isPoolLeague(_poolType) && activeLeagueId) {
-    return <Navigate to={getPoolRoute(_poolType!, activeLeagueId)} replace />;
-  }
-
-  // Game-density derived data — computed once per nhlGames change. This is a
-  // pure transform, no new API calls; keeps the function-call audit identical.
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURN.
+  // Game-density derived data — pure transform of nhlGames, no new API
+  // calls; safe to compute even for pool leagues that early-return below.
   const teamGameCounts = useMemo(() => {
     const counts = new Map<string, { team: string; games: number; days: Set<string> }>();
     for (const g of nhlGames) {
@@ -140,6 +135,12 @@ const ScheduleManager = () => {
     }
     return counts;
   }, [nhlGames]);
+
+  // Redirect pool leagues to their pool page (must come AFTER all hooks).
+  const _poolType = activeLeagueFormat?.leagueType;
+  if (isPoolLeague(_poolType) && activeLeagueId) {
+    return <Navigate to={getPoolRoute(_poolType!, activeLeagueId)} replace />;
+  }
 
   const maxDayCount = Math.max(1, ...Object.values(dayCounts));
   const maxTeamGames = Math.max(1, ...teamGameCounts.map(t => t.games));
