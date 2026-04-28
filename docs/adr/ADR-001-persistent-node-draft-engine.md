@@ -144,44 +144,37 @@ What carries forward from the prior decision-day work: the Performance Mandate, 
 
 ## Alternatives Considered
 
-### Path 1 — Node.js-only Phase 4.5 (rejected)
+### (a) Separate Cloud Run service for the draft worker (rejected)
 
-**Shape.** Stay on Node.js + Supabase Edge Functions. Address Phase 4's perf failures within the existing runtime: replace pg_cron + 2-min keep-alive with a Cloud Run service running a Node.js process that holds in-memory state per draft, switch transport from Supabase Realtime to Socket.IO or `ws` running on the same Node service, port the candidate-pool cache.
+**Shape.** New Node.js service deployed to its own Cloud Run instance, alongside the existing Hono server. WebSocket client connections terminate at the new service; the existing server stays focused on the HTTP API.
 
-**Why considered.** Lowest-friction path. No new language, no new ops surface, no learning curve. Could ship fastest if it worked.
+**Why considered.** Architectural separation: clean failure isolation, independent scaling, independent deploys for the draft engine without rolling the API.
 
-**Why rejected.** Two reasons:
+**Why rejected.** Operational complexity for marginal v1 benefit. Two deployment units, two CI configurations, two observability surfaces, a routing layer between them, and increased coordination overhead during deploys — all to host a workload that comfortably fits inside the existing server at v1 scale (~50 concurrent drafts at peak). The architectural pattern (persistent state per draft + WebSocket transport + event log) doesn't require service separation; it requires persistent code, which the existing server already provides. **If future scale ever justifies splitting it out, doing so is a refactor, not a rewrite — Phase 0–4 primitives don't change.**
 
-1. **Insufficient ceiling for the longer roadmap.** Citrus's product roadmap includes daily-fantasy expansion: short-window contests, real-time score updates, large concurrent contest pools, live in-game scoring deltas. These workloads demand sustained high-concurrency message fanout with predictable tail latency — the regime where Node's single-threaded event loop and per-request memory model start showing their limits without aggressive workarounds. We'd be re-architecting again in 12–18 months for the same reason we're re-architecting now: chasing a competitive performance bar against a roadmap the current runtime wasn't sized for. Pay the architectural cost once.
-2. **No reference architecture at the relevant scale.** No fantasy-sports comparable we can find runs the live experience on Node. The pattern that demonstrably works at scale (Sleeper, Discord) is on the BEAM. Choosing Node here means inventing a path no one we're aware of has actually shipped to the relevant scale, while passing on the path our most credible competitor demonstrably ships.
+### (b) Keep Edge Functions as a disaster-recovery safety net (rejected)
 
-### Path 2 — Full Elixir rewrite (rejected)
+**Shape.** Move the hot path to in-server code but retain the Phase 0–4 Edge Function infrastructure (pgmq queue, pg_cron sweep + keep-alive, Deno autopick worker, vendored shared code) as a passive fallback that activates if the persistent worker is unavailable.
 
-**Shape.** Rewrite everything — main app, Stormy AI, data pipeline, scoring, public pages — in Elixir/Phoenix. Single runtime in production. Maximum architectural coherence.
+**Why considered.** Defense in depth. If the server crashes mid-draft, the cron sweep would catch missed deadlines and commit autopicks via the existing Edge Function path.
 
-**Why considered.** Eliminates the dual-runtime ops cost (KI-009). Single language across the stack. Hiring story simpler.
+**Why rejected.** The infrastructure cost outweighs the benefit at v1 scale, and event log replay on Cloud Run restart already provides the recovery story. Concretely: keeping the safety net means maintaining the pg_cron jobs (`draft-deadline-sweep`, `draft-autopick-keepalive`), the pgmq queue (`draft_deadlines`) and archive table, the vendored shared code (KI-007), the cross-runtime hash agreement infrastructure, the Vault secret and keep-alive token plumbing, and the Deno-runtime worker — for a code path that almost never fires under normal operation. Cloud Run restart latency is on the order of seconds; the WebSocket reconnect protocol covers that gap. The simplest thing that works wins. KI-009 captures the reasoning in the registry.
 
-**Why rejected.** Scope. The non-draft features in the Citrus codebase represent ~18 months of work: leagues, rosters, matchups, scoring, the data pipeline, Stormy, public pages, the React SPA. Rewriting them is a year-plus project that solves a problem we don't have. The non-draft features perform fine on Node. The mandate's perf targets are about the live draft experience; the rest of the app can take 800ms to load a roster page and no user notices. There's no UX win from rewriting the rest, and there's a year of opportunity cost.
+### (c) Elixir/Phoenix migration (rejected)
 
-### Path 3 — Hybrid: Node main app + Elixir draft engine (selected)
+**Shape.** Separate Elixir/Phoenix service, persistent BEAM processes per draft, Phoenix Channels for transport.
 
-**Shape.** What's described in the Decision section above.
+**Why considered.** Sleeper and Discord both run Elixir for similar workloads. OTP supervision trees map cleanly onto "one process per active draft." Best-in-class tail-latency profile under sustained load.
 
-**Why selected.** Pays the architectural cost exactly where the cost is justified: the live draft engine, which (a) has the binding performance mandate, (b) has a clear reference architecture in the Elixir/Phoenix world, (c) has the most direct user-perceived UX impact. Leaves the rest of the application in its current mature, working state. The ~16-week implementation timeline (Phases 4.5 + 4.6) is bounded; a full rewrite would have been 12+ months.
+**Why rejected.** Solo-founder execution risk over a 16-week timeline. New language + new runtime + new framework + new deploy target + new observability surface + new testing harness, all simultaneously. The architectural pattern is what delivers the Mandate's targets, not the language; persistent Node code delivers the same pattern with the founder's existing toolchain (TypeScript, npm, Hono, Vitest, Cloud Run). The full audit trail is in § Decision History.
 
-The dual-runtime ops cost is real (tracked as KI-009). The mitigation is to define the cross-runtime contract narrowly (the Postgres RPC surface + the WebSocket message protocol) and let each runtime own its lane. The boundary is the integration; everything inside each lane is single-runtime.
+### (d) Optimize within the Edge Function model (rejected)
 
-### Go (rejected as the engine language)
+**Shape.** Stay on Edge Functions and tighten the existing autopick path: shorter cron cadence, candidate caching across keep-alive ticks, request coalescing.
 
-Go was the strongest non-Elixir candidate. Goroutines, channels, mature ecosystem, smaller learning curve from a Node/TS background, excellent tooling. Many high-concurrency real-time systems run on Go. Discord famously moved one of its hot paths from Go to Rust, not from Go to Elixir — suggesting Go can clear the relevant performance bar.
+**Why considered.** Lowest-friction path. No deployment changes.
 
-We rejected Go for the engine for three specific reasons:
-
-1. **Predictability under sustained load.** Go's per-process garbage collector pauses are well-bounded but apply to the entire process. Under sustained high-concurrency workloads (the daily-fantasy regime), GC pause tail latency in Go is observably worse than BEAM's per-process / generational scheme. The BEAM was designed for soft-real-time telecom workloads where tail latency is the metric; that design pays off exactly in our hot-path regime.
-2. **Supervision tree as a domain fit.** Erlang/OTP's supervisor + GenServer + DynamicSupervisor patterns map almost too neatly onto "one persistent process per draft, restart on crash, hot-code-reload on deploy without dropping connections." In Go we'd be hand-rolling the same patterns with goroutines, channels, and a custom restart policy. We'd end up reinventing OTP poorly. In Elixir, OTP is the runtime.
-3. **Architectural parity with the reference systems.** Sleeper and Discord both run Elixir for the workloads we're modeling. Choosing Elixir means our debugging, profiling, and capacity-planning playbooks can borrow from theirs. Choosing Go means we're alone in our specific architectural neighborhood — possibly fine, but a different risk profile.
-
-Go would have been a defensible choice. Elixir is the better-fit choice given our roadmap. The Week 1 validation gate (see below) explicitly leaves the door open to revisiting Go if the Elixir learning curve proves unworkable for a solo founder.
+**Why rejected.** **Ephemeral functions are the wrong runtime model for live multiplayer state.** The 11.7s/pick on Phase 4 staging breaks down structurally — pg_cron cadence, cold starts, no persistent state across invocations, third-party Realtime fanout limits. Best-case in-architecture optimization is ~30–50% reduction; the Mandate requires ~10×. The architecture, not the implementation, is what fails the targets.
 
 ## Consequences
 
