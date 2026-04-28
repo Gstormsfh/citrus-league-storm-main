@@ -1,3 +1,64 @@
+# Citrus Draft Performance Mandate
+
+## Non-negotiable competitive requirements
+
+Citrus's live draft experience MUST be competitive with Yahoo Fantasy and ESPN Fantasy on every dimension users perceive. This is not an optimization goal. It is a foundational design constraint equivalent to correctness.
+
+### Hard performance targets
+
+These targets define what "competitive" means. Any architecture, design, or implementation that cannot meet these targets is rejected by definition, regardless of how sophisticated, correct, or elegant it is.
+
+- **Manual pick submission** (user clicks "draft player" → all participants see the pick): p95 ≤ 300ms, p99 ≤ 500ms
+- **Autopick latency** (deadline expiry → pick committed and broadcast): p95 ≤ 1000ms, p99 ≤ 2000ms
+- **Draft state load** (user enters draft room → fully rendered with current state): p95 ≤ 1500ms
+- **Timer accuracy** (server-displayed countdown vs actual deadline): drift < 100ms across all clients
+- **Pick-to-broadcast fanout** (server commits pick → all connected clients have updated UI): p95 ≤ 200ms
+- **Reconnection recovery** (client WebSocket drops → reconnects → state resynced): p95 ≤ 2000ms
+
+### Architectural implications
+
+The performance targets above require specific architectural choices. Designs that conflict with these are rejected:
+
+1. **Persistent stateful worker per active draft.** Drafts run in long-lived processes that hold state in memory for the duration of the draft. Stateless function-per-request architectures cannot meet sub-200ms broadcast fanout at scale.
+
+2. **WebSocket transport for live drafts.** Manual picks, broadcasts, timer updates, and chat all flow through bidirectional WebSocket connections. HTTP polling and long-poll are insufficient for the broadcast targets above.
+
+3. **In-memory candidate pool and pre-computed scoring per draft.** Autopick decisions consult cached state, not Postgres queries. A per-pick query of the player pool cannot meet sub-1s autopick latency.
+
+4. **Postgres as durability and disaster recovery, not hot path.** The event log, projection tables, and pgmq scheduler remain as the source of truth and the safety net. They are not on the hot path for manual pick submission, broadcast fanout, or autopick scoring.
+
+5. **WebSocket reconnection with state snapshot recovery.** Mobile network blips, page refreshes, and brief connection drops are normal user behavior. Clients must reconnect and resync within 2 seconds without losing draft progress.
+
+### Design review checklist
+
+Before any architectural change, design proposal, or new chunk plan is approved, it must explicitly answer:
+
+1. Does this design meet every performance target listed above? Show the back-of-envelope calculation.
+2. If not, which target does it fail and why? Is the failure acceptable given the alternative? (Default answer: no.)
+3. Does this design support the architectural patterns in #1-5 above, or does it conflict with them?
+4. If a chunk plan defers performance work to a later phase, does that later phase have a concrete plan and timeline, or is it "we'll figure it out"?
+
+### Non-negotiables
+
+The following are NOT acceptable framings, regardless of how persuasive the surrounding argument:
+
+- "We can optimize this later" — for any user-perceived latency
+- "It's only slow in the autopick path" — autopick IS user-perceived
+- "Most users won't notice" — Yahoo/ESPN users will compare; we lose
+- "It's competitive with v1" — v1 is not the bar; Yahoo/ESPN are
+- "It's good enough for the demo" — there is no demo bar separate from the competitive bar
+- "The architecture supports optimization later" — only counts if later is scheduled and bounded
+
+### Recovery from prior decisions
+
+The Phase 0-4 architecture solved correctness but did not solve competitive performance. The Phase 4.5 redesign (persistent worker + WebSocket transport + in-memory state) is required to bring the system to competitive parity before Phase 5 (UI) is built on top of it.
+
+Phase 5 must NOT be built against the Phase 0-4 architecture alone. It must be built against the Phase 4.5-extended architecture, or it will require rework when performance gaps are discovered later.
+
+This document is the source of truth on this. If a future plan contradicts it, this document wins.
+
+---
+
 # Citrus Fantasy Sports — Engineering Standards
 
 ## Project Overview
