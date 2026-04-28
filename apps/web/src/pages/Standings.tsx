@@ -477,9 +477,9 @@ const Standings = () => {
       </div>
 
       {/* MOBILE: Compact header with league context */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Standings</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">Standings</h1>
           <div className="flex items-center gap-1">
             {(activeLeague?.name || leagueTeams.length > 0) && (
               <span className="text-xs font-display text-citrus-charcoal/50 truncate max-w-[120px]">

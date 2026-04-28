@@ -211,9 +211,9 @@ const StormyAssistant = () => {
     <div className="min-h-screen bg-[#D4E8B8] flex flex-col relative">
       <CitrusBackground density="light" />
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Stormy Assistant</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">Stormy Assistant</h1>
         </div>
       </div>
 

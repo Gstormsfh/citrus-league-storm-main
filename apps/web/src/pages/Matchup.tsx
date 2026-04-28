@@ -5074,7 +5074,7 @@ const Matchup = () => {
       </div>
       
       {/* MOBILE: Sticky scoreboard header — ESPN/Yahoo style */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-14 px-3">
           {/* My team score */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
