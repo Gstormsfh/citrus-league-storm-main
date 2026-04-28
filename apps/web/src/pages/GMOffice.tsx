@@ -148,7 +148,7 @@ const GMOffice = () => {
     'Lineup Manager',
   ]);
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-foreground relative">
+    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
@@ -175,10 +175,13 @@ const GMOffice = () => {
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
               {/* Compact page header */}
               <div className="hidden lg:block max-w-5xl mx-auto mb-4">
-                <h1 className="text-2xl font-varsity font-black text-citrus-forest uppercase tracking-tight">
+                <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5">
+                  ✦ Command Center
+                </div>
+                <h1 className="font-calistoga text-3xl text-pastel-cream leading-none">
                   {isPool ? `${getPoolLabel(leagueType!)} Pool Hub` : "GM's Office"}
                 </h1>
-                <p className="text-sm font-display text-citrus-charcoal/70">
+                <p className="text-sm text-white/55 mt-2">
                   {isPool ? 'Your pool command center' : 'Your command center for team management and strategy'}
                 </p>
               </div>
@@ -198,15 +201,15 @@ const GMOffice = () => {
                 <div className="max-w-3xl mx-auto mb-4">
                   <Link
                     to={`/playoffs/${activeLeagueId}`}
-                    className="flex items-center justify-between gap-3 rounded-lg border-2 border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/40 dark:to-yellow-950/40 px-4 py-3 hover:shadow-md transition-shadow"
+                    className="flex items-center justify-between gap-3 rounded-2xl ring-1 ring-amber-400/50 bg-gradient-to-r from-amber-500/15 to-yellow-500/10 px-4 py-3 hover:ring-amber-400/70 hover:bg-amber-500/15 transition-all shadow-[0_8px_24px_-12px_rgba(251,191,36,0.3)]"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <Trophy className="w-5 h-5 text-amber-600 shrink-0" />
-                      <span className="font-bold text-foreground truncate">
+                      <Trophy className="w-5 h-5 text-amber-400 shrink-0" />
+                      <span className="font-bold text-pastel-cream truncate">
                         {playoffChampion.championTeamName} — League Champion
                       </span>
                     </div>
-                    <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 shrink-0">
+                    <span className="text-xs font-jbmono uppercase tracking-[0.22em] font-bold text-amber-300 shrink-0">
                       View Bracket
                     </span>
                   </Link>
@@ -216,10 +219,10 @@ const GMOffice = () => {
                 <div className="max-w-3xl mx-auto mb-4">
                   <Link
                     to={`/playoffs/${activeLeagueId}`}
-                    className="flex items-center justify-between px-3 py-2 rounded-md border border-border/40 bg-muted/30 text-sm hover:bg-muted/50 transition-colors"
+                    className="flex items-center justify-between px-3 py-2 rounded-xl ring-1 ring-white/10 bg-white/5 text-sm hover:bg-white/10 transition-colors"
                   >
-                    <span className="text-muted-foreground">Playoffs in Progress</span>
-                    <span className="font-medium text-primary">View Bracket</span>
+                    <span className="text-white/55">Playoffs in Progress</span>
+                    <span className="font-medium text-pastel-orange">View Bracket</span>
                   </Link>
                 </div>
               )}
@@ -229,15 +232,15 @@ const GMOffice = () => {
                   <div
                     role="status"
                     aria-live="polite"
-                    className="flex items-center justify-between gap-3 rounded-lg border-2 border-citrus-forest bg-citrus-cream px-4 py-3 shadow-[0_4px_0_rgba(27,48,34,0.15)]"
+                    className="flex items-center justify-between gap-3 rounded-2xl ring-1 ring-pastel-orange/40 bg-[#1A2A20] px-4 py-3 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <Trophy className="w-5 h-5 text-citrus-orange shrink-0" />
-                      <span className="font-varsity font-bold text-citrus-forest truncate">
+                      <Trophy className="w-5 h-5 text-pastel-orange shrink-0" />
+                      <span className="font-bold text-pastel-cream truncate">
                         Season Complete — Rosters Locked
                       </span>
                     </div>
-                    <Badge className="bg-citrus-sage border-2 border-citrus-forest text-citrus-cream text-xs font-varsity font-bold shrink-0">
+                    <Badge className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold shrink-0">
                       Read Only
                     </Badge>
                   </div>
@@ -251,35 +254,35 @@ const GMOffice = () => {
               <CitrusSectionDivider />
               
               <TooltipProvider>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto mt-4">
                 {actions.map((action, index) => {
                   const isLocked = seasonComplete && LOCKED_ACTION_TITLES.has(action.title);
                   const cardInner = (
                     <Card className={cn(
-                      "h-full border-4 border-citrus-forest overflow-hidden relative bg-citrus-cream corduroy-texture rounded-[2rem] shadow-[0_6px_0_rgba(27,48,34,0.2)]",
+                      "h-full border-0 ring-1 ring-white/10 overflow-hidden relative bg-[#1A2A20] rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]",
                       isLocked
-                        ? "opacity-60 cursor-not-allowed grayscale"
-                        : "transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_0_rgba(223,117,54,0.4)] cursor-pointer",
+                        ? "opacity-50 cursor-not-allowed grayscale"
+                        : "transition-all duration-300 hover:-translate-y-0.5 hover:ring-pastel-orange/40 hover:shadow-[0_24px_60px_-16px_rgba(255,168,87,0.25)] cursor-pointer",
                     )}>
-                      {/* Background gradient */}
-                      <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-br ${action.gradient} opacity-10`} />
-                      
-                      {/* Floating citrus icon */}
-                      <action.citrusIcon className="absolute top-2 right-2 w-12 h-12 text-citrus-sage/10 rotate-12" />
-                      
-                      <CardHeader className="relative z-10">
-                        <div className="relative">
-                          <div className={`w-20 h-20 rounded-varsity bg-gradient-to-br ${action.gradient} border-4 border-citrus-forest flex items-center justify-center mb-4 group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)]`}>
-                            <action.icon className="h-10 w-10 text-citrus-cream" strokeWidth={2.5} />
+                      {/* Decorative gradient corner glow */}
+                      <div aria-hidden="true" className="absolute top-0 right-0 w-56 h-56 bg-pastel-orange/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none transition-opacity duration-300 group-hover:bg-pastel-orange/20" />
+
+                      {/* Floating citrus icon — subtle */}
+                      <action.citrusIcon aria-hidden="true" className="absolute top-3 right-3 w-10 h-10 text-pastel-orange/15 rotate-12 transition-all duration-300 group-hover:text-pastel-orange/30 group-hover:rotate-6" />
+
+                      <CardHeader className="relative z-10 p-6">
+                        <div className="relative mb-4">
+                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pastel-orange/30 to-pastel-orange/10 ring-1 ring-pastel-orange/30 flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:ring-pastel-orange/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                            <action.icon className="h-7 w-7 text-pastel-orange" strokeWidth={2} />
                           </div>
                           {action.hasNewInsight && (
-                            <Badge className="absolute top-0 right-0 bg-citrus-orange border-2 border-citrus-forest text-citrus-cream text-xs font-varsity font-bold shadow-patch">
-                              New!
+                            <Badge className="absolute -top-1.5 -right-1.5 bg-pastel-orange ring-1 ring-pastel-orange/40 text-[#0F1F15] text-[9px] font-jbmono uppercase tracking-[0.18em] font-bold px-2 py-0.5">
+                              New
                             </Badge>
                           )}
                         </div>
-                        <CardTitle className="text-xl font-varsity font-black text-citrus-forest uppercase tracking-tight group-hover:text-citrus-orange transition-colors">{action.title}</CardTitle>
-                        <CardDescription className="text-sm mt-2 font-display text-citrus-charcoal">
+                        <CardTitle className="font-calistoga text-xl text-pastel-cream leading-tight transition-colors group-hover:text-pastel-orange">{action.title}</CardTitle>
+                        <CardDescription className="text-sm mt-2 text-white/55 leading-relaxed">
                           {action.description}
                         </CardDescription>
                       </CardHeader>
@@ -329,7 +332,7 @@ const GMOffice = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) - Extends to edge */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>
