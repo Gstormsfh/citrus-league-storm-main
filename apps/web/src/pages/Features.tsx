@@ -30,15 +30,18 @@ const CORE_FEATURES: Array<{
   desc: string;
   icon: React.ComponentType<{ className?: string }>;
   accent: AccentName;
+  scene?: string;
 }> = [
   {
     label: 'Stormy AI Assistant',
+    scene: '/mascots/scene-stormy-ai.webp',
     desc: 'Data-driven draft advice, trade analysis, and lineup optimization powered by advanced AI and industry-leading projections. Plugged into your roster, scoring, and matchup.',
     icon: ScoreboardIcon,
     accent: 'orange',
   },
   {
     label: 'Live Scoring Updates',
+    scene: '/mascots/scene-livescoring.webp',
     desc: 'Real-time scoring updates with live stats and advanced metrics during games. Watch your matchup shift with every shot, hit, block, and save.',
     icon: ShiftIcon,
     accent: 'sage',
@@ -57,12 +60,14 @@ const CORE_FEATURES: Array<{
   },
   {
     label: 'Dynasty Support',
+    scene: '/mascots/scene-cup.webp',
     desc: 'Built-in tools for keeper and dynasty leagues, including future draft pick trading, contract years, and prospect rankings.',
     icon: CupIcon,
     accent: 'orange',
   },
   {
     label: 'Draft Tools',
+    scene: '/mascots/scene-draft.webp',
     desc: 'Mock drafts against AI managers, cheat sheets, ADP rankings, and live draft rooms with chat. Build your championship team with confidence.',
     icon: DraftIcon,
     accent: 'sage',
@@ -76,9 +81,11 @@ const FORMATS: Array<{
   accent: AccentName;
   icon: React.ComponentType<{ className?: string }>;
   to: string;
+  scene?: string;
 }> = [
   {
     label: 'Snake / Auction / Salary',
+    scene: '/mascots/scene-squad.webp',
     sub: 'Run any league format. Custom scoring, commish tools, live draft rooms.',
     badge: 'Fantasy',
     accent: 'orange',
@@ -87,6 +94,7 @@ const FORMATS: Array<{
   },
   {
     label: 'Daily Pickem',
+    scene: '/mascots/scene-pickem.webp',
     sub: 'Pick the winner of every NHL game. Straight up — no spreads, no over-unders.',
     badge: 'Daily',
     accent: 'sage',
@@ -95,6 +103,7 @@ const FORMATS: Array<{
   },
   {
     label: 'Survivor Pool',
+    scene: '/mascots/scene-survivor.webp',
     sub: "One pick a week, can't reuse teams. Lose once and you're in the sin bin.",
     badge: 'Weekly',
     accent: 'butter',
@@ -103,6 +112,7 @@ const FORMATS: Array<{
   },
   {
     label: 'Stanley Cup Brackets',
+    scene: '/mascots/scene-cup.webp',
     sub: 'Predict the entire playoff run. Confidence-weighted scoring all the way to the Cup.',
     badge: 'Apr–Jun',
     accent: 'peach',
