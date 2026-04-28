@@ -61,29 +61,34 @@ This document is the source of truth on this. If a future plan contradicts it, t
 
 # Tech Stack
 
-## Hybrid runtime: Node.js/Next.js main app + Elixir/Phoenix draft engine
+## Live draft engine: persistent code inside the existing Node server
 
-Per **ADR-001** (`docs/adr/ADR-001-elixir-phoenix-draft-engine.md`), the live draft engine is built as a separate Elixir/Phoenix service holding per-draft state in memory and communicating via WebSocket transport. The rest of the application — leagues, rosters, matchups, scoring dashboards, AI assistant, public pages — remains on the existing Node.js / Next.js / Supabase stack.
+Per **ADR-001** (`docs/adr/ADR-001-persistent-node-draft-engine.md`), the live draft engine is **persistent code running inside the existing Node.js / Hono server on Cloud Run**, not a separate service. The engine:
 
-This is a deliberate hybrid. The driver was the Performance Mandate above: the existing Node.js + Edge Function architecture cannot meet sub-1s autopick latency or sub-200ms broadcast fanout at scale. The Elixir/Phoenix runtime — the same architectural pattern Sleeper, Discord, and other real-time multiplayer systems converge on — meets those targets natively via persistent BEAM processes and Phoenix Channels.
+- Communicates with browser clients via **WebSocket** (added to the existing Node server in chunk 11g.1).
+- Holds **per-draft in-memory state** (one `DraftRoom` instance per active draft) for the duration of the draft.
+- Writes durably to Postgres via the **existing Phase 2 RPCs** (`submit_pick_v2`, `append_draft_event`, `record_shadow_event`, `reconstruct_draft_state`, `draft_pause`, `draft_resume`, `draft_extend`, `validate_draft_event_payload`). The integration boundary is the existing RPC surface; it does not change without an ADR.
+- **Recovers via event log replay on service restart.** No separate disaster-recovery path. On startup the server queries `draft_events` for active drafts, rebuilds in-memory `DraftRoom` state, and resumes timers. Connected clients reconnect via the WebSocket resume protocol with their `last_seen_id`.
+
+The driver was the Performance Mandate above: the Phase 0–4 architecture used Supabase Edge Functions as the autopick host, which is the **wrong runtime model** for live multiplayer state. Edge Functions are ephemeral stateless invocations; live drafts demand persistent stateful processes. World-class real-time platforms (Discord, Sleeper, Figma, Yahoo, ESPN) all use persistent stateful server processes for the live experience layer. Putting the engine inside the existing Node server keeps it on the founder's existing toolchain (TypeScript, npm, Hono, Vitest, Cloud Run) with no new language, no new deploy target, no new operational surface — and removes the Edge Function infrastructure entirely (KI-009).
 
 ### What runs where
 
-- **Node.js / Next.js / Supabase** (existing): apps/web (React SPA), server (Hono API), packages/shared, data-pipeline (Python NHL ingest), supabase/migrations, supabase/functions/* except draft-autopick. All non-draft features. All durability storage (Postgres event log, projection tables, RLS).
-- **Elixir / Phoenix** (new, Phase 4.5+): the live draft engine. Persistent `DraftServer` GenServers — one per active draft — hold candidate pool, current pick, timer, and per-team queue in memory. Phoenix Channels deliver picks/broadcasts/timer ticks over WebSocket. The Elixir service writes durably to Postgres via the existing `submit_pick_v2` RPC and reads the event log via Ecto.
-- **Edge Function `draft-autopick`** (existing, role changes): demoted from hot-path autopick worker to fallback-only. The pgmq sweep + keep-alive cron remain as the disaster-recovery safety net — if the Elixir engine is unavailable mid-draft, the Edge Function path still commits picks (slowly but correctly). No code is deleted; the wiring changes.
+- **Node.js / Next.js / Supabase main app** (existing): apps/web (React SPA), `server/` (Hono API + the new draft engine code), packages/shared, data-pipeline (Python NHL ingest), supabase/migrations. All non-draft features. All durability storage (Postgres event log, projection tables, RLS).
+- **Live draft engine** (new in `server/`, Phase 4.5+): a `DraftRoom` class plus a WebSocket layer added inside the existing Node server. Picks/broadcasts/timer ticks/presence flow over WebSocket. Autopick is a `setTimeout` per draft. Recovery is event-log replay on server startup.
+- **Edge Function `draft-autopick` and pgmq scheduler** (existing): **removed entirely in Phase 4.5 chunk 11g.8.** The pg_cron jobs (`draft-deadline-sweep`, `draft-autopick-keepalive`) get unscheduled, the pgmq queue (`draft_deadlines`) and its archive get dropped, the Deno code at `supabase/functions/draft-autopick/` and the vendored shared code at `supabase/functions/_shared/_vendored/` get deleted. The Phase 0–4 infrastructure was a correctness scaffold; once the persistent in-server engine carries the hot path and event log replay carries recovery, the scaffold is no longer pulling its weight (KI-009).
 
 ### Working in this codebase
 
-- **Sessions touching the draft engine** (anything under `elixir/` once it lands; or anything in supabase/migrations or server/ that interacts with `submit_pick_v2`, `draft_events`, `draft_picks_v2`, `pgmq` queues, or `draft-autopick`) MUST use Elixir patterns where the runtime is Elixir, and MUST honor the existing event-log + idempotency-key + payload-hash contracts where the runtime is Node/Postgres. The cross-runtime contract (RPC signatures, payload shapes, idempotency-key derivation) is the integration boundary; it does not change without an ADR.
-- **Sessions touching the main app** (apps/web, server/ routes that aren't draft, packages/shared, data-pipeline, public pages, AI Assistant) continue with the existing TypeScript/Node patterns documented under "Engineering Standards" below. No Elixir.
-- **Sessions touching shared utilities** (`packages/shared/`) need to consider whether the change affects the cross-runtime contract. Changes to `computePickPayloadHash`, `AUTOPICK_NAMESPACE_UUID`, `ScoringSettings`, or anything in the draft hot path require coordinated updates to the Elixir engine. Other shared utilities are Node/TS only.
+- **Sessions touching the draft engine** (the new `DraftRoom`/WebSocket code in `server/`, or anything in `supabase/migrations/` that interacts with `submit_pick_v2`, `draft_events`, `draft_picks_v2`) use the existing TypeScript / Node patterns. The integration boundary is the existing Postgres RPC surface (which doesn't change without an ADR) plus the WebSocket message protocol (chunk 11g.1's deliverable).
+- **Sessions touching the main app** (apps/web, server/ routes that aren't draft, packages/shared, data-pipeline, public pages, AI Assistant) continue with the existing TypeScript/Node patterns documented under "Engineering Standards" below.
+- **Sessions touching shared utilities** (`packages/shared/`) — `computePickPayloadHash`, `AUTOPICK_NAMESPACE_UUID`, `ScoringSettings` are imported directly by the draft engine code. No vendoring (KI-007 resolves when the Edge Functions are removed in chunk 11g.8).
 
 ### See also
 
-- `docs/adr/ADR-001-elixir-phoenix-draft-engine.md` — full ADR with research, alternatives, and consequences.
-- `docs/PHASE_4_5_PLAN.md` — chunk-by-chunk plan for the Elixir engine build-out.
-- `docs/REGISTRY.md` — project-wide known-issues registry. KI-008 (architectural pivot) and KI-009 (operational complexity of dual runtimes) live here.
+- `docs/adr/ADR-001-persistent-node-draft-engine.md` — full ADR with research, alternatives, Decision History, and consequences.
+- `docs/PHASE_4_5_PLAN.md` — chunks 11g.1 through 11g.9 implementation plan.
+- `docs/REGISTRY.md` — project-wide known-issues registry. KI-008 (architectural pivot from Edge Functions), KI-009 (Edge Function infrastructure removed entirely), KI-010 (Tier 1 perf optimizations baked in from start) live here.
 
 ---
 
