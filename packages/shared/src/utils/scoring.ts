@@ -66,8 +66,45 @@ export class ScoringCalculator {
   private settings: ScoringSettings;
 
   constructor(settings?: ScoringSettings | Partial<ScoringSettings> | null) {
-    // Handle both ScoringSettings interface and raw league.scoring_settings objects
-    this.settings = (settings as ScoringSettings) || DEFAULT_SCORING;
+    // Accept null/undefined → use defaults silently (expected path).
+    // Accept a full ScoringSettings object (has .skater AND .goalie)
+    //   → use as-is.
+    // Reject malformed input (e.g. {} from an unprovisioned league
+    // row, or a Partial<ScoringSettings> missing one of the sub-
+    // objects) → console.warn AND fall back to defaults rather than
+    // crash downstream when calculatePoints reads
+    // `this.settings.skater.goals`.
+    //
+    // The previous `|| DEFAULT_SCORING` shortcut only caught
+    // null/undefined/falsy values — `{}` is truthy in JS, so an
+    // empty object passed the gate and broke downstream. Caught by
+    // the Phase 4 SC-406b cross-transaction diagnostic on staging.
+    //
+    // Loud-fail-then-fallback over silent-fallback: the warn fires
+    // only when the caller PROVIDED an object that we couldn't use,
+    // not when they passed null/undefined (the expected "use
+    // defaults" path).
+    if (
+      settings != null &&
+      typeof settings === 'object' &&
+      (settings as Partial<ScoringSettings>).skater != null &&
+      (settings as Partial<ScoringSettings>).goalie != null
+    ) {
+      this.settings = settings as ScoringSettings;
+    } else {
+      if (settings != null) {
+        console.warn(
+          '[ScoringCalculator] Malformed scoring_settings — using defaults',
+          {
+            received:
+              typeof settings === 'object'
+                ? Object.keys(settings as object)
+                : typeof settings,
+          },
+        );
+      }
+      this.settings = DEFAULT_SCORING;
+    }
   }
 
   /**
