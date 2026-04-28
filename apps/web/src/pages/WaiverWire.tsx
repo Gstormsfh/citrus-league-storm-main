@@ -11,8 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Clock, AlertCircle, CheckCircle2, XCircle, User, Trophy } from 'lucide-react';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
-import { CitrusBackground } from '@/components/CitrusBackground';
-import { CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/CitrusIcons';
 import { WaiverService, type WaiverClaim, type WaiverPriority } from '@/services/WaiverService';
 import { PlayerService, type Player } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
@@ -391,8 +389,7 @@ const WaiverWire = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] flex flex-col relative">
-      <CitrusBackground density="light" />
+    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
@@ -407,25 +404,24 @@ const WaiverWire = () => {
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-2 lg:px-4 order-1 lg:order-2">
-              <div className="text-center mb-12 relative">
-              <CitrusLeaf className="absolute -top-4 -left-8 w-16 h-16 text-citrus-sage/15 rotate-12" />
-              <CitrusWedge className="absolute -top-2 -right-6 w-14 h-14 text-citrus-orange/15 -rotate-45" />
-              
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <Trophy className="w-10 h-10 text-citrus-orange" />
-                <h1 className="text-4xl md:text-5xl font-varsity font-black text-citrus-forest uppercase tracking-tight">Waiver Wire</h1>
-                <Trophy className="w-10 h-10 text-citrus-sage" />
-              </div>
-              <p className="text-lg font-display text-citrus-charcoal">
-                {isFAAB ? 'Place FAAB bids on free agents' : 'Manage waiver claims and priorities'}
-              </p>
-              {isFAAB && faabBudget !== null && (
-                <div className="mt-2 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-citrus-orange/10 border border-citrus-orange/30">
-                  <span className="text-sm font-bold text-citrus-forest">FAAB Budget:</span>
-                  <span className="text-lg font-varsity font-black text-citrus-orange">${faabBudget}</span>
+              <div className="text-left mb-8 relative">
+                <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 flex items-center gap-2">
+                  <Trophy className="w-3.5 h-3.5" />
+                  ✦ Waiver Wire
                 </div>
-              )}
-            </div>
+                <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none">
+                  {isFAAB ? 'Bid on the difference-maker.' : 'Claim before kickoff.'}
+                </h1>
+                <p className="text-sm text-white/55 mt-2">
+                  {isFAAB ? 'Place FAAB bids on free agents' : 'Manage waiver claims and priorities'}
+                </p>
+                {isFAAB && faabBudget !== null && (
+                  <div className="mt-4 inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-pastel-orange/15 ring-1 ring-pastel-orange/40 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]">
+                    <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft">FAAB Budget</span>
+                    <span className="font-calistoga text-2xl text-pastel-orange tabular-nums leading-none">${faabBudget}</span>
+                  </div>
+                )}
+              </div>
 
             {/* Demo Mode Banner */}
             {isGuestMode(userLeagueState) && (
@@ -440,58 +436,58 @@ const WaiverWire = () => {
 
             {/* Waiver Priority & Settings */}
             <div className="grid md:grid-cols-2 gap-6 mb-8">
-              <Card className="bg-citrus-cream corduroy-texture border-4 border-citrus-sage rounded-varsity shadow-patch relative overflow-hidden">
-                <CitrusSparkle className="absolute top-2 right-2 w-12 h-12 text-citrus-sage/10" />
+              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+                <div aria-hidden="true" className="absolute top-0 right-0 w-48 h-48 bg-pastel-sage/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
                 <CardHeader className="relative z-10">
-                  <CardTitle className="font-varsity font-black text-citrus-forest uppercase flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-citrus-orange" />
+                  <CardTitle className="font-calistoga text-lg text-pastel-cream flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-pastel-sage-soft" />
                     Your Waiver Priority
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="relative z-10">
                   {loading ? (
-                    <div className="text-center py-4 font-display">Loading...</div>
+                    <div className="text-center py-4 text-white/55">Loading…</div>
                   ) : myPriority ? (
                     <div className="text-center">
-                      <div className="text-6xl font-varsity font-black text-citrus-orange mb-2">
+                      <div className="font-calistoga text-6xl text-pastel-sage-soft tabular-nums leading-none mb-2">
                         #{myPriority}
                       </div>
-                      <p className="text-sm font-display text-citrus-charcoal">
+                      <p className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-white/55">
                         of {teamCount || waiverPriority.length} teams
                       </p>
                     </div>
                   ) : (
-                    <div className="text-center py-4 font-display text-citrus-charcoal">
+                    <div className="text-center py-4 text-white/55">
                       Priority not set
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              <Card className="bg-citrus-cream corduroy-texture border-4 border-citrus-orange rounded-varsity shadow-patch relative overflow-hidden">
-                <CitrusLeaf className="absolute top-2 right-2 w-12 h-12 text-citrus-orange/10 rotate-12" />
+              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+                <div aria-hidden="true" className="absolute top-0 right-0 w-48 h-48 bg-pastel-orange/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
                 <CardHeader className="relative z-10">
-                  <CardTitle className="font-varsity font-black text-citrus-forest uppercase flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-citrus-sage" />
+                  <CardTitle className="font-calistoga text-lg text-pastel-cream flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-pastel-orange" />
                     Waiver Settings
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 relative z-10">
-                  <div className="flex items-center justify-between p-3 bg-citrus-sage/10 rounded-varsity border-2 border-citrus-sage/30">
-                    <span className="text-sm font-display text-citrus-charcoal">Process Time</span>
-                    <span className="font-varsity font-bold text-citrus-forest">
+                <CardContent className="space-y-2 relative z-10">
+                  <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
+                    <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold">Process Time</span>
+                    <span className="text-sm font-bold text-pastel-cream">
                       {formatWaiverProcessTime(waiverSettings?.waiver_process_time)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-citrus-peach/10 rounded-varsity border-2 border-citrus-peach/30">
-                    <span className="text-sm font-display text-citrus-charcoal">Waiver Period</span>
-                    <span className="font-varsity font-bold text-citrus-forest">
+                  <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
+                    <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold">Waiver Period</span>
+                    <span className="text-sm font-bold text-pastel-cream tabular-nums">
                       {waiverSettings?.waiver_period_hours || 48} hours
                     </span>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-citrus-orange/10 rounded-varsity border-2 border-citrus-orange/30">
-                    <span className="text-sm font-display text-citrus-charcoal">Game Lock</span>
-                    <Badge className={`${waiverSettings?.waiver_game_lock ? 'bg-citrus-sage' : 'bg-citrus-charcoal'} text-citrus-cream font-varsity`}>
+                  <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
+                    <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold">Game Lock</span>
+                    <Badge className={`text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold border-0 ${waiverSettings?.waiver_game_lock ? 'bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft' : 'bg-white/10 ring-1 ring-white/20 text-white/55'}`}>
                       {waiverSettings?.waiver_game_lock ? 'Enabled' : 'Disabled'}
                     </Badge>
                   </div>
@@ -500,30 +496,30 @@ const WaiverWire = () => {
             </div>
 
             {/* Search Available Players */}
-            <Card className="mb-8 bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[2rem] shadow-patch">
+            <Card className="mb-8 bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
               <CardHeader>
-                <CardTitle className="font-varsity font-black text-citrus-forest uppercase flex items-center gap-2">
-                  <Search className="w-5 h-5 text-citrus-orange" />
+                <CardTitle className="font-calistoga text-xl text-pastel-cream flex items-center gap-2">
+                  <Search className="w-5 h-5 text-pastel-orange" />
                   Search Available Players
                 </CardTitle>
-                <CardDescription className="font-display text-citrus-charcoal">
+                <CardDescription className="text-white/55">
                   Find players to add via waiver claim
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col md:flex-row gap-3 mb-6">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-citrus-charcoal/50" />
-                    <Input 
-                      placeholder="Search by player name..." 
-                      className="pl-10 border-3 border-citrus-sage rounded-varsity bg-citrus-cream font-display h-12"
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
+                    <Input
+                      placeholder="Search by player name…"
+                      className="pl-10 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 h-12"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && searchPlayers()}
                     />
                   </div>
                   <Select value={positionFilter} onValueChange={setPositionFilter}>
-                    <SelectTrigger className="w-full md:w-[180px] border-3 border-citrus-sage rounded-varsity bg-citrus-cream font-display h-12">
+                    <SelectTrigger className="w-full md:w-[180px] bg-white/5 border-white/10 text-pastel-cream focus:ring-pastel-orange/40 h-12">
                       <SelectValue placeholder="All Positions" />
                     </SelectTrigger>
                     <SelectContent>
@@ -545,48 +541,48 @@ const WaiverWire = () => {
                       )}
                     </SelectContent>
                   </Select>
-                  <Button 
+                  <Button
                     onClick={searchPlayers}
                     disabled={searchLoading}
-                    className="bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest rounded-varsity shadow-patch font-varsity font-bold uppercase h-12"
+                    className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] disabled:opacity-50 h-12"
                   >
-                    {searchLoading ? 'Searching...' : 'Search'}
+                    {searchLoading ? 'Searching…' : 'Search'}
                   </Button>
                 </div>
 
                 {availablePlayers.length > 0 && (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {availablePlayers.map((player) => {
                       const isGameLocked = lockedTeams.has(player.team_abbrev);
                       return (
-                      <div key={player.player_id} className="flex items-center justify-between p-4 bg-citrus-sage/10 rounded-varsity border-2 border-citrus-sage/30 hover:border-citrus-orange hover:shadow-patch transition-all">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-varsity font-bold text-citrus-forest">
+                      <div key={player.player_id} className="flex items-center justify-between gap-3 p-4 bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/40 hover:bg-white/[0.07] rounded-xl transition-all">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-pastel-cream truncate">
                               {player.full_name}
                             </span>
                             {isGameLocked ? (
-                              <Badge className="bg-amber-500/15 text-amber-700 border-amber-300 text-[10px] font-display font-bold gap-0.5 h-5">
+                              <Badge className="bg-amber-400/20 ring-1 ring-amber-400/40 text-amber-300 border-0 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold gap-1 h-5">
                                 <Lock className="w-3 h-3" />
                                 Waiver
                               </Badge>
                             ) : (
-                              <Badge className="bg-green-500/15 text-green-700 border-green-300 text-[10px] font-display font-bold gap-0.5 h-5">
+                              <Badge className="bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold gap-1 h-5">
                                 <Zap className="w-3 h-3" />
                                 Free Agent
                               </Badge>
                             )}
                           </div>
-                          <div className="text-sm font-display text-citrus-charcoal">
-                            {player.position_code} - {player.team_abbrev} #{player.jersey_number}
+                          <div className="text-xs text-white/55 mt-1 tabular-nums">
+                            {player.position_code} · {player.team_abbrev} · #{player.jersey_number}
                           </div>
                         </div>
                         <Button
                           onClick={() => setSelectedPlayer(player)}
                           size="sm"
                           className={isGameLocked
-                            ? "bg-amber-500 border-2 border-amber-700 rounded-varsity font-varsity font-bold"
-                            : "bg-citrus-orange border-2 border-citrus-forest rounded-varsity font-varsity font-bold"
+                            ? "bg-amber-400/20 ring-1 ring-amber-400/40 text-amber-300 hover:bg-amber-400/30 font-bold shrink-0"
+                            : "bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] shrink-0"
                           }
                         >
                           {isGameLocked ? 'Claim' : 'Add'}
@@ -600,27 +596,31 @@ const WaiverWire = () => {
 
             {/* Claim Confirmation (shown when a player is selected) */}
             {selectedPlayer && (
-              <Card className="bg-citrus-cream corduroy-texture border-4 border-citrus-orange rounded-[2rem] shadow-patch animate-in slide-in-from-top-2">
-                <CardHeader>
-                  <CardTitle className="font-varsity font-black text-citrus-forest uppercase flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-citrus-orange" />
+              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/40 rounded-2xl shadow-[0_24px_60px_-16px_rgba(255,168,87,0.3)] animate-in slide-in-from-top-2 mb-8 relative overflow-hidden">
+                <div aria-hidden="true" className="absolute top-0 right-0 w-64 h-64 bg-pastel-orange/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+                <CardHeader className="relative z-10">
+                  <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5">
+                    ✦ Action Required
+                  </div>
+                  <CardTitle className="font-calistoga text-xl text-pastel-cream flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-pastel-orange" />
                     {isFAAB ? 'Place FAAB Bid' : 'Confirm Claim'}
                   </CardTitle>
-                  <CardDescription className="text-citrus-charcoal font-display">
+                  <CardDescription className="text-white/55 mt-1">
                     {isFAAB
                       ? `Bid on ${selectedPlayer.full_name} — Budget: $${faabBudget ?? 0}`
                       : `Add ${selectedPlayer.full_name} to your roster`
                     }
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between p-4 bg-citrus-sage/10 rounded-varsity border-2 border-citrus-sage/30 mb-4">
+                <CardContent className="relative z-10">
+                  <div className="flex items-center justify-between p-4 bg-white/5 ring-1 ring-white/10 rounded-xl mb-4">
                     <div>
-                      <div className="font-varsity font-bold text-citrus-forest">
+                      <div className="font-bold text-pastel-cream">
                         {selectedPlayer.full_name}
                       </div>
-                      <div className="text-sm font-display text-citrus-charcoal">
-                        {selectedPlayer.position_code} - {selectedPlayer.team_abbrev}
+                      <div className="text-xs text-white/55 mt-0.5">
+                        {selectedPlayer.position_code} · {selectedPlayer.team_abbrev}
                       </div>
                     </div>
                   </div>
@@ -628,7 +628,7 @@ const WaiverWire = () => {
                   {/* FAAB Bid Amount */}
                   {isFAAB && (
                     <div className="mb-4">
-                      <label className="text-sm font-bold text-citrus-forest mb-1 block">Bid Amount ($)</label>
+                      <label className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft mb-1.5 block">Bid Amount ($)</label>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -640,10 +640,10 @@ const WaiverWire = () => {
                             const val = Math.max(0, parseFloat(e.target.value) || 0);
                             setFaabBidAmount(Math.min(val, faabBudget ?? 100));
                           }}
-                          className="w-28"
+                          className="w-28 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
                           placeholder="$0"
                         />
-                        <span className="text-xs text-muted-foreground">of ${faabBudget ?? 0} remaining</span>
+                        <span className="text-xs text-white/55 tabular-nums">of ${faabBudget ?? 0} remaining</span>
                       </div>
                     </div>
                   )}
@@ -651,19 +651,19 @@ const WaiverWire = () => {
                   {/* Drop player selector */}
                   {myRoster.length > 0 && (
                     <div className="mb-4">
-                      <label className="text-sm font-bold text-citrus-forest mb-1 block">Drop Player (optional)</label>
+                      <label className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft mb-1.5 block">Drop Player (optional)</label>
                       <Select
                         value={dropPlayer?.toString() || 'none'}
                         onValueChange={(val) => setDropPlayer(val === 'none' ? null : Number(val))}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full bg-white/5 border-white/10 text-pastel-cream focus:ring-pastel-orange/40">
                           <SelectValue placeholder="Select player to drop" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">No drop</SelectItem>
                           {myRoster.map(p => (
                             <SelectItem key={p.player_id} value={p.player_id.toString()}>
-                              {p.full_name} ({p.position_code} - {p.team_abbrev})
+                              {p.full_name} ({p.position_code} · {p.team_abbrev})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -674,14 +674,14 @@ const WaiverWire = () => {
                   <div className="flex items-center gap-2">
                     <Button
                       onClick={handleSubmitClaim}
-                      className="bg-citrus-orange border-2 border-citrus-forest rounded-varsity font-varsity font-bold flex-1"
+                      className="flex-1 bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]"
                     >
                       {isFAAB ? `Submit $${faabBidAmount} Bid` : 'Submit Claim'}
                     </Button>
                     <Button
                       variant="outline"
                       onClick={() => { setSelectedPlayer(null); setDropPlayer(null); setFaabBidAmount(0); }}
-                      className="rounded-varsity font-varsity"
+                      className="bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold"
                     >
                       Cancel
                     </Button>
@@ -704,40 +704,40 @@ const WaiverWire = () => {
                   claim.league_waiver_process_time || waiverSettings?.waiver_process_time,
                 );
                 const statusStyles: Record<string, string> = {
-                  pending: 'bg-amber-400 text-citrus-forest',
-                  successful: 'bg-emerald-500 text-white',
-                  failed: 'bg-rose-500 text-white',
-                  cancelled: 'bg-slate-400 text-white',
+                  pending: 'bg-amber-400/20 ring-1 ring-amber-400/40 text-amber-300',
+                  successful: 'bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft',
+                  failed: 'bg-red-400/20 ring-1 ring-red-400/40 text-red-300',
+                  cancelled: 'bg-white/10 ring-1 ring-white/20 text-white/55',
                 };
 
                 return (
                   <div
                     key={claim.id}
-                    className={`p-4 rounded-varsity border-3 ${
+                    className={`p-4 rounded-xl ring-1 ${
                       variant === 'pending'
-                        ? 'bg-gradient-to-r from-amber-50 to-citrus-peach/30 border-amber-500/60'
-                        : 'bg-citrus-cream/60 border-citrus-forest/30'
+                        ? 'bg-amber-400/10 ring-amber-400/30'
+                        : 'bg-white/5 ring-white/10'
                     }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex-1 min-w-[200px]">
-                        <div className="font-varsity font-bold text-citrus-forest text-lg">
+                        <div className="font-bold text-pastel-cream text-base">
                           {player?.full_name || `Player #${claim.player_id}`}
                         </div>
                         {player && (
-                          <div className="text-sm font-display text-citrus-charcoal/80">
-                            {player.position} • {player.team}
+                          <div className="text-xs text-white/55 mt-0.5">
+                            {player.position} · {player.team}
                           </div>
                         )}
                         {dropP && (
-                          <div className="text-sm font-display text-citrus-orange/90 mt-1">
-                            Dropping: {dropP.full_name} ({dropP.position} • {dropP.team})
+                          <div className="text-xs text-pastel-orange-soft mt-1.5">
+                            Dropping: {dropP.full_name} ({dropP.position} · {dropP.team})
                             {isFAAB && claim.is_conditional_drop && (
-                              <span className="ml-1 text-xs opacity-70">(conditional)</span>
+                              <span className="ml-1 text-[10px] text-white/55">(conditional)</span>
                             )}
                           </div>
                         )}
-                        <div className="text-xs font-display text-citrus-charcoal/70 mt-1">
+                        <div className="text-[11px] text-white/55 mt-1.5 tabular-nums">
                           {isFAAB
                             ? `Bid: $${claim.bid_amount ?? 0}`
                             : `Your priority: #${claim.priority}`}
@@ -747,18 +747,17 @@ const WaiverWire = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge
-                          className={`font-varsity font-bold uppercase text-xs ${
-                            statusStyles[claim.status] || 'bg-citrus-sage text-citrus-cream'
+                          className={`text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold border-0 ${
+                            statusStyles[claim.status] || 'bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft'
                           }`}
                         >
                           {claim.status}
                         </Badge>
                         {variant === 'pending' && (
                           <Button
-                            variant="outline"
                             size="sm"
                             onClick={() => handleCancelClaim(claim.id)}
-                            className="border-2 border-citrus-forest rounded-varsity font-varsity"
+                            className="bg-red-400/20 ring-1 ring-red-400/40 text-red-300 hover:bg-red-400/30 font-bold"
                           >
                             Cancel
                           </Button>
@@ -767,28 +766,28 @@ const WaiverWire = () => {
                     </div>
 
                     {variant === 'pending' && (clearsAtFormatted || nextProcessFormatted) && (
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2 text-xs font-display">
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2 text-xs">
                         {clearsAtFormatted && (
-                          <div className="flex items-start gap-2 rounded-md bg-white/70 border border-amber-500/40 p-2">
-                            <Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                            <div>
-                              <div className="uppercase tracking-wide text-[10px] text-amber-700 font-bold">
+                          <div className="flex items-start gap-2 rounded-lg bg-white/5 ring-1 ring-amber-400/30 p-2">
+                            <Clock className="w-4 h-4 text-amber-300 mt-0.5 shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-amber-300">
                                 Waiver window clears
                               </div>
-                              <div className="text-citrus-forest font-semibold">
+                              <div className="text-pastel-cream font-bold mt-0.5 tabular-nums">
                                 {clearsAtFormatted}
                               </div>
                             </div>
                           </div>
                         )}
                         {nextProcessFormatted && (
-                          <div className="flex items-start gap-2 rounded-md bg-white/70 border border-citrus-forest/40 p-2">
-                            <Zap className="w-4 h-4 text-citrus-forest mt-0.5 shrink-0" />
-                            <div>
-                              <div className="uppercase tracking-wide text-[10px] text-citrus-forest font-bold">
+                          <div className="flex items-start gap-2 rounded-lg bg-white/5 ring-1 ring-pastel-orange/30 p-2">
+                            <Zap className="w-4 h-4 text-pastel-orange mt-0.5 shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft">
                                 Claim processes
                               </div>
-                              <div className="text-citrus-forest font-semibold">
+                              <div className="text-pastel-cream font-bold mt-0.5 tabular-nums">
                                 {nextProcessFormatted}
                               </div>
                             </div>
@@ -798,7 +797,7 @@ const WaiverWire = () => {
                     )}
 
                     {claim.failure_reason && variant === 'history' && (
-                      <div className="mt-2 text-xs font-display text-rose-700">
+                      <div className="mt-2 text-xs text-red-300">
                         Reason: {claim.failure_reason}
                       </div>
                     )}
@@ -807,50 +806,51 @@ const WaiverWire = () => {
               };
 
               return (
-                <Card className="bg-citrus-cream corduroy-texture border-4 border-citrus-forest rounded-[2rem] shadow-patch">
+                <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <CardHeader>
-                    <CardTitle className="font-varsity font-black text-citrus-forest uppercase flex items-center gap-2">
-                      <AlertCircle className="w-5 h-5 text-citrus-orange" />
+                    <CardTitle className="font-calistoga text-xl text-pastel-cream flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-pastel-orange" />
                       Active Waiver Claims
                       {pendingClaims.length > 0 && (
-                        <Badge className="ml-2 bg-citrus-orange text-white font-varsity">
+                        <Badge className="ml-2 bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft border-0 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold">
                           {pendingClaims.length}
                         </Badge>
                       )}
                     </CardTitle>
-                    <CardDescription className="font-display text-citrus-charcoal/80">
+                    <CardDescription className="text-white/55">
                       All times shown in Mountain Time (MT)
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {loading ? (
-                      <div className="text-center py-12 font-display text-citrus-charcoal">
-                        Loading claims...
+                      <div className="text-center py-12 text-white/55">
+                        Loading claims…
                       </div>
                     ) : pendingClaims.length === 0 && historyClaims.length === 0 ? (
                       <div className="text-center py-12">
-                        <User className="w-16 h-16 text-citrus-sage/30 mx-auto mb-4" />
-                        <p className="font-display text-citrus-charcoal">No active waiver claims</p>
+                        <User className="w-16 h-16 text-pastel-orange/20 mx-auto mb-4" />
+                        <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5">✦ Empty</div>
+                        <p className="text-white/55">No active waiver claims</p>
                       </div>
                     ) : (
                       <div className="space-y-6">
                         {pendingClaims.length > 0 ? (
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             {pendingClaims.map(c => renderClaimRow(c, 'pending'))}
                           </div>
                         ) : (
-                          <div className="rounded-lg border-2 border-dashed border-citrus-forest/30 py-6 text-center font-display text-citrus-charcoal/70">
+                          <div className="rounded-xl border-2 border-dashed border-white/15 py-6 text-center text-white/55 text-sm">
                             No pending claims. Submit one above.
                           </div>
                         )}
 
                         {historyClaims.length > 0 && (
                           <details className="group">
-                            <summary className="cursor-pointer font-varsity font-bold text-citrus-forest uppercase text-sm list-none flex items-center gap-2">
+                            <summary className="cursor-pointer font-jbmono text-[10px] tracking-[0.32em] uppercase font-bold text-pastel-orange-soft list-none flex items-center gap-2 hover:text-pastel-orange transition-colors">
                               <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
                               Recent activity ({historyClaims.length})
                             </summary>
-                            <div className="mt-3 space-y-3">
+                            <div className="mt-3 space-y-2">
                               {historyClaims.slice(0, 10).map(c => renderClaimRow(c, 'history'))}
                             </div>
                           </details>
@@ -874,7 +874,7 @@ const WaiverWire = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>
