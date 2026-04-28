@@ -180,42 +180,46 @@ What carries forward from the prior decision-day work: the Performance Mandate, 
 
 ### Positive
 
-1. **Performance Mandate compliance is achievable, not aspirational.** The architectural pattern (persistent process per draft + WebSocket transport + in-memory candidate pool) brings every mandate target into the achievable envelope. Manual pick p95 ≤ 300ms is a single in-memory state mutation + Phoenix Channel broadcast. Autopick p95 ≤ 1000ms is a deadline timer firing inside the DraftServer + in-memory selection + Postgres write + broadcast. Sub-200ms broadcast fanout to ~12–24 connected clients per draft is well within Phoenix Channels' published envelope.
-2. **Architectural parity with the reference systems users compare against.** Sleeper, Discord, Figma, the Phoenix Channels community — these are the live-collaboration patterns. Citrus's draft engine joins that architectural neighborhood instead of inventing a different one.
-3. **OTP fault tolerance maps onto the domain.** A `DraftServer` process crashes, the supervisor restarts it, the new process recovers state via `reconstruct_draft_state(...)` from the event log, connected clients reconnect via Phoenix Channels' built-in resume. The "let it crash + supervised restart" model is what we'd want anyway; OTP just ships it.
-4. **Hot-code-reload preserves in-progress drafts during deploys.** This is a real operational property, not theoretical. A code change to the autopick heuristic deployed mid-draft does not drop connected clients or restart the in-memory state. Drafts in flight at deploy time complete on the new code without users noticing. The Node + Edge Function path has no equivalent.
-5. **Architectural ceiling supports daily-fantasy expansion.** The live-scoring and live-contest workloads on the roadmap fit the same persistent-process + Phoenix Channels pattern. Adopting it now amortizes the architectural cost across the live draft AND the future daily-fantasy product. Single architectural pivot, multiple downstream uses.
-6. **Phase 0–4 work is preserved.** Event log, idempotency contracts, projection trigger, RLS, RPC signatures — all stay. The pivot is at the engine layer; underneath, the durability stack we already built does its job.
+1. **Performance Mandate compliance is achievable.** Persistent in-memory state + WebSocket transport + an in-process autopick scheduler put every Mandate target in the achievable envelope. Manual pick p95 ≤ 300ms is one in-memory state mutation + one broadcast. Autopick p95 ≤ 1000ms is a `setTimeout` firing in-process + in-memory selection + RPC write + broadcast. Sub-200ms broadcast fanout to ~12–24 clients per draft is well inside what a single Node process serves.
+2. **Single deployment unit, single observability surface, single CI pipeline.** No separate service to deploy, monitor, or coordinate during releases. The existing Cloud Run rollout pipeline carries the engine forward.
+3. **Same toolchain end-to-end.** TypeScript, npm, Hono, Vitest, `@citrus/shared` imported directly. No vendoring, no cross-runtime hash agreement, no second package ecosystem to keep in sync.
+4. **KI-007 closes.** Vendored shared code at `supabase/functions/_shared/_vendored/` exists only to feed the Edge Function path; deleting that path resolves the drift problem entirely.
+5. **Edge Function infrastructure removal is real cleanup.** Less code to maintain, fewer cron jobs to monitor, less Vault wiring, fewer deploy-time gotchas. The simplest thing that works.
+6. **Phase 0–4 durability primitives preserved.** Event log, idempotency contracts, projection trigger, RLS, RPC signatures — all unchanged. The pivot is at the engine layer; underneath, the durability stack we already built does its job.
+7. **Reversible by refactor, not rewrite.** If future scale demands a separate Cloud Run service for the engine, the `DraftRoom` class and WebSocket layer extract cleanly into their own deployment unit. The integration boundary (Postgres RPC surface + WebSocket protocol) doesn't change. KI-009 captures this.
 
 ### Negative
 
-1. **New language and runtime to learn.** Solo founder ramping on Elixir + Phoenix + OTP from a Node/TypeScript baseline. Realistic learning curve: **4–8 weeks** to confident productivity (the upper end if there are unexpected cliffs around concurrency primitives or BEAM operations). The Week 1 validation gate (see below) is explicitly designed to surface "this is going to take 12 weeks not 6" early enough to course-correct.
-2. **Operational complexity of dual-runtime production.** Two runtimes in production = two CI pipelines, two log aggregation contexts, two security review surfaces, two release vehicles, two sets of platform gotchas. Tracked formally as **KI-009** in `docs/REGISTRY.md`. The retrospective citation (`https://ryanrasti.com/blog/elixir-three-years-production/`) is explicit that Elixir's per-runtime ops cost is _lower_ than Node's, but **two runtimes is more overhead than one**, regardless. Mitigation: narrow cross-runtime contract, clear ownership boundaries, runbook covering both stacks (Phase 4.6 chunk 4.6.4).
-3. **~16-week total Phase 4.5+4.6 timeline before Phase 5 (UI work) can resume.** Phase 4.5 foundation is weeks 1–3; Phase 4.6 production-readiness is weeks 4–7; reasonable cushion for unknowns brings the realistic horizon to ~16 weeks of solo founder work assisted by Claude Code. UI work blocks behind this. The opportunity cost is real and should be visible in roadmap conversations.
-4. **Hiring pool considerations.** Elixir's hiring pool is materially smaller than Node's. For a solo founder at the current stage this is irrelevant; if/when Citrus hires its first engineer, the Elixir engine becomes a hiring constraint. Re-evaluate at hiring time.
+1. **Server restart drops live WebSocket connections briefly.** On deploy or crash, every connected client reconnects. Mitigation: chunk 11g.4's `last_seen_id` resume protocol replays missed events from `draft_events`; chunk 11g.6's startup recovery rebuilds in-memory state for active drafts. Brief reconnect blip, no draft progress lost.
+2. **Engine and HTTP API can't be rolled independently.** Any deploy rolls both. For v1 scale this is acceptable — deploys are infrequent and the reconnect protocol covers the gap.
+3. **WebSocket library dependency on existing server.** Adds a `ws` (or `socket.io`) dependency to the existing Hono server. **Chunk 11g.0 (dependency compatibility verification) is the explicit go/no-go gate** for this. If the existing server's middleware, async patterns, or build setup conflict with WebSocket upgrades in a way that can't be cleanly resolved, the alternative (a) — separate Cloud Run service — is the documented fall-back, not a rewrite.
+4. **No hot-code-reload across deploys.** Unlike the BEAM, Node deploys mean restarting the process. Same mitigation as (1): the reconnect protocol covers the gap.
 
 ## What stays vs. what changes
 
-### Stays (Phase 0–4 work, all unchanged)
+### Stays (Phase 0–4 work, all unchanged — the durability foundation is correct)
 
 - `draft_events` event log — append-only, gap-free per-league `seq`, single source of truth.
 - `draft_picks_v2` projection — synchronously maintained by the Phase 2 trigger.
-- `submit_pick_v2`, `append_draft_event`, `record_shadow_event`, `reconstruct_draft_state`, `draft_pause`, `draft_resume`, `draft_extend`, `validate_draft_event_payload` — RPC surface unchanged. The Elixir engine becomes a new caller.
-- `pgmq` `draft_deadlines` queue + `draft_deadline_sweep()` RPC — the safety-net path stays operational as the disaster-recovery fallback.
-- `autopick_failures` DLQ + `draft_autopick_dlq()` RPC — same role.
-- All RLS policies, idempotency-key derivation (`AUTOPICK_NAMESPACE_UUID` + UUIDv5 over `(league_id, pick_number, generation, 'autopick')`), payload-hash semantics (`computePickPayloadHash` from `@citrus/shared`).
-- Phase 2 server-side pick path (`server/src/services/DraftServiceV2.ts`) — until the Elixir engine subsumes the manual-pick hot path, this remains the production code path for pick submission. Cutover is staged, not Big Bang.
-- Phase 4 Edge Function `supabase/functions/draft-autopick/` — role changes (see below), code unchanged.
-- The Phase 0–4 Known Issues registry (`docs/RUNBOOKS/draft-engine-v2-known-issues.md`) — KI-001 through KI-007 still apply. KI-008+ in `docs/REGISTRY.md` are project-wide additions, not replacements.
+- All Phase 2 RPCs: `submit_pick_v2`, `append_draft_event`, `record_shadow_event`, `reconstruct_draft_state`, `draft_pause`, `draft_resume`, `draft_extend`, `validate_draft_event_payload`. The in-server engine becomes a new caller; signatures don't change.
+- All RLS policies, all schemas, all idempotency-key derivation (`AUTOPICK_NAMESPACE_UUID` + UUIDv5 over `(league_id, pick_number, generation, 'autopick')`), payload-hash semantics (`computePickPayloadHash` from `@citrus/shared`).
+- `autopick_failures` DLQ + `draft_autopick_dlq()` RPC — kept for terminal-failure logging from the in-server engine.
+- Phase 2 server-side pick path (`server/src/services/DraftServiceV2.ts`) — kept during cutover; once chunk 11g.3 ships and the WebSocket pick path is verified, the HTTP path becomes a fallback for clients that can't open WebSockets.
+- The Phase 0–4 Known Issues registry (`docs/RUNBOOKS/draft-engine-v2-known-issues.md`) — KI-001..KI-005 still apply. **KI-006 likely RESOLVED** at chunk 11g.7 by the in-memory candidate cache. **KI-007 RESOLVED** at chunk 11g.8 when vendored code is deleted.
 
-### Changes (the engine layer)
+### Changes (the engine layer + Edge Function infrastructure removal)
 
-- **New service.** `elixir/citrus_draft/` (or similar; structure TBD in Phase 4.5 chunk 1) — Phoenix application with `DraftServer` GenServer per active draft, `DraftSupervisor` (DynamicSupervisor) for lifecycle, `DraftRegistry` for `via_tuple` lookups, `DraftChannel` for WebSocket transport, `DraftServer.AutopickWorker` for in-memory candidate selection.
-- **New transport.** Phoenix Channels (WebSocket) for picks, broadcasts, timer ticks, presence. Replaces Supabase Realtime for the live-draft experience. The rest of the app continues to use Supabase Realtime where it currently does (e.g., chat, presence on non-draft surfaces).
-- **Edge Function `draft-autopick` role demotes from hot-path worker to fallback-only.** The pgmq sweep + keep-alive cron continue to run in production but only act when the Elixir engine is unavailable. Cron stays paused on staging until Phase 4.5 verification confirms the Elixir engine is the primary path; then the cron becomes the secondary path. No code is deleted.
-- **Server-side TypeScript pick path role changes.** `server/src/services/DraftServiceV2.ts` continues to handle the user-pick HTTP entry point during the Phase 4.5 cutover window. Once the Elixir engine's WebSocket-based pick submission is verified, the HTTP path becomes a fallback for clients that can't open WebSockets (rare but needs to work). The RPC contract underneath is identical, so both paths converge on the same Postgres state.
+- **New code in `server/`** (Phase 4.5+): a `DraftRoom` class holding per-draft in-memory state, a WebSocket layer added to the existing Hono server, a `setTimeout`-driven autopick scheduler, and a startup recovery routine that replays the event log for active drafts. Same TypeScript, same `@citrus/shared`, same npm tooling, same Vitest harness, same Cloud Run deployment.
+- **New transport.** WebSocket (library decided in chunk 11g.1) for picks, broadcasts, timer ticks, presence. The rest of the app continues to use Supabase Realtime where it currently does (chat, presence on non-draft surfaces).
+- **Removed entirely in chunk 11g.8 (per KI-009):**
+  - `supabase/functions/draft-autopick/` (the Deno autopick worker).
+  - The pg_cron jobs `draft-deadline-sweep` and `draft-autopick-keepalive`.
+  - The pgmq queue `draft_deadlines` and its archive table.
+  - The vendored shared code at `supabase/functions/_shared/_vendored/` (KI-007 closes).
+  - The cross-runtime hash-agreement infrastructure (Node-side hashing in `@citrus/shared` is sufficient; no Deno or SQL parity test surface needed once the Edge Function is gone).
+  - The Vault secret + keep-alive token plumbing tied to the Edge Function path.
 
-The deployment target for the Elixir engine — Fly.io vs. alternatives — is decided in Phase 4.6 chunk 4.6.3 alongside production hosting concerns (autoscaling, regional placement, cold-start, observability integrations). The Phase 4.5 foundation work uses local development for the first few chunks; staging deployment is its own chunk gate.
+The chunk 11g.8 commit verifies that nothing else in the codebase depends on these surfaces before the deletes land.
 
 ## Validation Gates
 
