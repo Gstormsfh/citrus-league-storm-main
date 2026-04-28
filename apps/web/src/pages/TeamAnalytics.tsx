@@ -14,8 +14,6 @@ import { LeagueService } from '@/services/LeagueService';
 import { ScheduleService } from '@/services/ScheduleService';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
-import { CitrusBackground } from '@/components/CitrusBackground';
-import { CitrusSparkle, CitrusBurst } from '@/components/icons/CitrusIcons';
 import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -237,15 +235,21 @@ const TeamAnalytics = () => {
 
 
   const getGradeColor = (grade: string) => {
-    if (grade.startsWith('A')) return "text-green-500 bg-green-500/10 border-green-500/20";
-    if (grade.startsWith('B')) return "text-blue-500 bg-blue-500/10 border-blue-500/20";
-    if (grade.startsWith('C')) return "text-yellow-500 bg-yellow-500/10 border-yellow-500/20";
-    return "text-red-500 bg-red-500/10 border-red-500/20";
+    if (grade.startsWith('A')) return "text-pastel-sage-soft bg-pastel-sage/15 border-pastel-sage/30";
+    if (grade.startsWith('B')) return "text-blue-300 bg-blue-400/15 border-blue-400/30";
+    if (grade.startsWith('C')) return "text-amber-300 bg-amber-400/15 border-amber-400/30";
+    return "text-red-300 bg-red-400/15 border-red-400/30";
+  };
+
+  const gradeBorderColor = (grade: string) => {
+    if (grade.startsWith('A')) return '#A6D3A0';
+    if (grade.startsWith('B')) return '#93C5FD';
+    if (grade.startsWith('C')) return '#FCD34D';
+    return '#FCA5A5';
   };
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] flex flex-col relative">
-      <CitrusBackground density="light" />
+    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
@@ -261,18 +265,24 @@ const TeamAnalytics = () => {
               {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
               <div>
-                <h1 className="text-4xl md:text-5xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">
-                  Stormy Analytics
+                <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 flex items-center gap-2">
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  ✦ Stormy Analytics
+                </div>
+                <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none mb-2">
+                  Roster Deep-Dive
                 </h1>
-                <p className="text-lg text-muted-foreground flex items-center gap-2">
-                  <Narwhal className="h-5 w-5 text-purple-500" />
+                <p className="text-sm text-white/55 flex items-center gap-2">
+                  <Narwhal className="h-4 w-4 text-pastel-orange" />
                   AI-Powered Roster Optimization
                 </p>
               </div>
               <div className="flex gap-3">
-                <Card className="px-4 py-2 bg-purple-500/5 border-purple-500/20">
-                  <div className="text-xs text-muted-foreground uppercase font-semibold">Team Rating</div>
-                  <div className="text-2xl font-bold text-purple-600">92.4 <span className="text-sm font-normal text-muted-foreground">/ 100</span></div>
+                <Card className="px-5 py-3 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]">
+                  <div className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold">Team Rating</div>
+                  <div className="font-calistoga text-3xl text-pastel-cream mt-1 leading-none">
+                    92.4 <span className="text-sm font-normal text-white/40 align-middle">/ 100</span>
+                  </div>
                 </Card>
               </div>
             </div>
@@ -288,47 +298,51 @@ const TeamAnalytics = () => {
               </div>
             )}
 
-            <div className="grid lg:grid-cols-3 gap-8">
+            <div className="grid lg:grid-cols-3 gap-6">
               {/* Main Positional Breakdown */}
-              <div className="lg:col-span-2 space-y-6">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" /> Positional Deep Dive
+              <div className="lg:col-span-2 space-y-4">
+                <h2 className="font-calistoga text-2xl text-pastel-cream flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-pastel-orange" /> Positional Deep Dive
                 </h2>
-                
+
                 <div className="space-y-4">
                   {positionalAnalysis.map((pos) => (
-                    <Card key={pos.position} className="overflow-hidden border-l-4" style={{ borderLeftColor: pos.grade.startsWith('A') ? '#22c55e' : pos.grade.startsWith('B') ? '#3b82f6' : pos.grade.startsWith('C') ? '#eab308' : '#ef4444' }}>
+                    <Card
+                      key={pos.position}
+                      className="overflow-hidden border-0 bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] border-l-4"
+                      style={{ borderLeftColor: gradeBorderColor(pos.grade) }}
+                    >
                       <CardContent className="p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <div className="flex items-center gap-3 mb-1">
-                              <h3 className="text-xl font-bold">{pos.position}</h3>
-                              <Badge variant="outline" className={getGradeColor(pos.grade)}>Grade: {pos.grade}</Badge>
-                              <Badge variant="secondary" className="text-xs">Rank #{pos.leagueRank}</Badge>
+                        <div className="flex justify-between items-start mb-4 gap-4">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <h3 className="font-calistoga text-xl text-pastel-cream">{pos.position}</h3>
+                              <Badge variant="outline" className={`${getGradeColor(pos.grade)} font-jbmono text-[10px] uppercase tracking-[0.18em] font-bold`}>Grade: {pos.grade}</Badge>
+                              <Badge variant="secondary" className="text-[10px] font-jbmono uppercase tracking-[0.18em] bg-white/5 ring-1 ring-white/10 text-white/70 hover:bg-white/10 border-0">Rank #{pos.leagueRank}</Badge>
                             </div>
-                            <p className="text-sm text-muted-foreground">{pos.description}</p>
+                            <p className="text-sm text-white/55 leading-relaxed">{pos.description}</p>
                           </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold">{pos.avgPoints}</div>
-                            <div className="text-xs text-muted-foreground">Avg Pts/Game</div>
+                          <div className="text-right shrink-0">
+                            <div className="font-calistoga text-3xl text-pastel-cream leading-none">{pos.avgPoints}</div>
+                            <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 mt-1">Avg Pts/Game</div>
                           </div>
                         </div>
 
                         <div className="space-y-3">
                           <div>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span>Performance Score</span>
-                              <span>{pos.score}/100</span>
+                            <div className="flex justify-between items-center text-[10px] font-jbmono uppercase tracking-[0.22em] mb-1.5">
+                              <span className="text-white/55">Performance Score</span>
+                              <span className="text-pastel-cream font-bold tabular-nums">{pos.score}/100</span>
                             </div>
-                            <Progress value={pos.score} className="h-2" />
+                            <Progress value={pos.score} className="h-1.5 bg-white/10" />
                           </div>
 
                           {pos.suggestion && (
-                            <div className="bg-muted/40 p-3 rounded-lg flex gap-3 items-start mt-3 border border-dashed">
-                              <Narwhal className="h-5 w-5 text-purple-500 shrink-0 mt-0.5" />
+                            <div className="bg-pastel-orange/8 ring-1 ring-pastel-orange/20 p-3 rounded-xl flex gap-3 items-start mt-3">
+                              <Narwhal className="h-5 w-5 text-pastel-orange shrink-0 mt-0.5" />
                               <div className="space-y-1">
-                                <div className="text-sm font-medium text-purple-700 dark:text-purple-400">Stormy's Suggestion</div>
-                                <p className="text-xs text-muted-foreground leading-relaxed">{pos.suggestion}</p>
+                                <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft">Stormy's Suggestion</div>
+                                <p className="text-xs text-white/70 leading-relaxed">{pos.suggestion}</p>
                               </div>
                             </div>
                           )}
@@ -340,41 +354,45 @@ const TeamAnalytics = () => {
               </div>
 
               {/* Right Column: Stormy's Targets */}
-              <div className="space-y-6">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5" /> AI Recommended Targets
+              <div className="space-y-4">
+                <h2 className="font-calistoga text-2xl text-pastel-cream flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-pastel-orange" /> AI Recommended Targets
                 </h2>
 
-                <Card className="bg-slate-950 text-slate-50 border-slate-800">
-                  <CardHeader>
-                    <CardTitle className="text-lg text-blue-400 flex items-center gap-2">
+                <Card className="bg-[#1A2A20] border-0 ring-1 ring-amber-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(251,191,36,0.15)] relative overflow-hidden">
+                  <div aria-hidden="true" className="absolute top-0 right-0 w-48 h-48 bg-amber-400/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                  <CardHeader className="relative z-10">
+                    <CardTitle className="font-calistoga text-lg text-amber-300 flex items-center gap-2">
                       <AlertCircle className="h-4 w-4" /> Urgent: Goaltending
                     </CardTitle>
-                    <CardDescription className="text-slate-400">
+                    <CardDescription className="text-white/55">
                       Your goalie grade is C-. Improving this position is the #1 priority to increase win probability.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
+                  <CardContent className="relative z-10">
+                    <div className="space-y-3">
+                      {freeAgentTargets.filter(p => p.position === 'G').length === 0 && (
+                        <div className="text-center py-3 text-xs text-white/55">No goalie targets surfaced yet.</div>
+                      )}
                       {freeAgentTargets.filter(p => p.position === 'G').map(player => (
-                         <div key={player.id} className="bg-[#E8EED9]/50 backdrop-blur-sm/20 p-3 rounded-lg border border-citrus-sage/20">
-                           <div className="flex justify-between items-start mb-2">
-                             <div>
-                               <div className="font-bold text-base">{player.name}</div>
-                               <div className="text-xs text-slate-400">{player.team} • {player.position}</div>
+                         <div key={player.id} className="bg-white/5 hover:bg-white/[0.07] transition-colors p-3 rounded-xl ring-1 ring-white/10">
+                           <div className="flex justify-between items-start mb-3 gap-3">
+                             <div className="min-w-0">
+                               <div className="font-bold text-pastel-cream truncate">{player.name}</div>
+                               <div className="text-xs text-white/55 mt-0.5">{player.team} · {player.position}</div>
                              </div>
-                             <Button size="sm" variant="secondary" className="h-7 text-xs">Claim</Button>
+                             <Button size="sm" className="h-7 text-xs bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shrink-0">Claim</Button>
                            </div>
                            <div className="grid grid-cols-2 gap-2 text-xs">
-                             <div className="bg-black/20 p-1.5 rounded flex flex-col items-center">
-                               <span className="text-slate-400">Avg Pts</span>
-                               <span className="font-mono font-bold text-green-400">{player.pointsPerGame}</span>
+                             <div className="bg-black/30 ring-1 ring-white/5 p-1.5 rounded-lg flex flex-col items-center">
+                               <span className="text-[9px] font-jbmono uppercase tracking-[0.18em] text-white/55">Avg Pts</span>
+                               <span className="font-mono font-bold text-pastel-sage-soft tabular-nums">{player.pointsPerGame.toFixed(1)}</span>
                              </div>
-                             <div className="bg-black/20 p-1.5 rounded flex flex-col items-center relative overflow-hidden">
-                               <span className="text-slate-400">This Week</span>
-                               <span className="font-mono font-bold text-white">{player.gamesThisWeek} Gms</span>
+                             <div className="bg-black/30 ring-1 ring-white/5 p-1.5 rounded-lg flex flex-col items-center relative overflow-hidden">
+                               <span className="text-[9px] font-jbmono uppercase tracking-[0.18em] text-white/55">This Week</span>
+                               <span className="font-mono font-bold text-pastel-cream tabular-nums">{player.gamesThisWeek} Gms</span>
                                {player.scheduleAdvantage && (
-                                 <div className="absolute top-0 right-0 w-2 h-2 bg-green-500 rounded-full m-1 animate-pulse" />
+                                 <div className="absolute top-1 right-1 w-2 h-2 bg-pastel-sage rounded-full animate-pulse" />
                                )}
                              </div>
                            </div>
@@ -384,40 +402,40 @@ const TeamAnalytics = () => {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                    <CardHeader>
-                     <CardTitle className="text-base">Schedule Maximizers</CardTitle>
-                     <CardDescription>Free agents with favorable schedules this week</CardDescription>
+                     <CardTitle className="font-calistoga text-lg text-pastel-cream">Schedule Maximizers</CardTitle>
+                     <CardDescription className="text-white/55">Free agents with favorable schedules this week</CardDescription>
                    </CardHeader>
-                   <CardContent className="space-y-3">
+                   <CardContent className="space-y-2">
                       {loading ? (
-                        <div className="text-center py-4 text-sm text-muted-foreground">Loading schedule data...</div>
+                        <div className="text-center py-4 text-sm text-white/55">Loading schedule data…</div>
                       ) : freeAgentTargets.filter(p => p.position !== 'G' && p.gamesThisWeek >= 3).length === 0 ? (
-                        <div className="text-center py-4 text-sm text-muted-foreground">No schedule maximizers found this week.</div>
+                        <div className="text-center py-4 text-sm text-white/55">No schedule maximizers found this week.</div>
                       ) : (
                         <>
                           {freeAgentTargets.filter(p => p.position !== 'G' && p.gamesThisWeek >= 3).slice(0, 5).map(player => (
-                            <div key={player.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors group cursor-pointer border">
-                               <div className="flex items-center gap-3">
-                                 <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center font-bold text-xs">
+                            <div key={player.id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 hover:bg-white/[0.07] transition-colors group cursor-pointer ring-1 ring-white/10">
+                               <div className="flex items-center gap-3 min-w-0">
+                                 <div className="w-8 h-8 rounded-lg bg-pastel-orange/20 ring-1 ring-pastel-orange/30 flex items-center justify-center font-bold text-[10px] text-pastel-orange-soft shrink-0">
                                    {player.team.substring(0,2)}
                                  </div>
-                                 <div>
-                                   <div className="font-medium text-sm">{player.name}</div>
-                                   <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                      <Badge variant="outline" className="h-4 px-1 text-[11px]">{player.position}</Badge>
+                                 <div className="min-w-0">
+                                   <div className="font-bold text-sm text-pastel-cream truncate">{player.name}</div>
+                                   <div className="text-xs text-white/55 flex items-center gap-1 mt-0.5">
+                                      <Badge variant="outline" className="h-4 px-1.5 text-[10px] font-jbmono uppercase tracking-[0.18em] bg-transparent border-pastel-sage/40 text-pastel-sage-soft">{player.position}</Badge>
                                    </div>
                                  </div>
                                </div>
-                               <div className="text-right">
-                                 <div className={`text-xs font-bold flex items-center justify-end gap-1 ${player.gamesThisWeek >= 4 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                               <div className="text-right shrink-0">
+                                 <div className={`text-xs font-bold flex items-center justify-end gap-1 tabular-nums ${player.gamesThisWeek >= 4 ? 'text-pastel-sage-soft' : 'text-white/55'}`}>
                                    <Calendar className="h-3 w-3" /> {player.gamesThisWeek} Gms
                                  </div>
-                                 <div className="text-[11px] text-muted-foreground">{player.pointsPerGame.toFixed(1)} Pts/Gm</div>
+                                 <div className="text-[10px] text-white/55 tabular-nums">{player.pointsPerGame.toFixed(1)} Pts/Gm</div>
                                </div>
                             </div>
                           ))}
-                          <Button variant="ghost" className="w-full text-xs text-primary mt-2" onClick={() => window.location.href = '/free-agents?tab=schedule'}>
+                          <Button variant="ghost" className="w-full text-xs text-pastel-orange hover:text-pastel-orange-soft hover:bg-white/5 mt-2 font-jbmono uppercase tracking-[0.22em]" onClick={() => window.location.href = '/free-agents?tab=schedule'}>
                             View All Schedule Trends <ChevronRight className="h-3 w-3 ml-1" />
                           </Button>
                         </>
@@ -439,7 +457,7 @@ const TeamAnalytics = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>
