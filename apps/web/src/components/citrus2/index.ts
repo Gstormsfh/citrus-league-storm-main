@@ -52,6 +52,7 @@ export {
   WaiverWireScene,
   CreateLeagueScene,
   LeagueLiveScene,
+  StormyAIScene,
 } from './MascotScene';
 
 // On-brand loading state

@@ -252,6 +252,35 @@ export function AnalyticsConsoleScene({ size = 'xl', className = '' }: SceneProp
 }
 
 /* ──────────────────────────────────────────────────────────────────────
+ * SCENE: STORMY AI ASSISTANT (uses existing /mascots/scene-stormy-ai.webp)
+ * Stormy at his AI console — pre-rendered hero, same Sleeper aesthetic.
+ * ────────────────────────────────────────────────────────────────────── */
+
+export function StormyAIScene({ size = 'lg', className = '' }: SceneProps) {
+  const sz = SIZE[size];
+  return (
+    <div
+      className={`relative overflow-hidden bg-[#0F1F15] rounded-3xl ring-1 ring-white/10 ${sz.container} ${sz.minHeight} ${className}`}
+      role="img"
+      aria-label="Stormy the narwhal at an AI assistant console, ready to break down your league."
+    >
+      <img src="/mascots/scene-stormy-ai.webp" alt="" className="absolute inset-0 w-full h-full object-cover" loading="eager" />
+      <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(15,31,21,0.55) 0%, transparent 22%, transparent 65%, rgba(15,31,21,0.92) 100%)' }} />
+      <div className="absolute top-5 left-5 sm:top-6 sm:left-6 z-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#0F1F15]/70 ring-1 ring-pastel-orange/40 backdrop-blur-md">
+          <LivePulse size="xs" />
+          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold">Stormy · Always-on Assistant GM</span>
+        </div>
+      </div>
+      <div className="absolute bottom-5 left-5 sm:bottom-6 sm:left-6 z-10 max-w-md">
+        <div className="font-calistoga text-[26px] sm:text-[34px] text-pastel-cream leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">Ask anything.</div>
+        <div className="font-jbmono text-[9px] sm:text-[10px] uppercase tracking-[0.32em] text-white/70 mt-1.5">Trade reads · Start/sit · Roster construction · Waivers</div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────
  * SCENE: LEAGUE LIVE — center-ice puck drop (Stormy vs Lemon)
  * Hero asset: /mascots/scene-league-live.webp
  * Stormy as captain at the faceoff dot, Lemon across, Kiwi at the
