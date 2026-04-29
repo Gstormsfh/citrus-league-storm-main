@@ -38,7 +38,7 @@ A chunk's "performance gate" is a measured-on-staging assertion against these ta
 
 **Deliverable.** A pre-flight audit on the existing Node server before any draft-engine code lands. The chunk's commit produces a single document — pass/fail with specifics — and zero application code. Audit scope:
 
-- Existing `server/package.json` dependencies vs. a candidate WebSocket library (`ws` first, `socket.io` as fallback). Confirm the WebSocket library installs cleanly into the workspace, peer-deps and types resolve, no version conflicts.
+- Existing `server/package.json` dependencies vs. uWebSockets.js. Confirm the native C++ binary builds cleanly for the Cloud Run container architecture (Linux x64), peer-deps and types resolve, no version conflicts. Per ADR-001 the architecture specifies uWebSockets.js; alternative libraries (`ws`, `socket.io`) are explicitly not in scope.
 - Hono's HTTP-upgrade handling. Confirm Hono routes can coexist with a WebSocket upgrade handler on the same port, or document the specific Hono version + adapter combination required.
 - TypeScript build pipeline. Confirm `tsc` / `tsx` build path handles both the existing routes and the new WebSocket code without configuration churn.
 - Existing middleware (auth, JWT, RLS context). Confirm the middleware stack extends cleanly to WebSocket connections — auth on the upgrade handshake, league-membership check before `DraftRoom` join.
@@ -91,7 +91,7 @@ Sign-off discipline carries forward from Phase 0–4: each chunk lands as its ow
 **Acceptance criteria.**
 - The Hono HTTP server (port 3001) and the uWS server (port 3002) coexist; the existing API routes still pass their suite.
 - A test client with a valid token can upgrade to `/ws/draft/:lobbyId`. A test client with no token, an expired token, or a token for a different lobby is rejected with the documented close code.
-- Two test clients connected to the same `:lobbyId` both receive a message published to topic `draft:${lobbyId}` from a third actor (the test calls `app.publish(...)` directly to confirm fanout works before the LobbyManager exists).
+- Two test clients connected to the same `:lobbyId` both receive a message published to topic `draft:${lobbyId}` from a third actor (the test calls uWS `app.publish(topic, message)` directly — uWebSockets.js's built-in C++-backed pub/sub fast path — to confirm fanout works before LobbyManager exists).
 - A test client connected to a different `:lobbyId` does **not** receive the message (topic isolation verified).
 - Vitest covers each upgrade rejection path and the basic publish/subscribe roundtrip.
 
@@ -173,7 +173,7 @@ Sign-off discipline carries forward from Phase 0–4: each chunk lands as its ow
 - Timer ticks: with the deadline 60s out, clients receive 60 `time_remaining` events ±100ms (Mandate: timer drift < 100ms across clients).
 - Autopick on deadline: a 12-team / 12-pick unattended draft runs to completion. Every pick is via autopick. Total wall-clock < 30 seconds. Per-pick p95 ≤ 1000ms / p99 ≤ 2000ms (Mandate: autopick latency).
 - A 12-team / 180-pick (15 rounds) full unattended draft completes in < 6 minutes (autopick p95 × 180 ≈ 3 minutes plus 2× cushion).
-- Cross-runtime parity preserved during cutover: an autopick committed by the in-server engine produces the same idempotency key as the existing Edge Function path would have for the same `(league_id, pick_number, generation)`. Verified against `_v2_test._uuidv5` SQL helper output for a known input vector.
+- Cross-runtime parity preserved during cutover: an autopick committed by the in-server engine produces the same idempotency key as the existing Edge Function path would have for the same `(league_id, pick_number, generation)`. Verified at chunk 11g.6 time against `_v2_test._uuidv5` SQL helper output for a known input vector. The helper itself is removed in chunk 11g.9 after the second runtime is gone — the parity check is a one-shot verification at cutover, not an ongoing invariant.
 - Per autopick: one row in `notifications` with `user_id = autopicked_team.owner_id`, `type = 'SYSTEM'`, `metadata.source = 'draft_engine'`, `metadata.pick_number = N`. Zero rows for manual picks. Vitest asserts both directions.
 
 **Performance targets.**
