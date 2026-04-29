@@ -7,6 +7,8 @@
 **Author:** Engineering
 **Document owner:** CTO
 
+> **2026-04-29 editorial note:** the deploy target has since changed from Cloud Run to GCE per `docs/PHASE_4_5_ARCHITECTURE.md`. The incident analysis below is preserved as-written for historical accuracy — Cloud Run was the production platform on April 10, 2026 and naming it that way matters for the forensic record. Remediation items have been annotated where Cloud Run-specific actions are no longer directly applicable; see inline notes in §3 Fix, the P0 list, and the P1 list. The underlying principles (capacity planning, pre-draft scaling, change freezes, billing alert paging) remain in force on GCE.
+
 ---
 
 ## TL;DR
@@ -140,6 +142,8 @@ push the service into 429 / 503 territory.
 **Fix:** `minScale = 1`, `maxScale ≥ 10`, `2Gi` RAM, `2` CPU during draft
 windows. Treat "live draft is scheduled" as an operational signal and
 pre-scale.
+
+*[2026-04-29: deploy target now GCE; this remediation item should be re-evaluated against GCE-equivalent behavior — see `docs/PHASE_4_5_ARCHITECTURE.md`. The principle (capacity planned, pre-scaled before draft windows) carries forward; the specific knobs — `minScale`/`maxScale`/per-revision memory and CPU — are Cloud Run concepts that map onto Managed Instance Group sizing, machine-type selection, and pre-draft scale-up on GCE.]*
 
 ### 4. Ten deploys in 2.5 hours before the draft
 
@@ -276,6 +280,7 @@ change freeze.
       SELECTs each `COLUMNS.*` against a real Supabase schema in CI.
 - [ ] Raise Cloud Run revision for `@citrus/server` to
       `minScale=1, maxScale=10, 2Gi, 2 CPU`.
+      *[2026-04-29: deploy target now GCE; this remediation item should be re-evaluated against GCE-equivalent behavior — see `docs/PHASE_4_5_ARCHITECTURE.md`.]*
 - [ ] Delete every file under any `mockups/` or `gemini/` directory
       that ends up in `apps/web/dist/`. Add a bundle-size gate.
 - [ ] Migrate notification realtime from client-direct Supabase
@@ -292,6 +297,7 @@ change freeze.
       with a hard budget cap; page on-call for billing alerts.
 - [ ] Staging environment that mirrors production Cloud Run scaling so
       we can load-test a draft room before touching prod.
+      *[2026-04-29: deploy target now GCE; this remediation item should be re-evaluated against GCE-equivalent behavior — see `docs/PHASE_4_5_ARCHITECTURE.md`.]*
 - [ ] Schema-aware column codegen from Supabase so
       `packages/shared/src/constants/columns.ts` cannot drift.
 
