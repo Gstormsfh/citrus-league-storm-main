@@ -22,6 +22,7 @@ import {
   PuckIcon,
   CupIcon,
   MascotAvatar,
+  MascotPeek,
 } from '@/components/citrus2';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { getTodayMST, getTodayMSTDate, formatDateToString } from '@/utils/timezoneUtils';
@@ -197,7 +198,8 @@ const ScheduleManager = () => {
               {/* GAME DENSITY THIS WEEK — actual data viz, not a placeholder
                   list. Per-day bar chart up top, then a horizontal bar list
                   of top teams sorted by game count. */}
-              <Card className="max-w-5xl mx-auto mb-6 bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+              <Card className="max-w-5xl mx-auto mb-6 bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden group">
+                <MascotPeek id="pineapple" position="top-right" size="sm" />
                 <CardHeader>
                   <CardTitle className="font-calistoga text-xl text-pastel-cream flex items-center gap-2">
                     <ScoreboardIcon className="w-5 h-5 text-pastel-orange" strokeWidth={2} />

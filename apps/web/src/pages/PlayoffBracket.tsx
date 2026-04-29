@@ -11,6 +11,7 @@ import {
   MaskIcon,
   RangeIcon,
   MascotAvatar,
+  MascotPeek,
 } from '@/components/citrus2';
 import { LeagueService } from '@/services/LeagueService';
 import {
@@ -680,8 +681,9 @@ const PlayoffBracket = () => {
                 {seeds.length > 0 && bracket && (
                   <SeedList seeds={seeds} teamNames={teamNames} bracketSize={bracket.bracket_size} />
                 )}
-                <div className="bg-[#1A2A20] ring-1 ring-amber-400/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(251,191,36,0.15)] relative overflow-hidden">
+                <div className="bg-[#1A2A20] ring-1 ring-amber-400/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(251,191,36,0.15)] relative overflow-hidden group">
                   <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-amber-400/15 rounded-full blur-3xl pointer-events-none" />
+                  <MascotPeek id="pineapple" position="bottom-right" size="sm" />
                   <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-3">
                       <MascotAvatar id="stormy" size="sm" />

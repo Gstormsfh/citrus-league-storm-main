@@ -28,6 +28,7 @@ import {
   MaskIcon,
   RangeIcon,
   MascotAvatar,
+  MascotPeek,
 } from '@/components/citrus2';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
@@ -429,7 +430,8 @@ const WaiverWire = () => {
                     "spent" portion shows the white track. Tabular numerals for
                     the readout below. Only renders for FAAB leagues. */}
                 {isFAAB && faabBudget !== null && (
-                  <div className="mt-4 max-w-md bg-[#1A2A20] ring-1 ring-pastel-orange/40 rounded-2xl p-4 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]">
+                  <div className="mt-4 max-w-md bg-[#1A2A20] ring-1 ring-pastel-orange/40 rounded-2xl p-4 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)] relative overflow-hidden group">
+                    <MascotPeek id="kiwi" position="top-right" size="sm" />
                     <div className="flex items-baseline justify-between mb-2">
                       <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft">
                         FAAB Budget Remaining

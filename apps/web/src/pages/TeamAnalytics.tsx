@@ -26,6 +26,7 @@ import {
   ScoreboardIcon,
   RangeIcon,
   MascotAvatar,
+  MascotPeek,
 } from '@/components/citrus2';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 
@@ -636,8 +637,9 @@ const TeamAnalytics = () => {
                 rented ad slot used to be. */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden group">
                   <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />
+                  <MascotPeek id="lemon" position="bottom-right" size="sm" />
                   <div className="relative z-10">
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-3">
                       ✦ Team-strength radar

@@ -13,6 +13,7 @@ import {
   MaskIcon,
   RangeIcon,
   MascotAvatar,
+  MascotPeek,
 } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
@@ -1626,8 +1627,9 @@ Your Commissioner`);
             )}
 
             {userTeam && (
-              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(166,211,160,0.15)] relative overflow-hidden">
+              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(166,211,160,0.15)] relative overflow-hidden group">
                 <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-pastel-sage/15 rounded-full blur-3xl pointer-events-none" />
+                <MascotPeek id="stormy" position="bottom-right" size="sm" />
                 <CardHeader className="relative z-10">
                   <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-1">
                     ✦ Your Squad

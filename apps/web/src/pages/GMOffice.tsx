@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import {
   HockeyFooter,
   StormyChatTile,
+  MascotPeek,
   CrossedSticksIcon,
   SlateIcon,
   XGModelIcon,
@@ -370,13 +371,16 @@ const GMOffice = () => {
                     with a real on-brand sample exchange. Tapping anywhere in
                     the rail's footer link drops you into the full assistant. */}
                 <div className="space-y-3">
-                  <StormyChatTile
-                    variant="compact"
-                    exchange={{
-                      question: 'Should I bench McDavid for a back-to-back?',
-                      answer: 'Almost never — even on B2Bs his projection floor still beats most starts. Bench only if he is flagged or facing two elite goalies.',
-                    }}
-                  />
+                  <div className="relative overflow-hidden rounded-2xl group">
+                    <StormyChatTile
+                      variant="compact"
+                      exchange={{
+                        question: 'Should I bench McDavid for a back-to-back?',
+                        answer: 'Almost never — even on B2Bs his projection floor still beats most starts. Bench only if he is flagged or facing two elite goalies.',
+                      }}
+                    />
+                    <MascotPeek id="stormy" position="top-right" size="sm" />
+                  </div>
                   <Link
                     to="/gm-office/stormy"
                     className="block text-center px-4 py-2.5 rounded-xl bg-pastel-orange/15 ring-1 ring-pastel-orange/30 hover:bg-pastel-orange/25 hover:ring-pastel-orange/50 transition-all font-jbmono text-[10px] uppercase tracking-[0.22em] font-bold text-pastel-orange-soft"
