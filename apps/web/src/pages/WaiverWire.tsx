@@ -27,8 +27,9 @@ import {
   CrossedSticksIcon,
   MaskIcon,
   RangeIcon,
-  MascotPortrait,
 } from '@/components/citrus2';
+import { MASCOTS } from '@/constants/mascots';
+import { cn } from '@/lib/utils';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { formatWaiverProcessTime, formatMoment, computeNextWaiverProcessMoment } from '@/utils/timezoneUtils';
@@ -429,8 +430,8 @@ const WaiverWire = () => {
                     "spent" portion shows the white track. Tabular numerals for
                     the readout below. Only renders for FAAB leagues. */}
                 {isFAAB && faabBudget !== null && (
-                  <div className="mt-4 max-w-md bg-[#1A2A20] ring-1 ring-pastel-orange/40 rounded-2xl p-4 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]">
-                    <div className="flex items-baseline justify-between mb-2">
+                  <div className="mt-4 max-w-md bg-[#1A2A20] ring-1 ring-pastel-orange/40 rounded-2xl p-4 pr-32 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)] relative overflow-hidden">
+                    <div className="flex items-baseline justify-between mb-2 gap-2">
                       <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft">
                         FAAB Budget Remaining
                       </span>
@@ -449,6 +450,20 @@ const WaiverWire = () => {
                       <span>$0</span>
                       <span>$50</span>
                       <span>$100</span>
+                    </div>
+                    {/* Kiwi (analytics-pilled D-man) is integrated INTO the
+                        budget card — canonical portrait edge-bleeds from the
+                        right with a speech bubble pointing at the meter. He's
+                        doing the FAAB math on your behalf. */}
+                    <img
+                      src={MASCOTS.kiwi.image}
+                      alt="Kiwi — Defenceman"
+                      aria-hidden="true"
+                      className="absolute bottom-0 right-0 h-32 w-auto object-cover object-bottom pointer-events-none"
+                    />
+                    <div className="absolute top-3 right-20 bg-pastel-cream text-[#0F1F15] px-2.5 py-1.5 rounded-lg text-[9px] font-bold whitespace-nowrap shadow-[0_4px_12px_-4px_rgba(0,0,0,0.4)] z-10">
+                      Save 30% for the deadline
+                      <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 bg-pastel-cream rotate-45" />
                     </div>
                   </div>
                 )}
@@ -538,6 +553,43 @@ const WaiverWire = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Mascot-led position chip row — Stormy/Lemon/Kiwi/Pineapple
+                    LEAD the filter, not float beside it. Each character
+                    matches their position (Stormy the AGM = All, Lemon the
+                    forward = F, Kiwi the D-man = D, Pineapple the goalie = G).
+                    Existing Select stays for granular C/LW/RW. */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {[
+                    { value: 'all', label: 'All', mascot: 'stormy' as const, ring: 'ring-pastel-orange' },
+                    { value: 'F', label: 'Forwards', mascot: 'lemon' as const, ring: 'ring-pastel-orange' },
+                    { value: 'D', label: 'Defense', mascot: 'kiwi' as const, ring: 'ring-pastel-sage' },
+                    { value: 'G', label: 'Goalies', mascot: 'pineapple' as const, ring: 'ring-amber-400' },
+                  ].map((chip) => {
+                    const active = positionFilter === chip.value;
+                    return (
+                      <button
+                        key={chip.value}
+                        type="button"
+                        onClick={() => setPositionFilter(chip.value)}
+                        className={cn(
+                          'flex items-center gap-2 pl-1 pr-3 py-1 rounded-full ring-1 transition-all font-jbmono text-[10px] uppercase tracking-[0.18em] font-bold',
+                          active
+                            ? `bg-pastel-orange text-[#0F1F15] ${chip.ring} shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]`
+                            : 'bg-white/5 text-white/70 ring-white/10 hover:bg-white/10 hover:text-pastel-cream',
+                        )}
+                        aria-pressed={active}
+                      >
+                        <img
+                          src={MASCOTS[chip.mascot].image}
+                          alt=""
+                          className="w-7 h-7 rounded-full object-cover ring-2 ring-[#0F1F15]/20"
+                          loading="lazy"
+                        />
+                        {chip.label}
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className="flex flex-col md:flex-row gap-3 mb-6">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
@@ -897,16 +949,35 @@ const WaiverWire = () => {
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
-                  <MascotPortrait id="kiwi" />
-                  <div className="p-5">
-                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-1">
-                      ✦ Kiwi says
+                {/* Sleeper-style data tile — replaces the static Kiwi
+                    portrait (Kiwi is now integrated INTO the FAAB meter on
+                    the main content side). This rail tile shows real wire
+                    activity counts so the rail earns its space. */}
+                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ShiftIcon className="w-4 h-4 text-pastel-sage-soft" strokeWidth={2} />
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold">Wire activity</div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-white/55">Pending claims</span>
+                      <span className="font-calistoga text-2xl text-pastel-cream tabular-nums leading-none">
+                        {waiverClaims.filter(c => c.status === 'pending').length}
+                      </span>
                     </div>
-                    <div className="font-calistoga text-xl text-pastel-cream mb-2">Off the wire</div>
-                    <p className="text-xs text-white/70 leading-relaxed">
-                      Trending pickups process when the waiver clock runs out. Bid your max if you need the player tonight, save FAAB if it's a depth add.
-                    </p>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-white/55">Recent activity</span>
+                      <span className="font-calistoga text-lg text-pastel-cream tabular-nums leading-none">
+                        {waiverClaims.filter(c => c.status !== 'pending').length}
+                      </span>
+                    </div>
+                    <div className="h-px bg-white/10" />
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-white/55">My priority</span>
+                      <span className="font-jbmono text-[11px] text-pastel-orange tabular-nums font-bold">
+                        {myPriority !== null ? `#${myPriority}` : '—'}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
