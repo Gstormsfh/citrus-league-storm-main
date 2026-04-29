@@ -56,28 +56,33 @@ const ArmchairGM = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F1F15]">
+    <div className="min-h-screen flex flex-col bg-[#0F1F15] text-pastel-cream">
       <Navbar />
 
       <main className="flex-1 w-full pt-[var(--header-height)] pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-12">
-        {/* Hero Header */}
-        <div className="w-full bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest relative isolate overflow-visible">
-          <div className="absolute inset-0 opacity-5 pointer-events-none z-0" aria-hidden="true"
+        {/* Hero Header — deeper #0F1F15 band with orange glow + diagonal stripes for depth */}
+        <div className="w-full bg-[#0F1F15] border-b border-white/10 relative isolate overflow-hidden">
+          <div aria-hidden="true" className="absolute -top-32 -right-20 w-[480px] h-[480px] bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />
+          <div aria-hidden="true" className="absolute -bottom-24 -left-20 w-[360px] h-[360px] bg-pastel-sage/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute inset-0 opacity-[0.04] pointer-events-none z-0" aria-hidden="true"
             style={{
-              backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.1) 20px, rgba(255,255,255,0.1) 40px)',
+              backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.5) 20px, rgba(255,255,255,0.5) 40px)',
             }}
           />
 
           <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 relative z-10">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-citrus-sage/20 border-2 border-citrus-sage/30">
-                <DollarSign className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-citrus-sage" />
+              <div className="p-2 sm:p-3 rounded-2xl bg-pastel-orange/15 ring-1 ring-pastel-orange/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <DollarSign className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-pastel-orange" />
               </div>
               <div>
-                <h1 className="font-varsity text-xl sm:text-2xl md:text-3xl text-white tracking-tight">
+                <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
+                  ✦ NHL Salary Cap Toolkit
+                </div>
+                <h1 className="font-calistoga text-xl sm:text-2xl md:text-3xl text-pastel-cream leading-none">
                   Armchair GM
                 </h1>
-                <p className="text-xs sm:text-sm text-white/70 font-display mt-0.5">
+                <p className="text-xs sm:text-sm text-white/55 mt-1.5">
                   NHL Salary Cap Toolkit &middot; {formatCap(SALARY_CAP_2025_26)} cap
                 </p>
               </div>
@@ -107,10 +112,10 @@ const ArmchairGM = () => {
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    "flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 min-h-[44px] rounded-t-xl text-xs sm:text-sm font-display font-bold transition-all border-2 border-b-0 flex-shrink-0 whitespace-nowrap cursor-pointer",
+                    "flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 min-h-[44px] rounded-t-xl text-xs sm:text-sm font-bold transition-all border-2 border-b-0 flex-shrink-0 whitespace-nowrap cursor-pointer",
                     activeTab === tab.id
-                      ? "bg-[#E8EED9] text-citrus-forest border-citrus-sage/30 shadow-sm"
-                      : "bg-white/20 text-white border-white/10 hover:bg-white/30 hover:border-white/20"
+                      ? "bg-pastel-orange text-[#0F1F15] border-pastel-orange shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                      : "bg-white/5 text-white/55 border-white/10 hover:bg-white/[0.08] hover:border-pastel-orange/30 hover:text-pastel-cream"
                   )}
                 >
                   {tab.icon}
@@ -130,8 +135,8 @@ const ArmchairGM = () => {
               {showTeamSelector || !selectedTeam ? (
                 <>
                   <div className="flex items-center gap-3 mb-2">
-                    <TrendingUp className="w-5 h-5 text-citrus-sage" />
-                    <h2 className="font-varsity text-lg text-citrus-forest">Select a Team</h2>
+                    <TrendingUp className="w-5 h-5 text-pastel-orange" />
+                    <h2 className="font-calistoga text-lg text-pastel-cream">Select a Team</h2>
                   </div>
                   <TeamSelector
                     selectedTeam={selectedTeam}
@@ -142,7 +147,7 @@ const ArmchairGM = () => {
                 <>
                   <button
                     onClick={handleBackToTeams}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-citrus-sage/30 bg-white/60 hover:bg-citrus-sage/10 transition-colors font-display text-sm text-citrus-forest"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl ring-1 ring-pastel-cream/30 bg-transparent hover:bg-white/5 hover:ring-pastel-cream/50 transition-colors text-sm text-pastel-cream font-bold"
                   >
                     <ChevronLeft className="w-4 h-4" />
                     All Teams
@@ -150,22 +155,22 @@ const ArmchairGM = () => {
 
                   {isLoading && (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
-                      <Loader2 className="w-8 h-8 text-citrus-sage animate-spin" />
-                      <span className="text-sm text-citrus-charcoal/60 font-display">
-                        Loading roster data...
+                      <Loader2 className="w-8 h-8 text-pastel-orange animate-spin" />
+                      <span className="text-sm text-white/55">
+                        Loading roster data…
                       </span>
                     </div>
                   )}
 
                   {error && (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3 bg-slate-50/50 rounded-2xl border-2 border-slate-200">
-                      <AlertCircle className="w-8 h-8 text-slate-400" />
-                      <span className="text-sm text-slate-600 font-display">
+                    <div className="flex flex-col items-center justify-center py-12 gap-3 bg-[#1A2A20] ring-1 ring-red-400/40 rounded-2xl shadow-[0_8px_24px_-12px_rgba(248,113,113,0.2)]">
+                      <AlertCircle className="w-8 h-8 text-red-300" />
+                      <span className="text-sm text-white/70">
                         Unable to load team data. Please try again.
                       </span>
                       <button
                         onClick={() => setSelectedTeam(selectedTeam)}
-                        className="px-4 py-2 rounded-lg bg-citrus-sage/20 text-citrus-forest text-sm font-display font-bold hover:bg-citrus-sage/30 transition-colors"
+                        className="px-4 py-2 rounded-lg bg-pastel-orange text-[#0F1F15] text-sm font-bold hover:bg-pastel-orange-soft transition-colors shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                       >
                         Retry
                       </button>
@@ -179,10 +184,10 @@ const ArmchairGM = () => {
                       <RosterLineupView data={teamCapData} />
 
                       <div className="text-center py-4">
-                        <p className="text-xs text-citrus-charcoal/40 font-display">
+                        <p className="text-xs text-white/40">
                           Contract data is based on publicly available information and may not reflect the most recent transactions.
                           <br />
-                          Salary cap for 2025-26: {formatCap(SALARY_CAP_2025_26)} &middot; Roster data from NHL.com
+                          Salary cap for 2025-26: {formatCap(SALARY_CAP_2025_26)} · Roster data from NHL.com
                         </p>
                       </div>
                     </div>
@@ -216,9 +221,9 @@ const ArmchairGM = () => {
 
 function HeroBadge({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/10 border border-white/20 flex-shrink-0">
-      <span className="text-[10px] sm:text-xs text-white/70 font-display uppercase tracking-wider">{label}</span>
-      <span className="font-varsity text-xs sm:text-sm text-white">{value}</span>
+    <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/5 ring-1 ring-white/10 flex-shrink-0">
+      <span className="text-[10px] sm:text-xs text-white/55 font-jbmono uppercase tracking-[0.18em] font-bold">{label}</span>
+      <span className="text-xs sm:text-sm font-bold text-pastel-cream tabular-nums">{value}</span>
     </div>
   );
 }
