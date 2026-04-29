@@ -1,9 +1,11 @@
 # Phase 4.5 — Persistent Node Draft Engine in Existing Server (Chunks 11g.0–11g.10)
 
+> **2026-04-29 update:** deploy target changed from Cloud Run to GCE. See `docs/PHASE_4_5_ARCHITECTURE.md` for the canonical architecture; `CLAUDE.md` for high-level rationale; ADR-001 supersession note for the decision trail. Inline references in this plan have been updated to match. Chunk 11g.2's plan is being reshaped (see callout in that chunk); other chunks stand as-written.
+
 | | |
 |---|---|
-| **Status** | Plan accepted (2026-04-28). Implementation not yet started. |
-| **Authority** | `docs/adr/ADR-001-persistent-node-draft-engine.md` (the architectural decision: persistent code inside the existing Node.js / Hono server on Cloud Run, with `uWebSockets.js` as the live WebSocket layer; Edge Functions removed entirely); `CLAUDE.md` § Citrus Draft Performance Mandate (binding performance targets). |
+| **Status** | Plan accepted (2026-04-28). Deploy target updated 2026-04-29 (Cloud Run → GCE). Implementation in progress. |
+| **Authority** | `docs/adr/ADR-001-persistent-node-draft-engine.md` (the architectural decision: persistent code inside the existing Node.js / Hono server on GCE, with `uWebSockets.js` as the live WebSocket layer; Edge Functions removed entirely); `docs/PHASE_4_5_ARCHITECTURE.md` (canonical architecture reference for the deploy topology); `CLAUDE.md` § Citrus Draft Performance Mandate (binding performance targets). |
 | **Predecessor** | Phase 4 closeout, with autopick latency ~11.7s/pick measured on staging — non-competitive per the Mandate. |
 | **Successor** | Phase 5 (UI client work) is **blocked** until chunk 11g.10 sign-off. |
 | **Estimated solo-founder timeline** | Chunks 11g.0–11g.10 ≈ 3–5 weeks of solo-founder work assisted by Claude Code, including cushion for unknowns. No new language or runtime; the engine ships inside the existing server. |
@@ -38,7 +40,7 @@ A chunk's "performance gate" is a measured-on-staging assertion against these ta
 
 **Deliverable.** A pre-flight audit on the existing Node server before any draft-engine code lands. The chunk's commit produces a single document — pass/fail with specifics — and zero application code. Audit scope:
 
-- Existing `server/package.json` dependencies vs. uWebSockets.js. Confirm the native C++ binary builds cleanly for the Cloud Run container architecture (Linux x64), peer-deps and types resolve, no version conflicts. Per ADR-001 the architecture specifies uWebSockets.js; alternative libraries (`ws`, `socket.io`) are explicitly not in scope.
+- Existing `server/package.json` dependencies vs. uWebSockets.js. Confirm the native C++ binary builds cleanly for the GCE container architecture (Linux x64), peer-deps and types resolve, no version conflicts. Per ADR-001 the architecture specifies uWebSockets.js; alternative libraries (`ws`, `socket.io`) are explicitly not in scope. *(2026-04-29: audit findings still apply — uWS + Hono compose fine in one Node process; the port-conflict concern that drove the original A/B/C topology decision is moot on GCE since the platform does not impose Cloud Run's single-port constraint.)*
 - Hono's HTTP-upgrade handling. Confirm Hono routes can coexist with a WebSocket upgrade handler on the same port, or document the specific Hono version + adapter combination required.
 - TypeScript build pipeline. Confirm `tsc` / `tsx` build path handles both the existing routes and the new WebSocket code without configuration churn.
 - Existing middleware (auth, JWT, RLS context). Confirm the middleware stack extends cleanly to WebSocket connections — auth on the upgrade handshake, league-membership check before `LobbyManager` join.
@@ -51,7 +53,7 @@ A chunk's "performance gate" is a measured-on-staging assertion against these ta
 **Acceptance criteria.**
 - The audit document exists at the path above and answers each scope item with a definite yes/no/conflict.
 - A scratch branch demonstrates the WebSocket library installing into `server/` cleanly and Hono accepting a WebSocket upgrade on a test endpoint. The scratch branch is committed but not merged into `staging-setup` — its purpose is evidence, not deployable code.
-- If conflicts exist that can't be cleanly resolved, the chunk **escalates** before proceeding. The documented fall-back is alternative (a) from ADR-001 — a separate Cloud Run service. KI-009's "refactor not rewrite" framing is the binding promise; the architectural pattern carries either way.
+- If conflicts exist that can't be cleanly resolved, the chunk **escalates** before proceeding. The documented fall-back is alternative (a) from ADR-001 — a separate service on the same GCE platform. KI-009's "refactor not rewrite" framing is the binding promise; the architectural pattern carries either way.
 
 **Performance targets.** None.
 
@@ -59,13 +61,13 @@ A chunk's "performance gate" is a measured-on-staging assertion against these ta
 
 ---
 
-The goal of Phase 4.5 is a **single working draft running end-to-end on the existing Cloud Run server**, with measured performance meeting the Mandate, the Edge Function infrastructure deleted, and the in-memory `LobbyManager` model proven under realistic load. No new language, no new runtime, no new deploy target.
+The goal of Phase 4.5 is a **single working draft running end-to-end on the existing Node.js / Hono server (deployed to GCE)**, with measured performance meeting the Mandate, the Edge Function infrastructure deleted, and the in-memory `LobbyManager` model proven under realistic load. No new language, no new runtime; the engine ships inside the existing server. (Deploy target moved from Cloud Run to GCE on 2026-04-29 — see header note.)
 
 Sign-off discipline carries forward from Phase 0–4: each chunk lands as its own commit, runs on staging, and is reviewed before the next chunk starts. The chunk 11g.10 sign-off is the Phase 5 entry gate.
 
 ### Chunk 11g.1 — Discovery endpoint + JWT issuance
 
-**Deliverable.** A new Hono route `GET /api/drafts/:draftId/server` that returns `{ host, port, token }`. The `host` and `port` are sourced from environment configuration (single Cloud Run instance Day 1; the protocol shape is what matters for future sharding). The `token` is a short-lived JWT (5-minute expiration) signed with `SUPABASE_JWT_SECRET` (the same secret Supabase signs auth tokens with — one auth surface for the whole server), with claims `{ sub: userId, draftId, leagueId, iat, exp }`. The route runs through the existing `authMiddleware` and `membershipMiddleware` so only authenticated league members can request a token. (Note: `draftId` and `lobbyId` are the same identifier in Citrus — the draft IS the lobby. `draftId` is the canonical wire-format claim; later chunks may use `lobbyId` as an internal variable name for the same value.)
+**Deliverable.** A new Hono route `GET /api/drafts/:draftId/server` that returns `{ host, port, token }`. The `host` and `port` are sourced from environment configuration (single GCE VM Day 1; the protocol shape is what matters for future sharding — see `docs/PHASE_4_5_ARCHITECTURE.md` Stage 2/3 progression). The `token` is a short-lived JWT (5-minute expiration) signed with `SUPABASE_JWT_SECRET` (the same secret Supabase signs auth tokens with — one auth surface for the whole server), with claims `{ sub: userId, draftId, leagueId, iat, exp }`. The route runs through the existing `authMiddleware` and `membershipMiddleware` so only authenticated league members can request a token. (Note: `draftId` and `lobbyId` are the same identifier in Citrus — the draft IS the lobby. `draftId` is the canonical wire-format claim; later chunks may use `lobbyId` as an internal variable name for the same value.)
 
 **Dependencies.** 11g.0.
 
@@ -83,6 +85,8 @@ Sign-off discipline carries forward from Phase 0–4: each chunk lands as its ow
 ---
 
 ### Chunk 11g.2 — uWebSockets.js setup with WebSocket upgrade auth
+
+> **Reshape pending (2026-04-29).** The chunk plan as written below assumes the Cloud Run deploy target. With the pivot to GCE, the A/B/C port-topology decision is moot (GCE does not impose Cloud Run's single-port constraint), and the Hono-on-uWS adapter work is no longer required (Hono and uWS run on separate ports in the same Node process — see `docs/PHASE_4_5_ARCHITECTURE.md` "Stack Decision" and "Process layout"). Awaiting reshape brief from Garrett before implementation. The acceptance criteria below are still directionally correct; the implementation steps to reach them will simplify substantially.
 
 **Deliverable.** `uWebSockets.js` added to `server/package.json`, instantiated as a separate `uWS.App()` running on its own port (configurable; default 3002). The WebSocket endpoint at `/ws/draft/:draftId` validates the upgrade in the `upgrade` handler: extracts the `token` from the `Sec-WebSocket-Protocol` header (per chunk 11g.1: subprotocol header keeps the token out of URLs / logs / referrers), calls `verifyDraftToken(token, draftIdFromUrl)`, which confirms the token's `draftId` claim matches the URL parameter. Rejects with appropriate WS close codes on auth failure (4401 unauthorized, 4403 forbidden, 4404 draft mismatch). On accept, subscribes the socket to the topic `draft:${draftId}` and sets per-connection user context (`userId`, `leagueId`, `draftId`) for downstream message handlers.
 
@@ -215,14 +219,14 @@ Reads and writes `leagues.draft_status` using the `DraftStatus` type from `@citr
 
 ### Chunk 11g.8 — Failure mode test suite
 
-**Deliverable.** Six failure-mode integration tests covering the brief's scenarios. Each test runs against a real staging Cloud Run deploy (or a local server with the same wiring), seeds fixtures, asserts behavior end-to-end. Scenarios:
+**Deliverable.** Six failure-mode integration tests covering the brief's scenarios. Each test runs against a real staging GCE deploy (or a local server with the same wiring), seeds fixtures, asserts behavior end-to-end. Scenarios:
 
 1. **Process crash mid-draft** — kill the Node process during an active draft (5 picks committed, 2 clients connected). Expected: clients see WS disconnect, server restarts, lobby bootstraps from snapshot + replay (chunk 11g.7), clients reconnect with `last_seen_seq` (chunk 11g.5), draft continues. No picks lost, no duplicates.
 2. **Client reconnect after network drop** — drop a single client's WS connection mid-draft (TCP close). Expected: client reconnects, replays missed events from ring buffer (chunk 11g.5). No effect on other clients. Reconnection p95 ≤ 2000ms.
 3. **Duplicate pick submission with idempotency keys** — client A submits the same pick twice (same idempotency key, e.g. retry after a flaky network). Expected: second submission returns `{ was_duplicate: true }`, no second `draft_events` row, no second broadcast.
 4. **Two users racing on the clock** — clients A and B both submit picks within the same single-writer-queue tick. Expected: one wins (commits + broadcasts), the other receives a typed "not on clock" rejection without committing.
 5. **Slow client** — one client's WS has `getBufferedAmount() > 1MB` (simulated by withholding ACKs). Expected: chunk 11g.4's fanout protection skips the slow socket on subsequent broadcasts; the slow client is flagged for resync; other clients receive picks at normal latency.
-6. **Deploy during active draft (drain mode)** — Cloud Run revision swap while a draft is mid-clock. Expected: old instance flushes its single-writer queue and commits in-flight mutations before exit; new instance bootstraps the lobby from snapshot + replay; clients reconnect via 11g.5. Draft continues without operator intervention.
+6. **Deploy during active draft (drain mode)** — GCE rolling restart (process receives SIGTERM, drains, exits; new process boots) while a draft is mid-clock. Expected: old process flushes its single-writer queue and commits in-flight mutations before exit; new process bootstraps the lobby from snapshot + replay (chunk 11g.7); clients reconnect via 11g.5. Draft continues without operator intervention. *(See `docs/PHASE_4_5_ARCHITECTURE.md` "Failure Modes Handled on Day 1" and "Day 1 Topology" for the canonical drain semantics on GCE.)*
 
 **Dependencies.** 11g.5, 11g.6, 11g.7.
 
@@ -234,7 +238,7 @@ Reads and writes `leagues.draft_status` using the `DraftStatus` type from `@citr
 **Performance targets.**
 - All Mandate targets continue to hold under each scenario where they apply.
 
-**Estimated effort.** 4–5 days. Scenario 6 is the trickiest — needs the chosen Cloud Run revision-swap mechanism documented and a drain-mode hook on the engine (chunk should design this).
+**Estimated effort.** 4–5 days. Scenario 6 is the trickiest — needs the GCE rolling-restart / SIGTERM-drain mechanism documented and a drain-mode hook on the engine (chunk should design this).
 
 ---
 
@@ -269,7 +273,7 @@ The chunk also closes the runbook entries: **KI-007** (vendored shared code drif
 
 ### Chunk 11g.10 — Performance verification against the Mandate
 
-**Deliverable.** End-to-end performance verification on the deployed staging Cloud Run server against every binding target in `CLAUDE.md` § Citrus Draft Performance Mandate. A `server/bench/` benchmark harness drives realistic load (12-user lobbies, multiple concurrent drafts) using the `node --cpu-prof` workflow per VS Code Node profiling docs to capture flame graphs for any regression. The harness emits a structured report: per-Mandate-target p50/p95/p99 latency, throughput, error rate. Output committed to the repo so future regressions have a baseline.
+**Deliverable.** End-to-end performance verification on the deployed staging GCE server against every binding target in `CLAUDE.md` § Citrus Draft Performance Mandate. A `server/bench/` benchmark harness drives realistic load (12-user lobbies, multiple concurrent drafts) using the `node --cpu-prof` workflow per VS Code Node profiling docs to capture flame graphs for any regression. The harness emits a structured report: per-Mandate-target p50/p95/p99 latency, throughput, error rate. Output committed to the repo so future regressions have a baseline.
 
 The KI-010 Tier 1 optimizations are verified-in-place via grep:
 - Parallel async via `Promise.all`: chunk 11g.3 `LobbyManager` constructor.
@@ -294,7 +298,7 @@ A code-comment audit (`git grep "KI-010 Tier 1"`) produces the four expected hit
 **Pass:** Phase 5 (UI client work) unblocks. KI-010 closes (RESOLVED, with the chunk 11g.10 commit-sha as evidence).
 **Fail (any target missed by > 10%):** stop. Targeted optimization, not a fresh chunk. The Mandate is binding.
 
-**Performance targets.** The full Mandate set, end-to-end, on the deployed Cloud Run server.
+**Performance targets.** The full Mandate set, end-to-end, on the deployed GCE server.
 
 **Estimated effort.** 3–5 days. Includes profiling time and any targeted optimization passes that surface during the run.
 
@@ -305,7 +309,7 @@ A code-comment audit (`git grep "KI-010 Tier 1"`) produces the four expected hit
 New issues that surface during Phase 4.5 land in the appropriate registry at commit time:
 
 - **Cross-cutting / project-wide concerns** → `docs/REGISTRY.md`. Examples: ops surface area changes, new external dependencies, hosting-cost surprises.
-- **Draft-engine-specific concerns** → `docs/RUNBOOKS/draft-engine-v2-known-issues.md`. Examples: a `uWebSockets.js` quirk on Cloud Run, a Postgres query that needs an index, a Hono+uWS coexistence gotcha.
+- **Draft-engine-specific concerns** → `docs/RUNBOOKS/draft-engine-v2-known-issues.md`. Examples: a `uWebSockets.js` quirk on GCE, a Postgres query that needs an index, a Hono+uWS coexistence gotcha.
 - **Spec-level concerns (changes to the integration boundary)** → require an ADR. The integration boundary (Postgres RPC signatures, payload shapes, idempotency-key derivation, WebSocket message protocol) does not change without explicit governance.
 
 Existing open KIs that interact with this work:
@@ -324,7 +328,7 @@ New KIs filed at plan time (all rewritten to match the in-server engine directio
 
 Future KIs (likely to be filed during the build):
 
-- A KI covering whichever Cloud Run quirk surfaces (e.g., WebSocket idle-timeout tuning, revision-swap drain mode behavior).
+- A KI covering whichever GCE quirk surfaces (e.g., WebSocket idle-timeout tuning, rolling-restart drain-mode behavior, MIG rehash semantics if/when Stage 3 lands).
 - A KI covering whichever Hono+uWS coexistence quirk surfaces (port allocation, middleware reuse, build-pipeline interactions).
 - A KI for any latency target the benchmark suite chronically misses by < 10% — bounded, documented, scheduled for follow-up before Phase 5 starts.
 - **KI-011** is filed at plan time for the Day 2 multi-process sharding transition (single-process Day 1 is a deliberate scope cut, not a long-term posture; trigger conditions and refactor-not-rewrite contract documented in the registry row).
