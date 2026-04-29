@@ -54,6 +54,7 @@ export {
   LeagueLiveScene,
   StormyAIScene,
   FreeAgentsScene,
+  PlayoffBracketScene,
 } from './MascotScene';
 
 // On-brand loading state

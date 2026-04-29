@@ -252,6 +252,36 @@ export function AnalyticsConsoleScene({ size = 'xl', className = '' }: SceneProp
 }
 
 /* ──────────────────────────────────────────────────────────────────────
+ * SCENE: PLAYOFF BRACKET — CUP CHASE (uses existing /mascots/scene-cup.webp)
+ * The pre-rendered championship cup illustration repurposed as a
+ * bracket-page hero.
+ * ────────────────────────────────────────────────────────────────────── */
+
+export function PlayoffBracketScene({ size = 'lg', className = '' }: SceneProps) {
+  const sz = SIZE[size];
+  return (
+    <div
+      className={`relative overflow-hidden bg-[#0F1F15] rounded-3xl ring-1 ring-white/10 ${sz.container} ${sz.minHeight} ${className}`}
+      role="img"
+      aria-label="The championship cup glints under stadium lights — playoff bracket hero."
+    >
+      <img src="/mascots/scene-cup.webp" alt="" className="absolute inset-0 w-full h-full object-cover" loading="eager" />
+      <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(15,31,21,0.55) 0%, transparent 22%, transparent 65%, rgba(15,31,21,0.92) 100%)' }} />
+      <div className="absolute top-5 left-5 sm:top-6 sm:left-6 z-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#0F1F15]/70 ring-1 ring-amber-400/40 backdrop-blur-md">
+          <LivePulse size="xs" />
+          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-amber-300 font-bold">Postseason · Cup Chase</span>
+        </div>
+      </div>
+      <div className="absolute bottom-5 left-5 sm:bottom-6 sm:left-6 z-10 max-w-md">
+        <div className="font-calistoga text-[26px] sm:text-[34px] text-pastel-cream leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">Lift the cup.</div>
+        <div className="font-jbmono text-[9px] sm:text-[10px] uppercase tracking-[0.32em] text-white/70 mt-1.5">Bracket · Series · Champions only</div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────
  * SCENE: FREE AGENTS — SCOUTING ROOM (Stormy)
  * Hero asset: /mascots/scene-free-agents.webp
  * Stormy with clipboard in front of a curved holographic wall of
