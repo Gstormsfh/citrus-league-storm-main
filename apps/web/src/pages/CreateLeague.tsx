@@ -16,7 +16,6 @@ import {
   ShiftIcon,
   MaskIcon,
   NetIcon,
-  MascotPeek,
 } from '@/components/citrus2';
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -737,8 +736,7 @@ const CreateLeague = () => {
             <WaitlistSignup source="create_league_page" variant="compact" />
           </div>
 
-          <Card className="relative bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] overflow-hidden group">
-            <MascotPeek id="stormy" position="top-right" size="sm" />
+          <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] overflow-hidden">
             <CardContent className="p-4 sm:p-8">
               <Tabs defaultValue={defaultTab} value={defaultTab} onValueChange={(v) => setDefaultTab(v as "create" | "join")} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-8 bg-[#0F1F15] ring-1 ring-white/10 p-1 rounded-xl">

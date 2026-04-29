@@ -12,8 +12,7 @@ import {
   ShiftIcon,
   MaskIcon,
   RangeIcon,
-  MascotAvatar,
-  MascotPeek,
+  MascotPortrait,
 } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
@@ -1627,9 +1626,8 @@ Your Commissioner`);
             )}
 
             {userTeam && (
-              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(166,211,160,0.15)] relative overflow-hidden group">
+              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(166,211,160,0.15)] relative overflow-hidden">
                 <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-pastel-sage/15 rounded-full blur-3xl pointer-events-none" />
-                <MascotPeek id="stormy" position="bottom-right" size="sm" />
                 <CardHeader className="relative z-10">
                   <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-1">
                     ✦ Your Squad
@@ -1726,16 +1724,13 @@ Your Commissioner`);
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
-                  <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-3">
-                      <MascotAvatar id="stormy" size="sm" />
-                      <div className="min-w-0">
-                        <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Stormy says</div>
-                        <div className="font-bold text-sm text-pastel-cream truncate">League pulse</div>
-                      </div>
+                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                  <MascotPortrait id="stormy" />
+                  <div className="p-5">
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
+                      ✦ Stormy says
                     </div>
+                    <div className="font-calistoga text-xl text-pastel-cream mb-2">League pulse</div>
                     <p className="text-xs text-white/70 leading-relaxed">
                       <span className="font-bold text-pastel-cream tabular-nums">{teams.length}</span> of <span className="font-bold text-pastel-cream tabular-nums">{league.settings?.teamsCount || 12}</span> teams in.
                       {' '}

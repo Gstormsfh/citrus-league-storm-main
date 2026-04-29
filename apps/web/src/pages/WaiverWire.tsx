@@ -27,8 +27,7 @@ import {
   CrossedSticksIcon,
   MaskIcon,
   RangeIcon,
-  MascotAvatar,
-  MascotPeek,
+  MascotPortrait,
 } from '@/components/citrus2';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
@@ -430,8 +429,7 @@ const WaiverWire = () => {
                     "spent" portion shows the white track. Tabular numerals for
                     the readout below. Only renders for FAAB leagues. */}
                 {isFAAB && faabBudget !== null && (
-                  <div className="mt-4 max-w-md bg-[#1A2A20] ring-1 ring-pastel-orange/40 rounded-2xl p-4 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)] relative overflow-hidden group">
-                    <MascotPeek id="kiwi" position="top-right" size="sm" />
+                  <div className="mt-4 max-w-md bg-[#1A2A20] ring-1 ring-pastel-orange/40 rounded-2xl p-4 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]">
                     <div className="flex items-baseline justify-between mb-2">
                       <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft">
                         FAAB Budget Remaining
@@ -899,16 +897,13 @@ const WaiverWire = () => {
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
-                  <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-pastel-sage/15 rounded-full blur-3xl pointer-events-none" />
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-3">
-                      <MascotAvatar id="kiwi" size="sm" />
-                      <div className="min-w-0">
-                        <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold">Kiwi says</div>
-                        <div className="font-bold text-sm text-pastel-cream truncate">Off the wire</div>
-                      </div>
+                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                  <MascotPortrait id="kiwi" />
+                  <div className="p-5">
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-1">
+                      ✦ Kiwi says
                     </div>
+                    <div className="font-calistoga text-xl text-pastel-cream mb-2">Off the wire</div>
                     <p className="text-xs text-white/70 leading-relaxed">
                       Trending pickups process when the waiver clock runs out. Bid your max if you need the player tonight, save FAAB if it's a depth add.
                     </p>

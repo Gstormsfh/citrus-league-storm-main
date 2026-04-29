@@ -21,8 +21,7 @@ import {
   CrossedSticksIcon,
   PuckIcon,
   CupIcon,
-  MascotAvatar,
-  MascotPeek,
+  MascotPortrait,
 } from '@/components/citrus2';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { getTodayMST, getTodayMSTDate, formatDateToString } from '@/utils/timezoneUtils';
@@ -198,8 +197,7 @@ const ScheduleManager = () => {
               {/* GAME DENSITY THIS WEEK — actual data viz, not a placeholder
                   list. Per-day bar chart up top, then a horizontal bar list
                   of top teams sorted by game count. */}
-              <Card className="max-w-5xl mx-auto mb-6 bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden group">
-                <MascotPeek id="pineapple" position="top-right" size="sm" />
+              <Card className="max-w-5xl mx-auto mb-6 bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                 <CardHeader>
                   <CardTitle className="font-calistoga text-xl text-pastel-cream flex items-center gap-2">
                     <ScoreboardIcon className="w-5 h-5 text-pastel-orange" strokeWidth={2} />
@@ -505,18 +503,13 @@ const ScheduleManager = () => {
                 content where the rented ad slot used to be. */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
-                  <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-pastel-sage/15 rounded-full blur-3xl pointer-events-none" />
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-3">
-                      <MascotAvatar id="pineapple" size="sm" />
-                      <div className="min-w-0">
-                        <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold">
-                          Pineapple says
-                        </div>
-                        <div className="font-bold text-sm text-pastel-cream truncate">In the crease</div>
-                      </div>
+                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                  <MascotPortrait id="pineapple" />
+                  <div className="p-5">
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-1">
+                      ✦ Pineapple says
                     </div>
+                    <div className="font-calistoga text-xl text-pastel-cream mb-2">In the crease</div>
                     <p className="text-xs text-white/70 leading-relaxed">
                       Heaviest day this week: <span className="font-bold text-pastel-cream">
                         {Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '—'}
