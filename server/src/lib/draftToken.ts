@@ -14,10 +14,17 @@
  *    a separate `DRAFT_TOKEN_SECRET`; the user-facing auth surface stays
  *    single per ADR-001 § Decision.
  *
- * 2. **`draftId` is the canonical scope claim.** In Citrus the draft IS
- *    the lobby (no separate lobby entity). The PLAN sometimes uses both
- *    terms; the wire format uses `draftId`. Chunk 11g.2's WebSocket path
- *    is `/ws/draft/:draftId` for consistency.
+ * 2. **`draftId` is the canonical scope claim.** In Citrus's data model
+ *    the "draft" is not a separate entity — it's the league's drafting
+ *    phase, identified by `league_id` and tracked via the
+ *    `leagues.draft_status` enum. The JWT's `draftId` claim is therefore
+ *    the league's UUID. The "draftId" naming is preserved at the API
+ *    surface (URL path and JWT claim) because it's more semantic for
+ *    API consumers than "leagueId in drafting phase," but internally
+ *    these are the same identifier. See `docs/DRAFT_ENGINE_V2_SPEC.md`
+ *    §0 for the canonical model and `routes/drafts.ts` for the
+ *    `draft_status`-gated lookup. Chunk 11g.2's WebSocket path is
+ *    `/ws/draft/:draftId` for consistency.
  *
  * 3. **No `teamId` in the token.** A user may be a league member without
  *    owning a team yet (commissioner-only edge cases, pre-team-assignment

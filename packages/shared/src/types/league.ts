@@ -505,3 +505,23 @@ export function extractFormatSettings(settings: Record<string, unknown>): Partia
     faabBudget: (settings.faabBudget as number) || 100,
   };
 }
+
+// ============================================================================
+// DRAFT STATUS - The league's drafting phase
+// ============================================================================
+// In Citrus's data model the "draft" is not a separate entity — it's the
+// league's drafting phase, identified by `league_id` and tracked via the
+// `leagues.draft_status` enum. This is the canonical source for valid
+// values; the Zod validator at `server/src/middleware/validate.ts` and
+// the discovery endpoint at `server/src/routes/drafts.ts` import from here.
+
+export const DRAFT_STATUSES = ['not_started', 'queued', 'in_progress', 'paused', 'completed'] as const;
+export type DraftStatus = (typeof DRAFT_STATUSES)[number];
+
+/**
+ * Draft statuses where a WebSocket connection to the live engine is
+ * meaningful. `not_started` and `completed` reject discovery requests
+ * with 409. `paused` is connectable so users can stay in the draft
+ * room and see chat / commissioner actions while picks are halted.
+ */
+export const CONNECTABLE_DRAFT_STATUSES: readonly DraftStatus[] = ['queued', 'in_progress', 'paused'];
