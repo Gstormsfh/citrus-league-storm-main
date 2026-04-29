@@ -3103,7 +3103,7 @@ const Roster = () => {
 
                     {/* Date Selector */}
                     {currentMatchup && matchupWeekDates.length > 0 && (
-                      <div className="bg-card rounded-lg border p-4">
+                      <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4">
                         <WeeklySchedule
                           weekStart={currentMatchup.week_start_date}
                           weekEnd={currentMatchup.week_end_date}
@@ -3451,19 +3451,19 @@ const Roster = () => {
                             <h3 className="font-bold text-lg">Power Rankings</h3>
                          </div>
                          <div className="space-y-3">
-                           <div className="flex justify-between items-center p-2 bg-muted/40 rounded">
+                           <div className="flex justify-between items-center p-2 bg-white/5 ring-1 ring-white/10 rounded">
                               <span className="text-sm font-medium">Offense</span>
                               <Badge className="bg-green-500 hover:bg-green-600">A-</Badge>
                            </div>
-                           <div className="flex justify-between items-center p-2 bg-muted/40 rounded">
+                           <div className="flex justify-between items-center p-2 bg-white/5 ring-1 ring-white/10 rounded">
                               <span className="text-sm font-medium">Defense</span>
                               <Badge className="bg-yellow-500 hover:bg-yellow-600">B</Badge>
                            </div>
-                           <div className="flex justify-between items-center p-2 bg-muted/40 rounded">
+                           <div className="flex justify-between items-center p-2 bg-white/5 ring-1 ring-white/10 rounded">
                               <span className="text-sm font-medium">Goalie</span>
                               <Badge className="bg-blue-500 hover:bg-blue-600">A</Badge>
                            </div>
-                            <div className="flex justify-between items-center p-2 bg-muted/40 rounded">
+                            <div className="flex justify-between items-center p-2 bg-white/5 ring-1 ring-white/10 rounded">
                               <span className="text-sm font-medium">Depth</span>
                               <Badge className="bg-orange-500 hover:bg-orange-600">C+</Badge>
                             </div>
@@ -3487,7 +3487,7 @@ const Roster = () => {
                             <h4 className="text-sm font-semibold text-white/55 mb-3">{pos === 'C' ? 'Centers' : (pos === 'D' ? 'Defensemen' : `${pos} Wingers`)}</h4>
                             <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
                                {Object.entries(posStats[pos as 'C'|'LW'|'RW'|'D']).map(([key, value]) => (
-                                  <div key={key} className="flex flex-col p-3 bg-muted/30 rounded-lg border text-center">
+                                  <div key={key} className="flex flex-col p-3 bg-white/5 rounded-lg border text-center">
                                      <span className="text-white/55 uppercase text-xs font-bold tracking-wider">{key}</span>
                                      <span className="text-xl font-bold mt-1 text-foreground">{value}</span>
                                   </div>
@@ -3624,7 +3624,7 @@ const Roster = () => {
                                 <div className="col-span-2 text-right">Status</div>
                               </div>
                               {historyRows.map((tx) => (
-                                <div key={tx.id} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 p-4 border-b last:border-0 text-sm md:items-center hover:bg-muted/20 transition-colors relative">
+                                <div key={tx.id} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 p-4 border-b last:border-0 text-sm md:items-center hover:bg-white/5 transition-colors relative">
                                   {/* Mobile Top Row: Date & Status */}
                                   <div className="flex md:hidden justify-between items-start mb-1">
                                     <div className="text-white/55 text-xs">{tx.date}</div>

@@ -43,7 +43,6 @@ import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { useToast } from '@/hooks/use-toast';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
-import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
 import { ScoringCalculator } from '@/utils/scoringUtils';
@@ -1182,8 +1181,17 @@ const TradeAnalyzer = () => {
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <AdSpace size="300x250" label="Trade Sponsor" />
-                <AdSpace size="300x250" label="Fantasy Partner" />
+                {/* Sleeper-style trade tips tile — replaces legacy AdSpace */}
+                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-3">
+                    ✦ Trade tips
+                  </div>
+                  <ul className="space-y-2 text-[11px] text-white/70 leading-relaxed">
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Trade for upside, not name value</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Sell injury-flagged stars before news drops</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> 2-for-1 deals concentrate elite scoring</li>
+                  </ul>
+                </div>
               </div>
             </aside>
 

@@ -123,8 +123,8 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
       'rounded-lg overflow-hidden border shadow-sm',
       isChampionship && 'ring-2 ring-amber-400/50 shadow-[0_16px_40px_-12px_rgba(251,191,36,0.3)]',
       series.status === 'active' && 'ring-2 ring-pastel-orange/40 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]',
-      series.status === 'completed' && !isChampionship && 'border-border/50',
-      series.status === 'pending' && 'border-border/30 opacity-70',
+      series.status === 'completed' && !isChampionship && 'border-white/10',
+      series.status === 'pending' && 'border-white/10 opacity-70',
     )}>
       {/* Status badge */}
       <div className={cn(
@@ -150,9 +150,9 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
       <div className="p-2 space-y-1 bg-[#1A2A20]">
         {getTeamDisplay(series.home_team_id, series.home_seed, homeIsWinner, series.home_score)}
         <div className="flex items-center gap-1 px-3">
-          <div className="flex-1 border-t border-border/30"></div>
+          <div className="flex-1 border-t border-white/10"></div>
           <span className="text-[9px] text-white/55 font-medium uppercase">vs</span>
-          <div className="flex-1 border-t border-border/30"></div>
+          <div className="flex-1 border-t border-white/10"></div>
         </div>
         {getTeamDisplay(series.away_team_id, series.away_seed, awayIsWinner, series.away_score)}
       </div>
@@ -233,9 +233,9 @@ const BracketConnectors: React.FC<{ bracketSize: number; roundCount: number }> =
     <div className="flex items-center justify-center w-8 lg:w-12 shrink-0">
       <div className="w-px h-full bg-border/40 relative">
         {/* Horizontal tick marks at connection points */}
-        <div className="absolute top-1/4 -left-2 w-4 border-t border-border/40"></div>
-        <div className="absolute top-3/4 -left-2 w-4 border-t border-border/40"></div>
-        <div className="absolute top-1/2 left-2 w-4 border-t border-border/40"></div>
+        <div className="absolute top-1/4 -left-2 w-4 border-t border-white/10"></div>
+        <div className="absolute top-3/4 -left-2 w-4 border-t border-white/10"></div>
+        <div className="absolute top-1/2 left-2 w-4 border-t border-white/10"></div>
       </div>
     </div>
   );
@@ -274,7 +274,7 @@ const ChampionBanner: React.FC<{
         <div className="flex items-center justify-center gap-6 text-sm text-white/55">
           {runnerUpName && (
             <div className="flex items-center gap-1.5">
-              <Medal className="w-4 h-4 text-gray-400" />
+              <Medal className="w-4 h-4 text-white/40" />
               <span>2nd: {runnerUpName}</span>
             </div>
           )}
@@ -782,7 +782,7 @@ const PlayoffBracket = () => {
 
       {/* ====== WINNERS BRACKET ====== */}
       <Card className="mb-6 overflow-hidden border-none shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent pb-3 border-b border-border/40">
+        <CardHeader className="bg-gradient-to-r from-pastel-orange/10 to-transparent pb-3 border-b border-white/10">
           <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
             <Swords className="w-4 h-4" />
             {bracket.consolation_enabled ? 'Winners Bracket' : 'Bracket'}
@@ -847,7 +847,7 @@ const PlayoffBracket = () => {
       {/* ====== THIRD-PLACE GAME ====== */}
       {thirdPlaceSeries && (
         <Card className="mb-6 overflow-hidden border-none shadow-md">
-          <CardHeader className="bg-amber-50/50 dark:bg-amber-950/20 pb-3 border-b border-border/40">
+          <CardHeader className="bg-amber-400/10 pb-3 border-b border-white/10">
             <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-amber-300 font-bold flex items-center gap-2">
               <Medal className="w-4 h-4" />
               Third-Place Game
@@ -898,7 +898,7 @@ const PlayoffBracket = () => {
             <div className="md:hidden space-y-6">
               {Array.from(consolationByRound.keys()).sort((a, b) => a - b).map((roundNum, idx) => (
                 <div key={roundNum}>
-                  <h3 className="text-sm font-bold uppercase tracking-wider mb-3 pb-1 border-b text-white/55 border-border/30">
+                  <h3 className="text-sm font-bold uppercase tracking-wider mb-3 pb-1 border-b text-white/55 border-white/10">
                     Consolation R{idx + 1}
                   </h3>
                   <div className="space-y-3">

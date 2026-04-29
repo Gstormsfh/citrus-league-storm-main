@@ -33,7 +33,6 @@ import { useToast } from '@/hooks/use-toast';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 
-import { AdSpace } from '@/components/AdSpace';
 import { PlayoffService, type PlayoffPictureTeam, type PlayoffBracket as BracketType } from '@/services/PlayoffService';
 import { logger } from '@/utils/logger';
 // Citrus decorative imports removed — cleaner layout
@@ -932,8 +931,17 @@ const Standings = () => {
             {/* Left Sidebar - Hidden on mobile */}
             <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <AdSpace size="300x250" label="Standings Sponsor" />
-                <AdSpace size="300x250" label="Fantasy Partner" />
+                {/* Sleeper-style standings tips tile — replaces legacy AdSpace */}
+                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-3">
+                    ✦ Standings legend
+                  </div>
+                  <ul className="space-y-2 text-[11px] text-white/70 leading-relaxed">
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> W-L-T from head-to-head matchups</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> PF / PA tracks total points scored / against</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Streak shows current win or loss run</li>
+                  </ul>
+                </div>
               </div>
             </aside>
 

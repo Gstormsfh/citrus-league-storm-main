@@ -893,7 +893,7 @@ const CreateLeague = () => {
                             >
                               <RadioGroupItem value="round-by-round" id="mode-rbr" className="mt-1" />
                               <div className="flex-1">
-                                <div className="font-display font-bold text-sm mb-1">Round by Round</div>
+                                <div className="font-jbmono font-bold text-sm mb-1">Round by Round</div>
                                 <p className="text-xs text-white/55">
                                   Members pick each round&apos;s winners as it starts. You can only pick Round 2 after Round 1 finishes. Forgiving format — no need to predict upsets upfront.
                                 </p>
@@ -910,7 +910,7 @@ const CreateLeague = () => {
                             >
                               <RadioGroupItem value="full-bracket" id="mode-full" className="mt-1" />
                               <div className="flex-1">
-                                <div className="font-display font-bold text-sm mb-1">Full Bracket (March Madness style)</div>
+                                <div className="font-jbmono font-bold text-sm mb-1">Full Bracket (March Madness style)</div>
                                 <p className="text-xs text-white/55">
                                   Members pick ALL 15 series — including Stanley Cup champion — before Round 1 Game 1 puck drop. One shot, live with it. Classic playoff pool format.
                                 </p>

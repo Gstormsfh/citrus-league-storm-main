@@ -18,7 +18,6 @@ import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { leagueApi } from '@/api/leagues';
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
 
@@ -685,8 +684,17 @@ const OtherTeam = () => {
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <AdSpace size="300x250" label="Team Sponsor" />
-                <AdSpace size="300x250" label="Fantasy Partner" />
+                {/* Sleeper-style scouting tips tile — replaces legacy AdSpace */}
+                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-3">
+                    ✦ Scouting tips
+                  </div>
+                  <ul className="space-y-2 text-[11px] text-white/70 leading-relaxed">
+                    <li className="flex gap-2"><span className="text-pastel-sage-soft">▸</span> Compare positions before proposing trades</li>
+                    <li className="flex gap-2"><span className="text-pastel-sage-soft">▸</span> Check goalie depth before targeting forwards</li>
+                    <li className="flex gap-2"><span className="text-pastel-sage-soft">▸</span> Schedule strength matters as much as raw talent</li>
+                  </ul>
+                </div>
               </div>
             </aside>
 
