@@ -65,15 +65,15 @@ Sign-off discipline carries forward from Phase 0–4: each chunk lands as its ow
 
 ### Chunk 11g.1 — Discovery endpoint + JWT issuance
 
-**Deliverable.** A new Hono route `GET /api/drafts/:draftId/server` that returns `{ host, port, token }`. The `host` and `port` are sourced from environment configuration (single Cloud Run instance Day 1; the protocol shape is what matters for future sharding). The `token` is a short-lived JWT (5-minute expiration) signed with the existing server JWT secret, with claims `{ sub: userId, draftId, lobbyId, leagueId, exp, iat }`. The route runs through the existing `authMiddleware` and `membershipMiddleware` so only authenticated league members can request a token.
+**Deliverable.** A new Hono route `GET /api/drafts/:draftId/server` that returns `{ host, port, token }`. The `host` and `port` are sourced from environment configuration (single Cloud Run instance Day 1; the protocol shape is what matters for future sharding). The `token` is a short-lived JWT (5-minute expiration) signed with `SUPABASE_JWT_SECRET` (the same secret Supabase signs auth tokens with — one auth surface for the whole server), with claims `{ sub: userId, draftId, leagueId, iat, exp }`. The route runs through the existing `authMiddleware` and `membershipMiddleware` so only authenticated league members can request a token. (Note: `draftId` and `lobbyId` are the same identifier in Citrus — the draft IS the lobby. `draftId` is the canonical wire-format claim; later chunks may use `lobbyId` as an internal variable name for the same value.)
 
 **Dependencies.** 11g.0.
 
 **Acceptance criteria.**
 - `GET /api/drafts/:draftId/server` returns 200 with `{ host, port, token }` for a league member.
 - Returns 401 without a valid Authorization header. Returns 403 if the caller is not a member of the draft's league.
-- Token claims include `sub`, `draftId`, `lobbyId`, `leagueId`, `exp` (= `iat + 300`), and `iat`. Signed with the same secret as existing API JWTs.
-- Token decode helper (`server/src/lib/draftToken.ts`) exports `issueDraftToken(...)` and `verifyDraftToken(...)`. The verify helper rejects expired tokens, tokens with bad signatures, and tokens whose `lobbyId` does not match the lobby the WebSocket upgrade is targeting (the lobby/draft mismatch check is exercised in chunk 11g.2 but the helper lands here).
+- Token claims include `sub`, `draftId`, `leagueId`, `iat`, and `exp` (= `iat + 300`). Signed with `SUPABASE_JWT_SECRET` (HS256) so that future fast-path verification by the uWS upgrade handler is local-only (no Supabase round-trip).
+- Token decode helper (`server/src/lib/draftToken.ts`) exports `issueDraftToken(...)` and `verifyDraftToken(token, expectedDraftId)`. The verify helper rejects expired tokens, tokens with bad signatures, and tokens whose `draftId` claim does not match the `expectedDraftId` argument (the draft-mismatch check is exercised in chunk 11g.2 but the helper lands here).
 - Vitest covers: happy-path issuance, expired-token rejection, wrong-secret rejection, lobby-mismatch rejection, missing-claim rejection.
 
 **Performance targets.** Discovery endpoint p95 ≤ 50ms (it is a config lookup + signed JWT; no DB read beyond the membership check the existing middleware already does).
@@ -84,7 +84,7 @@ Sign-off discipline carries forward from Phase 0–4: each chunk lands as its ow
 
 ### Chunk 11g.2 — uWebSockets.js setup with WebSocket upgrade auth
 
-**Deliverable.** `uWebSockets.js` added to `server/package.json`, instantiated as a separate `uWS.App()` running on its own port (configurable; default 3002). The WebSocket endpoint at `/ws/draft/:lobbyId` validates the upgrade in the `upgrade` handler: extracts the `token` from the `Sec-WebSocket-Protocol` header (or query param — chunk 11g.1's contract decides which; document it), calls `verifyDraftToken`, confirms the token's `lobbyId` matches the URL `:lobbyId`. Rejects with appropriate WS close codes on auth failure (4401 unauthorized, 4403 forbidden, 4404 lobby mismatch). On accept, subscribes the socket to the topic `draft:${lobbyId}` and sets per-connection user context (`userId`, `leagueId`, `draftId`) for downstream message handlers.
+**Deliverable.** `uWebSockets.js` added to `server/package.json`, instantiated as a separate `uWS.App()` running on its own port (configurable; default 3002). The WebSocket endpoint at `/ws/draft/:draftId` validates the upgrade in the `upgrade` handler: extracts the `token` from the `Sec-WebSocket-Protocol` header (per chunk 11g.1: subprotocol header keeps the token out of URLs / logs / referrers), calls `verifyDraftToken(token, draftIdFromUrl)`, which confirms the token's `draftId` claim matches the URL parameter. Rejects with appropriate WS close codes on auth failure (4401 unauthorized, 4403 forbidden, 4404 draft mismatch). On accept, subscribes the socket to the topic `draft:${draftId}` and sets per-connection user context (`userId`, `leagueId`, `draftId`) for downstream message handlers.
 
 This chunk also extracts `verifyJwt` and `checkLeagueMembership` as runtime-agnostic helpers (current implementations are tightly coupled to Hono's `Context<Env>`, per chunk 11g.0 audit finding 3). Both Hono middleware and the uWS upgrade handler call into the extracted helpers. Existing middleware tests don't change; the helpers get called from inside the existing wrappers.
 
@@ -92,9 +92,9 @@ This chunk also extracts `verifyJwt` and `checkLeagueMembership` as runtime-agno
 
 **Acceptance criteria.**
 - The Hono HTTP server (port 3001) and the uWS server (port 3002) coexist; the existing API routes still pass their suite.
-- A test client with a valid token can upgrade to `/ws/draft/:lobbyId`. A test client with no token, an expired token, or a token for a different lobby is rejected with the documented close code.
-- Two test clients connected to the same `:lobbyId` both receive a message published to topic `draft:${lobbyId}` from a third actor (the test calls uWS `app.publish(topic, message)` directly — uWebSockets.js's built-in C++-backed pub/sub fast path — to confirm fanout works before LobbyManager exists).
-- A test client connected to a different `:lobbyId` does **not** receive the message (topic isolation verified).
+- A test client with a valid token can upgrade to `/ws/draft/:draftId`. A test client with no token, an expired token, or a token for a different draft is rejected with the documented close code.
+- Two test clients connected to the same `:draftId` both receive a message published to topic `draft:${draftId}` from a third actor (the test calls uWS `app.publish(topic, message)` directly — uWebSockets.js's built-in C++-backed pub/sub fast path — to confirm fanout works before LobbyManager exists).
+- A test client connected to a different `:draftId` does **not** receive the message (topic isolation verified).
 - Vitest covers each upgrade rejection path and the basic publish/subscribe roundtrip.
 - Graceful shutdown handler in `server/src/index.ts` is updated to stop the uWS app before the 10s force-exit fires (capture the listen-socket token returned by `uwsApp.listen(...)` and call `us_listen_socket_close(token)`). Verified by sending SIGTERM during a live WebSocket connection: connection closes cleanly within shutdown window, no force-exit triggered. Per chunk 11g.0 audit finding 4.
 

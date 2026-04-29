@@ -7,6 +7,7 @@ import { leagueRoutes } from './routes/leagues';
 import { playerRoutes } from './routes/players';
 import { matchupRoutes } from './routes/matchups';
 import { draftRoutes } from './routes/draft';
+import { draftsRoutes } from './routes/drafts';
 import { draftV2Routes } from './routes/draftV2Sync';
 import { draftV2PickRoutes } from './routes/draftV2Pick';
 import { draftV2EventsRoutes } from './routes/draftV2Events';
@@ -227,6 +228,10 @@ app.route('/api/leagues', leagueRoutes);
 app.route('/api/players', playerRoutes);
 app.route('/api/matchups', matchupRoutes);
 app.route('/api/draft', draftRoutes);
+// Phase 4.5 chunk 11g.1 — discovery endpoint at /api/drafts/:draftId/server.
+// Note the plural "drafts" — distinct from the v1/v2 /api/draft (singular)
+// surface above. ADR-001 § Decision (discovery-as-function pattern from Day 1).
+app.route('/api/drafts', draftsRoutes);
 // Draft Engine v2 — three routers all share the /api/draft/v2 prefix.
 // Hono merges them at lookup time. v1 above is unaffected.
 // Spec: docs/DRAFT_ENGINE_V2_SPEC.md §7 (endpoints).
