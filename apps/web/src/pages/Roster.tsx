@@ -15,10 +15,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart, Lock, Clock, AlertCircle } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
-import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusBurst, CitrusWedge, CitrusZest } from '@/components/icons/CitrusIcons';
-import { AdSpace } from '@/components/AdSpace';
-import { CitrusBackground } from '@/components/CitrusBackground';
-import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
@@ -2947,19 +2943,14 @@ const Roster = () => {
     <div className="min-h-screen bg-[#0F1F15] text-foreground relative">
       {/* Loading overlay during league switch - non-blocking */}
       {showLoadingOverlay && (
-        <div className="fixed inset-0 bg-[#D4E8B8]/90 backdrop-blur-lg z-[100] flex items-center justify-center">
+        <div className="fixed inset-0 bg-[#0F1F15]/90 backdrop-blur-lg z-[100] flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-citrus-orange mx-auto mb-4"></div>
-            <p className="text-lg font-medium">Switching leagues...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pastel-orange mx-auto mb-4"></div>
+            <p className="text-lg font-medium text-pastel-cream">Switching leagues…</p>
           </div>
         </div>
       )}
-      
-      {/* Citrus Background - Hidden on mobile for performance */}
-      <div className="hidden lg:block">
-        <CitrusBackground density="medium" animated={true} />
-      </div>
-      
+
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
@@ -2999,12 +2990,8 @@ const Roster = () => {
           )}>
             {/* Main Content - MOBILE: Full width / DESKTOP: Scrollable panel */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-3 lg:px-0 order-1 lg:order-2">
-              {/* Fantasy Team Header with Citrus Flair */}
-              <div className="bg-card rounded-lg shadow-md border p-4 mb-4 relative overflow-hidden">
-                {/* Decorative citrus leaves in background */}
-                <CitrusLeaf className="absolute top-2 right-2 w-16 h-16 text-citrus-sage opacity-10 rotate-12" />
-                <CitrusLeaf className="absolute bottom-2 left-1/4 w-12 h-12 text-citrus-peach opacity-10 -rotate-45" />
-                
+              {/* Fantasy Team Header — Citrus 2.0 dark surface */}
+              <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-5 mb-4 relative overflow-hidden">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-2 border-citrus-forest/20 flex items-center justify-center text-citrus-cream text-2xl font-varsity font-black shadow-patch relative overflow-hidden">
@@ -3018,10 +3005,9 @@ const Roster = () => {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h1 className="text-2xl font-varsity font-black text-citrus-forest">
+                    <h1 className="text-2xl font-calistoga text-pastel-cream">
                       {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Team')}
                     </h1>
-                    <CitrusSparkle className="w-4 h-4 text-citrus-orange opacity-70" />
                   </div>
                   <div className="text-citrus-charcoal text-sm font-display">
                     Manager: {userLeagueState === 'guest' ? 'Demo Team' : (profile?.username || 'You')}
@@ -3935,18 +3921,55 @@ const Roster = () => {
                 {/* Roster Depth Widget */}
                 <TeamIntelHub />
 
-                {/* Premium Ad Space 1 */}
-                <AdSpace size="300x250" label="Roster Sponsor" />
+                {/* Sleeper-style data tile — replaces the legacy AdSpace
+                    placeholder with real team-pulse stats. */}
+                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Activity className="w-4 h-4 text-pastel-orange-soft" strokeWidth={2} />
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Team pulse</div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-white/55">Record</span>
+                      <span className="font-calistoga text-2xl text-pastel-cream tabular-nums leading-none">
+                        {teamStats.record}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-white/55">Rank</span>
+                      <span className="font-calistoga text-lg text-pastel-cream tabular-nums leading-none">
+                        {teamStats.rank}
+                      </span>
+                    </div>
+                    <div className="h-px bg-white/10" />
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-white/55">Total points</span>
+                      <span className="font-jbmono text-[12px] text-pastel-orange tabular-nums font-bold">
+                        {teamStats.totalPoints}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-                {/* Premium Ad Space 2 */}
-                <AdSpace size="300x250" label="Fantasy Partner" />
+                {/* Quicklinks tile — replaces second legacy AdSpace */}
+                <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Lineup tips</div>
+                  </div>
+                  <ul className="text-[11px] text-white/70 space-y-1.5 leading-relaxed">
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Drag-and-drop to set your lineup</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Auto-lineup uses xG model projections</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Tap a player for full stats + projection</li>
+                  </ul>
+                </div>
               </div>
             </aside>
 
             {/* Right Sidebar - Notifications/Chat Panel - Hidden on mobile */}
             {userLeagueState === 'active-user' && userTeam?.league_id && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={userTeam.league_id} />
                 </div>
               </aside>
