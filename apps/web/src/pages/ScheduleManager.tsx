@@ -14,7 +14,6 @@ import { logger } from '@/utils/logger';
 import { Navigate } from 'react-router-dom';
 import {
   HockeyFooter,
-  ScheduleSlateScene,
   SlateIcon,
   ScoreboardIcon,
   ShiftIcon,
@@ -162,11 +161,6 @@ const ScheduleManager = () => {
         <div className="w-full m-0 p-0">
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
-
-              {/* HERO — Pineapple at the schedule wall */}
-              <div className="max-w-5xl mx-auto mb-6 lg:mb-8">
-                <ScheduleSlateScene size="lg" />
-              </div>
 
               {/* Header band — view-mode toggle and small section title */}
               <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">

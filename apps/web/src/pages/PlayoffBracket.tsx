@@ -5,7 +5,6 @@ import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
 import {
   HockeyFooter,
-  PlayoffBracketScene,
   CupIcon,
   CrossedSticksIcon,
   BracketIcon,
@@ -645,7 +644,7 @@ const PlayoffBracket = () => {
   }
 
   // Layout wrapper used throughout
-  const PageLayout: React.FC<{ children: React.ReactNode; showHero?: boolean }> = ({ children, showHero = true }) => (
+  const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
@@ -663,13 +662,6 @@ const PlayoffBracket = () => {
           )}>
             {/* Main content */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overflow-x-auto px-2 lg:px-6 order-1 lg:order-2">
-              {/* HERO — championship cup. Skipped on error/not-yet-generated
-                  states because those have their own focused empty UI. */}
-              {showHero && (
-                <div className="mb-6 lg:mb-8">
-                  <PlayoffBracketScene size="lg" />
-                </div>
-              )}
               {children}
             </div>
 

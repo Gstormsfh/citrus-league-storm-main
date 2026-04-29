@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import {
   HockeyFooter,
-  FreeAgentsScene,
   SlateIcon,
   CrossedSticksIcon,
   PuckIcon,
@@ -1254,11 +1253,6 @@ const FreeAgents = () => {
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Appears first on mobile */}
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
-
-              {/* HERO — Stormy in the scouting room */}
-              <div className="mb-6 lg:mb-8">
-                <FreeAgentsScene size="lg" />
-              </div>
 
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>

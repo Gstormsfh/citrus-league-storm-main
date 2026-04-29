@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import {
   HockeyFooter,
-  StormyAIScene,
   XGModelIcon,
   CrossedSticksIcon,
   PuckIcon,
@@ -226,11 +225,6 @@ const StormyAssistant = () => {
             {/* Main Content */}
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
               <div className="max-w-5xl mx-auto">
-
-                {/* HERO — Stormy AI scene */}
-                <div className="mb-6 lg:mb-8">
-                  <StormyAIScene size="lg" />
-                </div>
 
                 {/* Header */}
                 <div className="text-left mb-8">

@@ -22,7 +22,6 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { Navigate, useNavigate } from 'react-router-dom';
 import {
   HockeyFooter,
-  WaiverWireScene,
   ShiftIcon,
   PuckIcon,
   CrossedSticksIcon,
@@ -412,11 +411,6 @@ const WaiverWire = () => {
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-2 lg:px-4 order-1 lg:order-2">
-
-              {/* HERO — Kiwi at the wire */}
-              <div className="mb-6 lg:mb-8">
-                <WaiverWireScene size="lg" />
-              </div>
 
               <div className="text-left mb-8 relative">
                 <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 flex items-center gap-2">

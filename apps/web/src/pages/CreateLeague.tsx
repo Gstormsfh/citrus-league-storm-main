@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   HockeyFooter,
-  CreateLeagueScene,
   CupIcon,
   CrossedSticksIcon,
   PuckIcon,
@@ -704,11 +703,6 @@ const CreateLeague = () => {
 
       <main className="lg:pt-32 lg:pb-20 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] px-4">
         <div className="container mx-auto max-w-4xl">
-
-          {/* HERO — Stormy commissioning a new league with the squad */}
-          <div className="mb-6 lg:mb-8">
-            <CreateLeagueScene size="lg" />
-          </div>
 
           <div className="mb-8 text-left">
             <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 flex items-center gap-2">

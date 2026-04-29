@@ -46,15 +46,6 @@ export {
   StormyWelcomeScene,
   PineappleStandbyScene,
   LemonOnTheBoardsScene,
-  GMOfficeCommandScene,
-  ScheduleSlateScene,
-  AnalyticsConsoleScene,
-  WaiverWireScene,
-  CreateLeagueScene,
-  LeagueLiveScene,
-  StormyAIScene,
-  FreeAgentsScene,
-  PlayoffBracketScene,
 } from './MascotScene';
 
 // On-brand loading state

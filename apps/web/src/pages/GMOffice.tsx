@@ -11,7 +11,6 @@ import { Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   HockeyFooter,
-  GMOfficeCommandScene,
   StormyChatTile,
   CrossedSticksIcon,
   SlateIcon,
@@ -182,11 +181,6 @@ const GMOffice = () => {
           )}>
             {/* Main Content - Appears first on mobile */}
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
-
-              {/* HERO — Stormy command-center scene */}
-              <div className="max-w-5xl mx-auto mb-6 lg:mb-8">
-                <GMOfficeCommandScene size="xl" />
-              </div>
 
               {/* Demo Mode Banner */}
               {isGuestMode(userLeagueState) && (
