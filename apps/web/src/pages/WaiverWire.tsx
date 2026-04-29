@@ -430,12 +430,23 @@ const WaiverWire = () => {
                     "spent" portion shows the white track. Tabular numerals for
                     the readout below. Only renders for FAAB leagues. */}
                 {isFAAB && faabBudget !== null && (
-                  <div className="mt-4 max-w-md bg-[#1A2A20] ring-1 ring-pastel-orange/40 rounded-2xl p-4 pr-32 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)] relative overflow-hidden">
-                    <div className="flex items-baseline justify-between mb-2 gap-2">
-                      <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft">
-                        FAAB Budget Remaining
-                      </span>
-                      <span className="font-calistoga text-2xl text-pastel-orange tabular-nums leading-none">
+                  <div className="mt-4 max-w-md bg-[#1A2A20] ring-1 ring-pastel-orange/40 rounded-2xl p-4 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]">
+                    <div className="flex items-center justify-between mb-2 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {/* Kiwi IS the icon for FAAB — analytics D-man owns
+                            the budget math. No bubble, no static portrait —
+                            he just does the icon job. */}
+                        <img
+                          src={MASCOTS.kiwi.image}
+                          alt=""
+                          className="w-7 h-7 rounded-full object-cover ring-2 ring-pastel-orange/40 shrink-0"
+                          loading="lazy"
+                        />
+                        <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft truncate">
+                          FAAB Budget Remaining
+                        </span>
+                      </div>
+                      <span className="font-calistoga text-2xl text-pastel-orange tabular-nums leading-none shrink-0">
                         ${faabBudget}
                         <span className="text-sm text-white/40 ml-1">/ $100</span>
                       </span>
@@ -450,20 +461,6 @@ const WaiverWire = () => {
                       <span>$0</span>
                       <span>$50</span>
                       <span>$100</span>
-                    </div>
-                    {/* Kiwi (analytics-pilled D-man) is integrated INTO the
-                        budget card — canonical portrait edge-bleeds from the
-                        right with a speech bubble pointing at the meter. He's
-                        doing the FAAB math on your behalf. */}
-                    <img
-                      src={MASCOTS.kiwi.image}
-                      alt="Kiwi — Defenceman"
-                      aria-hidden="true"
-                      className="absolute bottom-0 right-0 h-32 w-auto object-cover object-bottom pointer-events-none"
-                    />
-                    <div className="absolute top-3 right-20 bg-pastel-cream text-[#0F1F15] px-2.5 py-1.5 rounded-lg text-[9px] font-bold whitespace-nowrap shadow-[0_4px_12px_-4px_rgba(0,0,0,0.4)] z-10">
-                      Save 30% for the deadline
-                      <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 bg-pastel-cream rotate-45" />
                     </div>
                   </div>
                 )}

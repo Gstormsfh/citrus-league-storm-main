@@ -21,8 +21,8 @@ import {
   CrossedSticksIcon,
   PuckIcon,
   CupIcon,
-  MascotPortrait,
 } from '@/components/citrus2';
+import { MASCOTS } from '@/constants/mascots';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { getTodayMST, getTodayMSTDate, formatDateToString } from '@/utils/timezoneUtils';
 
@@ -270,12 +270,20 @@ const ScheduleManager = () => {
                 </CardContent>
               </Card>
 
-              {/* BACK-TO-BACK WATCH — call out teams playing consecutive nights */}
+              {/* BACK-TO-BACK WATCH — Pineapple (goalie) IS the icon. B2Bs
+                  hit goalies hardest (they typically split starts), so the
+                  card title and every b2b row is led by his canonical avatar.
+                  Character is doing the icon job for the section he owns. */}
               <Card className="max-w-5xl mx-auto mb-6 bg-[#1A2A20] border-0 ring-1 ring-amber-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(251,191,36,0.12)] relative overflow-hidden">
                 <div aria-hidden="true" className="absolute -top-12 -right-12 w-44 h-44 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
                 <CardHeader className="relative z-10">
                   <CardTitle className="font-calistoga text-xl text-pastel-cream flex items-center gap-2">
-                    <ShiftIcon className="w-5 h-5 text-amber-300" strokeWidth={2} />
+                    <img
+                      src={MASCOTS.pineapple.image}
+                      alt=""
+                      className="w-7 h-7 rounded-full object-cover ring-2 ring-amber-400/40"
+                      loading="lazy"
+                    />
                     Back-to-Back Watch
                   </CardTitle>
                   <CardDescription className="text-white/55">
@@ -294,7 +302,12 @@ const ScheduleManager = () => {
                           key={`${b2b.team}-${b2b.from}`}
                           className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-400/10 ring-1 ring-amber-400/30"
                         >
-                          <MaskIcon className="w-4 h-4 text-amber-300 shrink-0" strokeWidth={2} />
+                          <img
+                            src={MASCOTS.pineapple.image}
+                            alt=""
+                            className="w-6 h-6 rounded-full object-cover ring-1 ring-amber-400/40 shrink-0"
+                            loading="lazy"
+                          />
                           <div className="min-w-0 flex-1">
                             <div className="font-jbmono text-[11px] tabular-nums uppercase tracking-[0.18em] text-pastel-cream font-bold">
                               {b2b.team}
@@ -503,20 +516,37 @@ const ScheduleManager = () => {
                 content where the rented ad slot used to be. */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
-                  <MascotPortrait id="pineapple" />
-                  <div className="p-5">
-                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-1">
-                      ✦ Pineapple says
+                {/* Sleeper-style slate tile — function-first, no portrait.
+                    Pineapple is now the icon for Back-to-Back Watch on the
+                    main side, so the rail earns its space with real data. */}
+                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="flex items-center gap-2 mb-3">
+                    <SlateIcon className="w-4 h-4 text-pastel-sage-soft" strokeWidth={2} />
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold">This week's slate</div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-white/55">Total games</span>
+                      <span className="font-calistoga text-2xl text-pastel-cream tabular-nums leading-none">
+                        {nhlGames.length}
+                      </span>
                     </div>
-                    <div className="font-calistoga text-xl text-pastel-cream mb-2">In the crease</div>
-                    <p className="text-xs text-white/70 leading-relaxed">
-                      Heaviest day this week: <span className="font-bold text-pastel-cream">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-white/55">Back-to-backs</span>
+                      <span className="font-calistoga text-lg text-amber-300 tabular-nums leading-none">
+                        {backToBacks.length}
+                      </span>
+                    </div>
+                    <div className="h-px bg-white/10" />
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-white/55">Heaviest day</span>
+                      <span className="font-jbmono text-[11px] text-pastel-orange tabular-nums font-bold">
                         {Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '—'}
-                      </span> with <span className="font-bold text-pastel-orange tabular-nums">
-                        {Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]?.[1] || 0} games
-                      </span>. Stack streamers if you have the bench room.
-                    </p>
+                        <span className="text-white/40 ml-1">
+                          ({Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]?.[1] || 0})
+                        </span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
