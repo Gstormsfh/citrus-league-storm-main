@@ -2960,17 +2960,17 @@ const Roster = () => {
       <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-varsity font-bold text-citrus-forest truncate">
+            <h1 className="text-sm font-calistoga font-bold text-pastel-cream truncate">
               {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Roster')}
             </h1>
             {activeLeague?.name && (
-              <div className="text-xs font-display text-citrus-charcoal/40 truncate -mt-0.5">
+              <div className="text-xs font-jbmono text-white/40 truncate -mt-0.5">
                 {activeLeague.name}
               </div>
             )}
           </div>
           <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-            <span className="text-xs font-varsity font-bold text-citrus-forest/70">
+            <span className="text-xs font-calistoga font-bold text-pastel-orange-soft">
               {teamStats.record}
             </span>
             <MobileMenuButton />
@@ -3122,7 +3122,7 @@ const Roster = () => {
                           hideScores={true}
                         />
                         {selectedDate && (
-                          <div className="mt-3 text-sm text-muted-foreground">
+                          <div className="mt-3 text-sm text-white/55">
                             <span className="font-medium">Viewing:</span> {(() => {
                               // Parse date manually to avoid timezone issues
                               const [year, month, day] = selectedDate.split('-').map(Number);
@@ -3141,7 +3141,7 @@ const Roster = () => {
                     )}
 
                     {!currentMatchup && selectedWeek && (
-                      <div className="bg-muted/50 rounded-lg border p-4 text-center text-sm text-muted-foreground">
+                      <div className="bg-white/5 rounded-lg border p-4 text-center text-sm text-white/55">
                         No matchup found for Week {selectedWeek}
                       </div>
                     )}
@@ -3164,7 +3164,7 @@ const Roster = () => {
                 )}
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Lineup</h2>
-                    <ToggleGroup type="single" value={statView} onValueChange={(v) => v && setStatView(v as any)} className="bg-muted/50 p-1 rounded-lg">
+                    <ToggleGroup type="single" value={statView} onValueChange={(v) => v && setStatView(v as any)} className="bg-white/5 p-1 rounded-lg">
                         <ToggleGroupItem value="seasonToDate" size="sm" className="text-xs">Season</ToggleGroupItem>
                         <ToggleGroupItem value="restOfSeason" size="sm" className="text-xs">Rest of Season</ToggleGroupItem>
                     </ToggleGroup>
@@ -3195,9 +3195,9 @@ const Roster = () => {
                   if (!userTeamId && userLeagueState === 'active-user') {
                     return (
                       <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <Trophy className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                        <Trophy className="w-16 h-16 text-white/55 mb-4 opacity-50" />
                         <h3 className="text-xl font-semibold mb-2">No Team Yet</h3>
-                        <p className="text-muted-foreground mb-4">Join or create a league to start building your roster.</p>
+                        <p className="text-white/55 mb-4">Join or create a league to start building your roster.</p>
                         <Button asChild>
                           <a href="/create-league">Create or Join a League</a>
                         </Button>
@@ -3210,9 +3210,9 @@ const Roster = () => {
                     const isPreDraft = userTeam && userTeam.league_id;
                     return (
                       <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <Users className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                        <Users className="w-16 h-16 text-white/55 mb-4 opacity-50" />
                         <h3 className="text-xl font-semibold mb-2">Empty Roster</h3>
-                        <p className="text-muted-foreground mb-4">
+                        <p className="text-white/55 mb-4">
                           {isPreDraft 
                             ? "Your roster will be populated after the draft is completed. Head to the draft room to start drafting!"
                             : "Your roster is empty. Complete your draft to add players."}
@@ -3246,13 +3246,13 @@ const Roster = () => {
                     <div>
                       {/* Mobile tap-to-swap cancel bar */}
                       {tapSelectedPlayerId && (
-                        <div className="flex items-center justify-between bg-citrus-orange/15 border border-citrus-orange/30 rounded-lg px-3 py-2 mb-3">
-                          <span className="text-sm font-display font-semibold text-citrus-forest">
+                        <div className="flex items-center justify-between bg-pastel-orange/15 border border-pastel-orange/30 rounded-lg px-3 py-2 mb-3">
+                          <span className="text-sm font-jbmono font-semibold text-pastel-cream">
                             Tap a highlighted position to move
                           </span>
                           <button
                             onClick={() => setTapSelectedPlayerId(null)}
-                            className="text-xs font-bold text-citrus-orange bg-citrus-orange/10 hover:bg-citrus-orange/20 rounded-lg px-3 py-1 transition-colors"
+                            className="text-xs font-bold text-pastel-orange bg-pastel-orange/10 hover:bg-pastel-orange/20 rounded-lg px-3 py-1 transition-colors"
                           >
                             Cancel
                           </button>
@@ -3349,41 +3349,41 @@ const Roster = () => {
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Season Points</span>
+                        <span className="text-sm text-white/55">Season Points</span>
                         <Trophy className="h-4 w-4 text-yellow-500" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.totalPoints}</div>
-                      <p className="text-xs text-muted-foreground mt-1">Rank: {teamStats.rank}</p>
+                      <p className="text-xs text-white/55 mt-1">Rank: {teamStats.rank}</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Avg. Weekly</span>
+                        <span className="text-sm text-white/55">Avg. Weekly</span>
                         <Activity className="h-4 w-4 text-blue-500" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.avgPoints}</div>
-                      <p className="text-xs text-muted-foreground mt-1">pts / week</p>
+                      <p className="text-xs text-white/55 mt-1">pts / week</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Highest Score</span>
+                        <span className="text-sm text-white/55">Highest Score</span>
                         <ArrowUpRight className="h-4 w-4 text-green-500" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.highScore}</div>
-                      <p className="text-xs text-muted-foreground mt-1">Week 2</p>
+                      <p className="text-xs text-white/55 mt-1">Week 2</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Moves Made</span>
+                        <span className="text-sm text-white/55">Moves Made</span>
                         <Users className="h-4 w-4 text-purple-500" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.waiverMoves}</div>
-                      <p className="text-xs text-muted-foreground mt-1">Waiver/Trades</p>
+                      <p className="text-xs text-white/55 mt-1">Waiver/Trades</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -3400,7 +3400,7 @@ const Roster = () => {
                              <Target className="h-5 w-5 text-primary" />
                              <div>
                                <h3 className="font-bold text-lg">Category Balance</h3>
-                               <p className="text-sm text-muted-foreground">Positional Breakdown</p>
+                               <p className="text-sm text-white/55">Positional Breakdown</p>
                              </div>
                            </div>
                            <Tabs value={selectedPosMetric} onValueChange={(v) => setSelectedPosMetric(v as any)} className="w-full sm:w-auto">
@@ -3433,7 +3433,7 @@ const Roster = () => {
                               />
                             </RadarChart>
                           </ResponsiveContainer>
-                          <div className="absolute top-0 right-0 text-xs text-muted-foreground text-right hidden sm:block">
+                          <div className="absolute top-0 right-0 text-xs text-white/55 text-right hidden sm:block">
                              <div className="mb-1">Chart shows % of Elite Baseline</div>
                              <div>100% = Top Tier Production</div>
                           </div>
@@ -3477,18 +3477,18 @@ const Roster = () => {
                 <Card className="mt-6">
                    <CardContent className="p-6">
                       <div className="flex items-center gap-2 mb-4">
-                         <BarChart3 className="h-5 w-5 text-gray-500" />
+                         <BarChart3 className="h-5 w-5 text-white/55" />
                          <h3 className="font-bold text-lg">Projected Season Totals</h3>
                       </div>
                       
                       <div className="space-y-6">
                         {['C', 'LW', 'RW', 'D'].map(pos => (
                           <div key={pos}>
-                            <h4 className="text-sm font-semibold text-muted-foreground mb-3">{pos === 'C' ? 'Centers' : (pos === 'D' ? 'Defensemen' : `${pos} Wingers`)}</h4>
+                            <h4 className="text-sm font-semibold text-white/55 mb-3">{pos === 'C' ? 'Centers' : (pos === 'D' ? 'Defensemen' : `${pos} Wingers`)}</h4>
                             <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
                                {Object.entries(posStats[pos as 'C'|'LW'|'RW'|'D']).map(([key, value]) => (
                                   <div key={key} className="flex flex-col p-3 bg-muted/30 rounded-lg border text-center">
-                                     <span className="text-muted-foreground uppercase text-xs font-bold tracking-wider">{key}</span>
+                                     <span className="text-white/55 uppercase text-xs font-bold tracking-wider">{key}</span>
                                      <span className="text-xl font-bold mt-1 text-foreground">{value}</span>
                                   </div>
                                ))}
@@ -3523,7 +3523,7 @@ const Roster = () => {
                               <h3 className="text-lg font-bold">Active Waiver Claims</h3>
                               <Badge variant="secondary" className="text-xs">{pendingWaivers.length}</Badge>
                             </div>
-                            <p className="text-xs text-muted-foreground mb-3">All times shown in Mountain Time (MT)</p>
+                            <p className="text-xs text-white/55 mb-3">All times shown in Mountain Time (MT)</p>
                             <div className="space-y-3">
                               {pendingWaivers.map((tx) => {
                                 const clearsAtFormatted = formatMoment(tx.waiverClearsAt);
@@ -3540,7 +3540,7 @@ const Roster = () => {
                                       <div className="flex-1 min-w-[200px]">
                                         <div className="font-bold text-base">{tx.playerName}</div>
                                         {(tx.playerPosition || tx.playerTeam) && (
-                                          <div className="text-sm text-muted-foreground">
+                                          <div className="text-sm text-white/55">
                                             {tx.playerPosition || ''}{tx.playerPosition && tx.playerTeam ? ' • ' : ''}{tx.playerTeam || ''}
                                           </div>
                                         )}
@@ -3555,7 +3555,7 @@ const Roster = () => {
                                             )}
                                           </div>
                                         )}
-                                        <div className="text-xs text-muted-foreground mt-1">
+                                        <div className="text-xs text-white/55 mt-1">
                                           {tx.bidAmount != null
                                             ? `Bid: $${tx.bidAmount}`
                                             : tx.priority != null
@@ -3608,15 +3608,15 @@ const Roster = () => {
                         <div>
                           <div className="mb-3">
                             <h3 className="text-lg font-bold">Transaction History</h3>
-                            <p className="text-xs text-muted-foreground mt-1">All times shown in Mountain Time (MT)</p>
+                            <p className="text-xs text-white/55 mt-1">All times shown in Mountain Time (MT)</p>
                           </div>
                           {historyRows.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground border rounded-lg border-dashed">
+                            <div className="text-center py-8 text-white/55 border rounded-lg border-dashed">
                               No transactions found.
                             </div>
                           ) : (
                             <div className="rounded-md border">
-                              <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b bg-muted/50 font-medium text-sm">
+                              <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b bg-white/5 font-medium text-sm">
                                 <div className="col-span-3">Date</div>
                                 <div className="col-span-2">Type</div>
                                 <div className="col-span-3">Player</div>
@@ -3627,7 +3627,7 @@ const Roster = () => {
                                 <div key={tx.id} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 p-4 border-b last:border-0 text-sm md:items-center hover:bg-muted/20 transition-colors relative">
                                   {/* Mobile Top Row: Date & Status */}
                                   <div className="flex md:hidden justify-between items-start mb-1">
-                                    <div className="text-muted-foreground text-xs">{tx.date}</div>
+                                    <div className="text-white/55 text-xs">{tx.date}</div>
                                     <div className="text-right">
                                       <span className={`text-xs px-2 py-0.5 rounded-full ${
                                         tx.status === 'processed' ? 'bg-green-100 text-green-700' :
@@ -3639,7 +3639,7 @@ const Roster = () => {
                                   </div>
 
                                   {/* Desktop: Date */}
-                                  <div className="hidden md:block col-span-3 text-muted-foreground text-xs">{tx.date}</div>
+                                  <div className="hidden md:block col-span-3 text-white/55 text-xs">{tx.date}</div>
 
                                   {/* Type Badge */}
                                   <div className="col-span-2 capitalize font-medium flex items-center">
@@ -3658,7 +3658,7 @@ const Roster = () => {
                                   {/* Player & Team (Mobile: Combined) */}
                                   <div className="col-span-3 font-medium text-base md:text-sm flex items-center gap-2">
                                     {tx.playerName}
-                                    <span className="md:hidden text-muted-foreground font-normal text-xs">• {tx.playerTeam}</span>
+                                    <span className="md:hidden text-white/55 font-normal text-xs">• {tx.playerTeam}</span>
                                   </div>
 
                                   {/* Desktop: Team */}
@@ -3890,10 +3890,10 @@ const Roster = () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="font-semibold">{player.name}</div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-sm text-white/55">
                             {formatPositionForDisplay(player.position)} • {player.team}
                           </div>
-                          <div className="text-xs text-muted-foreground mt-1">
+                          <div className="text-xs text-white/55 mt-1">
                             {player.stats?.points || 0} pts • {player.stats?.gamesPlayed || 0} GP
                           </div>
                         </div>
