@@ -86,6 +86,8 @@ Sign-off discipline carries forward from Phase 0–4: each chunk lands as its ow
 
 **Deliverable.** `uWebSockets.js` added to `server/package.json`, instantiated as a separate `uWS.App()` running on its own port (configurable; default 3002). The WebSocket endpoint at `/ws/draft/:lobbyId` validates the upgrade in the `upgrade` handler: extracts the `token` from the `Sec-WebSocket-Protocol` header (or query param — chunk 11g.1's contract decides which; document it), calls `verifyDraftToken`, confirms the token's `lobbyId` matches the URL `:lobbyId`. Rejects with appropriate WS close codes on auth failure (4401 unauthorized, 4403 forbidden, 4404 lobby mismatch). On accept, subscribes the socket to the topic `draft:${lobbyId}` and sets per-connection user context (`userId`, `leagueId`, `draftId`) for downstream message handlers.
 
+This chunk also extracts `verifyJwt` and `checkLeagueMembership` as runtime-agnostic helpers (current implementations are tightly coupled to Hono's `Context<Env>`, per chunk 11g.0 audit finding 3). Both Hono middleware and the uWS upgrade handler call into the extracted helpers. Existing middleware tests don't change; the helpers get called from inside the existing wrappers.
+
 **Dependencies.** 11g.1.
 
 **Acceptance criteria.**
@@ -94,6 +96,7 @@ Sign-off discipline carries forward from Phase 0–4: each chunk lands as its ow
 - Two test clients connected to the same `:lobbyId` both receive a message published to topic `draft:${lobbyId}` from a third actor (the test calls uWS `app.publish(topic, message)` directly — uWebSockets.js's built-in C++-backed pub/sub fast path — to confirm fanout works before LobbyManager exists).
 - A test client connected to a different `:lobbyId` does **not** receive the message (topic isolation verified).
 - Vitest covers each upgrade rejection path and the basic publish/subscribe roundtrip.
+- Graceful shutdown handler in `server/src/index.ts` is updated to stop the uWS app before the 10s force-exit fires (capture the listen-socket token returned by `uwsApp.listen(...)` and call `us_listen_socket_close(token)`). Verified by sending SIGTERM during a live WebSocket connection: connection closes cleanly within shutdown window, no force-exit triggered. Per chunk 11g.0 audit finding 4.
 
 **Performance targets.** Pick-to-broadcast fanout p95 ≤ 200ms measured at this chunk for the bare publish path (no LobbyManager work yet); recorded as the floor for chunk 11g.4's full-pick measurement.
 
