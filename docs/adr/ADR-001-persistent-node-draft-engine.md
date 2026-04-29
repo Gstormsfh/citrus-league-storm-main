@@ -7,6 +7,16 @@
 | **Binding constraints** | `CLAUDE.md` § Citrus Draft Performance Mandate; `docs/DRAFT_ENGINE_V2_SPEC.md` § §0. |
 | **Companion docs** | `docs/PHASE_4_5_PLAN.md` (chunks 11g.0–11g.10); `docs/REGISTRY.md` KI-008 (architectural pivot), KI-009 (Edge Function infrastructure removed entirely), KI-010 (Tier 1 perf optimizations baked in from start). |
 
+## Supersession Note — 2026-04-29: Cloud Run deploy target replaced by GCE
+
+The deploy target ratified in this ADR (Cloud Run) was superseded on **2026-04-29** in favor of **GCE (Google Compute Engine)**. Three platform constraints made Cloud Run wrong-shaped for the persistent stateful draft engine: a 60-minute hard cap on streaming/WebSocket requests (NHL drafts run longer), no native instance pinning (the in-memory `LobbyManager` requires every client of a league to land on the same instance), and no graceful WebSocket drain on deploy (every push would disconnect active drafts).
+
+The canonical reference for the new architecture is **`docs/PHASE_4_5_ARCHITECTURE.md`** (single platform on GCE for both `citrus-api` and the draft engine; Hono and uWebSockets.js sharing one Node process across two ports; Day 1 single VM expanding to a Managed Instance Group by Stage 3). `CLAUDE.md` § "Phase 4.5 Architectural Decisions" carries the high-level rationale; `docs/DRAFT_ENGINE_V2_SPEC.md` §0.5 / §0.5.1 carries the spec-side update.
+
+**What stands and what was superseded:** the persistent-Node-engine decision, the rejection of separate-service / Elixir / Edge-Function-safety-net alternatives, the uWebSockets.js library choice, the discovery-as-function pattern, the single-writer-queue-per-`LobbyManager` design, the chat/notification scope cut, and the Phase 0–4 durability foundation all stand unchanged. Only the deploy target piece was revised. All references to "Cloud Run" in the body of this ADR below should be read as superseded — read them as "the existing GCE-hosted Node server" or "deploy target" depending on context. The ADR body is preserved as-written for historical accuracy; ADRs are append-only by convention.
+
+The chunk-level reshape that flows from this supersession (notably 11g.2 and 11g.6) is tracked in `docs/PHASE_4_5_PLAN.md`.
+
 ## Context
 
 ### The 11.7s autopick problem
