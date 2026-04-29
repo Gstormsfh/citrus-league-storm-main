@@ -80,7 +80,7 @@ Any conflict between the performance mandate and the principles below is resolve
 
 ## §0.5 Architectural Approach
 
-Per **ADR-001** (`docs/adr/ADR-001-persistent-node-draft-engine.md`), the live draft engine is **persistent code inside the existing Node.js / Hono server on Cloud Run** — not a separate service, not Elixir, not Edge Functions. The engine adds a `LobbyManager` class (one in-memory instance per active draft), a WebSocket layer on the existing Hono server, and a `setTimeout`-driven autopick scheduler. The rest of the Citrus application — leagues, rosters, matchups, scoring dashboards, AI Assistant, public pages — continues on the existing **Node.js / Next.js / Supabase** stack unchanged.
+Per **ADR-001** (`docs/adr/ADR-001-persistent-node-draft-engine.md`), the live draft engine is **persistent code inside the existing Node.js / Hono server on GCE** (Google Compute Engine) — not a separate service, not Elixir, not Edge Functions. The engine adds a `LobbyManager` class (one in-memory instance per active draft), a WebSocket layer (uWebSockets.js, on a separate port from Hono within the same Node process), and a `setTimeout`-driven autopick scheduler. The rest of the Citrus application — leagues, rosters, matchups, scoring dashboards, AI Assistant, public pages — runs on the same GCE platform, on the existing **Node.js / Hono / Supabase** stack. The deploy target moved from Cloud Run to GCE during Phase 4.5 design review; full rationale lives in `docs/PHASE_4_5_ARCHITECTURE.md` (canonical reference) and is summarized under "Deploy Topology" below.
 
 The Phase 0–4 architectural primitives below (event log as source of truth, idempotency keys, payload hashes, projection trigger, server-owned time, runtime-checked invariants) are **preserved**. The in-server engine writes to Postgres through the existing RPCs (`submit_pick_v2`, `append_draft_event`, `record_shadow_event`, `reconstruct_draft_state`, `draft_pause`, `draft_resume`, `draft_extend`, `validate_draft_event_payload`); it reads the event log via the existing `@supabase/supabase-js` client; the projection trigger fires synchronously inside the same transaction the engine commits. From Postgres's perspective the engine is another well-behaved RPC caller.
 
@@ -89,16 +89,41 @@ What the in-server engine adds:
 - **Persistent in-memory state per draft.** Candidate pool, current pick, timer, per-team queues, connected-clients set, last broadcast event id — held in the `LobbyManager` instance for the lifetime of the draft. No per-action Postgres reads on the hot path.
 - **WebSocket transport for the live experience.** Picks, broadcasts, timer ticks, chat, presence. Sub-200ms broadcast fanout to connected clients (Performance Mandate §0). Tier 1 perf optimizations (parallel async, byte-limited delta broadcasts, per-socket fanout protection, in-memory candidate caching) are baked into the design across chunks 11g.3 (cache + parallel reads) and 11g.4 (delta broadcasts + fanout protection) — see KI-010.
 - **Sub-1s autopick.** Deadline expiry → in-memory candidate selection → `submit_pick_v2` write → broadcast, all in-process. The 11.7s/pick observed in Phase 4 was structural to the Edge Function model; the in-server engine targets p95 ≤ 1000ms (Performance Mandate §0).
-- **Recovery via event log replay on service restart.** No separate disaster-recovery path. On Cloud Run boot, the server queries `draft_events` for active drafts, rebuilds in-memory `LobbyManager` state from snapshot + replay, and resumes timers (chunk 11g.7). Connected clients reconnect via the WebSocket resume protocol with `last_seen_seq` (chunk 11g.5).
+- **Recovery via event log replay on service restart.** No separate disaster-recovery path. On VM/process boot, the server queries `draft_events` for active drafts, rebuilds in-memory `LobbyManager` state from snapshot + replay, and resumes timers (chunk 11g.7). Connected clients reconnect via the WebSocket resume protocol with `last_seen_seq` (chunk 11g.5).
 
 What the in-server engine **does not** add:
 
 - A new source of truth. `draft_events` remains authoritative. The engine's in-memory state is a derivation of the event log.
 - A new idempotency-key namespace. The same `AUTOPICK_NAMESPACE_UUID` and the same UUIDv5 derivation `(league_id, pick_number, generation, 'autopick')` apply. The integration boundary is the existing Postgres RPC surface; it does not change without an ADR.
-- A second deployment unit. The engine ships with the existing Cloud Run server. If future scale ever justifies splitting it out, that's a refactor, not a rewrite (KI-009).
-- A retained Edge Function safety net. **Chunk 11g.9 removes the Edge Function infrastructure entirely** — `supabase/functions/draft-autopick/`, the pg_cron jobs (`draft-deadline-sweep`, `draft-autopick-keepalive`), the pgmq queue (`draft_deadlines`) and archive, the vendored shared code at `supabase/functions/_shared/_vendored/`, and the cross-runtime hash-agreement infrastructure all get deleted. Recovery via event log replay on Cloud Run restart is sufficient (KI-009; KI-007 closes).
+- A second deployment unit. The engine ships in the same Node process as the existing Hono API server, deployed to the same GCE platform. If future scale ever justifies splitting it out, that's a refactor, not a rewrite (KI-009).
+- A retained Edge Function safety net. **Chunk 11g.9 removes the Edge Function infrastructure entirely** — `supabase/functions/draft-autopick/`, the pg_cron jobs (`draft-deadline-sweep`, `draft-autopick-keepalive`), the pgmq queue (`draft_deadlines`) and archive, the vendored shared code at `supabase/functions/_shared/_vendored/`, and the cross-runtime hash-agreement infrastructure all get deleted. Recovery via event log replay on VM/process restart is sufficient (KI-009; KI-007 closes).
 
 Phase 4.5 (`docs/PHASE_4_5_PLAN.md`) is the chunk-by-chunk plan (11g.0 through 11g.10) for building the in-server engine and removing the Edge Function infrastructure. Phase 5 (UI client work) MUST consume the Phase 4.5 architecture; it cannot be built against the Phase 0–4 architecture alone (per Performance Mandate §0, "Recovery from prior decisions").
+
+### §0.5.1 Deploy Topology
+
+The canonical reference for deploy architecture is `docs/PHASE_4_5_ARCHITECTURE.md`. The summary below is binding for this spec; any conflict is resolved in favor of the canonical doc.
+
+**Deploy target: GCE (Google Compute Engine).** Both `citrus-api` (HTTP) and the draft engine run on the same GCE platform — single platform, single deploy pipeline. Cloud Run was evaluated and rejected during Phase 4.5 design review for three reasons:
+
+1. **60-minute hard cap on streaming/WebSocket requests.** NHL drafts run longer; every long draft would force-disconnect all clients mid-pick.
+2. **No native instance pinning.** The stateful in-memory `LobbyManager` requires every client of a given league to land on the same instance. Cloud Run's session affinity is best-effort and insufficient for this guarantee.
+3. **No graceful WebSocket drain on deploy.** Every push would disconnect active drafts.
+
+**Process layout.** Hono (HTTP) and uWebSockets.js (WS) run in the **same Node process**, on **two separate ports**. uWS does not compose with Hono middleware; the discovery endpoint (`GET /api/drafts/:id/server` → `{host, port, token}`, chunk 11g.1) is the bridge that hands clients off from HTTP to WS. The HTTP framework is **Hono, unchanged** — no Express rewrite (the architecture doc's "Express stays for HTTP" is framework-agnostic shorthand for "the existing HTTP framework stays"; Hono is what is in production with 505 passing tests).
+
+**Stage progression** (binding plan, **not** a Day 1 build target):
+
+| Stage   | Topology                                                                                                            | Discovery returns                          | Application code change |
+| ------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ----------------------- |
+| Day 1   | Single GCE VM, single Node process, Hono + uWS sharing the process. No LB, no Redis, no worker pool, no MIG.        | The VM's address (env-driven constants).   | —                       |
+| Stage 2 | N uWS workers per VM (one per vCPU). HAProxy in-VM hashes `lobby_id` → worker.                                      | The VM's address.                          | None.                   |
+| Stage 3 | Multiple VMs in a MIG behind a GCP HTTP(S) Load Balancer with `RING_HASH` session affinity on `X-Lobby-Id`.         | The LB address.                            | None.                   |
+| Stage 4 | Memorystore Redis as a read-through snapshot cache (optional — only if rehydrate latency becomes user-visible).     | Unchanged.                                 | Read path adds cache.   |
+
+At Stage 3 there are two hash layers — LB → VM and HAProxy → worker — both keyed on lobby ID. The shard-key invariant (lobby ID is the only routing key; no shared mutable state across lobbies) holds at every stage.
+
+**Legacy.** `ops/cloudrun/service.yaml`, `ops/cloudrun/service-staging.yaml`, `ops/cloudrun/deploy.sh`, and the Cloud Run references in CI workflows remain in the repo. They will be retired or repurposed in chunk 11g.2; **do not delete them ahead of that chunk.**
 
 ## §1 Principles (non-negotiable)
 
