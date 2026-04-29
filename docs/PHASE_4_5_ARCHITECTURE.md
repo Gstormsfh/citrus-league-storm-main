@@ -125,53 +125,47 @@ Why this matters later: Future multi-process sharding doesn't require finding an
 
 Express side:
 
-POST /api/drafts/:id/start — commissioner action. Writes initial `draft_state` row, transitions lobby status to `drafting`, calls into the uWS module to activate the draft.
-GET /api/drafts/:id/server — returns `{ host, port, token }`. Token is a JWT with `{ user_id, draft_id, team_id, exp: now + 5min }` signed with a shared secret.
-GET /api/drafts/:id/state — returns current `draft_state` projection. Used for spectator views and post-draft reads.
+- POST /api/drafts/:id/start — commissioner action. Writes initial `draft_state` row, transitions lobby status to `drafting`, calls into the uWS module to activate the draft.
+- GET /api/drafts/:id/server — returns `{ host, port, token }`. Token is a JWT with `{ user_id, draft_id, team_id, exp: now + 5min }` signed with a shared secret.
+- GET /api/drafts/:id/state — returns current `draft_state` projection. Used for spectator views and post-draft reads.
 
 uWS side:
 
-WebSocket endpoint at `/ws/draft/:lobbyId`.
-On upgrade: validate JWT, confirm `draft_id` in token matches `lobbyId` in path. Reject otherwise.
-On open: subscribe socket to topic `draft:${lobbyId}` (uWS native pub/sub).
-Message handlers:
-
-`pick` — `{ player_id, idempotency_key }` → forward to `LobbyManager.submitPick()`.
-`resync` — `{ last_seq }` → reply with events from in-memory ring buffer since `last_seq`, or full snapshot if gap exceeds buffer.
-`chat` — optional, same pattern.
-
-
-Broadcast all accepted events via `app.publish('draft:${lobbyId}', event)`. Do not iterate subscribers manually.
+- WebSocket endpoint at `/ws/draft/:lobbyId`.
+- On upgrade: validate JWT, confirm `draft_id` in token matches `lobbyId` in path. Reject otherwise.
+- On open: subscribe socket to topic `draft:${lobbyId}` (uWS native pub/sub).
+- Message handlers:
+  - `pick` — `{ player_id, idempotency_key }` → forward to `LobbyManager.submitPick()`.
+  - `resync` — `{ last_seq }` → reply with events from in-memory ring buffer since `last_seq`, or full snapshot if gap exceeds buffer.
+  - `chat` — optional, same pattern.
+- Broadcast all accepted events via `app.publish('draft:${lobbyId}', event)`. Do not iterate subscribers manually.
 
 LobbyManager (one instance per active lobby, held in a `Map<lobbyId, LobbyManager>`):
 
-Owns in-memory state: current pick number, on-the-clock team, time remaining, recent events ring buffer (~200 events).
-Single-writer queue for all mutations.
-`submitPick(userId, playerId, idempotencyKey)`:
-
-Validate: is it this user's turn, is the player available, is the idempotency key unused.
-Insert into `draft_events` with next sequence number (transactional).
-Update in-memory projection.
-Push to ring buffer.
-Publish to uWS topic.
-
-
-Timer: `setInterval` per lobby ticking every 1s, broadcasting time remaining, triggering auto-pick at zero.
-Snapshot to `draft_state` table every N picks or every 30s.
+- Owns in-memory state: current pick number, on-the-clock team, time remaining, recent events ring buffer (~200 events).
+- Single-writer queue for all mutations.
+- `submitPick(userId, playerId, idempotencyKey)`:
+  1. Validate: is it this user's turn, is the player available, is the idempotency key unused.
+  2. Insert into `draft_events` with next sequence number (transactional).
+  3. Update in-memory projection.
+  4. Push to ring buffer.
+  5. Publish to uWS topic.
+- Timer: `setInterval` per lobby ticking every 1s, broadcasting time remaining, triggering auto-pick at zero.
+- Snapshot to `draft_state` table every N picks or every 30s.
 
 Process bootstrapping:
 
-On startup, query `lobbies` for status `drafting` and reload `LobbyManager` for each from snapshot + event replay.
-Health endpoint that surfaces active lobby count and per-lobby last-event timestamps.
+- On startup, query `lobbies` for status `drafting` and reload `LobbyManager` for each from snapshot + event replay.
+- Health endpoint that surfaces active lobby count and per-lobby last-event timestamps.
 
 ### Frontend (Vite SPA)
 
 WebSocket client wrapper:
 
-Calls discovery endpoint, opens WSS with returned token.
-Tracks `lastSeenSeq`, increments as events arrive.
-On disconnect: exponential backoff with jitter (start 500ms, max 30s).
-On reconnect: re-call discovery (server may have changed), re-open WSS, send `resync` with `lastSeenSeq`.
+- Calls discovery endpoint, opens WSS with returned token.
+- Tracks `lastSeenSeq`, increments as events arrive.
+- On disconnect: exponential backoff with jitter (start 500ms, max 30s).
+- On reconnect: re-call discovery (server may have changed), re-open WSS, send `resync` with `lastSeenSeq`.
 
 State store using the project's existing state management library. Lobby state is normalized; events are applied by sequence number; out-of-order or duplicate sequences are dropped.
 
@@ -181,9 +175,9 @@ Timer UI displays server time as authoritative. Local clock is used only for smo
 
 ### Persistence
 
-`draft_events` — append-only event log, primary key `(lobby_id, seq)`.
-`draft_state` — current projection per lobby, one row per lobby, updated on snapshot.
-`lobbies` — gains a `status` column (`scheduled | drafting | completed`) if not already present.
+- `draft_events` — append-only event log, primary key `(lobby_id, seq)`.
+- `draft_state` — current projection per lobby, one row per lobby, updated on snapshot.
+- `lobbies` — gains a `status` column (`scheduled | drafting | completed`) if not already present.
 
 Single Postgres connection pool. Pick mutations are transactional: `BEGIN; INSERT INTO draft_events; UPDATE draft_state; COMMIT;` then broadcast.
 
@@ -209,12 +203,12 @@ For Day 1 outages, the recovery path is: VM restarts (or is replaced), process b
 
 These must work correctly on Day 1, with tests:
 
-Process crash mid-draft. New process starts, loads snapshot + replays events, clients reconnect via discovery, resync via `last_seq`. Expected user impact: 10–30s blip, no lost picks.
-Client reconnect after network drop. Backoff, re-discover, resync. No duplicate picks (idempotency keys). No missed events (ring buffer replay).
-Duplicate pick submission. Same idempotency key submitted twice. Second submission returns the first result; no duplicate event written.
-Two users racing on the clock. Auto-pick triggers at the same instant a user submits. Single-writer queue serializes; one wins, the other gets a clean rejection. No split state.
-Slow client. One user on bad wifi cannot drain their socket buffer. Server checks `getBufferedAmount()` before send; disconnects clients exceeding threshold (~1MB). Other users unaffected.
-Deploy during active draft. Drain mode: refuse new lobby activations, let active drafts complete, then exit. For now this means scheduling deploys around draft windows; revisited at Stage 3.
+- **Process crash mid-draft.** New process starts, loads snapshot + replays events, clients reconnect via discovery, resync via `last_seq`. Expected user impact: 10–30s blip, no lost picks.
+- **Client reconnect after network drop.** Backoff, re-discover, resync. No duplicate picks (idempotency keys). No missed events (ring buffer replay).
+- **Duplicate pick submission.** Same idempotency key submitted twice. Second submission returns the first result; no duplicate event written.
+- **Two users racing on the clock.** Auto-pick triggers at the same instant a user submits. Single-writer queue serializes; one wins, the other gets a clean rejection. No split state.
+- **Slow client.** One user on bad wifi cannot drain their socket buffer. Server checks `getBufferedAmount()` before send; disconnects clients exceeding threshold (~1MB). Other users unaffected.
+- **Deploy during active draft.** Drain mode: refuse new lobby activations, let active drafts complete, then exit. For now this means scheduling deploys around draft windows; revisited at Stage 3.
 
 ---
 
