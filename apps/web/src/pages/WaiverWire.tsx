@@ -431,36 +431,41 @@ const WaiverWire = () => {
                     the readout below. Only renders for FAAB leagues. */}
                 {isFAAB && faabBudget !== null && (
                   <div className="mt-4 max-w-md bg-[#1A2A20] ring-1 ring-pastel-orange/40 rounded-2xl p-4 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]">
-                    <div className="flex items-center justify-between mb-2 gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {/* Kiwi IS the icon for FAAB — analytics D-man owns
-                            the budget math. No bubble, no static portrait —
-                            he just does the icon job. */}
-                        <img
-                          src={MASCOTS.kiwi.image}
-                          alt=""
-                          className="w-7 h-7 rounded-full object-cover ring-2 ring-pastel-orange/40 shrink-0"
-                          loading="lazy"
-                        />
-                        <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft truncate">
-                          FAAB Budget Remaining
-                        </span>
-                      </div>
-                      <span className="font-calistoga text-2xl text-pastel-orange tabular-nums leading-none shrink-0">
-                        ${faabBudget}
-                        <span className="text-sm text-white/40 ml-1">/ $100</span>
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-pastel-orange to-pastel-orange-soft rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(0, Math.min(100, faabBudget))}%` }}
+                    {/* Bespoke Kiwi pose: same OG character (sliced-kiwi
+                        face, round glasses, sage #44 jersey, orange citrus
+                        side, low-poly 3D, dark forest bg, warm rim) but in
+                        a NEW action — at his desk doing the FAAB math
+                        with a ledger and calculator. He IS the FAAB tile,
+                        not next to it. */}
+                    <div className="grid grid-cols-[96px_1fr] gap-3 items-center">
+                      <img
+                        src="/mascots/mascot-kiwi-faab.jpg"
+                        alt="Kiwi running the FAAB numbers"
+                        className="w-24 h-24 rounded-xl object-cover ring-1 ring-pastel-orange/30"
+                        loading="lazy"
                       />
-                    </div>
-                    <div className="flex items-center justify-between mt-2 font-jbmono text-[9px] tracking-[0.18em] uppercase text-white/55 font-bold">
-                      <span>$0</span>
-                      <span>$50</span>
-                      <span>$100</span>
+                      <div className="min-w-0">
+                        <div className="flex items-baseline justify-between gap-2 mb-2">
+                          <span className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft truncate">
+                            FAAB Budget Remaining
+                          </span>
+                          <span className="font-calistoga text-2xl text-pastel-orange tabular-nums leading-none shrink-0">
+                            ${faabBudget}
+                            <span className="text-sm text-white/40 ml-1">/ $100</span>
+                          </span>
+                        </div>
+                        <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-pastel-orange to-pastel-orange-soft rounded-full transition-all duration-500"
+                            style={{ width: `${Math.max(0, Math.min(100, faabBudget))}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between mt-2 font-jbmono text-[9px] tracking-[0.18em] uppercase text-white/55 font-bold">
+                          <span>$0</span>
+                          <span>$50</span>
+                          <span>$100</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
