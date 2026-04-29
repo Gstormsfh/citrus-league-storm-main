@@ -63,14 +63,40 @@ This document is the source of truth on this. If a future plan contradicts it, t
 
 ## Live draft engine: persistent code inside the existing Node server
 
-Per **ADR-001** (`docs/adr/ADR-001-persistent-node-draft-engine.md`), the live draft engine is **persistent code running inside the existing Node.js / Hono server on Cloud Run**, not a separate service. The engine:
+Per **ADR-001** (`docs/adr/ADR-001-persistent-node-draft-engine.md`), the live draft engine is **persistent code running inside the existing Node.js / Hono server on GCE** (Google Compute Engine), not a separate service. The engine:
 
 - Communicates with browser clients via **WebSocket** (WebSocket layer added to the existing Node server in chunk 11g.2; chunk 11g.1 is the discovery endpoint + JWT issuance).
 - Holds **per-draft in-memory state** (one `LobbyManager` instance per active draft) for the duration of the draft.
 - Writes durably to Postgres via the **existing Phase 2 RPCs** (`submit_pick_v2`, `append_draft_event`, `record_shadow_event`, `reconstruct_draft_state`, `draft_pause`, `draft_resume`, `draft_extend`, `validate_draft_event_payload`). The integration boundary is the existing RPC surface; it does not change without an ADR.
 - **Recovers via event log replay on service restart.** No separate disaster-recovery path. On startup the server queries `draft_events` for active drafts, rebuilds in-memory `LobbyManager` state, and resumes timers. Connected clients reconnect via the WebSocket resume protocol with their `last_seen_seq`.
 
-The driver was the Performance Mandate above: the Phase 0–4 architecture used Supabase Edge Functions as the autopick host, which is the **wrong runtime model** for live multiplayer state. Edge Functions are ephemeral stateless invocations; live drafts demand persistent stateful processes. World-class real-time platforms (Discord, Sleeper, Figma, Yahoo, ESPN) all use persistent stateful server processes for the live experience layer. Putting the engine inside the existing Node server keeps it on the founder's existing toolchain (TypeScript, npm, Hono, Vitest, Cloud Run) with no new language, no new deploy target, no new operational surface — and removes the Edge Function infrastructure entirely (KI-009).
+The driver was the Performance Mandate above: the Phase 0–4 architecture used Supabase Edge Functions as the autopick host, which is the **wrong runtime model** for live multiplayer state. Edge Functions are ephemeral stateless invocations; live drafts demand persistent stateful processes. World-class real-time platforms (Discord, Sleeper, Figma, Yahoo, ESPN) all use persistent stateful server processes for the live experience layer. Putting the engine inside the existing Node server keeps it on the founder's existing toolchain (TypeScript, npm, Hono, Vitest) with no new language and no new operational surface — and removes the Edge Function infrastructure entirely (KI-009). The deploy target moved from Cloud Run to GCE during Phase 4.5 design review; see "Phase 4.5 Architectural Decisions" below.
+
+### Phase 4.5 Architectural Decisions
+
+These decisions are locked. Changes require an ADR. Full rationale and the canonical reference live in `docs/PHASE_4_5_ARCHITECTURE.md`.
+
+- **Deploy target: GCE (Google Compute Engine).** Single GCE VM on Day 1, expanding to a Managed Instance Group by Stage 3. Cloud Run was rejected because it has a 60-minute hard cap on streaming/WebSocket requests (NHL drafts run longer — every long draft would force-disconnect mid-pick), no native instance pinning (the stateful in-memory `LobbyManager` requires all clients of a league to land on the same instance, and Cloud Run's session affinity is best-effort), and no graceful WebSocket drain on deploy (every push would disconnect active drafts).
+- **Single platform for both services.** Both `citrus-api` (HTTP) and the draft engine run on the same GCE platform. Two deploy pipelines plus cross-service auth coordination is a daily ops tax for a small team that outweighs Cloud Run's serverless conveniences for the API side.
+- **HTTP framework: Hono, unchanged.** The architecture doc's "Express stays for HTTP" is framework-agnostic shorthand for "the existing HTTP framework stays" — Hono is what is in production with 505 passing tests. No rewrite.
+- **WS library: uWebSockets.js, unchanged.** Hono and uWS share the same Node process: Hono on the existing port, uWS on a separate port — two ports / one process. uWS does not compose with Hono middleware; the discovery endpoint is the bridge between them.
+
+Five locked principles (one-line summaries; full discussion in `docs/PHASE_4_5_ARCHITECTURE.md`):
+
+1. **Lobby ID is the shard key.** No shared mutable state across lobbies.
+2. **Discovery as a function from Day 1.** Client → `GET /api/drafts/:id/server` → `{host, port, token}`. Day 1 returns env-driven constants; Stage 2+ becomes shard-aware. Already implemented in chunk 11g.1.
+3. **Event sourcing to Postgres.** `draft_events` is the system of record at every stage.
+4. **No in-memory state that cannot be reconstructed.** Snapshots + event replay handle every recovery path.
+5. **Single-writer per lobby.** All mutations flow through one async queue.
+
+Stage progression (binding plan, **not** a Day 1 build target):
+
+- **Day 1.** Single GCE VM, single Node process, Hono + uWS sharing the process. No load balancer, no Redis, no worker pool, no MIG, no standby. Discovery returns the VM's address.
+- **Stage 2.** N uWS workers per VM (one per vCPU). HAProxy in-VM hashes `lobby_id` → worker. Application code unchanged.
+- **Stage 3.** Multiple VMs in a MIG behind a GCP HTTP(S) Load Balancer with `RING_HASH` session affinity on `X-Lobby-Id`. Discovery starts returning the LB address. Two hash layers (LB → VM, HAProxy → worker), both keyed on lobby ID.
+- **Stage 4 (optional).** Memorystore Redis as a read-through snapshot cache, only if rehydrate latency becomes user-visible.
+
+Legacy `ops/cloudrun/` configuration and CI references to Cloud Run remain in the repo and are **not** to be deleted ahead of chunk 11g.2; they will be retired or repurposed in that chunk's reshape.
 
 ### What runs where
 
@@ -86,6 +112,7 @@ The driver was the Performance Mandate above: the Phase 0–4 architecture used 
 
 ### See also
 
+- `docs/PHASE_4_5_ARCHITECTURE.md` — canonical Phase 4.5 architecture reference (deploy target, principles, stage progression, failure modes).
 - `docs/adr/ADR-001-persistent-node-draft-engine.md` — full ADR with research, alternatives, Decision History, and consequences.
 - `docs/PHASE_4_5_PLAN.md` — chunks 11g.0 through 11g.10 implementation plan.
 - `docs/REGISTRY.md` — project-wide known-issues registry. KI-008 (architectural pivot from Edge Functions), KI-009 (Edge Function infrastructure removed entirely), KI-010 (Tier 1 perf optimizations baked in from start) live here.
