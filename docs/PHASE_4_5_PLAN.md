@@ -41,7 +41,7 @@ A chunk's "performance gate" is a measured-on-staging assertion against these ta
 - Existing `server/package.json` dependencies vs. uWebSockets.js. Confirm the native C++ binary builds cleanly for the Cloud Run container architecture (Linux x64), peer-deps and types resolve, no version conflicts. Per ADR-001 the architecture specifies uWebSockets.js; alternative libraries (`ws`, `socket.io`) are explicitly not in scope.
 - Hono's HTTP-upgrade handling. Confirm Hono routes can coexist with a WebSocket upgrade handler on the same port, or document the specific Hono version + adapter combination required.
 - TypeScript build pipeline. Confirm `tsc` / `tsx` build path handles both the existing routes and the new WebSocket code without configuration churn.
-- Existing middleware (auth, JWT, RLS context). Confirm the middleware stack extends cleanly to WebSocket connections — auth on the upgrade handshake, league-membership check before `DraftRoom` join.
+- Existing middleware (auth, JWT, RLS context). Confirm the middleware stack extends cleanly to WebSocket connections — auth on the upgrade handshake, league-membership check before `LobbyManager` join.
 - Async patterns and event loop. Confirm the existing server's existing background tasks, cron callers, and request handlers won't conflict with long-lived WebSocket connections holding the event loop.
 
 **Output.** A short writeup committed at `docs/PHASE_4_5_CHUNK_11g_0_compat_audit.md`: either "all clean, proceed to 11g.1" with the specific library + version pinned, or a numbered list of conflicts with proposed resolutions.
@@ -318,7 +318,7 @@ Future KIs (likely to be filed during the build):
 - A KI covering whichever Cloud Run quirk surfaces (e.g., WebSocket idle-timeout tuning, revision-swap drain mode behavior).
 - A KI covering whichever Hono+uWS coexistence quirk surfaces (port allocation, middleware reuse, build-pipeline interactions).
 - A KI for any latency target the benchmark suite chronically misses by < 10% — bounded, documented, scheduled for follow-up before Phase 5 starts.
-- A future-sharding KI when multi-process Day 2 work begins (the Day 1 single-process model is documented as a deliberate scope cut, not a long-term posture).
+- **KI-011** is filed at plan time for the Day 2 multi-process sharding transition (single-process Day 1 is a deliberate scope cut, not a long-term posture; trigger conditions and refactor-not-rewrite contract documented in the registry row).
 
 ---
 
@@ -327,7 +327,7 @@ Future KIs (likely to be filed during the build):
 - `docs/adr/ADR-001-persistent-node-draft-engine.md` — the architectural decision this plan implements.
 - `CLAUDE.md` § Citrus Draft Performance Mandate — the binding performance targets.
 - `CLAUDE.md` § Tech Stack — the in-server engine architecture documentation.
-- `docs/DRAFT_ENGINE_V2_SPEC.md` § §0 + §0.5 — spec-side reference (cross-runtime contract preserved; `DraftRoom` / `LobbyManager` is the in-process holder of the same projection).
+- `docs/DRAFT_ENGINE_V2_SPEC.md` § §0 + §0.5 — spec-side reference. `LobbyManager` is the in-process holder of the same projection (formerly referred to as `DraftRoom` in early architectural drafts; see ADR-001 Decision History).
 - `docs/REGISTRY.md` — KI-008, KI-009, KI-010 (project-wide concerns; rewritten for the in-server direction).
 - `docs/RUNBOOKS/draft-engine-v2-known-issues.md` — Phase 0–4 KIs; KI-004 SUPERSEDED and KI-007 RESOLVED at chunk 11g.9.
 

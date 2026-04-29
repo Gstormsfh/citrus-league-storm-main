@@ -5,7 +5,7 @@
 > file is.
 >
 > **Scope.** Project-wide concerns that span multiple subsystems
-> (draft engine + main app, Node.js + Elixir, ops + product). Issues
+> (draft engine + main app, Node.js, ops + product). Issues
 > scoped to a single subsystem live in that subsystem's own registry —
 > for the draft engine, see
 > `docs/RUNBOOKS/draft-engine-v2-known-issues.md` (KI-001 through
@@ -54,8 +54,8 @@
 | | |
 |---|---|
 | **Severity** | high — blocks Phase 5 (UI) until resolved by Phase 4.5 chunk 11g.10. |
-| **Surface** | The draft hot path. Spans `server/src/services/DraftServiceV2.ts`, the new in-server `DraftRoom` + WebSocket code (Phase 4.5+), and (until removed) `supabase/functions/draft-autopick/` plus the pgmq scheduler. |
-| **Description** | Phase 0–4 used Supabase Edge Functions as the autopick host. Phase 4 verification on staging measured autopick latency at **~11.7s/pick** — an order of magnitude over the Performance Mandate's p95 ≤ 1000ms target (`CLAUDE.md` § Citrus Draft Performance Mandate). Causes are structural to the runtime model: ephemeral stateless invocations, pg_cron 2-minute keep-alive cadence, no per-draft persistent state, candidate pool re-fetched every pick, broadcast fanout via third-party Realtime with rate limits. **Edge Functions are the wrong runtime model for live multiplayer state.** Phase 4.5 moves the live engine to **persistent Node code in the existing server** (one `DraftRoom` per active draft, WebSocket transport, in-process autopick scheduler). Phase 0–4 durability primitives (event log, idempotency, projection trigger, RPCs) stay unchanged — the engine is a new caller of the existing surface, not a replacement. ADR-001 documents the architectural decision. |
+| **Surface** | The draft hot path. Spans `server/src/services/DraftServiceV2.ts`, the new in-server `LobbyManager` + WebSocket code (Phase 4.5+), and (until removed) `supabase/functions/draft-autopick/` plus the pgmq scheduler. |
+| **Description** | Phase 0–4 used Supabase Edge Functions as the autopick host. Phase 4 verification on staging measured autopick latency at **~11.7s/pick** — an order of magnitude over the Performance Mandate's p95 ≤ 1000ms target (`CLAUDE.md` § Citrus Draft Performance Mandate). Causes are structural to the runtime model: ephemeral stateless invocations, pg_cron 2-minute keep-alive cadence, no per-draft persistent state, candidate pool re-fetched every pick, broadcast fanout via third-party Realtime with rate limits. **Edge Functions are the wrong runtime model for live multiplayer state.** Phase 4.5 moves the live engine to **persistent Node code in the existing server** (one `LobbyManager` per active draft, WebSocket transport, in-process autopick scheduler). Phase 0–4 durability primitives (event log, idempotency, projection trigger, RPCs) stay unchanged — the engine is a new caller of the existing surface, not a replacement. ADR-001 documents the architectural decision. |
 | **Why deferred** | Not a deferral — the architectural pivot itself. Phase 0–4 shipped correctness with performance knowingly punted to "Phase 7 optimization." The Performance Mandate (2026-04-27) reframed performance as a foundational constraint, retroactively making the runtime choice unacceptable. The 11.7s number was the trigger; the structural causes made the pivot non-negotiable. |
 | **Target phase / timeline** | **Phase 4.5 (chunks 11g.0–11g.10, `docs/PHASE_4_5_PLAN.md`).** Chunk 11g.0 verifies dependency compatibility. Chunks 11g.1–11g.7 build the in-server engine end-to-end (discovery + JWT, uWS upgrade, LobbyManager, pick + chat flow, reconnect, timer + autopick, snapshot + bootstrap). Chunk 11g.8 is the failure-mode integration test suite. Chunk 11g.9 removes the Edge Function infrastructure entirely (KI-009). Chunk 11g.10 verifies all Mandate targets on the deployed server. Phase 5 (UI) unblocks at 11g.10 sign-off. |
 | **Verification test** | The chunk 11g.10 performance harness on the deployed Cloud Run server. Seed concurrent drafts, drive picks at the deadline boundary, measure end-to-end (`deadline_expiry → submit_pick_v2 commit → all clients have updated UI`). **Pass:** every Mandate target met (manual pick p95 ≤ 300ms / p99 ≤ 500ms; autopick p95 ≤ 1000ms / p99 ≤ 2000ms; broadcast fanout p95 ≤ 200ms; draft state load p95 ≤ 1500ms; reconnection p95 ≤ 2000ms; timer drift < 100ms). **Fail:** any target missed by more than 10% triggers a design revisit before Phase 5 starts. The benchmark suite re-runs at every chunk gate so regressions are caught early. |
@@ -82,12 +82,23 @@
 | **Target phase / timeline** | **Built into Phase 4.5 chunks 11g.3 and 11g.4.** Each chunk's acceptance criteria reference the relevant Mandate target. Both chunks explicitly introduce the four Tier 1 optimizations as design-decision comments (`// KI-010 Tier 1: ...`) in the code so a reviewer can grep for them. Chunk 11g.10 verifies them end-to-end. No carry-forward to Phase 7 — if these aren't in by Phase 4.5 sign-off, Phase 5 doesn't start. |
 | **Verification test** | The Mandate's full target set, measured at chunk 11g.10: manual pick p95 ≤ 300ms, autopick p95 ≤ 1000ms, broadcast fanout p95 ≤ 200ms, draft state load p95 ≤ 1500ms, reconnection p95 ≤ 2000ms, timer drift < 100ms. Each Tier 1 optimization called out by name in code comments in chunks 11g.3 and 11g.4 (`git grep "KI-010 Tier 1"` returns ≥ 4 hits). **KI-006** (per-pick candidate scan latency) flips to **RESOLVED** at chunk 11g.10 if the latency harness confirms the in-memory cache eliminates the original cost. |
 
+### KI-011 — Multi-process sharding deferred to Day 2
+
+| | |
+|---|---|
+| **Severity** | low — deliberate scope cut, OPEN by design. |
+| **Surface** | `server/src/draft/LobbyManager.ts` (single-process Day 1); the discovery-as-function endpoint at `GET /api/drafts/:draftId/server` (chunk 11g.1); the in-process `LobbyRegistry` (chunk 11g.3). |
+| **Description** | The Day 1 architecture runs a single Node process holding all active `LobbyManager` instances in a shared `LobbyRegistry`. The discovery-as-function endpoint pattern (chunk 11g.1) is shaped to support multi-process sharding without client or protocol changes — when the time comes, the endpoint starts returning shard-specific addresses (the lobby ID is the shard key from Day 1) and the `LobbyRegistry` adds a routing layer. Until then, every connection for a given lobby lands on the same instance, which solves the immediate session-affinity problem in a degenerate way (KI-003 narrows accordingly). |
+| **Why deferred** | At v1 scale (~50 concurrent drafts at peak) a single Node process comfortably handles the workload, and the operational surface of multi-process coordination (shared discovery store, instance-to-lobby routing, deploy-time draining across shards) is real complexity that buys nothing today. The simplest thing that works wins now; complexity gets added back if and only if measured scale demands it. The protocol shape — clients calling `GET /api/drafts/:draftId/server` and connecting to whatever the response says — is what makes this a refactor, not a rewrite. |
+| **Target phase / timeline** | **Day 2 work.** Trigger for transition: either a capacity signal (single process exceeds ~10k concurrent WebSocket connections under realistic load, or autopick scheduling jitter degrades under contention) or an operational signal (deploy/restart blast radius becomes unacceptable for the user count at the time). When triggered, the work is its own effort with its own ADR if scope warrants — at minimum the routing layer, the cross-instance restart story, and the deploy-coordination semantics need design. |
+| **Verification test** | Not applicable until the trigger fires. When it does, the verification surface is the same Mandate target set that chunk 11g.10 establishes, re-run against the multi-process deployment with realistic per-shard load. The chunk 11g.1 protocol must not change as part of the transition — that's the contract this KI exists to enforce. |
+
 ---
 
 ## How to add a row
 
 1. Append a new `### KI-NNN` section. Use the next sequential ID across **both** registries (this one and `docs/RUNBOOKS/draft-engine-v2-known-issues.md`). Check the highest existing ID in each before assigning.
 2. Fill in all seven schema columns. None may be blank.
-3. Reference the KI- ID in the deferring code comment, e.g. `// TODO(KI-008): swap to Elixir engine`.
+3. Reference the KI- ID in the deferring code comment, e.g. `// TODO(KI-009): remove Edge Function infrastructure once persistent worker verified`.
 4. Reference the KI- ID in the commit message that ships the deferral.
 5. When resolving: append `**RESOLVED (commit-sha, date)**` plus a one-line note. Do not delete the row.

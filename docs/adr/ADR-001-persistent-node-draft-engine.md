@@ -60,12 +60,12 @@ This is the architecture Citrus's draft engine adopts. Languages and runtimes va
 ### Reference reading
 
 - **Sleeper** — directly comparable fantasy product. Engineering writeups document Elixir/Phoenix for the live-experience layer: ["The Story of Sleeper"](https://draftkick.com/blog/story-of-sleeper/); [ScyllaDB case study](https://www.scylladb.com/2020/10/22/sleeper-app-using-scylla-to-level-the-playing-field/).
-- **Discord** — billion-message-per-day persistent-process model: ["Architecting for Hyperscale"](https://d4dummies.com/architecting-for-hyperscale-an-in-depth-analysis-of-discords-billion-message-per-day-infrastructure/). The "one process per guild" pattern translates to "one `DraftRoom` per active draft."
+- **Discord** — billion-message-per-day persistent-process model: ["Architecting for Hyperscale"](https://d4dummies.com/architecting-for-hyperscale-an-in-depth-analysis-of-discords-billion-message-per-day-infrastructure/). The "one process per guild" pattern translates to "one `LobbyManager` per active draft."
 - **Figma** — non-fantasy reference, same pattern in Rust: ["How Figma's Multiplayer Technology Works"](https://www.figma.com/blog/how-figmas-multiplayer-technology-works/); ["Making Multiplayer More Reliable"](https://www.figma.com/blog/making-multiplayer-more-reliable/) (informs the chunk 11g.5 reconnection protocol).
 
 ### Why Node delivers the pattern
 
-The pattern doesn't require a specific runtime — it requires *persistent code with in-memory state and WebSocket transport*. Node delivers all three. A single Node process holds long-lived `DraftRoom` instances in memory across requests; the `ws` (or `socket.io`) library handles WebSocket upgrades on the existing Hono server; `setTimeout` drives per-draft autopick timers in-process. At v1 scale (~50 concurrent drafts at peak), the V8 event loop handles the pick + broadcast workload comfortably inside the Mandate's tail-latency targets.
+The pattern doesn't require a specific runtime — it requires *persistent code with in-memory state and WebSocket transport*. Node delivers all three. A single Node process holds long-lived `LobbyManager` instances in memory across requests; `uWebSockets.js` handles WebSocket upgrades on a separate port alongside the existing Hono server; `setTimeout` drives per-draft autopick timers in-process. At v1 scale (~50 concurrent drafts at peak), the V8 event loop handles the pick + broadcast workload comfortably inside the Mandate's tail-latency targets.
 
 The language choice was settled by execution risk and ecosystem fit, not architectural fit — see § Decision History for the full path. The pattern carries to any future runtime if scale ever justifies revisiting.
 
@@ -73,14 +73,18 @@ The language choice was settled by execution risk and ecosystem fit, not archite
 
 **Citrus builds the live draft engine as persistent code inside the existing Node.js / Hono server on Cloud Run.** Not a separate service. Not Elixir. Not Edge Functions. The engine is a new module set in `server/` consisting of:
 
-- A `DraftRoom` class holding **per-draft in-memory state** (one instance per active draft).
+- A `LobbyManager` class holding **per-draft in-memory state** (one instance per active draft).
 - A **WebSocket layer** added to the existing Hono server, accepting connections from browser clients for picks, broadcasts, timer ticks, presence.
 - An **autopick scheduler** driven by `setTimeout` per draft.
-- A **recovery path that replays the event log on server startup** — on boot, the server queries `draft_events` for active drafts, rebuilds in-memory `DraftRoom` state, and resumes timers. Connected clients reconnect via the WebSocket resume protocol with `last_seen_id`.
+- A **recovery path that replays the event log on server startup** — on boot, the server queries `draft_events` for active drafts, rebuilds in-memory `LobbyManager` state, and resumes timers. Connected clients reconnect via the WebSocket resume protocol with `last_seen_seq`.
 
 Writes go to Postgres via the existing Phase 2 RPCs (`submit_pick_v2`, `append_draft_event`, `record_shadow_event`, `reconstruct_draft_state`, `draft_pause`, `draft_resume`, `draft_extend`, `validate_draft_event_payload`). The integration boundary is the existing RPC surface; it does not change without an ADR.
 
 **The Edge Function infrastructure is removed entirely** in chunk 11g.9 — not retained as a safety net. The Deno code at `supabase/functions/draft-autopick/`, the pg_cron jobs (`draft-deadline-sweep`, `draft-autopick-keepalive`), the pgmq queue (`draft_deadlines`) and its archive, the vendored shared code at `supabase/functions/_shared/_vendored/`, and the cross-runtime hash-agreement infrastructure (Node-side hashing is sufficient now) all get deleted. Recovery via event log replay on Cloud Run restart is sufficient (KI-009).
+
+**Discovery-as-function endpoint pattern from Day 1.** Clients do not connect directly to a hardcoded WebSocket URL. The flow is: client calls `GET /api/drafts/:draftId/server` on the Hono API, receives `{host, port, token}` where `token` is a short-lived JWT scoped to the draft, then opens the WebSocket connection to the returned address. Day 1 returns constants from environment configuration; the protocol shape is what matters for future sharding. The lobby ID is the shard key from Day 1, so the routing decision can become non-trivial later without any client or protocol change. See KI-011 for the deferred multi-process transition.
+
+**Single-writer queue and ring buffer per `LobbyManager`.** All mutations to a `LobbyManager`'s state are serialized through a single async queue (`this.queue = this.queue.then(() => doMutation())`). On a single Node process the event loop already serializes mutations, but the pattern is present from Day 1 so that future multi-process sharding doesn't require finding and fixing concurrent-access bugs. Each `LobbyManager` also maintains a ring buffer of approximately 200 recent events to support reconnection replay (chunk 11g.5); the buffer's authoritative source is the `draft_events` table, which always holds the full event log — the buffer is a hot-path optimization, not a source of truth.
 
 Phase 0–4 work is **preserved**, not replaced:
 
@@ -105,10 +109,14 @@ Replaced Elixir with persistent Node on Cloud Run. Same architectural pattern, f
 
 Two further simplifications, made together:
 
-1. **The engine lives inside the existing Node server, not a separate Cloud Run service.** A separate service would add a deployment unit, a CI pipeline, an observability surface, and a routing layer for marginal architectural benefit at v1 scale. The existing Hono server already runs on Cloud Run; adding a WebSocket layer + a `DraftRoom` class to it is a code change, not an infrastructure change. **If future scale demands service separation, splitting out the draft engine is a refactor, not a rewrite — Phase 0–4 primitives don't change.**
+1. **The engine lives inside the existing Node server, not a separate Cloud Run service.** A separate service would add a deployment unit, a CI pipeline, an observability surface, and a routing layer for marginal architectural benefit at v1 scale. The existing Hono server already runs on Cloud Run; adding a WebSocket layer + a `LobbyManager` class to it is a code change, not an infrastructure change. **If future scale demands service separation, splitting out the draft engine is a refactor, not a rewrite — Phase 0–4 primitives don't change.**
 2. **Edge Function infrastructure is removed entirely**, not retained as a safety net. Recovery via event log replay on Cloud Run restart (chunk 11g.7) is sufficient. The pgmq scheduler, pg_cron jobs, vendored shared code, and the Deno autopick worker were a Phase 0–4 correctness scaffold; once the in-server engine carries the hot path and event log replay carries recovery, the scaffold isn't pulling its weight. Per CTO ethos of operational simplicity: the simplest thing that works.
 
 What carries forward from the prior decision-day work: the Performance Mandate, the Phase 0–4 primitives (event log, idempotency, projection trigger, RPCs), and the architectural pattern (persistent state holder per draft + WebSocket transport + in-memory state + event log underneath). No code from those decision days was committed; only documentation. The simplification reduces deployment surface, observability surface, and conceptual surface without giving up the architectural pattern.
+
+### 2026-04-29 — `DraftRoom` renamed to `LobbyManager`
+
+The class was originally drafted as `DraftRoom` (inherited from the GenServer-per-draft framing of the Elixir alternative) and renamed to `LobbyManager` for the Node persistent-engine implementation, matching the Live Draft Implementation Brief's naming. The locked file path is `server/src/draft/LobbyManager.ts`. References to `DraftRoom` in earlier session artifacts and prior commits refer to the same class under its earlier name.
 
 
 
@@ -156,7 +164,7 @@ What carries forward from the prior decision-day work: the Performance Mandate, 
 4. **KI-007 closes.** Vendored shared code at `supabase/functions/_shared/_vendored/` exists only to feed the Edge Function path; deleting that path resolves the drift problem entirely.
 5. **Edge Function infrastructure removal is real cleanup.** Less code to maintain, fewer cron jobs to monitor, less Vault wiring, fewer deploy-time gotchas. The simplest thing that works.
 6. **Phase 0–4 durability primitives preserved.** Event log, idempotency contracts, projection trigger, RLS, RPC signatures — all unchanged. The pivot is at the engine layer; underneath, the durability stack we already built does its job.
-7. **Reversible by refactor, not rewrite.** If future scale demands a separate Cloud Run service for the engine, the `DraftRoom` class and WebSocket layer extract cleanly into their own deployment unit. The integration boundary (Postgres RPC surface + WebSocket protocol) doesn't change. KI-009 captures this.
+7. **Reversible by refactor, not rewrite.** If future scale demands a separate Cloud Run service for the engine, the `LobbyManager` class and WebSocket layer extract cleanly into their own deployment unit. The integration boundary (Postgres RPC surface + WebSocket protocol) doesn't change. KI-009 captures this.
 
 ### Negative
 
@@ -179,7 +187,7 @@ What carries forward from the prior decision-day work: the Performance Mandate, 
 
 ### Changes (the engine layer + Edge Function infrastructure removal)
 
-- **New code in `server/`** (Phase 4.5+): a `DraftRoom` class holding per-draft in-memory state, a WebSocket layer added to the existing Hono server, a `setTimeout`-driven autopick scheduler, and a startup recovery routine that replays the event log for active drafts. Same TypeScript, same `@citrus/shared`, same npm tooling, same Vitest harness, same Cloud Run deployment.
+- **New code in `server/`** (Phase 4.5+): a `LobbyManager` class holding per-draft in-memory state, a WebSocket layer added to the existing Hono server, a `setTimeout`-driven autopick scheduler, and a startup recovery routine that replays the event log for active drafts. Same TypeScript, same `@citrus/shared`, same npm tooling, same Vitest harness, same Cloud Run deployment.
 - **New transport.** WebSocket via `uWebSockets.js` (library locked by this ADR; chunk 11g.0 verifies it integrates cleanly with the existing Hono server) for picks, broadcasts, timer ticks, presence. The rest of the app continues to use Supabase Realtime where it currently does (the existing chat/notification path through `notifications` table — see the chat/notification architecture findings — explicitly stays on Supabase Realtime; draft chat reuses that infrastructure rather than running over the uWS layer).
 - **Removed entirely in chunk 11g.9 (per KI-009):**
   - `supabase/functions/draft-autopick/` (the Deno autopick worker).
@@ -191,6 +199,10 @@ What carries forward from the prior decision-day work: the Performance Mandate, 
 
 The chunk 11g.9 commit verifies that nothing else in the codebase depends on these surfaces before the deletes land.
 
+### Chat and notifications — deliberate scope cut
+
+Chat in the draft room routes through the **existing** `send_league_chat_message` RPC and surfaces in `LeagueNotifications.tsx` everywhere — the draft engine does not maintain a parallel chat path. The `notifications` table sees no per-pick writes from the engine: manual picks broadcast to in-room clients via the WebSocket and surface for absentee users via the draft room's event log on next visit. Autopicks write a single-recipient notification to the affected user (so they see the autopick happened on next visit to the activity feed). This deliberate scope cut prevents the notification-storm failure mode documented in `docs/LIVE_DRAFT_DISASTER_POSTMORTEM.md` — fanning a manual-pick notification out to every league member on every pick produces O(picks × members) writes per draft and an unread-count thrash that triggered a 429 cascade in production. The chat/notification architecture findings recorded ahead of chunk 11g.0 establish "draft chat = league chat that happens during a draft" as the design contract.
+
 ## Validation Gates
 
 The implementation is gated by chunk-level go/no-go review points in `docs/PHASE_4_5_PLAN.md`. Each chunk's acceptance criteria reference the relevant Performance Mandate target; failures fix forward, not in a follow-up chunk.
@@ -199,7 +211,7 @@ The implementation is gated by chunk-level go/no-go review points in `docs/PHASE
 
 **The first gate.** Before any draft engine code lands, chunk 11g.0 audits the existing Node server's `package.json`, runtime config, build pipeline, and middleware stack for compatibility with a WebSocket library and HTTP-upgrade handling. Output is binary: "all clean, proceed to 11g.1" or a specific list of conflicts.
 
-**Fail mode.** If conflicts exist that can't be cleanly resolved (e.g., the existing Hono setup or middleware materially conflicts with WebSocket upgrades and patching it is high risk), the documented fall-back is alternative (a) — a separate Cloud Run service. That's a deploy-surface change, not an architectural rewrite; the `DraftRoom` class and WebSocket protocol from chunks 11g.1+ are unaffected. KI-009's "refactor not rewrite" framing is the binding promise.
+**Fail mode.** If conflicts exist that can't be cleanly resolved (e.g., the existing Hono setup or middleware materially conflicts with WebSocket upgrades and patching it is high risk), the documented fall-back is alternative (a) — a separate Cloud Run service. That's a deploy-surface change, not an architectural rewrite; the `LobbyManager` class and WebSocket protocol from chunks 11g.1+ are unaffected. KI-009's "refactor not rewrite" framing is the binding promise.
 
 ### Chunk 11g.4 — "Does the WebSocket pick path commit and broadcast?"
 
@@ -221,7 +233,7 @@ End of chunk 11g.10. Performance instrumentation harness runs against the deploy
 
 ### Reversibility
 
-The architectural pattern (persistent state holder per draft + WebSocket transport + in-memory state + event log replay) is unchanged across any plausible future re-evaluation. If v1 scale outgrows the in-server model, splitting the engine out into a separate Cloud Run service is a deployment refactor; the `DraftRoom` class, WebSocket protocol, and integration boundary all carry forward. KI-009 binds.
+The architectural pattern (persistent state holder per draft + WebSocket transport + in-memory state + event log replay) is unchanged across any plausible future re-evaluation. If v1 scale outgrows the in-server model, splitting the engine out into a separate Cloud Run service is a deployment refactor; the `LobbyManager` class, WebSocket protocol, and integration boundary all carry forward. KI-009 binds.
 
 ---
 

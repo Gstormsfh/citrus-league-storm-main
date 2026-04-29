@@ -65,29 +65,29 @@ This document is the source of truth on this. If a future plan contradicts it, t
 
 Per **ADR-001** (`docs/adr/ADR-001-persistent-node-draft-engine.md`), the live draft engine is **persistent code running inside the existing Node.js / Hono server on Cloud Run**, not a separate service. The engine:
 
-- Communicates with browser clients via **WebSocket** (added to the existing Node server in chunk 11g.1).
-- Holds **per-draft in-memory state** (one `DraftRoom` instance per active draft) for the duration of the draft.
+- Communicates with browser clients via **WebSocket** (WebSocket layer added to the existing Node server in chunk 11g.2; chunk 11g.1 is the discovery endpoint + JWT issuance).
+- Holds **per-draft in-memory state** (one `LobbyManager` instance per active draft) for the duration of the draft.
 - Writes durably to Postgres via the **existing Phase 2 RPCs** (`submit_pick_v2`, `append_draft_event`, `record_shadow_event`, `reconstruct_draft_state`, `draft_pause`, `draft_resume`, `draft_extend`, `validate_draft_event_payload`). The integration boundary is the existing RPC surface; it does not change without an ADR.
-- **Recovers via event log replay on service restart.** No separate disaster-recovery path. On startup the server queries `draft_events` for active drafts, rebuilds in-memory `DraftRoom` state, and resumes timers. Connected clients reconnect via the WebSocket resume protocol with their `last_seen_id`.
+- **Recovers via event log replay on service restart.** No separate disaster-recovery path. On startup the server queries `draft_events` for active drafts, rebuilds in-memory `LobbyManager` state, and resumes timers. Connected clients reconnect via the WebSocket resume protocol with their `last_seen_seq`.
 
 The driver was the Performance Mandate above: the Phase 0–4 architecture used Supabase Edge Functions as the autopick host, which is the **wrong runtime model** for live multiplayer state. Edge Functions are ephemeral stateless invocations; live drafts demand persistent stateful processes. World-class real-time platforms (Discord, Sleeper, Figma, Yahoo, ESPN) all use persistent stateful server processes for the live experience layer. Putting the engine inside the existing Node server keeps it on the founder's existing toolchain (TypeScript, npm, Hono, Vitest, Cloud Run) with no new language, no new deploy target, no new operational surface — and removes the Edge Function infrastructure entirely (KI-009).
 
 ### What runs where
 
 - **Node.js / Next.js / Supabase main app** (existing): apps/web (React SPA), `server/` (Hono API + the new draft engine code), packages/shared, data-pipeline (Python NHL ingest), supabase/migrations. All non-draft features. All durability storage (Postgres event log, projection tables, RLS).
-- **Live draft engine** (new in `server/`, Phase 4.5+): a `DraftRoom` class plus a WebSocket layer added inside the existing Node server. Picks/broadcasts/timer ticks/presence flow over WebSocket. Autopick is a `setTimeout` per draft. Recovery is event-log replay on server startup.
-- **Edge Function `draft-autopick` and pgmq scheduler** (existing): **removed entirely in Phase 4.5 chunk 11g.8.** The pg_cron jobs (`draft-deadline-sweep`, `draft-autopick-keepalive`) get unscheduled, the pgmq queue (`draft_deadlines`) and its archive get dropped, the Deno code at `supabase/functions/draft-autopick/` and the vendored shared code at `supabase/functions/_shared/_vendored/` get deleted. The Phase 0–4 infrastructure was a correctness scaffold; once the persistent in-server engine carries the hot path and event log replay carries recovery, the scaffold is no longer pulling its weight (KI-009).
+- **Live draft engine** (new in `server/`, Phase 4.5+): a `LobbyManager` class plus a WebSocket layer added inside the existing Node server. Picks/broadcasts/timer ticks/presence flow over WebSocket. Autopick is a `setTimeout` per draft. Recovery is event-log replay on server startup.
+- **Edge Function `draft-autopick` and pgmq scheduler** (existing): **removed entirely in Phase 4.5 chunk 11g.9.** The pg_cron jobs (`draft-deadline-sweep`, `draft-autopick-keepalive`) get unscheduled, the pgmq queue (`draft_deadlines`) and its archive get dropped, the Deno code at `supabase/functions/draft-autopick/` and the vendored shared code at `supabase/functions/_shared/_vendored/` get deleted. The Phase 0–4 infrastructure was a correctness scaffold; once the persistent in-server engine carries the hot path and event log replay carries recovery, the scaffold is no longer pulling its weight (KI-009).
 
 ### Working in this codebase
 
-- **Sessions touching the draft engine** (the new `DraftRoom`/WebSocket code in `server/`, or anything in `supabase/migrations/` that interacts with `submit_pick_v2`, `draft_events`, `draft_picks_v2`) use the existing TypeScript / Node patterns. The integration boundary is the existing Postgres RPC surface (which doesn't change without an ADR) plus the WebSocket message protocol (chunk 11g.1's deliverable).
+- **Sessions touching the draft engine** (the new `LobbyManager`/WebSocket code in `server/`, or anything in `supabase/migrations/` that interacts with `submit_pick_v2`, `draft_events`, `draft_picks_v2`) use the existing TypeScript / Node patterns. The integration boundary is the existing Postgres RPC surface (which doesn't change without an ADR) plus the WebSocket message protocol (established across chunks 11g.2 transport + 11g.4 pick + chat message types).
 - **Sessions touching the main app** (apps/web, server/ routes that aren't draft, packages/shared, data-pipeline, public pages, AI Assistant) continue with the existing TypeScript/Node patterns documented under "Engineering Standards" below.
-- **Sessions touching shared utilities** (`packages/shared/`) — `computePickPayloadHash`, `AUTOPICK_NAMESPACE_UUID`, `ScoringSettings` are imported directly by the draft engine code. No vendoring (KI-007 resolves when the Edge Functions are removed in chunk 11g.8).
+- **Sessions touching shared utilities** (`packages/shared/`) — `computePickPayloadHash`, `AUTOPICK_NAMESPACE_UUID`, `ScoringSettings` are imported directly by the draft engine code. No vendoring (KI-007 resolves when the Edge Functions are removed in chunk 11g.9).
 
 ### See also
 
 - `docs/adr/ADR-001-persistent-node-draft-engine.md` — full ADR with research, alternatives, Decision History, and consequences.
-- `docs/PHASE_4_5_PLAN.md` — chunks 11g.1 through 11g.9 implementation plan.
+- `docs/PHASE_4_5_PLAN.md` — chunks 11g.0 through 11g.10 implementation plan.
 - `docs/REGISTRY.md` — project-wide known-issues registry. KI-008 (architectural pivot from Edge Functions), KI-009 (Edge Function infrastructure removed entirely), KI-010 (Tier 1 perf optimizations baked in from start) live here.
 
 ---
