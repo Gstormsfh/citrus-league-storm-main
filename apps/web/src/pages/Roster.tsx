@@ -2994,10 +2994,10 @@ const Roster = () => {
               <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-5 mb-4 relative overflow-hidden">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-2 border-citrus-forest/20 flex items-center justify-center text-citrus-cream text-2xl font-varsity font-black shadow-patch relative overflow-hidden">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pastel-orange to-pastel-orange-soft ring-1 ring-pastel-orange/40 flex items-center justify-center text-[#0F1F15] text-2xl font-calistoga relative overflow-hidden shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
                   {/* Background pattern */}
                   <div className="absolute inset-0 opacity-20">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.3)_0%,_transparent_60%)]"></div>
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.4)_0%,_transparent_60%)]"></div>
                   </div>
                   <span className="relative z-10">
                     {userLeagueState === 'guest' ? 'CC' : (userTeam?.team_name?.substring(0, 2).toUpperCase() || profile?.username?.substring(0, 2).toUpperCase() || 'TM')}
@@ -3009,30 +3009,34 @@ const Roster = () => {
                       {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Team')}
                     </h1>
                   </div>
-                  <div className="text-citrus-charcoal text-sm font-display">
-                    Manager: {userLeagueState === 'guest' ? 'Demo Team' : (profile?.username || 'You')}
+                  <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold">
+                    Manager · {userLeagueState === 'guest' ? 'Demo Team' : (profile?.username || 'You')}
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
                 <div className="text-center px-4 py-2">
-                  <div className="text-sm text-muted-foreground">Record</div>
-                  <div className="font-bold">{teamStats.record}</div>
+                  <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/55 font-bold">Record</div>
+                  <div className="font-calistoga text-pastel-cream tabular-nums">{teamStats.record}</div>
                 </div>
                 <div className="text-center px-4 py-2">
-                  <div className="text-sm text-muted-foreground">Rank</div>
-                  <div className="font-bold">{teamStats.rank}</div>
+                  <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/55 font-bold">Rank</div>
+                  <div className="font-calistoga text-pastel-cream tabular-nums">{teamStats.rank}</div>
                 </div>
                 <div className="text-center px-4 py-2">
-                  <div className="text-sm text-muted-foreground">Total Pts</div>
-                  <div className="font-bold">{teamStats.totalPoints}</div>
+                  <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/55 font-bold">Total Pts</div>
+                  <div className="font-calistoga text-pastel-orange tabular-nums">{teamStats.totalPoints}</div>
                 </div>
               </div>
 
               <div>
                 {userLeagueState === 'active-user' && (
-                  <Button onClick={handleAutoLineup} variant="outline" className="flex gap-2">
+                  <Button
+                    onClick={handleAutoLineup}
+                    variant="outline"
+                    className="flex gap-2 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold"
+                  >
                     <Wand2 className="w-4 h-4" />
                     Auto Lineup
                   </Button>
@@ -3041,31 +3045,31 @@ const Roster = () => {
               </div>
             </div>
 
-            {/* Main Tabs */}
+            {/* Main Tabs — Citrus 2.0 dark */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <div className="bg-card rounded-lg shadow-md border">
-                <TabsList className="w-full p-0 bg-transparent border-b rounded-none gap-0">
-                <TabsTrigger 
-                  value="roster" 
-                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
+              <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <TabsList className="w-full p-0 bg-transparent border-b border-white/10 rounded-none gap-0 h-auto">
+                <TabsTrigger
+                  value="roster"
+                  className="flex-1 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
                   Roster
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="stats" 
-                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
+                <TabsTrigger
+                  value="stats"
+                  className="flex-1 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
                   Team Stats
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="trends" 
-                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
+                <TabsTrigger
+                  value="trends"
+                  className="flex-1 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
-                  Trends & Analytics
+                  Trends &amp; Analytics
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="transactions" 
-                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
+                <TabsTrigger
+                  value="transactions"
+                  className="flex-1 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
                   Transactions
                 </TabsTrigger>
