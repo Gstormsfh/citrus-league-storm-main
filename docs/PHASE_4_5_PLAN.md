@@ -1,12 +1,12 @@
-# Phase 4.5 + 4.6 — Elixir/Phoenix Draft Engine Implementation Plan
+# Phase 4.5 — Persistent Node Draft Engine in Existing Server (Chunks 11g.0–11g.10)
 
 | | |
 |---|---|
-| **Status** | Plan accepted (2026-04-27). Implementation not yet started. |
-| **Authority** | `docs/adr/ADR-001-elixir-phoenix-draft-engine.md` (the architectural decision); `CLAUDE.md` § Citrus Draft Performance Mandate (the binding performance targets). |
+| **Status** | Plan accepted (2026-04-28). Implementation not yet started. |
+| **Authority** | `docs/adr/ADR-001-persistent-node-draft-engine.md` (the architectural decision: persistent code inside the existing Node.js / Hono server on Cloud Run, with `uWebSockets.js` as the live WebSocket layer; Edge Functions removed entirely); `CLAUDE.md` § Citrus Draft Performance Mandate (binding performance targets). |
 | **Predecessor** | Phase 4 closeout, with autopick latency ~11.7s/pick measured on staging — non-competitive per the Mandate. |
-| **Successor** | Phase 5 (UI client work) is **blocked** until Phase 4.6 sign-off. |
-| **Estimated solo-founder timeline** | Phase 4.5 (foundation) ~3 weeks; Phase 4.6 (production-ready) ~4 weeks; ~16 weeks realistic with cushion for unknowns and the KI-010 learning-curve risk. |
+| **Successor** | Phase 5 (UI client work) is **blocked** until chunk 11g.10 sign-off. |
+| **Estimated solo-founder timeline** | Chunks 11g.0–11g.10 ≈ 3–5 weeks of solo-founder work assisted by Claude Code, including cushion for unknowns. No new language or runtime; the engine ships inside the existing server. |
 
 ## Working discipline (carried forward from Phase 0–4)
 
@@ -14,11 +14,12 @@
 - **Pause for review at every chunk gate.** No silent drift between chunks.
 - **No deferral lands without a registry row.** New issues that surface during the build go into `docs/REGISTRY.md` (project-wide concerns) or `docs/RUNBOOKS/draft-engine-v2-known-issues.md` (draft-engine-specific) at commit time.
 - **Performance Mandate is the binding constraint for every chunk.** Any chunk that introduces a new latency-sensitive surface must measure it; any chunk that fails a target either fixes it before the next chunk starts or registers a KI- with a bounded resolution timeline.
-- **Cross-runtime contract is the integration boundary.** Elixir engine ↔ Postgres uses the existing Phase 2 RPCs; Elixir engine ↔ browser clients uses Phoenix Channels. Both contracts are documented at the chunk that establishes them and don't change without an ADR.
+- **Tier 1 perf optimizations are baked in, not deferred (KI-010).** Parallel async via `Promise.all`, candidate pool cached at draft start in `LobbyManager` (chunk 11g.3), byte-limited delta broadcasts and per-socket fanout protection via `getBufferedAmount()` (chunk 11g.4) — each lands in the chunk that introduces the relevant surface, with code-comment evidence. End-to-end verification at chunk 11g.10.
+- **Integration boundary is the existing Postgres RPC surface plus the WebSocket message protocol.** RPC surface (`submit_pick_v2`, `append_draft_event`, `reconstruct_draft_state`, etc.) doesn't change without an ADR. WebSocket message protocol is established across chunks 11g.2 (transport + upgrade) and 11g.4 (pick + chat message types); same governance discipline.
 
 ## Performance targets (binding, from `CLAUDE.md` § Citrus Draft Performance Mandate)
 
-These are the constraints every chunk's acceptance criteria reference:
+Every chunk's acceptance criteria reference these:
 
 - Manual pick submission: p95 ≤ 300ms, p99 ≤ 500ms
 - Autopick latency: p95 ≤ 1000ms, p99 ≤ 2000ms
@@ -27,323 +28,307 @@ These are the constraints every chunk's acceptance criteria reference:
 - Pick-to-broadcast fanout: p95 ≤ 200ms
 - Reconnection recovery: p95 ≤ 2000ms
 
-A chunk's "performance gate" is a measured-on-staging assertion against these targets, scoped to whatever surface the chunk introduces.
+A chunk's "performance gate" is a measured-on-staging assertion against these targets, scoped to whatever surface the chunk introduces. The full target set is verified end-to-end at chunk 11g.10 — that's the Phase 5 entry gate.
 
 ---
 
-## Phase 4.5 — Foundation (weeks 1–3)
+## Phase 4.5 — Build the in-server engine, remove the Edge Function infrastructure
 
-The goal of Phase 4.5 is a **single working draft running end-to-end on staging**, with measured performance meeting the Mandate, integration with Postgres clean, and the solo founder's Elixir productivity confirmed.
+### Chunk 11g.0 — Dependency compatibility verification
 
-The Week 1 sign-off (after chunk 4.5.2) is the KI-010 go/no-go gate. The Week 3 sign-off (after chunk 4.5.8) is the Phase 4.6 entry gate.
+**Deliverable.** A pre-flight audit on the existing Node server before any draft-engine code lands. The chunk's commit produces a single document — pass/fail with specifics — and zero application code. Audit scope:
 
-### Chunk 4.5.1 — Elixir + Phoenix install, repo layout, dev loop
+- Existing `server/package.json` dependencies vs. a candidate WebSocket library (`ws` first, `socket.io` as fallback). Confirm the WebSocket library installs cleanly into the workspace, peer-deps and types resolve, no version conflicts.
+- Hono's HTTP-upgrade handling. Confirm Hono routes can coexist with a WebSocket upgrade handler on the same port, or document the specific Hono version + adapter combination required.
+- TypeScript build pipeline. Confirm `tsc` / `tsx` build path handles both the existing routes and the new WebSocket code without configuration churn.
+- Existing middleware (auth, JWT, RLS context). Confirm the middleware stack extends cleanly to WebSocket connections — auth on the upgrade handshake, league-membership check before `DraftRoom` join.
+- Async patterns and event loop. Confirm the existing server's existing background tasks, cron callers, and request handlers won't conflict with long-lived WebSocket connections holding the event loop.
 
-**Deliverable.** Elixir 1.16+ and Erlang/OTP 26+ installed on the dev environment. Phoenix 1.7+ project scaffolded under `elixir/citrus_draft/` (or whatever path the chunk decides; document it). `mix phx.new --no-html --no-assets --no-mailer citrus_draft` (API-only, no LiveView) tested running locally. iex REPL works. ExUnit test runner passes the default scaffolded tests. CI hook lands but does not run yet (placeholder workflow that will be wired up in chunk 4.6.4).
+**Output.** A short writeup committed at `docs/PHASE_4_5_CHUNK_11g_0_compat_audit.md`: either "all clean, proceed to 11g.1" with the specific library + version pinned, or a numbered list of conflicts with proposed resolutions.
 
-**Dependencies.** None. Pure setup chunk.
+**Dependencies.** None.
 
 **Acceptance criteria.**
-- `cd elixir/citrus_draft && mix test` passes the scaffolded tests.
-- `mix phx.server` boots locally; `curl localhost:4000` returns the default response.
-- `iex -S mix phx.server` opens a REPL with the project loaded.
-- The repo's top-level README documents how to install Elixir/Erlang and run the local dev loop. Same level of detail as the existing Node setup docs.
+- The audit document exists at the path above and answers each scope item with a definite yes/no/conflict.
+- A scratch branch demonstrates the WebSocket library installing into `server/` cleanly and Hono accepting a WebSocket upgrade on a test endpoint. The scratch branch is committed but not merged into `staging-setup` — its purpose is evidence, not deployable code.
+- If conflicts exist that can't be cleanly resolved, the chunk **escalates** before proceeding. The documented fall-back is alternative (a) from ADR-001 — a separate Cloud Run service. KI-009's "refactor not rewrite" framing is the binding promise; the architectural pattern carries either way.
 
-**Performance targets.** None for this chunk; pure infrastructure.
+**Performance targets.** None.
 
-**Estimated effort.** 1 day. Mostly install + configuration. Buffer for any cliffs around asdf/Homebrew/etc.
-
----
-
-### Chunk 4.5.2 — Phoenix chat tutorial + Week 1 validation gate
-
-**Deliverable.** The canonical Phoenix chat tutorial (or equivalent — point is to feel out Phoenix Channels end-to-end) running locally. One non-trivial extension on top: a per-room rate limiter implemented as a separate GenServer, demonstrating that the solo founder can compose actor-model components rather than just copy-paste. A short writeup (paragraph or two) committed alongside the code: how `DraftServer` will be structured given what the tutorial taught, in concrete enough detail to suggest real understanding.
-
-**Dependencies.** 4.5.1.
-
-**Acceptance criteria — and the KI-010 Week 1 sign-off gate:**
-- The chat tutorial works: two browser tabs can exchange messages over a Phoenix Channel.
-- The rate-limit extension works: messages exceeding the configured rate from one user are dropped (or queued, if implemented that way) without affecting other users in the same room.
-- The writeup describes `DraftServer`'s state shape, message protocol, supervision approach, and recovery flow at a level of specificity that suggests the solo founder _gets it_.
-- Subjective gate (per ADR-001 § Validation Gates Week 1): the dev loop feels productive, not painful. Editing/recompiling/testing is fast. The actor model maps onto the domain.
-
-**Pass:** proceed to chunk 4.5.3.
-**Fail:** **stop**. Re-evaluate per KI-010. If pivoting to Go is the call, a follow-up ADR-002 supersedes ADR-001's language choice; otherwise rescope and try again.
-
-**Performance targets.** None — the tutorial is for learning, not benchmarking.
-
-**Estimated effort.** 3–5 days, depending on how much of the Elixir model needs to be internalized. This is the chunk where the KI-010 risk plays out.
+**Estimated effort.** 1–2 days. Mostly install + a tiny prototype to prove the upgrade path works on the existing Hono setup.
 
 ---
 
-### Chunk 4.5.3 — Postgres connection via Ecto, RPC client surface
+The goal of Phase 4.5 is a **single working draft running end-to-end on the existing Cloud Run server**, with measured performance meeting the Mandate, the Edge Function infrastructure deleted, and the in-memory `LobbyManager` model proven under realistic load. No new language, no new runtime, no new deploy target.
 
-**Deliverable.** Ecto 3.x configured against the staging Supabase Postgres. Read-only Ecto queries against `leagues`, `teams`, `draft_events`, `draft_picks_v2` working (verified via integration tests that read seeded fixtures). RPC-call wrapper module — a thin Elixir module that calls `submit_pick_v2`, `append_draft_event`, `reconstruct_draft_state` via raw SQL through Ecto, with the parameter shapes matching the Phase 2 RPC signatures byte-for-byte. UUIDv5 derivation of the autopick idempotency key implemented in Elixir using the same `AUTOPICK_NAMESPACE_UUID` as the existing TypeScript and SQL implementations; cross-runtime test asserts agreement against a known input vector.
+Sign-off discipline carries forward from Phase 0–4: each chunk lands as its own commit, runs on staging, and is reviewed before the next chunk starts. The chunk 11g.10 sign-off is the Phase 5 entry gate.
 
-**Dependencies.** 4.5.1, 4.5.2.
+### Chunk 11g.1 — Discovery endpoint + JWT issuance
+
+**Deliverable.** A new Hono route `GET /api/drafts/:draftId/server` that returns `{ host, port, token }`. The `host` and `port` are sourced from environment configuration (single Cloud Run instance Day 1; the protocol shape is what matters for future sharding). The `token` is a short-lived JWT (5-minute expiration) signed with the existing server JWT secret, with claims `{ sub: userId, draftId, lobbyId, leagueId, exp, iat }`. The route runs through the existing `authMiddleware` and `membershipMiddleware` so only authenticated league members can request a token.
+
+**Dependencies.** 11g.0.
 
 **Acceptance criteria.**
-- An Elixir test calls `submit_pick_v2` against staging with a synthetic seed and verifies the projection trigger fires (i.e., a `draft_picks_v2` row lands).
-- An Elixir test calls `reconstruct_draft_state` and parses the returned jsonb into an Elixir map matching the documented shape.
-- UUIDv5 cross-runtime parity: given `(league_id, pick_number, generation, "autopick")`, the Elixir implementation produces the same UUID as `supabase/functions/draft-autopick/uuidv5.ts` and as `_v2_test._uuidv5` in the SQL test helpers. Three runtimes, one answer.
-- Connection pooling configured. Ecto pool size, timeouts, and retry behavior documented.
-- Cleanup: every test that mutates state uses an explicit DELETE-by-test-league-id or savepoint pattern; zero residue post-run.
+- `GET /api/drafts/:draftId/server` returns 200 with `{ host, port, token }` for a league member.
+- Returns 401 without a valid Authorization header. Returns 403 if the caller is not a member of the draft's league.
+- Token claims include `sub`, `draftId`, `lobbyId`, `leagueId`, `exp` (= `iat + 300`), and `iat`. Signed with the same secret as existing API JWTs.
+- Token decode helper (`server/src/lib/draftToken.ts`) exports `issueDraftToken(...)` and `verifyDraftToken(...)`. The verify helper rejects expired tokens, tokens with bad signatures, and tokens whose `lobbyId` does not match the lobby the WebSocket upgrade is targeting (the lobby/draft mismatch check is exercised in chunk 11g.2 but the helper lands here).
+- Vitest covers: happy-path issuance, expired-token rejection, wrong-secret rejection, lobby-mismatch rejection, missing-claim rejection.
 
-**Performance targets.** None on this chunk's hot path (it's the foundation for the hot path), but baseline Ecto query latencies measured and recorded so chunk 4.5.5 (latency measurement) has a reference.
-
-**Estimated effort.** 3–4 days.
-
----
-
-### Chunk 4.5.4 — Single-draft `DraftServer` + `DraftChannel` skeleton
-
-**Deliverable.** A `DraftServer` GenServer that holds the in-memory state for one draft: candidate pool, current pick number, generation, on-the-clock team, per-team queues, connected client set, last broadcast seq. `init/1` reconstructs state from Postgres via `reconstruct_draft_state` + the candidate pool query. `handle_call(:submit_pick, ...)` validates the pick against in-memory state, calls `submit_pick_v2`, updates the in-memory state on success, broadcasts to connected clients, returns the new state to the caller. A `DraftChannel` Phoenix Channel that joins clients to a per-draft topic, subscribes them to broadcasts, accepts `:submit_pick` events from the client, dispatches to the `DraftServer`, returns the result.
-
-This chunk is single-draft only. No DynamicSupervisor yet — one server is started by hand in iex for the test. Multi-draft is chunk 4.5.6.
-
-**Dependencies.** 4.5.3.
-
-**Acceptance criteria.**
-- A test seeds a draft on staging, starts a `DraftServer` for it manually, opens two WebSocket connections (mock clients), submits a pick from one, observes the broadcast on the other, verifies `draft_picks_v2` projection has the row, verifies `draft_events` has the pick event with correct `seq` and `idempotency_key`.
-- The cross-runtime contract is exercised: the Elixir engine wrote via the existing Phase 2 RPC and the existing trigger fired correctly. Read the projection from a Node test client; it should be byte-identical to a pick committed via the existing TypeScript `DraftServiceV2` path.
-- Server-side authoritative state: the `DraftServer`'s in-memory `current_pick_number` matches what the event log says after the pick.
-- Idempotency: submitting the same pick twice via the channel returns `was_duplicate=true` from the second call without committing a second event.
-
-**Performance targets** (first measurement against the Mandate):
-- Manual pick submission (channel join → pick submit → broadcast received on other client): p95 ≤ 300ms over 100 trial picks. **This is the first hard performance gate.**
-
-**Estimated effort.** 5–7 days. This is the chunk that proves the architectural shape works.
-
----
-
-### Chunk 4.5.5 — Latency measurement harness
-
-**Deliverable.** A standalone benchmark suite (`elixir/citrus_draft/bench/` or similar) that measures and reports against every Mandate target. Driver script seeds N drafts, opens M client connections per draft, runs picks at the deadline boundary, and emits a structured report: per-target p50/p95/p99 latency, throughput, error rate. Output is committed as part of the chunk so future chunks have a reference point and Week 3 sign-off has objective evidence.
-
-**Dependencies.** 4.5.4.
-
-**Acceptance criteria.**
-- The harness measures, end-to-end on staging:
-  - Manual pick latency (client submits → all connected clients have updated state)
-  - Broadcast fanout (server commits → first/last client receives the broadcast)
-  - State load (channel join → initial state delivered to the client)
-  - Timer drift (server-displayed countdown vs. actual deadline, sampled across simulated clients)
-- Report format: human-readable summary at the top, JSONL per-trial detail below for analysis. Committed to the repo alongside the harness.
-- Re-running the harness is a single command: `mix bench` or equivalent.
-- The current run's results meet every relevant Mandate target. **Failures fix forward, not in a follow-up chunk.**
-
-**Performance targets.** All Mandate targets that have a corresponding measurement at this chunk's stage. (Autopick latency comes online in chunk 4.5.8 once the autopick path is implemented; reconnection in Phase 4.6.)
+**Performance targets.** Discovery endpoint p95 ≤ 50ms (it is a config lookup + signed JWT; no DB read beyond the membership check the existing middleware already does).
 
 **Estimated effort.** 2–3 days.
 
 ---
 
-### Chunk 4.5.6 — Multi-draft via `DynamicSupervisor` + `Registry`
+### Chunk 11g.2 — uWebSockets.js setup with WebSocket upgrade auth
 
-**Deliverable.** `DraftSupervisor` (DynamicSupervisor) starts/stops `DraftServer` processes on demand. `DraftRegistry` (a `Registry` configured with `:unique` keys) lets the channel look up the per-draft server by `league_id` via `via_tuple/1`. Channel join handler ensures the server exists (start under supervision if not), then registers the connection. Server idle timeout: a `DraftServer` that has had no connected clients for N minutes shuts down gracefully, releasing memory; reconstructed on next join.
+**Deliverable.** `uWebSockets.js` added to `server/package.json`, instantiated as a separate `uWS.App()` running on its own port (configurable; default 3002). The WebSocket endpoint at `/ws/draft/:lobbyId` validates the upgrade in the `upgrade` handler: extracts the `token` from the `Sec-WebSocket-Protocol` header (or query param — chunk 11g.1's contract decides which; document it), calls `verifyDraftToken`, confirms the token's `lobbyId` matches the URL `:lobbyId`. Rejects with appropriate WS close codes on auth failure (4401 unauthorized, 4403 forbidden, 4404 lobby mismatch). On accept, subscribes the socket to the topic `draft:${lobbyId}` and sets per-connection user context (`userId`, `leagueId`, `draftId`) for downstream message handlers.
 
-**Dependencies.** 4.5.4.
+**Dependencies.** 11g.1.
 
 **Acceptance criteria.**
-- Two simultaneous drafts run in the same Phoenix node, each with its own `DraftServer`. Picks in one draft don't appear in the other; broadcasts are scoped correctly.
-- Crashing a single `DraftServer` (deliberately, in iex) causes the supervisor to restart it; the new server reconstructs state from the event log and connected clients reconnect via the channel's resume path. **No data loss.**
-- Idle shutdown works: after the configured idle timeout (chunk picks the value; document it), a draft with no connected clients stops cleanly. Memory drops. Reconnect re-spawns.
-- Latency benchmark from 4.5.5 still passes against multi-draft load (10 drafts running concurrently). Cross-draft interference is below noise.
+- The Hono HTTP server (port 3001) and the uWS server (port 3002) coexist; the existing API routes still pass their suite.
+- A test client with a valid token can upgrade to `/ws/draft/:lobbyId`. A test client with no token, an expired token, or a token for a different lobby is rejected with the documented close code.
+- Two test clients connected to the same `:lobbyId` both receive a message published to topic `draft:${lobbyId}` from a third actor (the test calls `app.publish(...)` directly to confirm fanout works before the LobbyManager exists).
+- A test client connected to a different `:lobbyId` does **not** receive the message (topic isolation verified).
+- Vitest covers each upgrade rejection path and the basic publish/subscribe roundtrip.
+
+**Performance targets.** Pick-to-broadcast fanout p95 ≤ 200ms measured at this chunk for the bare publish path (no LobbyManager work yet); recorded as the floor for chunk 11g.4's full-pick measurement.
+
+**Estimated effort.** 3–4 days. Most of the surprise here is on the upgrade-handler shape; the rest is a thin wrapper.
+
+---
+
+### Chunk 11g.3 — `LobbyManager` class with single-writer queue and ring buffer
+
+**Deliverable.** A `LobbyManager` class (`server/src/draft/LobbyManager.ts`) holding the in-memory state for one active draft. One instance per active lobby in a top-level `Map<lobbyId, LobbyManager>` (`LobbyRegistry`). Per-instance state: `pickNumber`, `onClockTeamId`, `pickDeadline`, `recentEvents` (ring buffer of ~200 events), `candidatePool` (cached at draft start; updated in place on pick events), `connectedSockets` (set of uWS WebSocket refs), `lastBroadcastSeq`. The constructor loads initial state from Postgres: `reconstruct_draft_state(draftId)` for the projection, plus a parallel `Promise.all` fetch of `player_directory`, `player_season_stats`, and `draft_picks_v2` to build the in-memory candidate pool. A single-writer queue serializes mutations: `this.queue = this.queue.then(() => doMutation())` so concurrent pick submissions never interleave. The lobby is registered into `LobbyRegistry` on construction and de-registered on shutdown.
+
+**Dependencies.** 11g.2.
+
+**Acceptance criteria.**
+- Constructing a `LobbyManager` for a seeded staging draft completes the full state load (RPC + parallel candidate fetch) in p95 ≤ 1500ms (Mandate: draft state load).
+- Two concurrent in-process mutations on the same `LobbyManager` execute in the order they were enqueued; a Vitest test deliberately races 50 mutations and asserts the resulting in-memory state matches a sequential application.
+- Ring buffer: pushing > 200 events keeps the most recent 200; older events are dropped from the buffer (they remain authoritative in `draft_events`).
+- `LobbyRegistry.get(lobbyId)` returns the same instance across calls within a process; `LobbyRegistry.evict(lobbyId)` clears it cleanly without leaking sockets.
+- **KI-010 Tier 1 evidence:** the parallel `Promise.all` candidate-pool load is annotated with a `// KI-010 Tier 1: parallel async on independent reads` comment so a reviewer can grep for it. The candidate pool is held on `this._candidates` for the lifetime of the draft (`// KI-010 Tier 1: candidate pool cached at draft start`).
 
 **Performance targets.**
-- All 4.5.4 targets continue to hold under 10 concurrent drafts.
-- New: `DraftServer` start time (cold) ≤ 500ms. This is what bounds the "first user joins after a quiet period" experience.
+- Draft state load p95 ≤ 1500ms (Mandate).
 
 **Estimated effort.** 3–4 days.
 
 ---
 
-### Chunk 4.5.7 — State recovery from event log (formal)
+### Chunk 11g.4 — Pick submission flow + draft-room chat
 
-**Deliverable.** The `DraftServer.init/1` recovery flow promoted from "calls reconstruct_draft_state" to a documented, tested, fault-tolerant procedure. Specifically: handles partial states (a draft mid-pause, a draft mid-extend, a draft after a generation bump), correctly identifies on-the-clock team across snake-order reversals, recovers per-team queues from `draft_queues`, recovers connected-clients-set from Phoenix presence on rejoin (not from the database — the client set is ephemeral by design). Handles the edge case where the engine recovers state but a sweep enqueued a stale pgmq message during the outage; the engine ignores those (the existing pgmq generation gate keeps them stale).
+**Deliverable.** WebSocket message handler routes inbound `{ type: 'submit_pick', ... }` and `{ type: 'chat', ... }` messages to the right `LobbyManager` method. `submitPick` validates: the sender is on the clock for this lobby, the player is available in the cached candidate pool, the idempotency key is unused. On valid input, it executes a transactional `submit_pick_v2` RPC against Postgres (which appends to `draft_events` and updates `draft_state` atomically), updates the in-memory projection (decrements candidate pool, advances pick number, recomputes on-clock team), pushes the event onto the ring buffer, and broadcasts a delta event over uWS topic `draft:${lobbyId}`. Broadcast is byte-limited (delta only, not full state) and uses `getBufferedAmount()` to skip slow sockets above a documented threshold (~1MB) — those sockets are flagged for the chunk 11g.5 reconnection path. Chat handler is a thin pass-through: validates league membership (already on the connection context from chunk 11g.2's upgrade handler) and calls the existing `send_league_chat_message` Postgres RPC. Chat does NOT broadcast over uWS — it goes through the existing notifications real-time path so it appears in `LeagueNotifications.tsx` everywhere, exactly as in-product chat does today (per the chat/notification architecture findings: draft chat = league chat that happens during a draft).
 
-**Dependencies.** 4.5.6.
+**Dependencies.** 11g.3.
 
 **Acceptance criteria.**
-- Test suite: kill a `DraftServer` mid-draft (5 picks committed), restart via supervisor, verify reconstructed state matches what the event log says. Continue picking. Nothing visible to the client.
-- Test suite: pause a draft via `draft_pause`, kill the engine, restart, verify the new server correctly identifies the draft as paused and rejects picks until resumed. Then call `draft_resume` and verify the engine accepts picks under the new generation.
-- Test suite: simulate the disaster-recovery fallback path. With the Elixir engine intentionally down, the existing Edge Function `draft-autopick` autopicks an expired deadline. The Elixir engine boots back up and reconstructs state including the autopick that landed during the outage. No conflicts, no duplicate picks.
-- Recovery latency: a `DraftServer` reconstructing state for an active draft (12 teams, 8 picks committed) completes init in < 1 second.
+- Two test clients connected to the same lobby; client A submits a pick; client B receives the broadcast event with the pick payload and updated `pickNumber` within p95 ≤ 200ms (Mandate: pick-to-broadcast fanout). Client A receives the same broadcast (or a `pick_committed` ack — chunk decides).
+- A duplicate `submit_pick` with the same idempotency key from the same client returns `{ was_duplicate: true }` without committing a second `draft_events` row.
+- A pick submitted by a client who is not on the clock is rejected with a typed error message and does not commit.
+- A pick for an already-drafted player is rejected with a typed error message.
+- A chat message sent over the WebSocket appears in `notifications` for every league member via `send_league_chat_message` and renders in `LeagueNotifications.tsx` for any user who has the matchup view open. The draft-room UI (chunk arrives in Phase 5) will read the same notification feed; nothing parallel is built.
+- End-to-end manual pick latency (client submit → broadcast received on other client) p95 ≤ 300ms / p99 ≤ 500ms over 100 trial picks (Mandate: manual pick submission).
+- **KI-010 Tier 1 evidence:** broadcast site annotated `// KI-010 Tier 1: byte-limited delta (not full state)` and `// KI-010 Tier 1: per-socket fanout protection via getBufferedAmount()`. Pick handler annotated `// KI-010 Tier 1: parallel async via Promise.all` at any independent read site.
 
 **Performance targets.**
-- Draft state load (engine boot → first client can join and receive state): p95 ≤ 1500ms (Mandate target).
+- Manual pick submission p95 ≤ 300ms / p99 ≤ 500ms.
+- Pick-to-broadcast fanout p95 ≤ 200ms.
 
-**Estimated effort.** 3–4 days. The disaster-recovery test scenario is the trickiest piece.
+**Estimated effort.** 4–5 days. The biggest correctness chunk in 11g — the integration with the existing RPC surface and the in-memory projection consistency are both load-bearing.
 
 ---
 
-### Chunk 4.5.8 — Autopick port with in-memory candidate cache + Week 3 sign-off
+### Chunk 11g.5 — Reconnection with `last_seen_seq` resume
 
-**Deliverable.** The autopick path runs inside `DraftServer`. Candidate pool is loaded into memory at server init from `player_directory` + `player_season_stats` (CURRENT_SEASON), filtered against `draft_picks_v2` for already-picked players. The heuristic from `supabase/functions/draft-autopick/heuristic.ts` is ported to Elixir as a pure module — same algorithm, byte-for-byte: queue first (head of `draft_queues` for the on-the-clock team, filter to undrafted), heuristic fallback (FPTS + positional need, with the same default weights as the Node implementation). Deadline expiry inside the `DraftServer` (a `Process.send_after/3` timer) triggers the autopick: select via in-memory cache, call `submit_pick_v2` with `actor.kind='autopick'` and the same UUIDv5-derived idempotency key the Node and SQL paths produce, broadcast.
+**Deliverable.** WebSocket resync handler. Client reconnects after a drop and sends `{ type: 'resume', lastSeenSeq }` as the first message after upgrade. Server compares to the lobby's ring buffer: if the gap is small (`lastSeenSeq` is still in the buffer), the server replays missed events from the buffer in order; if the gap exceeds the buffer (~200 events behind), the server sends a full snapshot — the same payload shape as `LobbyManager.constructor` produces — and the client reconciles. Reconnection state is per-socket; the lobby's authoritative state is unaffected.
 
-The Edge Function `draft-autopick` is **not** removed in this chunk. It stays paused on staging. Cutover to "Elixir engine is the primary path; Edge Function is the fallback" is a configuration change, not a code change.
+**Dependencies.** 11g.4.
 
-**Dependencies.** 4.5.5, 4.5.6, 4.5.7.
+**Acceptance criteria.**
+- Test: open a client, commit 5 picks while the client is connected, drop the WebSocket, reconnect with `lastSeenSeq` from before the drop. Client receives the 5 missed picks via ring-buffer replay, no full snapshot needed.
+- Test: open a client, commit 250 picks (more than the ring buffer), reconnect with the pre-burst `lastSeenSeq`. Client receives a full snapshot (the buffer overflow path) and the resulting in-memory client state matches what `LobbyManager` says.
+- Test: the figma-style scenario — two clients reconnect simultaneously after a network blip; both reconcile correctly without one starving the other.
+- Reconnection recovery p95 ≤ 2000ms (Mandate: reconnection recovery), measured as `client.connect() → client has consistent state`.
 
-**Acceptance criteria — and the Phase 4.6 entry gate per ADR-001 § Validation Gates Week 3:**
-- A 12-team / 12-pick unattended draft runs to completion via the Elixir engine. Every pick is via autopick (no human clients). Total wall-clock time < 30 seconds.
-- A 12-team / 180-pick (15 rounds) full unattended draft runs to completion via the Elixir engine. Total wall-clock time < 6 minutes (autopick p95 ≤ 1000ms × 180 picks ≈ 3 minutes; allow 2× for cushion).
-- Cross-runtime parity: an autopick committed by the Elixir engine has the **same idempotency key** as the same logical pick would have had if committed by the Node Edge Function path. (Verified by computing the key in Elixir and asserting it matches the SQL `_v2_test._uuidv5` helper's output for the same inputs.)
-- Latency benchmark from 4.5.5 passes every Mandate target: manual pick p95 ≤ 300ms, autopick p95 ≤ 1000ms, broadcast fanout p95 ≤ 200ms, draft state load p95 ≤ 1500ms.
-- Operational story: the solo founder has runbook-quality notes on (a) deploying the Elixir engine to staging, (b) reading its logs, (c) restarting it cleanly, (d) what to do when the engine crashes mid-draft. Notes can be incomplete on hosting specifics (that's chunk 4.6.3) but must cover what's been measured.
-- The Elixir codebase is maintainable: pattern-matched message handlers, clean module structure, ExUnit coverage on the hot paths, no `IO.inspect` left in shipped code.
+**Performance targets.**
+- Reconnection recovery p95 ≤ 2000ms.
 
-**Pass:** proceed to Phase 4.6.
-**Fail:** stop and review per ADR-001 § Validation Gates Week 3. Possible outcomes: targeted optimization, scope cut, or pivot back to Path 1.
-
-**Performance targets.** All Mandate targets except reconnection (Phase 4.6).
-
-**Estimated effort.** 5–7 days. The biggest chunk in Phase 4.5; closes the loop on the perf claim.
+**Estimated effort.** 2–3 days.
 
 ---
 
-## Phase 4.6 — Production-readiness (weeks 4–7)
+### Chunk 11g.6 — Pick deadline timer + autopick
 
-The goal of Phase 4.6 is **the engine is operationally credible in production**. Phase 4.5 ended with "it works on staging and meets the perf bar." Phase 4.6 ends with "we can run this in production without me being woken up at 3am for an outage we don't know how to handle."
+**Deliverable.** Each `LobbyManager` runs a `setInterval` (1s tick) for the duration of the lobby's life. Each tick: compute `timeRemaining = pickDeadline - now`, broadcast `{ type: 'time_remaining', value }` over the lobby topic. On expiration (`timeRemaining ≤ 0`): the autopick path runs through the same single-writer queue as manual picks. Selection algorithm: queue head first (head of `draft_queues` for the on-clock team, filter against the in-memory candidate pool); heuristic fallback (FPTS + positional need — port the existing `supabase/functions/draft-autopick/heuristic.ts` to TypeScript inside `server/src/draft/heuristic.ts`, same algorithm byte-for-byte). Autopick calls `submit_pick_v2` with `actor.kind='autopick'` and the existing UUIDv5-derived idempotency key (same `AUTOPICK_NAMESPACE_UUID` and same `(league_id, pick_number, generation, 'autopick')` derivation). Same broadcast path as a manual pick. Additionally, **autopicks write a single-recipient notification** to the affected user via the `notifications` table (`type='SYSTEM'`, `user_id = autopicked_team.owner_id`) so a user away from the draft room sees the autopick happened on their next visit to the in-product activity feed. This is the only `notifications` table write the engine performs per pick — manual picks are not surfaced through `notifications` (they reach in-room clients via the WebSocket and reach absentee users via the draft room's event log on next visit). This deliberate scope-cut is the "no notification storm" guarantee per the chat/notification architecture findings.
 
-Phase 5 (UI client work) starts at the end of Phase 4.6.
-
-### Chunk 4.6.1 — Reconnection / resume protocol
-
-**Deliverable.** A documented and tested reconnection protocol for browser clients. WebSocket dropped (network blip, page refresh, mobile context switch) → client reconnects → channel rejoin includes the client's last-seen `seq` → engine sends a state delta or full snapshot depending on the gap → client reconciles. Phoenix Channels' built-in reconnection logic is the substrate; the protocol on top of it handles the application-level state reconciliation.
-
-**Dependencies.** Phase 4.5 complete.
+**Dependencies.** 11g.4.
 
 **Acceptance criteria.**
-- Test: open client, commit 3 picks, drop WebSocket connection forcibly, reopen connection, client receives the missed state without a full re-fetch.
-- Test: open client, drop connection for 30 seconds, reconnect, client state reconciles. p95 ≤ 2000ms (Mandate reconnection target).
-- Test: kill the engine mid-draft, restart, all clients reconnect and pick up from where they left off. (Distinct from chunk 4.5.7's engine-side test in that this verifies the client experience.)
-- Test: figma-style scenario (`https://www.figma.com/blog/making-multiplayer-more-reliable/` informs this) — N clients, network partition split between two groups, partition heals, all clients re-converge to consistent state. N ≥ 4.
+- Timer ticks: with the deadline 60s out, clients receive 60 `time_remaining` events ±100ms (Mandate: timer drift < 100ms across clients).
+- Autopick on deadline: a 12-team / 12-pick unattended draft runs to completion. Every pick is via autopick. Total wall-clock < 30 seconds. Per-pick p95 ≤ 1000ms / p99 ≤ 2000ms (Mandate: autopick latency).
+- A 12-team / 180-pick (15 rounds) full unattended draft completes in < 6 minutes (autopick p95 × 180 ≈ 3 minutes plus 2× cushion).
+- Cross-runtime parity preserved during cutover: an autopick committed by the in-server engine produces the same idempotency key as the existing Edge Function path would have for the same `(league_id, pick_number, generation)`. Verified against `_v2_test._uuidv5` SQL helper output for a known input vector.
+- Per autopick: one row in `notifications` with `user_id = autopicked_team.owner_id`, `type = 'SYSTEM'`, `metadata.source = 'draft_engine'`, `metadata.pick_number = N`. Zero rows for manual picks. Vitest asserts both directions.
 
 **Performance targets.**
-- Reconnection recovery p95 ≤ 2000ms (Mandate target).
+- Autopick latency p95 ≤ 1000ms / p99 ≤ 2000ms.
+- Timer drift < 100ms across all connected clients.
 
 **Estimated effort.** 4–5 days.
 
 ---
 
-### Chunk 4.6.2 — Multi-instance coordination
+### Chunk 11g.7 — Snapshot persistence and process bootstrap
 
-**Deliverable.** When the Elixir engine runs on more than one instance (whether for HA or because the autoscaler spun up a second one under load), each draft is owned by exactly one instance. Two instances cannot both run a `DraftServer` for the same draft — that would split the in-memory state, double-broadcast, and double-pick. Coordination via either (a) `:libcluster` + a global Registry across the cluster, (b) Phoenix Presence with cluster-wide deduplication, or (c) a Postgres-advisory-lock per-draft pattern. The chunk picks one based on hosting constraints (chunk 4.6.3 informs this).
+**Deliverable.** `LobbyManager` writes a snapshot to `draft_state` every N picks (suggest N=5) and every 30 seconds, whichever comes first. Snapshot payload is the minimum needed to recover the in-memory projection without replaying the full event log: `pickNumber`, `onClockTeamId`, `pickDeadline`, `lastBroadcastSeq`. The candidate pool is NOT persisted in the snapshot — it gets rebuilt from `player_directory` + `draft_picks_v2` on bootstrap (cheaper than serializing 2000 rows × 14 columns). On process startup, a bootstrap routine queries `leagues WHERE draft_status = 'drafting'` and, for each, instantiates a `LobbyManager` from the latest snapshot + replay of `draft_events` since the snapshot's `lastBroadcastSeq`. Lobbies are registered into `LobbyRegistry` and timers resume. Connected clients reconnect via chunk 11g.5's protocol; the server-side state is already there waiting for them.
 
-**Dependencies.** 4.6.1.
+**Dependencies.** 11g.6.
 
 **Acceptance criteria.**
-- Test: two engine instances running locally (e.g., two `mix phx.server` on different ports clustered with `:libcluster`). Same draft attempted to be hosted by both: only one `DraftServer` exists; the other instance routes channel joins to the right node.
-- Test: kill the instance hosting a draft mid-game; the surviving instance picks up the draft within N seconds (where N is the chunk's documented target — likely ≤ 5 seconds). Connected clients reconnect via 4.6.1's protocol.
-- The cross-instance routing adds < 50ms of latency to picks routed via the non-owning instance. (For most drafts, all clients connect to the owning instance, so this is the worst-case path.)
+- A snapshot row appears in `draft_state` after every 5 committed picks during a test draft, and at least one row per 30 seconds even if no picks happen. Verified via row count + timestamp inspection.
+- Test: kill the server process mid-draft (5 picks committed, 2 clients connected, deadline 30s out). Restart. The bootstrap reloads the lobby from snapshot + 5 events of replay; the timer resumes with the correct `pickDeadline`; clients reconnect via 11g.5 and receive the current state. **No picks lost. No duplicates. Total recovery time < 5 seconds.**
+- Test: the snapshot/replay path agrees with a from-scratch `reconstruct_draft_state` call — the in-memory projection after bootstrap is byte-equal to a full reconstruction. Vitest property test runs over a corpus of synthetic event logs.
+- Bootstrap routine logs structured events (`lobby_bootstrap_started`, `lobby_bootstrap_complete`, `lobby_bootstrap_failed`) at INFO/INFO/ERROR for ops visibility.
 
 **Performance targets.**
-- All Mandate targets continue to hold under cross-instance routing for a fraction of the load.
+- Bootstrap completes in < 5 seconds for a 12-team / 50-picks-committed draft.
+- Snapshot write does not block the single-writer queue (runs as a fire-and-forget side effect after the mutation commits).
 
-**Estimated effort.** 4–6 days. This is operationally hairy; budget for cliffs.
+**Estimated effort.** 3–4 days.
 
 ---
 
-### Chunk 4.6.3 — Hosting deployment (Fly.io evaluation + decision)
+### Chunk 11g.8 — Failure mode test suite
 
-**Deliverable.** Production-ready hosting decision for the Elixir engine, with the deployment pipeline configured. The chunk evaluates Fly.io against alternatives (Render, Gigalixir, AWS ECS, GCP Cloud Run with always-on instances, self-hosted Kubernetes) on the dimensions that matter for this workload:
+**Deliverable.** Six failure-mode integration tests covering the brief's scenarios. Each test runs against a real staging Cloud Run deploy (or a local server with the same wiring), seeds fixtures, asserts behavior end-to-end. Scenarios:
 
-- WebSocket support and tail-latency characteristics
-- Always-on instances (no cold starts on draft join — the Mandate's draft state load target depends on this)
-- Multi-region placement options (most users are North American; a single US region is fine for v1)
-- Cluster-friendly networking (for `:libcluster` if chunk 4.6.2 went that route)
-- Deploy-without-dropping-connections support (Fly's blue/green; equivalents elsewhere)
-- Ops surface and observability integrations
-- Cost at the expected v1 scale (~50 concurrent drafts during peak draft season; trivial outside)
-- Founder familiarity (lower-friction paths win ties)
+1. **Process crash mid-draft** — kill the Node process during an active draft (5 picks committed, 2 clients connected). Expected: clients see WS disconnect, server restarts, lobby bootstraps from snapshot + replay (chunk 11g.7), clients reconnect with `last_seen_seq` (chunk 11g.5), draft continues. No picks lost, no duplicates.
+2. **Client reconnect after network drop** — drop a single client's WS connection mid-draft (TCP close). Expected: client reconnects, replays missed events from ring buffer (chunk 11g.5). No effect on other clients. Reconnection p95 ≤ 2000ms.
+3. **Duplicate pick submission with idempotency keys** — client A submits the same pick twice (same idempotency key, e.g. retry after a flaky network). Expected: second submission returns `{ was_duplicate: true }`, no second `draft_events` row, no second broadcast.
+4. **Two users racing on the clock** — clients A and B both submit picks within the same single-writer-queue tick. Expected: one wins (commits + broadcasts), the other receives a typed "not on clock" rejection without committing.
+5. **Slow client** — one client's WS has `getBufferedAmount() > 1MB` (simulated by withholding ACKs). Expected: chunk 11g.4's fanout protection skips the slow socket on subsequent broadcasts; the slow client is flagged for resync; other clients receive picks at normal latency.
+6. **Deploy during active draft (drain mode)** — Cloud Run revision swap while a draft is mid-clock. Expected: old instance flushes its single-writer queue and commits in-flight mutations before exit; new instance bootstraps the lobby from snapshot + replay; clients reconnect via 11g.5. Draft continues without operator intervention.
 
-The chunk's deliverable is the picked target deployed to staging with the engine running on it, full deploy → reconnect-without-dropping-clients verified, plus a one-page writeup of the evaluation rationale committed to the repo.
-
-**Dependencies.** 4.6.2.
+**Dependencies.** 11g.5, 11g.6, 11g.7.
 
 **Acceptance criteria.**
-- The Elixir engine is deployed and running on the chosen hosting target's staging environment.
-- WebSocket connections from a real browser to the deployed engine work end-to-end.
-- A code change deployed via the production pipeline does NOT drop in-flight client connections (or, if it does briefly, the 4.6.1 reconnection protocol covers the gap so users don't notice).
-- Latency benchmark from 4.5.5 re-runs against the deployed staging engine and meets every Mandate target.
-- Cost projection at expected v1 scale documented.
+- All six tests pass on staging. Each test produces a structured log artifact (committed alongside the test) showing the timeline of events for review.
+- Each test asserts both the happy outcome AND the absence of a failure mode (e.g., scenario 3 also asserts that `draft_events` has exactly one row, not zero or two).
+- Mandate targets continue to hold under each scenario where they apply (e.g., scenario 2 asserts reconnection p95 ≤ 2000ms; scenario 4 asserts manual pick latency under contention p95 ≤ 300ms).
 
 **Performance targets.**
-- All Mandate targets continue to hold against the deployed (not local) engine. This is the first measurement against real production network conditions; some adjustment may be needed.
+- All Mandate targets continue to hold under each scenario where they apply.
 
-**Estimated effort.** 5–7 days. Includes evaluation time. Expect surprises specific to whichever target gets picked.
+**Estimated effort.** 4–5 days. Scenario 6 is the trickiest — needs the chosen Cloud Run revision-swap mechanism documented and a drain-mode hook on the engine (chunk should design this).
 
 ---
 
-### Chunk 4.6.4 — Observability + on-call runbook
+### Chunk 11g.9 — Edge Function infrastructure removal
 
-**Deliverable.** Logs, metrics, and traces from the Elixir engine flow into the same aggregation as the Node main app (or document why they have to be separate). Critical alerts wired up: engine instance crash, draft state inconsistency between in-memory and event log, autopick latency p95 > Mandate target, reconnection failure rate > N%, message broadcast failure. On-call runbook documenting what to do for each alert: the indicator, the diagnosis, the remediation, the escalation. CI pipeline for the Elixir codebase enabled (the placeholder workflow from 4.5.1 wired up for real).
+**Deliverable.** Once chunks 11g.1–11g.8 are deployed and verified on staging, this chunk deletes the Phase 0–4 Edge Function infrastructure entirely. Specifically:
 
-**Dependencies.** 4.6.3.
+- Delete `supabase/functions/draft-autopick/` (the Deno autopick worker).
+- Drop the pg_cron jobs `draft-deadline-sweep` and `draft-autopick-keepalive` via a new migration in `supabase/migrations/`.
+- Drop the pgmq queue `draft_deadlines` and its archive table via the same migration.
+- Delete `supabase/functions/_shared/_vendored/` (no second runtime needs vendored shared code; the in-server engine imports `@citrus/shared` natively).
+- Remove the SQL `_v2_test._uuidv5` cross-runtime parity helper and the corresponding TypeScript test fixture — there is no second runtime to compare against.
+- `git grep` audit confirms zero remaining references to deleted surfaces in shipped code (test fixtures, comments, runbooks). Stale references either get updated or get deleted.
+
+The chunk also closes the runbook entries: **KI-007** (vendored shared code drift) flips to `RESOLVED (chunk 11g.9 commit-sha, date)`. **KI-004** (Phase 3 keep-alive cron's hardcoded staging URL) is annotated `SUPERSEDED by chunk 11g.9 — surface deleted` with the same commit SHA.
+
+**Dependencies.** 11g.6 (the in-server autopick path must be the primary path before the Edge Function is removed), 11g.8 (the failure-mode test suite must pass without the Edge Function as a fallback).
 
 **Acceptance criteria.**
-- Engine logs are queryable from the same place as Node app logs (or the runbook explicitly documents the second log surface).
-- Each Mandate target has a corresponding metric. Dashboards exist showing trailing 24h p50/p95/p99 against target. Visible at a glance whether we're regressing.
-- Alerts fire end-to-end: deliberately introduce a failure (e.g., kill the engine, deploy a regression in autopick latency), confirm the alert reaches the on-call surface (whatever it is — Discord webhook, email, etc.) within 5 minutes.
-- Runbook is operationally credible: a fresh reader who has never touched the engine can read the runbook for an alert and know what to do, with a defined escalation path if the runbook's steps don't resolve it.
-- CI pipeline runs `mix test` and `mix format --check-formatted` on every PR touching `elixir/`. Fails the PR on either failure.
+- `git ls-files supabase/functions/draft-autopick/` returns 0 files.
+- `git ls-files supabase/functions/_shared/_vendored/` returns 0 files.
+- `git grep -n "_vendored\|draft-deadline-sweep\|draft-autopick-keepalive\|draft_deadlines"` returns no references in shipped code (matches in `docs/RUNBOOKS/draft-engine-v2-known-issues.md` and migration history are expected and acceptable).
+- The removal migration applies cleanly on staging and is idempotent (re-running is a no-op).
+- The chunk 11g.8 test suite re-runs after the deletion and all six scenarios still pass — confirming the Edge Function was already not on the critical path.
+- KI-007 row in `docs/RUNBOOKS/draft-engine-v2-known-issues.md` carries `RESOLVED (commit-sha, date)`. KI-004 row similarly annotated.
 
-**Performance targets.**
-- N/A (this is the chunk that measures performance, not a chunk that introduces a new latency surface).
+**Performance targets.** None (subtractive chunk).
 
-**Estimated effort.** 5–7 days.
+**Estimated effort.** 1–2 days. Mostly auditing and writing the migration; the deletes themselves are mechanical.
 
 ---
 
-## Phase 4.6 sign-off → Phase 5 unblocks
+### Chunk 11g.10 — Performance verification against the Mandate
 
-When 4.6.4 lands cleanly:
+**Deliverable.** End-to-end performance verification on the deployed staging Cloud Run server against every binding target in `CLAUDE.md` § Citrus Draft Performance Mandate. A `server/bench/` benchmark harness drives realistic load (12-user lobbies, multiple concurrent drafts) using the `node --cpu-prof` workflow per VS Code Node profiling docs to capture flame graphs for any regression. The harness emits a structured report: per-Mandate-target p50/p95/p99 latency, throughput, error rate. Output committed to the repo so future regressions have a baseline.
 
-- Every Mandate target is met on the deployed engine.
-- The dual-runtime production reality (KI-009) is operationally credible: deploy pipeline, observability, on-call runbook all in place.
-- Solo-founder learning-curve risk (KI-010) is resolved: by definition of completing Phase 4.6, the founder is productive in Elixir. KI-010 closes.
-- Phase 5 (UI client work) starts. The UI is built against the Elixir engine's WebSocket protocol from chunk 4.5.4 + the reconnection protocol from chunk 4.6.1. The Phase 0–4 server-side TypeScript pick path stays as a fallback for clients that can't open WebSockets but is no longer the primary path.
+The KI-010 Tier 1 optimizations are verified-in-place via grep:
+- Parallel async via `Promise.all`: chunk 11g.3 `LobbyManager` constructor.
+- Candidate pool cached at draft start: chunk 11g.3 `this._candidates`.
+- Byte-limited delta broadcasts: chunk 11g.4 broadcast site.
+- Per-socket fanout protection via `getBufferedAmount()`: chunk 11g.4 broadcast site.
+
+A code-comment audit (`git grep "KI-010 Tier 1"`) produces the four expected hits. Missing hits indicate the optimization was deferred or removed silently — both fail the chunk.
+
+**Dependencies.** 11g.9.
+
+**Acceptance criteria — and the Phase 5 entry gate:**
+- Manual pick submission p95 ≤ 300ms / p99 ≤ 500ms over 1000 trial picks across 5 concurrent lobbies.
+- Autopick latency p95 ≤ 1000ms / p99 ≤ 2000ms over 500 trial autopicks.
+- Pick-to-broadcast fanout p95 ≤ 200ms.
+- Draft state load (cold lobby bootstrap) p95 ≤ 1500ms.
+- Reconnection recovery p95 ≤ 2000ms over 100 reconnect cycles.
+- Timer drift < 100ms across all clients in a 12-user lobby over a full 15-round draft.
+- `git grep "KI-010 Tier 1"` returns ≥ 4 hits in `server/src/draft/`.
+- Benchmark report committed at `server/bench/PHASE_4_5_BASELINE.json` (machine-readable) and `server/bench/PHASE_4_5_BASELINE.md` (human-readable summary). Future Phase 5+ work re-runs against this baseline.
+
+**Pass:** Phase 5 (UI client work) unblocks. KI-010 closes (RESOLVED, with the chunk 11g.10 commit-sha as evidence).
+**Fail (any target missed by > 10%):** stop. Targeted optimization, not a fresh chunk. The Mandate is binding.
+
+**Performance targets.** The full Mandate set, end-to-end, on the deployed Cloud Run server.
+
+**Estimated effort.** 3–5 days. Includes profiling time and any targeted optimization passes that surface during the run.
 
 ---
 
 ## Registry tracking during the build
 
-New issues that surface during Phase 4.5 / 4.6 land in the appropriate registry at commit time:
+New issues that surface during Phase 4.5 land in the appropriate registry at commit time:
 
-- **Cross-cutting / project-wide concerns** → `docs/REGISTRY.md`. Examples: ops surface area changes, new external dependencies, hosting-cost surprises, security review gaps that span runtimes.
-- **Draft-engine-specific concerns** → `docs/RUNBOOKS/draft-engine-v2-known-issues.md`. Examples: a specific Elixir performance gotcha around the BEAM scheduler, an Ecto query that needs an index added to Postgres, a Phoenix Channels behavior that diverges from documented expectation.
-- **Spec-level concerns (changes to the cross-runtime contract)** → require an ADR. The cross-runtime boundary (RPC signatures, payload shapes, idempotency-key derivation, WebSocket message protocol) does not change without explicit governance.
+- **Cross-cutting / project-wide concerns** → `docs/REGISTRY.md`. Examples: ops surface area changes, new external dependencies, hosting-cost surprises.
+- **Draft-engine-specific concerns** → `docs/RUNBOOKS/draft-engine-v2-known-issues.md`. Examples: a `uWebSockets.js` quirk on Cloud Run, a Postgres query that needs an index, a Hono+uWS coexistence gotcha.
+- **Spec-level concerns (changes to the integration boundary)** → require an ADR. The integration boundary (Postgres RPC signatures, payload shapes, idempotency-key derivation, WebSocket message protocol) does not change without explicit governance.
 
 Existing open KIs that interact with this work:
 
-- **KI-003** (Phase 7 carryover): rate limiter session-affinity. The Elixir engine's `DraftServer` model effectively solves the per-instance rate limiter problem (per-draft state is per-instance by design). Re-evaluate KI-003 at the end of Phase 4.6 — likely RESOLVED by virtue of the architectural change.
-- **KI-004** (Phase 8a target): hardcoded staging URL in keep-alive cron. Still applies if the Edge Function fallback path is retained. The cron's URL still needs to be Vault-resolved before prod cutover. No change.
-- **KI-005** (Phase 8a target): DLQ paging trigger. Still applies — the Edge Function fallback path can still hit `read_ct >= 3` and write to `autopick_failures`. The Elixir engine's autopick path also writes to `autopick_failures` on terminal failure (chunk 4.5.8 deliverable). The paging trigger covers both.
-- **KI-006** (Phase 7 target): heuristic O(N×M) candidate scan latency. **Largely resolved by chunk 4.5.8** — the Elixir engine's in-memory candidate cache eliminates the per-pick query that was the cost driver. The Phase 7 latency benchmark is now relevant only for the Edge Function fallback path. Re-evaluate at end of Phase 4.6.
-- **KI-007** (Phase 7 target): vendored shared code drift. The Elixir engine introduces a third runtime that needs the same constants (`AUTOPICK_NAMESPACE_UUID`, scoring weights). Either keep the canonical-vs-vendored discipline (and add Elixir as a third vendor target) or move the shared constants to a language-neutral source (JSON file, env vars, dedicated table) that all three runtimes read. Decision deferred to Phase 4.6 chunk 4.6.4 alongside the broader observability work; track as **KI-007 expands to cover the third runtime**.
+- **KI-003** (Phase 7 carryover): rate limiter session-affinity. The single-process Day 1 architecture means every connection for a given lobby lands on the same instance, which solves the immediate session-affinity problem in a degenerate way. Re-evaluate KI-003 if/when multi-process sharding ships.
+- **KI-004** (Phase 8a target): hardcoded staging URL in the keep-alive cron. **SUPERSEDED by chunk 11g.9** — the cron job ceases to exist. The runbook row carries the supersede annotation with the chunk 11g.9 commit-sha.
+- **KI-005** (Phase 8a target): DLQ paging trigger on `autopick_failures`. Still applies, but now narrower in scope: the in-server engine writes to `autopick_failures` on terminal autopick failure (chunk 11g.6 deliverable). The Edge Function path is gone (chunk 11g.9), so this is the only writer.
+- **KI-006** (Phase 7 target): heuristic O(N×M) candidate scan latency. **RESOLVED at chunk 11g.10** — the chunk 11g.3 in-memory candidate cache eliminates the per-pick query that was the cost driver; chunk 11g.10's benchmark confirms.
+- **KI-007** (Phase 7 target): vendored shared code drift. **RESOLVED at chunk 11g.9** — the vendored `_shared/_vendored/` directory is deleted alongside the Edge Function infrastructure. The in-server engine imports `@citrus/shared` natively; no second runtime needs vendored copies.
 
-New KIs already filed at plan time:
+New KIs filed at plan time (all rewritten to match the in-server engine direction):
 
-- **KI-008**: Phase 0–4 architecture insufficient for Yahoo/ESPN-grade live draft (architectural pivot rationale).
-- **KI-009**: Operational complexity of dual-runtime production.
-- **KI-010**: Solo founder learning curve risk; Week 1 validation gate.
+- **KI-008**: Phase 0–4 architecture insufficient for Yahoo/ESPN-grade live draft (architectural pivot rationale; the autopick latency was structural to the Edge Function model).
+- **KI-009**: Edge Function infrastructure removed entirely; engine in existing server (operational simplicity over dual-runtime hedging).
+- **KI-010**: Tier 1 perf optimizations baked into Phase 4.5 design from the start (parallel async, candidate pool caching, byte-limited delta broadcasts, fanout protection — closes at chunk 11g.10 with measured evidence).
 
 Future KIs (likely to be filed during the build):
 
-- A KI covering the chosen hosting target's specific quirks (filed in chunk 4.6.3).
-- A KI covering whatever cross-instance coordination edge case turns out to be flaky (filed in chunk 4.6.2 or whenever it surfaces).
-- A KI for any latency target the benchmark suite chronically misses by < 10% — bounded, documented, scheduled for follow-up.
+- A KI covering whichever Cloud Run quirk surfaces (e.g., WebSocket idle-timeout tuning, revision-swap drain mode behavior).
+- A KI covering whichever Hono+uWS coexistence quirk surfaces (port allocation, middleware reuse, build-pipeline interactions).
+- A KI for any latency target the benchmark suite chronically misses by < 10% — bounded, documented, scheduled for follow-up before Phase 5 starts.
+- A future-sharding KI when multi-process Day 2 work begins (the Day 1 single-process model is documented as a deliberate scope cut, not a long-term posture).
 
 ---
 
 ## Cross-references
 
-- `docs/adr/ADR-001-elixir-phoenix-draft-engine.md` — the architectural decision this plan implements.
+- `docs/adr/ADR-001-persistent-node-draft-engine.md` — the architectural decision this plan implements.
 - `CLAUDE.md` § Citrus Draft Performance Mandate — the binding performance targets.
-- `CLAUDE.md` § Tech Stack — the hybrid runtime documentation.
-- `docs/DRAFT_ENGINE_V2_SPEC.md` § §0 + §0.5 — spec-side reference.
-- `docs/REGISTRY.md` — KI-008, KI-009, KI-010 (project-wide concerns).
-- `docs/RUNBOOKS/draft-engine-v2-known-issues.md` — Phase 0–4 KIs that continue to apply.
+- `CLAUDE.md` § Tech Stack — the in-server engine architecture documentation.
+- `docs/DRAFT_ENGINE_V2_SPEC.md` § §0 + §0.5 — spec-side reference (cross-runtime contract preserved; `DraftRoom` / `LobbyManager` is the in-process holder of the same projection).
+- `docs/REGISTRY.md` — KI-008, KI-009, KI-010 (project-wide concerns; rewritten for the in-server direction).
+- `docs/RUNBOOKS/draft-engine-v2-known-issues.md` — Phase 0–4 KIs; KI-004 SUPERSEDED and KI-007 RESOLVED at chunk 11g.9.
 
-This plan is **accepted but not yet executing**. Implementation begins with chunk 4.5.1 in a separate session/commit. Each chunk lands as its own commit with deliverables verified before the next starts.
+This plan is **accepted but not yet executing**. Implementation begins with chunk 11g.0 in a separate session/commit. Each chunk lands as its own commit with deliverables verified on staging before the next starts.

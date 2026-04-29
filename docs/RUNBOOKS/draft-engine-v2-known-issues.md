@@ -206,6 +206,23 @@ wire-up needed for chunk 9d.
 | **Target phase for resolution** | **Phase 8a** (prod cutover). The prod cutover migration replaces the literal URL with `'https://' \|\| vault.read_secret('draft_autopick_worker_url') \|\| '/functions/v1/draft-autopick'` (or equivalent). Same Vault provisioning recipe as `draft-autopick-token`; same rotation procedure. The runbook's "STAGING_PROJECT_REF" marker comment in the chunk 10d migration flags the line that must change. |
 | **Verification test** | After the Phase 8a cutover migration applies on prod: `SELECT count(*) FROM cron.job WHERE jobname = 'draft-autopick-keepalive' AND command LIKE '%jjgspcpvqaiitloglxbb%';` must return **0** (no staging ref leaked into prod). Plus the positive assertion `SELECT count(*) FROM cron.job WHERE jobname = 'draft-autopick-keepalive' AND command LIKE '%vault.read_secret%';` must return **1** (URL is Vault-resolved). Both assertions fail-loud during the cutover smoke test. |
 
+**SUPERSEDED by ADR-001 / KI-009 (2026-04-28).** The Edge Function infrastructure — including the `draft-autopick-keepalive` cron and the staging-URL issue this row tracks — is removed entirely in chunk 11g.9 of `docs/PHASE_4_5_PLAN.md`. KI-004 is therefore moot: the cron job ceases to exist before any prod cutover would have parameterized its URL. The chunk 11g.9 commit's deletion will close this row.
+
+---
+
+### KI-007 — Vendored `@citrus/shared` code at `supabase/functions/_shared/_vendored/`
+
+| | |
+|---|---|
+| **Severity** | medium (at deferral time); now scheduled for resolution. |
+| **Function / file** | `supabase/functions/_shared/_vendored/scoring.ts`, `payload-hash.ts`, `season.ts`, `query-columns.ts`. The Phase 4 Edge Function `draft-autopick` consumes these copies because the Supabase bundler couldn't resolve workspace-level imports of `@citrus/shared` from the Deno runtime on Windows dev boxes. |
+| **Description** | Drift risk: the canonical `@citrus/shared` source and the vendored copies must stay byte-for-byte identical for cross-runtime hash agreement (UUIDv5 idempotency keys, `computePickPayloadHash`, scoring weights). A drift between Node and Deno means autopicks and manual picks compute different idempotency keys for the same logical pick — silent double-picks under contention. The Phase 4 commit added a `KI-007 RESOLVED` placeholder comment at every vendored file plus a structural validator on `ScoringCalculator` so a malformed scoring config crashes loud rather than silently producing zeros. |
+| **Why deferred** | Phase 4 needed the autopick path on staging before Phase 4.5 design closure. Vendoring was the lowest-friction path; resolving the bundler issue properly would have blocked the chunk. The drift risk was acceptable at Phase 4 scope because the cross-runtime parity test suite catches divergence before deploy. |
+| **Target phase for resolution** | **Phase 4.5 chunk 11g.9** (per ADR-001 / KI-009). The Edge Function infrastructure is removed entirely; the vendored copies, the cross-runtime hash-agreement test infrastructure, and the SQL `_v2_test._uuidv5` parity helper all get deleted alongside the autopick worker. The persistent Node engine in the existing server imports `@citrus/shared` natively — no vendoring needed. |
+| **Verification test** | After chunk 11g.9 lands (completion target: Phase 4.5 sign-off): `git ls-files supabase/functions/_shared/_vendored/` must return **0 files** (directory deleted). Plus `git grep -n "_vendored"` returns no references in shipped code. Plus the test suite's UUIDv5 cross-runtime parity test (which compared TS vs SQL vs Deno) is removed cleanly because there's no second runtime to compare against. |
+
+**RESOLVED (chunk 11g.9 commit, target date Phase 4.5 completion).** Closure note pending the chunk 11g.9 commit; this row is pre-marked because ADR-001 (2026-04-28) commits to the deletion as part of the Phase 4.5 plan. The actual `RESOLVED` annotation on the runbook row gets the commit SHA when 11g.9 ships.
+
 ---
 
 ## How to add a row
