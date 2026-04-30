@@ -2,7 +2,7 @@
 
 ## §1. Status & Authority
 
-**Status:** Draft. Pending Zach's review.
+**Status:** Path A event-sourcing ratified by Zach 2026-04-30. Remaining §8 questions still open.
 
 **Date:** 2026-04-30.
 
@@ -59,7 +59,7 @@ This ADR captures the architectural decisions for migrating auction from v1's di
 - Migration: existing `draft_events` rows for snake/linear are unchanged. Auction events begin appending starting at chunk 11g.6 cutover.
 - Test surface: snake/linear tests do not need to know about auction event types because they filter on type at the application layer.
 
-**Sharpening: envelope vs payload polymorphism (added 2026-04-30 in response to Zach's pushback).**
+**Sharpening: envelope vs payload polymorphism (added 2026-04-30 in response to Zach's pushback; Zach ratified the sharpened framing same day).**
 
 The pushback worth addressing directly: polymorphic database tables are problematic when they force structurally different data into a uniform column shape. They are not problematic when the *envelope* is uniform and the *payload* is schema-flexible.
 
@@ -74,7 +74,7 @@ The polymorphism is at the envelope level only (one event-log table, multiple ev
 
 If the *envelope* ever needed to diverge — for example, if auction events required a different sequence-number primitive (per-nomination rather than per-lobby), different durability semantics, or different read-replica behavior — path B (separate `auction_events` table) would be revisited. None of those divergences are currently anticipated.
 
-**Pending confirmation from Zach.** Garrett asked Zach separately to confirm this aligns with his architecture-doc intent. If Zach pushes back to path B (separate `auction_events` table), this section gets re-litigated; the rest of the ADR is unaffected.
+**Ratified by Zach 2026-04-30** after the sharpened envelope-vs-payload framing was provided. Path A locked.
 
 ### §3.2 — LobbyManager shape: format-aware single class with state-machine dispatch
 
@@ -353,7 +353,7 @@ Rejected because:
 
 These are the items Garrett has flagged for Zach's explicit review before chunk 11g.6 implementation begins. Garrett's recommendations are noted; Zach has authority to confirm, push back, or revise.
 
-- **§3.1 Polymorphic event types vs separate table.** Garrett asked Zach 2026-04-30 to confirm path A aligns with his architecture-doc intent. Awaiting reply.
+- **§3.1 Polymorphic event types vs separate table.** ✅ Ratified by Zach 2026-04-30 after sharpened envelope-vs-payload framing. See §3.1 for full reasoning.
 - **§3.2 Format-aware LobbyManager vs separate class.** Garrett ratified format-aware 2026-04-30. Confirming Zach agrees this aligns with chunk 11g.4 plumbing intent.
 - **§3.3 Anti-snipe defaults (30s threshold, 30s extension).** Garrett ratified industry-standard 2026-04-30. Confirming default values are reasonable for NHL fantasy auction culture.
 - **§3.4 Nomination window default (60s).** Garrett ratified 2026-04-30. Confirming default is reasonable for NHL fantasy auction culture.
@@ -368,3 +368,4 @@ These are the items Garrett has flagged for Zach's explicit review before chunk 
 |---|---|---|
 | 2026-04-30 | Garrett Storms | Initial draft. Five architectural decisions captured per Garrett's ratifications 2026-04-30. Path A event-sourcing pending Zach's separate confirmation. |
 | 2026-04-30 | Garrett Storms | Sharpened §3.1 in response to Zach's pushback on polymorphic events. Clarified that polymorphism is at the envelope level (uniform `draft_events` table structure) not the payload level (JSONB handles type-specific variance). No decision change; reasoning made explicit. |
+| 2026-04-30 | Zach Drever | Ratified path A (single `draft_events` table, polymorphic event types) after sharpened envelope-vs-payload framing. ADR-002 §3.1 locked. |
