@@ -40,7 +40,7 @@ export function GameModeCard({
   );
 
   return (
-    <div className="flex-shrink-0 w-[240px] sm:w-[260px] snap-start h-full">
+    <div className="flex-shrink-0 w-[240px] sm:w-[260px] snap-start">
       <GlowCard accent={accent} className="h-full">
         <article className="flex flex-col h-full overflow-hidden">
           {scene ? (
@@ -83,7 +83,7 @@ export function GameModeCard({
             <h3 className="font-sans font-bold text-[1.1rem] leading-snug text-pastel-cream mb-1.5">
               {label}
             </h3>
-            <p className="text-[12px] text-white/55 leading-snug mb-4 flex-grow">
+            <p className="text-[12px] text-white/55 leading-snug mb-4 flex-grow min-h-[80px] line-clamp-4">
               {sub}
             </p>
             {to ? <Link to={to} className="contents">{button}</Link> : button}

@@ -222,7 +222,7 @@ export default function PoolPlayoffConfidence() {
         {/* Available confidence bank */}
         {availableValues.length > 0 && (
           <Card className="mb-4 bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 rounded-2xl p-3 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.2)]">
-            <div className="text-[10px] font-display font-bold uppercase text-white/70/50 mb-2">Available Confidence Points</div>
+            <div className="text-[10px] font-display font-bold uppercase text-white/50 mb-2">Available Confidence Points</div>
             <div className="flex flex-wrap gap-1.5">
               {availableValues.map(v => (
                 <div key={v} className="w-8 h-8 rounded-full bg-pastel-orange/15 ring-1 ring-pastel-orange/40 flex items-center justify-center text-xs font-bold text-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)]">
@@ -356,11 +356,11 @@ export default function PoolPlayoffConfidence() {
                               <span className="font-semibold" style={highInfo ? { color: highInfo.primaryColor } : undefined}>
                                 {high.team_abbrev} {h2hMap[s.bracket_slot].high_wins}
                               </span>
-                              <span className="text-white/70/40">—</span>
+                              <span className="text-white/40">—</span>
                               <span className="font-semibold" style={lowInfo ? { color: lowInfo.primaryColor } : undefined}>
                                 {h2hMap[s.bracket_slot].low_wins} {low.team_abbrev}
                               </span>
-                              <span className="text-white/70/40">({h2hMap[s.bracket_slot].games} games)</span>
+                              <span className="text-white/40">({h2hMap[s.bracket_slot].games} games)</span>
                             </div>
                           );
                         })()}
@@ -368,7 +368,7 @@ export default function PoolPlayoffConfidence() {
                         {/* Confidence selector */}
                         {pick?.picked_team_id && !locked && (
                           <div>
-                            <div className="text-[10px] font-display text-white/70/50 mb-1">Confidence:</div>
+                            <div className="text-[10px] font-display text-white/50 mb-1">Confidence:</div>
                             <div className="flex flex-wrap gap-1">
                               {Array.from({ length: totalSeries }, (_, i) => i + 1).map(v => {
                                 const isUsedElsewhere = usedValues.has(v) && pick.confidence_value !== v;
@@ -410,14 +410,14 @@ export default function PoolPlayoffConfidence() {
 
         {series.length === 0 && (
           <Card className="p-8 text-center">
-            <AlertTriangle className="h-8 w-8 text-white/70/30 mx-auto mb-2" />
+            <AlertTriangle className="h-8 w-8 text-white/30 mx-auto mb-2" />
             <p className="text-white/55 text-sm">Bracket not yet set. Picks open once playoff seeds are finalized.</p>
           </Card>
         )}
 
         {/* How it works */}
         <Card className="mt-6 bg-pastel-surface-tile border-0 ring-1 ring-pastel-sage/30 rounded-2xl px-4 py-3 shadow-[0_8px_24px_-12px_rgba(166,211,160,0.15)]">
-          <div className="text-[10px] font-display font-bold uppercase text-white/70/50 mb-1">How Confidence Pools Work</div>
+          <div className="text-[10px] font-display font-bold uppercase text-white/50 mb-1">How Confidence Pools Work</div>
           <ul className="text-[11px] text-white/70 space-y-0.5 list-disc pl-3">
             <li>Pick the winner of each playoff series</li>
             <li>Assign a confidence value (1-{totalSeries}) to each pick — each value used exactly once</li>

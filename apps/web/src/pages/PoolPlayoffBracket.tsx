@@ -442,11 +442,11 @@ export default function PoolPlayoffBracket() {
                             <span className="font-semibold" style={highInfo ? { color: highInfo.primaryColor } : undefined}>
                               {high?.team_abbrev} {h2hMap[s.bracket_slot].high_wins}
                             </span>
-                            <span className="text-white/70/40">—</span>
+                            <span className="text-white/40">—</span>
                             <span className="font-semibold" style={lowInfo ? { color: lowInfo.primaryColor } : undefined}>
                               {h2hMap[s.bracket_slot].low_wins} {low?.team_abbrev}
                             </span>
-                            <span className="text-white/70/40">({h2hMap[s.bracket_slot].games} games)</span>
+                            <span className="text-white/40">({h2hMap[s.bracket_slot].games} games)</span>
                           </div>
                         )}
                         {myPick?.picked_team_id && !locked && (
@@ -464,7 +464,7 @@ export default function PoolPlayoffBracket() {
                                 {g}
                               </button>
                             ))}
-                            <span className="text-[10px] text-white/70/50 ml-1">+1 if correct</span>
+                            <span className="text-[10px] text-white/50 ml-1">+1 if correct</span>
                           </div>
                         )}
                         {/* Pick summary: always visible when a pick exists */}
@@ -499,7 +499,7 @@ export default function PoolPlayoffBracket() {
 
         {series.length === 0 && (
           <Card className="p-8 text-center">
-            <AlertTriangle className="h-8 w-8 text-white/70/30 mx-auto mb-2" />
+            <AlertTriangle className="h-8 w-8 text-white/30 mx-auto mb-2" />
             <p className="text-white/55 text-sm">Bracket not yet set. Picks open once seeds are finalized.</p>
           </Card>
         )}
