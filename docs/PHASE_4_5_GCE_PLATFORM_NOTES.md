@@ -211,4 +211,4 @@ Garrett's own reflections from the 2026-04-29 → 2026-04-30 session.
 - **Status:** Complete. All TBDs resolved or explicitly deferred to chunk 11g.2 (regional decision deferred per §6; production-target machine type recommended per §1; deploy pipeline shape recommended per §1).
 - **Spike acceptance reviewer (Garrett):** ✅ 2026-04-30.
 - **Spike acceptance reviewer (Zach, when onboard):** Pending.
-- **Chunk 11g.2 unblocked:** Pending Zach's review of this document and the surrounding Phase 4.5 architectural docs.
+- **Chunk 11g.2 unblocked:** Granted by Zach 2026-04-30 via async Slack ratification of the five-point summary. Chunk 11g.2 cleared to start post-Web-Summit.

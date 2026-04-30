@@ -3,7 +3,8 @@
 Answers to the "Clarifying Questions Before Implementation" section of [`PHASE_4_5_ARCHITECTURE.md`](./PHASE_4_5_ARCHITECTURE.md). The architecture doc is framework- and product-agnostic by design; this doc binds it to Citrus's actual product, codebase, and operational reality.
 
 **Authority:** Garrett Storms, founder/CEO. Answered 2026-04-29.
-**Status:** Ratified for Phase 4.5 chunk planning. Subject to revision when Zach (incoming CTO) is onboard, per the same supersession-note convention used for ADR-001.
+**Status:** Ratified 2026-04-30.
+**Ratification:** All five decision points (path B launch volume, all three draft formats, co-manager support v1, provisional Montreal region, `e2-medium` VM tier) ratified by Zach 2026-04-30 via async Slack response. Architecture doc and project plan are now operational, not pending.
 
 ---
 

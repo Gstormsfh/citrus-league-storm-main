@@ -3,7 +3,7 @@
 Schedule, dependencies, and risk callouts for Phase 4.5 implementation through v1 production launch (NHL fantasy season opener, October 2026).
 
 **Authority:** Garrett Storms, founder/CEO. Proposed 2026-04-29.
-**Status:** Awaiting Zach's ratification. Subject to revision per the same supersession-note convention used for ADR-001 if any date materially changes.
+**Status:** Ratified 2026-04-30. Subject to revision per the same supersession-note convention used for ADR-001 if any date materially changes.
 
 **Companion docs:**
 - [`PHASE_4_5_ARCHITECTURE.md`](./PHASE_4_5_ARCHITECTURE.md) — canonical architecture (Zach's design).
@@ -197,3 +197,4 @@ Material schedule decisions captured here for traceability.
 | 2026-04-29 | Push notification flagged as deferrable to v1.1 | Push is enhancement; in-app fallback works. |
 | 2026-04-29 | Load test (chunk 11g.11) added as hard gate | Path B from `PHASE_4_5_ARCHITECTURE_ANSWERS.md` Q4.1 rests on this test. |
 | 2026-04-30 | Chunk 11g.2.0 spike executed by Garrett, all findings recorded in `PHASE_4_5_GCE_PLATFORM_NOTES.md` | `e2-medium` right-sized at 15.5 MiB idle (saving ~$150/mo vs original `e2-standard-4` plan); regional decision deferred pending multi-city benchmark; `--container-image` flag deprecated by GCP (chunk 11g.2 deploy pattern adjusted); ~$97/mo Cloud Workstations drain killed during pre-spike audit. |
+| 2026-04-30 | Zach ratified all five decision points (path B, three formats, co-manager v1, provisional Montreal, `e2-medium` VM tier) | Async Slack response. Architecture doc, project plan, and platform notes now operational. |
