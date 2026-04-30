@@ -1,0 +1,18 @@
+{
+  "name": "citrus-spike",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Throwaway hello-world for Phase 4.5 chunk 11g.2.0 (GCE platform spike). Not part of Citrus production.",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "1.13.7",
+    "hono": "4.6.0",
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.51.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
