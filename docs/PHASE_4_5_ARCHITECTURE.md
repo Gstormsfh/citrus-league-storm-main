@@ -324,6 +324,8 @@ A draft can be created, started, played to completion with 1,000 simulated clien
 
 ## Clarifying Questions Before Implementation
 
+> *See [`docs/PHASE_4_5_ARCHITECTURE_ANSWERS.md`](./PHASE_4_5_ARCHITECTURE_ANSWERS.md) for Citrus-specific answers to all questions below.*
+
 Some of these will change the implementation meaningfully; others are flagged so we don't make implicit assumptions.
 
 ### Product / draft mechanics
