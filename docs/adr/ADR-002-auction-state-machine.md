@@ -59,6 +59,21 @@ This ADR captures the architectural decisions for migrating auction from v1's di
 - Migration: existing `draft_events` rows for snake/linear are unchanged. Auction events begin appending starting at chunk 11g.6 cutover.
 - Test surface: snake/linear tests do not need to know about auction event types because they filter on type at the application layer.
 
+**Sharpening: envelope vs payload polymorphism (added 2026-04-30 in response to Zach's pushback).**
+
+The pushback worth addressing directly: polymorphic database tables are problematic when they force structurally different data into a uniform column shape. They are not problematic when the *envelope* is uniform and the *payload* is schema-flexible.
+
+What this design proposes:
+
+- **Envelope (uniform across all event types):** `lobby_id`, `seq`, `event_type`, `payload`, `created_at`, idempotency-key column, optional payload-hash for chunk 11g.4 validation. Every row in `draft_events` has the same envelope columns regardless of whether the event is a snake pick or an auction bid.
+- **Payload (type-specific, schema-flexible):** stored as JSONB. Each event type defines its own payload shape (catalogued in §4.1 below). Postgres treats each row's payload as an opaque JSONB document; no schema-level constraint forces payload uniformity.
+
+Concrete example. A snake/linear `pick_submitted` payload looks like `{team_id, player_id, pick_number, round_number, idempotency_key}`. An auction `auction_bid_placed` payload looks like `{nomination_id, team_id, bid_amount, idempotency_key}`. These are structurally different. They live in the same `payload` column because JSONB is the right tool for type-varying payloads — that's its purpose.
+
+The polymorphism is at the envelope level only (one event-log table, multiple event types). The payload's structural variance is handled by JSONB, not by forcing snake and auction into a Procrustean common shape.
+
+If the *envelope* ever needed to diverge — for example, if auction events required a different sequence-number primitive (per-nomination rather than per-lobby), different durability semantics, or different read-replica behavior — path B (separate `auction_events` table) would be revisited. None of those divergences are currently anticipated.
+
 **Pending confirmation from Zach.** Garrett asked Zach separately to confirm this aligns with his architecture-doc intent. If Zach pushes back to path B (separate `auction_events` table), this section gets re-litigated; the rest of the ADR is unaffected.
 
 ### §3.2 — LobbyManager shape: format-aware single class with state-machine dispatch
@@ -352,3 +367,4 @@ These are the items Garrett has flagged for Zach's explicit review before chunk 
 | Date | Author | Change |
 |---|---|---|
 | 2026-04-30 | Garrett Storms | Initial draft. Five architectural decisions captured per Garrett's ratifications 2026-04-30. Path A event-sourcing pending Zach's separate confirmation. |
+| 2026-04-30 | Garrett Storms | Sharpened §3.1 in response to Zach's pushback on polymorphic events. Clarified that polymorphism is at the envelope level (uniform `draft_events` table structure) not the payload level (JSONB handles type-specific variance). No decision change; reasoning made explicit. |
