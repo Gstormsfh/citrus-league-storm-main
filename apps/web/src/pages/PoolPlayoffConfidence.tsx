@@ -262,11 +262,11 @@ export default function PoolPlayoffConfidence() {
 
                     return (
                       <div key={s.series_id} className={cn(
-                        'border rounded-lg p-3 space-y-2 transition-colors relative',
-                        gameIsLive && 'border-red-400 bg-red-50/20 ring-1 ring-red-400/20',
-                        isCorrect && 'border-green-400 bg-green-50/50',
-                        isWrong && 'border-red-300 bg-red-50/30',
-                        locked && !isCorrect && !isWrong && !gameIsLive && 'opacity-70 bg-white/5 ring-1 ring-white/10',
+                        'rounded-lg p-3 space-y-2 transition-colors relative bg-white/5 ring-1 ring-white/10',
+                        gameIsLive && 'bg-red-400/10 ring-1 ring-red-400/30',
+                        isCorrect && 'bg-pastel-sage/15 ring-1 ring-pastel-sage/40',
+                        isWrong && 'bg-red-400/10 ring-1 ring-red-400/40',
+                        locked && !isCorrect && !isWrong && !gameIsLive && 'opacity-70',
                       )}>
                         {gameIsLive && (
                           <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-calistoga px-2 py-0.5 rounded-full shadow-md">

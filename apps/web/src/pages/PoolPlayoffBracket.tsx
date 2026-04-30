@@ -387,10 +387,9 @@ export default function PoolPlayoffBracket() {
                     const gameIsFinal = seriesGame && seriesGame.status === 'final';
 
                     return (
-                      <div key={s.series_id} className={cn('border-2 rounded-xl p-3 space-y-2 bg-white relative',
-                          gameIsLive && 'border-red-400 bg-red-50/20 ring-1 ring-red-400/20',
+                      <div key={s.series_id} className={cn('rounded-xl p-3 space-y-2 bg-white/5 ring-1 ring-white/10 relative',
+                          gameIsLive && 'bg-red-400/10 ring-1 ring-red-400/30',
                           locked && s.series_status === 'final' && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/8',
-                          !gameIsLive && !locked && 'border-fantasy-border',
                       )}>
                         {/* LIVE ribbon — only when a game is ACTUALLY in progress */}
                         {gameIsLive && (

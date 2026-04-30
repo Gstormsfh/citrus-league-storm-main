@@ -263,6 +263,90 @@ Lower priority than current visual fixes — we'll catch the surfaced
 instances inline as we restyle each component. Queue the generalized
 sweep for after Phase 1 component fixes settle.
 
+### Phase 1E playoff-pool Card sweeps — unverifiable on staging until prod data arrives
+
+Phase 1E (commit landed 2026-04-30) included per-callsite `bg-*` token
+swaps across `PoolPlayoffBracket.tsx`, `PoolPlayoffConfidence.tsx`, and
+`PoolPlayoffHub.tsx` — converting hardcoded light-theme classes
+(`bg-white`, `bg-red-50/X`, `bg-green-50/X`) to v2 vocabulary
+(`bg-white/5 ring-1 ring-white/10`, `bg-red-400/10 ring-red-400/30`,
+`bg-pastel-sage/15 ring-pastel-sage/40`). These callsites are gated
+on series data — locked / live / correct / wrong states require
+populated `nhl_playoff_seeds` and `nhl_playoff_series` rows, which are
+empty on staging (per the 2026-04-29 active finding).
+
+Visual verification of these specific state transitions is therefore
+deferred to production, where 2026 NHL playoff seeds populate within
+days (league pick deadline shows 4d 6h at commit time). If anything
+renders incorrectly once prod data arrives, hotfix from prod
+observation. Risk is genuinely small — same v2 token vocabulary used
+successfully across 50+ components in Phase 1A–1D. Same-shape swaps,
+same surface tokens, same ring/bg semantics.
+
+### Vite dev-server selective staleness — eject the long-running process when you smell it
+
+Twice in the 2026-04-30 staging-setup session a long-running Vite dev
+process (24h+ uptime) silently ignored a watcher event for one or
+two specific recently-edited files while serving fresh source for
+other files in the same edit batch. Symptoms: `curl
+http://localhost:8080/src/path/to/file.tsx` returns the OLD
+transformed source while the disk has the NEW source, AND
+`git diff path/to/file.tsx` shows the intended changes, AND
+`npm run build` (which reads disk directly, bypasses dev server)
+succeeds with the new source. Browser then renders v1 styling on
+pages whose imports were "missed" by Vite.
+
+Diagnostic order:
+1. `Read` the disk file — confirm new content present
+2. `git diff` — confirm working tree matches intent
+3. `curl http://localhost:8080/src/<path>` and grep for new tokens
+   vs old tokens
+4. If disk has new + curl returns old: Vite cache stale, restart
+
+Remediation:
+1. `Stop-Process -Id <pid> -Force` (the node listening on 8080)
+2. `Remove-Item -Recurse -Force apps/web/node_modules/.vite,
+   apps/web/dist`
+3. `cd apps/web && npm run dev` (background)
+4. Wait for "Local: http://localhost:8080/" stdout
+5. Re-curl the affected file to confirm new tokens served
+
+First occurrence: PID 19072 → 37632 (during GlowCard alignment work).
+Second occurrence: PID 37632 → 17720 (during Phase 1E Card
+tokenization). Both fully resolved by the kill+clear+restart sequence.
+Suspected cause: chokidar watcher fatigue after the dev process
+accumulates many file events over a multi-day uptime — the watcher
+silently drops events instead of crashing. No upstream fix known;
+operational guidance is "restart Vite when smelled."
+
+If this happens a third time, consider adding a `pretest` script
+that touches a sentinel file and curls it back to detect staleness
+proactively, OR documenting a max-uptime convention (eject Vite at
+24h regardless of symptoms).
+
+### ArmchairGM v2 migration — strip MockDraftSimulator Card pins
+
+When the ArmchairGM page migrates from v1 cream to v2 dark, strip the
+five `// PINNED: v1 surface preserved until ArmchairGM page migrates to v2`
+comments + the `bg-white/80 ring-1 ring-citrus-sage/30 border-0
+shadow-varsity text-citrus-forest` overrides from
+`apps/web/src/components/armchair-gm/MockDraftSimulator.tsx`. They were
+added in Phase 1E (shadcn Card global tokenization) to preserve the
+v1 visual on the still-v1 ArmchairGM parent page until that page is
+itself migrated. Once ArmchairGM is v2, the bare `<Card>` will inherit
+the v2 default surface and these explicit pins become redundant clutter.
+
+### Visual v1 holdouts found during walkthrough 2026-04-30
+
+- Loading screen on playoff pool pages still v1 styled (suspected
+  shared loading skeleton component)
+- PoolPlayoffRoster.tsx page (the user-facing roster pick UI for
+  playoff-roster-pool format) still v1 styled
+
+Both queued for next visual-fix batch after the functional triage of
+issues 3 (bracket/confidence pool error rendering) and 4 (NHL Bracket
+tab empty) completes.
+
 ### Staging QA tooling — admin league factory
 
 Currently staging QA is limited to whichever league formats exist in

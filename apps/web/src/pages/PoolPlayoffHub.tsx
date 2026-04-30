@@ -553,10 +553,10 @@ export default function PoolPlayoffHub() {
 
                           return (
                             <div key={g.game_id} className={cn(
-                              'relative rounded-xl border-2 overflow-hidden bg-white transition-all',
-                              isLive && 'border-red-400 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]',
-                              isFinal && 'border-pastel-sage/30',
-                              !isLive && !isFinal && 'border-pastel-sage/20'
+                              'relative rounded-xl ring-1 overflow-hidden bg-pastel-surface-tile transition-all',
+                              isLive && 'ring-red-400/40 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]',
+                              isFinal && 'ring-pastel-sage/30',
+                              !isLive && !isFinal && 'ring-white/10'
                             )}>
                               {/* Team-colored header with score */}
                               <div className="relative">
@@ -602,7 +602,7 @@ export default function PoolPlayoffHub() {
                                 </div>
                                 {/* Live period/clock strip — only during live play */}
                                 {isLive && (
-                                  <div className="bg-red-50 border-t border-red-200 px-3 py-1 text-center text-[11px] font-display font-bold text-red-700 tabular-nums">
+                                  <div className="bg-red-400/10 border-t border-red-400/30 px-3 py-1 text-center text-[11px] font-display font-bold text-red-300 tabular-nums">
                                     {timeLabel}
                                   </div>
                                 )}
@@ -806,10 +806,10 @@ export default function PoolPlayoffHub() {
                         const roundName = s.round === 1 ? 'R1' : s.round === 2 ? 'R2' : s.round === 3 ? 'CF' : 'SCF';
                         return (
                           <div key={s.series_id} className={cn(
-                            'flex items-center gap-2 p-2 rounded border',
-                            isCorrect && 'border-green-400 bg-green-50/50',
-                            isWrong && 'border-red-300 bg-red-50/30',
-                            !isFinal && pick && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/8',
+                            'flex items-center gap-2 p-2 rounded ring-1 ring-white/10 bg-white/5',
+                            isCorrect && 'bg-pastel-sage/15 ring-pastel-sage/40',
+                            isWrong && 'bg-red-400/10 ring-red-400/40',
+                            !isFinal && pick && 'ring-pastel-sage/30 bg-pastel-sage/8',
                             !pick && 'border-2 border-dashed border-white/15 bg-white/5'
                           )}>
                             <span className="text-[9px] font-mono text-white/50 w-8">{roundName}-{String.fromCharCode(64 + s.bracket_slot)}</span>
