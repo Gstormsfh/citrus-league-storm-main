@@ -285,7 +285,7 @@ Rejected because:
 - Two classes duplicate plumbing tests.
 - Recovery path branches on draft format — branch point in safety-critical code.
 
-### A3 — Keep v1 anti-snipe semantics (rejected per Zach 2026-04-30)
+### A3 — Keep v1 anti-snipe semantics (rejected per Garrett 2026-04-30)
 
 Considered: preserve v1's hard-reset-to-15s anti-snipe behavior as a deliberate product choice.
 
@@ -295,7 +295,7 @@ Rejected because:
 - v1 behavior is unusual and likely surprises users coming from major-platform fantasy.
 - Commissioner customization in §4.3 preserves flexibility for leagues that want shorter/different windows.
 
-### A4 — Skip auction in v1, defer to v1.1 (rejected per Zach 2026-04-30)
+### A4 — Skip auction in v1, defer to v1.1 (rejected per Garrett 2026-04-30)
 
 Considered: ship snake/linear only at v1 launch; add auction in v1.1 with more design time.
 
