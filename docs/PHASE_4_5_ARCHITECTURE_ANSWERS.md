@@ -180,7 +180,7 @@ Severity ladder for incidents:
 
 ## Surfaced Follow-Up Work (Beyond Phase 4.5 Chunks 11g.0–11g.10)
 
-Surfaced during the Q&A. Tracked here so nothing gets lost. None blocks Phase 4.5 architecture decisions.
+Surfaced during the Q&A. **Each item is scheduled with target windows in [`PHASE_4_5_PROJECT_PLAN.md`](./PHASE_4_5_PROJECT_PLAN.md)** — that doc is the canonical schedule. The list below is a quick reference; the project plan is the source of truth for dates and dependencies.
 
 1. **Auction format state machine** — separate ADR / design doc. Required before auction live-drafting ships next NHL season.
 2. **Co-manager schema migration** — `team_managers` join table (or equivalent) and authorization-check refactor. Required before live draft v1 ships next NHL season.

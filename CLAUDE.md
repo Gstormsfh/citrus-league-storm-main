@@ -112,6 +112,7 @@ Legacy `ops/cloudrun/` configuration and CI references to Cloud Run remain in th
 
 ### See also
 
+- `docs/PHASE_4_5_PROJECT_PLAN.md` — schedule, dependencies, and risk callouts for Phase 4.5 through launch.
 - `docs/PHASE_4_5_ARCHITECTURE.md` — canonical Phase 4.5 architecture reference (deploy target, principles, stage progression, failure modes).
 - `docs/PHASE_4_5_ARCHITECTURE_ANSWERS.md` — Citrus-specific answers to the architecture doc's clarifying questions (draft formats, on-call, SLO, expected launch volume, etc.).
 - `docs/adr/ADR-001-persistent-node-draft-engine.md` — full ADR with research, alternatives, Decision History, and consequences.

@@ -3,6 +3,8 @@
 > *"A complex system that works is invariably found to have evolved from a simple system that worked. A complex system designed from scratch never works and cannot be patched up to make it work. You have to start over with a working simple system."*
 > — John Gall
 
+> *For schedule, dependencies, and risk callouts, see [`docs/PHASE_4_5_PROJECT_PLAN.md`](./PHASE_4_5_PROJECT_PLAN.md).*
+
 This document describes both the Day 1 architecture for the live draft system and the evolution path to horizontal scaling. The two are designed together so each stage is a mechanical progression from the previous one — no rewrites, no retrofits, no architecture migrations.
 
 The principles in the Day 1 architecture exist specifically because they make Stages 2–4 cheap. We are not building Stage 4 on Day 1. We are building Day 1 in a shape that can become Stage 4 without rework.
