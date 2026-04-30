@@ -3627,7 +3627,7 @@ const DraftRoom = () => {
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[1fr_340px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
             <div className="min-w-0 overflow-y-visible lg:overflow-y-auto lg:overflow-x-hidden lg:max-h-[calc(100dvh-7rem)] px-0 sm:px-2 lg:px-2 order-1 lg:order-1">
         {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}

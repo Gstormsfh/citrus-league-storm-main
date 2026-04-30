@@ -1250,7 +1250,7 @@ const FreeAgents = () => {
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_280px] xl:grid-cols-[220px_1fr_340px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Appears first on mobile */}
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
 

@@ -202,6 +202,46 @@ prod-data dumps. A future operator could `git add .` and accidentally
 commit them. Add the pattern to `.gitignore` to make that footgun
 impossible.
 
+### Layout debt — rail widths declared per-page across 17 consumers
+
+Tonight's rail-widening change required touching **14 files** for a single
+visual decision (right rail 260→280 lg / 280→340 xl). The grid template
+column declarations are duplicated as literal strings across consumer
+pages: 11 share an identical `lg:grid-cols-[200px_1fr_260px]
+xl:grid-cols-[220px_1fr_280px]`, plus 3 unique variants (PlayoffBracket,
+Roster, DraftRoom).
+
+Right architectural fix: extract a shared layout component, e.g.
+
+```tsx
+<ThreeColumnPage
+  leftRail={<TeamIntel />}
+  rightRail={<LeagueNotifications leagueId={...} />}
+>
+  {mainContent}
+</ThreeColumnPage>
+```
+
+…with a single `tailwind.config.ts` token for rail widths (e.g.
+`width.left-rail` and `width.right-rail`) so future tweaks are
+one-line changes. Or at minimum a CSS variable on `<html>` driving the
+grid template via `[--right-rail-w:280px] xl:[--right-rail-w:340px]`
+combined with a custom `lg:grid-cols-[...var(--right-rail-w)...]`
+arbitrary value.
+
+Lower priority than current visual fixes; queue for after Phase 1
+settles. The width-change commit (the worked example) is a useful
+reference point for why this matters — every future rail width tweak
+costs 14+ file edits and a sed-with-scope-leak risk like the one
+caught tonight (PoolPlayoffRoster.tsx had a coincidentally-matching
+grid pattern that sed touched until I noticed it didn't mount
+LeagueNotifications).
+
+Also worth noting: a second sub-bug surfaced — sed pattern matching is
+substring-based, so any page using a similar grid template for an
+unrelated layout gets caught up. A shared layout component eliminates
+that hazard entirely.
+
 ### Generalized double-opacity Tailwind class sweep
 
 The earlier sweep (commit `ac3cc2e`) targeted only two specific
@@ -223,6 +263,26 @@ Lower priority than current visual fixes — we'll catch the surfaced
 instances inline as we restyle each component. Queue the generalized
 sweep for after Phase 1 component fixes settle.
 
+### Staging QA tooling — admin league factory
+
+Currently staging QA is limited to whichever league formats exist in
+the database. Tonight's rail-widening for Roster/DraftRoom couldn't be
+visually verified because no roster-format league exists on staging.
+Right tool: a staging-only admin page (or SQL helper script) that
+creates leagues across all formats (roster/H2H/dynasty/points/playoff/
+survivor/pickem) on demand with parametric knobs (size, draft state,
+week number, populated data). Useful for: visual QA across formats,
+demoing different product surfaces (Web Summit), debugging user
+reports against reproducible league shapes. Estimate: 2-4 hours of
+work, scoped after Phase 1 visual rollout settles. Note: 'staging-only'
+means feature-flagged or env-gated, never deployed to prod.
+
+Deferred from 2026-04-30 staging-setup session. Decision: Web Summit
+demo is playoff-format only, season-long pages won't see real traffic
+until October fantasy launch, off-season prod QA window in July is
+sufficient. Build admin tooling post-Web-Summit when there's room for
+proper feature-flag and parametric scope.
+
 ---
 
-*Last updated: 2026-04-29*
+*Last updated: 2026-04-30*

@@ -657,7 +657,7 @@ const PlayoffBracket = () => {
           <div className={cn(
             "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
             userLeagueState === 'active-user' && (activeLeagueId || leagueId)
-              ? "lg:grid-cols-[220px_1fr_260px] xl:grid-cols-[240px_1fr_280px]"
+              ? "lg:grid-cols-[220px_1fr_280px] xl:grid-cols-[240px_1fr_340px]"
               : "lg:grid-cols-[220px_1fr]"
           )}>
             {/* Main content */}
