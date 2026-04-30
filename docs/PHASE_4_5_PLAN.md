@@ -1,6 +1,6 @@
 # Phase 4.5 — Persistent Node Draft Engine in Existing Server (Chunks 11g.0–11g.10)
 
-> **2026-04-29 update:** deploy target changed from Cloud Run to GCE. See `docs/PHASE_4_5_ARCHITECTURE.md` for the canonical architecture; `CLAUDE.md` for high-level rationale; ADR-001 supersession note for the decision trail. Inline references in this plan have been updated to match. Chunk 11g.2's plan is being reshaped (see callout in that chunk); other chunks stand as-written.
+> **2026-04-29 update:** deploy target changed from Cloud Run to GCE. See `docs/PHASE_4_5_ARCHITECTURE.md` for the canonical architecture; `CLAUDE.md` for high-level rationale; ADR-001 supersession note for the decision trail. Inline references in this plan have been updated to match. Chunk 11g.2 has been reshaped for the GCE pivot and a new chunk 11g.2.0 (GCE platform spike) added before it; other chunks stand as-written.
 
 | | |
 |---|---|
@@ -84,27 +84,139 @@ Sign-off discipline carries forward from Phase 0–4: each chunk lands as its ow
 
 ---
 
-### Chunk 11g.2 — uWebSockets.js setup with WebSocket upgrade auth
+### Chunk 11g.2.0 — GCE Platform Spike *(test-first, throwaway)*
 
-> **Reshape pending (2026-04-29).** The chunk plan as written below assumes the Cloud Run deploy target. With the pivot to GCE, the A/B/C port-topology decision is moot (GCE does not impose Cloud Run's single-port constraint), and the Hono-on-uWS adapter work is no longer required (Hono and uWS run on separate ports in the same Node process — see `docs/PHASE_4_5_ARCHITECTURE.md` "Stack Decision" and "Process layout"). Awaiting reshape brief from Garrett before implementation. The acceptance criteria below are still directionally correct; the implementation steps to reach them will simplify substantially.
+**Goal:** validate GCE as the Phase 4.5 deploy platform on a throwaway VM before locking implementation decisions in chunk 11g.2. Output is a written platform-decisions doc, not production deployment.
 
-**Deliverable.** `uWebSockets.js` added to `server/package.json`, instantiated as a separate `uWS.App()` running on its own port (configurable; default 3002). The WebSocket endpoint at `/ws/draft/:draftId` validates the upgrade in the `upgrade` handler: extracts the `token` from the `Sec-WebSocket-Protocol` header (per chunk 11g.1: subprotocol header keeps the token out of URLs / logs / referrers), calls `verifyDraftToken(token, draftIdFromUrl)`, which confirms the token's `draftId` claim matches the URL parameter. Rejects with appropriate WS close codes on auth failure (4401 unauthorized, 4403 forbidden, 4404 draft mismatch). On accept, subscribes the socket to the topic `draft:${draftId}` and sets per-connection user context (`userId`, `leagueId`, `draftId`) for downstream message handlers.
+**Why this exists.** Citrus has zero prior GCE experience (all GCP compute to date is Cloud Run). The platform pivot decided in `PHASE_4_5_ARCHITECTURE.md` is sound on paper, but the operational specifics (machine type, region, container runtime, networking, IAM, Docker base image, startup script pattern) need to be learned hands-on before chunk 11g.2 implementation locks them. 1–2 days here saves rework risk in 11g.2 and downstream chunks.
 
-This chunk also extracts `verifyJwt` and `checkLeagueMembership` as runtime-agnostic helpers (current implementations are tightly coupled to Hono's `Context<Env>`, per chunk 11g.0 audit finding 3). Both Hono middleware and the uWS upgrade handler call into the extracted helpers. Existing middleware tests don't change; the helpers get called from inside the existing wrappers.
+**What this chunk produces:**
 
-**Dependencies.** 11g.1.
+1. A throwaway GCE VM (`citrus-spike-uws`) running Citrus's existing Hono server + a minimal uWS hello-world server in the same Node process, on two ports.
+2. A written platform-decisions doc at `docs/PHASE_4_5_GCE_PLATFORM_NOTES.md` capturing: machine type chosen, region chosen, container runtime, Docker base image, firewall rules, IAM service account setup, deploy pipeline shape, observed startup time, observed memory baseline, observed network latency from Garrett's Edmonton location.
+3. The throwaway VM deleted at chunk close.
 
-**Acceptance criteria.**
-- The Hono HTTP server (port 3001) and the uWS server (port 3002) coexist; the existing API routes still pass their suite.
-- A test client with a valid token can upgrade to `/ws/draft/:draftId`. A test client with no token, an expired token, or a token for a different draft is rejected with the documented close code.
-- Two test clients connected to the same `:draftId` both receive a message published to topic `draft:${draftId}` from a third actor (the test calls uWS `app.publish(topic, message)` directly — uWebSockets.js's built-in C++-backed pub/sub fast path — to confirm fanout works before LobbyManager exists).
-- A test client connected to a different `:draftId` does **not** receive the message (topic isolation verified).
-- Vitest covers each upgrade rejection path and the basic publish/subscribe roundtrip.
-- Graceful shutdown handler in `server/src/index.ts` is updated to stop the uWS app before the 10s force-exit fires (capture the listen-socket token returned by `uwsApp.listen(...)` and call `us_listen_socket_close(token)`). Verified by sending SIGTERM during a live WebSocket connection: connection closes cleanly within shutdown window, no force-exit triggered. Per chunk 11g.0 audit finding 4.
+**Acceptance criteria:**
 
-**Performance targets.** Pick-to-broadcast fanout p95 ≤ 200ms measured at this chunk for the bare publish path (no LobbyManager work yet); recorded as the floor for chunk 11g.4's full-pick measurement.
+- GCE VM provisioned in the chosen region.
+- Container with Hono + uWS hello-world deployed and reachable on two distinct external ports.
+- WebSocket upgrade succeeds against the uWS port (e.g. `wscat -c wss://<vm-ip>:<uws-port>/ws/draft/test` returns a 101 Switching Protocols response).
+- HTTP GET succeeds against the Hono port (e.g. `curl https://<vm-ip>:<hono-port>/api/health` returns 200).
+- Both servers run from the same Node process (verified via `ps aux | grep node` showing one PID).
+- SIGTERM handler verified: kill the process, both servers shut down cleanly within 10 seconds.
+- Platform-decisions doc committed at `docs/PHASE_4_5_GCE_PLATFORM_NOTES.md`.
+- Throwaway VM deleted (`gcloud compute instances delete citrus-spike-uws --zone=<zone> --project=citrus-fantasy-staging`).
+- GCP billing for spike resources cleaned up (no orphaned static IPs, persistent disks, etc.).
 
-**Estimated effort.** 3–4 days. Most of the surprise here is on the upgrade-handler shape; the rest is a thin wrapper.
+**Decisions to lock during the spike (capture in platform-decisions doc):**
+
+| Decision | Provisional default (review during spike) |
+|---|---|
+| Machine type (staging) | `e2-standard-4` (4 vCPU, 16 GB) — overprovisioned but cheap (~$100/mo); confirms headroom |
+| Region | `northamerica-northeast1` (Montreal) preferred for Canadian user proximity; benchmark vs `us-central1` |
+| Container runtime | Docker via Container-Optimized OS (COS) — GCP-managed, standard pattern |
+| Base image | `node:22-alpine` (matches Cloud Run config) |
+| Networking | Static external IP (release on VM delete); VPC firewall rule for ports `${PORT}` and `${DRAFT_WS_PORT}` |
+| IAM | Dedicated service account `citrus-draft-engine@<project>.iam.gserviceaccount.com` with scoped Secret Manager + Cloud Logging access |
+| Startup script | systemd unit + Docker pull on boot; container restart-always policy |
+| Deploy pipeline shape | TBD: github-actions → docker build → push to Artifact Registry → SSH-deploy script vs gcloud-managed instance template; decide during spike |
+| Health check | TCP on Hono port + WS handshake on uWS port |
+| Logging | stdout/stderr → Cloud Logging via COS default agent |
+
+**Constraints:**
+
+- Use `citrus-fantasy-staging` GCP project. Do NOT use prod.
+- Do not modify any production code paths. Spike is throwaway.
+- Do not provision any persistent resources (Cloud SQL, Memorystore, etc.). VM only.
+- Do not edit `ops/cloudrun/service*.yaml` or any production Dockerfile in this chunk. Hands off.
+- Hard time-box: 2 working days. If spike runs longer, stop and surface blockers to Garrett before continuing.
+
+**Estimated effort:** 1–2 days.
+
+**Dependencies:** none. Can start immediately after Web Summit (May 19, 2026).
+
+**Acceptance reviewer:** Garrett. Zach if onboard.
+
+---
+
+### Chunk 11g.2 — uWS Server Bring-Up + GCE Staging Deploy
+
+**Goal:** stand up a real uWebSockets.js server alongside the existing Hono server in the same Node process, deploy to a real GCE staging VM (not throwaway), and verify the discovery endpoint flow end-to-end against the deployed pair.
+
+**Why reshape from original 11g.2.** The original chunk 11g.2 was written assuming Cloud Run as the deploy target. Cloud Run's one-port-per-container constraint forced a A/B/C topology decision (uWS owns 8080 with Hono adapter / two services / sidecars), and option A would have required a 300–500 line Hono-on-uWS adapter. With the GCE pivot ratified in `PHASE_4_5_ARCHITECTURE.md`, the constraint disappears: GCE containers expose multiple ports trivially. Two ports, one process is the simplest solution, exactly as Zach's architecture doc specifies. The adapter work is gone. The A/B/C decision is moot.
+
+**Pre-requisite:** chunk 11g.2.0 (GCE platform spike) complete, with platform-decisions doc committed.
+
+**What this chunk produces:**
+
+1. A real GCE staging VM (`citrus-staging-draft`) deployed and serving traffic. Not throwaway.
+2. The existing Hono server running on its existing port, unchanged in behavior.
+3. A new uWS server in the same Node process, listening on `${DRAFT_WS_PORT}` (default 3002), with a single WebSocket route at `/ws/draft/:lobbyId` that accepts upgrades and echoes incoming messages (no LobbyManager wiring yet — that's chunk 11g.3).
+4. JWT validation on WebSocket upgrade: extract token from `Sec-WebSocket-Protocol` header (per `lib/draftToken.ts` design decision §4), call `verifyDraftToken` against the `:lobbyId` path param, reject mismatches with WS close code 4401 and structured close reason.
+5. Discovery endpoint (`GET /api/drafts/:draftId/server`) updated so `host` and `port` env-driven values reflect the GCE staging VM's actual IP and uWS port.
+6. Container Dockerfile updated to expose both ports.
+7. CI/CD pipeline updated: GitHub Actions builds the container, pushes to Artifact Registry, deploys to GCE staging via the deploy pipeline shape locked in chunk 11g.2.0.
+8. SUPABASE_JWT_SECRET wired from GCP Secret Manager into the running container at boot.
+9. End-to-end smoke test: client calls discovery → opens WSS to returned host/port with returned token → JWT validates → WS connects → echo round-trip succeeds.
+
+**Out of scope** (deferred to later chunks):
+
+- LobbyManager class and per-draft state machine (chunk 11g.3).
+- Pick submission, idempotency keys, event sourcing transactional writes (chunk 11g.4).
+- Pub/sub broadcast via uWS topics (chunk 11g.5).
+- Timer ticking and autopick (chunk 11g.6).
+- Snapshot persistence and process bootstrap state recovery (chunk 11g.7).
+- Failure-mode test suite (chunk 11g.8).
+- Production GCE deploy (chunk 11g.10).
+- Cloud Run YAML retirement (in or after chunk 11g.3, once GCE staging is verified working).
+
+**Acceptance criteria:**
+
+- GCE staging VM provisioned per platform-decisions doc, with static external IP allocated.
+- Container builds reproducibly via the GitHub Actions pipeline; image tag matches commit SHA.
+- SUPABASE_JWT_SECRET resolves from GCP Secret Manager at container boot; absence is detected and surfaces as a 503 from the discovery endpoint per existing `draftToken.ts` behavior.
+- Hono server reachable on `${PORT}` via VM external IP; existing `/api/health` endpoint returns 200.
+- uWS server reachable on `${DRAFT_WS_PORT}`; WebSocket upgrade with valid JWT in `Sec-WebSocket-Protocol` succeeds (101 Switching Protocols).
+- WebSocket upgrade with missing JWT, invalid signature, expired token, or `:lobbyId` path mismatch is rejected with WS close code 4401.
+- Both servers run in the same Node process (verified `ps`).
+- SIGTERM handler shuts both servers down cleanly within 10 seconds (verified).
+- Discovery endpoint returns the correct staging VM host/port for valid league member callers; 401/403/404/409/503 paths still behave per chunk 11g.1's contract.
+- End-to-end smoke test passes: real client (test script) calls discovery → opens WSS → echoes message → receives echo → closes cleanly.
+- All 505 existing tests still pass on the staging-deployed image.
+- 5+ new tests covering uWS upgrade JWT validation paths.
+- `docs/PHASE_4_5_GCE_PLATFORM_NOTES.md` (from chunk 11g.2.0) updated with any deviations discovered during real deploy.
+- **Cloud Run YAMLs untouched** — left in repo as fallback until chunk 11g.3 cleanup.
+
+**Performance verification (preliminary, not the full 11g.10 perf gate):**
+
+- Discovery endpoint p95 latency ≤ 300ms on the GCE staging deploy (matches existing performance mandate for Hono routes).
+- WS upgrade handshake completes within 100ms of client request (no LobbyManager work yet, so this is pure JWT verify + uWS upgrade).
+- Container cold-start time recorded and added to platform-decisions doc.
+
+**Risk callouts:**
+
+- **Static IP allocation cost.** GCE static external IPs are billed when *unattached*; budget the staging IP into ongoing GCP costs. Estimate: ~$3/mo while VM is running, ~$8/mo if VM is stopped. Document in platform-decisions.
+- **Secret Manager IAM scope.** The container's service account needs `roles/secretmanager.secretAccessor` on `SUPABASE_JWT_SECRET` only — not blanket Secret Manager access. Verify minimum scope.
+- **Sec-WebSocket-Protocol token transport.** Per `lib/draftToken.ts` §4, the design decision is to carry the JWT in the WS subprotocol header to avoid URL-leakage. uWS supports this but the client wrapper (chunk 11g.5+) needs to send the protocol value correctly. Note in platform-decisions for the chunk 11g.5 implementer.
+- **Firewall rules and CORS.** Hono CORS allowlist (in `app.ts`) currently includes Firebase Hosting origins for staging. uWS connections originate from the same Firebase-hosted SPA but bypass CORS (WS doesn't enforce it). Verify staging Firebase site can establish WS to the GCE VM.
+
+**Estimated effort:** 5–7 working days.
+
+**Dependencies:**
+
+- Chunk 11g.2.0 complete (platform-decisions doc committed).
+- Zach onboard (or available for review) for the deploy pipeline architecture review.
+- SUPABASE_JWT_SECRET provisioned in `citrus-fantasy-staging` (✅ done 2026-04-29).
+
+**Acceptance reviewer:** Garrett + Zach (both required for the deploy pipeline + GCE config review).
+
+**Cross-references:**
+
+- `PHASE_4_5_ARCHITECTURE.md` — Stack Decision section for two-ports-one-process; Day 1 Topology section for the staging deploy shape.
+- `PHASE_4_5_ARCHITECTURE_ANSWERS.md` — Q3.5 GCE deploy target details.
+- `server/src/lib/draftToken.ts` — JWT verification contract; `Sec-WebSocket-Protocol` token transport decision.
+- `server/src/routes/drafts.ts` — discovery endpoint that this chunk's deploy must serve correctly.
+- Chunk 11g.1 (commits 00b8776, eb784cd) — discovery endpoint and JWT issuance, already committed.
 
 ---
 
