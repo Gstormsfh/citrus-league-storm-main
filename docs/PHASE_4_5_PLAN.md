@@ -86,6 +86,8 @@ Sign-off discipline carries forward from Phase 0–4: each chunk lands as its ow
 
 ### Chunk 11g.2.0 — GCE Platform Spike *(test-first, throwaway)*
 
+> **Status:** Complete (2026-04-30). See [`docs/PHASE_4_5_GCE_PLATFORM_NOTES.md`](./PHASE_4_5_GCE_PLATFORM_NOTES.md) for findings. Approval to proceed to chunk 11g.2 pending Zach's review.
+
 **Goal:** validate GCE as the Phase 4.5 deploy platform on a throwaway VM before locking implementation decisions in chunk 11g.2. Output is a written platform-decisions doc, not production deployment.
 
 **Why this exists.** Citrus has zero prior GCE experience (all GCP compute to date is Cloud Run). The platform pivot decided in `PHASE_4_5_ARCHITECTURE.md` is sound on paper, but the operational specifics (machine type, region, container runtime, networking, IAM, Docker base image, startup script pattern) need to be learned hands-on before chunk 11g.2 implementation locks them. 1–2 days here saves rework risk in 11g.2 and downstream chunks.

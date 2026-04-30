@@ -196,3 +196,4 @@ Material schedule decisions captured here for traceability.
 | 2026-04-29 | Auction ADR sub-deadline July 1 | Auction is critical-path; later ratification compresses load test margin. |
 | 2026-04-29 | Push notification flagged as deferrable to v1.1 | Push is enhancement; in-app fallback works. |
 | 2026-04-29 | Load test (chunk 11g.11) added as hard gate | Path B from `PHASE_4_5_ARCHITECTURE_ANSWERS.md` Q4.1 rests on this test. |
+| 2026-04-30 | Chunk 11g.2.0 spike executed by Garrett, all findings recorded in `PHASE_4_5_GCE_PLATFORM_NOTES.md` | `e2-medium` right-sized at 15.5 MiB idle (saving ~$150/mo vs original `e2-standard-4` plan); regional decision deferred pending multi-city benchmark; `--container-image` flag deprecated by GCP (chunk 11g.2 deploy pattern adjusted); ~$97/mo Cloud Workstations drain killed during pre-spike audit. |
