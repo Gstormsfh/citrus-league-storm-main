@@ -469,14 +469,14 @@ const Standings = () => {
   // Force render content if we have teams, regardless of loading state
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] relative">
+    <div className="min-h-screen bg-pastel-surface relative">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
       </div>
 
       {/* MOBILE: Compact header with league context */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <h1 className="text-lg font-bold text-pastel-cream">Standings</h1>
           <div className="flex items-center gap-1">
@@ -555,7 +555,7 @@ const Standings = () => {
             <div className="flex items-center space-x-4 animated-element animate">
               <div className="w-40">
                 <Select defaultValue={season} onValueChange={setSeason}>
-                  <SelectTrigger className="w-full bg-[#1A2A20] rounded-full border-white/15 text-pastel-cream hover:border-pastel-orange/40 transition-colors">
+                  <SelectTrigger className="w-full bg-pastel-surface-tile rounded-full border-white/15 text-pastel-cream hover:border-pastel-orange/40 transition-colors">
                     <SelectValue placeholder="Select Season" />
                   </SelectTrigger>
                   <SelectContent className="z-[9999]">
@@ -570,7 +570,7 @@ const Standings = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-full border-white/15 bg-[#1A2A20] text-pastel-cream hover:bg-pastel-orange/10 hover:border-pastel-orange/40 hover:text-pastel-orange-soft"
+                  className="rounded-full border-white/15 bg-pastel-surface-tile text-pastel-cream hover:bg-pastel-orange/10 hover:border-pastel-orange/40 hover:text-pastel-orange-soft"
                   onClick={async () => {
                     setLoading(true);
                     try {
@@ -596,7 +596,7 @@ const Standings = () => {
                   Refresh
                 </Button>
               )}
-              <Button variant="outline" size="sm" className="rounded-full border-white/15 bg-[#1A2A20] text-pastel-cream hover:bg-pastel-orange/10 hover:border-pastel-orange/40 hover:text-pastel-orange-soft">
+              <Button variant="outline" size="sm" className="rounded-full border-white/15 bg-pastel-surface-tile text-pastel-cream hover:bg-pastel-orange/10 hover:border-pastel-orange/40 hover:text-pastel-orange-soft">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>
@@ -605,7 +605,7 @@ const Standings = () => {
             </div>
           </div>
           
-          <Card className="max-w-5xl mx-auto overflow-hidden bg-[#1A2A20] !border-white/10 ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] p-0" style={{ visibility: 'visible', opacity: 1 }}>
+          <Card className="max-w-5xl mx-auto overflow-hidden bg-pastel-surface-tile !border-white/10 ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] p-0" style={{ visibility: 'visible', opacity: 1 }}>
             <div className="overflow-x-auto" style={{ visibility: 'visible', opacity: 1 }}>
               <Table style={{ visibility: 'visible', opacity: 1 }}>
                 <thead className="bg-black/20 border-b border-white/10">
@@ -752,7 +752,7 @@ const Standings = () => {
           
           {/* Per-Category Roto Breakdown */}
           {isRoto && leagueCategories.length > 0 && sortedTeams.some(t => t.categoryRanks) && (
-            <Card className="max-w-5xl mx-auto mt-6 overflow-hidden bg-[#1A2A20] !border-white/10 ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-0">
+            <Card className="max-w-5xl mx-auto mt-6 overflow-hidden bg-pastel-surface-tile !border-white/10 ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-0">
               <CardHeader className="bg-pastel-orange/10 pb-3 border-b border-white/10">
                 <CardTitle className="text-sm font-bold text-pastel-cream">Category Rankings</CardTitle>
               </CardHeader>
@@ -799,7 +799,7 @@ const Standings = () => {
           )}
 
           <div className="max-w-5xl mx-auto mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="bg-[#1A2A20] !border-white/10 ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-0 overflow-hidden h-full">
+            <Card className="bg-pastel-surface-tile !border-white/10 ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-0 overflow-hidden h-full">
               <CardHeader className="bg-pastel-orange/10 pb-4 border-b border-white/10">
                 <CardTitle className="text-lg font-bold text-pastel-cream flex items-center gap-2">
                   <span className="w-8 h-8 rounded-full bg-pastel-orange/15 ring-1 ring-pastel-orange/30 flex items-center justify-center text-pastel-orange">🏆</span>
@@ -814,7 +814,7 @@ const Standings = () => {
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6 bg-[#1A2A20]">
+              <CardContent className="pt-6 bg-pastel-surface-tile">
                 <div className="space-y-2">
                   {/* Use playoff picture data if available, otherwise fall back to sorted teams */}
                   {(playoffPictureLoaded && playoffPictureTeams.length > 0 ? playoffPictureTeams : sortedTeams.map((t, idx) => ({
@@ -873,7 +873,7 @@ const Standings = () => {
                               M{magicNum}
                             </span>
                           )}
-                          <div className="text-xs font-bold bg-[#0F1F15] ring-1 ring-white/15 text-pastel-cream px-2 py-1 rounded-md tabular-nums">
+                          <div className="text-xs font-bold bg-pastel-surface ring-1 ring-white/15 text-pastel-cream px-2 py-1 rounded-md tabular-nums">
                             {hasMatchups
                               ? `${team.wins}-${team.losses}${team.ties > 0 ? `-${team.ties}` : ''}`
                               : `${team.pf?.toFixed?.(1) ?? '0.0'} pts`}
@@ -902,14 +902,14 @@ const Standings = () => {
               </CardContent>
             </Card>
             
-            <Card className="bg-[#1A2A20] !border-white/10 ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-0 overflow-hidden h-full">
+            <Card className="bg-pastel-surface-tile !border-white/10 ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-0 overflow-hidden h-full">
               <CardHeader className="bg-pastel-orange/10 pb-4 border-b border-white/10">
                 <CardTitle className="text-lg font-bold text-pastel-cream flex items-center gap-2">
                   <span className="w-8 h-8 rounded-full bg-pastel-orange/15 ring-1 ring-pastel-orange/30 flex items-center justify-center text-pastel-orange">🔥</span>
                   Points Leaders
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6 bg-[#1A2A20]">
+              <CardContent className="pt-6 bg-pastel-surface-tile">
                 <div className="space-y-3">
                   {[...teams].sort((a, b) => b.points - a.points).slice(0, 5).map((team) => (
                     <div key={team.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors ring-1 ring-transparent hover:ring-pastel-orange/30">
@@ -932,7 +932,7 @@ const Standings = () => {
             <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
                 {/* Sleeper-style standings tips tile — replaces legacy AdSpace */}
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-3">
                     ✦ Standings legend
                   </div>
@@ -948,7 +948,7 @@ const Standings = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>

@@ -79,7 +79,7 @@ const baseClasses = cn(
   'transition-all duration-200 ease-out',
   'active:scale-[0.97] active:translate-y-0',
   'disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 disabled:translate-y-0',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pastel-orange/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F1F15]',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pastel-orange/60 focus-visible:ring-offset-2 focus-visible:ring-offset-pastel-surface',
   'whitespace-nowrap',
 );
 

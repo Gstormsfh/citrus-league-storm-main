@@ -115,7 +115,7 @@ const ProfileSetup = () => {
     <DarkLayout>
       <Navbar />
       <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
-        <Card className="w-full max-w-2xl bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
+        <Card className="w-full max-w-2xl bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
           <CardHeader className="space-y-3 text-center">
             <div className="flex justify-center mb-2">
               <MascotAvatar id="stormy" size="lg" />

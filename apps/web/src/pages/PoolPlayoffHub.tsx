@@ -432,7 +432,7 @@ export default function PoolPlayoffHub() {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-[#0F1F15] text-pastel-cream pt-24 pb-12 px-4">
+      <div className="min-h-screen bg-pastel-surface text-pastel-cream pt-24 pb-12 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Hero */}
           <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
@@ -466,7 +466,7 @@ export default function PoolPlayoffHub() {
             {/* Main */}
             <div className="space-y-4">
               {/* Your Picks CTA */}
-              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)]">
+              <Card className="bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)]">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Target className="h-4 w-4 text-pastel-orange" />
@@ -483,7 +483,7 @@ export default function PoolPlayoffHub() {
                           ? 'Pick winners and assign confidence values to each series.'
                           : 'Pick the winner and # of games for each playoff series.'}
                   </p>
-                  <Button asChild className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
+                  <Button asChild className="bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
                     <Link to={`${makePicksRoute}?league=${leagueId}`}>
                       {lockCountdown?.locked ? 'View Picks' : 'Make My Picks'} <ChevronRight className="h-4 w-4 ml-1" />
                     </Link>
@@ -523,7 +523,7 @@ export default function PoolPlayoffHub() {
                 if (gamesWithMyPlayers.length === 0 && rosterCtx.length === 0) return null;
 
                 return (
-                  <Card className="bg-[#1A2A20] border-0 ring-2 ring-pastel-orange/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.2)]">
+                  <Card className="bg-pastel-surface-tile border-0 ring-2 ring-pastel-orange/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.2)]">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-center justify-between gap-2">
                         <span className="flex items-center gap-2">
@@ -567,7 +567,7 @@ export default function PoolPlayoffHub() {
                                   >
                                     {g.away_team}
                                   </div>
-                                  <div className="flex flex-col items-center justify-center py-2 px-3 bg-[#0F1F15] ring-1 ring-white/10 text-pastel-cream min-w-[96px]">
+                                  <div className="flex flex-col items-center justify-center py-2 px-3 bg-pastel-surface ring-1 ring-white/10 text-pastel-cream min-w-[96px]">
                                     {hasGameData ? (
                                       <div className="flex items-center gap-1 font-mono font-black text-xl tabular-nums">
                                         <span>{g.away_score}</span>
@@ -696,7 +696,7 @@ export default function PoolPlayoffHub() {
                   return 'Scheduled';
                 };
                 return (
-                  <Card className="bg-[#1A2A20] border-0 ring-2 ring-pastel-orange/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.2)]">
+                  <Card className="bg-pastel-surface-tile border-0 ring-2 ring-pastel-orange/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.2)]">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-pastel-orange" />
@@ -727,7 +727,7 @@ export default function PoolPlayoffHub() {
                               'relative rounded-lg border p-3 transition-colors',
                               isLive ? 'border-red-400 bg-red-50/40 ring-1 ring-red-400/30' :
                               isFinal ? 'ring-1 ring-white/10 bg-white/5' :
-                              'ring-1 ring-pastel-sage/30 bg-[#1A2A20]'
+                              'ring-1 ring-pastel-sage/30 bg-pastel-surface-tile'
                             )}>
                               {isLive && (
                                 <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-calistoga px-2 py-0.5 rounded-full shadow-md">
@@ -933,7 +933,7 @@ export default function PoolPlayoffHub() {
             {/* Sidebar */}
             <div className="space-y-3">
               {/* Invite */}
-              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+              <Card className="bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-display">Invite Friends</CardTitle>
                 </CardHeader>
@@ -980,7 +980,7 @@ export default function PoolPlayoffHub() {
               </Card>
 
               {/* Rules recap */}
-              <Card className="ring-1 ring-pastel-sage/30 bg-[#1A2A20] rounded-2xl">
+              <Card className="ring-1 ring-pastel-sage/30 bg-pastel-surface-tile rounded-2xl">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-display">Pool Rules</CardTitle>
                 </CardHeader>

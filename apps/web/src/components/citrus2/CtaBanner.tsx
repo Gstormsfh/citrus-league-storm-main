@@ -33,7 +33,7 @@ export function CtaBanner({
 }) {
   return (
     <section className="relative max-w-[1280px] mx-auto px-6 pb-24">
-      <div className="group bg-gradient-to-br from-[#1A2A20] to-[#0F1F15] border border-white/10 rounded-[28px] p-10 md:p-14 text-center relative overflow-hidden hover:border-pastel-orange/40 transition-colors duration-500">
+      <div className="group bg-gradient-to-br from-pastel-surface-tile to-pastel-surface border border-white/10 rounded-[28px] p-10 md:p-14 text-center relative overflow-hidden hover:border-pastel-orange/40 transition-colors duration-500">
         {/* Atmospheric orange glow — intensifies on hover */}
         <div
           aria-hidden="true"
@@ -67,7 +67,7 @@ export function CtaBanner({
           )}
           <Link
             to={ctaHref}
-            className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[15px] font-bold px-8 rounded-md hover:bg-white hover:text-[#0F1F15] transition-all duration-200 shadow-[0_8px_32px_-8px_rgba(255,107,26,0.5)] hover:shadow-[0_16px_48px_-8px_rgba(255,107,26,0.6)] hover:-translate-y-0.5 active:scale-95"
+            className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[15px] font-bold px-8 rounded-md hover:bg-white hover:text-pastel-surface transition-all duration-200 shadow-[0_8px_32px_-8px_rgba(255,107,26,0.5)] hover:shadow-[0_16px_48px_-8px_rgba(255,107,26,0.6)] hover:-translate-y-0.5 active:scale-95"
             style={{ height: '54px' }}
           >
             <span>{ctaLabel}</span>

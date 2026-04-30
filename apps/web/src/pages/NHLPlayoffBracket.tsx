@@ -153,7 +153,7 @@ export default function NHLPlayoffBracket() {
         </div>
 
         {/* Inline pool CTA — with Pineapple peeking (he presides over the playoffs) */}
-        <div className="group relative mb-10 bg-[#1A2A20] border border-pastel-orange/30 rounded-2xl p-5 flex items-center justify-between gap-4 flex-wrap overflow-hidden hover:border-pastel-orange/60 transition-colors duration-300">
+        <div className="group relative mb-10 bg-pastel-surface-tile border border-pastel-orange/30 rounded-2xl p-5 flex items-center justify-between gap-4 flex-wrap overflow-hidden hover:border-pastel-orange/60 transition-colors duration-300">
           <MascotPeek id="pineapple" position="top-right" size="sm" />
           <div className="relative z-10">
             <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft mb-1 font-bold">
@@ -206,7 +206,7 @@ export default function NHLPlayoffBracket() {
                       <article
                         key={s.series_id}
                         className={cn(
-                          'bg-[#1A2A20] border rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5',
+                          'bg-pastel-surface-tile border rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5',
                           isActive
                             ? 'hover:shadow-[0_16px_40px_-12px_rgba(255,107,26,0.4)]'
                             : isFinal

@@ -401,9 +401,9 @@ const TeamAnalytics = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
           <h1 className="text-lg font-bold text-pastel-cream">Analytics</h1>
         </div>
@@ -429,7 +429,7 @@ const TeamAnalytics = () => {
                   </p>
                 </div>
                 <div className="flex gap-3">
-                  <Card className="px-5 py-3 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]">
+                  <Card className="px-5 py-3 bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]">
                     <div className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold">Team Rating</div>
                     <div className="font-calistoga text-3xl text-pastel-cream mt-1 leading-none tabular-nums">
                       92.4 <span className="text-sm font-normal text-white/40 align-middle">/ 100</span>
@@ -462,7 +462,7 @@ const TeamAnalytics = () => {
                       return (
                         <Card
                           key={pos.position}
-                          className="overflow-hidden border-0 bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] border-l-4"
+                          className="overflow-hidden border-0 bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] border-l-4"
                           style={{ borderLeftColor: gradeBorderColor(pos.grade) }}
                         >
                           <CardContent className="p-6">
@@ -544,7 +544,7 @@ const TeamAnalytics = () => {
                     AI Recommended Targets
                   </h2>
 
-                  <Card className="bg-[#1A2A20] border-0 ring-1 ring-amber-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(251,191,36,0.15)] relative overflow-hidden">
+                  <Card className="bg-pastel-surface-tile border-0 ring-1 ring-amber-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(251,191,36,0.15)] relative overflow-hidden">
                     <div aria-hidden="true" className="absolute top-0 right-0 w-48 h-48 bg-amber-400/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
                     <CardHeader className="relative z-10">
                       <CardTitle className="font-calistoga text-lg text-amber-300 flex items-center gap-2">
@@ -566,7 +566,7 @@ const TeamAnalytics = () => {
                                 <div className="font-bold text-pastel-cream truncate">{player.name}</div>
                                 <div className="text-xs text-white/55 mt-0.5">{player.team} · {player.position}</div>
                               </div>
-                              <Button size="sm" className="h-7 text-xs bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shrink-0">Claim</Button>
+                              <Button size="sm" className="h-7 text-xs bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shrink-0">Claim</Button>
                             </div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               <div className="bg-black/30 ring-1 ring-white/5 p-1.5 rounded-lg flex flex-col items-center">
@@ -587,7 +587,7 @@ const TeamAnalytics = () => {
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
                       <CardTitle className="font-calistoga text-lg text-pastel-cream">Schedule Maximizers</CardTitle>
                       <CardDescription className="text-white/55">Free agents with favorable schedules this week</CardDescription>
@@ -636,7 +636,7 @@ const TeamAnalytics = () => {
                 rented ad slot used to be. */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
                   <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />
                   <div className="relative z-10">
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-3">
@@ -650,7 +650,7 @@ const TeamAnalytics = () => {
                     </div>
                   </div>
                 </div>
-                <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <MascotPortrait id="lemon" />
                   <div className="p-4">
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-1">
@@ -668,7 +668,7 @@ const TeamAnalytics = () => {
             {/* Right Sidebar - Notifications */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>

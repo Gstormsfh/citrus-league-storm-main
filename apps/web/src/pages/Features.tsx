@@ -183,7 +183,7 @@ export default function Features() {
 
         {/* Stormy callout */}
         <section className="relative max-w-[1280px] mx-auto px-6 pb-16 md:pb-24">
-          <div className="bg-[#1A2A20] border border-white/10 rounded-3xl p-6 md:p-10 lg:p-14 grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-6 lg:gap-8 items-center">
+          <div className="bg-pastel-surface-tile border border-white/10 rounded-3xl p-6 md:p-10 lg:p-14 grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-6 lg:gap-8 items-center">
             <div className="flex justify-center lg:justify-start">
               <MascotAvatar id="stormy" size="xl" />
             </div>

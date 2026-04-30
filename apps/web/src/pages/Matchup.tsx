@@ -5055,14 +5055,14 @@ const Matchup = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] relative w-full">
+    <div className="min-h-screen bg-pastel-surface relative w-full">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
       </div>
       
       {/* MOBILE: Sticky scoreboard header — ESPN/Yahoo style */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-14 px-3">
           {/* My team score */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -5474,7 +5474,7 @@ const Matchup = () => {
             {/* Notifications Panel - Right side on desktop, hidden on mobile */}
             {userLeagueState === 'active-user' && league?.id && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={league.id} />
                 </div>
               </aside>

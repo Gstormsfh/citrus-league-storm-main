@@ -19,7 +19,7 @@ const ALERTS = [
 const TONE_BG: Record<string, string> = {
   sage: 'bg-pastel-sage-soft',
   orange: 'bg-pastel-peach',
-  butter: 'bg-[#F4E5B8]',
+  butter: 'bg-pastel-butter',
 };
 
 export default function PreviewPulse() {

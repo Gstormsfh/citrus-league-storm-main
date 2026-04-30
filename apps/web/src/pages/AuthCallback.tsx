@@ -127,7 +127,7 @@ const AuthCallback = () => {
   return (
     <DarkLayout>
       <main className="min-h-screen flex items-center justify-center p-4 relative">
-        <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
+        <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-3">
               <MascotAvatar id="stormy" size="lg" />

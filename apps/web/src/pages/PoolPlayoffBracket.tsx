@@ -241,7 +241,7 @@ export default function PoolPlayoffBracket() {
   return (
     <>
     <Navbar />
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream py-6 px-4 pt-24">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream py-6 px-4 pt-24">
       <div className="max-w-6xl mx-auto mb-3">
         <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-pastel-sage-soft hover:text-pastel-cream inline-flex items-center gap-1">
           <ArrowLeft className="h-4 w-4" />Back to Pool Home
@@ -257,7 +257,7 @@ export default function PoolPlayoffBracket() {
               {pickMode === 'full-bracket' && (
                 <Badge className={cn(
                   'text-[10px] font-display font-bold',
-                  isGloballyLocked ? 'bg-white/5 ring-1 ring-white/10 text-white/55' : 'bg-pastel-orange text-[#0F1F15]'
+                  isGloballyLocked ? 'bg-white/5 ring-1 ring-white/10 text-white/55' : 'bg-pastel-orange text-pastel-surface'
                 )}>
                   {isGloballyLocked ? <><Lock className="h-3 w-3 mr-1" />BRACKET LOCKED</> : 'FULL BRACKET MODE'}
                 </Badge>
@@ -278,7 +278,7 @@ export default function PoolPlayoffBracket() {
             )}
           </div>
           {dirty && (
-            <Button onClick={savePicks} disabled={saving} className="bg-pastel-sage text-[#0F1F15] hover:bg-pastel-sage-soft font-bold shadow-[0_4px_12px_-4px_rgba(166,211,160,0.4)]">
+            <Button onClick={savePicks} disabled={saving} className="bg-pastel-sage text-pastel-surface hover:bg-pastel-sage-soft font-bold shadow-[0_4px_12px_-4px_rgba(166,211,160,0.4)]">
               <Save className="h-4 w-4 mr-2" />{saving ? 'Saving...' : 'Save Picks'}
             </Button>
           )}

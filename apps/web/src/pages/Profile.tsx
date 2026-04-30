@@ -928,12 +928,12 @@ const Profile = () => {
   // If user is not logged in, show signup prompt
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
+      <div className="min-h-screen bg-pastel-surface text-pastel-cream">
         <Navbar />
         <main className="pt-16 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
           <div className="container mx-auto px-3 sm:px-4">
             <div className="max-w-2xl mx-auto">
-              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_24px_60px_-16px_rgba(255,168,87,0.25)] relative overflow-hidden">
+              <Card className="bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_24px_60px_-16px_rgba(255,168,87,0.25)] relative overflow-hidden">
                 <div aria-hidden="true" className="absolute top-0 right-0 w-64 h-64 bg-pastel-orange/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
                 <CardHeader className="relative z-10">
                   <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5">
@@ -945,7 +945,7 @@ const Profile = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 relative z-10">
-                  <Button asChild className="w-full bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
+                  <Button asChild className="w-full bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
                     <Link to="/auth">Sign In / Sign Up</Link>
                   </Button>
                   <Button asChild variant="outline" className="w-full bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold">
@@ -962,7 +962,7 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream">
       <Navbar />
       <main className="pt-16 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
         <div className="container mx-auto px-3 sm:px-4">
@@ -1009,7 +1009,7 @@ const Profile = () => {
                             if (e.key === 'Escape') { setIsEditingDisplayName(false); setDisplayNameInput(profile?.display_name || ''); }
                           }}
                         />
-                        <Button size="sm" onClick={handleSaveDisplayName} disabled={savingDisplayName} className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold disabled:opacity-50">
+                        <Button size="sm" onClick={handleSaveDisplayName} disabled={savingDisplayName} className="bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold disabled:opacity-50">
                           {savingDisplayName ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => { setIsEditingDisplayName(false); setDisplayNameInput(profile?.display_name || ''); }} className="text-white/55 hover:text-pastel-cream hover:bg-white/5">
@@ -1043,11 +1043,11 @@ const Profile = () => {
                   </div>
                 </div>
 
-                <TabsList className="animated-element w-full lg:w-auto grid grid-cols-4 lg:flex bg-[#1A2A20] ring-1 ring-white/10 p-1 rounded-xl">
-                  <TabsTrigger value="overview" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Overview</TabsTrigger>
-                  <TabsTrigger value="stats" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Statistics</TabsTrigger>
-                  <TabsTrigger value="achievements" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Trophies</TabsTrigger>
-                  <TabsTrigger value="settings" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Settings</TabsTrigger>
+                <TabsList className="animated-element w-full lg:w-auto grid grid-cols-4 lg:flex bg-pastel-surface-tile ring-1 ring-white/10 p-1 rounded-xl">
+                  <TabsTrigger value="overview" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Overview</TabsTrigger>
+                  <TabsTrigger value="stats" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Statistics</TabsTrigger>
+                  <TabsTrigger value="achievements" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Trophies</TabsTrigger>
+                  <TabsTrigger value="settings" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Settings</TabsTrigger>
                 </TabsList>
               </div>
 
@@ -1055,7 +1055,7 @@ const Profile = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Profile Info */}
                   <div className="lg:col-span-2 space-y-6">
-                    <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                    <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                       <CardHeader className="flex flex-row items-center justify-between">
                         <div>
                           <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
@@ -1161,14 +1161,14 @@ const Profile = () => {
 
                         {isEditing && (
                           <div className="flex gap-2 pt-4">
-                            <Button onClick={handleSave} className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Save Changes</Button>
+                            <Button onClick={handleSave} className="bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Save Changes</Button>
                             <Button variant="outline" onClick={() => setIsEditing(false)} className="bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold">Cancel</Button>
                           </div>
                         )}
                       </CardContent>
                     </Card>
 
-                    <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                    <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
                           <History className="h-5 w-5 text-pastel-orange" />
@@ -1202,7 +1202,7 @@ const Profile = () => {
 
                   {/* Quick Stats Sidebar */}
                   <div className="space-y-6">
-                    <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                    <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                       <CardHeader>
                         <CardTitle className="font-calistoga text-lg text-pastel-cream">Season Summary</CardTitle>
                       </CardHeader>
@@ -1237,7 +1237,7 @@ const Profile = () => {
                       </CardContent>
                     </Card>
 
-                    <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                    <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                       <CardHeader>
                         <CardTitle className="font-calistoga text-lg text-pastel-cream">Team Info</CardTitle>
                       </CardHeader>
@@ -1260,28 +1260,28 @@ const Profile = () => {
 
               <TabsContent value="stats" className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-6 text-center">
                       <Calendar className="h-8 w-8 mx-auto mb-2 text-amber-300" />
                       <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.totalSeasons}</div>
                       <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">Leagues</div>
                     </CardContent>
                   </Card>
-                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-6 text-center">
                       <Target className="h-8 w-8 mx-auto mb-2 text-blue-300" />
                       <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.overallRecord}</div>
                       <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">W-L Record</div>
                     </CardContent>
                   </Card>
-                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-6 text-center">
                       <TrendingUp className="h-8 w-8 mx-auto mb-2 text-pastel-sage-soft" />
                       <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.totalPoints.toLocaleString()}</div>
                       <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">Total Points</div>
                     </CardContent>
                   </Card>
-                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-6 text-center">
                       <Medal className="h-8 w-8 mx-auto mb-2 text-pastel-orange" />
                       <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.avgPointsPerGame || '—'}</div>
@@ -1290,7 +1290,7 @@ const Profile = () => {
                   </Card>
                 </div>
 
-                <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <CardHeader>
                     <CardTitle className="font-calistoga text-xl text-pastel-cream">Performance History</CardTitle>
                     <CardDescription className="text-white/55">Your matchup results across all leagues</CardDescription>
@@ -1338,7 +1338,7 @@ const Profile = () => {
                             : 'Join a league and complete a season to see your performance history here.'}
                         </p>
                         {userLeagueState !== 'active-user' && (
-                          <Button asChild className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
+                          <Button asChild className="bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
                             <Link to="/create-league">Create or Join a League</Link>
                           </Button>
                         )}
@@ -1357,7 +1357,7 @@ const Profile = () => {
                 {achievements.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {achievements.map((achievement, index) => (
-                      <Card key={index} className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 hover:ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] hover:shadow-[0_24px_60px_-16px_rgba(255,168,87,0.2)] transition-all">
+                      <Card key={index} className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 hover:ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] hover:shadow-[0_24px_60px_-16px_rgba(255,168,87,0.2)] transition-all">
                         <CardContent className="p-6">
                           <div className="flex items-start gap-4">
                             <div className="p-3 rounded-xl bg-pastel-orange/15 ring-1 ring-pastel-orange/30 shrink-0">
@@ -1378,7 +1378,7 @@ const Profile = () => {
                     ))}
                   </div>
                 ) : (
-                  <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-12 text-center">
                       <Trophy className="h-12 w-12 mx-auto mb-4 text-pastel-orange/30" />
                       <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">✦ Empty</div>
@@ -1389,7 +1389,7 @@ const Profile = () => {
                           : 'Join a league and start competing to earn achievements!'}
                       </p>
                       {userLeagueState !== 'active-user' && (
-                        <Button asChild className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
+                        <Button asChild className="bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
                           <Link to="/create-league">Create or Join a League</Link>
                         </Button>
                       )}
@@ -1407,7 +1407,7 @@ const Profile = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Display Name & Account Info */}
-                  <Card className="animated-element lg:col-span-2 bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="animated-element lg:col-span-2 bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
                         <User className="h-5 w-5 text-pastel-orange" />
@@ -1432,7 +1432,7 @@ const Profile = () => {
                                 onClick={handleSaveDisplayName}
                                 disabled={savingDisplayName || displayNameInput.trim() === (profile?.display_name || '')}
                                 size="sm"
-                                className="shrink-0 bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold disabled:opacity-50"
+                                className="shrink-0 bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold disabled:opacity-50"
                               >
                                 {savingDisplayName ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
                               </Button>
@@ -1465,7 +1465,7 @@ const Profile = () => {
                                   variant={theme === value ? 'default' : 'outline'}
                                   onClick={() => setTheme(value)}
                                   className={`flex-1 font-bold ${theme === value
-                                    ? 'bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]'
+                                    ? 'bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]'
                                     : 'bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50'}`}
                                   size="sm"
                                 >
@@ -1481,7 +1481,7 @@ const Profile = () => {
                   </Card>
 
                   {/* Change Password */}
-                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
                         <Lock className="h-5 w-5 text-pastel-orange" />
@@ -1518,7 +1518,7 @@ const Profile = () => {
                         <Button
                           type="submit"
                           disabled={changePasswordLoading || !newPassword || !confirmPassword}
-                          className="w-full bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
+                          className="w-full bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
                         >
                           {changePasswordLoading ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Updating…</>
@@ -1531,7 +1531,7 @@ const Profile = () => {
                   </Card>
 
                   {/* Team Settings */}
-                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
                         <Shield className="h-5 w-5 text-pastel-orange" />
@@ -1568,13 +1568,13 @@ const Profile = () => {
                           className="min-h-[80px] bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
                         />
                       </div>
-                      <Button onClick={handleSaveTeamName} className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Save Team Details</Button>
+                      <Button onClick={handleSaveTeamName} className="bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Save Team Details</Button>
                     </CardContent>
                   </Card>
 
                   {/* League Reset (Commissioner Only) */}
                   {commissionerLeagues.length > 0 && (
-                    <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-red-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(248,113,113,0.15)]">
+                    <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-red-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(248,113,113,0.15)]">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 font-calistoga text-red-300">
                           <RotateCcw className="h-5 w-5" />
@@ -1631,7 +1631,7 @@ const Profile = () => {
 
                   {/* Commissioner League Settings — Full Settings Panel */}
                   {commissionerLeagues.length > 0 && (
-                    <Card className="animated-element lg:col-span-2 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)]">
+                    <Card className="animated-element lg:col-span-2 bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)]">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
                           <Crown className="h-5 w-5 text-pastel-orange" />
@@ -1669,11 +1669,11 @@ const Profile = () => {
                           </div>
                         ) : selectedSettingsLeagueId && selectedLeagueData ? (
                           <Tabs value={commSettingsTab} onValueChange={setCommSettingsTab} className="w-full">
-                            <TabsList className="grid w-full grid-cols-4 bg-[#0F1F15] ring-1 ring-white/10 p-1 rounded-xl">
-                              <TabsTrigger value="waivers" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Waivers</TabsTrigger>
-                              <TabsTrigger value="scoring" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Scoring</TabsTrigger>
-                              <TabsTrigger value="draft" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Draft</TabsTrigger>
-                              <TabsTrigger value="rosters" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Rosters</TabsTrigger>
+                            <TabsList className="grid w-full grid-cols-4 bg-pastel-surface ring-1 ring-white/10 p-1 rounded-xl">
+                              <TabsTrigger value="waivers" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Waivers</TabsTrigger>
+                              <TabsTrigger value="scoring" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Scoring</TabsTrigger>
+                              <TabsTrigger value="draft" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Draft</TabsTrigger>
+                              <TabsTrigger value="rosters" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Rosters</TabsTrigger>
                             </TabsList>
 
                             {/* Waiver Settings Tab */}
@@ -1967,7 +1967,7 @@ const Profile = () => {
                         {/* Save Button */}
                         {selectedSettingsLeagueId && selectedLeagueData && commSettingsTab !== 'rosters' && (
                           <div className="flex justify-end gap-2 border-t border-white/10 pt-4">
-                            <Button onClick={handleSaveCommSettings} disabled={savingCommSettings} className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50">
+                            <Button onClick={handleSaveCommSettings} disabled={savingCommSettings} className="bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50">
                               {savingCommSettings ? (
                                 <>
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1984,7 +1984,7 @@ const Profile = () => {
                   )}
 
                   {/* Game Preferences */}
-                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
                         <Settings className="h-5 w-5 text-pastel-orange" />
@@ -2021,7 +2021,7 @@ const Profile = () => {
                   </Card>
 
                   {/* Legal & Privacy */}
-                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
                         <FileText className="h-5 w-5 text-pastel-orange" />
@@ -2052,7 +2052,7 @@ const Profile = () => {
                   </Card>
 
                   {/* Data Export */}
-                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="animated-element bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
                         <Download className="h-5 w-5 text-pastel-orange" />
@@ -2075,7 +2075,7 @@ const Profile = () => {
                   </Card>
 
                   {/* Subscription Plan */}
-                  <Card className="animated-element lg:col-span-2 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)] relative overflow-hidden">
+                  <Card className="animated-element lg:col-span-2 bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)] relative overflow-hidden">
                     <div aria-hidden="true" className="absolute top-0 right-0 w-64 h-64 bg-pastel-orange/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
                     <CardHeader className="relative z-10">
                       <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
@@ -2122,7 +2122,7 @@ const Profile = () => {
                   </Card>
 
                   {/* Delete Account */}
-                  <Card className="animated-element lg:col-span-2 bg-[#1A2A20] border-0 ring-1 ring-red-400/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(248,113,113,0.2)]">
+                  <Card className="animated-element lg:col-span-2 bg-pastel-surface-tile border-0 ring-1 ring-red-400/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(248,113,113,0.2)]">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 font-calistoga text-red-300">
                         <Trash2 className="h-5 w-5" />
@@ -2150,7 +2150,7 @@ const Profile = () => {
                             Delete My Account
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent className="bg-[#1A2A20] border-0 ring-1 ring-red-400/40 text-pastel-cream">
+                        <AlertDialogContent className="bg-pastel-surface-tile border-0 ring-1 ring-red-400/40 text-pastel-cream">
                           <AlertDialogHeader>
                             <AlertDialogTitle className="font-calistoga text-pastel-cream">Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription className="space-y-4 text-white/70">

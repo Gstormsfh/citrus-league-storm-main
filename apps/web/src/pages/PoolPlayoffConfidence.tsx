@@ -188,7 +188,7 @@ export default function PoolPlayoffConfidence() {
   return (
     <>
     <Navbar />
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream py-6 px-4 pt-24">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream py-6 px-4 pt-24">
       <div className="max-w-5xl mx-auto mb-3">
         <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-pastel-sage-soft hover:text-pastel-cream inline-flex items-center gap-1">
           <ArrowLeft className="h-4 w-4" />Back to Pool Home
@@ -212,7 +212,7 @@ export default function PoolPlayoffConfidence() {
               <div className="text-lg font-bold text-pastel-orange">{totalConfidence}</div>
             </div>
             {dirty && (
-              <Button onClick={savePicks} disabled={saving} className="bg-pastel-sage text-[#0F1F15] hover:bg-pastel-sage-soft font-bold shadow-[0_4px_12px_-4px_rgba(166,211,160,0.4)]">
+              <Button onClick={savePicks} disabled={saving} className="bg-pastel-sage text-pastel-surface hover:bg-pastel-sage-soft font-bold shadow-[0_4px_12px_-4px_rgba(166,211,160,0.4)]">
                 <Save className="h-4 w-4 mr-1" />{saving ? 'Saving...' : 'Save'}
               </Button>
             )}
@@ -221,7 +221,7 @@ export default function PoolPlayoffConfidence() {
 
         {/* Available confidence bank */}
         {availableValues.length > 0 && (
-          <Card className="mb-4 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl p-3 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.2)]">
+          <Card className="mb-4 bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 rounded-2xl p-3 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.2)]">
             <div className="text-[10px] font-display font-bold uppercase text-white/70/50 mb-2">Available Confidence Points</div>
             <div className="flex flex-wrap gap-1.5">
               {availableValues.map(v => (
@@ -381,7 +381,7 @@ export default function PoolPlayoffConfidence() {
                                     className={cn(
                                       'w-7 h-7 rounded-full text-[11px] font-bold transition-all border',
                                       isSelected
-                                        ? 'bg-pastel-orange text-[#0F1F15] ring-2 ring-pastel-orange/60 scale-110 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]'
+                                        ? 'bg-pastel-orange text-pastel-surface ring-2 ring-pastel-orange/60 scale-110 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]'
                                         : isUsedElsewhere
                                           ? 'bg-white/5 ring-1 ring-white/10 text-white/30 cursor-not-allowed'
                                           : 'bg-white/5 ring-1 ring-white/10 text-white/55 hover:ring-pastel-orange/40 hover:text-pastel-cream'
@@ -416,7 +416,7 @@ export default function PoolPlayoffConfidence() {
         )}
 
         {/* How it works */}
-        <Card className="mt-6 bg-[#1A2A20] border-0 ring-1 ring-pastel-sage/30 rounded-2xl px-4 py-3 shadow-[0_8px_24px_-12px_rgba(166,211,160,0.15)]">
+        <Card className="mt-6 bg-pastel-surface-tile border-0 ring-1 ring-pastel-sage/30 rounded-2xl px-4 py-3 shadow-[0_8px_24px_-12px_rgba(166,211,160,0.15)]">
           <div className="text-[10px] font-display font-bold uppercase text-white/70/50 mb-1">How Confidence Pools Work</div>
           <ul className="text-[11px] text-white/70 space-y-0.5 list-disc pl-3">
             <li>Pick the winner of each playoff series</li>

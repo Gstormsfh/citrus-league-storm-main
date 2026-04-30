@@ -133,8 +133,8 @@ const MobileMenuButton = () => {
 
       {/* Full-screen slide-in menu — dark Citrus 2.0 panel */}
       {menuOpen && (
-        <div className="fixed inset-0 top-0 z-[60] bg-[#0F1F15]/98 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
-          <div className="flex flex-col h-[calc(100dvh-env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+0.75rem)] px-4 pb-3 bg-[#0F1F15] text-pastel-cream relative overflow-hidden">
+        <div className="fixed inset-0 top-0 z-[60] bg-pastel-surface/98 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
+          <div className="flex flex-col h-[calc(100dvh-env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+0.75rem)] px-4 pb-3 bg-pastel-surface text-pastel-cream relative overflow-hidden">
             {/* Decorative orange + sage halos */}
             <div aria-hidden="true" className="absolute -top-32 -right-20 w-[420px] h-[420px] bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />
             <div aria-hidden="true" className="absolute -bottom-24 -left-20 w-[320px] h-[320px] bg-pastel-sage/10 rounded-full blur-3xl pointer-events-none" />
@@ -169,7 +169,7 @@ const MobileMenuButton = () => {
                 </button>
 
                 {leagueListOpen && (
-                  <div className="mt-1 rounded-xl ring-1 ring-white/10 bg-[#1A2A20] overflow-hidden shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="mt-1 rounded-xl ring-1 ring-white/10 bg-pastel-surface-tile overflow-hidden shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <div className="px-3 py-2 text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold border-b border-white/10">
                       My Leagues ({userLeagues.length})
                     </div>
@@ -277,7 +277,7 @@ const MobileMenuButton = () => {
                   </div>
                 </div>
               ) : (
-                <Button className="w-full h-11 font-bold rounded-xl bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]" asChild>
+                <Button className="w-full h-11 font-bold rounded-xl bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]" asChild>
                   <Link to="/auth" onClick={closeMenu}>Sign In</Link>
                 </Button>
               )}

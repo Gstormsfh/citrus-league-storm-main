@@ -121,7 +121,7 @@ export function HockeyFooter({
                   key={m.id}
                   src={m.image}
                   alt={m.name}
-                  className="w-9 h-9 rounded-full ring-2 ring-[#0F1F15] object-cover transition-transform group-hover:scale-105 hover:!scale-110 hover:z-10 relative"
+                  className="w-9 h-9 rounded-full ring-2 ring-pastel-surface object-cover transition-transform group-hover:scale-105 hover:!scale-110 hover:z-10 relative"
                   loading="lazy"
                 />
               ))}

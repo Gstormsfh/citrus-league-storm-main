@@ -125,7 +125,7 @@ const MobileBottomNav = () => {
     <nav
       className={cn(
         "fixed bottom-0 left-0 right-0 z-50 lg:hidden",
-        "bg-[#0F1F15]/98 backdrop-blur-xl",
+        "bg-pastel-surface/98 backdrop-blur-xl",
         "border-t border-white/10",
         "shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.4)]"
       )}
@@ -136,7 +136,7 @@ const MobileBottomNav = () => {
       }}
     >
       {/* Dark gradient overlay for depth */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0F1F15] to-[#152821]/90 -z-10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-pastel-surface to-[#152821]/90 -z-10" />
 
       <div className="flex items-center justify-around px-1 h-16">
         {navItems.map((item) => {

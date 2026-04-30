@@ -553,15 +553,15 @@ const OtherTeam = () => {
 
   if (!team) {
     return (
-      <div className="min-h-screen bg-[#0F1F15] flex items-center justify-center px-4">
-        <div className="text-center bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl px-8 py-10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+      <div className="min-h-screen bg-pastel-surface flex items-center justify-center px-4">
+        <div className="text-center bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl px-8 py-10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-3">
             ✦ Team Not Found
           </div>
           <h1 className="font-calistoga text-2xl text-pastel-cream mb-5">We couldn&rsquo;t find that team.</h1>
           <Button
             onClick={() => navigate('/standings')}
-            className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold"
+            className="bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold"
           >
             Back to Standings
           </Button>
@@ -577,9 +577,9 @@ const OtherTeam = () => {
 
   return (
     <ErrorBoundary>
-    <div className="min-h-screen bg-[#0F1F15]">
+    <div className="min-h-screen bg-pastel-surface">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
           <h1 className="text-lg font-bold text-pastel-cream">Team View</h1>
         </div>
@@ -596,7 +596,7 @@ const OtherTeam = () => {
           <ArrowLeft className="w-4 h-4 mr-2" /> Back to Standings
         </Button>
 
-        <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-6 sm:p-8 mb-8 relative overflow-hidden">
+        <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-6 sm:p-8 mb-8 relative overflow-hidden">
           <div aria-hidden="true" className="absolute top-0 right-0 w-72 h-72 bg-pastel-orange/8 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
           <div aria-hidden="true" className="absolute bottom-0 left-0 w-48 h-48 bg-pastel-sage/6 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
 
@@ -621,7 +621,7 @@ const OtherTeam = () => {
             {userLeagueState === 'active-user' && (
               <Button
                 size="lg"
-                className="w-full md:w-auto bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] hover:shadow-[0_12px_32px_-8px_rgba(255,168,87,0.6)] transition-all"
+                className="w-full md:w-auto bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] hover:shadow-[0_12px_32px_-8px_rgba(255,168,87,0.6)] transition-all"
                 onClick={() => navigate(`/trade-analyzer?partner=${team.id}`)}
               >
                 <ArrowRightLeft className="w-4 h-4 mr-2" />
@@ -654,12 +654,12 @@ const OtherTeam = () => {
               <StartersGrid
                 players={roster.starters}
                 slotAssignments={roster.slotAssignments}
-                className="bg-[#1A2A20] ring-1 ring-white/10 p-6 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]"
+                className="bg-pastel-surface-tile ring-1 ring-white/10 p-6 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]"
                 onPlayerClick={handlePlayerClick}
               />
               <BenchGrid
                 players={roster.bench}
-                className="bg-[#1A2A20] ring-1 ring-white/10 p-6 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]"
+                className="bg-pastel-surface-tile ring-1 ring-white/10 p-6 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]"
                 onPlayerClick={handlePlayerClick}
               />
               {roster.ir.length > 0 && (
@@ -685,7 +685,7 @@ const OtherTeam = () => {
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
                 {/* Sleeper-style scouting tips tile — replaces legacy AdSpace */}
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-sage/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-3">
                     ✦ Scouting tips
                   </div>
@@ -701,7 +701,7 @@ const OtherTeam = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>

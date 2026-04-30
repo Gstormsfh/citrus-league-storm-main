@@ -19,7 +19,7 @@ export function StormyChatTile({
 }) {
   const padding = variant === 'compact' ? 'p-4' : 'p-6';
   return (
-    <div className={`bg-[#1A2A20] border border-white/10 rounded-2xl ${padding} shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]`}>
+    <div className={`bg-pastel-surface-tile border border-white/10 rounded-2xl ${padding} shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]`}>
       <div className="space-y-4">
         {/* User question */}
         <div className="flex justify-end">

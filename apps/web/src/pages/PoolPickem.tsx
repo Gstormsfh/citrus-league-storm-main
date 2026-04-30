@@ -91,7 +91,7 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
   const homeStreak = hr?.streak || '-';
 
   return (
-    <div className={`grid grid-cols-[1fr_auto_1fr] rounded-xl overflow-hidden transition-all duration-200 bg-[#1A2A20] ring-1 ${
+    <div className={`grid grid-cols-[1fr_auto_1fr] rounded-xl overflow-hidden transition-all duration-200 bg-pastel-surface-tile ring-1 ${
       picked ? 'ring-pastel-orange/40 shadow-[0_8px_24px_-12px_rgba(255,107,26,0.3)]' : 'ring-white/10 hover:ring-white/20'
     } ${locked && !isLive ? 'opacity-60' : ''}`}>
 
@@ -357,10 +357,10 @@ const PoolPickem = () => {
           </div>
 
           {/* Header — STICKY below navbar */}
-          <div className="sticky top-[92px] z-30 bg-[#0F1F15]/95 backdrop-blur-md py-2 sm:py-3 mb-4 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
+          <div className="sticky top-[92px] z-30 bg-pastel-surface/95 backdrop-blur-md py-2 sm:py-3 mb-4 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
+              <div className="flex items-center bg-pastel-surface-tile rounded-md ring-1 ring-white/10 overflow-hidden">
                 <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
@@ -374,7 +374,7 @@ const PoolPickem = () => {
               </div>
 
               {/* Progress pill */}
-              <div className="hidden sm:flex items-center gap-2 bg-[#1A2A20] rounded-full px-3 py-1.5 ring-1 ring-white/10">
+              <div className="hidden sm:flex items-center gap-2 bg-pastel-surface-tile rounded-full px-3 py-1.5 ring-1 ring-white/10">
                 <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
                   <div className="h-full bg-pastel-orange rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                 </div>
@@ -387,7 +387,7 @@ const PoolPickem = () => {
                 <span className="hidden sm:inline-flex"><InvitePlayersButton joinCode={activeLeague.join_code} leagueName={activeLeague.name} /></span>
               )}
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="bg-[#1A2A20] h-8 sm:h-9 ring-1 ring-white/10">
+                <TabsList className="bg-pastel-surface-tile h-8 sm:h-9 ring-1 ring-white/10">
                   <TabsTrigger value="picks" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Picks</TabsTrigger>
                   <TabsTrigger value="standings" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Standings</TabsTrigger>
                   <TabsTrigger value="league" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">League</TabsTrigger>
@@ -440,7 +440,7 @@ const PoolPickem = () => {
                   ))}
 
                   {/* Submit bar */}
-                  <div className="sticky bottom-20 lg:bottom-4 bg-[#1A2A20]/95 backdrop-blur-md ring-1 ring-pastel-orange/30 rounded-2xl py-3 px-4 flex items-center justify-between shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)]">
+                  <div className="sticky bottom-20 lg:bottom-4 bg-pastel-surface-tile/95 backdrop-blur-md ring-1 ring-pastel-orange/30 rounded-2xl py-3 px-4 flex items-center justify-between shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)]">
                     <div className="flex items-center gap-2">
                       <div className="w-20 h-2 rounded-full bg-white/10 overflow-hidden">
                         <div className="h-full bg-pastel-orange rounded-full transition-all" style={{ width: `${pct}%` }} />

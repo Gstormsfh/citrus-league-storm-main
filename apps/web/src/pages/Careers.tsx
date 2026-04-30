@@ -34,7 +34,7 @@ export default function Careers() {
           {POSITIONS.map((job) => (
             <article
               key={job.title}
-              className="bg-[#1A2A20] border border-white/10 rounded-2xl p-5 flex items-center gap-5 flex-wrap hover:border-pastel-orange/40 transition-colors"
+              className="bg-pastel-surface-tile border border-white/10 rounded-2xl p-5 flex items-center gap-5 flex-wrap hover:border-pastel-orange/40 transition-colors"
             >
               <div className="w-12 h-12 rounded-xl bg-pastel-orange/15 ring-1 ring-pastel-orange/30 flex items-center justify-center text-pastel-orange-soft flex-shrink-0">
                 <job.icon className="w-5 h-5" strokeWidth={2} />

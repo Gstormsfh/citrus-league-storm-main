@@ -191,9 +191,9 @@ const PoolConfidence = () => {
           </div>
 
           {/* Header — STICKY below navbar */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 sticky top-[92px] z-30 bg-[#0F1F15]/95 backdrop-blur-md py-2 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 sticky top-[92px] z-30 bg-pastel-surface/95 backdrop-blur-md py-2 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
+              <div className="flex items-center bg-pastel-surface-tile rounded-md ring-1 ring-white/10 overflow-hidden">
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
@@ -215,7 +215,7 @@ const PoolConfidence = () => {
                 <InvitePlayersButton joinCode={activeLeague.join_code} leagueName={activeLeague.name} />
               )}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-                <TabsList className="bg-[#1A2A20] h-9 ring-1 ring-white/10">
+                <TabsList className="bg-pastel-surface-tile h-9 ring-1 ring-white/10">
                   <TabsTrigger value="picks" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Rank Picks</TabsTrigger>
                   <TabsTrigger value="standings" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Standings</TabsTrigger>
                   <TabsTrigger value="league" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">League</TabsTrigger>
@@ -261,7 +261,7 @@ const PoolConfidence = () => {
                           const homeWon = isFinal && game.home_score > game.away_score;
 
                           return (
-                            <div key={gameId} className={`rounded-2xl ring-1 overflow-hidden transition-all duration-200 bg-[#1A2A20] ${
+                            <div key={gameId} className={`rounded-2xl ring-1 overflow-hidden transition-all duration-200 bg-pastel-surface-tile ${
                               isLive ? 'ring-pastel-orange/50 shadow-[0_8px_24px_-12px_rgba(255,107,26,0.4)]'
                               : pick ? 'ring-pastel-orange/30 shadow-[0_8px_24px_-12px_rgba(255,107,26,0.25)]' : 'ring-white/10 hover:ring-white/20'
                             }`}>
@@ -355,7 +355,7 @@ const PoolConfidence = () => {
                   ))}
 
                   {/* Submit */}
-                  <div className="sticky bottom-20 lg:bottom-4 bg-[#1A2A20]/95 backdrop-blur-md ring-1 ring-pastel-orange/30 rounded-2xl py-3 px-4 flex items-center justify-between shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)]">
+                  <div className="sticky bottom-20 lg:bottom-4 bg-pastel-surface-tile/95 backdrop-blur-md ring-1 ring-pastel-orange/30 rounded-2xl py-3 px-4 flex items-center justify-between shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)]">
                     <span className="text-[13px] text-pastel-cream">
                       {picks.size === 0 ? <span className="text-white/55">Pick a team, then assign confidence</span> : <><span className="font-bold tabular-nums">{picks.size}</span> of <span className="tabular-nums">{games.length}</span> picked</>}
                     </span>

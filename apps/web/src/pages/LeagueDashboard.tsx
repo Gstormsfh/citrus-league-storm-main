@@ -610,7 +610,7 @@ const LeagueDashboard = () => {
       <div className="min-h-screen flex flex-col">
         <Navbar />
         <main className="flex-1 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md bg-[#1A2A20] border-0 ring-1 ring-red-400/40 rounded-2xl shadow-[0_24px_60px_-16px_rgba(248,113,113,0.2)]">
+          <Card className="w-full max-w-md bg-pastel-surface-tile border-0 ring-1 ring-red-400/40 rounded-2xl shadow-[0_24px_60px_-16px_rgba(248,113,113,0.2)]">
             <CardHeader>
               <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-red-300 font-bold mb-1.5">
                 ✦ League not found
@@ -621,7 +621,7 @@ const LeagueDashboard = () => {
             <CardContent>
               <Button
                 onClick={() => navigate('/')}
-                className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]"
+                className="bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]"
               >
                 Go Home
               </Button>
@@ -634,9 +634,9 @@ const LeagueDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream flex flex-col">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
           <h1 className="text-lg font-bold text-pastel-cream">League</h1>
         </div>
@@ -691,7 +691,7 @@ const LeagueDashboard = () => {
                         League Settings
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 text-pastel-cream">
+                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 text-pastel-cream">
                       <DialogHeader>
                         <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
                           ✦ Commissioner
@@ -707,12 +707,12 @@ const LeagueDashboard = () => {
                       
                       <Tabs value={activeSettingsTab} onValueChange={setActiveSettingsTab} className="w-full">
                         <div className="overflow-x-auto -mx-2 px-2">
-                          <TabsList className="inline-flex w-auto min-w-full bg-[#0F1F15] ring-1 ring-white/10 p-1 rounded-xl">
+                          <TabsList className="inline-flex w-auto min-w-full bg-pastel-surface ring-1 ring-white/10 p-1 rounded-xl">
                             {(['waivers','scoring','draft','trades','rosterslots','playoffs','rosters'] as const).map((tab) => (
                               <TabsTrigger
                                 key={tab}
                                 value={tab}
-                                className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                                className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                               >
                                 {tab === 'rosterslots' ? 'Roster Slots' : tab.charAt(0).toUpperCase() + tab.slice(1)}
                               </TabsTrigger>
@@ -1494,7 +1494,7 @@ Your Commissioner`);
 
           {/* League Info Cards — three core league shape stats with custom hockey icons */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+            <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
               <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-orange/10 rounded-full blur-3xl pointer-events-none" />
               <CardHeader className="pb-2 relative z-10">
                 <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
@@ -1519,7 +1519,7 @@ Your Commissioner`);
               </CardContent>
             </Card>
 
-            <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+            <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
               <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-sage/10 rounded-full blur-3xl pointer-events-none" />
               <CardHeader className="pb-2 relative z-10">
                 <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
@@ -1533,7 +1533,7 @@ Your Commissioner`);
               </CardContent>
             </Card>
 
-            <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+            <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
               <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-orange/10 rounded-full blur-3xl pointer-events-none" />
               <CardHeader className="pb-2 relative z-10">
                 <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
@@ -1554,8 +1554,8 @@ Your Commissioner`);
             {league.draft_status !== 'completed' && (
               <Card className={
                 league.draft_status === 'in_progress'
-                  ? 'bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.2)]'
-                  : 'bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]'
+                  ? 'bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.2)]'
+                  : 'bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]'
               }>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
@@ -1604,7 +1604,7 @@ Your Commissioner`);
                     }}
                     className={`w-full font-bold ${
                       league.draft_status === 'in_progress'
-                        ? 'bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]'
+                        ? 'bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]'
                         : 'bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50'
                     } disabled:opacity-50`}
                     disabled={!leagueId}
@@ -1626,7 +1626,7 @@ Your Commissioner`);
             )}
 
             {userTeam && (
-              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(166,211,160,0.15)] relative overflow-hidden">
+              <Card className="bg-pastel-surface-tile border-0 ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(166,211,160,0.15)] relative overflow-hidden">
                 <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-pastel-sage/15 rounded-full blur-3xl pointer-events-none" />
                 <CardHeader className="relative z-10">
                   <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-1">
@@ -1660,7 +1660,7 @@ Your Commissioner`);
           </div>
 
           {/* Teams List */}
-          <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+          <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
             <CardHeader>
               <CardTitle className="font-calistoga text-pastel-cream flex items-center gap-2">
                 <CrossedSticksIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} />
@@ -1724,7 +1724,7 @@ Your Commissioner`);
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <MascotPortrait id="stormy" />
                   <div className="p-5">
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
@@ -1740,7 +1740,7 @@ Your Commissioner`);
                     </p>
                   </div>
                 </div>
-                <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="flex items-center gap-2 mb-2">
                     <RangeIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">League quicklinks</div>
@@ -1757,7 +1757,7 @@ Your Commissioner`);
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {leagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={leagueId} />
                 </div>
               </aside>

@@ -59,7 +59,7 @@ const LIVE_GAMES = [
 const ACCENT_BG: Record<string, string> = {
   orange: 'bg-pastel-orange/15 ring-pastel-orange/40 text-pastel-orange-soft',
   sage: 'bg-pastel-sage/20 ring-pastel-sage/40 text-pastel-sage-soft',
-  butter: 'bg-[#F4E5B8]/15 ring-[#F4E5B8]/40 text-[#F4E5B8]',
+  butter: 'bg-pastel-butter/15 ring-pastel-butter/40 text-pastel-butter',
 };
 
 // SVG hockey rink lines — decorative background pattern
@@ -87,7 +87,7 @@ function RinkPattern() {
 
 export default function PreviewArena() {
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative overflow-x-hidden">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream relative overflow-x-hidden">
       {/* Subtle rink pattern bg */}
       <div className="absolute inset-0 pointer-events-none">
         <RinkPattern />
@@ -106,7 +106,7 @@ export default function PreviewArena() {
       />
 
       {/* Nav */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F1F15]/85 border-b border-white/5">
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-pastel-surface/85 border-b border-white/5">
         <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between gap-6 relative">
           <Link to="/preview-arena" className="flex items-center gap-1.5">
             <span className="font-calistoga text-[24px] leading-none text-pastel-cream">Citrus</span>
@@ -185,7 +185,7 @@ export default function PreviewArena() {
                 {['JK', 'AM', 'SD', 'TR', 'MV'].map((init, i) => (
                   <div
                     key={init}
-                    className="w-9 h-9 rounded-full bg-pastel-sage/30 ring-2 ring-[#0F1F15] flex items-center justify-center font-jbmono text-[10px] font-bold text-pastel-cream"
+                    className="w-9 h-9 rounded-full bg-pastel-sage/30 ring-2 ring-pastel-surface flex items-center justify-center font-jbmono text-[10px] font-bold text-pastel-cream"
                     style={{ zIndex: 5 - i }}
                   >
                     {init}
@@ -207,7 +207,7 @@ export default function PreviewArena() {
           <div className="lg:col-span-6 relative">
             <div className="relative">
               {/* Live game tile */}
-              <div className="bg-[#1A2A20] border border-white/10 rounded-2xl p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] mb-4 relative">
+              <div className="bg-pastel-surface-tile border border-white/10 rounded-2xl p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] mb-4 relative">
                 <div className="flex items-center justify-between mb-4">
                   <span className="flex items-center gap-1.5">
                     <span className="relative flex w-1.5 h-1.5">
@@ -243,7 +243,7 @@ export default function PreviewArena() {
               </div>
 
               {/* League standings tile */}
-              <div className="bg-[#1A2A20] border border-white/10 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] overflow-hidden">
+              <div className="bg-pastel-surface-tile border border-white/10 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
                   <div>
                     <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 font-bold">
@@ -308,7 +308,7 @@ export default function PreviewArena() {
             return (
               <article
                 key={g.label}
-                className="flex-shrink-0 w-[300px] snap-start bg-[#1A2A20] border border-white/10 rounded-2xl p-6 hover:border-pastel-orange/40 hover:-translate-y-1 transition-all"
+                className="flex-shrink-0 w-[300px] snap-start bg-pastel-surface-tile border border-white/10 rounded-2xl p-6 hover:border-pastel-orange/40 hover:-translate-y-1 transition-all"
               >
                 <div className="flex items-center justify-between mb-5">
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center ring-1 ${ACCENT_BG[g.accent]}`}>
@@ -343,7 +343,7 @@ export default function PreviewArena() {
 
       {/* Final CTA banner */}
       <section className="relative max-w-[1280px] mx-auto px-6 pb-20">
-        <div className="bg-gradient-to-br from-[#1A2A20] to-[#0F1F15] border border-white/10 rounded-[28px] p-10 md:p-14 text-center relative overflow-hidden">
+        <div className="bg-gradient-to-br from-pastel-surface-tile to-pastel-surface border border-white/10 rounded-[28px] p-10 md:p-14 text-center relative overflow-hidden">
           <div
             aria-hidden="true"
             className="absolute -top-20 -right-20 w-[400px] h-[400px] rounded-full opacity-30 blur-3xl"
@@ -365,7 +365,7 @@ export default function PreviewArena() {
             </p>
             <Link
               to="/create-league"
-              className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[15px] font-bold px-7 rounded-md hover:bg-white hover:text-[#0F1F15] transition-colors shadow-[0_8px_24px_-8px_rgba(255,107,26,0.5)]"
+              className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[15px] font-bold px-7 rounded-md hover:bg-white hover:text-pastel-surface transition-colors shadow-[0_8px_24px_-8px_rgba(255,107,26,0.5)]"
               style={{ height: '52px' }}
             >
               <span>Create your league</span>

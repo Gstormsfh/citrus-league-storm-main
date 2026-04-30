@@ -2940,10 +2940,10 @@ const Roster = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-foreground relative">
+    <div className="min-h-screen bg-pastel-surface text-foreground relative">
       {/* Loading overlay during league switch - non-blocking */}
       {showLoadingOverlay && (
-        <div className="fixed inset-0 bg-[#0F1F15]/90 backdrop-blur-lg z-[100] flex items-center justify-center">
+        <div className="fixed inset-0 bg-pastel-surface/90 backdrop-blur-lg z-[100] flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pastel-orange mx-auto mb-4"></div>
             <p className="text-lg font-medium text-pastel-cream">Switching leagues…</p>
@@ -2957,7 +2957,7 @@ const Roster = () => {
       </div>
       
       {/* MOBILE: Compact sticky header with roster context + hamburger menu */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-sm font-calistoga font-bold text-pastel-cream truncate">
@@ -2991,10 +2991,10 @@ const Roster = () => {
             {/* Main Content - MOBILE: Full width / DESKTOP: Scrollable panel */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-3 lg:px-0 order-1 lg:order-2">
               {/* Fantasy Team Header — Citrus 2.0 dark surface */}
-              <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-5 mb-4 relative overflow-hidden">
+              <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-5 mb-4 relative overflow-hidden">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pastel-orange to-pastel-orange-soft ring-1 ring-pastel-orange/40 flex items-center justify-center text-[#0F1F15] text-2xl font-calistoga relative overflow-hidden shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pastel-orange to-pastel-orange-soft ring-1 ring-pastel-orange/40 flex items-center justify-center text-pastel-surface text-2xl font-calistoga relative overflow-hidden shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
                   {/* Background pattern */}
                   <div className="absolute inset-0 opacity-20">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.4)_0%,_transparent_60%)]"></div>
@@ -3047,7 +3047,7 @@ const Roster = () => {
 
             {/* Main Tabs — Citrus 2.0 dark */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+              <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                 <TabsList className="w-full p-0 bg-transparent border-b border-white/10 rounded-none gap-0 h-auto">
                 <TabsTrigger
                   value="roster"
@@ -3103,7 +3103,7 @@ const Roster = () => {
 
                     {/* Date Selector */}
                     {currentMatchup && matchupWeekDates.length > 0 && (
-                      <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4">
+                      <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl p-4">
                         <WeeklySchedule
                           weekStart={currentMatchup.week_start_date}
                           weekEnd={currentMatchup.week_end_date}
@@ -3927,7 +3927,7 @@ const Roster = () => {
 
                 {/* Sleeper-style data tile — replaces the legacy AdSpace
                     placeholder with real team-pulse stats. */}
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="flex items-center gap-2 mb-3">
                     <Activity className="w-4 h-4 text-pastel-orange-soft" strokeWidth={2} />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Team pulse</div>
@@ -3956,7 +3956,7 @@ const Roster = () => {
                 </div>
 
                 {/* Quicklinks tile — replaces second legacy AdSpace */}
-                <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="flex items-center gap-2 mb-2">
                     <Target className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Lineup tips</div>
@@ -3973,7 +3973,7 @@ const Roster = () => {
             {/* Right Sidebar - Notifications/Chat Panel - Hidden on mobile */}
             {userLeagueState === 'active-user' && userTeam?.league_id && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={userTeam.league_id} />
                 </div>
               </aside>

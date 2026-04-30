@@ -137,9 +137,9 @@ const PoolSurvivor = () => {
           </div>
 
           {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 sticky top-[92px] z-30 bg-[#0F1F15]/95 backdrop-blur-md py-2 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 sticky top-[92px] z-30 bg-pastel-surface/95 backdrop-blur-md py-2 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
             <div className="flex items-center gap-2">
-              <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
+              <div className="flex items-center bg-pastel-surface-tile rounded-md ring-1 ring-white/10 overflow-hidden">
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
@@ -162,7 +162,7 @@ const PoolSurvivor = () => {
                 <InvitePlayersButton joinCode={activeLeague.join_code} leagueName={activeLeague.name} />
               )}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-                <TabsList className="bg-[#1A2A20] h-9 ring-1 ring-white/10">
+                <TabsList className="bg-pastel-surface-tile h-9 ring-1 ring-white/10">
                   <TabsTrigger value="pick" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">My Pick</TabsTrigger>
                   <TabsTrigger value="standings" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Standings</TabsTrigger>
                   <TabsTrigger value="history" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">History</TabsTrigger>
@@ -203,7 +203,7 @@ const PoolSurvivor = () => {
                             isSelected ? 'scale-105 text-white ring-2 ring-white/40 shadow-[0_8px_24px_-12px_rgba(255,107,26,0.5)]'
                             : isUsed ? 'opacity-25 cursor-not-allowed grayscale ring-white/10 bg-white/5'
                             : isLocked ? 'opacity-40 cursor-not-allowed ring-white/10 bg-white/5'
-                            : 'bg-[#1A2A20] ring-white/10 hover:ring-pastel-orange/50 hover:scale-[1.02] hover:shadow-[0_8px_24px_-12px_rgba(255,107,26,0.3)]'
+                            : 'bg-pastel-surface-tile ring-white/10 hover:ring-pastel-orange/50 hover:scale-[1.02] hover:shadow-[0_8px_24px_-12px_rgba(255,107,26,0.3)]'
                           }`}
                           style={isSelected ? {
                             background: info.primaryColor,
@@ -258,7 +258,7 @@ const PoolSurvivor = () => {
                   )}
 
                   {/* Submit bar */}
-                  <div className="sticky bottom-20 lg:bottom-4 bg-[#1A2A20]/95 backdrop-blur-md ring-1 ring-pastel-orange/30 rounded-2xl py-3 px-4 flex items-center justify-between shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)]">
+                  <div className="sticky bottom-20 lg:bottom-4 bg-pastel-surface-tile/95 backdrop-blur-md ring-1 ring-pastel-orange/30 rounded-2xl py-3 px-4 flex items-center justify-between shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)]">
                     <span className="text-[13px] text-pastel-cream">
                       {selectedTeam ? (
                         <span className="flex items-center gap-2">
@@ -308,7 +308,7 @@ const PoolSurvivor = () => {
                           <TableRow key={s.user_id} className={`border-white/5 hover:bg-white/5 transition-colors ${s.user_id === user?.id ? 'bg-pastel-orange/10' : ''}`}>
                             <TableCell className="text-center">
                               <span className={`inline-flex w-7 h-7 rounded-full items-center justify-center text-xs font-bold ${
-                                !s.is_eliminated ? 'bg-pastel-sage text-[#0F1F15]' : 'bg-red-500/30 text-red-300'
+                                !s.is_eliminated ? 'bg-pastel-sage text-pastel-surface' : 'bg-red-500/30 text-red-300'
                               }`}>{i + 1}</span>
                             </TableCell>
                             <TableCell className="font-bold text-pastel-cream">
@@ -361,7 +361,7 @@ const PoolSurvivor = () => {
                     const info = getInfo(pick.team);
                     const ringClass = pick.is_correct === true ? 'ring-pastel-sage/40' : pick.is_correct === false ? 'ring-red-500/40' : 'ring-white/10';
                     return (
-                      <div key={pick.week} className={`flex items-center gap-3 p-3 rounded-xl bg-[#1A2A20] ring-1 ${ringClass} hover:ring-pastel-orange/40 transition-all`}>
+                      <div key={pick.week} className={`flex items-center gap-3 p-3 rounded-xl bg-pastel-surface-tile ring-1 ${ringClass} hover:ring-pastel-orange/40 transition-all`}>
                         <Badge variant="outline" className="text-[10px] font-jbmono shrink-0 w-14 justify-center border-white/15 text-white/55 uppercase tracking-wider">Wk {pick.week}</Badge>
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs text-white shadow-sm shrink-0"
                           style={{ background: info.primaryColor }}>

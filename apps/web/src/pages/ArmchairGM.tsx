@@ -56,12 +56,12 @@ const ArmchairGM = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F1F15] text-pastel-cream">
+    <div className="min-h-screen flex flex-col bg-pastel-surface text-pastel-cream">
       <Navbar />
 
       <main className="flex-1 w-full pt-[var(--header-height)] pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-12">
         {/* Hero Header — deeper #0F1F15 band with orange glow + diagonal stripes for depth */}
-        <div className="w-full bg-[#0F1F15] border-b border-white/10 relative isolate overflow-hidden">
+        <div className="w-full bg-pastel-surface border-b border-white/10 relative isolate overflow-hidden">
           <div aria-hidden="true" className="absolute -top-32 -right-20 w-[480px] h-[480px] bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />
           <div aria-hidden="true" className="absolute -bottom-24 -left-20 w-[360px] h-[360px] bg-pastel-sage/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute inset-0 opacity-[0.04] pointer-events-none z-0" aria-hidden="true"
@@ -114,7 +114,7 @@ const ArmchairGM = () => {
                   className={cn(
                     "flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 min-h-[44px] rounded-t-xl text-xs sm:text-sm font-bold transition-all border-2 border-b-0 flex-shrink-0 whitespace-nowrap cursor-pointer",
                     activeTab === tab.id
-                      ? "bg-pastel-orange text-[#0F1F15] border-pastel-orange shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                      ? "bg-pastel-orange text-pastel-surface border-pastel-orange shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                       : "bg-white/5 text-white/55 border-white/10 hover:bg-white/[0.08] hover:border-pastel-orange/30 hover:text-pastel-cream"
                   )}
                 >
@@ -163,14 +163,14 @@ const ArmchairGM = () => {
                   )}
 
                   {error && (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3 bg-[#1A2A20] ring-1 ring-red-400/40 rounded-2xl shadow-[0_8px_24px_-12px_rgba(248,113,113,0.2)]">
+                    <div className="flex flex-col items-center justify-center py-12 gap-3 bg-pastel-surface-tile ring-1 ring-red-400/40 rounded-2xl shadow-[0_8px_24px_-12px_rgba(248,113,113,0.2)]">
                       <AlertCircle className="w-8 h-8 text-red-300" />
                       <span className="text-sm text-white/70">
                         Unable to load team data. Please try again.
                       </span>
                       <button
                         onClick={() => setSelectedTeam(selectedTeam)}
-                        className="px-4 py-2 rounded-lg bg-pastel-orange text-[#0F1F15] text-sm font-bold hover:bg-pastel-orange-soft transition-colors shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                        className="px-4 py-2 rounded-lg bg-pastel-orange text-pastel-surface text-sm font-bold hover:bg-pastel-orange-soft transition-colors shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                       >
                         Retry
                       </button>

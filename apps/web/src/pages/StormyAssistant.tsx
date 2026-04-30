@@ -211,9 +211,9 @@ const StormyAssistant = () => {
   }, [inputValue, isLoading, buildContext]);
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
           <h1 className="text-lg font-bold text-pastel-cream">Stormy Assistant</h1>
         </div>
@@ -251,16 +251,16 @@ const StormyAssistant = () => {
                 )}
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 max-w-[400px] mx-auto mb-8 bg-[#1A2A20] ring-1 ring-white/10 p-1 rounded-xl">
+                  <TabsList className="grid w-full grid-cols-2 max-w-[400px] mx-auto mb-8 bg-pastel-surface-tile ring-1 ring-white/10 p-1 rounded-xl">
                     <TabsTrigger
                       value="chat"
-                      className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                      className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                     >
                       <MessageSquare className="h-4 w-4" /> Chat
                     </TabsTrigger>
                     <TabsTrigger
                       value="settings"
-                      className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                      className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                     >
                       <Settings className="h-4 w-4" /> Settings
                     </TabsTrigger>
@@ -268,7 +268,7 @@ const StormyAssistant = () => {
 
                   {/* ── Chat Tab ─────────────────────────────────── */}
                   <TabsContent value="chat" className="mt-0">
-                    <Card className="h-[calc(100vh-12rem)] sm:h-[650px] flex flex-col overflow-hidden bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+                    <Card className="h-[calc(100vh-12rem)] sm:h-[650px] flex flex-col overflow-hidden bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
                       <CardHeader className="border-b border-white/10 bg-white/[0.03] px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-pastel-orange/30 to-pastel-orange/10 ring-1 ring-pastel-orange/40 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
@@ -296,7 +296,7 @@ const StormyAssistant = () => {
                         </div>
                       </CardHeader>
 
-                      <CardContent className="flex-1 p-0 overflow-hidden bg-[#0F1F15] relative">
+                      <CardContent className="flex-1 p-0 overflow-hidden bg-pastel-surface relative">
                         <div
                           ref={scrollRef}
                           className="h-full overflow-y-auto overscroll-contain p-4 sm:p-6"
@@ -367,7 +367,7 @@ const StormyAssistant = () => {
                             <Button
                               type="submit"
                               size="icon"
-                              className="h-12 w-12 bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] disabled:opacity-50"
+                              className="h-12 w-12 bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] disabled:opacity-50"
                               disabled={!inputValue.trim() || isLoading}
                             >
                               {isLoading ? (
@@ -399,7 +399,7 @@ const StormyAssistant = () => {
                             key={label}
                             type="button"
                             onClick={() => setInputValue(label + ' please')}
-                            className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[#1A2A20] ring-1 ring-white/10 hover:ring-pastel-orange/40 hover:bg-white/[0.07] transition-all group"
+                            className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-pastel-surface-tile ring-1 ring-white/10 hover:ring-pastel-orange/40 hover:bg-white/[0.07] transition-all group"
                           >
                             <Icon className="w-3.5 h-3.5 text-pastel-orange/70 group-hover:text-pastel-orange" strokeWidth={2} />
                             <span className="font-jbmono text-[10px] uppercase tracking-[0.18em] text-white/70 group-hover:text-pastel-cream font-bold">{label}</span>
@@ -413,7 +413,7 @@ const StormyAssistant = () => {
                   <TabsContent value="settings" className="mt-0 space-y-8">
                     <div className="grid md:grid-cols-2 gap-6">
                       {/* Usage Card */}
-                      <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)] h-full relative overflow-hidden">
+                      <Card className="bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)] h-full relative overflow-hidden">
                         <div aria-hidden="true" className="absolute -top-10 -right-10 w-44 h-44 bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />
                         <CardHeader className="relative z-10">
                           <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
@@ -446,7 +446,7 @@ const StormyAssistant = () => {
                             <span className="font-bold text-pastel-cream">Every 7 days</span>
                           </div>
 
-                          <Button className="w-full bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
+                          <Button className="w-full bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
                             <Crown className="h-5 w-5 mr-2" />
                             Upgrade to Unlimited
                           </Button>
@@ -454,7 +454,7 @@ const StormyAssistant = () => {
                       </Card>
 
                       {/* Configuration Card */}
-                      <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(166,211,160,0.15)] h-full relative overflow-hidden">
+                      <Card className="bg-pastel-surface-tile border-0 ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(166,211,160,0.15)] h-full relative overflow-hidden">
                         <div aria-hidden="true" className="absolute -top-10 -right-10 w-44 h-44 bg-pastel-sage/15 rounded-full blur-3xl pointer-events-none" />
                         <CardHeader className="relative z-10">
                           <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
@@ -515,7 +515,7 @@ const StormyAssistant = () => {
                 tile that helps the user actually USE the assistant well. */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
                   <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />
                   <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-3">
@@ -532,7 +532,7 @@ const StormyAssistant = () => {
                     </ul>
                   </div>
                 </div>
-                <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="flex items-center gap-2 mb-2">
                     <RangeIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">What I see</div>
@@ -547,7 +547,7 @@ const StormyAssistant = () => {
             {/* Right Sidebar - Notifications */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>

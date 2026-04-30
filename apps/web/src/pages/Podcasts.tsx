@@ -79,7 +79,7 @@ const Podcasts = () => {
                   alt="Featured Podcast"
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0F1F15] via-[#0F1F15]/70 to-transparent flex flex-col justify-end p-6">
+                <div className="absolute inset-0 bg-gradient-to-t from-pastel-surface via-pastel-surface/70 to-transparent flex flex-col justify-end p-6">
                   <span className="bg-pastel-orange text-white text-[10px] font-jbmono font-bold uppercase tracking-widest px-2.5 py-1 rounded-md mb-3 inline-block w-fit ring-1 ring-pastel-orange/40">
                     Featured Episode
                   </span>
@@ -151,7 +151,7 @@ const Podcasts = () => {
                       alt={episode.title}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#1A2A20]" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-pastel-surface-tile" />
                   </div>
                   <div className="w-2/3 p-4 flex flex-col">
                     <h3 className="font-sans font-bold text-[16px] text-pastel-cream mb-2 leading-tight line-clamp-1 tracking-[-0.015em]">

@@ -147,7 +147,7 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
         )}
       </div>
 
-      <div className="p-2 space-y-1 bg-[#1A2A20]">
+      <div className="p-2 space-y-1 bg-pastel-surface-tile">
         {getTeamDisplay(series.home_team_id, series.home_seed, homeIsWinner, series.home_score)}
         <div className="flex items-center gap-1 px-3">
           <div className="flex-1 border-t border-white/10"></div>
@@ -256,7 +256,7 @@ const ChampionBanner: React.FC<{
   const thirdPlaceName = bracket.third_place_team_id ? teamNames[bracket.third_place_team_id] : null;
 
   return (
-    <Card className="bg-[#1A2A20] border-0 ring-2 ring-amber-400/50 rounded-2xl shadow-[0_24px_60px_-16px_rgba(251,191,36,0.35)] overflow-hidden relative">
+    <Card className="bg-pastel-surface-tile border-0 ring-2 ring-amber-400/50 rounded-2xl shadow-[0_24px_60px_-16px_rgba(251,191,36,0.35)] overflow-hidden relative">
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMSIgZmlsbD0iI2Y1OWUwYiIgb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] pointer-events-none"></div>
       <CardContent className="relative p-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-3">
@@ -320,7 +320,7 @@ const CommissionerControls: React.FC<CommissionerControlsProps> = ({
   if (!isCommissioner) return null;
 
   return (
-    <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/20 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+    <Card className="bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/20 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-bold flex items-center gap-2">
           <MaskIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
@@ -445,7 +445,7 @@ const SeedList: React.FC<{
               <div key={seed.id} className="flex items-center gap-2 px-4 py-2 text-sm">
                 <span className={cn(
                   'w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                  seed.seed_number <= 2 ? 'bg-pastel-orange text-[#0F1F15]' : 'bg-white/5 ring-1 ring-white/10 text-white/55',
+                  seed.seed_number <= 2 ? 'bg-pastel-orange text-pastel-surface' : 'bg-white/5 ring-1 ring-white/10 text-white/55',
                 )}>
                   {seed.seed_number}
                 </span>
@@ -645,9 +645,9 @@ const PlayoffBracket = () => {
 
   // Layout wrapper used throughout
   const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
           <h1 className="text-lg font-bold text-pastel-cream">Playoffs</h1>
         </div>
@@ -680,7 +680,7 @@ const PlayoffBracket = () => {
                 {seeds.length > 0 && bracket && (
                   <SeedList seeds={seeds} teamNames={teamNames} bracketSize={bracket.bracket_size} />
                 )}
-                <div className="bg-[#1A2A20] ring-1 ring-amber-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(251,191,36,0.15)] overflow-hidden">
+                <div className="bg-pastel-surface-tile ring-1 ring-amber-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(251,191,36,0.15)] overflow-hidden">
                   <MascotPortrait id="stormy" />
                   <div className="p-5">
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-amber-300 font-bold mb-1">
@@ -698,7 +698,7 @@ const PlayoffBracket = () => {
             {/* Right sidebar - notifications */}
             {userLeagueState === 'active-user' && (activeLeagueId || leagueId) && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId || leagueId || ''} />
                 </div>
               </aside>

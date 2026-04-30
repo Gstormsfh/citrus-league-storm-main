@@ -59,7 +59,7 @@ export function GameModeCard({
                 style={{ background: 'linear-gradient(to bottom, transparent 0%, #1A2A20 100%)' }}
               />
               {badge && (
-                <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-md font-jbmono text-[9px] tracking-wider uppercase font-bold ring-1 ${a.chip} backdrop-blur-md bg-[#0F1F15]/70`}>
+                <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-md font-jbmono text-[9px] tracking-wider uppercase font-bold ring-1 ${a.chip} backdrop-blur-md bg-pastel-surface/70`}>
                   {badge}
                 </span>
               )}

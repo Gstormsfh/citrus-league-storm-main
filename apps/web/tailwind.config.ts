@@ -105,7 +105,7 @@ export default {
 					'border-strong': 'rgba(255, 255, 255, 0.15)', // ghost border accessible
 				},
 				// ==========================================
-				// PASTEL VIBRANT TOKENS — additive, for /preview-redesign only
+				// PASTEL VIBRANT TOKENS — the live v2 design system.
 				// Citrus brand: warm cream/peach pastel base, vibrant orange punches.
 				// Glossier × Casper × Notion register.
 				// ==========================================
@@ -122,6 +122,19 @@ export default {
 					orange: '#FF6B1A',          // vibrant primary CTA
 					'orange-soft': '#FF9F66',   // softer warm orange
 					'orange-deep': '#C04A0E',   // deep orange (text on light)
+					// Dark forest surface family — page backgrounds and cards in v2.
+					// Use bg-pastel-surface for page wrappers, bg-pastel-surface-tile for
+					// cards, and bg-pastel-surface-high for hover/active states.
+					//
+					// IMPORTANT: surface* are SURFACE colors. forest* (above) are TEXT colors
+					// (deep-forest-on-light backgrounds). Don't conflate them.
+					//
+					// Lifted from citrus2/tokens.ts (C2.bg / C2.surface / C2.surfaceHigh) on
+					// 2026-04-29. Replaces ~341 hex-literal usages across migrated v2 pages.
+					surface: '#0F1F15',         // page surface (deep forest)
+					'surface-tile': '#1A2A20',  // card / tile surface
+					'surface-high': '#243429',  // hover / active state
+					butter: '#F4E5B8',          // butter accent (4th color in mascot palette)
 				},
 				// Citrus fantasy sports theme colors - High-Contrast Citrus Palette
 				fantasy: {

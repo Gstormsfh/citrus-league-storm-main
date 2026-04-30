@@ -689,13 +689,13 @@ const CreateLeague = () => {
   // RENDER
   // ============================================================================
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream relative">
       {/* Decorative Background — pastel-orange + sage halos in citrus2 voice */}
       <div aria-hidden="true" className="absolute top-0 right-0 w-96 h-96 bg-pastel-orange/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
       <div aria-hidden="true" className="absolute bottom-0 left-0 w-96 h-96 bg-pastel-sage/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
 
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
           <h1 className="text-lg font-bold text-pastel-cream">Create League</h1>
         </div>
@@ -736,20 +736,20 @@ const CreateLeague = () => {
             <WaitlistSignup source="create_league_page" variant="compact" />
           </div>
 
-          <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] overflow-hidden">
+          <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] overflow-hidden">
             <CardContent className="p-4 sm:p-8">
               <Tabs defaultValue={defaultTab} value={defaultTab} onValueChange={(v) => setDefaultTab(v as "create" | "join")} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-8 bg-[#0F1F15] ring-1 ring-white/10 p-1 rounded-xl">
+                <TabsList className="grid w-full grid-cols-2 mb-8 bg-pastel-surface ring-1 ring-white/10 p-1 rounded-xl">
                   <TabsTrigger
                     value="create"
-                    className="flex items-center gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                    className="flex items-center gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                   >
                     <CupIcon className="w-4 h-4" strokeWidth={2} />
                     Create League
                   </TabsTrigger>
                   <TabsTrigger
                     value="join"
-                    className="flex items-center gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                    className="flex items-center gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                   >
                     <UserPlus className="w-4 h-4" />
                     Join League
@@ -1306,7 +1306,7 @@ const CreateLeague = () => {
                             <h4 className="font-semibold text-sm uppercase tracking-wider text-white/55">
                               {category} Stats
                             </h4>
-                            <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_8px_24px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                            <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_8px_24px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                               {stats.map((stat) => (
                                 <div
                                   key={stat.id}
@@ -1394,7 +1394,7 @@ const CreateLeague = () => {
                           <h4 className="font-semibold text-sm uppercase tracking-wider text-white/55">
                             Skater Categories
                           </h4>
-                          <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_8px_24px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                          <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_8px_24px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                             {AVAILABLE_CATEGORIES.filter(c => !c.isGoalie).map((cat) => (
                               <div
                                 key={cat.id}
@@ -1426,7 +1426,7 @@ const CreateLeague = () => {
                           <h4 className="font-semibold text-sm uppercase tracking-wider text-white/55">
                             Goalie Categories
                           </h4>
-                          <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_8px_24px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                          <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_8px_24px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                             {AVAILABLE_CATEGORIES.filter(c => c.isGoalie).map((cat) => (
                               <div
                                 key={cat.id}

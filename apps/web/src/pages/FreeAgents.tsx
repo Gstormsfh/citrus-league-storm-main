@@ -1238,9 +1238,9 @@ const FreeAgents = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Free Agents</h1>
@@ -1293,22 +1293,22 @@ const FreeAgents = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 max-w-2xl mb-6 bg-[#1A2A20] ring-1 ring-white/10 p-1 rounded-xl">
+          <TabsList className="grid w-full grid-cols-3 max-w-2xl mb-6 bg-pastel-surface-tile ring-1 ring-white/10 p-1 rounded-xl">
             <TabsTrigger
               value="available"
-              className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+              className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
             >
               Available
             </TabsTrigger>
             <TabsTrigger
               value="schedule"
-              className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+              className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
             >
               <Calendar className="h-4 w-4" /> Schedule
             </TabsTrigger>
             <TabsTrigger
               value="watch"
-              className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+              className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
             >
               Watch List
             </TabsTrigger>
@@ -1324,7 +1324,7 @@ const FreeAgents = () => {
                     key={pos}
                     className={`cursor-pointer px-4 py-1 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold border-0 transition-all ${
                       isActive
-                        ? 'bg-pastel-orange text-[#0F1F15] shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]'
+                        ? 'bg-pastel-orange text-pastel-surface shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]'
                         : 'bg-white/5 ring-1 ring-white/10 text-white/70 hover:bg-white/[0.08] hover:ring-pastel-orange/30'
                     }`}
                     onClick={() => setPositionFilter(pos)}
@@ -2395,7 +2395,7 @@ const FreeAgents = () => {
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <MascotPortrait id="stormy" />
                   <div className="p-5">
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
@@ -2409,7 +2409,7 @@ const FreeAgents = () => {
                     </ul>
                   </div>
                 </div>
-                <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="flex items-center gap-2 mb-2">
                     <RangeIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Sort tips</div>
@@ -2424,7 +2424,7 @@ const FreeAgents = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>

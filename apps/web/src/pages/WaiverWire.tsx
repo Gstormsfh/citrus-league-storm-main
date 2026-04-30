@@ -397,9 +397,9 @@ const WaiverWire = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Waiver Wire</h1>
@@ -430,7 +430,7 @@ const WaiverWire = () => {
                     "spent" portion shows the white track. Tabular numerals for
                     the readout below. Only renders for FAAB leagues. */}
                 {isFAAB && faabBudget !== null && (
-                  <div className="mt-4 max-w-md bg-[#1A2A20] ring-1 ring-pastel-orange/40 rounded-2xl p-4 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]">
+                  <div className="mt-4 max-w-md bg-pastel-surface-tile ring-1 ring-pastel-orange/40 rounded-2xl p-4 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]">
                     {/* Bespoke Kiwi pose: same OG character (sliced-kiwi
                         face, round glasses, sage #44 jersey, orange citrus
                         side, low-poly 3D, dark forest bg, warm rim) but in
@@ -484,7 +484,7 @@ const WaiverWire = () => {
 
             {/* Waiver Priority & Settings */}
             <div className="grid md:grid-cols-2 gap-6 mb-8">
-              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+              <Card className="bg-pastel-surface-tile border-0 ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
                 <div aria-hidden="true" className="absolute top-0 right-0 w-48 h-48 bg-pastel-sage/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
                 <CardHeader className="relative z-10">
                   <CardTitle className="font-calistoga text-lg text-pastel-cream flex items-center gap-2">
@@ -512,7 +512,7 @@ const WaiverWire = () => {
                 </CardContent>
               </Card>
 
-              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+              <Card className="bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
                 <div aria-hidden="true" className="absolute top-0 right-0 w-48 h-48 bg-pastel-orange/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
                 <CardHeader className="relative z-10">
                   <CardTitle className="font-calistoga text-lg text-pastel-cream flex items-center gap-2">
@@ -544,7 +544,7 @@ const WaiverWire = () => {
             </div>
 
             {/* Search Available Players */}
-            <Card className="mb-8 bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+            <Card className="mb-8 bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
               <CardHeader>
                 <CardTitle className="font-calistoga text-xl text-pastel-cream flex items-center gap-2">
                   <Search className="w-5 h-5 text-pastel-orange" />
@@ -576,7 +576,7 @@ const WaiverWire = () => {
                         className={cn(
                           'flex items-center gap-2 pl-1 pr-3 py-1 rounded-full ring-1 transition-all font-jbmono text-[10px] uppercase tracking-[0.18em] font-bold',
                           active
-                            ? `bg-pastel-orange text-[#0F1F15] ${chip.ring} shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]`
+                            ? `bg-pastel-orange text-pastel-surface ${chip.ring} shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]`
                             : 'bg-white/5 text-white/70 ring-white/10 hover:bg-white/10 hover:text-pastel-cream',
                         )}
                         aria-pressed={active}
@@ -584,7 +584,7 @@ const WaiverWire = () => {
                         <img
                           src={MASCOTS[chip.mascot].image}
                           alt=""
-                          className="w-7 h-7 rounded-full object-cover ring-2 ring-[#0F1F15]/20"
+                          className="w-7 h-7 rounded-full object-cover ring-2 ring-pastel-surface/20"
                           loading="lazy"
                         />
                         {chip.label}
@@ -629,7 +629,7 @@ const WaiverWire = () => {
                   <Button
                     onClick={searchPlayers}
                     disabled={searchLoading}
-                    className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] disabled:opacity-50 h-12"
+                    className="bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] disabled:opacity-50 h-12"
                   >
                     {searchLoading ? 'Searching…' : 'Search'}
                   </Button>
@@ -667,7 +667,7 @@ const WaiverWire = () => {
                           size="sm"
                           className={isGameLocked
                             ? "bg-amber-400/20 ring-1 ring-amber-400/40 text-amber-300 hover:bg-amber-400/30 font-bold shrink-0"
-                            : "bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] shrink-0"
+                            : "bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] shrink-0"
                           }
                         >
                           {isGameLocked ? 'Claim' : 'Add'}
@@ -681,7 +681,7 @@ const WaiverWire = () => {
 
             {/* Claim Confirmation (shown when a player is selected) */}
             {selectedPlayer && (
-              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/40 rounded-2xl shadow-[0_24px_60px_-16px_rgba(255,168,87,0.3)] animate-in slide-in-from-top-2 mb-8 relative overflow-hidden">
+              <Card className="bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/40 rounded-2xl shadow-[0_24px_60px_-16px_rgba(255,168,87,0.3)] animate-in slide-in-from-top-2 mb-8 relative overflow-hidden">
                 <div aria-hidden="true" className="absolute top-0 right-0 w-64 h-64 bg-pastel-orange/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
                 <CardHeader className="relative z-10">
                   <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5">
@@ -759,7 +759,7 @@ const WaiverWire = () => {
                   <div className="flex items-center gap-2">
                     <Button
                       onClick={handleSubmitClaim}
-                      className="flex-1 bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]"
+                      className="flex-1 bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]"
                     >
                       {isFAAB ? `Submit $${faabBidAmount} Bid` : 'Submit Claim'}
                     </Button>
@@ -891,7 +891,7 @@ const WaiverWire = () => {
               };
 
               return (
-                <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <CardHeader>
                     <CardTitle className="font-calistoga text-xl text-pastel-cream flex items-center gap-2">
                       <AlertCircle className="w-5 h-5 text-pastel-orange" />
@@ -955,7 +955,7 @@ const WaiverWire = () => {
                     portrait (Kiwi is now integrated INTO the FAAB meter on
                     the main content side). This rail tile shows real wire
                     activity counts so the rail earns its space. */}
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-sage/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="flex items-center gap-2 mb-3">
                     <ShiftIcon className="w-4 h-4 text-pastel-sage-soft" strokeWidth={2} />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold">Wire activity</div>
@@ -982,7 +982,7 @@ const WaiverWire = () => {
                     </div>
                   </div>
                 </div>
-                <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="flex items-center gap-2 mb-2">
                     <RangeIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Pickup strategy</div>
@@ -999,7 +999,7 @@ const WaiverWire = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>

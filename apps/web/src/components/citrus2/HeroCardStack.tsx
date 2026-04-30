@@ -18,7 +18,7 @@ export function HeroCardStack() {
     <div className="relative w-full max-w-[480px] mx-auto h-[440px] sm:h-[480px]">
       {/* Back card — sage — League standings preview */}
       <div
-        className="absolute top-2 right-0 sm:top-4 sm:-right-2 w-[240px] sm:w-[280px] bg-[#1A2A20] border border-pastel-sage/30 rounded-2xl p-4 sm:p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] rotate-[6deg] origin-bottom-left"
+        className="absolute top-2 right-0 sm:top-4 sm:-right-2 w-[240px] sm:w-[280px] bg-pastel-surface-tile border border-pastel-sage/30 rounded-2xl p-4 sm:p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] rotate-[6deg] origin-bottom-left"
         aria-hidden="true"
       >
         <div className="flex items-center gap-3 mb-4">
@@ -53,7 +53,7 @@ export function HeroCardStack() {
 
       {/* Middle card — butter — Stormy AI with real Stormy voice */}
       <div
-        className="absolute top-16 left-0 sm:top-20 sm:-left-4 w-[260px] sm:w-[300px] bg-[#1A2A20] border border-[#F4E5B8]/30 rounded-2xl p-4 sm:p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] -rotate-[5deg]"
+        className="absolute top-16 left-0 sm:top-20 sm:-left-4 w-[260px] sm:w-[300px] bg-pastel-surface-tile border border-pastel-butter/30 rounded-2xl p-4 sm:p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] -rotate-[5deg]"
         aria-hidden="true"
       >
         <div className="flex items-center gap-3 mb-4">
@@ -82,7 +82,7 @@ export function HeroCardStack() {
       </div>
 
       {/* Front card — orange — Live game with real team colors */}
-      <div className="absolute bottom-0 right-0 w-[280px] sm:w-[320px] bg-[#1A2A20] border border-pastel-orange/40 rounded-2xl p-4 sm:p-5 shadow-[0_30px_70px_-20px_rgba(255,107,26,0.25),0_24px_60px_-20px_rgba(0,0,0,0.6)] rotate-[2deg]">
+      <div className="absolute bottom-0 right-0 w-[280px] sm:w-[320px] bg-pastel-surface-tile border border-pastel-orange/40 rounded-2xl p-4 sm:p-5 shadow-[0_30px_70px_-20px_rgba(255,107,26,0.25),0_24px_60px_-20px_rgba(0,0,0,0.6)] rotate-[2deg]">
         <div className="flex items-center justify-between mb-4">
           <span className="flex items-center gap-1.5">
             <LivePulse size="xs" />

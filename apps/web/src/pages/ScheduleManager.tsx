@@ -150,9 +150,9 @@ const ScheduleManager = () => {
   const currentMatchup = upcomingMatchups[0];
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
           <h1 className="text-lg font-bold text-pastel-cream">Schedule</h1>
         </div>
@@ -179,7 +179,7 @@ const ScheduleManager = () => {
                 {viewMode === 'summary' ? (
                   <Button
                     onClick={() => setViewMode('full')}
-                    className="w-full md:w-auto bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] hover:shadow-[0_12px_32px_-8px_rgba(255,168,87,0.6)] transition-all"
+                    className="w-full md:w-auto bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] hover:shadow-[0_12px_32px_-8px_rgba(255,168,87,0.6)] transition-all"
                   >
                     Full slate view
                   </Button>
@@ -197,7 +197,7 @@ const ScheduleManager = () => {
               {/* GAME DENSITY THIS WEEK — actual data viz, not a placeholder
                   list. Per-day bar chart up top, then a horizontal bar list
                   of top teams sorted by game count. */}
-              <Card className="max-w-5xl mx-auto mb-6 bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+              <Card className="max-w-5xl mx-auto mb-6 bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                 <CardHeader>
                   <CardTitle className="font-calistoga text-xl text-pastel-cream flex items-center gap-2">
                     <ScoreboardIcon className="w-5 h-5 text-pastel-orange" strokeWidth={2} />
@@ -274,7 +274,7 @@ const ScheduleManager = () => {
                   hit goalies hardest (they typically split starts), so the
                   card title and every b2b row is led by his canonical avatar.
                   Character is doing the icon job for the section he owns. */}
-              <Card className="max-w-5xl mx-auto mb-6 bg-[#1A2A20] border-0 ring-1 ring-amber-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(251,191,36,0.12)] relative overflow-hidden">
+              <Card className="max-w-5xl mx-auto mb-6 bg-pastel-surface-tile border-0 ring-1 ring-amber-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(251,191,36,0.12)] relative overflow-hidden">
                 <div aria-hidden="true" className="absolute -top-12 -right-12 w-44 h-44 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
                 <CardHeader className="relative z-10">
                   <CardTitle className="font-calistoga text-xl text-pastel-cream flex items-center gap-2">
@@ -328,7 +328,7 @@ const ScheduleManager = () => {
               {/* GAME LIST — the original schedule list, kept for the "I just
                   want to scroll the games" use case. Now treated as the
                   detail layer beneath the data viz cards. */}
-              <Card className="max-w-5xl mx-auto mb-8 bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+              <Card className="max-w-5xl mx-auto mb-8 bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                 <CardHeader>
                   <CardTitle className="font-calistoga text-xl text-pastel-cream flex items-center gap-2">
                     <PuckIcon className="w-5 h-5 text-pastel-orange" strokeWidth={2} />
@@ -377,7 +377,7 @@ const ScheduleManager = () => {
               {/* Summary View */}
               {viewMode === 'summary' && (
                 <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-6">
-                  <Card className="border-0 bg-[#1A2A20] ring-1 ring-pastel-orange/20 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+                  <Card className="border-0 bg-pastel-surface-tile ring-1 ring-pastel-orange/20 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
                     <div aria-hidden="true" className="absolute top-0 right-0 w-48 h-48 bg-pastel-orange/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
                     <CardHeader className="relative z-10">
                       <CardTitle className="flex items-center gap-2 text-pastel-cream font-calistoga text-xl">
@@ -401,7 +401,7 @@ const ScheduleManager = () => {
                   </Card>
 
                   <div className="space-y-6">
-                    <Card className="border-0 bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                    <Card className="border-0 bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                       <CardHeader className="pb-2">
                         <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold">Current Record</CardTitle>
                       </CardHeader>
@@ -413,7 +413,7 @@ const ScheduleManager = () => {
                     </Card>
 
                     {recentResults.length > 0 && (
-                      <Card className="border-0 bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                      <Card className="border-0 bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                         <CardHeader className="pb-2">
                           <CardTitle className="flex items-center gap-2 text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold">
                             <CupIcon className="h-4 w-4 text-pastel-orange" strokeWidth={2} />
@@ -440,7 +440,7 @@ const ScheduleManager = () => {
               {/* Full View */}
               {viewMode === 'full' && (
                 <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  <Card className="border-0 bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="border-0 bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 font-calistoga text-xl text-pastel-cream">
                         <CrossedSticksIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} />
@@ -473,7 +473,7 @@ const ScheduleManager = () => {
                     </CardContent>
                   </Card>
 
-                  <Card className="border-0 bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <Card className="border-0 bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 font-calistoga text-xl text-pastel-cream">
                         <CupIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} />
@@ -519,7 +519,7 @@ const ScheduleManager = () => {
                 {/* Sleeper-style slate tile — function-first, no portrait.
                     Pineapple is now the icon for Back-to-Back Watch on the
                     main side, so the rail earns its space with real data. */}
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-sage/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-sage/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="flex items-center gap-2 mb-3">
                     <SlateIcon className="w-4 h-4 text-pastel-sage-soft" strokeWidth={2} />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold">This week's slate</div>
@@ -555,7 +555,7 @@ const ScheduleManager = () => {
             {/* Right Sidebar - Notifications */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>

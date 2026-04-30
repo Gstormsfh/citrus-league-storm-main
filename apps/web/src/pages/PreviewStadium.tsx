@@ -31,7 +31,7 @@ const PRODUCT_CARDS = [
     body: 'Sunday-to-Saturday weeks mean every league goes the distance. The big slate is when the trophies are decided.',
     stat: '7 games tonight',
     icon: Zap,
-    bg: 'bg-[#F4E5B8]',
+    bg: 'bg-pastel-butter',
   },
   {
     label: 'Stormy AI',

@@ -59,7 +59,7 @@ const Guides = () => {
 
         <Tabs defaultValue="beginner" className="mb-12">
           <div className="flex justify-center mb-8">
-            <TabsList className="bg-[#1A2A20] h-10 ring-1 ring-white/10">
+            <TabsList className="bg-pastel-surface-tile h-10 ring-1 ring-white/10">
               <TabsTrigger value="beginner" className="px-6 text-[13px] font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Beginner</TabsTrigger>
               <TabsTrigger value="intermediate" className="px-6 text-[13px] font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Intermediate</TabsTrigger>
               <TabsTrigger value="advanced" className="px-6 text-[13px] font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Advanced</TabsTrigger>

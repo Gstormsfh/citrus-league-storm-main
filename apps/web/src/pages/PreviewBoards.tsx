@@ -32,9 +32,9 @@ function BoardsDivider() {
 
 export default function PreviewBoards() {
   return (
-    <div className="min-h-screen bg-[#FFF8F0] text-pastel-forest relative overflow-x-hidden">
+    <div className="min-h-screen bg-pastel-cream text-pastel-forest relative overflow-x-hidden">
       {/* DARK FOREST TOP HALF */}
-      <div className="relative bg-[#0F1F15] text-pastel-cream pb-20">
+      <div className="relative bg-pastel-surface text-pastel-cream pb-20">
         {/* Atmospheric orange glow */}
         <div
           aria-hidden="true"
@@ -48,7 +48,7 @@ export default function PreviewBoards() {
         />
 
         {/* Nav */}
-        <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F1F15]/85 border-b border-white/5">
+        <header className="sticky top-0 z-40 backdrop-blur-md bg-pastel-surface/85 border-b border-white/5">
           <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between gap-6">
             <Link to="/preview-boards" className="flex items-center gap-1.5">
               <span className="font-calistoga text-[24px] leading-none text-pastel-cream">Citrus</span>
@@ -117,7 +117,7 @@ export default function PreviewBoards() {
               {['JK', 'AM', 'SD', 'TR', 'MV'].map((init, i) => (
                 <div
                   key={init}
-                  className="w-9 h-9 rounded-full bg-pastel-sage/30 ring-2 ring-[#0F1F15] flex items-center justify-center font-jbmono text-[10px] font-bold text-pastel-cream"
+                  className="w-9 h-9 rounded-full bg-pastel-sage/30 ring-2 ring-pastel-surface flex items-center justify-center font-jbmono text-[10px] font-bold text-pastel-cream"
                   style={{ zIndex: 5 - i }}
                 >
                   {init}
@@ -288,7 +288,7 @@ export default function PreviewBoards() {
 
         {/* Final CTA — back on dark */}
         <section className="relative max-w-[1280px] mx-auto px-6">
-          <div className="bg-[#0F1F15] text-pastel-cream rounded-[28px] p-10 md:p-14 text-center relative overflow-hidden">
+          <div className="bg-pastel-surface text-pastel-cream rounded-[28px] p-10 md:p-14 text-center relative overflow-hidden">
             <div
               aria-hidden="true"
               className="absolute -top-20 -right-20 w-[400px] h-[400px] rounded-full opacity-30 blur-3xl"
@@ -303,7 +303,7 @@ export default function PreviewBoards() {
               </p>
               <Link
                 to="/create-league"
-                className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[15px] font-bold px-8 rounded-md hover:bg-white hover:text-[#0F1F15] transition-colors shadow-[0_8px_32px_-8px_rgba(255,107,26,0.5)]"
+                className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[15px] font-bold px-8 rounded-md hover:bg-white hover:text-pastel-surface transition-colors shadow-[0_8px_32px_-8px_rgba(255,107,26,0.5)]"
                 style={{ height: '54px' }}
               >
                 <span>Create your league</span>
