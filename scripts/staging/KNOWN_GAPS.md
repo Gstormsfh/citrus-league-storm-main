@@ -202,6 +202,27 @@ prod-data dumps. A future operator could `git add .` and accidentally
 commit them. Add the pattern to `.gitignore` to make that footgun
 impossible.
 
+### Generalized double-opacity Tailwind class sweep
+
+The earlier sweep (commit `ac3cc2e`) targeted only two specific
+prefix patterns: `text-white/X/Y` and `border-pastel-sage/X/Y`. While
+restyling `apps/web/src/components/StormyChatBubble.tsx` for v2 dark
+mode, a third variant of the same bug class surfaced:
+`backdrop-blur-sm/50` (lines 293 and 351 — `backdrop-blur-sm` is a
+valid Tailwind utility but `/50` is a stale opacity-modifier suffix
+that Tailwind doesn't accept on backdrop filters; the entire class
+is silently dropped).
+
+The bug shape is "any Tailwind class with a `/[0-9]+/[0-9]+` pattern
+in it" — could include other prefixes we haven't seen (e.g.,
+`bg-pastel-orange/X/Y`, `ring-pastel-sage/X/Y`, future variants). The
+right next sweep is a *generalized* regex match: `(\w+(?:-[a-z-]+)*)/[0-9]+/[0-9]+`
+across `apps/web/src/**/*.{tsx,ts}` to catch every variant.
+
+Lower priority than current visual fixes — we'll catch the surfaced
+instances inline as we restyle each component. Queue the generalized
+sweep for after Phase 1 component fixes settle.
+
 ---
 
 *Last updated: 2026-04-29*
