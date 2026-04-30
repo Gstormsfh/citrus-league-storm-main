@@ -178,6 +178,7 @@ Sign-off discipline carries forward from Phase 0–4: each chunk lands as its ow
 - Hono server reachable on `${PORT}` via VM external IP; existing `/api/health` endpoint returns 200.
 - uWS server reachable on `${DRAFT_WS_PORT}`; WebSocket upgrade with valid JWT in `Sec-WebSocket-Protocol` succeeds (101 Switching Protocols).
 - WebSocket upgrade with missing JWT, invalid signature, expired token, or `:lobbyId` path mismatch is rejected with WS close code 4401.
+- On successful WS upgrade, the verified JWT claims (`userId`/`sub`, `draftId`, `leagueId`, `exp`) are attached to the per-connection context (uWS `userData` or equivalent) for downstream message handlers in chunks 11g.4+. The attachment shape is documented in chunk 11g.2's deliverables.
 - Both servers run in the same Node process (verified `ps`).
 - SIGTERM handler shuts both servers down cleanly within 10 seconds (verified).
 - Discovery endpoint returns the correct staging VM host/port for valid league member callers; 401/403/404/409/503 paths still behave per chunk 11g.1's contract.
