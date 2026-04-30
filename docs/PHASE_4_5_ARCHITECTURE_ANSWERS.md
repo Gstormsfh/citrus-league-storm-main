@@ -183,7 +183,7 @@ Severity ladder for incidents:
 
 Surfaced during the Q&A. **Each item is scheduled with target windows in [`PHASE_4_5_PROJECT_PLAN.md`](./PHASE_4_5_PROJECT_PLAN.md)** — that doc is the canonical schedule. The list below is a quick reference; the project plan is the source of truth for dates and dependencies.
 
-1. **Auction format state machine** — separate ADR / design doc. Required before auction live-drafting ships next NHL season.
+1. **Auction format state machine** — see [`docs/adr/ADR-002-auction-state-machine.md`](./adr/ADR-002-auction-state-machine.md). Drafted 2026-04-30; pending Zach review.
 2. **Co-manager schema migration** — `team_managers` join table (or equivalent) and authorization-check refactor. Required before live draft v1 ships next NHL season.
 3. **Push notification infrastructure** — separate technical design (FCM most likely). Required before next NHL season.
 4. **Sentry / client-side error tracking** — post-Web-Summit. Valuable for live-draft debugging.
