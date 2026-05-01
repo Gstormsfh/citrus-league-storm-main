@@ -52,11 +52,16 @@ playoffPoolRoutes.post('/bracket-pickem/picks', async (c) => {
       !!lockDeadline &&
       new Date(lockDeadline) <= new Date();
 
-    const seriesQuery = supabaseAdmin.from('nhl_playoff_series').select('bracket_slot');
-    const { data: lockedSeries } =
+    // Full-bracket pre-deadline: nothing is locked. Industry standard —
+    // Yahoo, ESPN, CBS bracket pools all use deadline-only locking.
+    // Full-bracket post-deadline OR round-by-round: anything not pending is locked.
+    const lockedSeries =
       pickMode === 'full-bracket' && !isGloballyLocked
-        ? await seriesQuery.eq('series_status', 'final')
-        : await seriesQuery.neq('series_status', 'pending');
+        ? []
+        : (await supabaseAdmin
+            .from('nhl_playoff_series')
+            .select('bracket_slot')
+            .neq('series_status', 'pending')).data ?? [];
 
     const lockedSlots = new Set((lockedSeries || []).map(s => s.bracket_slot));
     const allowedPicks = picks.filter(p => !lockedSlots.has(p.series_slot));

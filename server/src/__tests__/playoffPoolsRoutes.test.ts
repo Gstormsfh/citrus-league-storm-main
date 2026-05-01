@@ -26,18 +26,17 @@ afterEach(() => vi.clearAllMocks());
 /**
  * Pick-lock logic regression coverage for POST /api/playoff-pools/bracket-pickem/picks.
  *
- * Lock-mode contract:
+ * Lock-mode contract (deadline-only for full-bracket, matching Yahoo/ESPN/CBS):
  *   - round-by-round (default): any non-pending series locks its slot.
- *   - full-bracket (before lock deadline): only `final` series lock; users can
- *     still pick winners of `active` R1 series (full-bracket UX = predict the
- *     entire bracket up front).
+ *   - full-bracket (before lock deadline): NOTHING locks. Users can pick any
+ *     series including finalized ones (deadline is the only authoritative gate).
  *   - full-bracket (after lock deadline): everything non-pending locks.
  *
  * The frontend at PoolPlayoffBracket.tsx:166-171 mirrors this logic. The
  * server must agree or it rejects picks the UI accepted.
  */
 describe('POST /api/playoff-pools/bracket-pickem/picks — pick lock logic', () => {
-  it('full-bracket mode (before lock): allows active series, rejects only final', async () => {
+  it('full-bracket mode (before lock): allows ALL series including finals (deadline-only)', async () => {
     const { supabaseAdmin, createUserClient } = await import('../lib/supabase');
     const { app } = await import('../app');
 
@@ -55,14 +54,18 @@ describe('POST /api/playoff-pools/bracket-pickem/picks — pick lock logic', () 
           error: null,
         });
       }
-      // nhl_playoff_series — only slot 3 is final (locked in full-bracket mode)
+      // nhl_playoff_series — even if slot 3 is final, full-bracket pre-deadline
+      // short-circuits the lock query so this mock data should never be consulted.
       return createChain({ data: [{ bracket_slot: 3 }], error: null });
     });
 
     (createUserClient as any).mockReturnValue(
       createMockSupabase({
         playoff_bracket_picks: createChain({
-          data: [{ id: 1, series_slot: 1, picked_team_id: 7 }],
+          data: [
+            { id: 1, series_slot: 1, picked_team_id: 7 },
+            { id: 2, series_slot: 3, picked_team_id: 12 },
+          ],
           error: null,
         }),
       })
@@ -74,15 +77,15 @@ describe('POST /api/playoff-pools/bracket-pickem/picks — pick lock logic', () 
       body: JSON.stringify({
         leagueId: 'lg1',
         picks: [
-          { series_slot: 1, picked_team_id: 7 }, // active R1 — allowed in full-bracket
-          { series_slot: 3, picked_team_id: 12 }, // final R1 — locked
+          { series_slot: 1, picked_team_id: 7 },  // active R1 — allowed
+          { series_slot: 3, picked_team_id: 12 }, // final R1 — also allowed pre-deadline
         ],
       }),
     });
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.data.picks).toBeDefined();
+    expect(body.data.picks).toHaveLength(2);
   });
 
   it('round-by-round mode: rejects all non-pending series (legacy behavior)', async () => {

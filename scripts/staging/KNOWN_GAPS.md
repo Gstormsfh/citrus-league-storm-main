@@ -263,6 +263,34 @@ Lower priority than current visual fixes — we'll catch the surfaced
 instances inline as we restyle each component. Queue the generalized
 sweep for after Phase 1 component fixes settle.
 
+### Commissioner deadline UX — warn on late deadlines
+
+With deadline-only locking (Phase 1F-bis: full-bracket pre-deadline =
+nothing locked), commissioners can technically set a lock deadline
+after some R1 series have already finalized — which means users
+picking late see actual outcomes when making picks. This isn't
+enforced as wrong (industry standard treats deadline as
+authoritative), but the create-league flow should warn commissioners
+when their proposed deadline is later than any of the R1 series
+start times in `nhl_playoff_series`. Suggested copy:
+
+  "Heads up: 3 series have already started by your selected
+  deadline. Picks for those series will be made with full
+  information. This is allowed but unusual. Continue?"
+
+Soft warning, not a hard block. Lower priority; queue for after
+Phase 1 visual rollout.
+
+### Finalized series cards — visual disambiguation
+
+When a series is final and the user has not made a pick, the card
+currently shows the actual NHL winner with team-color emphasis (the
+same visual as "my pick is X"). Result: users assume they picked
+when they didn't. Need a clear "Your pick:" indicator separate from
+the displayed winner. Surface during the broader bracket visual
+sweep (the team-row contrast diagnostic from 2026-05-01). Not
+blocking the deadline-only spec change.
+
 ### Path C — playoff-sync cron silently broken since April 17
 
 `nhl_pipeline_meta.last_refresh` for `playoff_series` and

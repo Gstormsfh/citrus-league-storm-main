@@ -160,11 +160,12 @@ export default function PoolPlayoffBracket() {
     const s = series.find(x => x.bracket_slot === slot);
     if (!s) return;
 
-    // In full-bracket mode: allow picks for ANY slot before the global
-    // lock deadline, even if the series is 'pending' (R2-R4 with no teams
-    // filled in yet). After lock or after series is final, block.
+    // Full-bracket: nothing is locked before the global deadline — users
+    // can pick any series including ones already finalized. Industry
+    // standard for bracket pools (Yahoo, ESPN, CBS use deadline-only
+    // locking). After the deadline, everything is locked.
     if (pickMode === 'full-bracket') {
-      if (isGloballyLocked || s.series_status === 'final') return;
+      if (isGloballyLocked) return;
     } else {
       // Round-by-round: legacy behavior — only pick when series is 'pending'
       if (s.series_status !== 'pending') return;
@@ -317,10 +318,10 @@ export default function PoolPlayoffBracket() {
                     const myPick = picks.get(s.bracket_slot);
                     // Lock semantics differ by mode:
                     //   round-by-round: series locks once it starts (status !== 'pending')
-                    //   full-bracket:   series locks at the league's global deadline
-                    //                   (or once series is final — no point changing then)
+                    //   full-bracket:   only the global deadline locks; finalized
+                    //                   series remain pickable until then
                     const locked = pickMode === 'full-bracket'
-                      ? (isGloballyLocked || s.series_status === 'final')
+                      ? isGloballyLocked
                       : s.series_status !== 'pending';
                     const isActive = s.series_status === 'active';
 
