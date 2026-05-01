@@ -263,6 +263,75 @@ Lower priority than current visual fixes — we'll catch the surfaced
 instances inline as we restyle each component. Queue the generalized
 sweep for after Phase 1 component fixes settle.
 
+### Path C — playoff-sync cron silently broken since April 17
+
+`nhl_pipeline_meta.last_refresh` for `playoff_series` and
+`playoff_seeds` keys = `2026-04-17 13:51:07+00` on prod, ~14 days
+stale at the time of the 2026-05-01 propagation-trigger work.
+`sync_playoff_results.py` (Step 3 in `.github/workflows/playoff-sync.yml`)
+hasn't successfully completed since R1 began.
+
+The workflow's `continue-on-error: true` on Step 3 means failures
+don't surface anywhere — no Slack alert, no GitHub email, nothing.
+The only telemetry is the freshness timestamp, which we never
+check in monitoring. Failures during the most active part of the
+playoffs accumulated for two weeks before being noticed (only
+because the propagation trigger work surfaced the staleness).
+
+Need:
+- Workflow-level monitoring: Slack alert on `playoff_series`
+  freshness > 24h, OR a CI-level freshness check that fails the
+  build if data is stale during expected playoff window.
+- Remove or scope the `continue-on-error` after the explicit Step
+  3 failure mode is understood. Right now we don't even know what
+  the cron is failing on — could be NHL API change, Supabase auth
+  expiry, network, anything.
+
+CRITICAL pre-Web-Summit infrastructure debt — same root-cause
+class as the propagation bug itself (silent failure of automated
+pipelines we depend on). The trigger we shipped on 2026-05-01
+keeps the data correct regardless of cron state, but the cron
+still needs to be fixed for everything else it does (game→series
+linking, win counts, pick scoring RPCs).
+
+### Path B — sync_playoff_results.py cascade logic doesn't actually cascade
+
+The script's docstring (line 8-9) claims:
+"4. Cascade winners into next-round series (R1 winners populate R2)"
+
+The implementation at `sync_series_state_from_bracket()` lines
+132-138 only populates `high_seed_team_id` / `low_seed_team_id`
+from the NHL bracket API response (`s.get('topSeedTeam')`,
+`s.get('bottomSeedTeam')`). There is no code that says "for each
+newly-finalized series, find the child via parent_slot_a/b and
+write winner_team_id into the appropriate seed slot."
+
+Now that the DB trigger handles cascade reliably (migration
+20260501120000_add_playoff_winner_propagation_trigger.sql), this
+script needs to be rewritten OR have its docstring corrected to
+remove the false claim. Lower priority since the trigger is the
+source-of-truth. But the gap between docstring and reality is
+exactly the kind of dead-reckoning that breeds 14-day silent
+failures (see Path C above).
+
+### Path D — audit all GitHub Actions workflows for `continue-on-error: true`
+
+Each `continue-on-error: true` flag is a potential silent-failure
+hiding spot. Today's investigation surfaced one in
+`playoff-sync.yml` Step 3 that masked a 14-day cron failure;
+others may be doing the same in workflows we haven't checked
+(`production-deploy.yml`, `staging-deploy.yml`, `ci.yml`,
+`deploy-preview.yml`, `rls-audit.yml`, `main.yml`).
+
+Action: grep `continue-on-error: true` across `.github/workflows/`
+and surface every instance. For each, either:
+- Document why the failure is genuinely tolerable (and add a
+  monitoring/alerting compensating control), OR
+- Remove the flag so the failure surfaces loudly.
+
+Should land before Web Summit. The 14-day cron silence pattern can
+recur in any workflow with this antipattern.
+
 ### Playoff-pools route — additional locking issues to scope separately
 
 Surfaced during the 2026-05-01 fix for full-bracket "Save failed" on
