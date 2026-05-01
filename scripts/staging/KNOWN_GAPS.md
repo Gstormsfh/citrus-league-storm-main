@@ -263,6 +263,16 @@ Lower priority than current visual fixes — we'll catch the surfaced
 instances inline as we restyle each component. Queue the generalized
 sweep for after Phase 1 component fixes settle.
 
+### Staging playoff-data freshness — manual sync required
+
+`scripts/staging/08-copy-prod-playoff-data.sql` copies prod's
+`nhl_playoff_seeds`, `nhl_playoff_series`, and `nhl_pipeline_meta` to
+staging at execution time. Idempotent (DELETE-before-INSERT). Re-run
+periodically during active playoffs to refresh staging data,
+especially before any visual QA pass on bracket/confidence pool
+pages. Long-term: a periodic Supabase function or cron job could
+automate this, but manual re-run is sufficient for now.
+
 ### Phase 1E playoff-pool Card sweeps — unverifiable on staging until prod data arrives
 
 Phase 1E (commit landed 2026-04-30) included per-callsite `bg-*` token
