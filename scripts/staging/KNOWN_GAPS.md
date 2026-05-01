@@ -263,6 +263,34 @@ Lower priority than current visual fixes — we'll catch the surfaced
 instances inline as we restyle each component. Queue the generalized
 sweep for after Phase 1 component fixes settle.
 
+### Playoff-pools route — additional locking issues to scope separately
+
+Surfaced during the 2026-05-01 fix for full-bracket "Save failed" on
+`POST /api/playoff-pools/bracket-pickem/picks` (real users in 2026
+prod's "Office Hockey Pool" full-bracket leagues were hitting it
+post-R1-start). The pickMode-aware lock fix landed; these adjacent
+issues are NOT bundled into that fix and should be tracked:
+
+1. `lockedSeries` query has no season filter — pulls all non-pending
+   series across all seasons. Today only 2025 series exist; in
+   2026+ this will over-lock cross-season. Either add a season
+   filter (requires storing the league's target season explicitly,
+   which `leagues.settings` doesn't currently do for bracket
+   pickem) or scope `nhl_playoff_series` writes to current season
+   only via the data pipeline.
+
+2. Confidence picks route (`POST /confidence/picks`) has NO lock
+   check at all. A user can "save" confidence picks against
+   finalized series silently — same shape as the bracket pickem
+   bug but worse (no error, just silent acceptance). Defer to a
+   focused fix when confidence pools see real production traffic.
+
+3. `GET /:leagueId/picks` doesn't filter by season either. Same
+   issue as (1) — defer with the season-filter ticket.
+
+All three are below threshold for active-incident fix but should
+land before the next playoff cycle.
+
 ### Staging playoff-data freshness — manual sync required
 
 `scripts/staging/08-copy-prod-playoff-data.sql` copies prod's
