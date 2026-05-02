@@ -372,7 +372,7 @@
   }
   
   html {
-  background: #D4E8B8;
+  background: #0F1F15;
   }
 
   .dark html, html.dark {
@@ -382,7 +382,7 @@
   body {
   overflow-x: hidden;
   overflow-y: auto;
-  background: #D4E8B8;
+  background: #0F1F15;
   @apply text-citrus-forest font-sans corduroy-texture;
   margin: 0;
   padding: 0;
