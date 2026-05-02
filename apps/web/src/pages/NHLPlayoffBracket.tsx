@@ -55,6 +55,15 @@ const ROUND_NAMES: Record<number, string> = {
   4: 'Stanley Cup Final',
 };
 
+interface LiveGame {
+  game_id: number;
+  home_team: string;
+  away_team: string;
+  home_score: number;
+  away_score: number;
+  status: string;
+}
+
 export default function NHLPlayoffBracket() {
   const [season] = useState<number>(2025);
   const [seeds, setSeeds] = useState<Seed[]>([]);
@@ -62,6 +71,7 @@ export default function NHLPlayoffBracket() {
   const [loading, setLoading] = useState(true);
   const [meta, setMeta] = useState<{ oldest_refresh: string | null } | null>(null);
   const [h2hMap, setH2hMap] = useState<Record<number, { high_wins: number; low_wins: number; games: number }>>({});
+  const [liveGames, setLiveGames] = useState<LiveGame[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -85,6 +95,20 @@ export default function NHLPlayoffBracket() {
     };
     load();
     const interval = setInterval(load, 60000); // refresh every 60s
+    return () => clearInterval(interval);
+  }, [season]);
+
+  // Live games refresh on a tighter cadence — drives the LIVE badge
+  useEffect(() => {
+    const fetchLive = async () => {
+      try {
+        const res = await fetch(`/api/nhl-playoffs/live-games?season=${season}`);
+        const json = await res.json();
+        setLiveGames(json.data?.games || json.games || []);
+      } catch { /* non-critical */ }
+    };
+    fetchLive();
+    const interval = setInterval(fetchLive, 30_000);
     return () => clearInterval(interval);
   }, [season]);
 
@@ -199,7 +223,10 @@ export default function NHLPlayoffBracket() {
                     const highInfo = high ? NHL_TEAMS.find((t) => t.abbrev === high.team_abbrev) : null;
                     const lowInfo = low ? NHL_TEAMS.find((t) => t.abbrev === low.team_abbrev) : null;
                     const isFinal = s.series_status === 'final';
-                    const isActive = s.series_status === 'active';
+                    const gameIsLive = !!liveGames.find(g =>
+                      (g.home_team === high?.team_abbrev && g.away_team === low?.team_abbrev) ||
+                      (g.home_team === low?.team_abbrev && g.away_team === high?.team_abbrev)
+                    );
                     const h2h = h2hMap[s.bracket_slot];
 
                     return (
@@ -207,12 +234,12 @@ export default function NHLPlayoffBracket() {
                         key={s.series_id}
                         className={cn(
                           'bg-pastel-surface-tile border rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5',
-                          isActive
+                          gameIsLive
                             ? 'hover:shadow-[0_16px_40px_-12px_rgba(255,107,26,0.4)]'
                             : isFinal
                             ? 'hover:shadow-[0_16px_40px_-12px_rgba(132,165,125,0.3)]'
                             : 'hover:shadow-[0_16px_40px_-12px_rgba(255,255,255,0.1)]',
-                          isActive
+                          gameIsLive
                             ? 'border-pastel-orange/40'
                             : isFinal
                             ? 'border-pastel-sage/30'
@@ -238,7 +265,7 @@ export default function NHLPlayoffBracket() {
                               </span>
                             )}
                           </div>
-                          {isActive && (
+                          {gameIsLive && (
                             <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-pastel-orange/15 ring-1 ring-pastel-orange/30">
                               <LivePulse size="xs" />
                               <span className="font-jbmono text-[9px] uppercase tracking-wider text-pastel-orange-soft font-bold leading-none">
