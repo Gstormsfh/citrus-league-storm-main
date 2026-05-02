@@ -29,23 +29,29 @@ exact rollback target. Run locally and save the output to this file
 
 ### Firebase Hosting current release
 
-```bash
-firebase hosting:sites:list --project citrus-fantasy-prod
+The Firebase CLI does not expose `hosting:releases:list` directly.
+Use one of:
 
-firebase hosting:releases:list \
-  --site citrus-fantasy-prod \
-  --project citrus-fantasy-prod \
-  --limit 5
-```
+- **Console**: Firebase Console → Hosting → `citrus-fantasy-prod` →
+  Release history tab → top row is current.
+- **REST API** (requires authenticated gcloud + quota project):
+  ```bash
+  curl -sS \
+    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+    -H "X-Goog-User-Project: citrus-fantasy-prod" \
+    "https://firebasehosting.googleapis.com/v1beta1/sites/citrus-fantasy-prod/channels/live/releases?pageSize=3"
+  ```
+  Top entry's `name` field has format
+  `sites/citrus-fantasy-prod/channels/live/releases/<RELEASE_ID>`.
+  Save the `<RELEASE_ID>` portion.
+- **Channel summary** (no release ID, just timestamp):
+  ```bash
+  firebase hosting:channel:list \
+    --site citrus-fantasy-prod \
+    --project citrus-fantasy-prod
+  ```
 
-Expected output: a table of recent releases. Note the **first row's
-release ID** — that's the current live release. Save as
-`PREDEPLOY_FIREBASE_RELEASE` below.
-
-```
-PREDEPLOY_FIREBASE_RELEASE=<paste here>
-PREDEPLOY_FIREBASE_RELEASE_TIMESTAMP=<paste here>
-```
+Save the release ID as `PREDEPLOY_FIREBASE_RELEASE` below.
 
 ### Cloud Run current revision
 
@@ -55,16 +61,85 @@ gcloud run revisions list \
   --region=us-central1 \
   --project=citrus-fantasy-prod \
   --limit=5 \
-  --format="table(name,creationTimestamp,active,servingPercentage:label=TRAFFIC%)"
+  --format="table(name,creationTimestamp,active)"
 ```
 
-Expected output: rows with `Active=Yes` and `TRAFFIC%=100` on the
-current live revision. Save as `PREDEPLOY_CLOUDRUN_REVISION` below.
+The row with `active=yes` is the currently-serving revision. Save as
+`PREDEPLOY_CLOUDRUN_REVISION` below.
+
+---
+
+## Pre-deploy capture (filled 2026-05-02)
+
+Captured immediately before the staging-setup → master merge for the
+v2 Citrus 2.0 dark theme rollout + tonight's playoff polish + Draft
+Engine v2 server-side scaffolding. Use these as exact rollback
+targets if anything goes wrong post-deploy.
 
 ```
-PREDEPLOY_CLOUDRUN_REVISION=<paste here>
-PREDEPLOY_CLOUDRUN_REVISION_TIMESTAMP=<paste here>
+PREDEPLOY_FIREBASE_RELEASE=1777231289278000
+PREDEPLOY_FIREBASE_VERSION=ab3bc39653f7a3f2
+PREDEPLOY_FIREBASE_RELEASE_TIMESTAMP=2026-04-26T19:21:29.278Z
+PREDEPLOY_FIREBASE_FILE_COUNT=111
+PREDEPLOY_FIREBASE_BUNDLE_BYTES=1994290
+
+PREDEPLOY_CLOUDRUN_REVISION=citrus-api-00109-csh
+PREDEPLOY_CLOUDRUN_REVISION_TIMESTAMP=2026-04-26T19:20:01.746430Z
+
+PREDEPLOY_GIT_SHA=d48a4b9098f6586bb057de91250010ff8ae39a03
+PREDEPLOY_GIT_TITLE=fix(bracket): show LIVE only when a series game is actually in progress
+PREDEPLOY_GH_RUN_ID=24964852869
+PREDEPLOY_CAPTURED_AT=2026-05-02
 ```
+
+### Paste-ready rollback commands (Scenarios A and B)
+
+**Scenario A — Firebase Hosting rollback:**
+
+Use the Firebase Console (recommended — clones the release into a
+fresh deployment without re-running the workflow):
+```
+https://console.firebase.google.com/project/citrus-fantasy-prod/hosting/sites/citrus-fantasy-prod
+```
+→ Release history → find the row with release ID
+`1777231289278000` (timestamp 2026-04-26 19:21:29 UTC) → click
+the three-dot menu → "Rollback to this version".
+
+Or via REST API clone (if console is not available):
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "X-Goog-User-Project: citrus-fantasy-prod" \
+  -H "Content-Type: application/json" \
+  -d '{"versionName":"sites/citrus-fantasy-prod/versions/ab3bc39653f7a3f2"}' \
+  "https://firebasehosting.googleapis.com/v1beta1/sites/citrus-fantasy-prod/channels/live/releases"
+```
+
+**Scenario B — Cloud Run revision rollback:**
+
+```bash
+gcloud run services update-traffic citrus-api \
+  --region=us-central1 \
+  --project=citrus-fantasy-prod \
+  --to-revisions=citrus-api-00109-csh=100
+```
+
+Verify after rollback:
+```bash
+gcloud run services describe citrus-api \
+  --region=us-central1 --project=citrus-fantasy-prod \
+  --format='value(status.traffic[].revisionName,status.traffic[].percent)'
+```
+Expect: `citrus-api-00109-csh    100`.
+
+Then health check:
+```bash
+API_URL=$(gcloud run services describe citrus-api \
+  --region=us-central1 --project=citrus-fantasy-prod \
+  --format='value(status.url)')
+curl -s -o /dev/null -w "%{http_code}\n" "$API_URL/api/health"
+```
+Expect: `200`.
 
 ### Supabase trigger state (already verified 2026-05-02)
 
