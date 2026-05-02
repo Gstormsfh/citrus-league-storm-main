@@ -263,6 +263,14 @@ Lower priority than current visual fixes — we'll catch the surfaced
 instances inline as we restyle each component. Queue the generalized
 sweep for after Phase 1 component fixes settle.
 
+### Shared <TeamPickButton> component — dedup PoolPlayoffBracket and PoolPlayoffConfidence team rows
+
+The team-row JSX (~50 lines) is duplicated inline between
+`PoolPlayoffBracket.tsx` and `PoolPlayoffConfidence.tsx`. The
+2026-05-01 contrast fix had to apply the same set of changes to
+both. A shared `<TeamPickButton>` component would eliminate the
+drift risk. Out of scope for the contrast fix; queue post-Web-Summit.
+
 ### Commissioner deadline UX — warn on late deadlines
 
 With deadline-only locking (Phase 1F-bis: full-bracket pre-deadline =

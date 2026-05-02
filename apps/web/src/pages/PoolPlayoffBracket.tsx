@@ -333,17 +333,20 @@ export default function PoolPlayoffBracket() {
                           onClick={() => team && handlePick(s.bracket_slot, team.team_id)}
                           disabled={!team || locked}
                           className={cn(
-                            'relative overflow-hidden rounded-lg border-2 p-2.5 text-left transition-all',
-                            picked ? 'ring-2 ring-pastel-sage/60 bg-pastel-sage/10 shadow-[0_4px_12px_-4px_rgba(166,211,160,0.3)]' : 'ring-1 ring-white/10 bg-white/5 hover:ring-pastel-sage/40',
+                            'relative overflow-hidden rounded-lg p-2.5 text-left transition-all',
+                            'bg-pastel-surface ring-1 ring-white/10',
+                            'focus-visible:ring-2 focus-visible:ring-pastel-orange/40 focus-visible:outline-none',
+                            picked && 'ring-2 ring-pastel-orange/50',
+                            !picked && !locked && 'hover:ring-pastel-orange/30',
                             !team && 'opacity-40',
+                            locked && !picked && 'opacity-50 cursor-not-allowed',
                           )}
-                          style={picked && info ? { background: `linear-gradient(135deg, ${info.primaryColor}12, ${info.secondaryColor}08)` } : undefined}
                         >
-                          {/* Color bar on left */}
+                          {/* Color bar on left — team identity accent */}
                           {info && (
-                            <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: info.primaryColor }} />
+                            <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: info.primaryColor }} />
                           )}
-                          <div className="flex items-center gap-2.5 pl-1.5">
+                          <div className="flex items-center gap-2.5 pl-2">
                             {/* Team abbrev badge in team's primary color */}
                             <div
                               className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-calistoga font-black text-white flex-shrink-0 shadow-sm"
@@ -354,7 +357,7 @@ export default function PoolPlayoffBracket() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1">
                                 <span className="text-[10px] font-mono text-white/55">#{team?.seed || '-'}</span>
-                                <span className="text-sm font-display font-bold truncate" style={info ? { color: info.primaryColor } : undefined}>
+                                <span className="text-sm font-display font-bold truncate text-pastel-cream">
                                   {info?.name || team?.team_abbrev || 'TBD'}
                                 </span>
                               </div>
@@ -390,7 +393,7 @@ export default function PoolPlayoffBracket() {
                     return (
                       <div key={s.series_id} className={cn('rounded-xl p-3 space-y-2 bg-white/5 ring-1 ring-white/10 relative',
                           gameIsLive && 'bg-red-400/10 ring-1 ring-red-400/30',
-                          locked && s.series_status === 'final' && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/8',
+                          locked && s.series_status === 'final' && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/10',
                       )}>
                         {/* LIVE ribbon — only when a game is ACTUALLY in progress */}
                         {gameIsLive && (
@@ -406,7 +409,12 @@ export default function PoolPlayoffBracket() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] uppercase font-display font-bold text-white/55">Series {String.fromCharCode(64 + s.bracket_slot)}</span>
                             {s.conference && (
-                              <Badge variant="outline" className={cn('text-[9px] px-1 py-0', s.conference === 'Eastern' ? 'border-blue-300 text-blue-700' : 'border-orange-300 text-orange-700')}>
+                              <Badge className={cn(
+                                'text-[9px] px-1 py-0 border-0 font-jbmono uppercase tracking-wider font-bold',
+                                s.conference === 'Eastern'
+                                  ? 'bg-pastel-sage/15 ring-1 ring-pastel-sage/40 text-pastel-sage-soft'
+                                  : 'bg-pastel-orange/15 ring-1 ring-pastel-orange/40 text-pastel-orange-soft'
+                              )}>
                                 {s.conference === 'Eastern' ? 'EAST' : 'WEST'}
                               </Badge>
                             )}
@@ -437,13 +445,13 @@ export default function PoolPlayoffBracket() {
                         </div>
                         {/* Season H2H record */}
                         {h2hMap[s.bracket_slot] && h2hMap[s.bracket_slot].games > 0 && (
-                          <div className="flex items-center justify-center gap-1.5 text-[10px] text-white/55 pt-1 border-t border-fantasy-border/40">
+                          <div className="flex items-center justify-center gap-1.5 text-[10px] text-white/55 pt-1 border-t border-white/10">
                             <span className="font-mono">Season H2H:</span>
-                            <span className="font-semibold" style={highInfo ? { color: highInfo.primaryColor } : undefined}>
+                            <span className="font-semibold text-pastel-cream">
                               {high?.team_abbrev} {h2hMap[s.bracket_slot].high_wins}
                             </span>
                             <span className="text-white/40">—</span>
-                            <span className="font-semibold" style={lowInfo ? { color: lowInfo.primaryColor } : undefined}>
+                            <span className="font-semibold text-pastel-cream">
                               {h2hMap[s.bracket_slot].low_wins} {low?.team_abbrev}
                             </span>
                             <span className="text-white/40">({h2hMap[s.bracket_slot].games} games)</span>
