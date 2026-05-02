@@ -8,6 +8,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Trophy, Lock, Check, Save, AlertTriangle, ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { StormyLoading } from '@/components/citrus2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -237,7 +238,7 @@ export default function PoolPlayoffBracket() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-white/55">Loading...</div>;
+  if (loading) return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center"><StormyLoading message="Loading pool..." /></div></>;
 
   return (
     <>

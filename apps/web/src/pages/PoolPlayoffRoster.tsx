@@ -19,6 +19,7 @@ import {
   Eye, Calendar, Clock,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { StormyLoading } from '@/components/citrus2';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -575,7 +576,7 @@ export default function PoolPlayoffRosterEntry() {
   };
 
   if (loading) {
-    return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center text-citrus-charcoal/60">Loading pool...</div></>;
+    return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center"><StormyLoading message="Loading pool..." /></div></>;
   }
 
   return (

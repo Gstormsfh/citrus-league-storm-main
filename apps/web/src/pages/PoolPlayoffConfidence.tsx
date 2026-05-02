@@ -12,6 +12,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Trophy, Lock, Save, AlertTriangle, ChevronDown, ChevronUp, Check, ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { StormyLoading } from '@/components/citrus2';
 import { NHL_TEAMS } from '@/types/captracker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -183,7 +184,7 @@ export default function PoolPlayoffConfidence() {
 
   const totalConfidence = useMemo(() => Array.from(picks.values()).reduce((s, p) => s + (p.confidence_value || 0), 0), [picks]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-white/55">Loading...</div>;
+  if (loading) return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center"><StormyLoading message="Loading pool..." /></div></>;
 
   return (
     <>

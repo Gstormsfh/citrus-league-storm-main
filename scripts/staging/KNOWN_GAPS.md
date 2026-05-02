@@ -263,6 +263,15 @@ Lower priority than current visual fixes — we'll catch the surfaced
 instances inline as we restyle each component. Queue the generalized
 sweep for after Phase 1 component fixes settle.
 
+### LoadingScreen.tsx — route-level full-screen loader still v1
+
+The component at `apps/web/src/components/LoadingScreen.tsx` has
+hardcoded light-green fallback (`bg-[#D4E8B8] dark:bg-background`),
+`text-gray-600`, and inline `fontFamily: 'sans-serif'`. Used at
+app-level route boundaries, not specific to pool surfaces. Separate
+from the playoff pool inline loaders that got the StormyLoading
+drop-in (2026-05-01 commit). Queue post-Web-Summit.
+
 ### Shared <TeamPickButton> component — dedup PoolPlayoffBracket and PoolPlayoffConfidence team rows
 
 The team-row JSX (~50 lines) is duplicated inline between

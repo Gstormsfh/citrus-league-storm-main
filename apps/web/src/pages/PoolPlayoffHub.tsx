@@ -17,6 +17,7 @@ import {
   Mail, MessageSquare, Link as LinkIcon, Eye, Calendar,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { StormyLoading } from '@/components/citrus2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -412,7 +413,7 @@ export default function PoolPlayoffHub() {
   };
 
   if (loading) {
-    return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center text-white/55">Loading pool...</div></>;
+    return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center"><StormyLoading message="Loading pool..." /></div></>;
   }
 
   if (!league) {
