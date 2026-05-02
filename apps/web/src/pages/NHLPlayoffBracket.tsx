@@ -262,11 +262,11 @@ export default function NHLPlayoffBracket() {
                         {h2h && h2h.games > 0 && high && low && (
                           <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-center gap-2 font-jbmono text-[10px] text-white/45">
                             <span className="uppercase tracking-wider font-bold">Season H2H</span>
-                            <span className="font-bold" style={highInfo ? { color: highInfo.primaryColor } : undefined}>
+                            <span className="font-bold text-pastel-cream">
                               {high.team_abbrev} {h2h.high_wins}
                             </span>
                             <span className="text-white/30">—</span>
-                            <span className="font-bold" style={lowInfo ? { color: lowInfo.primaryColor } : undefined}>
+                            <span className="font-bold text-pastel-cream">
                               {h2h.low_wins} {low.team_abbrev}
                             </span>
                           </div>
@@ -344,7 +344,7 @@ function BracketTeamRow({
     >
       {info && <TeamColorBar abbrev={info.abbrev} className="!h-full !w-1" />}
       <div
-        className="w-8 h-8 rounded flex items-center justify-center text-[9px] font-jbmono font-black text-white flex-shrink-0"
+        className="w-8 h-8 rounded ring-1 ring-white/20 flex items-center justify-center text-[9px] font-jbmono font-black text-white flex-shrink-0"
         style={{ background: info?.primaryColor || '#6b7280' }}
       >
         {team.team_abbrev}
@@ -352,7 +352,7 @@ function BracketTeamRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
           <span className="font-jbmono text-[10px] text-white/45 tabular-nums">#{team.seed}</span>
-          <span className={cn('text-xs font-sans font-bold truncate', isWinner ? 'text-pastel-cream' : 'text-white/70')}>
+          <span className="text-xs font-sans font-bold truncate text-pastel-cream">
             {info?.name || team.team_abbrev}
           </span>
         </div>

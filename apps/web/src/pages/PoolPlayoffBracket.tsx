@@ -238,7 +238,7 @@ export default function PoolPlayoffBracket() {
     }
   };
 
-  if (loading) return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center"><StormyLoading message="Loading pool..." /></div></>;
+  if (loading) return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center bg-pastel-surface"><StormyLoading message="Loading pool..." /></div></>;
 
   return (
     <>
@@ -350,7 +350,7 @@ export default function PoolPlayoffBracket() {
                           <div className="flex items-center gap-2.5 pl-2">
                             {/* Team abbrev badge in team's primary color */}
                             <div
-                              className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-calistoga font-black text-white flex-shrink-0 shadow-sm"
+                              className="w-10 h-10 rounded-lg ring-1 ring-white/20 flex items-center justify-center text-xs font-calistoga font-black text-white flex-shrink-0 shadow-sm"
                               style={info ? { background: info.primaryColor } : { background: '#6b7280' }}
                             >
                               {team?.team_abbrev || '?'}
@@ -369,7 +369,7 @@ export default function PoolPlayoffBracket() {
                               </div>
                             </div>
                             {picked && (
-                              <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={info ? { background: info.primaryColor } : { background: '#7A9B7A' }}>
+                              <div className="w-5 h-5 rounded-full ring-1 ring-white/20 flex items-center justify-center flex-shrink-0" style={info ? { background: info.primaryColor } : { background: '#7A9B7A' }}>
                                 <Check className="w-3 h-3 text-white" />
                               </div>
                             )}

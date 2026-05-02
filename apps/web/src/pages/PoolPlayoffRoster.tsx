@@ -576,15 +576,15 @@ export default function PoolPlayoffRosterEntry() {
   };
 
   if (loading) {
-    return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center"><StormyLoading message="Loading pool..." /></div></>;
+    return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center bg-pastel-surface"><StormyLoading message="Loading pool..." /></div></>;
   }
 
   return (
     <>
     <Navbar />
-    <div className="min-h-screen bg-gradient-to-b from-white to-[#F5F8ED] pb-24 pt-24">
+    <div className="min-h-screen bg-pastel-surface pb-24 pt-24">
       <div className="max-w-7xl mx-auto px-4 mb-3">
-        <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-citrus-sage hover:text-citrus-forest inline-flex items-center gap-1">
+        <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-pastel-sage-soft hover:text-pastel-cream inline-flex items-center gap-1">
           <ArrowLeft className="h-4 w-4" />{isViewMode ? 'Back to Hub' : 'Back to Pool Home'}
         </Link>
       </div>
@@ -592,40 +592,40 @@ export default function PoolPlayoffRosterEntry() {
       {/* View mode banner */}
       {isViewMode && (
         <div className="max-w-7xl mx-auto px-4 mb-3">
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-citrus-orange/10 border border-citrus-orange/30">
-            <Eye className="h-5 w-5 text-citrus-orange flex-shrink-0" />
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-pastel-orange/10 ring-1 ring-pastel-orange/30">
+            <Eye className="h-5 w-5 text-pastel-orange flex-shrink-0" />
             <div>
-              <div className="text-sm font-display font-bold text-citrus-forest">
+              <div className="text-sm font-bold text-pastel-cream">
                 Viewing {viewOwnerName || 'Teammate'}&apos;s Roster
               </div>
-              <div className="text-[11px] text-citrus-charcoal/60">Read-only — you cannot modify this roster.</div>
+              <div className="text-[11px] text-white/55">Read-only — you cannot modify this roster.</div>
             </div>
           </div>
         </div>
       )}
 
       {/* Sticky header with roster progress */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-xl border-b border-fantasy-border shadow-sm">
+      <div className="sticky top-0 z-30 bg-pastel-surface-tile ring-1 ring-white/10">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <h1 className="text-lg font-varsity font-black uppercase text-citrus-forest flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-citrus-orange" />
+              <h1 className="text-lg font-calistoga text-pastel-cream flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-pastel-orange" />
                 {isViewMode ? `${viewOwnerName || 'Teammate'}'s Roster` : (league?.name || 'Playoff Roster Pool')}
               </h1>
-              <div className="flex items-center gap-3 mt-1 text-xs text-citrus-charcoal/70">
-                <span className="font-display font-bold text-citrus-forest">{roster.length}/{rosterSize} players</span>
+              <div className="flex items-center gap-3 mt-1 text-xs text-white/70">
+                <span className="font-bold text-pastel-cream">{roster.length}/{rosterSize} players</span>
                 <span>F: {posCounts.F}/{posReqs.F}</span>
                 <span>D: {posCounts.D}/{posReqs.D}</span>
                 <span>G: {posCounts.G}/{posReqs.G}</span>
-                {!isViewMode && lastSaved && <span className="text-citrus-sage italic">Saved {lastSaved}</span>}
+                {!isViewMode && lastSaved && <span className="text-pastel-sage-soft italic">Saved {lastSaved}</span>}
               </div>
             </div>
             {!isViewMode && (
               <Button
                 onClick={saveRoster}
                 disabled={saving || locked || roster.length < rosterSize}
-                className="bg-citrus-sage hover:bg-citrus-sage/90 text-citrus-forest font-display font-bold"
+                className="bg-pastel-sage text-pastel-surface hover:bg-pastel-sage-soft font-bold"
               >
                 {locked ? <><Lock className="h-4 w-4 mr-1" />Locked</> : saving ? 'Saving...' : <><Save className="h-4 w-4 mr-1" />Save Roster</>}
               </Button>
@@ -633,9 +633,9 @@ export default function PoolPlayoffRosterEntry() {
           </div>
 
           {/* Roster progress bar */}
-          <div className="mt-2 h-2 bg-citrus-sage/10 rounded-full overflow-hidden">
+          <div className="mt-2 h-2 bg-white/10 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-citrus-sage to-citrus-orange rounded-full transition-all duration-300"
+              className="h-full bg-gradient-to-r from-pastel-sage to-pastel-orange rounded-full transition-all duration-300"
               style={{ width: `${Math.min(100, (roster.length / rosterSize) * 100)}%` }}
             />
           </div>
@@ -645,10 +645,10 @@ export default function PoolPlayoffRosterEntry() {
       <div className="max-w-7xl mx-auto px-4 pt-4">
         {/* ─── TODAY'S GAMES (restored — shown on both Hub AND roster page) ─── */}
         {todayGamesWithPlayers.length > 0 && (
-          <Card className="mb-4 border-2 border-citrus-orange/40 bg-gradient-to-br from-citrus-orange/5 to-white shadow-md">
+          <Card className="mb-4 bg-pastel-surface-tile ring-1 ring-pastel-orange/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-citrus-orange" />
+              <CardTitle className="text-base flex items-center gap-2 text-pastel-cream">
+                <Calendar className="h-4 w-4 text-pastel-orange" />
                 Today&apos;s Games — {isViewMode ? `${viewOwnerName || 'Their'} Players` : 'Your Players'}
               </CardTitle>
             </CardHeader>
@@ -660,13 +660,13 @@ export default function PoolPlayoffRosterEntry() {
                   const isFinal = g.status === 'final';
                   return (
                     <div key={g.game_id} className={cn(
-                      'relative rounded-lg border p-3',
-                      isLive ? 'border-red-400 bg-red-50/40 ring-1 ring-red-400/30' :
-                      isFinal ? 'border-citrus-charcoal/20 bg-muted/20' :
-                      'border-citrus-sage/30 bg-white'
+                      'relative rounded-lg p-3 bg-pastel-surface ring-1',
+                      isLive ? 'bg-red-400/10 ring-red-400/30' :
+                      isFinal ? 'ring-pastel-sage/30' :
+                      'ring-white/10'
                     )}>
                       {isLive && (
-                        <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-varsity font-black uppercase px-2 py-0.5 rounded-full shadow-md">
+                        <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-500 text-white text-[9px] font-calistoga uppercase tracking-wider px-2 py-0.5 rounded-full">
                           <span className="relative flex h-1.5 w-1.5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
                             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
@@ -675,18 +675,18 @@ export default function PoolPlayoffRosterEntry() {
                         </div>
                       )}
                       <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1.5 text-sm font-display font-bold text-citrus-forest">
+                        <div className="flex items-center gap-1.5 text-sm font-bold text-pastel-cream">
                           <span>{g.away_team}</span>
-                          <span className="text-citrus-charcoal/40">@</span>
+                          <span className="text-white/40">@</span>
                           <span>{g.home_team}</span>
                         </div>
                         {g.series_game_number && (
-                          <Badge variant="outline" className="text-[9px] border-citrus-sage/40">Game {g.series_game_number}</Badge>
+                          <Badge className="text-[9px] px-1 py-0 bg-white/5 ring-1 ring-white/10 text-white/55 border-0 font-jbmono uppercase tracking-wider">Game {g.series_game_number}</Badge>
                         )}
                       </div>
                       <div className={cn(
-                        'text-xs font-display mb-2 flex items-center gap-1.5',
-                        isLive ? 'text-red-700 font-bold' : isFinal ? 'text-citrus-charcoal/60' : 'text-citrus-charcoal/50'
+                        'text-xs mb-2 flex items-center gap-1.5',
+                        isLive ? 'text-red-300 font-bold' : isFinal ? 'text-white/55' : 'text-white/45'
                       )}>
                         <Clock className="h-3 w-3" />
                         {(isLive || isFinal) ? (
@@ -701,17 +701,19 @@ export default function PoolPlayoffRosterEntry() {
                           return (
                             <div key={p.id} className="flex items-center justify-between text-[11px]">
                               <div className="flex items-center gap-1.5 min-w-0">
-                                <Badge variant="outline" className={cn(
-                                  'text-[8px] px-1 py-0',
-                                  normalizePos(p.position) === 'G' ? 'border-purple-300 text-purple-700' : normalizePos(p.position) === 'D' ? 'border-blue-300 text-blue-700' : 'border-citrus-sage text-citrus-forest'
+                                <Badge className={cn(
+                                  'text-[8px] px-1 py-0 border-0 font-bold',
+                                  normalizePos(p.position) === 'G' ? 'bg-pastel-butter/15 ring-1 ring-pastel-butter/40 text-pastel-butter' :
+                                  normalizePos(p.position) === 'D' ? 'bg-pastel-orange/15 ring-1 ring-pastel-orange/40 text-pastel-orange-soft' :
+                                  'bg-pastel-sage/15 ring-1 ring-pastel-sage/40 text-pastel-sage-soft'
                                 )}>{normalizePos(p.position)}</Badge>
-                                <span className="font-medium truncate">{shortName(p.full_name)}</span>
+                                <span className="font-medium truncate text-pastel-cream">{shortName(p.full_name)}</span>
                               </div>
                               {ps && normalizePos(p.position) !== 'G' && (
-                                <span className="text-citrus-charcoal/70 flex-shrink-0 ml-1 tabular-nums">{ps.goals ?? 0}G {ps.assists ?? 0}A {calcPlayoffFpts(p).toFixed(1)}pts</span>
+                                <span className="text-white/70 flex-shrink-0 ml-1 tabular-nums">{ps.goals ?? 0}G {ps.assists ?? 0}A {calcPlayoffFpts(p).toFixed(1)}pts</span>
                               )}
                               {ps && normalizePos(p.position) === 'G' && (
-                                <span className="text-citrus-charcoal/70 flex-shrink-0 ml-1 tabular-nums">{ps.saves ?? 0}SV {calcPlayoffFpts(p).toFixed(1)}pts</span>
+                                <span className="text-white/70 flex-shrink-0 ml-1 tabular-nums">{ps.saves ?? 0}SV {calcPlayoffFpts(p).toFixed(1)}pts</span>
                               )}
                             </div>
                           );
@@ -748,17 +750,17 @@ export default function PoolPlayoffRosterEntry() {
           return (
             <div className="space-y-4 mb-6">
               {/* Total points banner */}
-              <Card className="border-2 border-citrus-orange/40 bg-gradient-to-r from-citrus-orange/10 via-citrus-sage/10 to-white shadow-md">
+              <Card className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30">
                 <CardContent className="p-4">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                      <div className="text-[10px] uppercase font-display font-bold text-citrus-charcoal/60 tracking-wide">Total Playoff FPTS</div>
-                      <div className="text-4xl font-varsity font-black text-citrus-forest leading-none">{totalFpts.toFixed(1)}</div>
-                      <div className="text-xs text-citrus-charcoal/60 mt-1">
+                      <div className="text-[10px] uppercase font-jbmono font-bold text-pastel-orange-soft tracking-wider">Total Playoff FPTS</div>
+                      <div className="text-4xl font-calistoga text-pastel-cream leading-none">{totalFpts.toFixed(1)}</div>
+                      <div className="text-xs text-white/55 mt-1">
                         Across {roster.length} players · {totalG}G · {totalA}A · {totalGP} player-games played
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-xs border-citrus-sage/40">
+                    <Badge className="text-xs bg-white/5 ring-1 ring-white/10 text-white/55 border-0 font-jbmono uppercase tracking-wider">
                       <Eye className="h-3 w-3 mr-1" /> Read-only view
                     </Badge>
                   </div>
@@ -767,9 +769,9 @@ export default function PoolPlayoffRosterEntry() {
 
               {/* Grouped stat tables by position */}
               {rowsByGroup.map(group => (
-                <Card key={group.title} className="border-fantasy-border bg-white shadow-sm">
+                <Card key={group.title}>
                   <CardHeader className="pb-2 px-4">
-                    <CardTitle className="text-xs font-display font-bold uppercase text-citrus-charcoal/70 tracking-wide">
+                    <CardTitle className="text-xs font-jbmono font-bold uppercase text-white/55 tracking-wider">
                       {group.title}
                     </CardTitle>
                   </CardHeader>
@@ -777,7 +779,7 @@ export default function PoolPlayoffRosterEntry() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="border-b border-citrus-sage/20 text-[10px] uppercase font-display text-citrus-charcoal/50">
+                          <tr className="border-b border-white/10 text-[10px] uppercase font-jbmono text-white/45">
                             <th className="text-left py-2 px-4 font-bold">Player</th>
                             <th className="text-left py-2 px-2 font-bold">Team</th>
                             <th className="text-right py-2 px-2 font-bold">GP</th>
@@ -799,54 +801,55 @@ export default function PoolPlayoffRosterEntry() {
                                 <th className="text-right py-2 px-2 font-bold hidden sm:table-cell">BLK</th>
                               </>
                             )}
-                            <th className="text-right py-2 px-4 font-bold text-citrus-forest">FPTS</th>
+                            <th className="text-right py-2 px-4 font-bold text-pastel-sage-soft bg-pastel-sage/10">FPTS</th>
                           </tr>
                         </thead>
                         <tbody>
                           {group.rows.length === 0 ? (
-                            <tr><td colSpan={9} className="text-center text-citrus-charcoal/40 italic py-4">No players picked at this position.</td></tr>
+                            <tr><td colSpan={9} className="text-center text-white/45 italic py-4">No players picked at this position.</td></tr>
                           ) : group.rows.map(r => {
                             const s = r.stat;
                             const isG = group.title.startsWith('Goalies');
                             return (
-                              <tr key={r.player.id} className="border-b border-citrus-sage/10 hover:bg-citrus-sage/5">
+                              <tr key={r.player.id} className="border-b border-white/10 hover:bg-white/5">
                                 <td className="py-2 px-4">
                                   <button
                                     type="button"
                                     onClick={() => setStatsModalPlayer(r.player)}
-                                    className="font-medium text-left hover:text-citrus-orange hover:underline transition-colors"
+                                    className="font-medium text-left text-pastel-cream hover:text-pastel-orange hover:underline transition-colors"
                                   >
                                     <span className="sm:hidden">{shortName(r.player.full_name)}</span>
                                     <span className="hidden sm:inline">{r.player.full_name}</span>
                                   </button>
                                 </td>
-                                <td className="py-2 px-2 text-citrus-charcoal/70">{r.player.team}</td>
-                                <td className="py-2 px-2 text-right tabular-nums">{s?.games_played ?? 0}</td>
+                                <td className="py-2 px-2 text-white/70">{r.player.team}</td>
+                                <td className="py-2 px-2 text-right tabular-nums text-pastel-cream">{s?.games_played ?? 0}</td>
                                 {isG ? (
                                   <>
-                                    <td className="py-2 px-2 text-right tabular-nums">{s?.wins ?? 0}</td>
-                                    <td className="py-2 px-2 text-right tabular-nums">{s?.saves ?? 0}</td>
-                                    <td className="py-2 px-2 text-right tabular-nums">{s?.shutouts ?? 0}</td>
-                                    <td className="py-2 px-2 text-right tabular-nums">{s?.goals_against ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums text-pastel-cream">{s?.wins ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums text-pastel-cream">{s?.saves ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums text-pastel-cream">{s?.shutouts ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums text-pastel-cream">{s?.goals_against ?? 0}</td>
                                   </>
                                 ) : (
                                   <>
-                                    <td className="py-2 px-2 text-right tabular-nums">{s?.goals ?? 0}</td>
-                                    <td className="py-2 px-2 text-right tabular-nums">{s?.assists ?? 0}</td>
-                                    <td className="py-2 px-2 text-right tabular-nums font-semibold">{s?.points ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums text-pastel-cream">{s?.goals ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums text-pastel-cream">{s?.assists ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums font-semibold text-pastel-cream">{s?.points ?? 0}</td>
                                     <td className={cn(
                                       'py-2 px-2 text-right tabular-nums hidden sm:table-cell',
-                                      (s?.plus_minus ?? 0) > 0 && 'text-green-700 font-semibold',
-                                      (s?.plus_minus ?? 0) < 0 && 'text-red-600 font-semibold',
+                                      (s?.plus_minus ?? 0) > 0 ? 'text-pastel-sage-soft font-semibold' :
+                                      (s?.plus_minus ?? 0) < 0 ? 'text-red-300 font-semibold' :
+                                      'text-pastel-cream',
                                     )}>
                                       {s ? (s.plus_minus > 0 ? `+${s.plus_minus}` : s.plus_minus) : 0}
                                     </td>
-                                    <td className="py-2 px-2 text-right tabular-nums">{s?.shots ?? 0}</td>
-                                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{s?.hits ?? 0}</td>
-                                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{s?.blocks ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums text-pastel-cream">{s?.shots ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell text-pastel-cream">{s?.hits ?? 0}</td>
+                                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell text-pastel-cream">{s?.blocks ?? 0}</td>
                                   </>
                                 )}
-                                <td className="py-2 px-4 text-right tabular-nums font-bold text-citrus-forest">{r.fpts.toFixed(1)}</td>
+                                <td className="py-2 px-4 text-right tabular-nums font-bold text-pastel-cream">{r.fpts.toFixed(1)}</td>
                               </tr>
                             );
                           })}
@@ -869,29 +872,40 @@ export default function PoolPlayoffRosterEntry() {
             {/* Search + Position tabs */}
             <div className="flex flex-wrap gap-2 mb-3">
               <div className="relative flex-1 min-w-[180px]">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white/40" />
                 <Input
                   placeholder="Search players or teams..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 h-9 text-sm bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border"
+                  className="pl-8 h-9 text-sm"
                 />
               </div>
-              <div className="flex bg-[#E8EED9]/50 rounded-lg border border-fantasy-border p-0.5">
-                {POSITION_TABS.map(tab => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setPosFilter(tab.key)}
-                    className={cn(
-                      'px-3 py-1.5 text-xs font-display font-bold rounded-md transition-colors',
-                      posFilter === tab.key
-                        ? 'bg-citrus-forest text-white shadow-sm'
-                        : 'text-citrus-charcoal/70 hover:text-citrus-forest'
-                    )}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+              <div className="flex bg-pastel-surface rounded-lg ring-1 ring-white/10 p-0.5">
+                {POSITION_TABS.map(tab => {
+                  const active = posFilter === tab.key;
+                  const activeClass =
+                    tab.key === 'All' ? 'bg-pastel-cream text-pastel-surface' :
+                    tab.key === 'F' ? 'bg-pastel-sage text-pastel-surface' :
+                    tab.key === 'D' ? 'bg-pastel-orange text-pastel-surface' :
+                    'bg-pastel-butter text-pastel-surface';
+                  const inactiveClass =
+                    tab.key === 'All' ? 'text-white/55 hover:text-pastel-cream' :
+                    tab.key === 'F' ? 'text-pastel-sage-soft hover:text-pastel-cream' :
+                    tab.key === 'D' ? 'text-pastel-orange-soft hover:text-pastel-cream' :
+                    'text-pastel-butter hover:text-pastel-cream';
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setPosFilter(tab.key)}
+                      className={cn(
+                        'px-3 py-1.5 text-xs font-bold rounded-md transition-colors',
+                        active ? activeClass : inactiveClass
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -900,10 +914,10 @@ export default function PoolPlayoffRosterEntry() {
               <button
                 onClick={() => setTeamFilter(null)}
                 className={cn(
-                  'flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-display font-bold border transition-colors',
+                  'flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-bold border-0 ring-1 transition-colors',
                   !teamFilter
-                    ? 'bg-citrus-forest text-white border-citrus-forest'
-                    : 'bg-white text-citrus-charcoal/70 border-citrus-sage/30 hover:border-citrus-forest'
+                    ? 'bg-pastel-cream text-pastel-surface ring-pastel-cream'
+                    : 'bg-white/5 text-white/70 ring-white/10 hover:ring-pastel-cream/40'
                 )}
               >
                 All Teams
@@ -916,19 +930,19 @@ export default function PoolPlayoffRosterEntry() {
                     key={team}
                     onClick={() => setTeamFilter(teamFilter === team ? null : team)}
                     className={cn(
-                      'flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-display font-bold border transition-colors flex items-center gap-1',
+                      'flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-bold border-0 ring-1 transition-colors flex items-center gap-1',
                       teamFilter === team
-                        ? 'bg-citrus-forest text-white border-citrus-forest'
+                        ? 'bg-pastel-cream text-pastel-surface ring-pastel-cream'
                         : atCap
-                          ? 'bg-red-50 text-red-400 border-red-200'
-                          : 'bg-white text-citrus-charcoal/70 border-citrus-sage/30 hover:border-citrus-forest'
+                          ? 'bg-red-400/10 text-red-300 ring-red-400/30'
+                          : 'bg-white/5 text-white/70 ring-white/10 hover:ring-pastel-cream/40'
                     )}
                   >
                     {team}
                     {count > 0 && (
                       <span className={cn(
-                        'w-4 h-4 rounded-full flex items-center justify-center text-[9px]',
-                        atCap ? 'bg-red-500 text-white' : 'bg-citrus-sage text-white'
+                        'w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold',
+                        atCap ? 'bg-red-500 text-white' : 'bg-pastel-sage text-pastel-surface'
                       )}>
                         {count}
                       </span>
@@ -945,12 +959,12 @@ export default function PoolPlayoffRosterEntry() {
               const norm = normalizePos(selectedPlayer.position);
               const fpts = calcSeasonFpts(selectedPlayer);
               return (
-                <Card className="mb-3 border-2 border-citrus-orange/40 bg-gradient-to-r from-citrus-orange/5 to-citrus-sage/5 shadow-md relative">
+                <Card className="mb-3 bg-pastel-surface-tile ring-1 ring-pastel-orange/40 relative">
                   <CardContent className="p-3">
                     {/* Close X — absolute corner so it never fights for space */}
                     <button
                       onClick={() => setSelectedPlayer(null)}
-                      className="absolute top-1.5 right-1.5 p-1 rounded text-citrus-charcoal/40 hover:text-citrus-charcoal hover:bg-muted/30"
+                      className="absolute top-1.5 right-1.5 p-1 rounded text-white/40 hover:text-pastel-cream hover:bg-white/5"
                       title="Close preview"
                     >
                       <X className="h-4 w-4" />
@@ -958,13 +972,15 @@ export default function PoolPlayoffRosterEntry() {
 
                     {/* Row 1: Pos + Name + Meta */}
                     <div className="flex items-center gap-2 pr-6 mb-2">
-                      <Badge variant="outline" className={cn(
-                        'text-[11px] px-2 flex-shrink-0',
-                        norm === 'G' ? 'border-purple-300 text-purple-700' : norm === 'D' ? 'border-blue-300 text-blue-700' : 'border-citrus-sage text-citrus-forest'
+                      <Badge className={cn(
+                        'text-[11px] px-2 flex-shrink-0 border-0 font-bold',
+                        norm === 'G' ? 'bg-pastel-butter/15 ring-1 ring-pastel-butter/40 text-pastel-butter' :
+                        norm === 'D' ? 'bg-pastel-orange/15 ring-1 ring-pastel-orange/40 text-pastel-orange-soft' :
+                        'bg-pastel-sage/15 ring-1 ring-pastel-sage/40 text-pastel-sage-soft'
                       )}>{norm}</Badge>
                       <div className="min-w-0 flex-1">
-                        <div className="font-display font-bold text-base text-citrus-forest truncate">{selectedPlayer.full_name}</div>
-                        <div className="text-[11px] text-citrus-charcoal/60 truncate">
+                        <div className="font-bold text-base text-pastel-cream truncate">{selectedPlayer.full_name}</div>
+                        <div className="text-[11px] text-white/55 truncate">
                           {selectedPlayer.team} · GP {selectedPlayer.games_played}
                           {norm === 'G'
                             ? ` · ${selectedPlayer.wins || 0}W${(() => {
@@ -975,8 +991,8 @@ export default function PoolPlayoffRosterEntry() {
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <div className="text-[9px] uppercase font-display text-citrus-charcoal/50 leading-none">FPTS</div>
-                        <div className="font-varsity text-lg text-green-700 font-black leading-tight">{fpts.toFixed(1)}</div>
+                        <div className="text-[9px] uppercase font-jbmono text-white/45 tracking-wider leading-none">FPTS</div>
+                        <div className="font-calistoga text-lg text-pastel-sage-soft leading-tight">{fpts.toFixed(1)}</div>
                       </div>
                     </div>
 
@@ -984,14 +1000,14 @@ export default function PoolPlayoffRosterEntry() {
                     <div className="flex items-stretch gap-2">
                       <button
                         onClick={() => setStatsModalPlayer(selectedPlayer)}
-                        className="flex-1 sm:flex-initial px-3 py-2 rounded bg-white border border-citrus-sage/40 text-citrus-forest text-xs font-bold hover:bg-citrus-sage/10 transition-colors"
+                        className="flex-1 sm:flex-initial px-3 py-2 rounded bg-white/5 ring-1 ring-white/10 text-pastel-cream text-xs font-bold hover:bg-white/10 transition-colors"
                       >
                         Details
                       </button>
                       {onRoster ? (
                         <button
                           onClick={() => { removePlayer(selectedPlayer.id); setSelectedPlayer(null); }}
-                          className="flex-1 sm:flex-initial px-4 py-2 rounded bg-red-500 hover:bg-red-600 text-white text-xs font-display font-bold transition-colors"
+                          className="flex-1 sm:flex-initial px-4 py-2 rounded bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-colors"
                         >
                           Remove from Roster
                         </button>
@@ -1000,10 +1016,10 @@ export default function PoolPlayoffRosterEntry() {
                           onClick={() => { if (addable) { addPlayer(selectedPlayer); setSelectedPlayer(null); } }}
                           disabled={!addable}
                           className={cn(
-                            'flex-1 sm:flex-initial px-4 py-2 rounded text-xs font-display font-bold transition-colors',
+                            'flex-1 sm:flex-initial px-4 py-2 rounded text-xs font-bold transition-colors',
                             addable
-                              ? 'bg-citrus-orange hover:bg-citrus-orange/90 text-white'
-                              : 'bg-muted text-citrus-charcoal/50 cursor-not-allowed'
+                              ? 'bg-pastel-orange hover:bg-pastel-orange-soft text-pastel-surface'
+                              : 'bg-white/5 ring-1 ring-white/10 text-white/30 cursor-not-allowed'
                           )}
                           title={addable ? 'Add to roster' : 'Position full or team cap reached'}
                         >
@@ -1019,7 +1035,7 @@ export default function PoolPlayoffRosterEntry() {
             {/* Top sticky horizontal scrollbar (desktop only — mobile doesn't
                 need it since the table fits the viewport). */}
             <div
-              className="overflow-x-scroll scrollbar-styled mb-1 bg-fantasy-light/40 rounded border border-fantasy-border/40"
+              className="overflow-x-scroll scrollbar-styled mb-1 bg-white/5 rounded ring-1 ring-white/10"
               style={{ height: '14px' }}
               onScroll={(e) => {
                 const container = e.currentTarget;
@@ -1030,7 +1046,7 @@ export default function PoolPlayoffRosterEntry() {
               <div id="roster-scroll-helper-inner" style={{ width: '1100px', height: '1px' }} />
             </div>
             {/* Hint text so users know they can scroll */}
-            <div className="text-[10px] text-citrus-charcoal/50 mb-2 text-center italic">
+            <div className="text-[10px] text-white/45 mb-2 text-center italic">
               Tip: scroll ↔ to see more stats (xG, TOI, +/-, etc.)
             </div>
 
@@ -1038,7 +1054,7 @@ export default function PoolPlayoffRosterEntry() {
                 overflow-auto = horizontal + vertical scrollbars always visible
                 (styled by .scrollbar-styled). max-h bounds vertical so the
                 horizontal bar at the bottom stays within the viewport. */}
-            <Card className="border-fantasy-border bg-fantasy-surface">
+            <Card>
               <div
                 data-roster-table
                 className="overflow-auto scrollbar-styled"
@@ -1054,47 +1070,47 @@ export default function PoolPlayoffRosterEntry() {
                     On mobile, table naturally shrinks to fit the few visible columns
                     (no dead horizontal space after the player name). */}
                 <table className="w-full text-sm border-collapse" style={{ minWidth: '1100px' }}>
-                  <thead className="bg-fantasy-light sticky top-0 z-10 border-b border-fantasy-border">
+                  <thead className="bg-pastel-surface-tile sticky top-0 z-10 border-b border-white/10">
                     <tr>
-                      <th className="px-2 py-2 text-left text-xs font-display font-bold text-citrus-forest w-8">#</th>
-                      <th className="px-2 py-2 text-left text-xs font-display font-bold text-citrus-forest w-20">Action</th>
+                      <th className="px-2 py-2 text-left text-xs font-bold text-pastel-cream w-8">#</th>
+                      <th className="px-2 py-2 text-left text-xs font-bold text-pastel-cream w-20">Action</th>
                       {(() => {
                         const ind = (col: string) => sortBy === col ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '';
-                        const cn_sort = 'cursor-pointer select-none hover:text-citrus-orange transition-colors';
+                        const cn_sort = 'cursor-pointer select-none hover:text-pastel-orange transition-colors';
                         return (
                           <>
-                            <th onClick={() => toggleSort('name')} className={cn('px-2 py-2 text-left text-xs font-display font-bold text-citrus-forest min-w-[140px]', cn_sort)}>Player{ind('name')}</th>
-                            <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest">Pos</th>
-                            <th onClick={() => toggleSort('team')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>Team{ind('team')}</th>
-                            <th onClick={() => toggleSort('gp')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>GP{ind('gp')}</th>
+                            <th onClick={() => toggleSort('name')} className={cn('px-2 py-2 text-left text-xs font-bold text-pastel-cream min-w-[140px]', cn_sort)}>Player{ind('name')}</th>
+                            <th className="px-2 py-2 text-center text-xs font-bold text-pastel-cream">Pos</th>
+                            <th onClick={() => toggleSort('team')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>Team{ind('team')}</th>
+                            <th onClick={() => toggleSort('gp')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>GP{ind('gp')}</th>
                             {posFilter === 'G' ? (
                               /* Goalie-specific columns */
                               <>
-                                <th onClick={() => toggleSort('g_w')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>W{ind('g_w')}</th>
-                                <th onClick={() => toggleSort('a_sv')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>SV{ind('a_sv')}</th>
-                                <th onClick={() => toggleSort('pts_so')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>SO{ind('pts_so')}</th>
-                                <th onClick={() => toggleSort('sog_ga')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>GA{ind('sog_ga')}</th>
-                                <th onClick={() => toggleSort('pm_svpct')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>SV%{ind('pm_svpct')}</th>
-                                <th onClick={() => toggleSort('xg_gaa')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-purple-700', cn_sort)}>GAA{ind('xg_gaa')}</th>
+                                <th onClick={() => toggleSort('g_w')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>W{ind('g_w')}</th>
+                                <th onClick={() => toggleSort('a_sv')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>SV{ind('a_sv')}</th>
+                                <th onClick={() => toggleSort('pts_so')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>SO{ind('pts_so')}</th>
+                                <th onClick={() => toggleSort('sog_ga')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>GA{ind('sog_ga')}</th>
+                                <th onClick={() => toggleSort('pm_svpct')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>SV%{ind('pm_svpct')}</th>
+                                <th onClick={() => toggleSort('xg_gaa')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-butter bg-pastel-butter/10', cn_sort)}>GAA{ind('xg_gaa')}</th>
                               </>
                             ) : (
                               /* Skater columns — default for All / Forwards / Defense */
                               <>
-                                <th onClick={() => toggleSort('g_w')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>G{ind('g_w')}</th>
-                                <th onClick={() => toggleSort('a_sv')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>A{ind('a_sv')}</th>
-                                <th onClick={() => toggleSort('pts_so')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>PTS{ind('pts_so')}</th>
-                                <th onClick={() => toggleSort('sog_ga')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>SOG{ind('sog_ga')}</th>
-                                <th onClick={() => toggleSort('hit')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>HIT{ind('hit')}</th>
-                                <th onClick={() => toggleSort('blk')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>BLK{ind('blk')}</th>
-                                <th onClick={() => toggleSort('pm_svpct')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest', cn_sort)}>+/-{ind('pm_svpct')}</th>
-                                <th onClick={() => toggleSort('xg_gaa')} className={cn('px-2 py-2 text-center text-xs font-display font-bold text-purple-700', cn_sort)}>xG{ind('xg_gaa')}</th>
+                                <th onClick={() => toggleSort('g_w')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>G{ind('g_w')}</th>
+                                <th onClick={() => toggleSort('a_sv')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>A{ind('a_sv')}</th>
+                                <th onClick={() => toggleSort('pts_so')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>PTS{ind('pts_so')}</th>
+                                <th onClick={() => toggleSort('sog_ga')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>SOG{ind('sog_ga')}</th>
+                                <th onClick={() => toggleSort('hit')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>HIT{ind('hit')}</th>
+                                <th onClick={() => toggleSort('blk')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>BLK{ind('blk')}</th>
+                                <th onClick={() => toggleSort('pm_svpct')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-cream', cn_sort)}>+/-{ind('pm_svpct')}</th>
+                                <th onClick={() => toggleSort('xg_gaa')} className={cn('px-2 py-2 text-center text-xs font-bold text-pastel-butter bg-pastel-butter/10', cn_sort)}>xG{ind('xg_gaa')}</th>
                               </>
                             )}
                           </>
                         );
                       })()}
-                      <th className="px-2 py-2 text-center text-xs font-display font-bold text-citrus-forest" title="Avg time on ice per game (min:sec)">TOI</th>
-                      <th className="px-2 py-2 text-center text-xs font-bold text-green-700 bg-green-50/50">FPTS</th>
+                      <th className="px-2 py-2 text-center text-xs font-bold text-pastel-cream" title="Avg time on ice per game (min:sec)">TOI</th>
+                      <th className="px-2 py-2 text-center text-xs font-bold text-pastel-sage-soft bg-pastel-sage/10">FPTS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1108,21 +1124,21 @@ export default function PoolPlayoffRosterEntry() {
                         <tr
                           key={player.id}
                           className={cn(
-                            'border-b border-fantasy-border/30 transition-colors cursor-pointer',
-                            selectedPlayer?.id === player.id && 'bg-citrus-orange/10 ring-1 ring-citrus-orange/30',
-                            onRoster && selectedPlayer?.id !== player.id && 'bg-citrus-sage/10 border-l-2 border-l-citrus-sage',
-                            !onRoster && selectedPlayer?.id !== player.id && 'hover:bg-fantasy-light/30',
+                            'border-b border-white/10 transition-colors cursor-pointer',
+                            selectedPlayer?.id === player.id && 'bg-pastel-orange/10 ring-1 ring-pastel-orange/30',
+                            onRoster && selectedPlayer?.id !== player.id && 'border-l-2 border-l-pastel-sage',
+                            !onRoster && selectedPlayer?.id !== player.id && 'hover:bg-white/5',
                             !addable && !onRoster && selectedPlayer?.id !== player.id && 'opacity-50'
                           )}
                           onClick={() => setSelectedPlayer(player)}
                         >
-                          <td className="px-2 py-1.5 text-xs font-mono text-citrus-forest/60">{idx + 1}</td>
+                          <td className="px-2 py-1.5 text-xs font-mono text-white/55">{idx + 1}</td>
                           {/* Add / Remove button on the LEFT (discoverable) */}
                           <td className="px-2 py-1.5">
                             {onRoster ? (
                               <button
                                 onClick={(e) => { e.stopPropagation(); removePlayer(player.id); }}
-                                className="px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 transition-colors text-[11px] font-bold border border-red-200"
+                                className="px-2 py-1 rounded bg-red-400/10 hover:bg-red-400/20 text-red-300 hover:text-red-200 transition-colors text-[11px] font-bold ring-1 ring-red-400/30 border-0"
                                 title="Remove from roster"
                               >
                                 Remove
@@ -1132,10 +1148,10 @@ export default function PoolPlayoffRosterEntry() {
                                 onClick={(e) => { e.stopPropagation(); if (addable) addPlayer(player); }}
                                 disabled={!addable}
                                 className={cn(
-                                  'px-2 py-1 rounded transition-colors text-[11px] font-bold border',
+                                  'px-2 py-1 rounded transition-colors text-[11px] font-bold border-0 ring-1',
                                   addable
-                                    ? 'bg-citrus-sage/10 hover:bg-citrus-sage/20 text-citrus-forest border-citrus-sage/40'
-                                    : 'bg-muted/30 text-citrus-charcoal/40 border-muted cursor-not-allowed'
+                                    ? 'bg-pastel-orange/15 hover:bg-pastel-orange/25 text-pastel-orange-soft ring-pastel-orange/40'
+                                    : 'bg-white/5 text-white/30 ring-white/10 cursor-not-allowed'
                                 )}
                                 title={addable ? 'Add to roster' : 'Cannot add (position full or team cap)'}
                               >
@@ -1145,13 +1161,13 @@ export default function PoolPlayoffRosterEntry() {
                           </td>
                           <td className="px-2 py-1.5">
                             <div className="flex items-center gap-1.5">
-                              {onRoster && <Check className="h-3.5 w-3.5 text-citrus-sage flex-shrink-0" />}
+                              {onRoster && <Check className="h-3.5 w-3.5 text-pastel-sage flex-shrink-0" />}
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); setStatsModalPlayer(player); }}
                                 className={cn(
-                                  'text-sm font-medium truncate text-left hover:text-citrus-orange hover:underline transition-colors',
-                                  onRoster && 'text-citrus-forest font-bold'
+                                  'text-sm font-semibold truncate text-left text-pastel-cream hover:text-pastel-orange hover:underline transition-colors',
+                                  onRoster && 'font-bold'
                                 )}
                                 title="View player details"
                               >
@@ -1162,30 +1178,32 @@ export default function PoolPlayoffRosterEntry() {
                             </div>
                           </td>
                           <td className="px-2 py-1.5 text-center">
-                            <Badge variant="outline" className={cn(
-                              'text-[10px] px-1.5',
-                              norm === 'G' ? 'border-purple-300 text-purple-700' : norm === 'D' ? 'border-blue-300 text-blue-700' : 'border-citrus-sage text-citrus-forest'
+                            <Badge className={cn(
+                              'text-[10px] px-1.5 border-0 font-bold',
+                              norm === 'G' ? 'bg-pastel-butter/15 ring-1 ring-pastel-butter/40 text-pastel-butter' :
+                              norm === 'D' ? 'bg-pastel-orange/15 ring-1 ring-pastel-orange/40 text-pastel-orange-soft' :
+                              'bg-pastel-sage/15 ring-1 ring-pastel-sage/40 text-pastel-sage-soft'
                             )}>
                               {norm}
                             </Badge>
                           </td>
                           <td className="px-2 py-1.5 text-center">
-                            <span className={cn('text-xs font-medium', teamAtCap && !onRoster && 'text-red-400')}>
+                            <span className={cn('text-xs font-medium text-pastel-cream', teamAtCap && !onRoster && 'text-red-300')}>
                               {player.team}
                             </span>
                           </td>
-                          <td className="px-2 py-1.5 text-center text-xs">{player.games_played}</td>
+                          <td className="px-2 py-1.5 text-center text-xs text-pastel-cream">{player.games_played}</td>
                           {norm === 'G' ? (
                             <>
-                              <td className="px-2 py-1.5 text-center text-xs font-semibold">{player.wins || 0}</td>
-                              <td className="px-2 py-1.5 text-center text-xs">{player.saves || 0}</td>
-                              <td className="px-2 py-1.5 text-center text-xs font-bold">{player.shutouts || 0}</td>
-                              <td className="px-2 py-1.5 text-center text-xs">{player.goals_against || 0}</td>
+                              <td className="px-2 py-1.5 text-center text-xs font-semibold text-pastel-cream">{player.wins || 0}</td>
+                              <td className="px-2 py-1.5 text-center text-xs text-pastel-cream">{player.saves || 0}</td>
+                              <td className="px-2 py-1.5 text-center text-xs font-bold text-pastel-cream">{player.shutouts || 0}</td>
+                              <td className="px-2 py-1.5 text-center text-xs text-pastel-cream">{player.goals_against || 0}</td>
                               {/* HIT+BLK placeholders only when headers are showing (skater/all filter) */}
                               {posFilter !== 'G' && (
-                                <td className="px-2 py-1.5 text-center text-xs text-citrus-charcoal/30" colSpan={2}>—</td>
+                                <td className="px-2 py-1.5 text-center text-xs text-white/30" colSpan={2}>—</td>
                               )}
-                              <td className="px-2 py-1.5 text-center text-xs">
+                              <td className="px-2 py-1.5 text-center text-xs text-pastel-cream">
                                 {(() => {
                                   // Prefer API value (string or number), fall back to computing from saves/shots_faced
                                   let sp = Number(player.save_pct ?? player.save_percentage ?? 0);
@@ -1197,7 +1215,7 @@ export default function PoolPlayoffRosterEntry() {
                                   return pct.toFixed(1) + '%';
                                 })()}
                               </td>
-                              <td className="px-2 py-1.5 text-center text-xs text-purple-700">
+                              <td className="px-2 py-1.5 text-center text-xs text-pastel-cream">
                                 {(() => {
                                   let g = Number(player.gaa ?? player.goals_against_average ?? 0);
                                   // Fallback: GAA = goals_against * 60 / (icetime_seconds / 60) = goals_against * 3600 / icetime_seconds
@@ -1207,26 +1225,31 @@ export default function PoolPlayoffRosterEntry() {
                                   return g > 0 ? g.toFixed(2) : '—';
                                 })()}
                               </td>
-                              <td className="px-2 py-1.5 text-center text-xs">—</td>
+                              <td className="px-2 py-1.5 text-center text-xs text-pastel-cream">—</td>
                             </>
                           ) : (
                             <>
-                              <td className="px-2 py-1.5 text-center text-xs font-semibold">{player.goals}</td>
-                              <td className="px-2 py-1.5 text-center text-xs">{player.assists}</td>
-                              <td className="px-2 py-1.5 text-center text-xs font-bold">{player.points}</td>
-                              <td className="px-2 py-1.5 text-center text-xs">{player.shots}</td>
-                              <td className="px-2 py-1.5 text-center text-xs">{player.hits}</td>
-                              <td className="px-2 py-1.5 text-center text-xs">{player.blocks}</td>
-                              <td className={cn('px-2 py-1.5 text-center text-xs', (player.plus_minus || 0) > 0 && 'text-green-700', (player.plus_minus || 0) < 0 && 'text-red-600')}>
+                              <td className="px-2 py-1.5 text-center text-xs font-semibold text-pastel-cream">{player.goals}</td>
+                              <td className="px-2 py-1.5 text-center text-xs text-pastel-cream">{player.assists}</td>
+                              <td className="px-2 py-1.5 text-center text-xs font-bold text-pastel-cream">{player.points}</td>
+                              <td className="px-2 py-1.5 text-center text-xs text-pastel-cream">{player.shots}</td>
+                              <td className="px-2 py-1.5 text-center text-xs text-pastel-cream">{player.hits}</td>
+                              <td className="px-2 py-1.5 text-center text-xs text-pastel-cream">{player.blocks}</td>
+                              <td className={cn(
+                                'px-2 py-1.5 text-center text-xs',
+                                (player.plus_minus || 0) > 0 ? 'text-pastel-sage-soft' :
+                                (player.plus_minus || 0) < 0 ? 'text-red-300' :
+                                'text-pastel-cream'
+                              )}>
                                 {(player.plus_minus ?? 0) > 0 ? '+' : ''}{player.plus_minus ?? 0}
                               </td>
-                              <td className="px-2 py-1.5 text-center text-xs text-purple-700 font-semibold">
+                              <td className="px-2 py-1.5 text-center text-xs text-pastel-cream font-semibold">
                                 {(() => {
                                   const xg = player.xGoals ?? player.x_goals ?? 0;
                                   return xg > 0 ? xg.toFixed(1) : '—';
                                 })()}
                               </td>
-                              <td className="px-2 py-1.5 text-center text-xs text-citrus-charcoal/70">
+                              <td className="px-2 py-1.5 text-center text-xs text-white/70">
                                 {player.icetime_seconds && player.games_played ? (() => {
                                   const totalSec = Math.round(player.icetime_seconds / player.games_played);
                                   const m = Math.floor(totalSec / 60);
@@ -1236,7 +1259,7 @@ export default function PoolPlayoffRosterEntry() {
                               </td>
                             </>
                           )}
-                          <td className="px-2 py-1.5 text-center text-xs font-bold text-green-700 bg-green-50/20">{fpts.toFixed(1)}</td>
+                          <td className="px-2 py-1.5 text-center text-xs font-bold text-pastel-cream">{fpts.toFixed(1)}</td>
                         </tr>
                       );
                     })}
@@ -1252,11 +1275,11 @@ export default function PoolPlayoffRosterEntry() {
             !isViewMode && 'lg:sticky lg:top-[110px] lg:self-start'
           )}>
             {/* Roster card */}
-            <Card className="border-fantasy-border bg-white shadow-md">
+            <Card>
               <CardHeader className="pb-2 px-4">
-                <CardTitle className="text-sm font-display font-bold text-citrus-forest flex items-center justify-between">
+                <CardTitle className="text-sm font-bold text-pastel-cream flex items-center justify-between">
                   <span className="flex items-center gap-2">
-                    {isViewMode ? <Eye className="h-4 w-4 text-citrus-orange" /> : <Users className="h-4 w-4 text-citrus-orange" />}
+                    {isViewMode ? <Eye className="h-4 w-4 text-pastel-orange" /> : <Users className="h-4 w-4 text-pastel-orange" />}
                     {isViewMode ? `${viewOwnerName || 'Teammate'}'s Roster` : 'Your Roster'} ({roster.length}/{rosterSize})
                   </span>
                 </CardTitle>
@@ -1264,26 +1287,26 @@ export default function PoolPlayoffRosterEntry() {
               <CardContent className="px-4 pb-4 space-y-3">
                 {/* Forwards */}
                 <div>
-                  <div className="text-[10px] font-display font-bold uppercase text-citrus-charcoal/50 mb-1">Forwards ({posCounts.F}/{posReqs.F})</div>
+                  <div className="text-[10px] font-jbmono font-bold uppercase tracking-wider text-white/55 mb-1">Forwards ({posCounts.F}/{posReqs.F})</div>
                   <div className="space-y-1">
                     {roster.filter(p => isForward(p.position)).map(p => (
-                      <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-citrus-sage/5 rounded border border-citrus-sage/20">
+                      <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-white/5 ring-1 ring-white/10 border-l-2 border-l-pastel-sage rounded">
                         <div className="flex items-center gap-2 min-w-0">
-                          <Badge variant="outline" className="text-[9px] px-1 border-citrus-sage">{normalizePos(p.position)}</Badge>
+                          <Badge className="text-[9px] px-1 border-0 font-bold bg-pastel-sage/15 ring-1 ring-pastel-sage/40 text-pastel-sage-soft">{normalizePos(p.position)}</Badge>
                           <button
                             type="button"
                             onClick={() => setStatsModalPlayer(p)}
-                            className="text-xs font-medium truncate text-left hover:text-citrus-orange hover:underline transition-colors"
+                            className="text-xs font-semibold truncate text-left text-pastel-cream hover:text-pastel-orange hover:underline transition-colors"
                           >
                             <span className="sm:hidden">{shortName(p.full_name)}</span>
                             <span className="hidden sm:inline">{p.full_name}</span>
                           </button>
-                          <span className="text-[10px] text-citrus-charcoal/50">{p.team}</span>
+                          <span className="text-[10px] text-white/55">{p.team}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-green-700">{calcFpts(p).toFixed(1)}</span>
+                          <span className="text-xs font-bold text-pastel-sage-soft">{calcFpts(p).toFixed(1)}</span>
                           {!locked && !isViewMode && (
-                            <button onClick={() => removePlayer(p.id)} className="text-red-300 hover:text-red-500">
+                            <button onClick={() => removePlayer(p.id)} className="text-red-300 hover:text-red-200">
                               <X className="h-3.5 w-3.5" />
                             </button>
                           )}
@@ -1291,7 +1314,7 @@ export default function PoolPlayoffRosterEntry() {
                       </div>
                     ))}
                     {Array.from({ length: Math.max(0, posReqs.F - posCounts.F) }).map((_, i) => (
-                      <div key={`empty-f-${i}`} className="flex items-center py-1.5 px-2 rounded border border-dashed border-citrus-sage/20 text-citrus-charcoal/30">
+                      <div key={`empty-f-${i}`} className="flex items-center py-1.5 px-2 rounded border border-dashed border-white/15 text-white/30">
                         <User className="h-3 w-3 mr-2" />
                         <span className="text-[11px] italic">Empty F slot</span>
                       </div>
@@ -1301,26 +1324,26 @@ export default function PoolPlayoffRosterEntry() {
 
                 {/* Defensemen */}
                 <div>
-                  <div className="text-[10px] font-display font-bold uppercase text-citrus-charcoal/50 mb-1">Defense ({posCounts.D}/{posReqs.D})</div>
+                  <div className="text-[10px] font-jbmono font-bold uppercase tracking-wider text-white/55 mb-1">Defense ({posCounts.D}/{posReqs.D})</div>
                   <div className="space-y-1">
                     {roster.filter(p => normalizePos(p.position) === 'D').map(p => (
-                      <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-blue-50/40 rounded border border-blue-200/30">
+                      <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-white/5 ring-1 ring-white/10 border-l-2 border-l-pastel-orange rounded">
                         <div className="flex items-center gap-2 min-w-0">
-                          <Badge variant="outline" className="text-[9px] px-1 border-blue-300 text-blue-700">D</Badge>
+                          <Badge className="text-[9px] px-1 border-0 font-bold bg-pastel-orange/15 ring-1 ring-pastel-orange/40 text-pastel-orange-soft">D</Badge>
                           <button
                             type="button"
                             onClick={() => setStatsModalPlayer(p)}
-                            className="text-xs font-medium truncate text-left hover:text-citrus-orange hover:underline transition-colors"
+                            className="text-xs font-semibold truncate text-left text-pastel-cream hover:text-pastel-orange hover:underline transition-colors"
                           >
                             <span className="sm:hidden">{shortName(p.full_name)}</span>
                             <span className="hidden sm:inline">{p.full_name}</span>
                           </button>
-                          <span className="text-[10px] text-citrus-charcoal/50">{p.team}</span>
+                          <span className="text-[10px] text-white/55">{p.team}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-green-700">{calcFpts(p).toFixed(1)}</span>
+                          <span className="text-xs font-bold text-pastel-sage-soft">{calcFpts(p).toFixed(1)}</span>
                           {!locked && !isViewMode && (
-                            <button onClick={() => removePlayer(p.id)} className="text-red-300 hover:text-red-500">
+                            <button onClick={() => removePlayer(p.id)} className="text-red-300 hover:text-red-200">
                               <X className="h-3.5 w-3.5" />
                             </button>
                           )}
@@ -1328,7 +1351,7 @@ export default function PoolPlayoffRosterEntry() {
                       </div>
                     ))}
                     {Array.from({ length: Math.max(0, posReqs.D - posCounts.D) }).map((_, i) => (
-                      <div key={`empty-d-${i}`} className="flex items-center py-1.5 px-2 rounded border border-dashed border-blue-200/30 text-citrus-charcoal/30">
+                      <div key={`empty-d-${i}`} className="flex items-center py-1.5 px-2 rounded border border-dashed border-white/15 text-white/30">
                         <Shield className="h-3 w-3 mr-2" />
                         <span className="text-[11px] italic">Empty D slot</span>
                       </div>
@@ -1338,26 +1361,26 @@ export default function PoolPlayoffRosterEntry() {
 
                 {/* Goalies */}
                 <div>
-                  <div className="text-[10px] font-display font-bold uppercase text-citrus-charcoal/50 mb-1">Goalies ({posCounts.G}/{posReqs.G})</div>
+                  <div className="text-[10px] font-jbmono font-bold uppercase tracking-wider text-white/55 mb-1">Goalies ({posCounts.G}/{posReqs.G})</div>
                   <div className="space-y-1">
                     {roster.filter(p => normalizePos(p.position) === 'G').map(p => (
-                      <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-purple-50/40 rounded border border-purple-200/30">
+                      <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-white/5 ring-1 ring-white/10 border-l-2 border-l-pastel-butter rounded">
                         <div className="flex items-center gap-2 min-w-0">
-                          <Badge variant="outline" className="text-[9px] px-1 border-purple-300 text-purple-700">G</Badge>
+                          <Badge className="text-[9px] px-1 border-0 font-bold bg-pastel-butter/15 ring-1 ring-pastel-butter/40 text-pastel-butter">G</Badge>
                           <button
                             type="button"
                             onClick={() => setStatsModalPlayer(p)}
-                            className="text-xs font-medium truncate text-left hover:text-citrus-orange hover:underline transition-colors"
+                            className="text-xs font-semibold truncate text-left text-pastel-cream hover:text-pastel-orange hover:underline transition-colors"
                           >
                             <span className="sm:hidden">{shortName(p.full_name)}</span>
                             <span className="hidden sm:inline">{p.full_name}</span>
                           </button>
-                          <span className="text-[10px] text-citrus-charcoal/50">{p.team}</span>
+                          <span className="text-[10px] text-white/55">{p.team}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-green-700">{calcFpts(p).toFixed(1)}</span>
+                          <span className="text-xs font-bold text-pastel-sage-soft">{calcFpts(p).toFixed(1)}</span>
                           {!locked && !isViewMode && (
-                            <button onClick={() => removePlayer(p.id)} className="text-red-300 hover:text-red-500">
+                            <button onClick={() => removePlayer(p.id)} className="text-red-300 hover:text-red-200">
                               <X className="h-3.5 w-3.5" />
                             </button>
                           )}
@@ -1365,7 +1388,7 @@ export default function PoolPlayoffRosterEntry() {
                       </div>
                     ))}
                     {Array.from({ length: Math.max(0, posReqs.G - posCounts.G) }).map((_, i) => (
-                      <div key={`empty-g-${i}`} className="flex items-center py-1.5 px-2 rounded border border-dashed border-purple-200/30 text-citrus-charcoal/30">
+                      <div key={`empty-g-${i}`} className="flex items-center py-1.5 px-2 rounded border border-dashed border-white/15 text-white/30">
                         <User className="h-3 w-3 mr-2" />
                         <span className="text-[11px] italic">Empty G slot</span>
                       </div>
@@ -1375,18 +1398,19 @@ export default function PoolPlayoffRosterEntry() {
 
                 {/* Team breakdown */}
                 {roster.length > 0 && (
-                  <div className="pt-2 border-t border-fantasy-border">
-                    <div className="text-[10px] font-display font-bold uppercase text-citrus-charcoal/50 mb-1.5">Team Breakdown</div>
+                  <div className="pt-2 border-t border-white/10">
+                    <div className="text-[10px] font-jbmono font-bold uppercase tracking-wider text-white/55 mb-1.5">Team Breakdown</div>
                     <div className="flex flex-wrap gap-1">
                       {Array.from(teamCounts.entries())
                         .sort((a, b) => b[1] - a[1])
                         .map(([team, count]) => (
                           <Badge
                             key={team}
-                            variant="outline"
                             className={cn(
-                              'text-[10px]',
-                              hasCap && count >= maxPerTeam ? 'border-red-300 text-red-700 bg-red-50' : 'border-citrus-sage/30'
+                              'text-[10px] border-0 font-bold',
+                              hasCap && count >= maxPerTeam
+                                ? 'bg-red-400/10 ring-1 ring-red-400/30 text-red-300'
+                                : 'bg-white/5 ring-1 ring-white/10 text-white/70'
                             )}
                           >
                             {team}: {hasCap ? `${count}/${maxPerTeam}` : count}
@@ -1400,15 +1424,15 @@ export default function PoolPlayoffRosterEntry() {
 
             {/* Quick tips (own roster) or Back to Hub (view mode) */}
             {isViewMode ? (
-              <Button asChild variant="outline" className="w-full border-citrus-sage/40 text-citrus-forest font-display">
+              <Button asChild className="w-full bg-white/5 ring-1 ring-white/10 text-pastel-cream hover:bg-white/10 border-0">
                 <Link to={`/pool/playoff-hub?league=${leagueId}`}>
                   <ArrowLeft className="h-4 w-4 mr-1" />Back to Hub
                 </Link>
               </Button>
             ) : (
-              <Card className="border-fantasy-border bg-citrus-sage/5 px-4 py-3">
-                <div className="text-[10px] font-display font-bold uppercase text-citrus-charcoal/50 mb-1">How it works</div>
-                <ul className="text-[11px] text-citrus-charcoal/70 space-y-0.5 list-disc pl-3">
+              <Card className="ring-1 ring-pastel-sage/30 px-4 py-3">
+                <div className="text-[10px] font-jbmono font-bold uppercase tracking-wider text-white/55 mb-1">How it works</div>
+                <ul className="text-[11px] text-white/70 space-y-0.5 list-disc pl-3">
                   <li>Pick {rosterSize} players from playoff teams</li>
                   {hasCap && <li>Max {maxPerTeam} players per NHL team</li>}
                   {!hasCap && <li>No per-team cap — stack any team if you want</li>}

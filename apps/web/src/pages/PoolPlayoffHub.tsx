@@ -413,7 +413,7 @@ export default function PoolPlayoffHub() {
   };
 
   if (loading) {
-    return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center"><StormyLoading message="Loading pool..." /></div></>;
+    return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center bg-pastel-surface"><StormyLoading message="Loading pool..." /></div></>;
   }
 
   if (!league) {

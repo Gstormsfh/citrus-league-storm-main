@@ -184,7 +184,7 @@ export default function PoolPlayoffConfidence() {
 
   const totalConfidence = useMemo(() => Array.from(picks.values()).reduce((s, p) => s + (p.confidence_value || 0), 0), [picks]);
 
-  if (loading) return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center"><StormyLoading message="Loading pool..." /></div></>;
+  if (loading) return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center bg-pastel-surface"><StormyLoading message="Loading pool..." /></div></>;
 
   return (
     <>

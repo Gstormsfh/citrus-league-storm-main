@@ -202,6 +202,62 @@ prod-data dumps. A future operator could `git add .` and accidentally
 commit them. Add the pattern to `.gitignore` to make that footgun
 impossible.
 
+### Migration application asymmetry — verify ALL targeted environments after apply
+
+On 2026-05-01 the playoff winner propagation trigger migration
+(`20260501120000_add_playoff_winner_propagation_trigger`) was applied
+to staging via Supabase MCP but the corresponding prod application
+either failed silently or was never attempted, despite the commit
+message of `ee6f441` claiming both environments were updated.
+
+The asymmetry was not detected for ~14 hours. During that window,
+prod's R2 series rows had `high_seed_team_id` and `low_seed_team_id`
+NULL despite seven R1 finals having known winners (slots 1, 3, 4, 5,
+6, 7, 8 — including VGK in slot 7 which Garrett mentally noted as
+"propagated correctly" but was actually NULL on prod). All 9 prod
+bracket-pickem leagues + confidence pools + the public
+`/nhl/playoffs` page rendered R2 with blank/TBD teams during this
+window.
+
+Discovered during 2026-05-02 pre-ship rollback runbook prep when
+sanity-checking trigger presence on prod (`SELECT COUNT(*) FROM
+pg_trigger WHERE tgname = 'trg_propagate_playoff_winner'` returned 0).
+Trigger was applied via MCP at apply time and immediately propagated
+all 7 R1 winners into their R2 children via the migration's idempotent
+backfill UPDATEs (lines 73-89).
+
+**Lesson**: when applying migrations via MCP across multiple
+environments, verify each environment independently afterward with at
+least three checks:
+1. `information_schema.triggers` (or routines / tables / etc.)
+   contains the new object on every targeted env
+2. `supabase_migrations.schema_migrations` has the version row on
+   every targeted env
+3. A behavioral query confirms the migration actually did its job
+   (e.g., did the backfill UPDATE do anything; does the trigger fire
+   when expected)
+
+Do not trust silent success. The act of running `apply_migration`
+returns `{success: true}` without confirming the destination was the
+project you intended.
+
+**Followup work**:
+- Build a small CLI helper `scripts/verify-migration-applied.mjs
+  <project-ref> <migration-name>` that runs the three checks above
+  and exits non-zero on any failure. Standardize across staging-deploy
+  and production-deploy operator runbooks. Queue post-Web-Summit.
+- Add a "after every multi-env MCP apply, run verify on each env"
+  reminder to OPERATIONS.md.
+- Note the version-stamp drift: the file `20260501120000_add_playoff_winner_propagation_trigger.sql`
+  was logged in prod's `schema_migrations` as version `20260502080320`
+  (apply timestamp) instead of the file's filename version. This is
+  cosmetic but means future env bootstraps that compare versions
+  between filesystem and DB will see false-mismatch on prod
+  specifically. Either rename the file post-fact (destructive on
+  staging where the original version is logged) or accept the
+  divergence with a note. **Accepting the divergence** — the migration
+  name matches; only the version stamp differs.
+
 ### Layout debt — rail widths declared per-page across 17 consumers
 
 Tonight's rail-widening change required touching **14 files** for a single
@@ -263,14 +319,64 @@ Lower priority than current visual fixes — we'll catch the surfaced
 instances inline as we restyle each component. Queue the generalized
 sweep for after Phase 1 component fixes settle.
 
-### LoadingScreen.tsx — route-level full-screen loader still v1
+### v1 marketing pages may show dark stripes below content on tall viewports
 
-The component at `apps/web/src/components/LoadingScreen.tsx` has
-hardcoded light-green fallback (`bg-[#D4E8B8] dark:bg-background`),
-`text-gray-600`, and inline `fontFamily: 'sans-serif'`. Used at
-app-level route boundaries, not specific to pool surfaces. Separate
-from the playoff pool inline loaders that got the StormyLoading
-drop-in (2026-05-01 commit). Queue post-Web-Summit.
+The 2026-05-02 Option E fix changed html/body bg in index.css from
+cream (`#D4E8B8`) to dark (`#0F1F15`) to eliminate the boot-flash.
+Marketing pages (Index, About, Pricing, Careers) compose their
+content from cream-bg sections (HeroSection, FeaturesSection,
+Footer) that fill the viewport, so the body bg rarely shows. Edge
+cases: very short content pages (NotFound, Privacy, Terms with
+limited content) on tall viewports may show a dark stripe at the
+bottom. Fix when each page gets its v2 migration: add
+`bg-[#D4E8B8] min-h-screen` wrapper or migrate the page to v2 dark.
+Currently no user-accessible v1 marketing pages are demo-critical
+for Web Summit (playoff suite is the demo target), so deferring
+until post-Web-Summit migration.
+
+### Team brand colors with poor dark-theme contrast — selective secondary-color fallback
+
+6 NHL teams (CAR, OTT, SJS, WPG, FLA, MIN) have both primary AND
+secondary brand colors that fail WCAG AA (3:1) contrast against the
+v2 pastel-surface bg. The 2026-05-02 universal `ring-white/20` fix
+raises all chip edge perception ~10% but doesn't fully solve these 6
+specific teams. Post-Web-Summit option: implement a tier-2 fallback
+that uses a custom v2 chip color (e.g., team-color-tinted-with-cream-
+overlay or pastel-cream backdrop tile) ONLY for these 6 teams. Don't
+pre-emptively add complexity — apply only if visual feedback during
+Web Summit demos suggests these specific teams read as broken.
+
+### PoolPlayoff* pages skip DarkLayout while other pool pages use it
+
+PoolSurvivor, PoolPickem, PoolConfidence (non-playoff), and
+NHLPlayoffBracket all wrap their pages in `<DarkLayout>`. The 4
+PoolPlayoff* pages (Bracket, Confidence, Hub, Roster) use a bare
+`<>` fragment with `<Navbar />` + a manually-styled wrapper div
+instead. The loading-state bg fix (2026-05-02) added
+`bg-pastel-surface` to the manual wrapper to match what DarkLayout
+would have provided. Architectural consistency cleanup
+post-Web-Summit: refactor the 4 PoolPlayoff* pages to use
+DarkLayout, removing the manual wrapper duplication.
+
+### Save button color consolidation across playoff pool family
+
+PoolPlayoffBracket and PoolPlayoffRoster currently use sage save
+buttons (matching v1 "sage = positive action" semantics). The global
+v2 system treats orange as the primary action color (StormyChatBubble
+send, CTAs across homepage). Sage is also used semantically for
+"correct outcome" on bracket cards post-deadline, creating
+overloading. Decision deferred — should be a single scoped change
+across PoolPlayoffBracket, PoolPlayoffConfidence, PoolPlayoffRoster
+save buttons together, not piecemeal. Queue post-Web-Summit.
+
+### LoadingScreen.tsx legacy mascot PNGs — assets deletable post-fix
+
+The 4 Gemini-generated mascot PNGs (`Gemini_Generated_Image_Kiwi.png`,
+`_Lemon.png`, `_Narwhal.png`, `_Pineapple.png`) under
+`apps/web/src/assets/images/` became dead assets after the 2026-05-02
+LoadingScreen redesign (Option A — CSS spinner instead of mascot
+rotation). Confirmed only LoadingScreen.tsx imported them. Safe to
+delete in a separate cleanup pass post-Web-Summit.
 
 ### Shared <TeamPickButton> component — dedup PoolPlayoffBracket and PoolPlayoffConfidence team rows
 
