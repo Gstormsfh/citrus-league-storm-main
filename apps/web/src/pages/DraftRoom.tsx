@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { LeagueService, League, Team, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
@@ -14,7 +15,6 @@ import { publicApi } from '@/api/public';
 import { logger } from '@/utils/logger';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { DraftLobby } from '@/components/draft/DraftLobby';
 import { DraftBoard } from '@/components/draft/DraftBoard';
 import { PlayerPool } from '@/components/draft/PlayerPool';
@@ -51,7 +51,6 @@ import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { ScoringCalculator, type ScoringSettings } from '@/utils/scoringUtils';
-import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { useToast } from '@/hooks/use-toast';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
@@ -3604,7 +3603,7 @@ const DraftRoom = () => {
 
   // ALWAYS render something - never return null
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative touch-manipulation overflow-x-clip">
+    <div className="min-h-screen bg-pastel-surface relative touch-manipulation overflow-x-clip">
       {/* Realtime connection banner — surfaces when the draft-pick channel
           drops so users know their draft isn't silently stalled.
           'connected' is the quiescent state; we don't render anything. */}
@@ -3619,16 +3618,16 @@ const DraftRoom = () => {
         </div>
       )}
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Draft Room</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">Draft Room</h1>
         </div>
       </div>
 
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[1fr_340px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
             <div className="min-w-0 overflow-y-visible lg:overflow-y-auto lg:overflow-x-hidden lg:max-h-[calc(100dvh-7rem)] px-0 sm:px-2 lg:px-2 order-1 lg:order-1">
         {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}
@@ -3644,10 +3643,10 @@ const DraftRoom = () => {
           <div className="container mx-auto px-4 py-20">
             <Card className="max-w-2xl mx-auto">
               <CardHeader>
-                <CardTitle className="text-citrus-forest">Draft Room</CardTitle>
+                <CardTitle className="text-pastel-cream">Draft Room</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-muted-foreground">{error}</p>
+                <p className="text-white/55">{error}</p>
                 <div className="flex gap-2">
                   <Button onClick={() => loadDraftData()}>Retry</Button>
                   <Button variant="outline" onClick={() => navigate(`/league/${leagueId}`)}>
@@ -3710,7 +3709,7 @@ const DraftRoom = () => {
                 <Card className="border-2 border-primary bg-primary/5">
                   <CardContent className="p-4 sm:p-6 text-center">
                     <h2 className="text-xl sm:text-2xl font-bold mb-2">Ready to Begin?</h2>
-                    <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
+                    <p className="text-sm sm:text-base text-white/55 mb-4 sm:mb-6">
                       All teams are ready. Start the draft timer for the first pick.
                     </p>
                     <Button
@@ -3727,13 +3726,13 @@ const DraftRoom = () => {
             )}
 
             {/* Sticky Draft Header - Mobile-first compact design */}
-            <div className="bg-card border-b sticky top-0 z-30 shadow-sm">
+            <div className="bg-pastel-surface-tile border-b border-white/10 sticky top-0 z-30 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)]">
               <div className="px-3 py-2 md:container md:mx-auto md:px-4 md:py-3">
                 {/* Row 1: Pick info + Timer + Action */}
                 <div className="flex items-center justify-between gap-2">
                   {/* Left: Round/Pick + Team + Connection */}
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs md:text-sm text-muted-foreground flex items-center gap-2">
+                    <div className="text-xs md:text-sm text-white/55 flex items-center gap-2">
                       <span>R{draftState?.currentRound || 1} • Pick {draftState?.currentPick || 1}/{(teams?.length || 0) * (draftSettings?.rounds || 21)}</span>
                       {leagueId && <ConnectionStatus leagueId={leagueId} />}
                     </div>
@@ -3780,7 +3779,7 @@ const DraftRoom = () => {
                             'flex items-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 rounded-full font-semibold text-xs md:text-sm transition-all border-2',
                             userAutoDraftEnabled
                               ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-600/30'
-                              : 'bg-muted border-border text-muted-foreground hover:border-green-500 hover:text-green-600'
+                              : 'bg-white/5 border border-white/10 text-white/55 hover:border-pastel-sage hover:text-pastel-sage-soft'
                           )}
                         >
                           <Zap className={cn('h-3.5 w-3.5 md:h-4 md:w-4', userAutoDraftEnabled && 'fill-white')} />
@@ -3804,7 +3803,7 @@ const DraftRoom = () => {
                 {/* Mobile draft-order bar — next picks at a glance so users don't need to switch tabs */}
                 {teams.length > 1 && draftState && (
                   <div className="flex items-center gap-1 mt-1.5 overflow-x-auto text-xs lg:hidden pb-0.5 scrollbar-styled">
-                    <span className="text-muted-foreground flex-shrink-0 text-[10px]">Next:</span>
+                    <span className="text-white/55 flex-shrink-0 text-[10px]">Next:</span>
                     {(() => {
                       const boardOrder = orderedTeamsForBoard.length > 0 ? orderedTeamsForBoard : teams;
                       const teamsCount = boardOrder.length;
@@ -3829,7 +3828,7 @@ const DraftRoom = () => {
                               ? 'bg-primary text-primary-foreground'
                               : p.team.owner_id === user?.id
                                 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                : 'bg-muted text-muted-foreground'
+                                : 'bg-white/5 text-white/55'
                           )}
                         >
                           {p.team.team_name.length > 10 ? p.team.team_name.slice(0, 10) + '…' : p.team.team_name}
@@ -3846,14 +3845,14 @@ const DraftRoom = () => {
                       <div className="flex items-center gap-2">
                         <Badge className="text-[10px] flex-shrink-0 bg-primary text-primary-foreground">{selectedPlayer.position}</Badge>
                         <span className="font-bold text-sm md:text-base truncate cursor-pointer hover:text-primary hover:underline" onClick={() => handlePlayerClick(selectedPlayer.id)}>{selectedPlayer.full_name}</span>
-                        <span className="text-xs text-muted-foreground flex-shrink-0">{selectedPlayer.team}</span>
+                        <span className="text-xs text-white/55 flex-shrink-0">{selectedPlayer.team}</span>
                       </div>
                       {/* Full stat line — scrollable on mobile */}
                       <div className="flex items-center gap-2 mt-1.5 overflow-x-auto text-[11px] md:text-xs pb-0.5 scrollbar-styled">
                         {selectedPlayer.position === 'G' ? (
                           <>
                             <span className="flex-shrink-0 font-bold text-primary">{selectedPlayer.wins || 0}W</span>
-                            <span className="text-muted-foreground/40">|</span>
+                            <span className="text-white/30">|</span>
                             <span className="flex-shrink-0">{selectedPlayer.losses || 0}L</span>
                             <span className="flex-shrink-0">{selectedPlayer.goals_against_average ? selectedPlayer.goals_against_average.toFixed(2) : '0.00'} GAA</span>
                             <span className="flex-shrink-0">{selectedPlayer.save_percentage ? (selectedPlayer.save_percentage * 100).toFixed(1) : '0.0'}%</span>
@@ -3863,7 +3862,7 @@ const DraftRoom = () => {
                         ) : (
                           <>
                             <span className="flex-shrink-0 font-bold text-primary">{selectedPlayer.points} PTS</span>
-                            <span className="text-muted-foreground/40">|</span>
+                            <span className="text-white/30">|</span>
                             <span className="flex-shrink-0">{selectedPlayer.goals}G</span>
                             <span className="flex-shrink-0">{selectedPlayer.assists}A</span>
                             <span className="flex-shrink-0">{selectedPlayer.plus_minus > 0 ? '+' : ''}{selectedPlayer.plus_minus}</span>
@@ -3899,18 +3898,18 @@ const DraftRoom = () => {
                   const lastTeam = mostRecent ? teamsById.get(mostRecent.team_id) : null;
 
                   return (
-                    <div className="mt-2 flex items-center gap-3 bg-muted/20 border border-border/40 rounded-lg px-3 py-2.5">
+                    <div className="mt-2 flex items-center gap-3 bg-white/5 border border-white/10 rounded-lg px-3 py-2.5">
                       {nextQueuedPlayer ? (
                         <>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
                               <Star className="h-3.5 w-3.5 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />
-                              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide flex-shrink-0">Up Next</span>
+                              <span className="text-[10px] text-white/55 font-medium uppercase tracking-wide flex-shrink-0">Up Next</span>
                               <Badge variant="outline" className="text-[10px] flex-shrink-0">{nextQueuedPlayer.position}</Badge>
                               <span className="font-bold text-sm truncate cursor-pointer hover:text-primary hover:underline" onClick={() => handlePlayerClick(nextQueuedPlayer.id)}>{nextQueuedPlayer.full_name}</span>
-                              <span className="text-xs text-muted-foreground flex-shrink-0">{nextQueuedPlayer.team}</span>
+                              <span className="text-xs text-white/55 flex-shrink-0">{nextQueuedPlayer.team}</span>
                             </div>
-                            <div className="flex items-center gap-1.5 mt-1 text-[10px] md:text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1.5 mt-1 text-[10px] md:text-xs text-white/55">
                               {nextQueuedPlayer.position === 'G' ? (
                                 <span>{nextQueuedPlayer.wins || 0}W • {nextQueuedPlayer.goals_against_average?.toFixed(2) || '0.00'} GAA • {nextQueuedPlayer.save_percentage ? (nextQueuedPlayer.save_percentage * 100).toFixed(1) : '0.0'}%</span>
                               ) : (
@@ -3931,15 +3930,15 @@ const DraftRoom = () => {
                         </>
                       ) : lastPlayer && lastTeam ? (
                         <div className="flex items-center gap-2 text-xs md:text-sm w-full">
-                          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Last Pick</span>
+                          <span className="text-[10px] text-white/55 font-medium uppercase tracking-wide">Last Pick</span>
                           <Badge variant="outline" className="text-[10px]">{lastPlayer.position}</Badge>
                           <span className="font-semibold truncate cursor-pointer hover:text-primary hover:underline" onClick={() => handlePlayerClick(lastPlayer.id)}>{lastPlayer.full_name}</span>
-                          <span className="text-muted-foreground hidden sm:inline">to {lastTeam.team_name}</span>
-                          <span className="text-muted-foreground ml-auto flex-shrink-0">R{mostRecent!.round_number}</span>
+                          <span className="text-white/55 hidden sm:inline">to {lastTeam.team_name}</span>
+                          <span className="text-white/55 ml-auto flex-shrink-0">R{mostRecent!.round_number}</span>
                         </div>
                       ) : (
                         <div className="text-center w-full py-1">
-                          <p className="text-xs text-muted-foreground">Click a player below to select them for drafting</p>
+                          <p className="text-xs text-white/55">Click a player below to select them for drafting</p>
                         </div>
                       )}
                     </div>
@@ -3949,7 +3948,7 @@ const DraftRoom = () => {
                 {/* Queue badges - only show on desktop or if queue has items */}
                 {draftQueue.length > 0 && (
                   <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-0.5">
-                    <span className="text-[10px] text-muted-foreground flex-shrink-0">Queue:</span>
+                    <span className="text-[10px] text-white/55 flex-shrink-0">Queue:</span>
                     {draftQueue.slice(0, 3).map((playerId) => {
                       const player = availablePlayers.find(p => p.id === playerId);
                       if (!player || draftedPlayerIds.has(playerId)) return null;
@@ -4010,10 +4009,10 @@ const DraftRoom = () => {
                             <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-background border">
                               <div>
                                 <div className="font-bold">{auctionState.currentNomination.player_name}</div>
-                                <div className="text-xs text-muted-foreground">
+                                <div className="text-xs text-white/55">
                                   Current bid: <span className="font-bold text-amber-600">${auctionState.currentNomination.current_high_bid}</span>
                                 </div>
-                                <div className={`text-[10px] font-bold ${(auctionTimeRemaining ?? 99) <= 10 ? 'text-red-500 animate-pulse' : 'text-muted-foreground'}`}>
+                                <div className={`text-[10px] font-bold ${(auctionTimeRemaining ?? 99) <= 10 ? 'text-red-500 animate-pulse' : 'text-white/55'}`}>
                                   {auctionTimeRemaining !== null ? `${auctionTimeRemaining}s remaining` : `Expires: ${new Date(auctionState.currentNomination.expires_at).toLocaleTimeString()}`}
                                 </div>
                               </div>
@@ -4070,7 +4069,7 @@ const DraftRoom = () => {
                             </div>
                           </div>
                         ) : (
-                          <div className="text-center py-4 text-sm text-muted-foreground">
+                          <div className="text-center py-4 text-sm text-white/55">
                             {auctionState.isMyTurnToNominate && selectedPlayer ? (
                               <Button
                                 className="bg-amber-500 hover:bg-amber-600 text-white font-bold"
@@ -4137,16 +4136,16 @@ const DraftRoom = () => {
                         {/* Bid History — real-time transparency */}
                         {auctionState.bidHistory && auctionState.bidHistory.length > 0 && (
                           <div className="mt-3 pt-3 border-t border-amber-200">
-                            <div className="text-xs font-semibold text-muted-foreground mb-2">Bid History</div>
+                            <div className="text-xs font-semibold text-white/55 mb-2">Bid History</div>
                             <div className="space-y-1 max-h-32 overflow-y-auto">
                               {auctionState.bidHistory.map((bid, i) => {
                                 const teamName = auctionState.budgets.find(b => b.team_id === bid.team_id)?.team_name || 'Unknown';
                                 return (
-                                  <div key={i} className={`flex justify-between text-xs p-1.5 rounded ${i === 0 ? 'bg-amber-100 dark:bg-amber-900/30 font-bold' : 'bg-muted/30'}`}>
+                                  <div key={i} className={`flex justify-between text-xs p-1.5 rounded ${i === 0 ? 'bg-amber-100 dark:bg-amber-900/30 font-bold' : 'bg-white/5'}`}>
                                     <span className="truncate">{teamName}</span>
                                     <div className="flex items-center gap-2">
                                       <span className="font-bold text-amber-600">${bid.bid_amount}</span>
-                                      {bid.created_at && <span className="text-muted-foreground">{new Date(bid.created_at).toLocaleTimeString()}</span>}
+                                      {bid.created_at && <span className="text-white/55">{new Date(bid.created_at).toLocaleTimeString()}</span>}
                                     </div>
                                   </div>
                                 );
@@ -4158,10 +4157,10 @@ const DraftRoom = () => {
                         {/* Budget overview for all teams */}
                         {auctionState.budgets.length > 0 && (
                           <div className="mt-3 pt-3 border-t">
-                            <div className="text-xs font-semibold text-muted-foreground mb-2">Team Budgets</div>
+                            <div className="text-xs font-semibold text-white/55 mb-2">Team Budgets</div>
                             <div className="grid grid-cols-2 gap-1">
                               {auctionState.budgets.map(b => (
-                                <div key={b.team_id} className="flex justify-between text-xs p-1 rounded bg-muted/30">
+                                <div key={b.team_id} className="flex justify-between text-xs p-1 rounded bg-white/5">
                                   <span className="truncate">{b.team_name}</span>
                                   <span className="font-bold">${b.remaining_budget}</span>
                                 </div>
@@ -4266,10 +4265,10 @@ const DraftRoom = () => {
 
                         {/* Draft from selected player */}
                         {currentTeam?.owner_id === user?.id && selectedPlayer && (
-                          <Card className="p-4 border-2 border-fantasy-primary shadow-lg bg-card">
+                          <Card className="p-4 border-2 border-pastel-orange/40 shadow-[0_16px_40px_-12px_rgba(255,168,87,0.25)] bg-pastel-surface-tile">
                             <div className="text-center mb-3">
                               <div className="text-lg font-bold">{selectedPlayer.full_name}</div>
-                              <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
+                              <div className="text-xs text-white/55 flex items-center justify-center gap-2">
                                 <Badge variant="outline">{selectedPlayer.position}</Badge>
                                 <span>{selectedPlayer.team}</span>
                                 <span className="font-semibold text-fantasy-primary">{selectedPlayer.points} PTS</span>
@@ -4305,7 +4304,7 @@ const DraftRoom = () => {
                         {/* Commissioner controls on mobile */}
                         {isCommissioner && (
                           <details className="group">
-                            <summary className="cursor-pointer text-sm font-semibold mb-2 p-2 bg-muted/50 rounded hover:bg-muted/70 transition-colors text-destructive">
+                            <summary className="cursor-pointer text-sm font-semibold mb-2 p-2 bg-white/5 rounded hover:bg-white/10 transition-colors text-destructive">
                               Commissioner Controls
                             </summary>
                             <div className="mt-2 space-y-2">
@@ -4423,10 +4422,10 @@ const DraftRoom = () => {
                   
                   {/* Prominent Draft Button - Only show when it's user's turn and player selected */}
                   {currentTeam?.owner_id === user?.id && selectedPlayer && (
-                    <Card className="p-6 border-2 border-fantasy-primary shadow-lg bg-card">
+                    <Card className="p-6 border-2 border-pastel-orange/40 shadow-[0_16px_40px_-12px_rgba(255,168,87,0.25)] bg-pastel-surface-tile">
                       <div className="text-center mb-4">
                         <div className="text-xl font-bold mb-1">{selectedPlayer.full_name}</div>
-                        <div className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+                        <div className="text-sm text-white/55 flex items-center justify-center gap-2">
                           <Badge variant="outline">{selectedPlayer.position}</Badge>
                           <span>•</span>
                           <span>{selectedPlayer.team}</span>
@@ -4474,7 +4473,7 @@ const DraftRoom = () => {
                   {/* Commissioner Controls - Collapsible */}
                   {isCommissioner && (
                     <details className="group">
-                      <summary className="cursor-pointer text-sm font-semibold mb-2 p-2 bg-muted/50 rounded hover:bg-muted/70 transition-colors text-destructive">
+                      <summary className="cursor-pointer text-sm font-semibold mb-2 p-2 bg-white/5 rounded hover:bg-white/10 transition-colors text-destructive">
                         Commissioner Controls
                       </summary>
                       <div className="mt-2 space-y-2">
@@ -4526,7 +4525,7 @@ const DraftRoom = () => {
             {isCommissioner && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
               <>
                 {/* Mobile: Fixed bottom bar spanning full width */}
-                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t shadow-[0_-2px_10px_rgba(0,0,0,0.1)] px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-pastel-surface-tile border-t border-white/10 shadow-[0_-2px_10px_rgba(0,0,0,0.5)] px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
                   <div className="flex items-center justify-center gap-2">
                     <span className="text-[10px] font-semibold text-destructive uppercase tracking-wide flex-shrink-0">Commish</span>
                     {/* Undo Last Pick */}
@@ -4571,7 +4570,7 @@ const DraftRoom = () => {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="shadow-lg bg-card h-10 px-4 text-sm"
+                      className="shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)] bg-pastel-surface-tile ring-1 ring-white/10 text-pastel-cream h-10 px-4 text-sm"
                       onClick={handleUndoLastPick}
                     >
                       <RotateCcw className="h-4 w-4 mr-2" />
@@ -4613,7 +4612,7 @@ const DraftRoom = () => {
                 <CheckCircle className="h-12 w-12" />
               </div>
               <h1 className="text-4xl font-bold mb-4">Congratulations!</h1>
-              <p className="text-xl text-muted-foreground mb-6">
+              <p className="text-xl text-white/55 mb-6">
                 The draft is complete! Your rosters are now locked and ready for the season.
               </p>
               {/* Demo State CTA - removed (disabled) */}
@@ -4702,18 +4701,29 @@ const DraftRoom = () => {
         )}
             </div>
 
-            {/* Left Sidebar - Hidden on desktop during draft to maximize player table space */}
+            {/* Left Sidebar — mobile-only draft tips tile. Replaces the
+                legacy AdSpace placeholders. Desktop draft experience
+                maximizes the central player table; this tile only
+                renders on mobile beneath the main board. */}
             <aside className="w-full lg:hidden order-2 lg:order-1">
               <div className="space-y-4">
-                <AdSpace size="300x250" label="Draft Sponsor" />
-                <AdSpace size="300x250" label="Fantasy Partner" />
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-3">
+                    ✦ Draft tips
+                  </div>
+                  <ul className="space-y-2 text-[11px] text-white/70 leading-relaxed">
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Queue your top 5 in case of timeout</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Auto-pick uses xG model projections</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Watch the bid history in auction mode</li>
+                  </ul>
+                </div>
               </div>
             </aside>
 
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && (activeLeagueId || leagueId) && (
               <aside className="hidden lg:block order-2">
-                <div className="lg:sticky lg:top-24 h-[calc(100dvh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100dvh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId || leagueId || ''} />
                 </div>
               </aside>
@@ -4721,7 +4731,7 @@ const DraftRoom = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
       
       {/* Player Stats Modal */}
       <PlayerStatsModal
@@ -4749,10 +4759,10 @@ const DraftRoom = () => {
               <CardTitle>Unexpected State</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-white/55">
                 The draft room is in an unexpected state. Please refresh the page.
               </p>
-              <div className="text-xs font-mono bg-muted p-3 rounded space-y-1">
+              <div className="text-xs font-mono bg-white/5 ring-1 ring-white/10 p-3 rounded-lg space-y-1">
                 <p>Loading: {String(loading)}</p>
                 <p>Auth Loading: {String(authLoading)}</p>
                 <p>Has User: {String(!!user)}</p>

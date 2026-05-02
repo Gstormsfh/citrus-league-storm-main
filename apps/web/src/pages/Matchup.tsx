@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate, Navigate, Link } from "react-router-dom";
+import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
 import { cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
 import MobileMenuButton from '@/components/MobileMenuButton';
-import Footer from '@/components/Footer';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { TeamCard } from "@/components/matchup/TeamCard";
 import { MatchupComparison } from "@/components/matchup/MatchupComparison";
@@ -35,9 +35,6 @@ import { DemoMatchupCacheService, type DemoMatchupPayload } from '@/services/Dem
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { MatchupScoreJobService } from '@/services/MatchupScoreJobService';
 import { DataCacheService, TTL } from '@/services/DataCacheService';
-import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge, CitrusBurst, CitrusZest } from '@/components/icons/CitrusIcons';
-import { CitrusBackground } from '@/components/CitrusBackground';
-import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
 import { ScoringCalculator, DEFAULT_SCORING } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
@@ -5058,46 +5055,37 @@ const Matchup = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative w-full">
-      {/* Citrus Background - Floating citrus elements - Hidden on mobile for performance */}
-      <div className="hidden lg:block">
-        <CitrusBackground density="light" animated={true} />
-      </div>
-      
-      {/* Decorative elements to match Home page - Hidden on mobile */}
-      <div className="hidden lg:block absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
-      <div className="hidden lg:block absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
-
+    <div className="min-h-screen bg-pastel-surface relative w-full">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
       </div>
       
       {/* MOBILE: Sticky scoreboard header — ESPN/Yahoo style */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-14 px-3">
           {/* My team score */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="text-lg font-varsity font-black text-citrus-forest tabular-nums">
+            <span className="text-lg font-calistoga font-black text-pastel-cream tabular-nums">
               {parseFloat(myTeamPoints || '0').toFixed(1)}
             </span>
-            <span className="text-xs font-display font-semibold text-citrus-forest/70 truncate">
+            <span className="text-xs font-jbmono font-semibold text-pastel-cream/70 truncate">
               {userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
             </span>
           </div>
           {/* Week badge */}
           <div className="flex flex-col items-center px-2 flex-shrink-0">
-            <span className="text-[10px] font-display font-bold text-citrus-charcoal/50 uppercase tracking-wider">
+            <span className="text-[10px] font-jbmono font-bold text-white/55 uppercase tracking-wider">
               {currentMatchup ? `Wk ${selectedWeek}` : 'VS'}
             </span>
-            <span className="text-xs text-citrus-charcoal/30 font-bold">—</span>
+            <span className="text-xs text-white/40 font-bold">—</span>
           </div>
           {/* Opponent score + menu */}
           <div className="flex items-center gap-1 min-w-0 flex-1 justify-end">
-            <span className="text-xs font-display font-semibold text-citrus-orange/70 truncate text-right">
+            <span className="text-xs font-jbmono font-semibold text-pastel-orange-soft truncate text-right">
               {userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans'}
             </span>
-            <span className="text-lg font-varsity font-black text-citrus-orange tabular-nums">
+            <span className="text-lg font-calistoga font-black text-pastel-orange tabular-nums">
               {parseFloat(opponentTeamPoints || '0').toFixed(1)}
             </span>
             <MobileMenuButton />
@@ -5118,7 +5106,7 @@ const Matchup = () => {
           <div className={cn(
             "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
             userLeagueState === 'active-user' && league?.id
-              ? "lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px]"
+              ? "lg:grid-cols-[200px_1fr_280px] xl:grid-cols-[220px_1fr_340px]"
               : "lg:grid-cols-[200px_1fr] xl:grid-cols-[220px_1fr]"
           )}>
             {/* Main Content - MOBILE: Full width, full height / DESKTOP: Scrollable panel */}
@@ -5145,8 +5133,8 @@ const Matchup = () => {
                 </Card>
               )}
               {(league?.id || activeLeagueId) && playoffChampion.status === 'in_progress' && (
-                <div className="mb-4 flex items-center justify-between px-3 py-2 rounded-md border border-border/40 bg-muted/30 text-sm">
-                  <span className="text-muted-foreground">Playoffs in Progress</span>
+                <div className="mb-4 flex items-center justify-between px-3 py-2 rounded-md border border-white/10 bg-white/5 text-sm">
+                  <span className="text-white/55">Playoffs in Progress</span>
                   <Link
                     to={`/playoffs/${league?.id || activeLeagueId}`}
                     className="font-medium text-primary hover:underline"
@@ -5173,7 +5161,7 @@ const Matchup = () => {
                   {/* Matchup Viewer Dropdown - Show all matchups for current week */}
                   {userLeagueState === 'active-user' && allWeekMatchups.length > 0 && (
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2">
-                      <label className="text-xs sm:text-sm font-medium text-muted-foreground">View Matchup:</label>
+                      <label className="text-xs sm:text-sm font-medium text-white/55">View Matchup:</label>
                       <Select
                         value={selectedMatchupId || currentMatchup?.id || ''}
                         onValueChange={async (value) => {
@@ -5253,7 +5241,7 @@ const Matchup = () => {
             <div className="text-center py-12 max-w-lg mx-auto">
               {userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' ? (
                 <div>
-                  <p className="text-muted-foreground text-base mb-6">
+                  <p className="text-white/55 text-base mb-6">
                     {error}
                   </p>
                   <LeagueCreationCTA
@@ -5263,11 +5251,11 @@ const Matchup = () => {
                 </div>
               ) : error === 'draft_not_completed' ? (
                 <div className="max-w-md mx-auto text-center">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-citrus-sage/20 flex items-center justify-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-pastel-sage/20 flex items-center justify-center">
                     <span className="text-2xl">🏒</span>
                   </div>
-                  <h3 className="text-lg font-bold text-citrus-forest mb-2">Draft Your Team First</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
+                  <h3 className="text-lg font-bold text-pastel-cream mb-2">Draft Your Team First</h3>
+                  <p className="text-sm text-white/55 mb-4">
                     Complete your league's draft to unlock weekly matchups and start competing.
                   </p>
                   <Button onClick={() => navigate(`/draft-room?league=${activeLeagueId}`)}>
@@ -5276,7 +5264,7 @@ const Matchup = () => {
                 </div>
               ) : (
                 <div className="max-w-md mx-auto text-center">
-                  <p className="text-muted-foreground text-base mb-4">{error}</p>
+                  <p className="text-white/55 text-base mb-4">{error}</p>
                   <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
                 </div>
               )}
@@ -5409,9 +5397,9 @@ const Matchup = () => {
            !(userLeagueState === 'logged-in-no-league' && (demoMyTeam.length > 0 || demoOpponentTeam.length > 0)) &&
            userLeagueState !== 'logged-in-no-league' && (
             <div className="text-center py-20">
-              <p className="text-muted-foreground mb-4">No matchup data available.</p>
-              <p className="text-sm text-muted-foreground mb-4">This may be because:</p>
-              <ul className="text-sm text-muted-foreground mb-4 text-left max-w-md mx-auto">
+              <p className="text-white/55 mb-4">No matchup data available.</p>
+              <p className="text-sm text-white/55 mb-4">This may be because:</p>
+              <ul className="text-sm text-white/55 mb-4 text-left max-w-md mx-auto">
                 <li>• The matchup hasn't been generated yet</li>
                 <li>• You don't have a team in this league</li>
                 <li>• The draft hasn't been completed</li>
@@ -5486,7 +5474,7 @@ const Matchup = () => {
             {/* Notifications Panel - Right side on desktop, hidden on mobile */}
             {userLeagueState === 'active-user' && league?.id && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={league.id} />
                 </div>
               </aside>
@@ -5502,7 +5490,7 @@ const Matchup = () => {
       </main>
       {/* Footer - Hidden on mobile */}
       <div className="hidden lg:block">
-        <Footer />
+        <HockeyFooter />
       </div>
     </div>
   );

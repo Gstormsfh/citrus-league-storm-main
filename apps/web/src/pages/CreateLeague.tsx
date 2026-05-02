@@ -1,5 +1,22 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  HockeyFooter,
+  CupIcon,
+  CrossedSticksIcon,
+  PuckIcon,
+  ScoreboardIcon,
+  XGModelIcon,
+  SlateIcon,
+  DraftIcon,
+  PickemIcon,
+  SurvivorIcon,
+  BracketIcon,
+  RangeIcon,
+  ShiftIcon,
+  MaskIcon,
+  NetIcon,
+} from '@/components/citrus2';
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -7,7 +24,6 @@ import { useLeague } from "@/contexts/LeagueContext";
 import { LeagueService } from "@/services/LeagueService";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,24 +73,24 @@ import {
 } from "@/types/leagueTypes";
 
 // ============================================================================
-// LEAGUE TYPE CARD ICONS
+// LEAGUE TYPE CARD ICONS — custom hockey iconography from citrus2
 // ============================================================================
 const LEAGUE_TYPE_ICONS: Record<LeagueType, React.ReactNode> = {
-  'fantasy': <Trophy className="w-8 h-8" />,
-  'pickem': <Target className="w-8 h-8" />,
-  'survivor': <Shield className="w-8 h-8" />,
-  'confidence-pool': <BarChart3 className="w-8 h-8" />,
-  'playoff-bracket-pickem': <Trophy className="w-8 h-8" />,
-  'playoff-confidence-pool': <BarChart3 className="w-8 h-8" />,
-  'playoff-roster-pool': <Shield className="w-8 h-8" />,
+  'fantasy':                  <CrossedSticksIcon className="w-8 h-8" strokeWidth={1.75} />,
+  'pickem':                   <PickemIcon className="w-8 h-8" strokeWidth={1.75} />,
+  'survivor':                 <SurvivorIcon className="w-8 h-8" strokeWidth={1.75} />,
+  'confidence-pool':          <XGModelIcon className="w-8 h-8" strokeWidth={1.75} />,
+  'playoff-bracket-pickem':   <BracketIcon className="w-8 h-8" strokeWidth={1.75} />,
+  'playoff-confidence-pool':  <XGModelIcon className="w-8 h-8" strokeWidth={1.75} />,
+  'playoff-roster-pool':      <ScoreboardIcon className="w-8 h-8" strokeWidth={1.75} />,
 };
 
 const DRAFT_TYPE_ICONS: Record<DraftType, React.ReactNode> = {
-  'snake': <Shuffle className="h-5 w-5" />,
-  'linear': <ArrowDown className="h-5 w-5" />,
-  'auction': <DollarSign className="h-5 w-5" />,
+  'snake':    <Shuffle className="h-5 w-5" />,
+  'linear':   <ArrowDown className="h-5 w-5" />,
+  'auction':  <DollarSign className="h-5 w-5" />,
   'autopick': <Bot className="h-5 w-5" />,
-  'offline': <FileEdit className="h-5 w-5" />,
+  'offline':  <DraftIcon className="h-5 w-5" strokeWidth={2} />,
 };
 
 // ============================================================================
@@ -102,8 +118,8 @@ const DEFAULT_LEAGUE_STATS = [
 const SectionHeader = ({ title, subtitle, badge }: { title: string; subtitle: string; badge?: React.ReactNode }) => (
   <div className="flex items-center justify-between mb-6">
     <div>
-      <h3 className="text-xl font-bold">{title}</h3>
-      <p className="text-muted-foreground text-sm">{subtitle}</p>
+      <h3 className="font-calistoga text-xl text-pastel-cream leading-none">{title}</h3>
+      <p className="text-white/55 text-sm mt-1.5">{subtitle}</p>
     </div>
     {badge}
   </div>
@@ -673,37 +689,42 @@ const CreateLeague = () => {
   // RENDER
   // ============================================================================
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative">
-      {/* Decorative Background */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[hsl(var(--vibrant-yellow))] rounded-full opacity-10 blur-3xl -z-10"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[hsl(var(--vibrant-green))] rounded-full opacity-10 blur-3xl -z-10"></div>
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream relative">
+      {/* Decorative Background — pastel-orange + sage halos in citrus2 voice */}
+      <div aria-hidden="true" className="absolute top-0 right-0 w-96 h-96 bg-pastel-orange/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
+      <div aria-hidden="true" className="absolute bottom-0 left-0 w-96 h-96 bg-pastel-sage/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
 
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Create League</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">Create League</h1>
         </div>
       </div>
 
       <main className="lg:pt-32 lg:pb-20 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] px-4">
         <div className="container mx-auto max-w-4xl">
 
-          <div className="mb-8 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 citrus-gradient-text">
-              Create or Join a League
+          <div className="mb-8 text-left">
+            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 flex items-center gap-2">
+              <CupIcon className="w-3.5 h-3.5" strokeWidth={2} />
+              ✦ Opening Night
+            </div>
+            <h1 className="font-calistoga text-3xl sm:text-4xl md:text-5xl text-pastel-cream leading-none mb-2">
+              Create or join a league.
             </h1>
-            <p className="text-lg text-muted-foreground">
-              Start your own league or join your friends.
+            <p className="text-sm sm:text-base text-white/55">
+              Spin up a fresh league for your group, or jump into a friend&rsquo;s with an invite code.
             </p>
           </div>
 
           {/* Testing Phase Banner — only for season-long fantasy */}
           {searchParams.get('type') === 'all' && (
-          <Alert className="mb-6 bg-citrus-orange/20 border-2 border-citrus-orange/40">
-            <Sparkles className="h-4 w-4 text-citrus-orange" />
-            <AlertDescription className="text-citrus-forest">
-              <span className="font-bold">We're in testing phase!</span> Your league will be filled with AI teams so you can experience the full platform. Try the complete draft experience and draft against AI opponents.
-              <span className="block mt-2 text-sm">
+          <Alert className="mb-6 bg-pastel-orange/15 ring-1 ring-pastel-orange/40 border-0 text-pastel-cream rounded-2xl shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]">
+            <Sparkles className="h-4 w-4 text-pastel-orange" />
+            <AlertDescription className="text-pastel-cream">
+              <span className="font-bold text-pastel-orange-soft">We&rsquo;re in testing phase.</span>{' '}
+              Your league will be filled with AI teams so you can experience the full platform. Try the complete draft experience and draft against AI opponents.
+              <span className="block mt-2 text-sm text-white/70">
                 Sign up for the waitlist to be notified when full service launches with real multiplayer leagues.
               </span>
             </AlertDescription>
@@ -715,15 +736,21 @@ const CreateLeague = () => {
             <WaitlistSignup source="create_league_page" variant="compact" />
           </div>
 
-          <Card className="card-citrus border-none shadow-xl overflow-hidden">
+          <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] overflow-hidden">
             <CardContent className="p-4 sm:p-8">
               <Tabs defaultValue={defaultTab} value={defaultTab} onValueChange={(v) => setDefaultTab(v as "create" | "join")} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-8">
-                  <TabsTrigger value="create" className="flex items-center gap-2">
-                    <Trophy className="w-4 h-4" />
+                <TabsList className="grid w-full grid-cols-2 mb-8 bg-pastel-surface ring-1 ring-white/10 p-1 rounded-xl">
+                  <TabsTrigger
+                    value="create"
+                    className="flex items-center gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                  >
+                    <CupIcon className="w-4 h-4" strokeWidth={2} />
                     Create League
                   </TabsTrigger>
-                  <TabsTrigger value="join" className="flex items-center gap-2">
+                  <TabsTrigger
+                    value="join"
+                    className="flex items-center gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                  >
                     <UserPlus className="w-4 h-4" />
                     Join League
                   </TabsTrigger>
@@ -762,22 +789,22 @@ const CreateLeague = () => {
                           key={type}
                           type="button"
                           onClick={() => setLeagueType(type)}
-                          className={`relative text-left rounded-xl border-2 p-5 transition-all duration-200 ${
+                          className={`relative text-left rounded-2xl p-5 transition-all duration-200 ${
                             leagueType === type
-                              ? 'border-primary bg-primary/5 shadow-md ring-2 ring-primary/20'
-                              : 'border-muted bg-transparent hover:border-primary/40 hover:bg-muted/20'
+                              ? 'bg-pastel-orange/15 ring-2 ring-pastel-orange/50 shadow-[0_8px_24px_-8px_rgba(255,168,87,0.4)]'
+                              : 'bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/30 hover:bg-white/[0.08]'
                           }`}
                         >
                           {leagueType === type && (
                             <div className="absolute top-3 right-3">
-                              <CheckCircle className="w-5 h-5 text-primary" />
+                              <CheckCircle className="w-5 h-5 text-pastel-orange" />
                             </div>
                           )}
-                          <div className={`mb-3 ${leagueType === type ? 'text-primary' : 'text-muted-foreground'}`}>
+                          <div className={`mb-3 ${leagueType === type ? 'text-pastel-orange' : 'text-pastel-orange/60'}`}>
                             {LEAGUE_TYPE_ICONS[type]}
                           </div>
-                          <h4 className="font-bold text-base mb-1">{LEAGUE_TYPE_LABELS[type]}</h4>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
+                          <h4 className="font-calistoga text-lg text-pastel-cream mb-1.5 leading-tight">{LEAGUE_TYPE_LABELS[type]}</h4>
+                          <p className="text-xs text-white/55 leading-relaxed">
                             {LEAGUE_TYPE_DESCRIPTIONS[type]}
                           </p>
                         </button>
@@ -788,7 +815,7 @@ const CreateLeague = () => {
                   {/* ======================================================== */}
                   {/* SECTION 2: LEAGUE NAME + BASIC INFO                      */}
                   {/* ======================================================== */}
-                  <div className="border-t pt-6 space-y-6">
+                  <div className="border-t border-white/10 pt-6 space-y-6">
                     <div className="space-y-3">
                       <Label htmlFor="league-name" className="text-base">League Name</Label>
                       <Input
@@ -816,7 +843,7 @@ const CreateLeague = () => {
                           className="h-12"
                           placeholder={isPool ? '2–100' : '2–50'}
                         />
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-white/55">
                           {isPool ? 'Any number from 2 to 100' : 'Any number from 2 to 50'}
                         </p>
                       </div>
@@ -825,7 +852,7 @@ const CreateLeague = () => {
                       {(leagueType === 'playoff-bracket-pickem' || leagueType === 'playoff-confidence-pool' || leagueType === 'playoff-roster-pool') && (
                         <div className="space-y-3">
                           <Label htmlFor="playoff-lock" className="text-base flex items-center gap-2">
-                            <Lock className="h-4 w-4 text-citrus-orange" />
+                            <Lock className="h-4 w-4 text-pastel-orange" />
                             {leagueType === 'playoff-roster-pool' ? 'Roster Lock Deadline' : 'Pick Lock Deadline'}
                           </Label>
                           <Input
@@ -835,7 +862,7 @@ const CreateLeague = () => {
                             onChange={(e) => setPlayoffLockDeadline(e.target.value)}
                             className="h-12"
                           />
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             {leagueType === 'playoff-roster-pool'
                               ? 'After this time, rosters lock and players cannot be swapped. Default is Round 1 Game 1 puck drop.'
                               : 'After this time, picks lock. Typically set to just before the first playoff game.'}
@@ -847,7 +874,7 @@ const CreateLeague = () => {
                       {leagueType === 'playoff-bracket-pickem' && (
                         <div className="space-y-3">
                           <Label className="text-base flex items-center gap-2">
-                            <Trophy className="h-4 w-4 text-citrus-orange" />
+                            <Trophy className="h-4 w-4 text-pastel-orange" />
                             Bracket Pick Mode
                           </Label>
                           <RadioGroup
@@ -860,14 +887,14 @@ const CreateLeague = () => {
                               className={cn(
                                 'flex items-start gap-3 rounded-lg border-2 p-4 cursor-pointer transition-colors',
                                 bracketPickMode === 'round-by-round'
-                                  ? 'border-citrus-orange bg-citrus-orange/5'
-                                  : 'border-border hover:border-citrus-orange/40'
+                                  ? 'bg-pastel-orange/15 ring-2 ring-pastel-orange/40 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)]'
+                                  : 'bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/30 hover:bg-white/[0.08]'
                               )}
                             >
                               <RadioGroupItem value="round-by-round" id="mode-rbr" className="mt-1" />
                               <div className="flex-1">
-                                <div className="font-display font-bold text-sm mb-1">Round by Round</div>
-                                <p className="text-xs text-muted-foreground">
+                                <div className="font-jbmono font-bold text-sm mb-1">Round by Round</div>
+                                <p className="text-xs text-white/55">
                                   Members pick each round&apos;s winners as it starts. You can only pick Round 2 after Round 1 finishes. Forgiving format — no need to predict upsets upfront.
                                 </p>
                               </div>
@@ -877,14 +904,14 @@ const CreateLeague = () => {
                               className={cn(
                                 'flex items-start gap-3 rounded-lg border-2 p-4 cursor-pointer transition-colors',
                                 bracketPickMode === 'full-bracket'
-                                  ? 'border-citrus-orange bg-citrus-orange/5'
-                                  : 'border-border hover:border-citrus-orange/40'
+                                  ? 'bg-pastel-orange/15 ring-2 ring-pastel-orange/40 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)]'
+                                  : 'bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/30 hover:bg-white/[0.08]'
                               )}
                             >
                               <RadioGroupItem value="full-bracket" id="mode-full" className="mt-1" />
                               <div className="flex-1">
-                                <div className="font-display font-bold text-sm mb-1">Full Bracket (March Madness style)</div>
-                                <p className="text-xs text-muted-foreground">
+                                <div className="font-jbmono font-bold text-sm mb-1">Full Bracket (March Madness style)</div>
+                                <p className="text-xs text-white/55">
                                   Members pick ALL 15 series — including Stanley Cup champion — before Round 1 Game 1 puck drop. One shot, live with it. Classic playoff pool format.
                                 </p>
                               </div>
@@ -911,7 +938,7 @@ const CreateLeague = () => {
                               ))}
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             {SCORING_FORMAT_DESCRIPTIONS[scoringFormat]}
                           </p>
                         </div>
@@ -923,7 +950,7 @@ const CreateLeague = () => {
                   {/* SECTION 3: POOL-SPECIFIC SETTINGS                        */}
                   {/* ======================================================== */}
                   {leagueType === 'pickem' && (
-                    <div className="border-t pt-6">
+                    <div className="border-t border-white/10 pt-6">
                       <SectionHeader
                         title="Pick'em Settings"
                         subtitle="Configure how picks work each week"
@@ -938,7 +965,7 @@ const CreateLeague = () => {
                               <SelectItem value="against-the-spread">Against the Spread (ATS)</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             {pickemFormat === 'straight-up'
                               ? 'Simply pick which team wins each game. 1 point per correct pick.'
                               : 'Pick winners against the point spread for more challenging predictions.'
@@ -956,7 +983,7 @@ const CreateLeague = () => {
                               <SelectItem value="15">15 games</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             {picksPerWeek === '0' ? 'Pick every game on the schedule each week.' : `Select ${picksPerWeek} games to pick each week.`}
                           </p>
                         </div>
@@ -969,7 +996,7 @@ const CreateLeague = () => {
                               <SelectItem value="first-game">Lock all picks at first game of the week</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             {pickDeadline === 'per-game'
                               ? 'Each pick locks when that game starts. Make late picks up until puck drop.'
                               : 'All picks lock when the first game of the week starts. Plan ahead.'
@@ -992,7 +1019,7 @@ const CreateLeague = () => {
                   )}
 
                   {leagueType === 'survivor' && (
-                    <div className="border-t pt-6">
+                    <div className="border-t border-white/10 pt-6">
                       <SectionHeader
                         title="Survivor Pool Settings"
                         subtitle="Configure elimination rules"
@@ -1008,7 +1035,7 @@ const CreateLeague = () => {
                               <SelectItem value="3">3 lives (two mulligans)</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             In classic survivor, one wrong pick eliminates you. Extra lives give second chances.
                           </p>
                         </div>
@@ -1031,15 +1058,15 @@ const CreateLeague = () => {
                               <SelectItem value="allow">Allow repeats after mid-season</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             Classic: once you pick a team, you can never pick them again. Allow repeats: teams reset at mid-season.
                           </p>
                         </div>
                         <div className="space-y-3 flex items-start pt-2">
-                          <div className="bg-muted/30 rounded-lg p-4">
+                          <div className="bg-white/5 ring-1 ring-white/10 rounded-xl p-4">
                             <div className="flex items-start gap-2">
-                              <Info className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                              <p className="text-sm text-muted-foreground">
+                              <Info className="w-4 h-4 text-pastel-orange mt-0.5 flex-shrink-0" />
+                              <p className="text-sm text-white/55">
                                 Each week, pick one NHL team to win. Last person standing wins!
                               </p>
                             </div>
@@ -1050,7 +1077,7 @@ const CreateLeague = () => {
                   )}
 
                   {leagueType === 'confidence-pool' && (
-                    <div className="border-t pt-6">
+                    <div className="border-t border-white/10 pt-6">
                       <SectionHeader
                         title="Confidence Pool Settings"
                         subtitle="Configure confidence point rules"
@@ -1070,11 +1097,11 @@ const CreateLeague = () => {
                         </div>
                         <div className="space-y-3">
                           <Label>Max Confidence Points</Label>
-                          <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
+                          <div className="flex items-center gap-2 px-3 py-2 bg-white/5 ring-1 ring-white/10 rounded-md">
                             <span className="text-sm font-semibold">{confidenceMaxPoints} points max</span>
-                            <span className="text-xs text-muted-foreground">(auto-linked to picks per week)</span>
+                            <span className="text-xs text-white/55">(auto-linked to picks per week)</span>
                           </div>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             Assign confidence points 1 through {confidenceMaxPoints} to each pick. Higher confidence = more points if correct.
                             Each value can only be used once per week. This is always equal to your picks per week.
                           </p>
@@ -1108,7 +1135,7 @@ const CreateLeague = () => {
                   {/* SECTION 4: DRAFT SETTINGS (Fantasy Only)                 */}
                   {/* ======================================================== */}
                   {showDraftSettings && (
-                    <div className="border-t pt-6">
+                    <div className="border-t border-white/10 pt-6">
                       <SectionHeader
                         title="Draft Settings"
                         subtitle="Choose how teams build their rosters"
@@ -1129,11 +1156,11 @@ const CreateLeague = () => {
                                 htmlFor={`draft-${type}`}
                                 className={`flex items-start gap-4 rounded-xl border-2 p-4 cursor-pointer transition-all
                                   ${draftType === type
-                                    ? 'border-primary bg-primary/5 shadow-sm'
-                                    : 'border-muted bg-transparent hover:bg-muted/20 hover:border-primary/40'
+                                    ? 'bg-pastel-orange/15 ring-2 ring-pastel-orange/40 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)]'
+                                    : 'bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/30 hover:bg-white/[0.08]'
                                   }`}
                               >
-                                <div className={`mt-0.5 ${draftType === type ? 'text-primary' : 'text-muted-foreground'}`}>
+                                <div className={`mt-0.5 ${draftType === type ? 'text-pastel-orange' : 'text-white/55'}`}>
                                   {DRAFT_TYPE_ICONS[type]}
                                 </div>
                                 <div className="flex-1">
@@ -1143,12 +1170,12 @@ const CreateLeague = () => {
                                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Most Popular</Badge>
                                     )}
                                   </div>
-                                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                                  <p className="text-xs text-white/55 mt-1 leading-relaxed">
                                     {DRAFT_TYPE_DESCRIPTIONS[type]}
                                   </p>
                                 </div>
                                 {draftType === type && (
-                                  <CheckCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                                  <CheckCircle className="w-5 h-5 text-pastel-orange flex-shrink-0 mt-0.5" />
                                 )}
                               </Label>
                             </div>
@@ -1194,10 +1221,10 @@ const CreateLeague = () => {
 
                         {draftType === 'offline' && (
                           <div className="md:col-span-3">
-                            <div className="bg-muted/30 rounded-lg p-4">
+                            <div className="bg-white/5 ring-1 ring-white/10 rounded-xl p-4">
                               <div className="flex items-start gap-2">
-                                <Info className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                                <p className="text-sm text-muted-foreground">
+                                <Info className="w-4 h-4 text-pastel-orange mt-0.5 flex-shrink-0" />
+                                <p className="text-sm text-white/55">
                                   With offline draft, the commissioner will manually enter draft results after your
                                   external draft event. Set up your own draft board, do it live, or use any method you prefer.
                                 </p>
@@ -1209,9 +1236,9 @@ const CreateLeague = () => {
 
                       {/* Auction-Specific Settings */}
                       {isAuction && (
-                        <div className="mt-6 p-4 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5">
+                        <div className="mt-6 p-4 rounded-xl border-2 border-dashed border-pastel-orange/40 bg-pastel-orange/8">
                           <h4 className="font-semibold text-sm mb-4 flex items-center gap-2">
-                            <DollarSign className="w-4 h-4 text-primary" />
+                            <DollarSign className="w-4 h-4 text-pastel-orange" />
                             Auction Settings
                           </h4>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1225,7 +1252,7 @@ const CreateLeague = () => {
                                 min={50}
                                 max={1000}
                               />
-                              <p className="text-xs text-muted-foreground">Budget per team</p>
+                              <p className="text-xs text-white/55">Budget per team</p>
                             </div>
                             <div className="space-y-2">
                               <Label className="text-sm">Minimum Bid ($)</Label>
@@ -1237,7 +1264,7 @@ const CreateLeague = () => {
                                 min={0}
                                 max={10}
                               />
-                              <p className="text-xs text-muted-foreground">Minimum bid on any player</p>
+                              <p className="text-xs text-white/55">Minimum bid on any player</p>
                             </div>
                             <div className="space-y-2">
                               <Label className="text-sm">Nomination Timer</Label>
@@ -1250,7 +1277,7 @@ const CreateLeague = () => {
                                   <SelectItem value="60">60 seconds</SelectItem>
                                 </SelectContent>
                               </Select>
-                              <p className="text-xs text-muted-foreground">Time to nominate a player</p>
+                              <p className="text-xs text-white/55">Time to nominate a player</p>
                             </div>
                           </div>
                         </div>
@@ -1262,12 +1289,12 @@ const CreateLeague = () => {
                   {/* SECTION 5: SCORING SETTINGS (Points-Based Formats)       */}
                   {/* ======================================================== */}
                   {showPointValues && (
-                    <div className="border-t pt-6">
+                    <div className="border-t border-white/10 pt-6">
                       <SectionHeader
                         title="Scoring Settings"
                         subtitle="Toggle stats and adjust point values"
                         badge={
-                          <Badge variant="secondary" className="bg-primary/10 text-primary">
+                          <Badge variant="secondary" className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft border-0">
                             {leagueStats.filter(s => s.enabled).length} Active Stats
                           </Badge>
                         }
@@ -1276,10 +1303,10 @@ const CreateLeague = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {Object.entries(statsByCategory).map(([category, stats]) => (
                           <div key={category} className="space-y-3">
-                            <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
+                            <h4 className="font-semibold text-sm uppercase tracking-wider text-white/55">
                               {category} Stats
                             </h4>
-                            <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+                            <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_8px_24px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                               {stats.map((stat) => (
                                 <div
                                   key={stat.id}
@@ -1291,7 +1318,7 @@ const CreateLeague = () => {
                                     checked={stat.enabled}
                                     onCheckedChange={() => handleStatToggle(stat.id)}
                                   />
-                                  <span className={`text-sm truncate ${stat.enabled ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                                  <span className={`text-sm truncate ${stat.enabled ? 'text-pastel-cream font-medium' : 'text-white/55'}`}>
                                     {stat.name}
                                   </span>
                                   <Select
@@ -1346,7 +1373,7 @@ const CreateLeague = () => {
                   {/* SECTION 5b: CATEGORY SETTINGS (H2H-Cat / Roto)           */}
                   {/* ======================================================== */}
                   {showCategories && (
-                    <div className="border-t pt-6">
+                    <div className="border-t border-white/10 pt-6">
                       <SectionHeader
                         title={scoringFormat === 'roto' ? 'Rotisserie Categories' : 'Head-to-Head Categories'}
                         subtitle={
@@ -1355,7 +1382,7 @@ const CreateLeague = () => {
                             : 'Select which stat categories count as individual matchups each week. Each category is a separate win/loss/tie.'
                         }
                         badge={
-                          <Badge variant="secondary" className="bg-primary/10 text-primary">
+                          <Badge variant="secondary" className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft border-0">
                             {selectedCategories.length} Categories
                           </Badge>
                         }
@@ -1364,10 +1391,10 @@ const CreateLeague = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Skater Categories */}
                         <div className="space-y-3">
-                          <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
+                          <h4 className="font-semibold text-sm uppercase tracking-wider text-white/55">
                             Skater Categories
                           </h4>
-                          <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+                          <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_8px_24px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                             {AVAILABLE_CATEGORIES.filter(c => !c.isGoalie).map((cat) => (
                               <div
                                 key={cat.id}
@@ -1381,7 +1408,7 @@ const CreateLeague = () => {
                                     onCheckedChange={() => handleCategoryToggle(cat.id)}
                                   />
                                   <span className={`font-medium ${
-                                    selectedCategories.includes(cat.id) ? 'text-foreground' : 'text-muted-foreground'
+                                    selectedCategories.includes(cat.id) ? 'text-pastel-cream' : 'text-white/55'
                                   }`}>
                                     {cat.name}
                                   </span>
@@ -1396,10 +1423,10 @@ const CreateLeague = () => {
 
                         {/* Goalie Categories */}
                         <div className="space-y-3">
-                          <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
+                          <h4 className="font-semibold text-sm uppercase tracking-wider text-white/55">
                             Goalie Categories
                           </h4>
-                          <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+                          <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_8px_24px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                             {AVAILABLE_CATEGORIES.filter(c => c.isGoalie).map((cat) => (
                               <div
                                 key={cat.id}
@@ -1413,7 +1440,7 @@ const CreateLeague = () => {
                                     onCheckedChange={() => handleCategoryToggle(cat.id)}
                                   />
                                   <span className={`font-medium ${
-                                    selectedCategories.includes(cat.id) ? 'text-foreground' : 'text-muted-foreground'
+                                    selectedCategories.includes(cat.id) ? 'text-pastel-cream' : 'text-white/55'
                                   }`}>
                                     {cat.name}
                                   </span>
@@ -1442,7 +1469,7 @@ const CreateLeague = () => {
                                   <SelectItem value="5">5 games</SelectItem>
                                 </SelectContent>
                               </Select>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-white/55">
                                 Minimum goalie starts required for rate stats (GAA, SV%) to count.
                               </p>
                             </div>
@@ -1456,7 +1483,7 @@ const CreateLeague = () => {
                   {/* SECTION 6: SEASON & PLAYOFF SETTINGS (Fantasy Only)      */}
                   {/* ======================================================== */}
                   {isFantasy && (
-                    <div className="border-t pt-6">
+                    <div className="border-t border-white/10 pt-6">
                       <SectionHeader
                         title="Season Settings"
                         subtitle="Playoffs, trade deadline, and keeper rules"
@@ -1508,7 +1535,7 @@ const CreateLeague = () => {
                               <SelectItem value="16">Week 16</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             No trades allowed after this week.
                           </p>
                         </div>
@@ -1519,19 +1546,19 @@ const CreateLeague = () => {
                         <button
                           type="button"
                           onClick={() => setShowAdvancedSeason(!showAdvancedSeason)}
-                          className="flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                          className="flex items-center gap-2 text-sm font-semibold text-pastel-orange hover:text-pastel-orange/80 transition-colors"
                         >
                           {showAdvancedSeason ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                           Advanced: Keeper & Dynasty Settings
                         </button>
 
                         {showAdvancedSeason && (
-                          <div className="mt-4 p-4 rounded-xl border-2 border-dashed border-muted bg-muted/10 space-y-6">
+                          <div className="mt-4 p-4 rounded-xl border-2 border-dashed border-white/15 bg-white/5 space-y-6">
                             {/* Keeper Toggle */}
                             <div className="flex items-center justify-between">
                               <div>
                                 <Label className="text-base font-semibold">Keeper League</Label>
-                                <p className="text-xs text-muted-foreground mt-1">
+                                <p className="text-xs text-white/55 mt-1">
                                   Teams keep a set number of players between seasons.
                                 </p>
                               </div>
@@ -1542,7 +1569,7 @@ const CreateLeague = () => {
                             </div>
 
                             {keeperEnabled && (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-primary/20">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-pastel-orange/30">
                                 <div className="space-y-2">
                                   <Label>Keepers Per Team</Label>
                                   <Select value={keeperCount} onValueChange={setKeeperCount} disabled={dynastyMode}>
@@ -1573,7 +1600,7 @@ const CreateLeague = () => {
                                       <SelectItem value="round-escalation">Escalation (cost goes up 1 round each year)</SelectItem>
                                     </SelectContent>
                                   </Select>
-                                  <p className="text-xs text-muted-foreground">
+                                  <p className="text-xs text-white/55">
                                     {keeperPenalty === 'none' && 'Keepers have no draft pick cost.'}
                                     {keeperPenalty === 'round-cost' && 'Keeping a player costs the round they were originally drafted in.'}
                                     {keeperPenalty === 'round-escalation' && 'Keeper cost increases by one round each season.'}
@@ -1589,7 +1616,7 @@ const CreateLeague = () => {
                                   <Crown className="w-4 h-4 text-amber-500" />
                                   Dynasty Mode
                                 </Label>
-                                <p className="text-xs text-muted-foreground mt-1">
+                                <p className="text-xs text-white/55 mt-1">
                                   Keep your entire roster between seasons. Only rookies are drafted each year.
                                   The ultimate long-term commitment.
                                 </p>
@@ -1612,7 +1639,7 @@ const CreateLeague = () => {
                   {/* SECTION 7: WAIVER & TRADE SETTINGS (Fantasy Only)        */}
                   {/* ======================================================== */}
                   {showWaiverSettings && (
-                    <div className="border-t pt-6">
+                    <div className="border-t border-white/10 pt-6">
                       <SectionHeader
                         title="Waiver & Trade Settings"
                         subtitle="Configure free agency and trade rules"
@@ -1679,7 +1706,7 @@ const CreateLeague = () => {
                               min={25}
                               max={500}
                             />
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-white/55">
                               Each team gets this budget to bid on free agents all season. Budget does not replenish.
                             </p>
                           </div>
@@ -1692,7 +1719,7 @@ const CreateLeague = () => {
                               checked={waiverSettings.waiver_game_lock}
                               onCheckedChange={(checked) => setWaiverSettings(prev => ({ ...prev, waiver_game_lock: checked }))}
                             />
-                            <span className="text-sm text-muted-foreground">Lock players during/after games</span>
+                            <span className="text-sm text-white/55">Lock players during/after games</span>
                           </div>
                         </div>
 
@@ -1703,7 +1730,7 @@ const CreateLeague = () => {
                               checked={waiverSettings.allow_trades_during_games}
                               onCheckedChange={(checked) => setWaiverSettings(prev => ({ ...prev, allow_trades_during_games: checked }))}
                             />
-                            <span className="text-sm text-muted-foreground">Players can be traded even if game-locked</span>
+                            <span className="text-sm text-white/55">Players can be traded even if game-locked</span>
                           </div>
                         </div>
 
@@ -1723,7 +1750,7 @@ const CreateLeague = () => {
                               <SelectItem value="10">10 per week</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             Limit how many free agent pickups a team can make each week. Resets every Monday.
                           </p>
                         </div>
@@ -1741,7 +1768,7 @@ const CreateLeague = () => {
                               <SelectItem value="150">150 per season</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             Limit total free agent pickups for the entire season.
                           </p>
                         </div>
@@ -1753,7 +1780,7 @@ const CreateLeague = () => {
                   {/* SECTION 8: POSITION TYPE + ROSTER SLOT CONFIG            */}
                   {/* ======================================================== */}
                   {isFantasy && (
-                    <div className="border-t pt-6 space-y-6">
+                    <div className="border-t border-white/10 pt-6 space-y-6">
                       {/* Position Type Toggle */}
                       <div>
                         <SectionHeader
@@ -1772,12 +1799,12 @@ const CreateLeague = () => {
                             className={cn(
                               "p-3 rounded-lg border-2 text-left transition-all",
                               positionType === 'individual'
-                                ? "border-primary bg-primary/10 ring-2 ring-primary/20"
-                                : "border-border hover:border-primary/50"
+                                ? "bg-pastel-orange/15 ring-2 ring-pastel-orange/40 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)]"
+                                : "bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/40 hover:bg-white/[0.08]"
                             )}
                           >
                             <div className="font-semibold text-sm">C / LW / RW / D / G</div>
-                            <div className="text-xs text-muted-foreground mt-1">Individual positions</div>
+                            <div className="text-xs text-white/55 mt-1">Individual positions</div>
                           </button>
                           <button
                             type="button"
@@ -1790,12 +1817,12 @@ const CreateLeague = () => {
                             className={cn(
                               "p-3 rounded-lg border-2 text-left transition-all",
                               positionType === 'forward'
-                                ? "border-primary bg-primary/10 ring-2 ring-primary/20"
-                                : "border-border hover:border-primary/50"
+                                ? "bg-pastel-orange/15 ring-2 ring-pastel-orange/40 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)]"
+                                : "bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/40 hover:bg-white/[0.08]"
                             )}
                           >
                             <div className="font-semibold text-sm">F / D / G</div>
-                            <div className="text-xs text-muted-foreground mt-1">Forward / Defense / Goalie</div>
+                            <div className="text-xs text-white/55 mt-1">Forward / Defense / Goalie</div>
                           </button>
                         </div>
                       </div>
@@ -1806,7 +1833,7 @@ const CreateLeague = () => {
                           title="Roster Slots"
                           subtitle="Customize how many of each position slot"
                           badge={
-                            <Badge variant="secondary" className="bg-primary/10 text-primary">
+                            <Badge variant="secondary" className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft border-0">
                               {Object.values(rosterSlots).reduce((a, b) => a + b, 0)} Total
                             </Badge>
                           }
@@ -1879,9 +1906,9 @@ const CreateLeague = () => {
                   )}
 
                   <div className="text-center pb-2">
-                    <UserPlus className="w-10 h-10 mx-auto mb-3 text-primary" />
+                    <UserPlus className="w-10 h-10 mx-auto mb-3 text-pastel-orange" />
                     <h2 className="text-xl font-bold mb-1">Join a League</h2>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-white/55">
                       Enter the join code provided by your league commissioner
                     </p>
                   </div>
@@ -1915,14 +1942,14 @@ const CreateLeague = () => {
                           </Button>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-white/55">
                         Ask your commissioner for the league join code, or paste it from an invite link
                       </p>
                     </div>
 
                     <div className="space-y-1.5">
                       <Label htmlFor="team-name-join" className="text-sm">
-                        Team Name <span className="text-muted-foreground font-normal">(optional)</span>
+                        Team Name <span className="text-white/55 font-normal">(optional)</span>
                       </Label>
                       <Input
                         id="team-name-join"
@@ -1932,18 +1959,18 @@ const CreateLeague = () => {
                         disabled={loading}
                         className="h-10"
                       />
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-white/55">
                         Leave blank to use your default team name
                       </p>
                     </div>
                   </div>
 
-                  <div className="bg-muted/30 rounded-lg p-3 space-y-1.5">
+                  <div className="bg-white/5 ring-1 ring-white/10 rounded-xl p-3 space-y-1.5">
                     <div className="flex items-start gap-2">
-                      <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                      <CheckCircle className="w-4 h-4 text-pastel-orange mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-sm font-medium">Before joining:</p>
-                        <ul className="text-xs text-muted-foreground space-y-0.5 mt-0.5">
+                        <ul className="text-xs text-white/55 space-y-0.5 mt-0.5">
                           <li>- Make sure you trust the league commissioner</li>
                           <li>- Check if the draft has already happened</li>
                           <li>- You can only own one team per league</li>
@@ -1985,7 +2012,7 @@ const CreateLeague = () => {
 
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };

@@ -33,11 +33,36 @@ playoffPoolRoutes.post('/bracket-pickem/picks', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
 
   try {
-    // Reject picks for series already started/finalized
-    const { data: lockedSeries } = await supabaseAdmin
-      .from('nhl_playoff_series')
-      .select('bracket_slot')
-      .neq('series_status', 'pending');
+    // Lock-mode contract: server must agree with the frontend's pickMode
+    // gating logic (see PoolPlayoffBracket.tsx:166-171). When they
+    // disagree, the UI accepts picks the server then rejects.
+    const { data: league, error: leagueErr } = await supabaseAdmin
+      .from('leagues')
+      .select('settings')
+      .eq('id', leagueId)
+      .single();
+    if (leagueErr || !league) {
+      return fail(c, AppError.notFound('League'));
+    }
+    const settings = (league.settings as Record<string, unknown>) || {};
+    const pickMode = (settings.playoffBracketPickMode as string) || 'round-by-round';
+    const lockDeadline = settings.playoffRosterLockedAt as string | undefined;
+    const isGloballyLocked =
+      pickMode === 'full-bracket' &&
+      !!lockDeadline &&
+      new Date(lockDeadline) <= new Date();
+
+    // Full-bracket pre-deadline: nothing is locked. Industry standard —
+    // Yahoo, ESPN, CBS bracket pools all use deadline-only locking.
+    // Full-bracket post-deadline OR round-by-round: anything not pending is locked.
+    const lockedSeries =
+      pickMode === 'full-bracket' && !isGloballyLocked
+        ? []
+        : (await supabaseAdmin
+            .from('nhl_playoff_series')
+            .select('bracket_slot')
+            .neq('series_status', 'pending')).data ?? [];
+
     const lockedSlots = new Set((lockedSeries || []).map(s => s.bracket_slot));
     const allowedPicks = picks.filter(p => !lockedSlots.has(p.series_slot));
     if (allowedPicks.length === 0) {

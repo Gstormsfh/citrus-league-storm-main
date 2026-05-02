@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Navbar from '@/components/Navbar';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
@@ -9,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, User, Mail, Phone, MapPin } from 'lucide-react';
 import { accountApi } from '@/api/account';
+import { DarkLayout, MascotAvatar } from '@/components/citrus2';
 
 const ProfileSetup = () => {
   const navigate = useNavigate();
@@ -101,20 +103,28 @@ const ProfileSetup = () => {
 
   if (checking || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+      <DarkLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-pastel-orange-soft" />
+        </div>
+      </DarkLayout>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/20">
-      <main className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">Set Up Your Profile</CardTitle>
-            <CardDescription className="text-center">
-              Complete your profile to get started
+    <DarkLayout>
+      <Navbar />
+      <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
+        <Card className="w-full max-w-2xl bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
+          <CardHeader className="space-y-3 text-center">
+            <div className="flex justify-center mb-2">
+              <MascotAvatar id="stormy" size="lg" />
+            </div>
+            <CardTitle className="text-2xl font-black text-pastel-cream tracking-[-0.02em]">
+              Set up your <span className="text-pastel-orange">profile</span>
+            </CardTitle>
+            <CardDescription className="text-white/60">
+              One last step before puck drop — name your manager profile
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -232,7 +242,7 @@ const ProfileSetup = () => {
           </CardContent>
         </Card>
       </main>
-    </div>
+    </DarkLayout>
   );
 };
 

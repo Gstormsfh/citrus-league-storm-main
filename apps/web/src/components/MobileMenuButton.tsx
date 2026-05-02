@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
 import { isPoolLeague, getPoolRoute, getPoolLabel, getLeagueTypeFromSettings } from '@/utils/leagueTypeHelpers';
-import { CitrusLogo } from '@/components/icons/CitrusIcons';
+import { CitrusLogo } from '@/components/citrus2';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -123,7 +123,7 @@ const MobileMenuButton = () => {
   return (
     <>
       <button
-        className="p-2 rounded-xl text-citrus-forest active:bg-citrus-sage/20 transition-colors"
+        className="p-2 rounded-xl text-pastel-cream active:bg-white/10 transition-colors"
         onClick={() => setMenuOpen(!menuOpen)}
         aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
         aria-expanded={menuOpen}
@@ -131,18 +131,22 @@ const MobileMenuButton = () => {
         {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
 
-      {/* Full-screen slide-in menu */}
+      {/* Full-screen slide-in menu — dark Citrus 2.0 panel */}
       {menuOpen && (
-        <div className="fixed inset-0 top-0 z-[60] bg-white/95 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl">
-          <div className="flex flex-col h-[calc(100dvh-env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+0.75rem)] px-4 pb-3 bg-gradient-to-b from-white to-[#F5F8ED]">
+        <div className="fixed inset-0 top-0 z-[60] bg-pastel-surface/98 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
+          <div className="flex flex-col h-[calc(100dvh-env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+0.75rem)] px-4 pb-3 bg-pastel-surface text-pastel-cream relative overflow-hidden">
+            {/* Decorative orange + sage halos */}
+            <div aria-hidden="true" className="absolute -top-32 -right-20 w-[420px] h-[420px] bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />
+            <div aria-hidden="true" className="absolute -bottom-24 -left-20 w-[320px] h-[320px] bg-pastel-sage/10 rounded-full blur-3xl pointer-events-none" />
+
             {/* Close button + logo */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 relative z-10">
               <Link to="/" onClick={closeMenu} className="flex items-center gap-2">
-                <CitrusLogo className="w-8 h-8 drop-shadow-sm" />
-                <span className="font-varsity font-black text-base uppercase text-citrus-forest tracking-tight">Citrus</span>
+                <CitrusLogo className="w-8 h-8" />
+                <span className="font-calistoga text-lg text-pastel-cream leading-none">Citrus</span>
               </Link>
               <button
-                className="p-2.5 rounded-xl text-citrus-forest"
+                className="p-2.5 rounded-xl text-pastel-cream active:bg-white/10 transition-colors"
                 onClick={closeMenu}
                 aria-label="Close menu"
               >
@@ -152,21 +156,21 @@ const MobileMenuButton = () => {
 
             {/* League switcher — plain buttons, no Radix dropdown */}
             {userLeagues.length > 0 && !leagueLoading && (
-              <div className="mb-3">
+              <div className="mb-3 relative z-10">
                 <button
-                  className="flex items-center gap-3 px-3 py-2.5 bg-citrus-forest/5 rounded-xl w-full active:bg-citrus-forest/15 transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 bg-white/5 ring-1 ring-white/10 rounded-xl w-full active:bg-white/[0.08] transition-colors"
                   onClick={() => setLeagueListOpen(prev => !prev)}
                 >
-                  <Trophy className="h-4 w-4 text-citrus-orange flex-shrink-0" />
-                  <span className="text-sm font-display font-semibold text-citrus-forest truncate flex-1 text-left">
+                  <Trophy className="h-4 w-4 text-pastel-orange flex-shrink-0" />
+                  <span className="text-sm font-bold text-pastel-cream truncate flex-1 text-left">
                     {activeLeague?.name || 'Select League'}
                   </span>
-                  <ChevronDown className={cn("h-4 w-4 text-citrus-forest/50 transition-transform", leagueListOpen && "rotate-180")} />
+                  <ChevronDown className={cn("h-4 w-4 text-white/55 transition-transform", leagueListOpen && "rotate-180")} />
                 </button>
 
                 {leagueListOpen && (
-                  <div className="mt-1 rounded-xl border border-citrus-sage/20 bg-white overflow-hidden">
-                    <div className="px-3 py-2 text-xs font-display uppercase text-citrus-forest/60 border-b border-citrus-sage/10">
+                  <div className="mt-1 rounded-xl ring-1 ring-white/10 bg-pastel-surface-tile overflow-hidden shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                    <div className="px-3 py-2 text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold border-b border-white/10">
                       My Leagues ({userLeagues.length})
                     </div>
                     {userLeagues.map((l) => {
@@ -176,8 +180,8 @@ const MobileMenuButton = () => {
                         <button
                           key={l.id}
                           className={cn(
-                            "flex items-center gap-3 w-full px-3 py-3 text-left active:bg-citrus-sage/20 transition-colors border-b border-citrus-sage/10 last:border-b-0",
-                            isActive && "bg-citrus-sage/10"
+                            "flex items-center gap-3 w-full px-3 py-3 text-left active:bg-white/[0.08] transition-colors border-b border-white/10 last:border-b-0",
+                            isActive && "bg-pastel-orange/10"
                           )}
                           onClick={() => {
                             setActiveLeagueId(l.id);
@@ -196,19 +200,19 @@ const MobileMenuButton = () => {
                             closeMenu();
                           }}
                         >
-                          <Trophy className="h-4 w-4 text-citrus-orange flex-shrink-0" />
+                          <Trophy className="h-4 w-4 text-pastel-orange flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-citrus-forest truncate">{l.name}</div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-sm font-bold text-pastel-cream truncate">{l.name}</div>
+                            <div className="text-xs text-white/55">
                               {isPoolLeague(lType) ? getPoolLabel(lType) + ' Pool' : 'Fantasy'}
                             </div>
                           </div>
-                          {isActive && <Check className="h-4 w-4 text-citrus-orange flex-shrink-0" />}
+                          {isActive && <Check className="h-4 w-4 text-pastel-orange flex-shrink-0" />}
                         </button>
                       );
                     })}
                     <button
-                      className="flex items-center gap-3 w-full px-3 py-3 text-left active:bg-citrus-sage/20 transition-colors text-citrus-sage font-medium"
+                      className="flex items-center gap-3 w-full px-3 py-3 text-left active:bg-white/[0.08] transition-colors text-pastel-orange-soft font-bold"
                       onClick={() => { navigate('/create-league'); closeMenu(); }}
                     >
                       <UserPlus className="h-4 w-4" />
@@ -220,7 +224,7 @@ const MobileMenuButton = () => {
             )}
 
             {/* Nav links */}
-            <nav className="flex-1 overflow-y-auto space-y-0.5">
+            <nav className="flex-1 overflow-y-auto space-y-0.5 relative z-10">
               {navTabs.map((tab) => {
                 const active = isTabActive(tab.path);
                 return (
@@ -230,50 +234,50 @@ const MobileMenuButton = () => {
                     onClick={closeMenu}
                     className={cn(
                       'flex items-center gap-3 px-3 py-3 rounded-xl transition-colors',
-                      active ? 'bg-citrus-sage/20 text-citrus-forest' : 'text-citrus-charcoal/80'
+                      active ? 'bg-pastel-orange/15 ring-1 ring-pastel-orange/40 text-pastel-orange-soft' : 'text-white/70 active:bg-white/5'
                     )}
                   >
-                    <tab.icon className="h-5 w-5" />
-                    <span className="text-[15px] font-display font-medium">{tab.label}</span>
-                    {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-citrus-orange" />}
+                    <tab.icon className={cn("h-5 w-5", active && "text-pastel-orange")} />
+                    <span className="text-[15px] font-bold">{tab.label}</span>
+                    {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-pastel-orange" />}
                   </Link>
                 );
               })}
 
-              <div className="h-px bg-citrus-sage/20 my-3" />
+              <div className="h-px bg-white/10 my-3" />
 
-              <Link to="/news" onClick={closeMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-citrus-charcoal/70">
+              <Link to="/news" onClick={closeMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/55 active:bg-white/5 transition-colors">
                 <Newspaper className="h-4 w-4" />
-                <span className="text-[14px] font-display font-medium">News</span>
+                <span className="text-[14px] font-bold">News</span>
               </Link>
-              <Link to="/contact" onClick={closeMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-citrus-charcoal/70">
+              <Link to="/contact" onClick={closeMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/55 active:bg-white/5 transition-colors">
                 <Newspaper className="h-4 w-4" />
-                <span className="text-[14px] font-display font-medium">Contact</span>
+                <span className="text-[14px] font-bold">Contact</span>
               </Link>
             </nav>
 
             {/* User footer */}
-            <div className="border-t border-citrus-sage/20 pt-3 mt-2 pb-safe">
+            <div className="border-t border-white/10 pt-3 mt-2 pb-safe relative z-10">
               {user ? (
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-citrus-orange flex items-center justify-center text-white text-sm font-varsity font-bold">
+                  <div className="h-10 w-10 rounded-2xl bg-pastel-orange/20 ring-1 ring-pastel-orange/40 flex items-center justify-center text-pastel-orange-soft text-sm font-bold">
                     {userInitial}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-citrus-forest truncate">{displayName}</p>
-                    <p className="text-xs text-citrus-charcoal/60 truncate">{user.email}</p>
+                    <p className="text-sm font-bold text-pastel-cream truncate">{displayName}</p>
+                    <p className="text-xs text-white/55 truncate">{user.email}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Link to="/profile" onClick={closeMenu} className="p-2 rounded-lg bg-citrus-sage/10">
-                      <CircleUser className="h-4 w-4 text-citrus-forest" />
+                    <Link to="/profile" onClick={closeMenu} className="p-2 rounded-lg bg-white/5 ring-1 ring-white/10 active:bg-white/[0.08] transition-colors">
+                      <CircleUser className="h-4 w-4 text-pastel-cream" />
                     </Link>
-                    <button onClick={handleSignOut} className="p-2 rounded-lg bg-red-50" aria-label="Sign out">
-                      <LogOut className="h-4 w-4 text-red-500" />
+                    <button onClick={handleSignOut} className="p-2 rounded-lg bg-red-400/15 ring-1 ring-red-400/30 active:bg-red-400/25 transition-colors" aria-label="Sign out">
+                      <LogOut className="h-4 w-4 text-red-300" />
                     </button>
                   </div>
                 </div>
               ) : (
-                <Button className="w-full h-11 font-display font-bold rounded-xl bg-citrus-sage text-citrus-forest" asChild>
+                <Button className="w-full h-11 font-bold rounded-xl bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]" asChild>
                   <Link to="/auth" onClick={closeMenu}>Sign In</Link>
                 </Button>
               )}

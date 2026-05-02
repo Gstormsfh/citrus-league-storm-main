@@ -1,16 +1,21 @@
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import { DarkLayout, HockeyFooter } from '@/components/citrus2';
+import Navbar from '@/components/Navbar';
 
 const Privacy = () => {
   return (
-    <div className="min-h-screen bg-[#D4E8B8] flex flex-col">
-      <Navbar />
-      <main className="flex-grow pt-16 lg:pt-24 px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
-        <div className="container mx-auto max-w-3xl py-12">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">Privacy Policy</h1>
-          <p className="text-sm text-muted-foreground mb-8">Last Updated: February 18, 2026</p>
+    <DarkLayout>
 
-          <div className="prose dark:prose-invert max-w-none space-y-6">
+
+      <Navbar />      <main className="relative max-w-[820px] mx-auto px-6 pt-16 pb-24">
+        <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">
+          Legal
+        </div>
+        <h1 className="font-sans font-black text-[2.5rem] md:text-[3.25rem] leading-tight tracking-[-0.03em] text-pastel-cream mb-3">
+          Privacy Policy
+        </h1>
+        <p className="font-jbmono text-[11px] tracking-wider uppercase text-white/45 mb-12">Last Updated: February 18, 2026</p>
+
+        <div className="prose prose-invert max-w-none space-y-6 text-white/75 prose-headings:text-pastel-cream prose-strong:text-pastel-cream prose-a:text-pastel-orange-soft hover:prose-a:text-pastel-orange">
             <p>
               <strong>Citrus Fantasy Hockey</strong> ("we," "our," or "us") is committed to protecting your privacy.
               This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use
@@ -220,11 +225,10 @@ const Privacy = () => {
               <h2 className="text-xl font-semibold mb-3">14. Consent</h2>
               <p>By using our Service, you consent to our Privacy Policy and agree to its terms.</p>
             </section>
-          </div>
         </div>
       </main>
-      <Footer />
-    </div>
+      <HockeyFooter />
+    </DarkLayout>
   );
 };
 

@@ -8,6 +8,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Trophy, Lock, Check, Save, AlertTriangle, ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { StormyLoading } from '@/components/citrus2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -160,11 +161,12 @@ export default function PoolPlayoffBracket() {
     const s = series.find(x => x.bracket_slot === slot);
     if (!s) return;
 
-    // In full-bracket mode: allow picks for ANY slot before the global
-    // lock deadline, even if the series is 'pending' (R2-R4 with no teams
-    // filled in yet). After lock or after series is final, block.
+    // Full-bracket: nothing is locked before the global deadline — users
+    // can pick any series including ones already finalized. Industry
+    // standard for bracket pools (Yahoo, ESPN, CBS use deadline-only
+    // locking). After the deadline, everything is locked.
     if (pickMode === 'full-bracket') {
-      if (isGloballyLocked || s.series_status === 'final') return;
+      if (isGloballyLocked) return;
     } else {
       // Round-by-round: legacy behavior — only pick when series is 'pending'
       if (s.series_status !== 'pending') return;
@@ -236,14 +238,14 @@ export default function PoolPlayoffBracket() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-citrus-charcoal/60">Loading...</div>;
+  if (loading) return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center bg-pastel-surface"><StormyLoading message="Loading pool..." /></div></>;
 
   return (
     <>
     <Navbar />
-    <div className="min-h-screen bg-gradient-to-b from-white to-[#F5F8ED] py-6 px-4 pt-24">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream py-6 px-4 pt-24">
       <div className="max-w-6xl mx-auto mb-3">
-        <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-citrus-sage hover:text-citrus-forest inline-flex items-center gap-1">
+        <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-pastel-sage-soft hover:text-pastel-cream inline-flex items-center gap-1">
           <ArrowLeft className="h-4 w-4" />Back to Pool Home
         </Link>
       </div>
@@ -252,18 +254,18 @@ export default function PoolPlayoffBracket() {
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div>
             <div className="flex items-center gap-2">
-              <Trophy className="h-6 w-6 text-citrus-orange" />
-              <h1 className="text-xl sm:text-2xl font-varsity font-black uppercase text-citrus-forest">Bracket Challenge</h1>
+              <Trophy className="h-6 w-6 text-pastel-orange" />
+              <h1 className="text-xl sm:text-2xl font-calistoga text-pastel-cream">Bracket Challenge</h1>
               {pickMode === 'full-bracket' && (
                 <Badge className={cn(
                   'text-[10px] font-display font-bold',
-                  isGloballyLocked ? 'bg-muted text-muted-foreground' : 'bg-citrus-orange text-white'
+                  isGloballyLocked ? 'bg-white/5 ring-1 ring-white/10 text-white/55' : 'bg-pastel-orange text-pastel-surface'
                 )}>
                   {isGloballyLocked ? <><Lock className="h-3 w-3 mr-1" />BRACKET LOCKED</> : 'FULL BRACKET MODE'}
                 </Badge>
               )}
             </div>
-            <p className="text-xs text-citrus-charcoal/70 mt-1">
+            <p className="text-xs text-white/70 mt-1">
               {pickMode === 'full-bracket'
                 ? isGloballyLocked
                   ? 'Your picks are locked. Track how your bracket survives each round.'
@@ -271,14 +273,14 @@ export default function PoolPlayoffBracket() {
                 : 'Pick winners & game counts. Points double each round (2 → 4 → 8 → 16).'}
             </p>
             {pickMode === 'full-bracket' && !isGloballyLocked && (
-              <div className="mt-2 text-[11px] font-display text-citrus-charcoal/70">
+              <div className="mt-2 text-[11px] font-display text-white/70">
                 <span className="font-bold">Picks made:</span> {picks.size} / 15
-                {picks.size < 15 && <span className="text-citrus-orange ml-2">· {15 - picks.size} remaining</span>}
+                {picks.size < 15 && <span className="text-pastel-orange ml-2">· {15 - picks.size} remaining</span>}
               </div>
             )}
           </div>
           {dirty && (
-            <Button onClick={savePicks} disabled={saving} className="bg-citrus-sage hover:bg-citrus-sage/90 text-citrus-forest font-display font-bold">
+            <Button onClick={savePicks} disabled={saving} className="bg-pastel-sage text-pastel-surface hover:bg-pastel-sage-soft font-bold shadow-[0_4px_12px_-4px_rgba(166,211,160,0.4)]">
               <Save className="h-4 w-4 mr-2" />{saving ? 'Saving...' : 'Save Picks'}
             </Button>
           )}
@@ -317,10 +319,10 @@ export default function PoolPlayoffBracket() {
                     const myPick = picks.get(s.bracket_slot);
                     // Lock semantics differ by mode:
                     //   round-by-round: series locks once it starts (status !== 'pending')
-                    //   full-bracket:   series locks at the league's global deadline
-                    //                   (or once series is final — no point changing then)
+                    //   full-bracket:   only the global deadline locks; finalized
+                    //                   series remain pickable until then
                     const locked = pickMode === 'full-bracket'
-                      ? (isGloballyLocked || s.series_status === 'final')
+                      ? isGloballyLocked
                       : s.series_status !== 'pending';
                     const isActive = s.series_status === 'active';
 
@@ -332,44 +334,47 @@ export default function PoolPlayoffBracket() {
                           onClick={() => team && handlePick(s.bracket_slot, team.team_id)}
                           disabled={!team || locked}
                           className={cn(
-                            'relative overflow-hidden rounded-lg border-2 p-2.5 text-left transition-all',
-                            picked ? 'border-citrus-sage shadow-md ring-1 ring-citrus-sage' : 'border-fantasy-border hover:border-citrus-sage/70',
+                            'relative overflow-hidden rounded-lg p-2.5 text-left transition-all',
+                            'bg-pastel-surface ring-1 ring-white/10',
+                            'focus-visible:ring-2 focus-visible:ring-pastel-orange/40 focus-visible:outline-none',
+                            picked && 'ring-2 ring-pastel-orange/50',
+                            !picked && !locked && 'hover:ring-pastel-orange/30',
                             !team && 'opacity-40',
+                            locked && !picked && 'opacity-50 cursor-not-allowed',
                           )}
-                          style={picked && info ? { background: `linear-gradient(135deg, ${info.primaryColor}12, ${info.secondaryColor}08)` } : undefined}
                         >
-                          {/* Color bar on left */}
+                          {/* Color bar on left — team identity accent */}
                           {info && (
-                            <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: info.primaryColor }} />
+                            <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: info.primaryColor }} />
                           )}
-                          <div className="flex items-center gap-2.5 pl-1.5">
+                          <div className="flex items-center gap-2.5 pl-2">
                             {/* Team abbrev badge in team's primary color */}
                             <div
-                              className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-varsity font-black text-white flex-shrink-0 shadow-sm"
+                              className="w-10 h-10 rounded-lg ring-1 ring-white/20 flex items-center justify-center text-xs font-calistoga font-black text-white flex-shrink-0 shadow-sm"
                               style={info ? { background: info.primaryColor } : { background: '#6b7280' }}
                             >
                               {team?.team_abbrev || '?'}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1">
-                                <span className="text-[10px] font-mono text-citrus-charcoal/60">#{team?.seed || '-'}</span>
-                                <span className="text-sm font-display font-bold truncate" style={info ? { color: info.primaryColor } : undefined}>
+                                <span className="text-[10px] font-mono text-white/55">#{team?.seed || '-'}</span>
+                                <span className="text-sm font-display font-bold truncate text-pastel-cream">
                                   {info?.name || team?.team_abbrev || 'TBD'}
                                 </span>
                               </div>
-                              <div className="text-[10px] text-citrus-charcoal/60 truncate">
+                              <div className="text-[10px] text-white/55 truncate">
                                 {team && team.wins !== undefined && team.wins !== null
                                   ? `${team.wins}-${team.losses}-${team.ot_losses} · ${team.points} pts`
                                   : (info?.fullName || '')}
                               </div>
                             </div>
                             {picked && (
-                              <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={info ? { background: info.primaryColor } : { background: '#7A9B7A' }}>
+                              <div className="w-5 h-5 rounded-full ring-1 ring-white/20 flex items-center justify-center flex-shrink-0" style={info ? { background: info.primaryColor } : { background: '#7A9B7A' }}>
                                 <Check className="w-3 h-3 text-white" />
                               </div>
                             )}
                             {(isActive || locked) && wins !== undefined && (
-                              <div className={cn('font-varsity text-xl flex-shrink-0', wins >= 4 ? 'text-citrus-forest font-black' : 'text-citrus-charcoal/70')}>
+                              <div className={cn('font-calistoga text-xl flex-shrink-0', wins >= 4 ? 'text-pastel-cream font-black' : 'text-white/70')}>
                                 {wins}
                               </div>
                             )}
@@ -387,14 +392,13 @@ export default function PoolPlayoffBracket() {
                     const gameIsFinal = seriesGame && seriesGame.status === 'final';
 
                     return (
-                      <div key={s.series_id} className={cn('border-2 rounded-xl p-3 space-y-2 bg-white relative',
-                          gameIsLive && 'border-red-400 bg-red-50/20 ring-1 ring-red-400/20',
-                          locked && s.series_status === 'final' && 'border-citrus-sage/40 bg-citrus-sage/5',
-                          !gameIsLive && !locked && 'border-fantasy-border',
+                      <div key={s.series_id} className={cn('rounded-xl p-3 space-y-2 bg-white/5 ring-1 ring-white/10 relative',
+                          gameIsLive && 'bg-red-400/10 ring-1 ring-red-400/30',
+                          locked && s.series_status === 'final' && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/10',
                       )}>
                         {/* LIVE ribbon — only when a game is ACTUALLY in progress */}
                         {gameIsLive && (
-                          <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-varsity font-black uppercase px-2 py-0.5 rounded-full shadow-md">
+                          <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-calistoga px-2 py-0.5 rounded-full shadow-md">
                             <span className="relative flex h-1.5 w-1.5">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
                               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
@@ -404,22 +408,27 @@ export default function PoolPlayoffBracket() {
                         )}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] uppercase font-display font-bold text-citrus-charcoal/60">Series {String.fromCharCode(64 + s.bracket_slot)}</span>
+                            <span className="text-[10px] uppercase font-display font-bold text-white/55">Series {String.fromCharCode(64 + s.bracket_slot)}</span>
                             {s.conference && (
-                              <Badge variant="outline" className={cn('text-[9px] px-1 py-0', s.conference === 'Eastern' ? 'border-blue-300 text-blue-700' : 'border-orange-300 text-orange-700')}>
+                              <Badge className={cn(
+                                'text-[9px] px-1 py-0 border-0 font-jbmono uppercase tracking-wider font-bold',
+                                s.conference === 'Eastern'
+                                  ? 'bg-pastel-sage/15 ring-1 ring-pastel-sage/40 text-pastel-sage-soft'
+                                  : 'bg-pastel-orange/15 ring-1 ring-pastel-orange/40 text-pastel-orange-soft'
+                              )}>
                                 {s.conference === 'Eastern' ? 'EAST' : 'WEST'}
                               </Badge>
                             )}
                           </div>
-                          {s.series_status === 'final' && <Badge className="bg-citrus-sage text-white text-[9px]">SERIES FINAL</Badge>}
-                          {isActive && !gameIsLive && <Badge variant="outline" className="text-[9px] border-citrus-orange text-citrus-orange">{s.high_seed_wins}-{s.low_seed_wins}</Badge>}
+                          {s.series_status === 'final' && <Badge className="bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0 text-[9px] font-jbmono uppercase tracking-[0.18em] font-bold">Series Final</Badge>}
+                          {isActive && !gameIsLive && <Badge className="text-[9px] bg-pastel-orange/15 ring-1 ring-pastel-orange/40 text-pastel-orange-soft border-0 font-jbmono tabular-nums">{s.high_seed_wins}-{s.low_seed_wins}</Badge>}
                           {!isActive && !locked && <Badge variant="outline" className="text-[9px]">PENDING</Badge>}
                         </div>
                         {/* Live game score overlay */}
                         {seriesGame && (seriesGame.status === 'live' || seriesGame.status === 'final') && (
                           <div className={cn(
                             'flex items-center justify-between px-3 py-1.5 rounded-lg text-sm',
-                            gameIsLive ? 'bg-red-100/80 border border-red-300' : 'bg-citrus-sage/10 border border-citrus-sage/20'
+                            gameIsLive ? 'bg-red-400/20 ring-1 ring-red-400/40' : 'bg-pastel-sage/10 ring-1 ring-pastel-sage/30'
                           )}>
                             <span className="font-mono font-bold">{seriesGame.away_team} {seriesGame.away_score}</span>
                             <span className={cn('text-[10px] font-display', gameIsLive && 'text-red-700 font-bold animate-pulse')}>
@@ -437,41 +446,41 @@ export default function PoolPlayoffBracket() {
                         </div>
                         {/* Season H2H record */}
                         {h2hMap[s.bracket_slot] && h2hMap[s.bracket_slot].games > 0 && (
-                          <div className="flex items-center justify-center gap-1.5 text-[10px] text-citrus-charcoal/60 pt-1 border-t border-fantasy-border/40">
+                          <div className="flex items-center justify-center gap-1.5 text-[10px] text-white/55 pt-1 border-t border-white/10">
                             <span className="font-mono">Season H2H:</span>
-                            <span className="font-semibold" style={highInfo ? { color: highInfo.primaryColor } : undefined}>
+                            <span className="font-semibold text-pastel-cream">
                               {high?.team_abbrev} {h2hMap[s.bracket_slot].high_wins}
                             </span>
-                            <span className="text-citrus-charcoal/40">—</span>
-                            <span className="font-semibold" style={lowInfo ? { color: lowInfo.primaryColor } : undefined}>
+                            <span className="text-white/40">—</span>
+                            <span className="font-semibold text-pastel-cream">
                               {h2hMap[s.bracket_slot].low_wins} {low?.team_abbrev}
                             </span>
-                            <span className="text-citrus-charcoal/40">({h2hMap[s.bracket_slot].games} games)</span>
+                            <span className="text-white/40">({h2hMap[s.bracket_slot].games} games)</span>
                           </div>
                         )}
                         {myPick?.picked_team_id && !locked && (
                           <div className="flex items-center gap-1.5 text-xs">
-                            <span className="text-citrus-charcoal/60">In:</span>
+                            <span className="text-white/55">In:</span>
                             {[4, 5, 6, 7].map(g => (
                               <button
                                 key={g}
                                 onClick={() => handleGames(s.bracket_slot, g)}
                                 className={cn(
                                   'px-2 py-0.5 rounded border text-[11px] transition-colors',
-                                  myPick.predicted_games === g ? 'border-citrus-orange bg-citrus-orange/10 font-bold' : 'border-citrus-border hover:border-citrus-orange',
+                                  myPick.predicted_games === g ? 'ring-2 ring-pastel-orange/60 bg-pastel-orange/15 text-pastel-orange-soft font-bold' : 'ring-1 ring-white/10 bg-white/5 text-white/55 hover:ring-pastel-orange/40 hover:text-pastel-cream',
                                 )}
                               >
                                 {g}
                               </button>
                             ))}
-                            <span className="text-[10px] text-citrus-charcoal/50 ml-1">+1 if correct</span>
+                            <span className="text-[10px] text-white/50 ml-1">+1 if correct</span>
                           </div>
                         )}
                         {/* Pick summary: always visible when a pick exists */}
                         {myPick?.picked_team_id && (locked || myPick.predicted_games) && (
                           <div className="flex items-center justify-between text-xs pt-1 border-t border-fantasy-border/30">
-                            <div className="flex items-center gap-1.5 text-citrus-charcoal/70">
-                              <Check className="h-3 w-3 text-citrus-sage" />
+                            <div className="flex items-center gap-1.5 text-white/70">
+                              <Check className="h-3 w-3 text-pastel-sage-soft" />
                               <span className="font-display font-semibold">
                                 {(() => {
                                   const pickedSeed = teamById.get(myPick.picked_team_id);
@@ -482,7 +491,7 @@ export default function PoolPlayoffBracket() {
                               </span>
                             </div>
                             {locked && myPick.points_earned != null && (
-                              <span className={cn('font-bold', (myPick.points_earned ?? 0) > 0 ? 'text-citrus-sage' : 'text-citrus-charcoal/50')}>
+                              <span className={cn('font-bold', (myPick.points_earned ?? 0) > 0 ? 'text-pastel-sage-soft' : 'text-white/55')}>
                                 {myPick.points_earned ?? 0} pts
                               </span>
                             )}
@@ -499,8 +508,8 @@ export default function PoolPlayoffBracket() {
 
         {series.length === 0 && (
           <Card className="p-8 text-center">
-            <AlertTriangle className="h-8 w-8 text-citrus-charcoal/30 mx-auto mb-2" />
-            <p className="text-citrus-charcoal/60 text-sm">Bracket not yet set. Picks open once seeds are finalized.</p>
+            <AlertTriangle className="h-8 w-8 text-white/30 mx-auto mb-2" />
+            <p className="text-white/55 text-sm">Bracket not yet set. Picks open once seeds are finalized.</p>
           </Card>
         )}
       </div>

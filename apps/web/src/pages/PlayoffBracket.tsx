@@ -3,7 +3,15 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import {
+  HockeyFooter,
+  CupIcon,
+  CrossedSticksIcon,
+  BracketIcon,
+  MaskIcon,
+  RangeIcon,
+  MascotPortrait,
+} from '@/components/citrus2';
 import { LeagueService } from '@/services/LeagueService';
 import {
   PlayoffService,
@@ -22,7 +30,6 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
-import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { LeagueMembershipService } from '@/services/LeagueMembershipService';
 import { useToast } from '@/hooks/use-toast';
@@ -54,7 +61,7 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
       return (
         <div className={cn(
           'flex items-center justify-between px-3 py-2 rounded-md',
-          'bg-muted/30 text-muted-foreground italic'
+          'bg-white/5 ring-1 ring-white/10 text-white/55 italic'
         )}>
           <span className="text-xs">TBD</span>
           <span className="text-xs">-</span>
@@ -71,9 +78,9 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
       <div className={cn(
         'flex items-center justify-between px-3 py-2 rounded-md transition-all',
         isCompleted && isWinner && 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800',
-        isCompleted && !isWinner && 'bg-muted/20 text-muted-foreground line-through opacity-60',
-        !isCompleted && 'bg-card border border-border/50 hover:border-primary/30',
-        isChampionship && isCompleted && isWinner && 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700',
+        isCompleted && !isWinner && 'bg-white/5 ring-1 ring-white/10 text-white/55 line-through opacity-60',
+        !isCompleted && 'bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/30',
+        isChampionship && isCompleted && isWinner && 'bg-amber-400/15 ring-1 ring-amber-400/40 shadow-[0_8px_24px_-12px_rgba(251,191,36,0.4)]',
       )}>
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {seedNum && (
@@ -81,7 +88,7 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
               'w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
               isCompleted && isWinner
                 ? 'bg-green-500 text-white'
-                : 'bg-muted text-muted-foreground'
+                : 'bg-white/5 ring-1 ring-white/10 text-white/55'
             )}>
               {seedNum}
             </span>
@@ -99,7 +106,7 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
         </div>
         <span className={cn(
           'font-bold tabular-nums ml-2 shrink-0',
-          isCompleted && isWinner ? 'text-green-600 dark:text-green-400' : 'text-foreground',
+          isCompleted && isWinner ? 'text-pastel-sage-soft' : 'text-pastel-cream',
           compact ? 'text-sm' : 'text-base',
         )}>
           {series.status === 'pending' ? '-' : score.toFixed(1)}
@@ -114,17 +121,17 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
   return (
     <div className={cn(
       'rounded-lg overflow-hidden border shadow-sm',
-      isChampionship && 'border-amber-300/50 dark:border-amber-700/50 shadow-amber-100/50 dark:shadow-amber-900/20',
-      series.status === 'active' && 'border-primary/30 ring-1 ring-primary/10',
-      series.status === 'completed' && !isChampionship && 'border-border/50',
-      series.status === 'pending' && 'border-border/30 opacity-70',
+      isChampionship && 'ring-2 ring-amber-400/50 shadow-[0_16px_40px_-12px_rgba(251,191,36,0.3)]',
+      series.status === 'active' && 'ring-2 ring-pastel-orange/40 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]',
+      series.status === 'completed' && !isChampionship && 'border-white/10',
+      series.status === 'pending' && 'border-white/10 opacity-70',
     )}>
       {/* Status badge */}
       <div className={cn(
         'px-3 py-1 text-xs font-bold uppercase tracking-wider text-center',
-        series.status === 'active' && 'bg-primary/10 text-primary',
+        series.status === 'active' && 'bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft',
         series.status === 'completed' && 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
-        series.status === 'pending' && 'bg-muted/50 text-muted-foreground',
+        series.status === 'pending' && 'bg-white/5 ring-1 ring-white/10 text-white/55',
         series.status === 'bye' && 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
       )}>
         {series.status === 'active' && 'Live'}
@@ -140,12 +147,12 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
         )}
       </div>
 
-      <div className="p-2 space-y-1 bg-card">
+      <div className="p-2 space-y-1 bg-pastel-surface-tile">
         {getTeamDisplay(series.home_team_id, series.home_seed, homeIsWinner, series.home_score)}
         <div className="flex items-center gap-1 px-3">
-          <div className="flex-1 border-t border-border/30"></div>
-          <span className="text-[9px] text-muted-foreground font-medium uppercase">vs</span>
-          <div className="flex-1 border-t border-border/30"></div>
+          <div className="flex-1 border-t border-white/10"></div>
+          <span className="text-[9px] text-white/55 font-medium uppercase">vs</span>
+          <div className="flex-1 border-t border-white/10"></div>
         </div>
         {getTeamDisplay(series.away_team_id, series.away_seed, awayIsWinner, series.away_score)}
       </div>
@@ -183,11 +190,11 @@ const RoundColumn: React.FC<RoundColumnProps> = ({
       {/* Round header */}
       <div className={cn(
         'text-center mb-4 pb-2 border-b-2',
-        isChampionship ? 'border-amber-400' : 'border-primary/20',
+        isChampionship ? 'ring-2 ring-amber-400/50' : 'ring-1 ring-pastel-orange/20',
       )}>
         <h3 className={cn(
           'text-sm font-bold uppercase tracking-wider',
-          isChampionship ? 'text-amber-600 dark:text-amber-400' : 'text-primary',
+          isChampionship ? 'text-amber-300' : 'text-pastel-orange',
         )}>
           {isChampionship && <Trophy className="w-4 h-4 inline-block mr-1 -mt-0.5" />}
           {roundName}
@@ -226,9 +233,9 @@ const BracketConnectors: React.FC<{ bracketSize: number; roundCount: number }> =
     <div className="flex items-center justify-center w-8 lg:w-12 shrink-0">
       <div className="w-px h-full bg-border/40 relative">
         {/* Horizontal tick marks at connection points */}
-        <div className="absolute top-1/4 -left-2 w-4 border-t border-border/40"></div>
-        <div className="absolute top-3/4 -left-2 w-4 border-t border-border/40"></div>
-        <div className="absolute top-1/2 left-2 w-4 border-t border-border/40"></div>
+        <div className="absolute top-1/4 -left-2 w-4 border-t border-white/10"></div>
+        <div className="absolute top-3/4 -left-2 w-4 border-t border-white/10"></div>
+        <div className="absolute top-1/2 left-2 w-4 border-t border-white/10"></div>
       </div>
     </div>
   );
@@ -249,31 +256,31 @@ const ChampionBanner: React.FC<{
   const thirdPlaceName = bracket.third_place_team_id ? teamNames[bracket.third_place_team_id] : null;
 
   return (
-    <Card className="border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950/40 dark:via-yellow-950/40 dark:to-orange-950/40 shadow-lg overflow-hidden">
+    <Card className="bg-pastel-surface-tile border-0 ring-2 ring-amber-400/50 rounded-2xl shadow-[0_24px_60px_-16px_rgba(251,191,36,0.35)] overflow-hidden relative">
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMSIgZmlsbD0iI2Y1OWUwYiIgb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] pointer-events-none"></div>
       <CardContent className="relative p-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-3">
           <Crown className="w-8 h-8 text-amber-500" />
-          <Trophy className="w-10 h-10 text-amber-600" />
+          <Trophy className="w-10 h-10 text-amber-300" />
           <Crown className="w-8 h-8 text-amber-500" />
         </div>
-        <h2 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 bg-clip-text text-transparent mb-1">
+        <h2 className="font-calistoga text-2xl lg:text-3xl text-amber-300 mb-1">
           {bracket.season} Champion
         </h2>
-        <p className="text-3xl lg:text-4xl font-black text-foreground mb-4">
+        <p className="font-calistoga text-3xl lg:text-4xl text-pastel-cream mb-4">
           {champName}
         </p>
 
-        <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+        <div className="flex items-center justify-center gap-6 text-sm text-white/55">
           {runnerUpName && (
             <div className="flex items-center gap-1.5">
-              <Medal className="w-4 h-4 text-gray-400" />
+              <Medal className="w-4 h-4 text-white/40" />
               <span>2nd: {runnerUpName}</span>
             </div>
           )}
           {thirdPlaceName && (
             <div className="flex items-center gap-1.5">
-              <Medal className="w-4 h-4 text-amber-700" />
+              <Medal className="w-4 h-4 text-amber-300" />
               <span>3rd: {thirdPlaceName}</span>
             </div>
           )}
@@ -313,10 +320,10 @@ const CommissionerControls: React.FC<CommissionerControlsProps> = ({
   if (!isCommissioner) return null;
 
   return (
-    <Card className="border-primary/20">
+    <Card className="bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/20 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-bold flex items-center gap-2">
-          <Shield className="w-4 h-4 text-primary" />
+          <MaskIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
           Commissioner Controls
         </CardTitle>
       </CardHeader>
@@ -402,7 +409,7 @@ const CommissionerControls: React.FC<CommissionerControlsProps> = ({
         )}
 
         {bracket && bracket.status === 'completed' && (
-          <div className="text-center text-xs text-muted-foreground py-2">
+          <div className="text-center text-xs text-white/55 py-2">
             Bracket complete. Season is over.
           </div>
         )}
@@ -438,14 +445,14 @@ const SeedList: React.FC<{
               <div key={seed.id} className="flex items-center gap-2 px-4 py-2 text-sm">
                 <span className={cn(
                   'w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                  seed.seed_number <= 2 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground',
+                  seed.seed_number <= 2 ? 'bg-pastel-orange text-pastel-surface' : 'bg-white/5 ring-1 ring-white/10 text-white/55',
                 )}>
                   {seed.seed_number}
                 </span>
                 <span className="font-medium truncate flex-1">
                   {teamNames[seed.team_id] || 'Unknown'}
                 </span>
-                <span className="text-xs text-muted-foreground tabular-nums">
+                <span className="text-xs text-white/55 tabular-nums">
                   {seed.regular_season_wins}-{seed.regular_season_losses}
                   {seed.regular_season_ties > 0 ? `-${seed.regular_season_ties}` : ''}
                 </span>
@@ -638,11 +645,11 @@ const PlayoffBracket = () => {
 
   // Layout wrapper used throughout
   const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="min-h-screen bg-[#D4E8B8]">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Playoffs</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">Playoffs</h1>
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
@@ -650,7 +657,7 @@ const PlayoffBracket = () => {
           <div className={cn(
             "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
             userLeagueState === 'active-user' && (activeLeagueId || leagueId)
-              ? "lg:grid-cols-[220px_1fr_260px] xl:grid-cols-[240px_1fr_280px]"
+              ? "lg:grid-cols-[220px_1fr_280px] xl:grid-cols-[240px_1fr_340px]"
               : "lg:grid-cols-[220px_1fr]"
           )}>
             {/* Main content */}
@@ -658,7 +665,7 @@ const PlayoffBracket = () => {
               {children}
             </div>
 
-            {/* Left sidebar */}
+            {/* Left sidebar — AdSpace replaced with on-brand Stormy commentary */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4">
                 <CommissionerControls
@@ -673,14 +680,25 @@ const PlayoffBracket = () => {
                 {seeds.length > 0 && bracket && (
                   <SeedList seeds={seeds} teamNames={teamNames} bracketSize={bracket.bracket_size} />
                 )}
-                <AdSpace size="300x250" label="Bracket Sponsor" />
+                <div className="bg-pastel-surface-tile ring-1 ring-amber-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(251,191,36,0.15)] overflow-hidden">
+                  <MascotPortrait id="stormy" />
+                  <div className="p-5">
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-amber-300 font-bold mb-1">
+                      ✦ Stormy says
+                    </div>
+                    <div className="font-calistoga text-xl text-pastel-cream mb-2">Cup chase</div>
+                    <p className="text-[11px] text-white/70 leading-relaxed">
+                      Single-elimination. Higher seed picks home ice. Click any series to see the matchup detail. Champions are immortalized.
+                    </p>
+                  </div>
+                </div>
               </div>
             </aside>
 
             {/* Right sidebar - notifications */}
             {userLeagueState === 'active-user' && (activeLeagueId || leagueId) && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId || leagueId || ''} />
                 </div>
               </aside>
@@ -688,7 +706,7 @@ const PlayoffBracket = () => {
           </div>
         </div>
       </main>
-      <div className="hidden lg:block"><Footer /></div>
+      <HockeyFooter />
     </div>
   );
 
@@ -697,7 +715,7 @@ const PlayoffBracket = () => {
     return (
       <PageLayout>
         <div className="text-center py-20">
-          <p className="text-muted-foreground text-lg mb-4">{error}</p>
+          <p className="text-white/55 text-lg mb-4">{error}</p>
           <Button onClick={() => effectiveLeagueId && navigate(`/standings`)}>
             Back to Standings
           </Button>
@@ -712,9 +730,9 @@ const PlayoffBracket = () => {
       <PageLayout>
         <div className="text-center py-16">
           <div className="mb-6">
-            <Trophy className="w-16 h-16 mx-auto text-primary/30 mb-4" />
+            <CupIcon className="w-16 h-16 mx-auto text-pastel-orange/30 mb-4" strokeWidth={2} />
             <h1 className="text-2xl font-bold mb-2">Playoff Bracket</h1>
-            <p className="text-muted-foreground max-w-md mx-auto">
+            <p className="text-white/55 max-w-md mx-auto">
               {isCommissioner
                 ? 'Generate the playoff bracket from the sidebar when the regular season ends. Teams will be seeded based on standings.'
                 : 'The playoff bracket has not been generated yet. Ask your commissioner to set it up when the regular season ends.'}
@@ -750,12 +768,12 @@ const PlayoffBracket = () => {
             Playoff Bracket
           </h1>
           {bracket.status === 'active' && (
-            <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft px-2 py-0.5 rounded-full">
               LIVE
             </span>
           )}
         </div>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-white/55">
           {bracket.bracket_size}-team single elimination
           {bracket.two_week_matchups && ' (two-week matchups)'}
           {bracket.consolation_enabled && ' with consolation bracket'}
@@ -764,8 +782,8 @@ const PlayoffBracket = () => {
 
       {/* ====== WINNERS BRACKET ====== */}
       <Card className="mb-6 overflow-hidden border-none shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent pb-3 border-b border-border/40">
-          <CardTitle className="text-sm font-bold uppercase tracking-wider text-primary flex items-center gap-2">
+        <CardHeader className="bg-gradient-to-r from-pastel-orange/10 to-transparent pb-3 border-b border-white/10">
+          <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
             <Swords className="w-4 h-4" />
             {bracket.consolation_enabled ? 'Winners Bracket' : 'Bracket'}
           </CardTitle>
@@ -802,7 +820,7 @@ const PlayoffBracket = () => {
                 <div key={roundNum}>
                   <h3 className={cn(
                     'text-sm font-bold uppercase tracking-wider mb-3 pb-1 border-b',
-                    isChampionship ? 'text-amber-600 border-amber-300' : 'text-primary border-primary/20',
+                    isChampionship ? 'text-amber-300 ring-1 ring-amber-400/40 bg-amber-400/10' : 'text-pastel-orange ring-1 ring-pastel-orange/30 bg-pastel-orange/10',
                   )}>
                     {isChampionship && <Trophy className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" />}
                     {roundName}
@@ -829,8 +847,8 @@ const PlayoffBracket = () => {
       {/* ====== THIRD-PLACE GAME ====== */}
       {thirdPlaceSeries && (
         <Card className="mb-6 overflow-hidden border-none shadow-md">
-          <CardHeader className="bg-amber-50/50 dark:bg-amber-950/20 pb-3 border-b border-border/40">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-2">
+          <CardHeader className="bg-amber-400/10 pb-3 border-b border-white/10">
+            <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-amber-300 font-bold flex items-center gap-2">
               <Medal className="w-4 h-4" />
               Third-Place Game
             </CardTitle>
@@ -850,8 +868,8 @@ const PlayoffBracket = () => {
       {/* ====== CONSOLATION BRACKET ====== */}
       {consolationByRound.size > 0 && (
         <Card className="mb-6 overflow-hidden border-none shadow-md">
-          <CardHeader className="bg-muted/30 pb-3 border-b border-border/40">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <CardHeader className="bg-white/[0.03] pb-3 border-b border-white/10">
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-white/55 flex items-center gap-2">
               <Shield className="w-4 h-4" />
               Consolation Bracket
             </CardTitle>
@@ -880,7 +898,7 @@ const PlayoffBracket = () => {
             <div className="md:hidden space-y-6">
               {Array.from(consolationByRound.keys()).sort((a, b) => a - b).map((roundNum, idx) => (
                 <div key={roundNum}>
-                  <h3 className="text-sm font-bold uppercase tracking-wider mb-3 pb-1 border-b text-muted-foreground border-border/30">
+                  <h3 className="text-sm font-bold uppercase tracking-wider mb-3 pb-1 border-b text-white/55 border-white/10">
                     Consolation R{idx + 1}
                   </h3>
                   <div className="space-y-3">

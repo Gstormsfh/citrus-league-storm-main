@@ -7,6 +7,10 @@ import { leagueRoutes } from './routes/leagues';
 import { playerRoutes } from './routes/players';
 import { matchupRoutes } from './routes/matchups';
 import { draftRoutes } from './routes/draft';
+import { draftsRoutes } from './routes/drafts';
+import { draftV2Routes } from './routes/draftV2Sync';
+import { draftV2PickRoutes } from './routes/draftV2Pick';
+import { draftV2EventsRoutes } from './routes/draftV2Events';
 import { rosterRoutes } from './routes/rosters';
 import { tradeRoutes } from './routes/trades';
 import { waiverRoutes } from './routes/waivers';
@@ -43,10 +47,17 @@ export type Env = {
 const app = new Hono<Env>();
 
 // ── CORS origins — environment-aware ─────────────────────────────────
+// Staging origins are allowed from both environments because:
+//   1. Same codebase runs on prod + staging — one allowlist keeps config simple.
+//   2. Cross-environment requests are harmless anyway: different Supabase projects
+//      mean different JWT signing secrets, so a staging-signed token cannot pass
+//      the prod API's auth validation (and vice versa).
 const isProduction = process.env.NODE_ENV === 'production';
 const corsOrigins: string[] = [
   'https://citrusfantasysports.com',
   'https://www.citrusfantasysports.com',
+  'https://citrus-fantasy-staging.web.app',
+  'https://citrus-fantasy-staging.firebaseapp.com',
 ];
 if (!isProduction) {
   corsOrigins.push('http://localhost:8080', 'http://localhost:5173');
@@ -217,6 +228,16 @@ app.route('/api/leagues', leagueRoutes);
 app.route('/api/players', playerRoutes);
 app.route('/api/matchups', matchupRoutes);
 app.route('/api/draft', draftRoutes);
+// Phase 4.5 chunk 11g.1 — discovery endpoint at /api/drafts/:draftId/server.
+// Note the plural "drafts" — distinct from the v1/v2 /api/draft (singular)
+// surface above. ADR-001 § Decision (discovery-as-function pattern from Day 1).
+app.route('/api/drafts', draftsRoutes);
+// Draft Engine v2 — three routers all share the /api/draft/v2 prefix.
+// Hono merges them at lookup time. v1 above is unaffected.
+// Spec: docs/DRAFT_ENGINE_V2_SPEC.md §7 (endpoints).
+app.route('/api/draft/v2', draftV2Routes);        // §7.2 GET /sync
+app.route('/api/draft/v2', draftV2PickRoutes);    // §7.3 POST /pick
+app.route('/api/draft/v2', draftV2EventsRoutes);  // §7.4 GET /events
 app.route('/api/rosters', rosterRoutes);
 app.route('/api/trades', tradeRoutes);
 app.route('/api/waivers', waiverRoutes);

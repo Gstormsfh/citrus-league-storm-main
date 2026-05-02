@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import Navbar from '@/components/Navbar';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Mail, CheckCircle2, Loader2 } from 'lucide-react';
+import { DarkLayout, MascotAvatar } from '@/components/citrus2';
 
 const VerifyEmail = () => {
   const navigate = useNavigate();
@@ -44,10 +46,14 @@ const VerifyEmail = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/20">
-      <main className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+    <DarkLayout>
+      <Navbar />
+      <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
+        <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
           <CardHeader className="text-center">
+            <div className="flex justify-center mb-2">
+              <MascotAvatar id="stormy" size="lg" />
+            </div>
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
               <Mail className="h-6 w-6 text-primary" />
             </div>
@@ -121,7 +127,7 @@ const VerifyEmail = () => {
           </CardContent>
         </Card>
       </main>
-    </div>
+    </DarkLayout>
   );
 };
 

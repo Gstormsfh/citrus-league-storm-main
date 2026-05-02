@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html lang="en" style="background: #D4E8B8;">
+<html lang="en" style="background: #0F1F15;">
   <head>
     <meta charset="UTF-8" />
     <script>
@@ -46,12 +46,12 @@
   </head>
 
   <body>
-    <div id="root" style="padding: 20px; font-family: sans-serif; text-align: center; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #D4E8B8;">
+    <div id="root" style="padding: 20px; font-family: sans-serif; text-align: center; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #0F1F15;">
       <div>
-        <h1 style="color: #333; margin-bottom: 20px;">CitrusSports</h1>
-        <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
-        <p style="color: #666;">Loading application...</p>
-        <p id="status" style="color: #999; font-size: 12px; margin-top: 10px;">Initializing...</p>
+        <h1 style="color: #FFF8F0; margin-bottom: 20px;">CitrusSports</h1>
+        <div style="border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #FF6B1A; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+        <p style="color: rgba(255,255,255,0.55);">Loading application...</p>
+        <p id="status" style="color: rgba(255,255,255,0.45); font-size: 12px; margin-top: 10px;">Initializing...</p>
       </div>
     </div>
     <style>
@@ -69,7 +69,7 @@
         function updateStatus(msg, isError) {
           if (statusEl) {
             statusEl.textContent = msg;
-            if (isError) statusEl.style.color = '#dc2626';
+            if (isError) statusEl.style.color = '#fca5a5';
           }
         }
 
@@ -90,7 +90,7 @@
           if (window.__REACT_MOUNTED) return;
           var root = document.getElementById('root');
           if (root) {
-            root.innerHTML = '<div style="padding:40px;font-family:sans-serif;text-align:center;max-width:600px;margin:0 auto"><h2 style="color:#dc2626;margin-bottom:16px">Page failed to load</h2><p style="color:#666;margin-bottom:16px">JavaScript could not start. Try refreshing or clearing your cache.</p><button onclick="location.reload()" style="padding:8px 24px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer">Reload</button></div>';
+            root.innerHTML = '<div style="padding:40px;font-family:sans-serif;text-align:center;max-width:600px;margin:0 auto;background:#0F1F15;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center"><h2 style="color:#fca5a5;margin-bottom:16px">Page failed to load</h2><p style="color:rgba(255,255,255,0.55);margin-bottom:16px">JavaScript could not start. Try refreshing or clearing your cache.</p><button onclick="location.reload()" style="padding:8px 24px;background:#FF6B1A;color:#0F1F15;border:none;border-radius:6px;cursor:pointer;font-weight:bold">Reload</button></div>';
           }
         }, 15000);
       })();

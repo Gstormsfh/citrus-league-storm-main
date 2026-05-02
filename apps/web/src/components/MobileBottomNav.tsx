@@ -125,9 +125,9 @@ const MobileBottomNav = () => {
     <nav
       className={cn(
         "fixed bottom-0 left-0 right-0 z-50 lg:hidden",
-        "bg-[#E8EED9]/98 backdrop-blur-xl",
-        "border-t border-citrus-sage/30",
-        "shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
+        "bg-pastel-surface/98 backdrop-blur-xl",
+        "border-t border-white/10",
+        "shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.4)]"
       )}
       style={{
         paddingBottom: 'env(safe-area-inset-bottom)',
@@ -135,8 +135,8 @@ const MobileBottomNav = () => {
         WebkitBackfaceVisibility: 'hidden',
       }}
     >
-      {/* iOS-style blur overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#E8EED9] to-[#E8EED9]/90 -z-10" />
+      {/* Dark gradient overlay for depth */}
+      <div className="absolute inset-0 bg-gradient-to-t from-pastel-surface to-[#152821]/90 -z-10" />
 
       <div className="flex items-center justify-around px-1 h-16">
         {navItems.map((item) => {
@@ -150,23 +150,24 @@ const MobileBottomNav = () => {
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 py-1.5 px-2 min-w-[56px] min-h-[48px] rounded-xl transition-all duration-200",
                 "ios-pressable touch-target",
-                active && "bg-citrus-sage/20",
+                active && "bg-pastel-orange/15",
               )}
             >
               <div className={cn(
                 "relative flex items-center justify-center w-7 h-7 rounded-lg transition-all duration-300",
-                active && "bg-citrus-sage shadow-sm"
+                active && "bg-pastel-orange shadow-[0_4px_12px_-4px_rgba(255,107,26,0.5)]"
               )}>
                 <Icon
                   className={cn(
                     "w-[18px] h-[18px] transition-colors duration-200",
-                    active ? "text-[#E8EED9]" : "text-citrus-charcoal/70"
+                    active ? "text-white" : "text-white/55"
                   )}
+                  strokeWidth={active ? 2.5 : 2}
                 />
               </div>
               <span className={cn(
-                "text-[11px] font-display font-semibold leading-tight transition-colors duration-200",
-                active ? "text-citrus-forest" : "text-citrus-charcoal/60"
+                "text-[10px] font-bold leading-tight transition-colors duration-200 tracking-tight",
+                active ? "text-pastel-cream" : "text-white/45"
               )}>
                 {item.label}
               </span>

@@ -1,0 +1,88 @@
+# ── Citrus API — STAGING Cloud Run Service Definition ─────────────────
+# Declarative config for `gcloud run services replace service-staging.yaml`
+# Region: us-central1 | GCP Project: citrus-fantasy-staging
+#
+# Usage:
+#   gcloud run services replace ops/cloudrun/service-staging.yaml \
+#     --region=us-central1 --project=citrus-fantasy-staging
+#
+# Differences from prod (ops/cloudrun/service.yaml):
+#   - Image registry points at citrus-fantasy-staging project
+#   - minScale=0 instead of 1 (staging can cold-start; no real users depend on it)
+#   - maxScale=3 instead of 10 (lower concurrency needs)
+#   - NODE_ENV stays "production" because the codebase uses it to gate
+#     production-grade logging behavior; the real environment signal is
+#     the GCP project ID. Set DEPLOYMENT_ENV=staging for any future code
+#     that needs to distinguish environments explicitly.
+#
+# Note: Environment variables with SECRET references require the secrets
+# to be created first in Google Secret Manager under the STAGING project.
+# See scripts/staging/02-create-gcp-secrets.md for setup instructions.
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: citrus-api
+  labels:
+    cloud.googleapis.com/location: us-central1
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/launch-stage: GA
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "3"
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/startup-cpu-boost: "true"
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 60
+      containers:
+        - image: us-central1-docker.pkg.dev/citrus-fantasy-staging/citrus-api/server:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              memory: 1Gi
+              cpu: "1"
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: DEPLOYMENT_ENV
+              value: staging
+            # NOTE: PORT is a reserved env var on Cloud Run — the platform
+            # sets it automatically (8080 default) and rejects attempts to
+            # specify it via `gcloud run deploy --set-env-vars`. Don't add it.
+            - name: SUPABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: SUPABASE_URL
+            - name: SUPABASE_ANON_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: SUPABASE_ANON_KEY
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: SUPABASE_SERVICE_ROLE_KEY
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            periodSeconds: 30
+            failureThreshold: 3
+  traffic:
+    - percent: 100
+      latestRevision: true

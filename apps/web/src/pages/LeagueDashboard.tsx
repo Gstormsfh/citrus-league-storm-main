@@ -1,5 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import {
+  HockeyFooter,
+  CupIcon,
+  CrossedSticksIcon,
+  PuckIcon,
+  ScoreboardIcon,
+  XGModelIcon,
+  SlateIcon,
+  DraftIcon,
+  ShiftIcon,
+  MaskIcon,
+  RangeIcon,
+  MascotPortrait,
+} from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { LeagueService, League, Team } from '@/services/LeagueService';
@@ -7,7 +21,6 @@ import { WaiverService } from '@/services/WaiverService';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +33,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { TradeService } from '@/services/TradeService';
 import { extractFormatSettings, AVAILABLE_CATEGORIES, DEFAULT_ROSTER_SLOTS, type LeagueSettings } from '@/types/leagueTypes';
@@ -598,46 +610,69 @@ const LeagueDashboard = () => {
       <div className="min-h-screen flex flex-col">
         <Navbar />
         <main className="flex-1 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-md bg-pastel-surface-tile border-0 ring-1 ring-red-400/40 rounded-2xl shadow-[0_24px_60px_-16px_rgba(248,113,113,0.2)]">
             <CardHeader>
-              <CardTitle>Error</CardTitle>
-              <CardDescription>{error || 'League not found'}</CardDescription>
+              <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-red-300 font-bold mb-1.5">
+                ✦ League not found
+              </div>
+              <CardTitle className="font-calistoga text-2xl text-pastel-cream">Something went sideways.</CardTitle>
+              <CardDescription className="text-white/55">{error || 'We couldn’t find that league.'}</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={() => navigate('/')}>Go Home</Button>
+              <Button
+                onClick={() => navigate('/')}
+                className="bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]"
+              >
+                Go Home
+              </Button>
             </CardContent>
           </Card>
         </main>
-        <Footer />
+        <HockeyFooter />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream flex flex-col">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 dark:bg-background/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">League</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">League</h1>
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
-          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_280px] xl:grid-cols-[220px_1fr_340px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
+
               {/* Header */}
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h1 className="text-4xl font-bold mb-2">{league.name}</h1>
-                <div className="flex items-center gap-2">
-                  <Badge variant={league.draft_status === 'completed' ? 'default' : 'secondary'}>
-                    {league.draft_status === 'not_started' && 'Not Started'}
-                    {league.draft_status === 'in_progress' && 'In Progress'}
-                    {league.draft_status === 'completed' && 'Completed'}
-                  </Badge>
+            <div className="flex items-center justify-between mb-4 gap-3">
+              <div className="min-w-0">
+                <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 flex items-center gap-2">
+                  <CupIcon className="w-3.5 h-3.5" strokeWidth={2} />
+                  ✦ League HQ
+                </div>
+                <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none mb-3 truncate">{league.name}</h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(() => {
+                    const status = league.draft_status;
+                    const cls = status === 'completed'
+                      ? 'bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft'
+                      : status === 'in_progress'
+                      ? 'bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft'
+                      : 'bg-white/10 ring-1 ring-white/20 text-white/70';
+                    return (
+                      <Badge className={`${cls} border-0 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold`}>
+                        {status === 'not_started' && 'Not Started'}
+                        {status === 'in_progress' && 'Draft Live'}
+                        {status === 'completed' && 'Draft Complete'}
+                      </Badge>
+                    );
+                  })()}
                   {isCommissioner && (
-                    <Badge variant="default" className="bg-primary text-primary-foreground flex items-center gap-1">
+                    <Badge className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft border-0 flex items-center gap-1 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold">
                       <Crown className="h-3 w-3" />
                       Commissioner
                     </Badge>
@@ -648,32 +683,40 @@ const LeagueDashboard = () => {
                 <div className="flex gap-2">
                   <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
                     <DialogTrigger asChild>
-                      <Button variant="outline">
+                      <Button
+                        variant="outline"
+                        className="bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold shrink-0"
+                      >
                         <Settings className="mr-2 h-4 w-4" />
                         League Settings
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/30 text-pastel-cream">
                       <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                          <Settings className="h-5 w-5" />
+                        <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
+                          ✦ Commissioner
+                        </div>
+                        <DialogTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                          <Settings className="h-5 w-5 text-pastel-orange" />
                           League Settings
                         </DialogTitle>
-                        <DialogDescription>
+                        <DialogDescription className="text-white/55">
                           Configure all league settings. Changes will notify all league members.
                         </DialogDescription>
                       </DialogHeader>
                       
                       <Tabs value={activeSettingsTab} onValueChange={setActiveSettingsTab} className="w-full">
                         <div className="overflow-x-auto -mx-2 px-2">
-                          <TabsList className="inline-flex w-auto min-w-full">
-                            <TabsTrigger value="waivers">Waivers</TabsTrigger>
-                            <TabsTrigger value="scoring">Scoring</TabsTrigger>
-                            <TabsTrigger value="draft">Draft</TabsTrigger>
-                            <TabsTrigger value="trades">Trades</TabsTrigger>
-                            <TabsTrigger value="rosterslots">Roster Slots</TabsTrigger>
-                            <TabsTrigger value="playoffs">Playoffs</TabsTrigger>
-                            <TabsTrigger value="rosters">Rosters</TabsTrigger>
+                          <TabsList className="inline-flex w-auto min-w-full bg-pastel-surface ring-1 ring-white/10 p-1 rounded-xl">
+                            {(['waivers','scoring','draft','trades','rosterslots','playoffs','rosters'] as const).map((tab) => (
+                              <TabsTrigger
+                                key={tab}
+                                value={tab}
+                                className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                              >
+                                {tab === 'rosterslots' ? 'Roster Slots' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                              </TabsTrigger>
+                            ))}
                           </TabsList>
                         </div>
                         
@@ -701,7 +744,7 @@ const LeagueDashboard = () => {
                               <SelectItem value="12:00:00">12:00 PM (Noon)</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             Time when waiver claims are processed daily
                           </p>
                         </div>
@@ -725,7 +768,7 @@ const LeagueDashboard = () => {
                               <SelectItem value="72">72 hours (3 days)</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             How long dropped players stay on waivers
                           </p>
                         </div>
@@ -749,7 +792,7 @@ const LeagueDashboard = () => {
                               <SelectItem value="faab">FAAB (Bidding)</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             Rolling: Priority moves after claim. Reverse: Worst team gets priority.
                           </p>
                         </div>
@@ -761,7 +804,7 @@ const LeagueDashboard = () => {
                               <Shield className="h-4 w-4" />
                               Game Lock
                             </Label>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-white/55">
                               Lock players during/after their games
                             </p>
                           </div>
@@ -778,7 +821,7 @@ const LeagueDashboard = () => {
                               <RefreshCw className="h-4 w-4" />
                               Allow Trades During Games
                             </Label>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-white/55">
                               Players can be traded even if game-locked
                             </p>
                           </div>
@@ -812,7 +855,7 @@ const LeagueDashboard = () => {
                               <SelectItem value="10">10 per week</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             Limit how many free agent pickups a team can make each week. Resets every Monday.
                           </p>
                         </div>
@@ -838,7 +881,7 @@ const LeagueDashboard = () => {
                               <SelectItem value="150">150 per season</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-white/55">
                             Limit total free agent pickups for the entire season.
                           </p>
                         </div>
@@ -851,7 +894,7 @@ const LeagueDashboard = () => {
                                 <Play className="h-4 w-4" />
                                 Process Waivers Now
                               </Label>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-white/55">
                                 Manually process all pending waiver claims
                               </p>
                             </div>
@@ -882,7 +925,7 @@ const LeagueDashboard = () => {
                                 <RefreshCw className="h-4 w-4" />
                                 Sync Rosters from Draft
                               </Label>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-white/55">
                                 Re-sync roster_assignments from draft_picks (safety net)
                               </p>
                             </div>
@@ -1084,7 +1127,7 @@ const LeagueDashboard = () => {
                                 disabled={league?.draft_status === 'completed'}
                               />
                               {league?.draft_status === 'completed' && (
-                                <p className="text-xs text-muted-foreground">Draft is completed - rounds cannot be changed</p>
+                                <p className="text-xs text-white/55">Draft is completed - rounds cannot be changed</p>
                               )}
                             </div>
                             
@@ -1100,7 +1143,7 @@ const LeagueDashboard = () => {
                                 disabled={league?.draft_status === 'completed'}
                               />
                               {league?.draft_status === 'completed' && (
-                                <p className="text-xs text-muted-foreground">Draft is completed - time limit cannot be changed</p>
+                                <p className="text-xs text-white/55">Draft is completed - time limit cannot be changed</p>
                               )}
                             </div>
                           </div>
@@ -1129,7 +1172,7 @@ const LeagueDashboard = () => {
                                   <SelectItem value="league_vote">League Vote</SelectItem>
                                 </SelectContent>
                               </Select>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-white/55">
                                 {tradeSettings.trade_review_type === 'none' && 'Trades are executed immediately when accepted.'}
                                 {tradeSettings.trade_review_type === 'commissioner' && 'Trades require commissioner approval before being processed.'}
                                 {tradeSettings.trade_review_type === 'league_vote' && 'League members vote on trades during the review window.'}
@@ -1155,7 +1198,7 @@ const LeagueDashboard = () => {
                                       <SelectItem value="72">72 hours</SelectItem>
                                     </SelectContent>
                                   </Select>
-                                  <p className="text-xs text-muted-foreground">
+                                  <p className="text-xs text-white/55">
                                     How long league members have to vote on trades
                                   </p>
                                 </div>
@@ -1178,7 +1221,7 @@ const LeagueDashboard = () => {
                                       <SelectItem value="0.75">75% (strong consensus)</SelectItem>
                                     </SelectContent>
                                   </Select>
-                                  <p className="text-xs text-muted-foreground">
+                                  <p className="text-xs text-white/55">
                                     Percentage of league members needed to veto a trade
                                   </p>
                                 </div>
@@ -1192,7 +1235,7 @@ const LeagueDashboard = () => {
                           <div className="space-y-4">
                             <div>
                               <h3 className="text-lg font-semibold mb-1">Roster Slot Configuration</h3>
-                              <p className="text-xs text-muted-foreground mb-4">
+                              <p className="text-xs text-white/55 mb-4">
                                 Customize the number of each position slot.
                                 {league?.draft_status === 'completed' && ' Some changes may affect active rosters.'}
                               </p>
@@ -1230,7 +1273,7 @@ const LeagueDashboard = () => {
                           <div className="space-y-4">
                             <div>
                               <h3 className="text-lg font-semibold mb-1">Playoff Settings</h3>
-                              <p className="text-xs text-muted-foreground mb-4">
+                              <p className="text-xs text-white/55 mb-4">
                                 Configure how many teams make the playoffs and the playoff duration.
                               </p>
                             </div>
@@ -1249,7 +1292,7 @@ const LeagueDashboard = () => {
                                   <SelectItem value="8">8 Teams</SelectItem>
                                 </SelectContent>
                               </Select>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-white/55">
                                 {playoffSettings.playoffTeams === 0 && 'League champion determined by regular season standings.'}
                                 {playoffSettings.playoffTeams === 4 && '4-team bracket: Semifinals → Championship (2 rounds).'}
                                 {playoffSettings.playoffTeams === 6 && '6-team bracket: Wild Card → Semifinals → Championship (3 rounds). Top 2 seeds get first-round byes.'}
@@ -1271,16 +1314,16 @@ const LeagueDashboard = () => {
                                     <SelectItem value="4">4 Weeks</SelectItem>
                                   </SelectContent>
                                 </Select>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-xs text-white/55">
                                   Total weeks reserved for the playoff bracket. Regular season length adjusts automatically.
                                 </p>
                               </div>
                             )}
 
                             {playoffSettings.playoffTeams > 0 && (
-                              <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                              <div className="rounded-xl ring-1 ring-white/10 bg-white/5 p-4 space-y-2">
                                 <h4 className="text-sm font-semibold">Bracket Preview</h4>
-                                <div className="text-xs text-muted-foreground space-y-1">
+                                <div className="text-xs text-white/55 space-y-1">
                                   {playoffSettings.playoffTeams === 4 && (
                                     <>
                                       <p>Round 1 (Semifinals): #1 vs #4, #2 vs #3</p>
@@ -1314,7 +1357,7 @@ const LeagueDashboard = () => {
                             {loadingRosterCounts ? (
                               <div className="text-center py-4">
                                 <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                                <p className="text-sm text-muted-foreground mt-2">Loading roster counts...</p>
+                                <p className="text-sm text-white/55 mt-2">Loading roster counts...</p>
                               </div>
                             ) : (
                               <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -1322,7 +1365,7 @@ const LeagueDashboard = () => {
                                   <div key={team.id} className="flex items-center justify-between p-3 border rounded-lg">
                                     <div>
                                       <div className="font-medium">{team.team_name}</div>
-                                      <div className="text-sm text-muted-foreground">
+                                      <div className="text-sm text-white/55">
                                         {rosterCounts[team.id] ?? 0} players
                                       </div>
                                     </div>
@@ -1346,7 +1389,7 @@ const LeagueDashboard = () => {
                           
                           {/* Join Code Display - Compact */}
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 px-3 py-2 bg-muted rounded-md border">
+                            <div className="flex-1 px-3 py-2 bg-white/5 ring-1 ring-white/10 rounded-md">
                               <div className="text-lg font-mono font-semibold text-center">{league.join_code || 'N/A'}</div>
                             </div>
                             <Button
@@ -1449,44 +1492,58 @@ Your Commissioner`);
             </div>
           </div>
 
-          {/* League Info Cards */}
+          {/* League Info Cards — three core league shape stats with custom hockey icons */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Users className="h-4 w-4" />
+            <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+              <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-orange/10 rounded-full blur-3xl pointer-events-none" />
+              <CardHeader className="pb-2 relative z-10">
+                <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
+                  <CrossedSticksIcon className="h-3.5 w-3.5" strokeWidth={2} />
                   Teams
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{teams.length}/{league.settings?.teamsCount || 12}</div>
-                <p className="text-xs text-muted-foreground">Teams in league (max: {league.settings?.teamsCount || 12})</p>
+              <CardContent className="relative z-10">
+                <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">
+                  {teams.length}
+                  <span className="text-white/40 mx-1.5 text-xl">/</span>
+                  <span className="text-pastel-orange">{league.settings?.teamsCount || 12}</span>
+                </div>
+                <p className="text-xs text-white/55 mt-2">Filled · max {league.settings?.teamsCount || 12}</p>
+                {/* Mini fill bar — actual visualization of how many slots are filled */}
+                <div className="mt-3 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-pastel-orange to-pastel-orange-soft transition-all"
+                    style={{ width: `${Math.min(100, (teams.length / (league.settings?.teamsCount || 12)) * 100)}%` }}
+                  />
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Trophy className="h-4 w-4" />
+            <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+              <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-sage/10 rounded-full blur-3xl pointer-events-none" />
+              <CardHeader className="pb-2 relative z-10">
+                <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
+                  <ScoreboardIcon className="h-3.5 w-3.5" strokeWidth={2} />
                   Roster Size
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{league.roster_size}</div>
-                <p className="text-xs text-muted-foreground">Players per team</p>
+              <CardContent className="relative z-10">
+                <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{league.roster_size}</div>
+                <p className="text-xs text-white/55 mt-2">Players per team</p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
+            <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+              <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-orange/10 rounded-full blur-3xl pointer-events-none" />
+              <CardHeader className="pb-2 relative z-10">
+                <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
+                  <DraftIcon className="h-3.5 w-3.5" strokeWidth={2} />
                   Draft Rounds
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{league.draft_rounds}</div>
-                <p className="text-xs text-muted-foreground">Total draft rounds</p>
+              <CardContent className="relative z-10">
+                <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{league.draft_rounds}</div>
+                <p className="text-xs text-white/55 mt-2">Total draft rounds</p>
               </CardContent>
             </Card>
           </div>
@@ -1495,18 +1552,22 @@ Your Commissioner`);
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             {/* Draft Room - visible to ALL league members based on draft status */}
             {league.draft_status !== 'completed' && (
-              <Card className={league.draft_status === 'in_progress' ? 'border-primary/30 bg-primary/5' : ''}>
+              <Card className={
+                league.draft_status === 'in_progress'
+                  ? 'bg-pastel-surface-tile border-0 ring-1 ring-pastel-orange/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.2)]'
+                  : 'bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]'
+              }>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
                     {league.draft_status === 'in_progress' ? (
-                      <><Play className="h-5 w-5 text-primary" /> Draft In Progress</>
+                      <><Play className="h-5 w-5 text-pastel-orange" /> Draft In Progress</>
                     ) : league.scheduled_draft_time ? (
-                      <><Clock className="h-5 w-5" /> Draft Scheduled</>
+                      <><Clock className="h-5 w-5 text-pastel-orange" /> Draft Scheduled</>
                     ) : (
-                      <>Draft Room</>
+                      <><DraftIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} /> Draft Room</>
                     )}
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-white/55">
                     {(() => {
                       if (league.draft_status === 'in_progress') {
                         return 'The draft is live! Join the draft room to make your picks.';
@@ -1541,9 +1602,12 @@ Your Commissioner`);
                       }
                       navigate(`/draft-room?league=${leagueId}`);
                     }}
-                    className="w-full"
+                    className={`w-full font-bold ${
+                      league.draft_status === 'in_progress'
+                        ? 'bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]'
+                        : 'bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50'
+                    } disabled:opacity-50`}
                     disabled={!leagueId}
-                    variant={league.draft_status === 'in_progress' ? 'default' : 'outline'}
                   >
                     <Play className="mr-2 h-4 w-4" />
                     {league.draft_status === 'in_progress'
@@ -1553,7 +1617,7 @@ Your Commissioner`);
                         : 'Enter Draft Lobby'}
                   </Button>
                   {!isCommissioner && league.draft_status === 'not_started' && (
-                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                    <p className="text-xs text-white/55 mt-2 text-center">
                       You'll be able to participate once the commissioner starts the draft
                     </p>
                   )}
@@ -1562,26 +1626,32 @@ Your Commissioner`);
             )}
 
             {userTeam && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Your Team</CardTitle>
-                  <CardDescription>{userTeam.team_name}</CardDescription>
+              <Card className="bg-pastel-surface-tile border-0 ring-1 ring-pastel-sage/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(166,211,160,0.15)] relative overflow-hidden">
+                <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-pastel-sage/15 rounded-full blur-3xl pointer-events-none" />
+                <CardHeader className="relative z-10">
+                  <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-1">
+                    ✦ Your Squad
+                  </div>
+                  <CardTitle className="font-calistoga text-pastel-cream truncate">{userTeam.team_name}</CardTitle>
+                  <CardDescription className="text-white/55">Manage your roster, set lineups, scout the wire.</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="relative z-10">
                   <div className="space-y-2">
-                    <Button 
+                    <Button
                       asChild
-                      variant="outline" 
-                      className="w-full"
+                      className="w-full bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft hover:bg-pastel-sage/30 font-bold"
                     >
-                      <Link to="/roster">View Roster</Link>
+                      <Link to="/roster">
+                        <ScoreboardIcon className="mr-2 h-4 w-4" strokeWidth={2} /> View Roster
+                      </Link>
                     </Button>
-                    <Button 
+                    <Button
                       asChild
-                      variant="outline" 
-                      className="w-full"
+                      className="w-full bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold"
                     >
-                      <Link to="/gm-office">GM Office</Link>
+                      <Link to="/gm-office">
+                        <CupIcon className="mr-2 h-4 w-4" strokeWidth={2} /> GM Office
+                      </Link>
                     </Button>
                   </div>
                 </CardContent>
@@ -1590,38 +1660,62 @@ Your Commissioner`);
           </div>
 
           {/* Teams List */}
-          <Card>
+          <Card className="bg-pastel-surface-tile border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
             <CardHeader>
-              <CardTitle>Teams</CardTitle>
-              <CardDescription>All teams in this league</CardDescription>
+              <CardTitle className="font-calistoga text-pastel-cream flex items-center gap-2">
+                <CrossedSticksIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} />
+                Teams
+              </CardTitle>
+              <CardDescription className="text-white/55">All teams in this league</CardDescription>
             </CardHeader>
             <CardContent>
               {teams.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-8 text-white/55">
+                  <PuckIcon className="w-10 h-10 mx-auto mb-3 text-pastel-orange/30" strokeWidth={2} />
                   <p>No teams found in this league.</p>
                   <p className="text-sm mt-2">Teams will appear here once they join.</p>
                 </div>
               ) : (
-              <div className="space-y-2">
-                {teams.map((team) => (
-                  <div
-                    key={team.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div>
-                      <div className="font-medium">{team.team_name}</div>
-                      {team.owner_id ? (
-                        <div className="text-sm text-muted-foreground">Owner: {team.owner_id === user?.id ? 'You' : 'User'}</div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">AI Team</div>
-                      )}
-                    </div>
-                    {team.owner_id === user?.id && (
-                      <Badge variant="outline">Your Team</Badge>
-                    )}
-                  </div>
-                ))}
-              </div>
+                <div className="space-y-2">
+                  {teams.map((team) => {
+                    const isMine = team.owner_id === user?.id;
+                    return (
+                      <div
+                        key={team.id}
+                        className={`flex items-center justify-between p-3 rounded-xl ring-1 ${
+                          isMine
+                            ? 'bg-pastel-sage/10 ring-pastel-sage/40'
+                            : 'bg-white/5 ring-white/10 hover:bg-white/[0.07] transition-colors'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 font-jbmono uppercase tracking-[0.18em] ${
+                            isMine
+                              ? 'bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft'
+                              : 'bg-pastel-orange/15 ring-1 ring-pastel-orange/30 text-pastel-orange-soft'
+                          }`}>
+                            {(team.team_name || '?').slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-bold text-pastel-cream truncate">{team.team_name}</div>
+                            {team.owner_id ? (
+                              <div className="text-xs text-white/55">Owner: {isMine ? 'You' : 'User'}</div>
+                            ) : (
+                              <div className="text-xs text-white/55 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-300/60 inline-block" /> AI Team
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {isMine && (
+                          <Badge className="bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold">
+                            Your Team
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -1630,15 +1724,40 @@ Your Commissioner`);
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <AdSpace size="300x250" label="League Sponsor" />
-                <AdSpace size="300x250" label="Fantasy Partner" />
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                  <MascotPortrait id="stormy" />
+                  <div className="p-5">
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
+                      ✦ Stormy says
+                    </div>
+                    <div className="font-calistoga text-xl text-pastel-cream mb-2">League pulse</div>
+                    <p className="text-xs text-white/70 leading-relaxed">
+                      <span className="font-bold text-pastel-cream tabular-nums">{teams.length}</span> of <span className="font-bold text-pastel-cream tabular-nums">{league.settings?.teamsCount || 12}</span> teams in.
+                      {' '}
+                      {league.draft_status === 'not_started' && 'Draft is on deck.'}
+                      {league.draft_status === 'in_progress' && 'Draft is live — get in there.'}
+                      {league.draft_status === 'completed' && 'Rosters set. Time to play.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <RangeIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">League quicklinks</div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Link to="/standings" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> Standings</Link>
+                    <Link to="/matchup" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> This week's matchup</Link>
+                    <Link to="/team-analytics" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> Team analytics</Link>
+                  </div>
+                </div>
               </div>
             </aside>
 
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {leagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={leagueId} />
                 </div>
               </aside>
@@ -1646,7 +1765,7 @@ Your Commissioner`);
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };

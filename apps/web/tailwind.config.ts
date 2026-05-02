@@ -76,6 +76,66 @@ export default {
 					charcoal: '#5C5C5C',    // Soft charcoal
 					forest: '#4A5F4D',      // Soft forest - NOT too dark
 				},
+				// ==========================================
+				// PREMIUM REDESIGN TOKENS — additive, do not modify existing citrus-* or fantasy-* tokens
+				// Used by /preview-redesign route only. Slapshot Editorial design system.
+				// ==========================================
+				premium: {
+					// Surface hierarchy — forest-black with subtle green undertone (preserves Citrus brand memory)
+					bg: '#0F1411',           // surface — base canvas
+					'bg-deep': '#0A0F0C',    // surface-container-lowest — utility bars
+					surface: '#181D1A',      // surface-container-low — sectioning
+					'surface-high': '#1C211D', // surface-container — primary cards
+					'surface-higher': '#262B28', // surface-container-high — interactive elements
+					'surface-highest': '#313632', // surface-container-highest — active states
+					'surface-bright': '#353A37',  // bright variant
+					// Text & content
+					text: '#DFE4DE',         // on-surface — primary text
+					'text-muted': '#A8B0A6', // secondary text
+					'text-dim': '#6B7368',   // tertiary text
+					// The signature accent — citrus orange
+					orange: '#FF6B1A',       // primary-container — surgical laser
+					'orange-soft': '#FFB596', // primary — softer variant
+					'orange-deep': '#581E00', // on-primary — text on orange
+					// Cool data accent for opposing/comparison data
+					ice: '#8DCDFF',          // tertiary
+					'ice-deep': '#00A2EB',   // tertiary-container
+					// Border / outline
+					border: 'rgba(255, 255, 255, 0.08)',     // ghost border default
+					'border-strong': 'rgba(255, 255, 255, 0.15)', // ghost border accessible
+				},
+				// ==========================================
+				// PASTEL VIBRANT TOKENS — the live v2 design system.
+				// Citrus brand: warm cream/peach pastel base, vibrant orange punches.
+				// Glossier × Casper × Notion register.
+				// ==========================================
+				pastel: {
+					cream: '#FFF8F0',           // base bg upper
+					'cream-warm': '#FFEDDB',    // base bg mid
+					peach: '#FFE0CC',           // base bg lower / soft accent
+					'peach-deep': '#FFB591',    // deeper peach accent
+					sage: '#84A57D',            // sage green for live/success
+					'sage-soft': '#C8DCC4',     // pale sage for chips/borders
+					forest: '#1B3022',          // deep forest text
+					'forest-soft': '#3E5A3E',   // muted forest text
+					'forest-dim': '#6B7B6B',    // tertiary text
+					orange: '#FF6B1A',          // vibrant primary CTA
+					'orange-soft': '#FF9F66',   // softer warm orange
+					'orange-deep': '#C04A0E',   // deep orange (text on light)
+					// Dark forest surface family — page backgrounds and cards in v2.
+					// Use bg-pastel-surface for page wrappers, bg-pastel-surface-tile for
+					// cards, and bg-pastel-surface-high for hover/active states.
+					//
+					// IMPORTANT: surface* are SURFACE colors. forest* (above) are TEXT colors
+					// (deep-forest-on-light backgrounds). Don't conflate them.
+					//
+					// Lifted from citrus2/tokens.ts (C2.bg / C2.surface / C2.surfaceHigh) on
+					// 2026-04-29. Replaces ~341 hex-literal usages across migrated v2 pages.
+					surface: '#0F1F15',         // page surface (deep forest)
+					'surface-tile': '#1A2A20',  // card / tile surface
+					'surface-high': '#243429',  // hover / active state
+					butter: '#F4E5B8',          // butter accent (4th color in mascot palette)
+				},
 				// Citrus fantasy sports theme colors - High-Contrast Citrus Palette
 				fantasy: {
 					primary: '#F9E076',     // Bright Lemon Peel (Center)
@@ -142,6 +202,22 @@ export default {
         "bounce-subtle": {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-5px)" }
+        },
+        "float-slow": {
+          "0%, 100%": { transform: "translateY(0px) rotate(0deg)" },
+          "50%": { transform: "translateY(-12px) rotate(1.5deg)" }
+        },
+        "float-medium": {
+          "0%, 100%": { transform: "translateY(0px) rotate(0deg)" },
+          "50%": { transform: "translateY(-8px) rotate(-1deg)" }
+        },
+        "marquee": {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" }
+        },
+        "live-pulse": {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.5", transform: "scale(1.3)" }
         }
 			},
 			animation: {
@@ -150,13 +226,24 @@ export default {
 				"fade-in": "fade-in 0.6s ease-out",
         "slide-in": "slide-in 0.4s ease-out",
         "slide-down": "slide-down 0.4s ease-out",
-        "bounce-subtle": "bounce-subtle 2s ease-in-out infinite"
+        "bounce-subtle": "bounce-subtle 2s ease-in-out infinite",
+        "float-slow": "float-slow 7s ease-in-out infinite",
+        "float-medium": "float-medium 5s ease-in-out infinite",
+        "marquee": "marquee 80s linear infinite",
+        "live-pulse": "live-pulse 1.6s ease-in-out infinite"
 			},
 			fontFamily: {
 				sans: ['Inter', 'Montserrat', 'sans-serif'],         // Clean body text
 				display: ['Montserrat', 'sans-serif'],               // Secondary headers
 				varsity: ['Graduate', 'Alfa Slab One', 'serif'],     // Bold varsity lettering
 				script: ['Pacifico', 'Bangers', 'cursive'],          // Surfer script accent
+				// Premium redesign — additive, used only on /preview-redesign
+				'editorial': ['"Playfair Display"', 'Georgia', 'serif'],   // Editorial serif headlines
+				'caps': ['"Bebas Neue"', '"Arial Narrow"', 'sans-serif'],   // Condensed caps section labels
+				'premium-body': ['Inter', 'system-ui', 'sans-serif'],      // Premium body text (Inter at heavier weights)
+				// Pastel-vibrant redesign — Citrus warm-character serif + clean body + tabular mono
+				'calistoga': ['Calistoga', 'Georgia', 'serif'],            // Warm display serif — Citrus voice with human warmth
+				'jbmono': ['"JetBrains Mono"', 'ui-monospace', 'monospace'], // Tabular numbers + mono labels
 			}
 		}
 	},

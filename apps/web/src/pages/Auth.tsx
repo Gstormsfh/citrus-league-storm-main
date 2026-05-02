@@ -3,18 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { UserAccountService } from '@/services/UserAccountService';
-import { logger } from '@citrus/shared';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Mail, Lock, HelpCircle, Chrome, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, HelpCircle, Chrome, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
-import { Separator } from '@/components/ui/separator';
+import Navbar from '@/components/Navbar';
+import {
+  DarkLayout,
+  CitrusCard,
+  CitrusButton,
+  CitrusLogo,
+} from '@/components/citrus2';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -30,25 +32,15 @@ const Auth = () => {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [tosAccepted, setTosAccepted] = useState(false);
+  const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const signInSafetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clean up safety timeout on unmount (e.g., when redirect navigates away)
   useEffect(() => {
     return () => {
-      if (signInSafetyTimeoutRef.current) {
-        clearTimeout(signInSafetyTimeoutRef.current);
-      }
+      if (signInSafetyTimeoutRef.current) clearTimeout(signInSafetyTimeoutRef.current);
     };
   }, []);
 
-  // CRITICAL: stash ?redirect= in sessionStorage on every Auth-page mount.
-  // This preserves the destination across EVERY sign-in method, including:
-  //   - Email/password (reads from window.location.search — already works)
-  //   - OAuth (Google strips query params on callback)
-  //   - Email signup that requires verification (user leaves /auth entirely,
-  //     comes back via /auth/callback with no query params)
-  // Without this stash, invite-link users who sign up (vs. sign in) land
-  // on the homepage after verifying their email — infuriating UX.
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -56,11 +48,9 @@ const Auth = () => {
       if (redirect && redirect.startsWith('/')) {
         sessionStorage.setItem('citrus:postAuthRedirect', redirect);
       }
-    } catch { /* storage disabled — defaults still work for signin path */ }
+    } catch { /* storage disabled */ }
   }, []);
 
-  // Reactive redirect: once AuthContext commits user state, navigate away.
-  // Honors ?redirect=<path> so share-link flows survive the auth round trip.
   useEffect(() => {
     if (!authLoading && user) {
       const params = new URLSearchParams(window.location.search);
@@ -70,63 +60,30 @@ const Auth = () => {
   }, [user, authLoading, navigate]);
 
   const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
   const getBetterErrorMessage = (errorMessage: string): string => {
     const lower = errorMessage.toLowerCase();
-
-    if (lower.includes('invalid login') || lower.includes('invalid credentials')) {
-      return 'Invalid email or password. Please check and try again.';
-    }
-    if (lower.includes('already registered') || lower.includes('already exists') || lower.includes('already in use')) {
-      return 'This email already has an account. Please sign in instead.';
-    }
-    if (lower.includes('email not confirmed') || lower.includes('email not verified')) {
-      return 'Please verify your email address. Check your inbox for the verification link.';
-    }
-    if (lower.includes('rate limit') || lower.includes('too many requests')) {
-      return 'Too many attempts. Please wait a few minutes before trying again.';
-    }
-    if (lower.includes('provider is not enabled') || lower.includes('unsupported provider')) {
-      return 'This sign-in method is not available yet. Please use email and password to sign in.';
-    }
-    if (lower.includes('signups not allowed') || lower.includes('signup is disabled')) {
-      return 'Sign-ups are temporarily disabled. Please try again later or contact support.';
-    }
-    if (lower.includes('validation_failed') || lower.includes('validation failed')) {
-      return 'Sign-up could not be completed. Please try again.';
-    }
-    if (lower.includes('password')) {
-      return errorMessage;
-    }
-    // Only treat as invalid email if the error specifically says the email format is bad.
-    // Otherwise pass the original Supabase message through so users see the real cause
-    // (previously any error containing "email" was mis-labeled as "Invalid email address").
-    if (lower.includes('invalid email') || lower.includes('email format') || lower.includes('malformed email')) {
-      return 'Invalid email address. Please check and try again.';
-    }
-
+    if (lower.includes('invalid login') || lower.includes('invalid credentials')) return 'Invalid email or password. Please check and try again.';
+    if (lower.includes('already registered') || lower.includes('already exists') || lower.includes('already in use')) return 'This email already has an account. Please sign in instead.';
+    if (lower.includes('email not confirmed') || lower.includes('email not verified')) return 'Please verify your email address. Check your inbox for the verification link.';
+    if (lower.includes('rate limit') || lower.includes('too many requests')) return 'Too many attempts. Please wait a few minutes before trying again.';
+    if (lower.includes('provider is not enabled') || lower.includes('unsupported provider')) return 'This sign-in method is not available yet. Please use email and password to sign in.';
+    if (lower.includes('signups not allowed') || lower.includes('signup is disabled')) return 'Sign-ups are temporarily disabled. Please try again later or contact support.';
+    if (lower.includes('validation_failed') || lower.includes('validation failed')) return 'Sign-up could not be completed. Please try again.';
+    if (lower.includes('password')) return errorMessage;
+    if (lower.includes('invalid email') || lower.includes('email format') || lower.includes('malformed email')) return 'Invalid email address. Please check and try again.';
     return errorMessage;
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (!validateEmail(email)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
+    if (!validateEmail(email)) { setError('Please enter a valid email address'); return; }
     setLoading(true);
-
     const { error } = await signIn(email, password);
-
     if (error) {
-      // If "Invalid credentials", check whether the email actually exists
-      // but was created via OAuth (no password). Industry standard UX.
       const isInvalidCreds = error.message?.toLowerCase().includes('invalid') || error.message?.toLowerCase().includes('credentials');
       if (isInvalidCreds) {
         try {
@@ -139,26 +96,17 @@ const Auth = () => {
           const info = (await res.json())?.data || (await res.json());
           if (info?.exists && !info.has_password) {
             const oauthProviders = (info.providers || []).filter((p: string) => p !== 'email');
-            if (oauthProviders.includes('google')) {
-              setError("This email was registered with Google. Click 'Sign in with Google' above to continue.");
-              setLoading(false);
-              return;
-            }
-            if (oauthProviders.length > 0) {
-              setError(`This email was registered with ${oauthProviders[0]}. Use that option above to sign in.`);
-              setLoading(false);
-              return;
-            }
+            if (oauthProviders.includes('google')) { setError("This email was registered with Google. Click 'Sign in with Google' above to continue."); setLoading(false); return; }
+            if (oauthProviders.length > 0) { setError(`This email was registered with ${oauthProviders[0]}. Use that option above to sign in.`); setLoading(false); return; }
           }
-        } catch { /* silently fall through to generic error */ }
+        } catch { /* fall through */ }
       }
       setError(getBetterErrorMessage(error.message));
       setLoading(false);
       return;
     }
-
     // On success: explicitly verify the session and navigate.
-    // Don't rely solely on the useEffect watching `user` — onAuthStateChange
+    // Do not rely solely on the useEffect watching user — onAuthStateChange
     // can race with the redirect, leaving users in guest mode briefly and
     // forcing them to sign in again.
     try {
@@ -176,9 +124,7 @@ const Auth = () => {
         }, 50);
         return;
       }
-    } catch (sessionError) {
-      logger.warn('Post-sign-in session verification failed', sessionError);
-    }
+    } catch { /* fall through to safety timeout */ }
 
     // Safety: if somehow we got here without a session, re-enable the button
     signInSafetyTimeoutRef.current = setTimeout(() => {
@@ -189,68 +135,28 @@ const Auth = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (!validateEmail(email)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
-      return;
-    }
-
-    if (!tosAccepted) {
-      setError('You must agree to the Terms of Service and Privacy Policy');
-      return;
-    }
-
+    if (!validateEmail(email)) { setError('Please enter a valid email address'); return; }
+    if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
+    if (!tosAccepted) { setError('Please accept the Terms of Service to continue'); return; }
     setLoading(true);
-
     try {
       const { data, error } = await signUp(email, password);
-      
-      if (error) {
-        let errorMessage = getBetterErrorMessage(error.message || 'An error occurred during signup');
-        
-        if (error.message?.toLowerCase().includes('already registered') || 
-            error.message?.toLowerCase().includes('already exists') ||
-            error.message?.toLowerCase().includes('user already registered') ||
-            error.message?.toLowerCase().includes('email address is already in use')) {
-          errorMessage = 'This email already has an account. Please sign in instead.';
-        }
-        
-        setError(errorMessage);
-        setLoading(false);
-        return;
-      }
-      
+      if (error) { setError(getBetterErrorMessage(error.message)); setLoading(false); return; }
       // Record consent for ToS and Privacy Policy (best-effort)
       if (data?.session || data?.user) {
         UserAccountService.recordConsent('terms_of_service', '2026-01-13');
         UserAccountService.recordConsent('privacy_policy', '2026-01-13');
       }
-
       // If email confirmation is required (no session), navigate to verify page
       if (data?.user && !data?.session) {
         navigate('/verify-email', { state: { email }, replace: true });
       } else if (data?.session) {
-        // Session is already set in the supabase client by signInWithPassword.
-        // Navigate immediately — don't wait for onAuthStateChange to fire the
-        // listener that sets React user state. The race was causing users to
-        // see guest mode briefly, then have to sign in again.
-        // Force-refresh the session once to guarantee AuthContext picks it up,
-        // then navigate with replace so Back doesn't return to /auth.
+        // Session already set; force-refresh + redirect home
         await supabase.auth.setSession({
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token,
         });
-        // Let the state propagate one tick before redirecting
         setTimeout(() => {
           const params = new URLSearchParams(window.location.search);
           const redirect = params.get('redirect');
@@ -260,52 +166,18 @@ const Auth = () => {
         navigate('/verify-email', { state: { email }, replace: true });
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
       setError(errorMessage);
       setLoading(false);
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!resetEmail || !validateEmail(resetEmail)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
-    setResetLoading(true);
-    setError(null);
-
-    try {
-      const { error } = await resetPassword(resetEmail);
-      
-      if (error) {
-        setError(getBetterErrorMessage(error.message || 'Failed to send reset email'));
-      } else {
-        setResetSuccess(true);
-      }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
-      setError(errorMessage);
-    } finally {
-      setResetLoading(false);
-    }
-  };
-
   const handleOAuthSignIn = async (provider: 'google') => {
-    setOauthLoading(provider);
     setError(null);
-
-    // Redirect is already stashed in sessionStorage on Auth-page mount.
-    // AuthCallback reads it back after the OAuth round-trip.
-
+    setOauthLoading(provider);
     try {
       const { error } = await signInWithOAuth(provider);
-      
-      if (error) {
-        setError(getBetterErrorMessage(error.message || `Failed to sign in with ${provider}`));
-        setOauthLoading(null);
-      }
-      // OAuth redirects away, so we don't need to handle success here
+      if (error) { setError(error.message || `Failed to sign in with ${provider}.`); setOauthLoading(null); }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
       setError(errorMessage);
@@ -313,141 +185,124 @@ const Auth = () => {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!validateEmail(resetEmail)) { setError('Please enter a valid email address'); return; }
+    setError(null);
+    setResetLoading(true);
+    try {
+      const { error } = await resetPassword(resetEmail);
+      if (error) setError(error.message || 'Failed to send reset email.');
+      else setResetSuccess(true);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      setError(errorMessage);
+    } finally { setResetLoading(false); }
+  };
+
+  const darkInputClass = 'bg-pastel-surface border-white/10 text-pastel-cream placeholder:text-white/35 focus-visible:ring-pastel-orange/40 focus-visible:border-pastel-orange/50 h-11';
+
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/20">
-      <main className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">Welcome to Citrus</CardTitle>
-            <CardDescription className="text-center">
-              Sign in to your account or create a new one
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+    <DarkLayout>
+      <Navbar />
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 pointer-events-none z-0"
+        style={{ background: 'radial-gradient(ellipse 50% 40% at 80% 15%, rgba(255,107,26,0.08) 0%, transparent 60%)' }}
+      />
+      <main className="relative z-10 flex items-center justify-center px-4 pt-24 pb-12 lg:pt-28 lg:pb-20 min-h-[calc(100vh-92px)]">
+        <div className="w-full max-w-[440px]">
+          <div className="flex flex-col items-center mb-6">
+            <CitrusLogo className="w-10 h-10 mb-3" variant="on-dark" />
+            <h1 className="font-sans font-black text-[1.75rem] tracking-[-0.025em] text-pastel-cream leading-none">
+              {activeTab === 'signin' ? 'Welcome back' : 'Join Citrus'}
+            </h1>
+            <p className="text-[13px] text-white/55 mt-2">
+              {activeTab === 'signin' ? (
+                <>New to Citrus?{' '}
+                  <button type="button" onClick={() => { setActiveTab('signup'); setError(null); }} className="text-pastel-orange-soft hover:text-pastel-orange font-bold underline-offset-4 hover:underline transition-colors">
+                    Create an account
+                  </button>
+                </>
+              ) : (
+                <>Already have an account?{' '}
+                  <button type="button" onClick={() => { setActiveTab('signin'); setError(null); }} className="text-pastel-orange-soft hover:text-pastel-orange font-bold underline-offset-4 hover:underline transition-colors">
+                    Sign in
+                  </button>
+                </>
+              )}
+            </p>
+          </div>
+
+          <CitrusCard padding="spacious" accent="orange">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'signin' | 'signup')} className="w-full">
+              <TabsList className="sr-only">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
-              
-              <TabsContent value="signin" className="space-y-4">
-                {/* OAuth Buttons */}
-                <div className="space-y-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleOAuthSignIn('google')}
-                    disabled={loading || oauthLoading !== null}
-                  >
-                    {oauthLoading === 'google' ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Chrome className="mr-2 h-4 w-4" />
-                    )}
-                    Sign in with Google
-                  </Button>
+
+              <TabsContent value="signin" className="space-y-4 mt-0">
+                <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('google')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'google'}>
+                  {oauthLoading !== 'google' && <Chrome className="w-4 h-4" />}
+                  Continue with Google
+                </CitrusButton>
+
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-white/10" /></div>
+                  <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45">or with email</span></div>
                 </div>
 
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <Separator />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
-                  </div>
-                </div>
-
-                <form onSubmit={handleSignIn} className="space-y-4">
+                <form onSubmit={handleSignIn} className="space-y-3">
                   {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200">
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                      <span className="text-[13px] font-medium leading-snug">{error}</span>
+                    </div>
                   )}
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-email">Email</Label>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="signin-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Email</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signin-email"
-                        type="email"
-                        placeholder="you@example.com"
-                        value={email}
-                        onChange={(e) => {
-                          setEmail(e.target.value);
-                          setError(null);
-                        }}
-                        className="pl-10"
-                        required
-                      />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                      <Input id="signin-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
                     </div>
                   </div>
-                  
-                  <div className="space-y-2">
+
+                  <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="signin-password">Password</Label>
+                      <Label htmlFor="signin-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Password</Label>
                       <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
                         <DialogTrigger asChild>
-                          <button
-                            type="button"
-                            className="text-xs text-primary hover:underline flex items-center gap-1"
-                            onClick={() => {
-                              setResetEmail(email);
-                              setResetSuccess(false);
-                              setError(null);
-                            }}
-                          >
-                            <HelpCircle className="h-3 w-3" />
+                          <button type="button" className="text-[11px] text-pastel-orange-soft hover:text-pastel-orange transition-colors flex items-center gap-1 font-bold" onClick={() => { setResetEmail(email); setResetSuccess(false); setError(null); }}>
+                            <HelpCircle className="h-3 w-3" strokeWidth={2.5} />
                             Forgot password?
                           </button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="bg-pastel-surface-tile border-white/10 text-pastel-cream">
                           <DialogHeader>
-                            <DialogTitle>Reset Password</DialogTitle>
-                            <DialogDescription>
-                              Enter your email address and we'll send you a link to reset your password.
-                            </DialogDescription>
+                            <DialogTitle className="font-sans font-black text-[1.5rem] tracking-[-0.02em] text-pastel-cream">Reset <span className="text-pastel-orange">password</span></DialogTitle>
+                            <DialogDescription className="text-white/65">Enter your email and we will send you a link to reset your password.</DialogDescription>
                           </DialogHeader>
-                          <div className="space-y-4 py-4">
+                          <div className="space-y-4 py-2">
                             {resetSuccess ? (
-                              <Alert>
-                                <AlertDescription>
-                                  Password reset email sent! Check your inbox and click the link to reset your password.
-                                </AlertDescription>
-                              </Alert>
+                              <div className="flex items-start gap-2 px-3 py-3 rounded-md bg-pastel-sage/15 ring-1 ring-pastel-sage/40 text-pastel-sage-soft">
+                                <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                                <span className="text-[13px] font-medium leading-snug">Reset email sent. Check your inbox.</span>
+                              </div>
                             ) : (
                               <>
-                                <div className="space-y-2">
-                                  <Label htmlFor="reset-email">Email</Label>
-                                  <Input
-                                    id="reset-email"
-                                    type="email"
-                                    placeholder="you@example.com"
-                                    value={resetEmail}
-                                    onChange={(e) => setResetEmail(e.target.value)}
-                                    required
-                                  />
+                                <div className="space-y-1.5">
+                                  <Label htmlFor="reset-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Email</Label>
+                                  <Input id="reset-email" type="email" placeholder="you@example.com" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} className={darkInputClass} required />
                                 </div>
                                 {error && (
-                                  <Alert variant="destructive">
-                                    <AlertDescription>{error}</AlertDescription>
-                                  </Alert>
+                                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200">
+                                    <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                                    <span className="text-[13px] font-medium leading-snug">{error}</span>
+                                  </div>
                                 )}
-                                <Button
-                                  onClick={handleForgotPassword}
-                                  disabled={resetLoading}
-                                  className="w-full"
-                                >
-                                  {resetLoading ? (
-                                    <>
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                      Sending...
-                                    </>
-                                  ) : (
-                                    'Send Reset Link'
-                                  )}
-                                </Button>
+                                <CitrusButton type="button" variant="primary" size="lg" fullWidth onClick={handleForgotPassword} loading={resetLoading}>
+                                  {resetLoading ? 'Sending...' : 'Send reset link'}
+                                </CitrusButton>
                               </>
                             )}
                           </div>
@@ -455,164 +310,85 @@ const Auth = () => {
                       </Dialog>
                     </div>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signin-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          setError(null);
-                        }}
-                        className="pl-10"
-                        required
-                      />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                      <Input id="signin-password" type="password" placeholder="••••••••" value={password} onChange={(e) => { setPassword(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
                     </div>
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={loading || oauthLoading !== null}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing in...
-                      </>
-                    ) : (
-                      'Sign In'
-                    )}
-                  </Button>
+                  <CitrusButton type="submit" variant="primary" size="lg" fullWidth loading={loading} disabled={oauthLoading !== null} className="mt-2">
+                    {loading ? 'Signing in...' : 'Sign in'}
+                  </CitrusButton>
                 </form>
               </TabsContent>
-              
-              <TabsContent value="signup" className="space-y-4">
-                {/* OAuth Buttons */}
-                <div className="space-y-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleOAuthSignIn('google')}
-                    disabled={loading || oauthLoading !== null}
-                  >
-                    {oauthLoading === 'google' ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Chrome className="mr-2 h-4 w-4" />
-                    )}
-                    Sign up with Google
-                  </Button>
+
+              <TabsContent value="signup" className="space-y-4 mt-0">
+                <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('google')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'google'}>
+                  {oauthLoading !== 'google' && <Chrome className="w-4 h-4" />}
+                  Continue with Google
+                </CitrusButton>
+
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-white/10" /></div>
+                  <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45">or with email</span></div>
                 </div>
 
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <Separator />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
-                  </div>
-                </div>
-
-                <form onSubmit={handleSignUp} className="space-y-4">
+                <form onSubmit={handleSignUp} className="space-y-3">
                   {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200">
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                      <span className="text-[13px] font-medium leading-snug">{error}</span>
+                    </div>
                   )}
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="signup-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Email</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="you@example.com"
-                        value={email}
-                        onChange={(e) => {
-                          setEmail(e.target.value);
-                          setError(null);
-                        }}
-                        className="pl-10"
-                        required
-                      />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                      <Input id="signup-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
                     </div>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="signup-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Password</Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          setError(null);
-                        }}
-                        className="pl-10"
-                        required
-                        minLength={8}
-                      />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                      <Input id="signup-password" type="password" placeholder="••••••••" value={password} onChange={(e) => { setPassword(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required minLength={8} />
                     </div>
                     {password && <PasswordStrength password={password} />}
                   </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm Password</Label>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="confirm-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Confirm Password</Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="confirm-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={confirmPassword}
-                        onChange={(e) => {
-                          setConfirmPassword(e.target.value);
-                          setError(null);
-                        }}
-                        className="pl-10"
-                        required
-                      />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                      <Input id="confirm-password" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
                     </div>
                   </div>
 
-                  <div className="flex items-start space-x-2">
-                    <Checkbox
-                      id="tos-accept"
-                      checked={tosAccepted}
-                      onCheckedChange={(checked) => setTosAccepted(checked as boolean)}
-                    />
-                    <Label htmlFor="tos-accept" className="text-sm font-normal cursor-pointer leading-tight">
+                  <div className="flex items-start gap-2.5 pt-1">
+                    <Checkbox id="tos-accept" checked={tosAccepted} onCheckedChange={(checked) => setTosAccepted(checked as boolean)} className="mt-0.5 border-white/30 data-[state=checked]:bg-pastel-orange data-[state=checked]:border-pastel-orange data-[state=checked]:text-white" />
+                    <Label htmlFor="tos-accept" className="text-[12px] font-normal cursor-pointer leading-snug text-white/65">
                       I agree to the{' '}
-                      <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                        Terms of Service
-                      </a>{' '}
+                      <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="text-pastel-orange-soft hover:text-pastel-orange font-bold underline-offset-4 hover:underline">Terms</a>{' '}
                       and{' '}
-                      <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                        Privacy Policy
-                      </a>
+                      <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-pastel-orange-soft hover:text-pastel-orange font-bold underline-offset-4 hover:underline">Privacy Policy</a>
                     </Label>
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={loading || oauthLoading !== null || !tosAccepted}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating account...
-                      </>
-                    ) : (
-                      'Sign Up'
-                    )}
-                  </Button>
+                  <CitrusButton type="submit" variant="primary" size="lg" fullWidth loading={loading} disabled={oauthLoading !== null || !tosAccepted} className="mt-2">
+                    {loading ? 'Creating account...' : 'Create account'}
+                  </CitrusButton>
                 </form>
               </TabsContent>
             </Tabs>
-          </CardContent>
-        </Card>
+          </CitrusCard>
+
+          <p className="text-center text-[10px] font-jbmono uppercase tracking-[0.32em] text-white/35 mt-6">
+            Free during launch · Founders pricing locked in
+          </p>
+        </div>
       </main>
-    </div>
+    </DarkLayout>
   );
 };
 

@@ -4,7 +4,7 @@
   "description": "A fresh take on fantasy sports with AI-powered insights",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#D4E8B8",
+  "background_color": "#0F1F15",
   "theme_color": "#A4C4A0",
   "orientation": "portrait-primary",
   "scope": "/",

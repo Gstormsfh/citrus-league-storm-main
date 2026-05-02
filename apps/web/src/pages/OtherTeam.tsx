@@ -1,9 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, ArrowRightLeft, Star } from 'lucide-react';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
@@ -20,7 +18,6 @@ import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { leagueApi } from '@/api/leagues';
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
 
@@ -556,10 +553,18 @@ const OtherTeam = () => {
 
   if (!team) {
     return (
-      <div className="min-h-screen bg-[#D4E8B8] flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Team Not Found</h1>
-          <Button onClick={() => navigate('/standings')}>Back to Standings</Button>
+      <div className="min-h-screen bg-pastel-surface flex items-center justify-center px-4">
+        <div className="text-center bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl px-8 py-10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+          <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-3">
+            ✦ Team Not Found
+          </div>
+          <h1 className="font-calistoga text-2xl text-pastel-cream mb-5">We couldn&rsquo;t find that team.</h1>
+          <Button
+            onClick={() => navigate('/standings')}
+            className="bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold"
+          >
+            Back to Standings
+          </Button>
         </div>
       </div>
     );
@@ -572,47 +577,51 @@ const OtherTeam = () => {
 
   return (
     <ErrorBoundary>
-    <div className="min-h-screen bg-[#D4E8B8]">
+    <div className="min-h-screen bg-pastel-surface">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Team View</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">Team View</h1>
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
-          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_280px] xl:grid-cols-[220px_1fr_340px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">
-              <Button 
-          variant="ghost" 
-          className="mb-6 hover:bg-muted/50" 
+              <Button
+          variant="ghost"
+          className="mb-6 text-white/55 hover:text-pastel-cream hover:bg-white/5 -ml-2"
           onClick={() => navigate('/standings')}
         >
           <ArrowLeft className="w-4 h-4 mr-2" /> Back to Standings
         </Button>
 
-        <div className="bg-card rounded-xl shadow-lg border p-6 mb-8 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-          
+        <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-6 sm:p-8 mb-8 relative overflow-hidden">
+          <div aria-hidden="true" className="absolute top-0 right-0 w-72 h-72 bg-pastel-orange/8 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+          <div aria-hidden="true" className="absolute bottom-0 left-0 w-48 h-48 bg-pastel-sage/6 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
+
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
             <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-2xl font-bold text-primary border-2 border-primary/20 shadow-inner">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-pastel-orange/30 to-pastel-orange/10 flex items-center justify-center font-calistoga text-3xl text-pastel-orange ring-1 ring-pastel-orange/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
                 {team.team_name.substring(0, 2).toUpperCase()}
               </div>
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">{team.team_name}</h1>
-                <div className="flex items-center gap-2 text-muted-foreground mt-1">
-                  <Star className="w-4 h-4 fill-muted-foreground/30" />
-                  <span>Manager: <span className="font-medium text-foreground">{ownerName}</span></span>
+                <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5">
+                  ✦ Roster · Read-only View
+                </div>
+                <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none">{team.team_name}</h1>
+                <div className="flex items-center gap-2 text-white/55 mt-2">
+                  <Star className="w-4 h-4 fill-pastel-sage/40 text-pastel-sage/60" />
+                  <span className="text-sm">Manager: <span className="font-bold text-pastel-cream">{ownerName}</span></span>
                 </div>
               </div>
             </div>
 
             {/* Only show trade button for active users, not demo teams */}
             {userLeagueState === 'active-user' && (
-              <Button 
-                size="lg" 
-                className="w-full md:w-auto shadow-md hover:shadow-lg transition-all"
+              <Button
+                size="lg"
+                className="w-full md:w-auto bg-pastel-orange text-pastel-surface hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] hover:shadow-[0_12px_32px_-8px_rgba(255,168,87,0.6)] transition-all"
                 onClick={() => navigate(`/trade-analyzer?partner=${team.id}`)}
               >
                 <ArrowRightLeft className="w-4 h-4 mr-2" />
@@ -620,10 +629,10 @@ const OtherTeam = () => {
               </Button>
             )}
             {isDemoTeam && (
-              <Button 
-                size="lg" 
+              <Button
+                size="lg"
                 variant="outline"
-                className="w-full md:w-auto"
+                className="w-full md:w-auto bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold"
                 onClick={() => navigate('/auth')}
               >
                 Sign Up to Create Your League
@@ -634,18 +643,23 @@ const OtherTeam = () => {
 
         <div className="space-y-8 animate-fade-in">
           {loading ? (
-            <div className="text-center py-12 text-muted-foreground">Loading roster...</div>
+            <div className="text-center py-12">
+              <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">
+                ✦ Loading
+              </div>
+              <p className="text-white/55">Pulling roster from the bench…</p>
+            </div>
           ) : (
             <>
-              <StartersGrid 
-                players={roster.starters} 
+              <StartersGrid
+                players={roster.starters}
                 slotAssignments={roster.slotAssignments}
-                className="bg-card/50 p-6 rounded-xl border shadow-sm"
+                className="bg-pastel-surface-tile ring-1 ring-white/10 p-6 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]"
                 onPlayerClick={handlePlayerClick}
               />
-              <BenchGrid 
+              <BenchGrid
                 players={roster.bench}
-                className="bg-card/50 p-6 rounded-xl border shadow-sm"
+                className="bg-pastel-surface-tile ring-1 ring-white/10 p-6 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]"
                 onPlayerClick={handlePlayerClick}
               />
               {roster.ir.length > 0 && (
@@ -670,15 +684,24 @@ const OtherTeam = () => {
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <AdSpace size="300x250" label="Team Sponsor" />
-                <AdSpace size="300x250" label="Fantasy Partner" />
+                {/* Sleeper-style scouting tips tile — replaces legacy AdSpace */}
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-sage/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-3">
+                    ✦ Scouting tips
+                  </div>
+                  <ul className="space-y-2 text-[11px] text-white/70 leading-relaxed">
+                    <li className="flex gap-2"><span className="text-pastel-sage-soft">▸</span> Compare positions before proposing trades</li>
+                    <li className="flex gap-2"><span className="text-pastel-sage-soft">▸</span> Check goalie depth before targeting forwards</li>
+                    <li className="flex gap-2"><span className="text-pastel-sage-soft">▸</span> Schedule strength matters as much as raw talent</li>
+                  </ul>
+                </div>
               </div>
             </aside>
 
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>
@@ -686,7 +709,7 @@ const OtherTeam = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
     </ErrorBoundary>
   );

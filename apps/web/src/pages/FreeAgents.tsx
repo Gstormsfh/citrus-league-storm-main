@@ -1,5 +1,17 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
+import {
+  HockeyFooter,
+  SlateIcon,
+  CrossedSticksIcon,
+  PuckIcon,
+  ScoreboardIcon,
+  XGModelIcon,
+  ShiftIcon,
+  MaskIcon,
+  RangeIcon,
+  MascotPortrait,
+} from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { leagueApi } from '@/api/leagues';
@@ -7,7 +19,6 @@ import { matchupApi } from '@/api/matchups';
 import { rosterApi } from '@/api/rosters';
 import Navbar from '@/components/Navbar';
 import MobileMenuButton from '@/components/MobileMenuButton';
-import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,9 +42,7 @@ import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
 import { getTodayMST, formatWaiverProcessTime } from '@/utils/timezoneUtils';
-import { CitrusBackground } from '@/components/CitrusBackground';
 import { COLUMNS } from '@/utils/queryColumns';
-import { AdSpace } from '@/components/AdSpace';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { GameLogosBar } from '@/components/matchup/GameLogosBar';
 import { logger } from '@/utils/logger';
@@ -1229,31 +1238,35 @@ const FreeAgents = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] relative">
-      <CitrusBackground density="light" />
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
-          <h1 className="text-lg font-varsity font-bold text-citrus-forest">Free Agents</h1>
+          <h1 className="text-lg font-bold text-pastel-cream">Free Agents</h1>
           <MobileMenuButton />
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_280px] xl:grid-cols-[220px_1fr_340px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Appears first on mobile */}
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
+
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Free Agents</h1>
-            <p className="text-muted-foreground">Available players to improve your roster</p>
+            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 flex items-center gap-2">
+              <SlateIcon className="w-3.5 h-3.5" strokeWidth={2} />
+              ✦ Scouting Room
+            </div>
+            <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none">Scout the pool.</h1>
+            <p className="text-sm text-white/55 mt-2">Available players to improve your roster — sort, filter, and pick up.</p>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
-            <Input 
-              placeholder="Search players..." 
-              className="max-w-xs"
+            <Input
+              placeholder="Search players…"
+              className="max-w-xs bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -1280,25 +1293,46 @@ const FreeAgents = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 max-w-2xl mb-6">
-            <TabsTrigger value="available">Available</TabsTrigger>
-            <TabsTrigger value="schedule" className="gap-2"><Calendar className="h-4 w-4" /> Schedule</TabsTrigger>
-            <TabsTrigger value="watch">Watch List</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 max-w-2xl mb-6 bg-pastel-surface-tile ring-1 ring-white/10 p-1 rounded-xl">
+            <TabsTrigger
+              value="available"
+              className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+            >
+              Available
+            </TabsTrigger>
+            <TabsTrigger
+              value="schedule"
+              className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+            >
+              <Calendar className="h-4 w-4" /> Schedule
+            </TabsTrigger>
+            <TabsTrigger
+              value="watch"
+              className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-pastel-surface data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+            >
+              Watch List
+            </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="available" className="space-y-6">
             {/* Quick Position Filters */}
             <div className="flex flex-wrap gap-2">
-              {positions.map((pos) => (
-                <Badge
-                  key={pos}
-                  variant={positionFilter === pos ? "default" : "outline"}
-                  className="cursor-pointer hover:bg-primary/90 px-4 py-1 text-sm transition-all"
-                  onClick={() => setPositionFilter(pos)}
-                >
-                  {pos === 'W' ? 'Wingers' : (pos === 'ALL' ? 'All Positions' : pos)}
-                </Badge>
-              ))}
+              {positions.map((pos) => {
+                const isActive = positionFilter === pos;
+                return (
+                  <Badge
+                    key={pos}
+                    className={`cursor-pointer px-4 py-1 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold border-0 transition-all ${
+                      isActive
+                        ? 'bg-pastel-orange text-pastel-surface shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]'
+                        : 'bg-white/5 ring-1 ring-white/10 text-white/70 hover:bg-white/[0.08] hover:ring-pastel-orange/30'
+                    }`}
+                    onClick={() => setPositionFilter(pos)}
+                  >
+                    {pos === 'W' ? 'Wingers' : (pos === 'ALL' ? 'All Positions' : pos)}
+                  </Badge>
+                );
+              })}
             </div>
 
             {/* Warning banner when roster lookup failed */}
@@ -1329,7 +1363,7 @@ const FreeAgents = () => {
                           <TrendingUp className="h-5 w-5 text-green-500" />
                           Top Trending
                           {trendingData.size > 0 && (
-                            <Badge className="text-[11px] ml-2 bg-citrus-sage text-citrus-forest">
+                            <Badge className="text-[11px] ml-2 bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0">
                               Live
                             </Badge>
                           )}
@@ -1343,12 +1377,12 @@ const FreeAgents = () => {
                             <div key={player.id} className="p-3 border-b flex items-center justify-between">
                               <div className="flex flex-col">
                                 <span className="font-medium">{player.full_name}</span>
-                                <span className="text-xs text-muted-foreground">{formatPositionForDisplay(player.position)} • {player.team}</span>
+                                <span className="text-xs text-white/55">{formatPositionForDisplay(player.position)} • {player.team}</span>
                               </div>
                               <div className="flex items-center gap-3">
                                 <div className="text-right">
                                   <div className="font-bold text-green-600">{player.adds.toLocaleString()}</div>
-                                  <div className="text-[11px] text-muted-foreground">Adds</div>
+                                  <div className="text-[11px] text-white/55">Adds</div>
                                 </div>
                                 <Button size="default" variant="default" className={`h-10 w-10 font-bold text-xl border shadow-sm disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                   {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
@@ -1375,12 +1409,12 @@ const FreeAgents = () => {
                                 <TableCell className="font-medium">
                                   <div className="flex flex-col">
                                     <span 
-                                      className="hover:underline hover:text-primary cursor-pointer"
+                                      className="hover:underline hover:text-pastel-orange cursor-pointer"
                                       onClick={() => handlePlayerClick(player)}
                                     >
                                       {player.full_name}
                                     </span>
-                                    <span className="text-xs text-muted-foreground">{player.team}</span>
+                                    <span className="text-xs text-white/55">{player.team}</span>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
@@ -1392,7 +1426,7 @@ const FreeAgents = () => {
                                     <Button 
                                       size="icon" 
                                       variant="ghost" 
-                                      className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                                      className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-white/55'}`}
                                       onClick={() => toggleWatchlist(player)}
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
@@ -1417,12 +1451,12 @@ const FreeAgents = () => {
                           <Calendar className="h-5 w-5 text-blue-500" />
                           Top Projected (Remaining Week)
                           {weeklyProjections.size === 0 && (
-                            <Badge variant="outline" className="text-[11px] ml-2 bg-citrus-cream text-citrus-forest border-citrus-sage">
+                            <Badge variant="outline" className="text-[11px] ml-2 bg-white/5 ring-1 ring-pastel-sage/30 text-pastel-cream border-0">
                               Loading...
                             </Badge>
                           )}
                           {weeklyProjections.size > 0 && (
-                            <Badge className="text-[11px] ml-2 bg-citrus-sage text-citrus-forest">
+                            <Badge className="text-[11px] ml-2 bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0">
                               Live Data
                             </Badge>
                           )}
@@ -1437,7 +1471,7 @@ const FreeAgents = () => {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium text-sm truncate">{player.full_name}</span>
-                                  <span className="text-[11px] text-muted-foreground shrink-0">{formatPositionForDisplay(player.position)}</span>
+                                  <span className="text-[11px] text-white/55 shrink-0">{formatPositionForDisplay(player.position)}</span>
                                 </div>
                                 {/* Schedule Icons Row */}
                                 {player.games && player.games.length > 0 && (
@@ -1450,8 +1484,8 @@ const FreeAgents = () => {
                                         const isHome = game.home_team === player.team;
                                         const opponentAbbrev = isHome ? game.away_team : game.home_team;
                                         return (
-                                          <div key={idx} className="flex items-center gap-0.5 bg-muted/50 rounded px-1 py-0.5">
-                                            <span className="text-[10px] text-muted-foreground">{isHome ? 'vs' : '@'}</span>
+                                          <div key={idx} className="flex items-center gap-0.5 bg-white/5 ring-1 ring-white/10 rounded px-1 py-0.5">
+                                            <span className="text-[10px] text-white/55">{isHome ? 'vs' : '@'}</span>
                                             <img 
                                               src={`https://assets.nhle.com/logos/nhl/svg/${opponentAbbrev}_light.svg`}
                                               alt={opponentAbbrev}
@@ -1469,7 +1503,7 @@ const FreeAgents = () => {
                                   <div className="font-bold text-blue-600 text-sm">
                                     {(player.weeklyProjection || 0).toFixed(1)}
                                   </div>
-                                  <div className="text-[10px] text-muted-foreground">{player.gamesThisWeek || 0}G</div>
+                                  <div className="text-[10px] text-white/55">{player.gamesThisWeek || 0}G</div>
                                 </div>
                                 <Button size="sm" variant="default" className={`h-8 w-8 font-bold border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                   {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
@@ -1497,12 +1531,12 @@ const FreeAgents = () => {
                                 <TableCell className="font-medium">
                                   <div className="flex flex-col">
                                     <span 
-                                      className="hover:underline hover:text-primary cursor-pointer"
+                                      className="hover:underline hover:text-pastel-orange cursor-pointer"
                                       onClick={() => handlePlayerClick(player)}
                                     >
                                       {player.full_name}
                                     </span>
-                                    <span className="text-xs text-muted-foreground">{player.team}</span>
+                                    <span className="text-xs text-white/55">{player.team}</span>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
@@ -1516,8 +1550,8 @@ const FreeAgents = () => {
                                           const isHome = game.home_team === player.team;
                                           const opponentAbbrev = isHome ? game.away_team : game.home_team;
                                           return (
-                                            <div key={idx} className="flex items-center gap-0.5 bg-muted/30 rounded px-1.5 py-0.5">
-                                              <span className="text-[10px] text-muted-foreground">{isHome ? 'vs' : '@'}</span>
+                                            <div key={idx} className="flex items-center gap-0.5 bg-white/5 ring-1 ring-white/10 rounded px-1.5 py-0.5">
+                                              <span className="text-[10px] text-white/55">{isHome ? 'vs' : '@'}</span>
                                               <img 
                                                 src={`https://assets.nhle.com/logos/nhl/svg/${opponentAbbrev}_light.svg`}
                                                 alt={opponentAbbrev}
@@ -1529,13 +1563,13 @@ const FreeAgents = () => {
                                         })}
                                     </div>
                                   ) : (
-                                    <span className="text-xs text-muted-foreground">-</span>
+                                    <span className="text-xs text-white/55">-</span>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex flex-col items-end">
                                     <span className="font-bold text-blue-600">{(player.weeklyProjection || 0).toFixed(1)}</span>
-                                    <span className="text-[11px] text-muted-foreground">{player.gamesThisWeek || 0} games</span>
+                                    <span className="text-[11px] text-white/55">{player.gamesThisWeek || 0} games</span>
                                   </div>
                                 </TableCell>
                                 <TableCell>
@@ -1543,7 +1577,7 @@ const FreeAgents = () => {
                                     <Button 
                                       size="icon" 
                                       variant="ghost" 
-                                      className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                                      className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-white/55'}`}
                                       onClick={() => toggleWatchlist(player)}
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
@@ -1576,7 +1610,7 @@ const FreeAgents = () => {
                           <TableHeader>
                             <TableRow>
                               <TableHead
-                                className="cursor-pointer hover:bg-muted/50 select-none min-w-[100px] md:min-w-[160px]"
+                                className="cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream min-w-[100px] md:min-w-[160px]"
                                 onClick={() => handleSort('name')}
                               >
                                 <div className="flex items-center justify-start">
@@ -1585,7 +1619,7 @@ const FreeAgents = () => {
                                 </div>
                               </TableHead>
                               <TableHead
-                                className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                 onClick={() => handleSort('position')}
                               >
                                 <div className="flex items-center justify-end">
@@ -1594,7 +1628,7 @@ const FreeAgents = () => {
                                 </div>
                               </TableHead>
                               <TableHead
-                                className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                 onClick={() => handleSort('team')}
                               >
                                 <div className="flex items-center justify-end">
@@ -1603,7 +1637,7 @@ const FreeAgents = () => {
                                 </div>
                               </TableHead>
                               <TableHead
-                                className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                 onClick={() => handleSort('gp')}
                               >
                                 <div className="flex items-center justify-end">
@@ -1615,7 +1649,7 @@ const FreeAgents = () => {
                               {filteredPlayers.some(p => p.position !== 'G') && (
                                 <>
                                   <TableHead
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                    className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                     onClick={() => handleSort('goals')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1624,7 +1658,7 @@ const FreeAgents = () => {
                                     </div>
                                   </TableHead>
                                   <TableHead
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                    className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                     onClick={() => handleSort('assists')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1633,7 +1667,7 @@ const FreeAgents = () => {
                                     </div>
                                   </TableHead>
                                   <TableHead
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                    className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                     onClick={() => handleSort('points')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1642,7 +1676,7 @@ const FreeAgents = () => {
                                     </div>
                                   </TableHead>
                                   <TableHead
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                    className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                     onClick={() => handleSort('shots')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1651,7 +1685,7 @@ const FreeAgents = () => {
                                     </div>
                                   </TableHead>
                                   <TableHead
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                    className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                     onClick={() => handleSort('hits')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1660,7 +1694,7 @@ const FreeAgents = () => {
                                     </div>
                                   </TableHead>
                                   <TableHead
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                    className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                     onClick={() => handleSort('blocks')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1669,7 +1703,7 @@ const FreeAgents = () => {
                                     </div>
                                   </TableHead>
                                   <TableHead
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                    className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                     onClick={() => handleSort('xGoals')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1684,7 +1718,7 @@ const FreeAgents = () => {
                               {filteredPlayers.some(p => p.position === 'G') && (
                                 <>
                                   <TableHead
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                    className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                     onClick={() => handleSort('wins')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1693,7 +1727,7 @@ const FreeAgents = () => {
                                     </div>
                                   </TableHead>
                                   <TableHead
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                    className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                     onClick={() => handleSort('gaa')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1702,7 +1736,7 @@ const FreeAgents = () => {
                                     </div>
                                   </TableHead>
                                   <TableHead
-                                    className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                                    className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                                     onClick={() => handleSort('savePct')}
                                   >
                                     <div className="flex items-center justify-end">
@@ -1719,16 +1753,16 @@ const FreeAgents = () => {
                             {visiblePlayers.map((player) => {
                               const isGoalie = player.position === 'G';
                               return (
-                                <TableRow key={player.id} className="hover:bg-muted/50">
+                                <TableRow key={player.id} className="hover:bg-white/5">
                                   <TableCell className="font-medium whitespace-nowrap">
                                     <div className="flex flex-col">
                                       <span
-                                        className="hover:underline hover:text-primary cursor-pointer text-sm"
+                                        className="hover:underline hover:text-pastel-orange cursor-pointer text-sm"
                                         onClick={() => handlePlayerClick(player)}
                                       >
                                         {player.full_name}
                                       </span>
-                                      <span className="text-[11px] text-muted-foreground">{player.status || 'Active'}</span>
+                                      <span className="text-[11px] text-white/55">{player.status || 'Active'}</span>
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-right text-sm whitespace-nowrap">{formatPositionForDisplay(player.position)}</TableCell>
@@ -1760,12 +1794,12 @@ const FreeAgents = () => {
                                       <Button
                                         size="icon"
                                         variant="ghost"
-                                        className={`h-7 w-7 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                                        className={`h-7 w-7 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-white/55'}`}
                                         onClick={() => toggleWatchlist(player)}
                                       >
                                         <Star className={`h-3.5 w-3.5 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                       </Button>
-                                      <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
+                                      <Button size="icon" variant="ghost" className="h-7 w-7 text-white/55" onClick={() => handlePlayerClick(player)}>
                                         <Info className="h-3.5 w-3.5" />
                                       </Button>
                                       <Button size="sm" variant="default" className={`h-7 w-7 font-bold text-base border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
@@ -1780,14 +1814,14 @@ const FreeAgents = () => {
                         </Table>
                       </div>
                       {/* Infinite scroll sentinel + count */}
-                      <div className="text-center py-2 text-xs text-muted-foreground">
+                      <div className="text-center py-2 text-xs text-white/55">
                         {filteredPlayers.length === 0 && players.length > 0
                           ? 'No players match your current filters'
                           : `Showing ${visiblePlayers.length} of ${filteredPlayers.length} players`}
                       </div>
                       {hasMorePlayers && (
                         <div ref={loadMoreRef} className="flex justify-center py-4">
-                          <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                          <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-pastel-orange"></div>
                         </div>
                       )}
                     </div>
@@ -1802,7 +1836,7 @@ const FreeAgents = () => {
                 <Calendar className="h-5 w-5 text-blue-500 mt-1 shrink-0" />
                 <div>
                   <h3 className="font-semibold text-blue-700 dark:text-blue-400">Top Projected Free Agents (Rest of Week)</h3>
-                  <p className="text-sm text-muted-foreground">Sorted by projected fantasy points for remaining games this matchup week.</p>
+                  <p className="text-sm text-white/55">Sorted by projected fantasy points for remaining games this matchup week.</p>
                 </div>
              </div>
 
@@ -1822,13 +1856,13 @@ const FreeAgents = () => {
 
              {loading || loadingMaximizers || loadingProjections ? (
                <div className="p-12 text-center">
-                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                 <p className="text-muted-foreground mt-4">
+                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-pastel-orange"></div>
+                 <p className="text-white/55 mt-4">
                    {loading ? 'Loading players...' : loadingProjections ? 'Calculating projections...' : 'Calculating schedule...'}
                  </p>
                </div>
              ) : scheduleMaximizers.length === 0 ? (
-               <div className="text-center py-12 text-muted-foreground">
+               <div className="text-center py-12 text-white/55">
                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
                  <p>No schedule data available.</p>
                </div>
@@ -1837,9 +1871,9 @@ const FreeAgents = () => {
                  <div className="overflow-x-auto">
                    <Table className="min-w-[500px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
                      <TableHeader>
-                       <TableRow className="bg-muted/30">
+                       <TableRow className="bg-white/5">
                          <TableHead
-                           className="cursor-pointer hover:bg-muted/50 select-none min-w-[90px] md:min-w-[140px]"
+                           className="cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream min-w-[90px] md:min-w-[140px]"
                            onClick={() => handleSort('name')}
                          >
                            <div className="flex items-center justify-start">
@@ -1848,7 +1882,7 @@ const FreeAgents = () => {
                            </div>
                          </TableHead>
                          <TableHead
-                           className="text-center cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                           className="text-center cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                            onClick={() => handleSort('position')}
                          >
                            <div className="flex items-center justify-center">
@@ -1862,7 +1896,7 @@ const FreeAgents = () => {
                            </div>
                          </TableHead>
                         <TableHead
-                          className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                          className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                           onClick={() => handleSort('points')}
                         >
                           <div className="flex items-center justify-end text-xs">
@@ -1871,7 +1905,7 @@ const FreeAgents = () => {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="text-center cursor-pointer hover:bg-muted/50 select-none bg-blue-500/10 whitespace-nowrap"
+                          className="text-center cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream bg-blue-500/10 whitespace-nowrap"
                           onClick={() => handleSort('weeklyProjection')}
                         >
                           <div className="flex items-center justify-center gap-1 font-bold text-blue-700">
@@ -1942,7 +1976,7 @@ const FreeAgents = () => {
                            const isGoalie = player.position === 'G';
                            const isTopPick = index < 3; // Highlight top 3
                            return (
-                             <TableRow key={player.id} className={`hover:bg-muted/50 ${isTopPick ? 'bg-green-500/5' : ''}`}>
+                             <TableRow key={player.id} className={`hover:bg-white/5 ${isTopPick ? 'bg-green-500/5' : ''}`}>
                                <TableCell className="font-medium">
                                  <div className="flex items-center gap-2">
                                    {isTopPick && (
@@ -1956,12 +1990,12 @@ const FreeAgents = () => {
                                    )}
                                    <div className="flex flex-col">
                                      <span
-                                       className="hover:underline hover:text-primary cursor-pointer font-semibold"
+                                       className="hover:underline hover:text-pastel-orange cursor-pointer font-semibold"
                                        onClick={() => handlePlayerClick(player)}
                                      >
                                        {player.full_name}
                                      </span>
-                                     <span className="text-xs text-muted-foreground">{player.team} • {isGoalie ? `W: ${player.wins || 0}` : `P: ${player.points || 0}`}</span>
+                                     <span className="text-xs text-white/55">{player.team} • {isGoalie ? `W: ${player.wins || 0}` : `P: ${player.points || 0}`}</span>
                                    </div>
                                  </div>
                                </TableCell>
@@ -2014,7 +2048,7 @@ const FreeAgents = () => {
                                      </div>
                                    </div>
                                  ) : (
-                                   <span className="text-xs text-muted-foreground">-</span>
+                                   <span className="text-xs text-white/55">-</span>
                                  )}
                                </TableCell>
                               <TableCell className="text-right">
@@ -2036,7 +2070,7 @@ const FreeAgents = () => {
                                   }`}>
                                     {player.weeklyProjection.toFixed(1)}
                                   </span>
-                                  <span className="text-[11px] text-muted-foreground">
+                                  <span className="text-[11px] text-white/55">
                                     {player.gamesThisWeek || 0} game{(player.gamesThisWeek || 0) !== 1 ? 's' : ''} left
                                   </span>
                                 </div>
@@ -2046,7 +2080,7 @@ const FreeAgents = () => {
                                    <Button
                                      size="icon"
                                      variant="ghost"
-                                     className={`h-7 w-7 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                                     className={`h-7 w-7 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-white/55'}`}
                                      onClick={() => toggleWatchlist(player)}
                                    >
                                      <Star className={`h-3.5 w-3.5 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
@@ -2087,12 +2121,12 @@ const FreeAgents = () => {
                    }).length;
                    return (
                      <>
-                       <div className="text-center py-3 text-sm text-muted-foreground">
+                       <div className="text-center py-3 text-sm text-white/55">
                          Showing {Math.min(visibleCount, totalSchedule)} of {totalSchedule} players
                        </div>
                        {visibleCount < totalSchedule && (
                          <div ref={loadMoreRef} className="flex justify-center py-4">
-                           <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                           <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-pastel-orange"></div>
                          </div>
                        )}
                      </>
@@ -2105,9 +2139,9 @@ const FreeAgents = () => {
           <TabsContent value="watch">
             {players.filter(p => watchlist.has(p.id)).length === 0 ? (
                <div className="p-12 text-center border-2 border-dashed rounded-lg">
-                 <Star className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                 <Star className="h-12 w-12 mx-auto text-white/55 mb-4" />
                  <h3 className="text-lg font-medium">Your watch list is empty</h3>
-                 <p className="text-muted-foreground mt-2">Star players to keep track of their performance.</p>
+                 <p className="text-white/55 mt-2">Star players to keep track of their performance.</p>
                  <Button variant="link" onClick={() => setActiveTab('available')} className="mt-4">
                    Browse Available Players
                  </Button>
@@ -2119,7 +2153,7 @@ const FreeAgents = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead
-                          className="cursor-pointer hover:bg-muted/50 select-none min-w-[100px] md:min-w-[160px]"
+                          className="cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream min-w-[100px] md:min-w-[160px]"
                           onClick={() => handleSort('name')}
                         >
                           <div className="flex items-center justify-start">
@@ -2128,7 +2162,7 @@ const FreeAgents = () => {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                          className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                           onClick={() => handleSort('position')}
                         >
                           <div className="flex items-center justify-end">
@@ -2137,7 +2171,7 @@ const FreeAgents = () => {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                          className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                           onClick={() => handleSort('team')}
                         >
                           <div className="flex items-center justify-end">
@@ -2146,7 +2180,7 @@ const FreeAgents = () => {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                          className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                           onClick={() => handleSort('gp')}
                         >
                           <div className="flex items-center justify-end">
@@ -2158,7 +2192,7 @@ const FreeAgents = () => {
                         {players.filter(p => watchlist.has(p.id)).some(p => p.position !== 'G') && (
                           <>
                             <TableHead
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                              className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                               onClick={() => handleSort('goals')}
                             >
                               <div className="flex items-center justify-end">
@@ -2167,7 +2201,7 @@ const FreeAgents = () => {
                               </div>
                             </TableHead>
                             <TableHead
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                              className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                               onClick={() => handleSort('assists')}
                             >
                               <div className="flex items-center justify-end">
@@ -2176,7 +2210,7 @@ const FreeAgents = () => {
                               </div>
                             </TableHead>
                             <TableHead
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                              className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                               onClick={() => handleSort('points')}
                             >
                               <div className="flex items-center justify-end">
@@ -2185,7 +2219,7 @@ const FreeAgents = () => {
                               </div>
                             </TableHead>
                             <TableHead
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                              className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                               onClick={() => handleSort('shots')}
                             >
                               <div className="flex items-center justify-end">
@@ -2194,7 +2228,7 @@ const FreeAgents = () => {
                               </div>
                             </TableHead>
                             <TableHead
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                              className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                               onClick={() => handleSort('hits')}
                             >
                               <div className="flex items-center justify-end">
@@ -2203,7 +2237,7 @@ const FreeAgents = () => {
                               </div>
                             </TableHead>
                             <TableHead
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                              className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                               onClick={() => handleSort('blocks')}
                             >
                               <div className="flex items-center justify-end">
@@ -2212,7 +2246,7 @@ const FreeAgents = () => {
                               </div>
                             </TableHead>
                             <TableHead
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                              className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                               onClick={() => handleSort('xGoals')}
                             >
                               <div className="flex items-center justify-end">
@@ -2227,7 +2261,7 @@ const FreeAgents = () => {
                         {players.filter(p => watchlist.has(p.id)).some(p => p.position === 'G') && (
                           <>
                             <TableHead
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                              className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                               onClick={() => handleSort('wins')}
                             >
                               <div className="flex items-center justify-end">
@@ -2236,7 +2270,7 @@ const FreeAgents = () => {
                               </div>
                             </TableHead>
                             <TableHead
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                              className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                               onClick={() => handleSort('gaa')}
                             >
                               <div className="flex items-center justify-end">
@@ -2245,7 +2279,7 @@ const FreeAgents = () => {
                               </div>
                             </TableHead>
                             <TableHead
-                              className="text-right cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap"
+                              className="text-right cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream whitespace-nowrap"
                               onClick={() => handleSort('savePct')}
                             >
                               <div className="flex items-center justify-end">
@@ -2262,11 +2296,11 @@ const FreeAgents = () => {
                       {sortPlayers(players.filter(p => watchlist.has(p.id))).map((player) => {
                         const isGoalie = player.position === 'G';
                         return (
-                          <TableRow key={player.id} className="hover:bg-muted/50">
+                          <TableRow key={player.id} className="hover:bg-white/5">
                             <TableCell className="font-medium whitespace-nowrap">
                               <div className="flex flex-col">
                                 <span
-                                  className="hover:underline hover:text-primary cursor-pointer text-sm"
+                                  className="hover:underline hover:text-pastel-orange cursor-pointer text-sm"
                                   onClick={() => handlePlayerClick(player)}
                                 >
                                   {player.full_name}
@@ -2310,7 +2344,7 @@ const FreeAgents = () => {
                                 >
                                   <Star className="h-3.5 w-3.5 fill-current" />
                                 </Button>
-                                <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => handlePlayerClick(player)}>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-white/55" onClick={() => handlePlayerClick(player)}>
                                   <Info className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button size="sm" variant="default" className={`h-7 w-7 font-bold text-base border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
@@ -2361,15 +2395,36 @@ const FreeAgents = () => {
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <AdSpace size="300x250" label="Free Agents Sponsor" />
-                <AdSpace size="300x250" label="Fantasy Partner" />
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                  <MascotPortrait id="stormy" />
+                  <div className="p-5">
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
+                      ✦ Stormy says
+                    </div>
+                    <div className="font-calistoga text-xl text-pastel-cream mb-3">Pickup priority</div>
+                    <ul className="text-[11px] text-white/70 space-y-1.5 leading-relaxed">
+                      <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Trending pickups go fast — claim early</li>
+                      <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Weekly schedule beats raw points-per-game</li>
+                      <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Star a player to track him on the watchlist</li>
+                    </ul>
+                  </div>
+                </div>
+                <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <RangeIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Sort tips</div>
+                  </div>
+                  <p className="text-[11px] text-white/70 leading-relaxed">
+                    Click any column header to sort. Tap a player row for full stats and projection breakdown.
+                  </p>
+                </div>
               </div>
             </aside>
 
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>
@@ -2377,7 +2432,7 @@ const FreeAgents = () => {
           </div>
         </div>
       </main>
-      <Footer />
+      <HockeyFooter />
     </div>
   );
 };

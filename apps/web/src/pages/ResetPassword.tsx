@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Navbar from '@/components/Navbar';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Lock, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
+import { DarkLayout } from '@/components/citrus2';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -98,32 +100,37 @@ const ResetPassword = () => {
 
   if (!hasToken) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/20 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <XCircle className="h-5 w-5 text-red-500" />
-              Invalid Reset Link
-            </CardTitle>
-            <CardDescription>{error || 'This password reset link is invalid or has expired.'}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => navigate('/auth')} className="w-full">
-              Return to Sign In
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <DarkLayout>
+        <Navbar />
+        <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
+          <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-pastel-cream">
+                <XCircle className="h-5 w-5 text-pastel-orange" />
+                Invalid Reset Link
+              </CardTitle>
+              <CardDescription className="text-white/60">{error || 'This password reset link is invalid or has expired.'}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={() => navigate('/auth')} className="w-full bg-pastel-orange text-white hover:bg-pastel-orange-deep">
+                Return to Sign In
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </DarkLayout>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold">Reset Your Password</CardTitle>
-          <CardDescription>Enter your new password below</CardDescription>
-        </CardHeader>
+    <DarkLayout>
+      <Navbar />
+      <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
+        <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-pastel-cream">Reset Your Password</CardTitle>
+            <CardDescription className="text-white/60">Enter your new password below</CardDescription>
+          </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
@@ -179,7 +186,8 @@ const ResetPassword = () => {
           </form>
         </CardContent>
       </Card>
-    </div>
+      </main>
+    </DarkLayout>
   );
 };
 

@@ -3,22 +3,18 @@ import { cn } from '@/lib/utils';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useSearchParams, useLocation, Navigate } from 'react-router-dom';
+import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague, isDemoLeague } from '@/contexts/LeagueContext';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { LeagueCreationCTA, InlineCTA } from '@/components/LeagueCreationCTA';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart, Lock, Clock, AlertCircle } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
-import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusBurst, CitrusWedge, CitrusZest } from '@/components/icons/CitrusIcons';
-import { AdSpace } from '@/components/AdSpace';
-import { CitrusBackground } from '@/components/CitrusBackground';
-import { CitrusSectionDivider } from '@/components/CitrusSectionDivider';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
@@ -2944,42 +2940,37 @@ const Roster = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#D4E8B8] text-foreground relative">
+    <div className="min-h-screen bg-pastel-surface text-foreground relative">
       {/* Loading overlay during league switch - non-blocking */}
       {showLoadingOverlay && (
-        <div className="fixed inset-0 bg-[#D4E8B8]/90 backdrop-blur-lg z-[100] flex items-center justify-center">
+        <div className="fixed inset-0 bg-pastel-surface/90 backdrop-blur-lg z-[100] flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-citrus-orange mx-auto mb-4"></div>
-            <p className="text-lg font-medium">Switching leagues...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pastel-orange mx-auto mb-4"></div>
+            <p className="text-lg font-medium text-pastel-cream">Switching leagues…</p>
           </div>
         </div>
       )}
-      
-      {/* Citrus Background - Hidden on mobile for performance */}
-      <div className="hidden lg:block">
-        <CitrusBackground density="medium" animated={true} />
-      </div>
-      
+
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
       </div>
       
       {/* MOBILE: Compact sticky header with roster context + hamburger menu */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#D4E8B8]/98 backdrop-blur-xl border-b border-citrus-sage/20 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-varsity font-bold text-citrus-forest truncate">
+            <h1 className="text-sm font-calistoga font-bold text-pastel-cream truncate">
               {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Roster')}
             </h1>
             {activeLeague?.name && (
-              <div className="text-xs font-display text-citrus-charcoal/40 truncate -mt-0.5">
+              <div className="text-xs font-jbmono text-white/40 truncate -mt-0.5">
                 {activeLeague.name}
               </div>
             )}
           </div>
           <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-            <span className="text-xs font-varsity font-bold text-citrus-forest/70">
+            <span className="text-xs font-calistoga font-bold text-pastel-orange-soft">
               {teamStats.record}
             </span>
             <MobileMenuButton />
@@ -2994,23 +2985,19 @@ const Roster = () => {
           <div className={cn(
             "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
             userLeagueState === 'active-user' && userTeam?.league_id
-              ? "lg:grid-cols-[260px_1fr_260px] xl:grid-cols-[280px_1fr_280px]"
+              ? "lg:grid-cols-[260px_1fr_280px] xl:grid-cols-[280px_1fr_340px]"
               : "lg:grid-cols-[260px_1fr] xl:grid-cols-[280px_1fr]"
           )}>
             {/* Main Content - MOBILE: Full width / DESKTOP: Scrollable panel */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-3 lg:px-0 order-1 lg:order-2">
-              {/* Fantasy Team Header with Citrus Flair */}
-              <div className="bg-card rounded-lg shadow-md border p-4 mb-4 relative overflow-hidden">
-                {/* Decorative citrus leaves in background */}
-                <CitrusLeaf className="absolute top-2 right-2 w-16 h-16 text-citrus-sage opacity-10 rotate-12" />
-                <CitrusLeaf className="absolute bottom-2 left-1/4 w-12 h-12 text-citrus-peach opacity-10 -rotate-45" />
-                
+              {/* Fantasy Team Header — Citrus 2.0 dark surface */}
+              <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-5 mb-4 relative overflow-hidden">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-2 border-citrus-forest/20 flex items-center justify-center text-citrus-cream text-2xl font-varsity font-black shadow-patch relative overflow-hidden">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pastel-orange to-pastel-orange-soft ring-1 ring-pastel-orange/40 flex items-center justify-center text-pastel-surface text-2xl font-calistoga relative overflow-hidden shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
                   {/* Background pattern */}
                   <div className="absolute inset-0 opacity-20">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.3)_0%,_transparent_60%)]"></div>
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.4)_0%,_transparent_60%)]"></div>
                   </div>
                   <span className="relative z-10">
                     {userLeagueState === 'guest' ? 'CC' : (userTeam?.team_name?.substring(0, 2).toUpperCase() || profile?.username?.substring(0, 2).toUpperCase() || 'TM')}
@@ -3018,35 +3005,38 @@ const Roster = () => {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h1 className="text-2xl font-varsity font-black text-citrus-forest">
+                    <h1 className="text-2xl font-calistoga text-pastel-cream">
                       {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Team')}
                     </h1>
-                    <CitrusSparkle className="w-4 h-4 text-citrus-orange opacity-70" />
                   </div>
-                  <div className="text-citrus-charcoal text-sm font-display">
-                    Manager: {userLeagueState === 'guest' ? 'Demo Team' : (profile?.username || 'You')}
+                  <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold">
+                    Manager · {userLeagueState === 'guest' ? 'Demo Team' : (profile?.username || 'You')}
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
                 <div className="text-center px-4 py-2">
-                  <div className="text-sm text-muted-foreground">Record</div>
-                  <div className="font-bold">{teamStats.record}</div>
+                  <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/55 font-bold">Record</div>
+                  <div className="font-calistoga text-pastel-cream tabular-nums">{teamStats.record}</div>
                 </div>
                 <div className="text-center px-4 py-2">
-                  <div className="text-sm text-muted-foreground">Rank</div>
-                  <div className="font-bold">{teamStats.rank}</div>
+                  <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/55 font-bold">Rank</div>
+                  <div className="font-calistoga text-pastel-cream tabular-nums">{teamStats.rank}</div>
                 </div>
                 <div className="text-center px-4 py-2">
-                  <div className="text-sm text-muted-foreground">Total Pts</div>
-                  <div className="font-bold">{teamStats.totalPoints}</div>
+                  <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/55 font-bold">Total Pts</div>
+                  <div className="font-calistoga text-pastel-orange tabular-nums">{teamStats.totalPoints}</div>
                 </div>
               </div>
 
               <div>
                 {userLeagueState === 'active-user' && (
-                  <Button onClick={handleAutoLineup} variant="outline" className="flex gap-2">
+                  <Button
+                    onClick={handleAutoLineup}
+                    variant="outline"
+                    className="flex gap-2 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold"
+                  >
                     <Wand2 className="w-4 h-4" />
                     Auto Lineup
                   </Button>
@@ -3055,31 +3045,31 @@ const Roster = () => {
               </div>
             </div>
 
-            {/* Main Tabs */}
+            {/* Main Tabs — Citrus 2.0 dark */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <div className="bg-card rounded-lg shadow-md border">
-                <TabsList className="w-full p-0 bg-transparent border-b rounded-none gap-0">
-                <TabsTrigger 
-                  value="roster" 
-                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
+              <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <TabsList className="w-full p-0 bg-transparent border-b border-white/10 rounded-none gap-0 h-auto">
+                <TabsTrigger
+                  value="roster"
+                  className="flex-1 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
                   Roster
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="stats" 
-                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
+                <TabsTrigger
+                  value="stats"
+                  className="flex-1 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
                   Team Stats
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="trends" 
-                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
+                <TabsTrigger
+                  value="trends"
+                  className="flex-1 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
-                  Trends & Analytics
+                  Trends &amp; Analytics
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="transactions" 
-                  className="flex-1 py-4 rounded-none data-[state=active]:bg-card data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary"
+                <TabsTrigger
+                  value="transactions"
+                  className="flex-1 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
                   Transactions
                 </TabsTrigger>
@@ -3113,7 +3103,7 @@ const Roster = () => {
 
                     {/* Date Selector */}
                     {currentMatchup && matchupWeekDates.length > 0 && (
-                      <div className="bg-card rounded-lg border p-4">
+                      <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl p-4">
                         <WeeklySchedule
                           weekStart={currentMatchup.week_start_date}
                           weekEnd={currentMatchup.week_end_date}
@@ -3132,7 +3122,7 @@ const Roster = () => {
                           hideScores={true}
                         />
                         {selectedDate && (
-                          <div className="mt-3 text-sm text-muted-foreground">
+                          <div className="mt-3 text-sm text-white/55">
                             <span className="font-medium">Viewing:</span> {(() => {
                               // Parse date manually to avoid timezone issues
                               const [year, month, day] = selectedDate.split('-').map(Number);
@@ -3151,7 +3141,7 @@ const Roster = () => {
                     )}
 
                     {!currentMatchup && selectedWeek && (
-                      <div className="bg-muted/50 rounded-lg border p-4 text-center text-sm text-muted-foreground">
+                      <div className="bg-white/5 rounded-lg border p-4 text-center text-sm text-white/55">
                         No matchup found for Week {selectedWeek}
                       </div>
                     )}
@@ -3174,7 +3164,7 @@ const Roster = () => {
                 )}
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Lineup</h2>
-                    <ToggleGroup type="single" value={statView} onValueChange={(v) => v && setStatView(v as any)} className="bg-muted/50 p-1 rounded-lg">
+                    <ToggleGroup type="single" value={statView} onValueChange={(v) => v && setStatView(v as any)} className="bg-white/5 p-1 rounded-lg">
                         <ToggleGroupItem value="seasonToDate" size="sm" className="text-xs">Season</ToggleGroupItem>
                         <ToggleGroupItem value="restOfSeason" size="sm" className="text-xs">Rest of Season</ToggleGroupItem>
                     </ToggleGroup>
@@ -3205,9 +3195,9 @@ const Roster = () => {
                   if (!userTeamId && userLeagueState === 'active-user') {
                     return (
                       <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <Trophy className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                        <Trophy className="w-16 h-16 text-white/55 mb-4 opacity-50" />
                         <h3 className="text-xl font-semibold mb-2">No Team Yet</h3>
-                        <p className="text-muted-foreground mb-4">Join or create a league to start building your roster.</p>
+                        <p className="text-white/55 mb-4">Join or create a league to start building your roster.</p>
                         <Button asChild>
                           <a href="/create-league">Create or Join a League</a>
                         </Button>
@@ -3220,9 +3210,9 @@ const Roster = () => {
                     const isPreDraft = userTeam && userTeam.league_id;
                     return (
                       <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <Users className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                        <Users className="w-16 h-16 text-white/55 mb-4 opacity-50" />
                         <h3 className="text-xl font-semibold mb-2">Empty Roster</h3>
-                        <p className="text-muted-foreground mb-4">
+                        <p className="text-white/55 mb-4">
                           {isPreDraft 
                             ? "Your roster will be populated after the draft is completed. Head to the draft room to start drafting!"
                             : "Your roster is empty. Complete your draft to add players."}
@@ -3256,13 +3246,13 @@ const Roster = () => {
                     <div>
                       {/* Mobile tap-to-swap cancel bar */}
                       {tapSelectedPlayerId && (
-                        <div className="flex items-center justify-between bg-citrus-orange/15 border border-citrus-orange/30 rounded-lg px-3 py-2 mb-3">
-                          <span className="text-sm font-display font-semibold text-citrus-forest">
+                        <div className="flex items-center justify-between bg-pastel-orange/15 border border-pastel-orange/30 rounded-lg px-3 py-2 mb-3">
+                          <span className="text-sm font-jbmono font-semibold text-pastel-cream">
                             Tap a highlighted position to move
                           </span>
                           <button
                             onClick={() => setTapSelectedPlayerId(null)}
-                            className="text-xs font-bold text-citrus-orange bg-citrus-orange/10 hover:bg-citrus-orange/20 rounded-lg px-3 py-1 transition-colors"
+                            className="text-xs font-bold text-pastel-orange bg-pastel-orange/10 hover:bg-pastel-orange/20 rounded-lg px-3 py-1 transition-colors"
                           >
                             Cancel
                           </button>
@@ -3359,41 +3349,41 @@ const Roster = () => {
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Season Points</span>
+                        <span className="text-sm text-white/55">Season Points</span>
                         <Trophy className="h-4 w-4 text-yellow-500" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.totalPoints}</div>
-                      <p className="text-xs text-muted-foreground mt-1">Rank: {teamStats.rank}</p>
+                      <p className="text-xs text-white/55 mt-1">Rank: {teamStats.rank}</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Avg. Weekly</span>
+                        <span className="text-sm text-white/55">Avg. Weekly</span>
                         <Activity className="h-4 w-4 text-blue-500" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.avgPoints}</div>
-                      <p className="text-xs text-muted-foreground mt-1">pts / week</p>
+                      <p className="text-xs text-white/55 mt-1">pts / week</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Highest Score</span>
+                        <span className="text-sm text-white/55">Highest Score</span>
                         <ArrowUpRight className="h-4 w-4 text-green-500" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.highScore}</div>
-                      <p className="text-xs text-muted-foreground mt-1">Week 2</p>
+                      <p className="text-xs text-white/55 mt-1">Week 2</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Moves Made</span>
+                        <span className="text-sm text-white/55">Moves Made</span>
                         <Users className="h-4 w-4 text-purple-500" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.waiverMoves}</div>
-                      <p className="text-xs text-muted-foreground mt-1">Waiver/Trades</p>
+                      <p className="text-xs text-white/55 mt-1">Waiver/Trades</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -3410,7 +3400,7 @@ const Roster = () => {
                              <Target className="h-5 w-5 text-primary" />
                              <div>
                                <h3 className="font-bold text-lg">Category Balance</h3>
-                               <p className="text-sm text-muted-foreground">Positional Breakdown</p>
+                               <p className="text-sm text-white/55">Positional Breakdown</p>
                              </div>
                            </div>
                            <Tabs value={selectedPosMetric} onValueChange={(v) => setSelectedPosMetric(v as any)} className="w-full sm:w-auto">
@@ -3443,7 +3433,7 @@ const Roster = () => {
                               />
                             </RadarChart>
                           </ResponsiveContainer>
-                          <div className="absolute top-0 right-0 text-xs text-muted-foreground text-right hidden sm:block">
+                          <div className="absolute top-0 right-0 text-xs text-white/55 text-right hidden sm:block">
                              <div className="mb-1">Chart shows % of Elite Baseline</div>
                              <div>100% = Top Tier Production</div>
                           </div>
@@ -3461,19 +3451,19 @@ const Roster = () => {
                             <h3 className="font-bold text-lg">Power Rankings</h3>
                          </div>
                          <div className="space-y-3">
-                           <div className="flex justify-between items-center p-2 bg-muted/40 rounded">
+                           <div className="flex justify-between items-center p-2 bg-white/5 ring-1 ring-white/10 rounded">
                               <span className="text-sm font-medium">Offense</span>
                               <Badge className="bg-green-500 hover:bg-green-600">A-</Badge>
                            </div>
-                           <div className="flex justify-between items-center p-2 bg-muted/40 rounded">
+                           <div className="flex justify-between items-center p-2 bg-white/5 ring-1 ring-white/10 rounded">
                               <span className="text-sm font-medium">Defense</span>
                               <Badge className="bg-yellow-500 hover:bg-yellow-600">B</Badge>
                            </div>
-                           <div className="flex justify-between items-center p-2 bg-muted/40 rounded">
+                           <div className="flex justify-between items-center p-2 bg-white/5 ring-1 ring-white/10 rounded">
                               <span className="text-sm font-medium">Goalie</span>
                               <Badge className="bg-blue-500 hover:bg-blue-600">A</Badge>
                            </div>
-                            <div className="flex justify-between items-center p-2 bg-muted/40 rounded">
+                            <div className="flex justify-between items-center p-2 bg-white/5 ring-1 ring-white/10 rounded">
                               <span className="text-sm font-medium">Depth</span>
                               <Badge className="bg-orange-500 hover:bg-orange-600">C+</Badge>
                             </div>
@@ -3487,18 +3477,18 @@ const Roster = () => {
                 <Card className="mt-6">
                    <CardContent className="p-6">
                       <div className="flex items-center gap-2 mb-4">
-                         <BarChart3 className="h-5 w-5 text-gray-500" />
+                         <BarChart3 className="h-5 w-5 text-white/55" />
                          <h3 className="font-bold text-lg">Projected Season Totals</h3>
                       </div>
                       
                       <div className="space-y-6">
                         {['C', 'LW', 'RW', 'D'].map(pos => (
                           <div key={pos}>
-                            <h4 className="text-sm font-semibold text-muted-foreground mb-3">{pos === 'C' ? 'Centers' : (pos === 'D' ? 'Defensemen' : `${pos} Wingers`)}</h4>
+                            <h4 className="text-sm font-semibold text-white/55 mb-3">{pos === 'C' ? 'Centers' : (pos === 'D' ? 'Defensemen' : `${pos} Wingers`)}</h4>
                             <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
                                {Object.entries(posStats[pos as 'C'|'LW'|'RW'|'D']).map(([key, value]) => (
-                                  <div key={key} className="flex flex-col p-3 bg-muted/30 rounded-lg border text-center">
-                                     <span className="text-muted-foreground uppercase text-xs font-bold tracking-wider">{key}</span>
+                                  <div key={key} className="flex flex-col p-3 bg-white/5 rounded-lg border text-center">
+                                     <span className="text-white/55 uppercase text-xs font-bold tracking-wider">{key}</span>
                                      <span className="text-xl font-bold mt-1 text-foreground">{value}</span>
                                   </div>
                                ))}
@@ -3533,7 +3523,7 @@ const Roster = () => {
                               <h3 className="text-lg font-bold">Active Waiver Claims</h3>
                               <Badge variant="secondary" className="text-xs">{pendingWaivers.length}</Badge>
                             </div>
-                            <p className="text-xs text-muted-foreground mb-3">All times shown in Mountain Time (MT)</p>
+                            <p className="text-xs text-white/55 mb-3">All times shown in Mountain Time (MT)</p>
                             <div className="space-y-3">
                               {pendingWaivers.map((tx) => {
                                 const clearsAtFormatted = formatMoment(tx.waiverClearsAt);
@@ -3550,7 +3540,7 @@ const Roster = () => {
                                       <div className="flex-1 min-w-[200px]">
                                         <div className="font-bold text-base">{tx.playerName}</div>
                                         {(tx.playerPosition || tx.playerTeam) && (
-                                          <div className="text-sm text-muted-foreground">
+                                          <div className="text-sm text-white/55">
                                             {tx.playerPosition || ''}{tx.playerPosition && tx.playerTeam ? ' • ' : ''}{tx.playerTeam || ''}
                                           </div>
                                         )}
@@ -3565,7 +3555,7 @@ const Roster = () => {
                                             )}
                                           </div>
                                         )}
-                                        <div className="text-xs text-muted-foreground mt-1">
+                                        <div className="text-xs text-white/55 mt-1">
                                           {tx.bidAmount != null
                                             ? `Bid: $${tx.bidAmount}`
                                             : tx.priority != null
@@ -3618,15 +3608,15 @@ const Roster = () => {
                         <div>
                           <div className="mb-3">
                             <h3 className="text-lg font-bold">Transaction History</h3>
-                            <p className="text-xs text-muted-foreground mt-1">All times shown in Mountain Time (MT)</p>
+                            <p className="text-xs text-white/55 mt-1">All times shown in Mountain Time (MT)</p>
                           </div>
                           {historyRows.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground border rounded-lg border-dashed">
+                            <div className="text-center py-8 text-white/55 border rounded-lg border-dashed">
                               No transactions found.
                             </div>
                           ) : (
                             <div className="rounded-md border">
-                              <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b bg-muted/50 font-medium text-sm">
+                              <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b bg-white/5 font-medium text-sm">
                                 <div className="col-span-3">Date</div>
                                 <div className="col-span-2">Type</div>
                                 <div className="col-span-3">Player</div>
@@ -3634,10 +3624,10 @@ const Roster = () => {
                                 <div className="col-span-2 text-right">Status</div>
                               </div>
                               {historyRows.map((tx) => (
-                                <div key={tx.id} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 p-4 border-b last:border-0 text-sm md:items-center hover:bg-muted/20 transition-colors relative">
+                                <div key={tx.id} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 p-4 border-b last:border-0 text-sm md:items-center hover:bg-white/5 transition-colors relative">
                                   {/* Mobile Top Row: Date & Status */}
                                   <div className="flex md:hidden justify-between items-start mb-1">
-                                    <div className="text-muted-foreground text-xs">{tx.date}</div>
+                                    <div className="text-white/55 text-xs">{tx.date}</div>
                                     <div className="text-right">
                                       <span className={`text-xs px-2 py-0.5 rounded-full ${
                                         tx.status === 'processed' ? 'bg-green-100 text-green-700' :
@@ -3649,7 +3639,7 @@ const Roster = () => {
                                   </div>
 
                                   {/* Desktop: Date */}
-                                  <div className="hidden md:block col-span-3 text-muted-foreground text-xs">{tx.date}</div>
+                                  <div className="hidden md:block col-span-3 text-white/55 text-xs">{tx.date}</div>
 
                                   {/* Type Badge */}
                                   <div className="col-span-2 capitalize font-medium flex items-center">
@@ -3668,7 +3658,7 @@ const Roster = () => {
                                   {/* Player & Team (Mobile: Combined) */}
                                   <div className="col-span-3 font-medium text-base md:text-sm flex items-center gap-2">
                                     {tx.playerName}
-                                    <span className="md:hidden text-muted-foreground font-normal text-xs">• {tx.playerTeam}</span>
+                                    <span className="md:hidden text-white/55 font-normal text-xs">• {tx.playerTeam}</span>
                                   </div>
 
                                   {/* Desktop: Team */}
@@ -3900,10 +3890,10 @@ const Roster = () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="font-semibold">{player.name}</div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-sm text-white/55">
                             {formatPositionForDisplay(player.position)} • {player.team}
                           </div>
-                          <div className="text-xs text-muted-foreground mt-1">
+                          <div className="text-xs text-white/55 mt-1">
                             {player.stats?.points || 0} pts • {player.stats?.gamesPlayed || 0} GP
                           </div>
                         </div>
@@ -3935,18 +3925,55 @@ const Roster = () => {
                 {/* Roster Depth Widget */}
                 <TeamIntelHub />
 
-                {/* Premium Ad Space 1 */}
-                <AdSpace size="300x250" label="Roster Sponsor" />
+                {/* Sleeper-style data tile — replaces the legacy AdSpace
+                    placeholder with real team-pulse stats. */}
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Activity className="w-4 h-4 text-pastel-orange-soft" strokeWidth={2} />
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Team pulse</div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-white/55">Record</span>
+                      <span className="font-calistoga text-2xl text-pastel-cream tabular-nums leading-none">
+                        {teamStats.record}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-white/55">Rank</span>
+                      <span className="font-calistoga text-lg text-pastel-cream tabular-nums leading-none">
+                        {teamStats.rank}
+                      </span>
+                    </div>
+                    <div className="h-px bg-white/10" />
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-white/55">Total points</span>
+                      <span className="font-jbmono text-[12px] text-pastel-orange tabular-nums font-bold">
+                        {teamStats.totalPoints}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-                {/* Premium Ad Space 2 */}
-                <AdSpace size="300x250" label="Fantasy Partner" />
+                {/* Quicklinks tile — replaces second legacy AdSpace */}
+                <div className="bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
+                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Lineup tips</div>
+                  </div>
+                  <ul className="text-[11px] text-white/70 space-y-1.5 leading-relaxed">
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Drag-and-drop to set your lineup</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Auto-lineup uses xG model projections</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Tap a player for full stats + projection</li>
+                  </ul>
+                </div>
               </div>
             </aside>
 
             {/* Right Sidebar - Notifications/Chat Panel - Hidden on mobile */}
             {userLeagueState === 'active-user' && userTeam?.league_id && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-card border rounded-lg shadow-sm overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={userTeam.league_id} />
                 </div>
               </aside>
@@ -3957,7 +3984,7 @@ const Roster = () => {
       
       {/* Footer - Hidden on mobile */}
       <div className="hidden lg:block">
-        <Footer />
+        <HockeyFooter />
       </div>
     </div>
   );
