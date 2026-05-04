@@ -13,6 +13,7 @@ Auth headers:
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from urllib.parse import urlencode
 
@@ -25,9 +26,20 @@ Filter = Tuple[str, str, Any]  # (col, op, value) where op in {"eq","neq","gte",
 
 
 class SupabaseRest:
-  def __init__(self, supabase_url: str, supabase_key: str, schema: str = "public", timeout_seconds: int = 60):
+  def __init__(self, supabase_url: Optional[str] = None, supabase_key: Optional[str] = None, schema: str = "public", timeout_seconds: int = 60):
+    # Fall back to env vars when args aren't supplied. This is what every
+    # caller used to duplicate (read VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY,
+    # then pass to constructor); centralising it removes the footgun where
+    # `SupabaseRest()` raised TypeError instead of just working.
+    if supabase_url is None:
+      supabase_url = os.getenv("VITE_SUPABASE_URL") or os.getenv("SUPABASE_URL")
+    if supabase_key is None:
+      supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     if not supabase_url or not supabase_key:
-      raise ValueError("supabase_url and supabase_key are required")
+      raise ValueError(
+        "supabase_url and supabase_key are required (pass explicitly or set "
+        "VITE_SUPABASE_URL/SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY env vars)"
+      )
     self.url = supabase_url.rstrip("/")
     self.key = supabase_key
     self.schema = schema
