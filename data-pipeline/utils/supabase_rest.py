@@ -129,7 +129,7 @@ class SupabaseRest:
   def upsert(self, table: str, rows: Union[dict, List[dict]], on_conflict: str) -> None:
     """
     Upsert rows with merge-duplicates resolution.
-    
+
     Note: merge-duplicates in PostgREST merges NULL values from existing rows with
     non-NULL values from new rows. For integer fields with default 0, this means
     that 0 values in new rows will overwrite existing 0 values (which is desired).
@@ -150,6 +150,15 @@ class SupabaseRest:
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase upsert failed ({table}): {r.status_code} {r.text}")
 
+  def insert(self, table: str, rows: Union[dict, List[dict]]) -> None:
+    """Plain insert (no upsert). Fails if a row collides with a unique constraint."""
+    url = f"{self.rest_base}/{table}"
+    hdr = self._headers({"Prefer": "return=minimal"})
+    body = rows if isinstance(rows, list) else [rows]
+    r = self.session.post(url, headers=hdr, data=json.dumps(body), timeout=self.timeout_seconds)
+    if r.status_code >= 400:
+      raise RuntimeError(f"Supabase insert failed ({table}): {r.status_code} {r.text}")
+
   def update(self, table: str, values: dict, filters: List[Filter]) -> None:
     qs = self._build_query(filters=filters)
     url = f"{self.rest_base}/{table}?{qs}"
@@ -167,6 +176,10 @@ class SupabaseRest:
     r = self.session.delete(url, headers=hdr, timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase delete failed ({table}): {r.status_code} {r.text}")
+
+  # Alias for callers that prefer the more explicit name.
+  def delete_where(self, table: str, filters: List[Filter]) -> None:
+    self.delete(table, filters)
 
   def rpc(self, fn: str, payload: dict) -> Any:
     url = f"{self.rest_base}/rpc/{fn}"
