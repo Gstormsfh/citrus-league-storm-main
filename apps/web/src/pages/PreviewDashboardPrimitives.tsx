@@ -6,10 +6,12 @@
  * - PlayerMonogram (license-clean player avatar)
  * - PercentileBullet (the JFresh-killer; bullet chart with median tick)
  * - StaleDataBadge (first-class freshness signal)
+ * - RinkHeatmap (Spatial Hero — locked Concept 3 visualization)
  *
  * Route: /preview-dashboard-primitives
  */
 
+import { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import {
   DarkLayout,
@@ -17,7 +19,74 @@ import {
   PlayerMonogram,
   PercentileBullet,
   StaleDataBadge,
+  RinkHeatmap,
+  type RinkMode,
+  type ShotEvent,
 } from '@/components/citrus2';
+
+// ── Mock shot data — realistic NHL offensive-zone distribution ──
+// Heavy slot concentration, moderate at faceoff circles, sparse along boards
+// and at points. ~80 shots total to mirror the mockup's density.
+const MOCK_SHOTS: ShotEvent[] = [
+  // High slot — the danger zone, lots of orange
+  ...Array.from({ length: 18 }, (_, i) => ({
+    id: `slot-${i}`,
+    x: 0.42 + Math.random() * 0.16,
+    y: 0.78 + Math.random() * 0.14,
+    xg_value: 0.18 + Math.random() * 0.12,
+    is_goal: i % 4 === 0,
+  })),
+  // Low slot — close to net
+  ...Array.from({ length: 8 }, (_, i) => ({
+    id: `lowslot-${i}`,
+    x: 0.45 + Math.random() * 0.10,
+    y: 0.92 + Math.random() * 0.06,
+    xg_value: 0.22 + Math.random() * 0.18,
+    is_goal: i % 3 === 0,
+  })),
+  // Faceoff dots (left + right)
+  ...Array.from({ length: 12 }, (_, i) => ({
+    id: `circle-${i}`,
+    x: i % 2 === 0 ? 0.20 + Math.random() * 0.16 : 0.64 + Math.random() * 0.16,
+    y: 0.55 + Math.random() * 0.18,
+    xg_value: 0.06 + Math.random() * 0.06,
+    is_goal: false,
+  })),
+  // Points (blue line) — low xG
+  ...Array.from({ length: 14 }, (_, i) => ({
+    id: `point-${i}`,
+    x: 0.10 + Math.random() * 0.80,
+    y: 0.04 + Math.random() * 0.18,
+    xg_value: 0.02 + Math.random() * 0.04,
+    is_goal: false,
+  })),
+  // Boards
+  ...Array.from({ length: 16 }, (_, i) => ({
+    id: `boards-${i}`,
+    x: i % 2 === 0 ? 0.04 + Math.random() * 0.08 : 0.88 + Math.random() * 0.08,
+    y: 0.20 + Math.random() * 0.60,
+    xg_value: 0.03 + Math.random() * 0.04,
+    is_goal: false,
+  })),
+  // Wrap-arounds
+  ...Array.from({ length: 6 }, (_, i) => ({
+    id: `wrap-${i}`,
+    x: 0.30 + Math.random() * 0.40,
+    y: 0.96 + Math.random() * 0.04,
+    xg_value: 0.04 + Math.random() * 0.04,
+    is_goal: false,
+  })),
+];
+
+// Smaller mock for low-sample state demo
+const MOCK_LOW_SAMPLE: ShotEvent[] = [
+  { id: 1, x: 0.50, y: 0.85, xg_value: 0.18, is_goal: true },
+  { id: 2, x: 0.46, y: 0.82, xg_value: 0.12, is_goal: false },
+  { id: 3, x: 0.54, y: 0.88, xg_value: 0.22, is_goal: true },
+  { id: 4, x: 0.30, y: 0.65, xg_value: 0.05, is_goal: false },
+  { id: 5, x: 0.70, y: 0.62, xg_value: 0.07, is_goal: false },
+  { id: 6, x: 0.50, y: 0.10, xg_value: 0.02, is_goal: false },
+];
 
 // Helper for variant captions
 function VariantCard({
@@ -86,6 +155,8 @@ const HUGHES = { fullName: 'Quinn Hughes', team: 'VAN', jersey: 43 };
 const SHESTERKIN = { fullName: 'Igor Shesterkin', team: 'NYR', jersey: 31 };
 
 export default function PreviewDashboardPrimitives() {
+  const [rinkMode, setRinkMode] = useState<RinkMode>('5v5');
+
   return (
     <DarkLayout>
       <Navbar />
@@ -94,17 +165,72 @@ export default function PreviewDashboardPrimitives() {
         {/* Page header */}
         <div className="mb-10">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-2 font-bold">
-            ✦ Day 1 Review · 2026-05-04
+            ✦ Day 2 Review · 2026-05-04
           </div>
           <h1 className="font-sans font-black text-[2rem] sm:text-[2.5rem] tracking-[-0.025em] text-pastel-cream leading-tight">
             Player Dashboard Component Primitives
           </h1>
           <p className="text-[14px] text-white/65 mt-3 max-w-3xl">
-            Every state variant of the three primitives that ship the Web Summit player profile
-            page (May 11). Built citrus2-native — dark forest surfaces, JBMono tabular numerics,
-            no third-party UI libraries, full keyboard + screen-reader support.
+            Every state variant of the primitives that ship the Web Summit player profile page
+            (May 11). Built citrus2-native — dark forest surfaces, JBMono tabular numerics, no
+            third-party UI libraries, full keyboard + screen-reader support. Locked design
+            direction: <strong className="text-pastel-orange-soft">Spatial Hero (Concept 3)</strong>.
           </p>
         </div>
+
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* RinkHeatmap — THE locked Spatial Hero composition          */}
+        {/* ────────────────────────────────────────────────────────── */}
+        <SectionHeader
+          eyebrow="Locked hero · Concept 3"
+          title="RinkHeatmap"
+          blurb="The Spatial Hero — full-bleed offensive-zone rink as the visual anchor, with shot density encoded by xG (color) and attempts (size). Player identity composed AT the rink (jersey watermark + name + eyebrow). Floating Stormy verdict tile top-right. Segmented mode control bottom-right carries the SINGLE page-wide ambient orange glow on the active option."
+        />
+
+        <SubSection title="Composed hero — full Concept 3 treatment">
+          <RinkHeatmap
+            shots={MOCK_SHOTS}
+            mode={rinkMode}
+            onModeChange={setRinkMode}
+            playerName="A. PRIMA"
+            eyebrow="C · ROYAL BLUES · 28YR"
+            jerseyNumber={97}
+            verdict="Generates 73% of his offense from the high slot — top-3 in NHL for danger-zone xG."
+            verdictEyebrow="Stormy verdict"
+            caption={`5v5 shots · ${MOCK_SHOTS.length} attempts · ${MOCK_SHOTS.filter((s) => s.is_goal).length} goals`}
+          />
+        </SubSection>
+
+        <SubSection title="States">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <VariantCard caption="Loading state — shimmer caption, no dots">
+              <div className="w-full">
+                <RinkHeatmap shots={[]} isLoading playerName="A. PRIMA" eyebrow="C · ROYAL BLUES" jerseyNumber={97} />
+              </div>
+            </VariantCard>
+            <VariantCard caption="Empty state — no shots in this mode">
+              <div className="w-full">
+                <RinkHeatmap shots={[]} mode="pp" playerName="A. PRIMA" eyebrow="C · ROYAL BLUES" jerseyNumber={97} />
+              </div>
+            </VariantCard>
+            <VariantCard caption="Low-sample state (<50 shots) — SS badge">
+              <div className="w-full">
+                <RinkHeatmap
+                  shots={MOCK_LOW_SAMPLE}
+                  playerName="A. PRIMA"
+                  eyebrow="C · ROYAL BLUES"
+                  jerseyNumber={97}
+                  caption={`5v5 · ${MOCK_LOW_SAMPLE.length} shots`}
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="Naked rink — no identity composition, no verdict">
+              <div className="w-full">
+                <RinkHeatmap shots={MOCK_SHOTS} caption={`${MOCK_SHOTS.length} attempts`} />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
 
         {/* ────────────────────────────────────────────────────────── */}
         {/* PlayerMonogram                                              */}

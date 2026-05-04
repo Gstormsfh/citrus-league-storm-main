@@ -23,6 +23,9 @@ export { PercentileBullet } from './PercentileBullet';
 export type { PercentileCategory, PercentileSize } from './PercentileBullet';
 export { StaleDataBadge } from './StaleDataBadge';
 export type { StaleDataBadgeVariant } from './StaleDataBadge';
+// Spatial Hero (locked Concept 3) — see apps/web/docs/PLAYER_DASHBOARD_DESIGN_SPEC.md
+export { RinkHeatmap } from './RinkHeatmap';
+export type { RinkMode, RinkModeOption, ShotEvent } from './RinkHeatmap';
 
 // Brand mark
 export { CitrusLogo, CitrusWordmark } from './CitrusLogo';
