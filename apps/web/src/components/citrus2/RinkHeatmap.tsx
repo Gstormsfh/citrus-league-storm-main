@@ -126,66 +126,68 @@ function findHottestShot(shots: ShotEvent[]): number {
 // the mockup spec (functional canvas, not decorative).
 
 function RinkOutline({ className }: { className?: string }) {
-  // All rink lines share the same thin weight per Visual Diff iteration #7 —
-  // mockup reads as elegant hairline geometry, not heavy ink. Boards/circles/
-  // crease all use 0.25 stroke (was 0.4); secondary lines drop to 0.15.
+  // Iteration #4 (Garrett's pragmatic-shrink): viewBox 100x55 (was 100x85).
+  // Eliminates the empty-void problem by cropping the offensive zone tighter
+  // around the action. Rink no longer shows the full goal-line-to-blue-line
+  // depth; instead frames goal area + faceoff circles + just past faceoffs.
+  // Geometry isn't NHL-accurate; it's visually balanced.
   const stroke = 'rgba(255,255,255,0.30)';
   const strokeWidth = 0.25;
   const strokeWidthSecondary = 0.15;
 
   return (
     <svg
-      viewBox="0 0 100 85"
+      viewBox="0 0 100 55"
       preserveAspectRatio="xMidYMid meet"
       className={cn('w-full h-full', className)}
       aria-hidden="true"
     >
-      {/* Boards (perimeter with rounded corners) */}
+      {/* Boards (perimeter with rounded corners — corners stay 6 radius) */}
       <path
-        d="M 6 0 L 94 0 Q 100 0 100 6 L 100 79 Q 100 85 94 85 L 6 85 Q 0 85 0 79 L 0 6 Q 0 0 6 0 Z"
+        d="M 6 0 L 94 0 Q 100 0 100 6 L 100 49 Q 100 55 94 55 L 6 55 Q 0 55 0 49 L 0 6 Q 0 0 6 0 Z"
         fill="none"
         stroke={stroke}
         strokeWidth={strokeWidth}
       />
 
       {/* Goal line (top) */}
-      <line x1="0" y1="11" x2="100" y2="11" stroke={stroke} strokeWidth={strokeWidthSecondary} />
+      <line x1="0" y1="7" x2="100" y2="7" stroke={stroke} strokeWidth={strokeWidthSecondary} />
 
-      {/* Goal crease (smaller, thinner half-circle just below goal line) */}
+      {/* Goal crease (small thin half-circle just below goal line) */}
       <path
-        d="M 46 11 A 4 4 0 0 0 54 11"
+        d="M 47 7 A 3 3 0 0 0 53 7"
         fill="none"
         stroke={stroke}
         strokeWidth={strokeWidth}
       />
 
       {/* Tiny goal-mouth indicator centered on goal line */}
-      <rect x="49" y="9.5" width="2" height="1.5" fill="none" stroke={stroke} strokeWidth={strokeWidthSecondary} />
+      <rect x="49" y="5.5" width="2" height="1.5" fill="none" stroke={stroke} strokeWidth={strokeWidthSecondary} />
 
       {/* Two large faceoff circles (offensive deep zone) */}
       {/* Left circle */}
-      <circle cx="31" cy="31" r="9" fill="none" stroke={stroke} strokeWidth={strokeWidth} />
-      <circle cx="31" cy="31" r="0.5" fill={stroke} />
-      {/* Hashmarks on left circle */}
-      <line x1="29" y1="22.4" x2="29" y2="20.4" stroke={stroke} strokeWidth={strokeWidth} />
-      <line x1="33" y1="22.4" x2="33" y2="20.4" stroke={stroke} strokeWidth={strokeWidth} />
-      <line x1="29" y1="39.6" x2="29" y2="41.6" stroke={stroke} strokeWidth={strokeWidth} />
-      <line x1="33" y1="39.6" x2="33" y2="41.6" stroke={stroke} strokeWidth={strokeWidth} />
+      <circle cx="31" cy="22" r="7" fill="none" stroke={stroke} strokeWidth={strokeWidth} />
+      <circle cx="31" cy="22" r="0.4" fill={stroke} />
+      {/* Hashmarks on left circle (above + below) */}
+      <line x1="29" y1="15.5" x2="29" y2="13.5" stroke={stroke} strokeWidth={strokeWidth} />
+      <line x1="33" y1="15.5" x2="33" y2="13.5" stroke={stroke} strokeWidth={strokeWidth} />
+      <line x1="29" y1="28.5" x2="29" y2="30.5" stroke={stroke} strokeWidth={strokeWidth} />
+      <line x1="33" y1="28.5" x2="33" y2="30.5" stroke={stroke} strokeWidth={strokeWidth} />
 
       {/* Right circle */}
-      <circle cx="69" cy="31" r="9" fill="none" stroke={stroke} strokeWidth={strokeWidth} />
-      <circle cx="69" cy="31" r="0.5" fill={stroke} />
+      <circle cx="69" cy="22" r="7" fill="none" stroke={stroke} strokeWidth={strokeWidth} />
+      <circle cx="69" cy="22" r="0.4" fill={stroke} />
       {/* Hashmarks on right circle */}
-      <line x1="67" y1="22.4" x2="67" y2="20.4" stroke={stroke} strokeWidth={strokeWidth} />
-      <line x1="71" y1="22.4" x2="71" y2="20.4" stroke={stroke} strokeWidth={strokeWidth} />
-      <line x1="67" y1="39.6" x2="67" y2="41.6" stroke={stroke} strokeWidth={strokeWidth} />
-      <line x1="71" y1="39.6" x2="71" y2="41.6" stroke={stroke} strokeWidth={strokeWidth} />
+      <line x1="67" y1="15.5" x2="67" y2="13.5" stroke={stroke} strokeWidth={strokeWidth} />
+      <line x1="71" y1="15.5" x2="71" y2="13.5" stroke={stroke} strokeWidth={strokeWidth} />
+      <line x1="67" y1="28.5" x2="67" y2="30.5" stroke={stroke} strokeWidth={strokeWidth} />
+      <line x1="71" y1="28.5" x2="71" y2="30.5" stroke={stroke} strokeWidth={strokeWidth} />
 
       {/* Small reference dot near goal-line center */}
-      <circle cx="50" cy="20" r="0.5" fill={stroke} />
+      <circle cx="50" cy="13" r="0.4" fill={stroke} />
 
-      {/* Blue line at bottom (entrance to offensive zone) */}
-      <line x1="0" y1="80" x2="100" y2="80" stroke={stroke} strokeWidth={strokeWidthSecondary} />
+      {/* Blue line near bottom (faint indicator only — no longer at viewBox edge) */}
+      <line x1="0" y1="52" x2="100" y2="52" stroke={stroke} strokeWidth={strokeWidthSecondary} />
     </svg>
   );
 }
@@ -203,7 +205,7 @@ function ShotDots({
 }) {
   return (
     <svg
-      viewBox="0 0 100 85"
+      viewBox="0 0 100 55"
       preserveAspectRatio="xMidYMid meet"
       className="absolute inset-0 w-full h-full pointer-events-none"
       aria-hidden="true"
@@ -216,9 +218,12 @@ function ShotDots({
       </defs>
 
       {shots.map((shot, idx) => {
-        // Map shot.x [0..1] → 4..96 (inset from boards), shot.y [0..1] → 78..14 (top to bottom)
+        // Iter #4: viewBox is now 100x55 (was 100x85). Re-anchor mapping so
+        // shots distribute correctly within the tighter rink.
+        // shot.x [0..1] → 4..96 (inset from boards horizontally)
+        // shot.y [0..1] → 50..8 (y=1 near goal at top, y=0 near blue line at bottom)
         const cx = 4 + shot.x * 92;
-        const cy = 78 - shot.y * 64;
+        const cy = 50 - shot.y * 42;
         // Visual diff iteration #1: dot sizes cut by ~55% — mockup reads as
         // density-cluster heatmap, not "M&Ms on ice." Target: 5-12px diameter
         // at 800px-wide render (was 11-22px which read as decorative).
@@ -398,10 +403,11 @@ export function RinkHeatmap({
       className={cn(
         'relative w-full overflow-hidden',
         'bg-pastel-surface ring-1 ring-white/10 rounded-2xl',
-        // Aspect ratio approximates the half-rink + room for player name composition.
-        // On mobile the rink stays landscape — design contract notes a future
-        // vertical-rink variant; out of scope for v1.
-        'aspect-[100/85]',
+        // Iter #4 (Garrett's pragmatic-shrink): aspect 100/55 (was 100/85).
+        // Tighter rink eliminates the empty-void problem; identity composition
+        // sits comfortably at bottom-left without competing with empty space.
+        // Mockup geometry isn't NHL-accurate; visual balance is.
+        'aspect-[100/55]',
         className,
       )}
     >
@@ -436,14 +442,16 @@ export function RinkHeatmap({
       {/* Bottom-left composition: jersey watermark + eyebrow + name (only when supplied) */}
       {(jerseyNumber || playerName || eyebrow) && (
         <div className="absolute left-6 sm:left-10 bottom-6 sm:bottom-8 max-w-[55%] pointer-events-none">
-          {/* Jersey watermark — sits BEHIND the name. Architectural anchor. */}
+          {/* Jersey watermark — sits BEHIND the name. Architectural anchor.
+              Iter #4: scaled down ~30% for the shorter container so the
+              watermark doesn't reach into the slot cluster region above. */}
           {jerseyNumber !== undefined && jerseyNumber !== null && jerseyNumber !== '' && (
             <span
               aria-hidden="true"
               className={cn(
                 'absolute -bottom-2 left-0',
                 'font-sans font-black text-pastel-cream/[0.07]',
-                'text-[180px] sm:text-[220px] md:text-[260px]',
+                'text-[120px] sm:text-[150px] md:text-[180px]',
                 'leading-none tracking-tighter',
                 'select-none pointer-events-none',
               )}
@@ -461,7 +469,7 @@ export function RinkHeatmap({
               <div
                 className={cn(
                   'font-sans font-black text-pastel-cream',
-                  'text-[44px] sm:text-[64px] md:text-[80px]',
+                  'text-[36px] sm:text-[52px] md:text-[64px]',
                   'leading-[0.92] tracking-[-0.04em]',
                 )}
               >
