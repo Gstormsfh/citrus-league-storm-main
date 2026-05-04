@@ -1,0 +1,424 @@
+/**
+ * Preview page for the player dashboard component primitives.
+ * Day 1 review surface — Web Summit launch (May 11).
+ *
+ * Shows every state variant of:
+ * - PlayerMonogram (license-clean player avatar)
+ * - PercentileBullet (the JFresh-killer; bullet chart with median tick)
+ * - StaleDataBadge (first-class freshness signal)
+ *
+ * Route: /preview-dashboard-primitives
+ */
+
+import Navbar from '@/components/Navbar';
+import {
+  DarkLayout,
+  HockeyFooter,
+  PlayerMonogram,
+  PercentileBullet,
+  StaleDataBadge,
+} from '@/components/citrus2';
+
+// Helper for variant captions
+function VariantCard({
+  caption,
+  children,
+  className = '',
+}: {
+  caption: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`flex flex-col items-start gap-3 p-4 rounded-xl bg-pastel-surface-tile ring-1 ring-white/10 ${className}`}
+    >
+      <div className="flex items-center min-h-[80px] w-full">{children}</div>
+      <div className="font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45 font-bold">
+        {caption}
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({
+  eyebrow,
+  title,
+  blurb,
+}: {
+  eyebrow: string;
+  title: string;
+  blurb?: string;
+}) {
+  return (
+    <div className="mb-6 mt-12 first:mt-0">
+      <div className="font-jbmono text-[11px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-2 font-bold">
+        ✦ {eyebrow}
+      </div>
+      <h2 className="font-sans font-black text-[1.5rem] sm:text-[1.75rem] tracking-[-0.02em] text-pastel-cream leading-tight">
+        {title}
+      </h2>
+      {blurb && <p className="text-[13px] text-white/65 mt-2 max-w-2xl">{blurb}</p>}
+    </div>
+  );
+}
+
+function SubSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mb-10">
+      <h3 className="font-sans font-bold text-[14px] text-pastel-cream uppercase tracking-wider mb-4">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+// ── Mock data ────────────────────────────────────────────────────────
+const TODAY = new Date();
+const daysAgo = (n: number) => new Date(TODAY.getTime() - n * 24 * 60 * 60 * 1000).toISOString();
+
+const MCDAVID = { fullName: 'Connor McDavid', team: 'EDM', jersey: 97 };
+const PASTRNAK = { fullName: 'David Pastrnak', team: 'BOS', jersey: 88 };
+const RINNE = { fullName: 'Pekka Rinne', team: 'NSH', jersey: 35 };
+const NO_TEAM = { fullName: 'Free Agent Player', team: undefined, jersey: undefined };
+const HUGHES = { fullName: 'Quinn Hughes', team: 'VAN', jersey: 43 };
+const SHESTERKIN = { fullName: 'Igor Shesterkin', team: 'NYR', jersey: 31 };
+
+export default function PreviewDashboardPrimitives() {
+  return (
+    <DarkLayout>
+      <Navbar />
+
+      <main className="relative max-w-[1280px] mx-auto px-6 pt-24 pb-16">
+        {/* Page header */}
+        <div className="mb-10">
+          <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-2 font-bold">
+            ✦ Day 1 Review · 2026-05-04
+          </div>
+          <h1 className="font-sans font-black text-[2rem] sm:text-[2.5rem] tracking-[-0.025em] text-pastel-cream leading-tight">
+            Player Dashboard Component Primitives
+          </h1>
+          <p className="text-[14px] text-white/65 mt-3 max-w-3xl">
+            Every state variant of the three primitives that ship the Web Summit player profile
+            page (May 11). Built citrus2-native — dark forest surfaces, JBMono tabular numerics,
+            no third-party UI libraries, full keyboard + screen-reader support.
+          </p>
+        </div>
+
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* PlayerMonogram                                              */}
+        {/* ────────────────────────────────────────────────────────── */}
+        <SectionHeader
+          eyebrow="Primitive 1 of 3"
+          title="PlayerMonogram"
+          blurb="License-clean stand-in for an NHL headshot. Initials in cream over team primary color, jersey number badge bottom-right. Squared (not round) so it differentiates from TeamChip — chip = team, monogram = player. Drop-in replacement everywhere we'd want a photo but legally can't."
+        />
+
+        <SubSection title="Sizes — xs / sm / md / lg / xl">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <VariantCard caption="xs · 28px · table cells">
+              <PlayerMonogram size="xs" {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
+            </VariantCard>
+            <VariantCard caption="sm · 40px · list rows">
+              <PlayerMonogram size="sm" {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
+            </VariantCard>
+            <VariantCard caption="md · 56px · cards">
+              <PlayerMonogram size="md" {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
+            </VariantCard>
+            <VariantCard caption="lg · 80px · sub-hero">
+              <PlayerMonogram size="lg" {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
+            </VariantCard>
+            <VariantCard caption="xl · 112px · player hero">
+              <PlayerMonogram size="xl" {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        <SubSection title="States">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <VariantCard caption="Default">
+              <PlayerMonogram size="md" {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
+            </VariantCard>
+            <VariantCard caption="Highlighted (selected in compare)">
+              <PlayerMonogram size="md" isHighlighted {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
+            </VariantCard>
+            <VariantCard caption="Low sample (<20 GP)">
+              <PlayerMonogram size="md" isLowSample {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
+            </VariantCard>
+            <VariantCard caption="Loading skeleton">
+              <PlayerMonogram size="md" isLoading {...MCDAVID} />
+            </VariantCard>
+            <VariantCard caption="Interactive (hover lift)">
+              <PlayerMonogram size="md" interactive {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        <SubSection title="Edge cases">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <VariantCard caption="One-name player → first 2 chars">
+              <PlayerMonogram size="md" {...RINNE} teamAbbrev={RINNE.team} jerseyNumber={RINNE.jersey} />
+            </VariantCard>
+            <VariantCard caption="No team → forest-soft fallback">
+              <PlayerMonogram size="md" {...NO_TEAM} teamAbbrev={NO_TEAM.team} jerseyNumber={NO_TEAM.jersey} />
+            </VariantCard>
+            <VariantCard caption="No jersey number → no badge">
+              <PlayerMonogram size="md" fullName="Connor McDavid" teamAbbrev="EDM" />
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        <SubSection title="Team color contrast palette — md size">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <VariantCard caption="EDM · royal navy (light text)">
+              <PlayerMonogram size="md" {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
+            </VariantCard>
+            <VariantCard caption="BOS · gold (dark contrast test)">
+              <PlayerMonogram size="md" {...PASTRNAK} teamAbbrev={PASTRNAK.team} jerseyNumber={PASTRNAK.jersey} />
+            </VariantCard>
+            <VariantCard caption="VAN · royal blue">
+              <PlayerMonogram size="md" {...HUGHES} teamAbbrev={HUGHES.team} jerseyNumber={HUGHES.jersey} />
+            </VariantCard>
+            <VariantCard caption="NYR · navy + red mix">
+              <PlayerMonogram size="md" {...SHESTERKIN} teamAbbrev={SHESTERKIN.team} jerseyNumber={SHESTERKIN.jersey} />
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* PercentileBullet                                            */}
+        {/* ────────────────────────────────────────────────────────── */}
+        <SectionHeader
+          eyebrow="Primitive 2 of 3"
+          title="PercentileBullet"
+          blurb="The JFresh-killer. Bullet chart with median reference, category-tinted fill, pattern overlay at low percentiles for color-not-only accessibility, tabular-numerics readout. Replaces JFresh's flat horizontal bars with something that doesn't look academic."
+        />
+
+        <SubSection title="4 categories at the same percentile (87th) — compare tints">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <VariantCard caption="offense · pastel-orange">
+              <div className="w-full">
+                <PercentileBullet label="xG/60" context="5v5" percentile={87} rawValue={3.42} rawUnit="/60" sampleSize={68} category="offense" />
+              </div>
+            </VariantCard>
+            <VariantCard caption="defense · pastel-sage">
+              <div className="w-full">
+                <PercentileBullet label="EVD GAR" context="5v5" percentile={87} rawValue={2.18} rawUnit="/60" sampleSize={68} category="defense" />
+              </div>
+            </VariantCard>
+            <VariantCard caption="special · pastel-butter">
+              <div className="w-full">
+                <PercentileBullet label="PP1 xGF/60" context="PP" percentile={87} rawValue={9.82} rawUnit="/60" sampleSize={68} category="special" />
+              </div>
+            </VariantCard>
+            <VariantCard caption="neutral · pastel-cream">
+              <div className="w-full">
+                <PercentileBullet label="Games Played" percentile={87} rawValue={68} sampleSize={68} category="neutral" />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        <SubSection title="Percentile spectrum — fill behavior across the range">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <VariantCard caption="98th — top decile · ambient glow">
+              <div className="w-full">
+                <PercentileBullet label="Goals/60" context="5v5" percentile={98} rawValue={1.42} rawUnit="/60" sampleSize={68} category="offense" />
+              </div>
+            </VariantCard>
+            <VariantCard caption="65th — above median">
+              <div className="w-full">
+                <PercentileBullet label="Goals/60" context="5v5" percentile={65} rawValue={0.82} rawUnit="/60" sampleSize={68} category="offense" />
+              </div>
+            </VariantCard>
+            <VariantCard caption="50th — exactly at median">
+              <div className="w-full">
+                <PercentileBullet label="Goals/60" context="5v5" percentile={50} rawValue={0.61} rawUnit="/60" sampleSize={68} category="offense" />
+              </div>
+            </VariantCard>
+            <VariantCard caption="32nd — below median, no pattern">
+              <div className="w-full">
+                <PercentileBullet label="Goals/60" context="5v5" percentile={32} rawValue={0.41} rawUnit="/60" sampleSize={68} category="offense" />
+              </div>
+            </VariantCard>
+            <VariantCard caption="18th — far-low · diagonal stripe pattern" className="md:col-span-2">
+              <div className="w-full">
+                <PercentileBullet label="Goals/60" context="5v5" percentile={18} rawValue={0.22} rawUnit="/60" sampleSize={68} category="offense" />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        <SubSection title="Special states">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <VariantCard caption="No data — empty track + caption">
+              <div className="w-full">
+                <PercentileBullet label="xGA/60" context="5v5" percentile={null} category="defense" />
+              </div>
+            </VariantCard>
+            <VariantCard caption="Low sample — 50% opacity + SS badge">
+              <div className="w-full">
+                <PercentileBullet label="xG/60" context="5v5" percentile={73} rawValue={2.91} rawUnit="/60" sampleSize={11} category="offense" />
+              </div>
+            </VariantCard>
+            <VariantCard caption="Loading skeleton">
+              <div className="w-full">
+                <PercentileBullet label="loading" percentile={50} isLoading />
+              </div>
+            </VariantCard>
+            <VariantCard caption="Compact mode — label + bar only">
+              <div className="w-full">
+                <PercentileBullet label="EVO GAR" percentile={87} rawValue={2.18} category="defense" compact />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        <SubSection title="Sizes — sm vs md">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <VariantCard caption="sm · no floor scale · for stacks of 8+">
+              <div className="w-full space-y-2">
+                <PercentileBullet size="sm" label="xG/60" percentile={87} rawValue={3.42} rawUnit="/60" sampleSize={68} category="offense" />
+                <PercentileBullet size="sm" label="EVD" percentile={42} rawValue={2.18} rawUnit="/60" sampleSize={68} category="defense" />
+                <PercentileBullet size="sm" label="PP" percentile={91} rawValue={9.82} rawUnit="/60" sampleSize={68} category="special" />
+              </div>
+            </VariantCard>
+            <VariantCard caption="md · with floor scale · for hero breakdowns">
+              <div className="w-full">
+                <PercentileBullet size="md" label="xG/60" percentile={87} rawValue={3.42} rawUnit="/60" sampleSize={68} category="offense" />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        <SubSection title="Full statistical breakdown — stacked vertical layout">
+          <div className="max-w-md p-5 rounded-2xl bg-pastel-surface-tile ring-1 ring-white/10">
+            <div className="flex items-center gap-3 mb-5">
+              <PlayerMonogram size="md" {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
+              <div>
+                <div className="font-sans font-bold text-pastel-cream text-[15px]">Connor McDavid</div>
+                <div className="font-jbmono text-[10px] uppercase tracking-wider text-white/45">C · EDM · 5v5</div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <PercentileBullet size="sm" label="EVO GAR" context="off" percentile={99} rawValue={4.21} rawUnit="/60" sampleSize={71} category="offense" />
+              <PercentileBullet size="sm" label="EVD GAR" context="def" percentile={48} rawValue={0.12} rawUnit="/60" sampleSize={71} category="defense" />
+              <PercentileBullet size="sm" label="PPO GAR" context="PP" percentile={94} rawValue={3.18} rawUnit="/60" sampleSize={71} category="special" />
+              <PercentileBullet size="sm" label="PEN GAR" context="net" percentile={62} rawValue={0.41} rawUnit="/60" sampleSize={71} category="neutral" />
+              <PercentileBullet size="sm" label="GP" percentile={88} rawValue={71} sampleSize={71} category="neutral" />
+            </div>
+          </div>
+        </SubSection>
+
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* StaleDataBadge                                              */}
+        {/* ────────────────────────────────────────────────────────── */}
+        <SectionHeader
+          eyebrow="Primitive 3 of 3"
+          title="StaleDataBadge"
+          blurb="First-class freshness signal. We display this everywhere a card or section is showing data that hasn't refreshed in 14+ days. Auto-computes severity from days-since-update — warning (14-30d) → alert (30-84d) → critical (84d+)."
+        />
+
+        <SubSection title="Inline chip — three severity tiers">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <VariantCard caption="Warning · 17d (player_directory pattern)">
+              <StaleDataBadge asOf={daysAgo(17)} />
+            </VariantCard>
+            <VariantCard caption="Alert · 45d (between thresholds)">
+              <StaleDataBadge asOf={daysAgo(45)} />
+            </VariantCard>
+            <VariantCard caption="Critical · 137d (goalie_gar pattern)">
+              <StaleDataBadge asOf={daysAgo(137)} />
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        <SubSection title="Block banner — for full sections">
+          <div className="space-y-3 max-w-2xl">
+            <StaleDataBadge variant="block" asOf={daysAgo(17)} label="Player directory" />
+            <StaleDataBadge variant="block" asOf={daysAgo(45)} label="ROS projections" />
+            <StaleDataBadge variant="block" asOf={daysAgo(137)} label="Goalie GAR model" />
+            <StaleDataBadge variant="block" asOf={null} label="Pipeline status" />
+          </div>
+        </SubSection>
+
+        <SubSection title="Hidden state — fresh data renders nothing">
+          <VariantCard caption="2d old data → no badge rendered (verify by inspecting the empty card below)">
+            <div className="text-white/45 font-jbmono text-[10px] uppercase tracking-wider">
+              <StaleDataBadge asOf={daysAgo(2)} />
+              <span>(nothing should render before this caption)</span>
+            </div>
+          </VariantCard>
+        </SubSection>
+
+        <SubSection title="Custom threshold — daily-projected stats want 7-day threshold">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <VariantCard caption="Default 14d threshold · 7d data is fresh">
+              <StaleDataBadge asOf={daysAgo(7)} />
+              <span className="text-white/45 font-jbmono text-[10px] uppercase tracking-wider ml-2">
+                (no badge)
+              </span>
+            </VariantCard>
+            <VariantCard caption="Custom 7d threshold · 7d data triggers warning">
+              <StaleDataBadge asOf={daysAgo(7)} thresholdDays={7} />
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* Composition example — the three primitives together         */}
+        {/* ────────────────────────────────────────────────────────── */}
+        <SectionHeader
+          eyebrow="Putting it together"
+          title="Composition preview"
+          blurb="A glimpse at how these three primitives compose into a player profile card. Real assembly happens in Phase 1 (Day 4-5)."
+        />
+
+        <div className="max-w-md p-5 rounded-2xl bg-pastel-surface-tile ring-1 ring-white/10">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <PlayerMonogram size="lg" fullName="Igor Shesterkin" teamAbbrev="NYR" jerseyNumber={31} isLowSample />
+              <div>
+                <div className="font-sans font-black text-pastel-cream text-[18px] leading-tight">
+                  Igor Shesterkin
+                </div>
+                <div className="font-jbmono text-[10px] uppercase tracking-wider text-white/45 mt-0.5">
+                  G · NYR · 5v5
+                </div>
+              </div>
+            </div>
+            <StaleDataBadge asOf={daysAgo(137)} />
+          </div>
+          <div className="space-y-3">
+            <PercentileBullet size="sm" label="GSAx" context="5v5" percentile={91} rawValue={14.2} sampleSize={11} category="defense" />
+            <PercentileBullet size="sm" label="Rebound Control" percentile={73} rawValue={2.41} rawUnit="%" sampleSize={11} category="defense" />
+            <PercentileBullet size="sm" label="Total G-GAR" percentile={88} rawValue={11.8} sampleSize={11} category="defense" />
+          </div>
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <div className="font-jbmono text-[9px] uppercase tracking-[0.22em] text-white/45 font-bold mb-1">
+              Stormy verdict
+            </div>
+            <p className="text-[13px] text-pastel-orange-soft italic font-sans">
+              Elite GSAx season; only 11 GP raises sample concerns, and goalie model is 4+ months
+              stale.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-12 pt-6 border-t border-white/10">
+          <div className="font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45 font-bold mb-2">
+            Day 1 status
+          </div>
+          <p className="text-[13px] text-white/65">
+            ✦ 3 of 5 primitives shipped. Day 2 morning: PercentileRingCluster (Concept A hero) +
+            RinkHeatmap (one-mode-at-a-time spatial). Day 3: StormyVerdict generation pipeline +
+            page composition. Live on prod by May 11 for Web Summit.
+          </p>
+        </div>
+      </main>
+
+      <HockeyFooter />
+    </DarkLayout>
+  );
+}

@@ -16,6 +16,14 @@ export { TeamChip, TeamColorBar } from './TeamChip';
 export { MascotAvatar, MascotPortrait } from './MascotAvatar';
 export { LivePulse, Eyebrow } from './LivePulse';
 
+// Player dashboards primitives (Web Summit launch — May 11)
+export { PlayerMonogram } from './PlayerMonogram';
+export type { PlayerMonogramSize } from './PlayerMonogram';
+export { PercentileBullet } from './PercentileBullet';
+export type { PercentileCategory, PercentileSize } from './PercentileBullet';
+export { StaleDataBadge } from './StaleDataBadge';
+export type { StaleDataBadgeVariant } from './StaleDataBadge';
+
 // Brand mark
 export { CitrusLogo, CitrusWordmark } from './CitrusLogo';
 
