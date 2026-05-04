@@ -406,11 +406,27 @@ export function RinkHeatmap({
       )}
     >
       {/* Rink outline — geometry layer */}
-      <RinkOutline className={cn(isLoading && 'opacity-40')} />
+      <RinkOutline className={cn(isLoading && 'opacity-40', isLowSample && 'opacity-60')} />
 
-      {/* Shot dots overlay */}
+      {/* Shot dots overlay — muted in low-sample state per Stripe/Linear pattern */}
       {!isLoading && !isEmpty && (
-        <ShotDots shots={shots} hottestIndex={hottestIndex} pulseId={pulseId} />
+        <div className={cn('absolute inset-0', isLowSample && 'opacity-50')}>
+          <ShotDots shots={shots} hottestIndex={isLowSample ? -1 : hottestIndex} pulseId={pulseId} />
+        </div>
+      )}
+
+      {/* Low-sample overlay caption — explicit "more data needed" treatment */}
+      {isLowSample && (
+        <div className="absolute inset-0 grid place-items-center pointer-events-none">
+          <div className="bg-pastel-surface-tile/85 backdrop-blur-sm ring-1 ring-pastel-butter/30 rounded-lg px-4 py-3 text-center max-w-[280px]">
+            <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] font-bold text-pastel-butter mb-1">
+              Limited sample
+            </div>
+            <div className="font-sans text-[12px] text-white/65 leading-snug">
+              {shots.length} shot{shots.length === 1 ? '' : 's'} · need{shots.length === 1 ? 's' : ''} more data for confident heatmap
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Loading / empty fallbacks */}
@@ -486,25 +502,12 @@ export function RinkHeatmap({
         </div>
       )}
 
-      {/* Optional caption + low-sample badge along bottom */}
-      {(caption || isLowSample) && (
-        <div className="absolute left-6 sm:left-10 bottom-2 right-44 flex items-center gap-2 pointer-events-none">
-          {isLowSample && (
-            <span
-              className={cn(
-                'font-jbmono uppercase tracking-[0.18em] text-[9px] font-bold',
-                'bg-pastel-butter/15 text-pastel-butter ring-1 ring-pastel-butter/40',
-                'rounded px-1.5 py-0.5',
-              )}
-            >
-              SS · {shots.length} shots
-            </span>
-          )}
-          {caption && (
-            <span className="font-jbmono uppercase tracking-[0.18em] text-[9px] font-bold text-white/45 truncate">
-              {caption}
-            </span>
-          )}
+      {/* Optional caption along bottom-left (low-sample now uses overlay treatment above) */}
+      {caption && !isLowSample && (
+        <div className="absolute left-6 sm:left-10 bottom-2 right-44 pointer-events-none">
+          <span className="font-jbmono uppercase tracking-[0.18em] text-[9px] font-bold text-white/45 truncate">
+            {caption}
+          </span>
         </div>
       )}
     </section>

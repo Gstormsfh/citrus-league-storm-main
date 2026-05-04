@@ -24,13 +24,13 @@ import {
   type ShotEvent,
 } from '@/components/citrus2';
 
-// ── Mock shot data — realistic NHL offensive-zone distribution ──
-// Visual diff iteration #2: bumped from ~74 dots to ~190 dots with much
-// heavier slot concentration (50 + 30 + 20 = 100 dots in slot region alone)
-// to match the mockup's visible heatmap-cluster density. Distribution is
-// gaussian-ish around hot zones, loose elsewhere.
+// ── Mock shot data — slot-concentrated NHL distribution ──
+// Visual diff iteration #3: distribution rebalanced. Mockup shows nearly
+// all dots concentrated in upper-half (slot + faceoff). Lower-half stays
+// near-empty because the identity composition (jersey watermark + name)
+// takes ownership of that space. Drastically cut points/boards from
+// 16+24=40 down to 6+4=10 — sparse hint, not cluttered scatter.
 function jitter(center: number, spread: number): number {
-  // Box-Muller-ish — clusters tighter than uniform random
   const u = Math.random() + 0.0001;
   const v = Math.random();
   const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
@@ -38,67 +38,59 @@ function jitter(center: number, spread: number): number {
 }
 
 const MOCK_SHOTS: ShotEvent[] = [
-  // SLOT cluster — the dense orange heatmap (50 dots, gaussian around center slot)
-  ...Array.from({ length: 50 }, (_, i) => ({
+  // SLOT cluster — dense orange heatmap (60 dots, tight gaussian)
+  ...Array.from({ length: 60 }, (_, i) => ({
     id: `slot-${i}`,
-    x: jitter(0.50, 0.06),
-    y: jitter(0.84, 0.05),
+    x: jitter(0.50, 0.05),
+    y: jitter(0.84, 0.04),
     xg_value: 0.18 + Math.random() * 0.14,
     is_goal: i % 5 === 0,
   })),
-  // HIGH SLOT — orange/butter mix above the slot (30 dots)
-  ...Array.from({ length: 30 }, (_, i) => ({
+  // HIGH SLOT — orange/butter mix above the slot (35 dots)
+  ...Array.from({ length: 35 }, (_, i) => ({
     id: `highslot-${i}`,
-    x: jitter(0.50, 0.09),
+    x: jitter(0.50, 0.08),
     y: jitter(0.74, 0.04),
     xg_value: 0.10 + Math.random() * 0.10,
-    is_goal: i % 8 === 0,
+    is_goal: i % 9 === 0,
   })),
-  // LOW SLOT — close to crease, very high xG (20 dots)
-  ...Array.from({ length: 20 }, (_, i) => ({
+  // LOW SLOT — close to crease, very high xG (22 dots)
+  ...Array.from({ length: 22 }, (_, i) => ({
     id: `lowslot-${i}`,
-    x: jitter(0.50, 0.05),
+    x: jitter(0.50, 0.04),
     y: jitter(0.93, 0.03),
     xg_value: 0.22 + Math.random() * 0.20,
     is_goal: i % 3 === 0,
   })),
-  // LEFT FACEOFF area — moderate density (24 dots)
+  // LEFT FACEOFF area — moderate density (24 dots, tight to circle)
   ...Array.from({ length: 24 }, (_, i) => ({
     id: `lcircle-${i}`,
-    x: jitter(0.30, 0.07),
-    y: jitter(0.62, 0.10),
+    x: jitter(0.30, 0.06),
+    y: jitter(0.64, 0.07),
     xg_value: 0.04 + Math.random() * 0.08,
     is_goal: i % 12 === 0,
   })),
-  // RIGHT FACEOFF area — moderate density (24 dots)
+  // RIGHT FACEOFF area — moderate density (24 dots, tight to circle)
   ...Array.from({ length: 24 }, (_, i) => ({
     id: `rcircle-${i}`,
-    x: jitter(0.70, 0.07),
-    y: jitter(0.62, 0.10),
+    x: jitter(0.70, 0.06),
+    y: jitter(0.64, 0.07),
     xg_value: 0.04 + Math.random() * 0.08,
     is_goal: i % 12 === 0,
   })),
-  // POINTS (blue line) — sparse, low xG (16 dots)
-  ...Array.from({ length: 16 }, (_, i) => ({
+  // POINTS — sparse hint (6 dots only, NOT a cluttered scatter)
+  ...Array.from({ length: 6 }, (_, i) => ({
     id: `point-${i}`,
-    x: 0.15 + Math.random() * 0.70,
-    y: 0.06 + Math.random() * 0.14,
+    x: 0.20 + Math.random() * 0.60,
+    y: 0.08 + Math.random() * 0.10,
     xg_value: 0.02 + Math.random() * 0.04,
     is_goal: false,
   })),
-  // LEFT BOARDS — sage scatter (12 dots)
-  ...Array.from({ length: 12 }, (_, i) => ({
-    id: `lboards-${i}`,
-    x: 0.04 + Math.random() * 0.10,
-    y: 0.20 + Math.random() * 0.60,
-    xg_value: 0.02 + Math.random() * 0.04,
-    is_goal: false,
-  })),
-  // RIGHT BOARDS — sage scatter (12 dots)
-  ...Array.from({ length: 12 }, (_, i) => ({
-    id: `rboards-${i}`,
-    x: 0.86 + Math.random() * 0.10,
-    y: 0.20 + Math.random() * 0.60,
+  // BOARDS — sparse hint along the upper edges (4 dots only)
+  ...Array.from({ length: 4 }, (_, i) => ({
+    id: `boards-${i}`,
+    x: i % 2 === 0 ? 0.06 : 0.92,
+    y: 0.45 + Math.random() * 0.30,
     xg_value: 0.02 + Math.random() * 0.04,
     is_goal: false,
   })),
@@ -227,32 +219,29 @@ export default function PreviewDashboardPrimitives() {
           />
         </SubSection>
 
-        <SubSection title="States">
+        <SubSection title="States — clean rink only (identity composition demoed in the hero above)">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <VariantCard caption="Loading state — shimmer caption, no dots">
+            <VariantCard caption="Loading state">
               <div className="w-full">
-                <RinkHeatmap shots={[]} isLoading playerName="A. PRIMA" eyebrow="C · ROYAL BLUES" jerseyNumber={97} />
+                <RinkHeatmap shots={[]} isLoading caption="Loading…" />
               </div>
             </VariantCard>
             <VariantCard caption="Empty state — no shots in this mode">
               <div className="w-full">
-                <RinkHeatmap shots={[]} mode="pp" playerName="A. PRIMA" eyebrow="C · ROYAL BLUES" jerseyNumber={97} />
+                <RinkHeatmap shots={[]} mode="pp" caption="No PP shots yet this season" />
               </div>
             </VariantCard>
-            <VariantCard caption="Low-sample state (<50 shots) — SS badge">
+            <VariantCard caption="Low-sample state — overlay caption + muted dots">
               <div className="w-full">
                 <RinkHeatmap
                   shots={MOCK_LOW_SAMPLE}
-                  playerName="A. PRIMA"
-                  eyebrow="C · ROYAL BLUES"
-                  jerseyNumber={97}
-                  caption={`5v5 · ${MOCK_LOW_SAMPLE.length} shots`}
+                  caption="Limited sample"
                 />
               </div>
             </VariantCard>
-            <VariantCard caption="Naked rink — no identity composition, no verdict">
+            <VariantCard caption="Mode switching — change segmented control">
               <div className="w-full">
-                <RinkHeatmap shots={MOCK_SHOTS} caption={`${MOCK_SHOTS.length} attempts`} />
+                <RinkHeatmap shots={MOCK_SHOTS.slice(0, 80)} mode="pp" onModeChange={() => {}} caption="80 attempts · PP only" />
               </div>
             </VariantCard>
           </div>
