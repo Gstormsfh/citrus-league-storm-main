@@ -35,8 +35,15 @@ jobs:
 
       # Step 0: Ingest playoff game schedule into nhl_games so the live
       # scraper (data_scraping_service.py) picks them up automatically.
-      # Safe to re-run — uses upsert on game_id. Scans 7 days ahead to
-      # catch newly announced games.
+      # Safe to re-run — uses upsert on game_id.
+      #
+      # Window: 30 days back, 7 days forward. The forward portion catches
+      # newly-announced games; the backward portion is the safety net for
+      # any prior cron outage (e.g. the proxy_manager bug that took out
+      # April 17 → May 4) that left finished games un-ingested. Without
+      # this window, "today only" scans permanently miss any game that
+      # was completed during a cron outage, and the daemon RPC that
+      # derives series wins from nhl_games has nothing to count.
       #
       # NO continue-on-error here. If this step fails, every downstream
       # job operates on stale/missing schedule data and the live scraper
@@ -44,7 +51,7 @@ jobs:
       # by hand. Fail the run loudly so GitHub emails about it.
       - name: Ingest playoff game schedule
         run: |
-          START=$(date -d "today" +%Y-%m-%d)
+          START=$(date -d "30 days ago" +%Y-%m-%d)
           END=$(date -d "+7 days" +%Y-%m-%d)
           python data-pipeline/acquisition/ingest_playoff_schedule.py --start "$START" --end "$END" --season 2025
 
