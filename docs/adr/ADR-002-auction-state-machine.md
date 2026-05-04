@@ -2,7 +2,7 @@
 
 ## §1. Status & Authority
 
-**Status:** Path A event-sourcing ratified by Zach 2026-04-30. Remaining §8 questions still open.
+**Status:** All architectural decisions ratified by Zach 2026-04-30 (Path A event-sourcing async-confirmed earlier same day; §3.2–§3.5 verbally ratified during in-person meeting). ADR locked.
 
 **Date:** 2026-04-30.
 
@@ -354,11 +354,11 @@ Rejected because:
 These are the items Garrett has flagged for Zach's explicit review before chunk 11g.6 implementation begins. Garrett's recommendations are noted; Zach has authority to confirm, push back, or revise.
 
 - **§3.1 Polymorphic event types vs separate table.** ✅ Ratified by Zach 2026-04-30 after sharpened envelope-vs-payload framing. See §3.1 for full reasoning.
-- **§3.2 Format-aware LobbyManager vs separate class.** Garrett ratified format-aware 2026-04-30. Confirming Zach agrees this aligns with chunk 11g.4 plumbing intent.
-- **§3.3 Anti-snipe defaults (30s threshold, 30s extension).** Garrett ratified industry-standard 2026-04-30. Confirming default values are reasonable for NHL fantasy auction culture.
-- **§3.4 Nomination window default (60s).** Garrett ratified 2026-04-30. Confirming default is reasonable for NHL fantasy auction culture.
-- **§4.2 Auto-nominate fallback algorithm.** Garrett ratified queue → ML → commissioner pre-set 2026-04-30. Confirming all three fallbacks are appropriately scoped, especially commissioner pre-set as the last-resort layer.
-- **§4.3 Commissioner-customizable surface.** Confirming the customization surface is comprehensive; flagging anything missing.
+- **§3.2 Format-aware LobbyManager vs separate class.** ✅ Ratified by Zach 2026-04-30 in-person meeting. Format-aware single class with state-machine dispatch is the right shape; aligns with chunk 11g.4 plumbing intent.
+- **§3.3 Anti-snipe defaults (30s threshold, 30s extension).** ✅ Ratified by Zach 2026-04-30 in-person meeting. Industry-standard incremental extension; defaults appropriate for NHL fantasy auction culture.
+- **§3.4 Nomination window default (60s).** ✅ Ratified by Zach 2026-04-30 in-person meeting. 60s default is reasonable for NHL fantasy auction culture.
+- **§4.2 Auto-nominate fallback algorithm.** ✅ Ratified by Zach 2026-04-30 in-person meeting. Queue head → ML projection → commissioner pre-set fallback chain is appropriately scoped.
+- **§4.3 Commissioner-customizable surface.** ✅ Ratified by Zach 2026-04-30 in-person meeting. Customization surface (budget, min bid, increment tiers, nomination/bid windows, anti-snipe threshold/extension) is comprehensive.
 
 ---
 
@@ -369,3 +369,4 @@ These are the items Garrett has flagged for Zach's explicit review before chunk 
 | 2026-04-30 | Garrett Storms | Initial draft. Five architectural decisions captured per Garrett's ratifications 2026-04-30. Path A event-sourcing pending Zach's separate confirmation. |
 | 2026-04-30 | Garrett Storms | Sharpened §3.1 in response to Zach's pushback on polymorphic events. Clarified that polymorphism is at the envelope level (uniform `draft_events` table structure) not the payload level (JSONB handles type-specific variance). No decision change; reasoning made explicit. |
 | 2026-04-30 | Zach Drever | Ratified path A (single `draft_events` table, polymorphic event types) after sharpened envelope-vs-payload framing. ADR-002 §3.1 locked. |
+| 2026-04-30 | Zach Drever | Verbally ratified all remaining ADR-002 architectural decisions (§3.2 format-aware LobbyManager, §3.3 anti-snipe defaults, §3.4 nomination window default, §4.2 auto-nominate algorithm, §4.3 commissioner customization surface) during in-person meeting with Garrett. Specifically validated that the single-writer queue from chunk 11g.4 cleanly resolves the auction bid race condition. ADR-002 fully locked. |

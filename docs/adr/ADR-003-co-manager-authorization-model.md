@@ -2,7 +2,7 @@
 
 ## §1. Status & Authority
 
-**Status:** Draft. Pending Zach's review.
+**Status:** All architectural decisions ratified by Zach 2026-04-30 in-person meeting. ADR locked.
 
 **Date:** 2026-04-30.
 
@@ -475,14 +475,14 @@ Rejected because:
 
 Garrett's recommendations are noted; Zach has authority to confirm, push back, or revise.
 
-- **§3.1 `team_managers` schema shape (join table with role enum).** Garrett ratified 2026-04-30. Confirming the schema choices (PK, unique constraints, indexes, denormalized `league_id`) align with Zach's architecture-doc-level expectations.
-- **§3.2 `team_authorized()` SQL helper as single source of truth.** Garrett ratified 2026-04-30. Confirming `STABLE SECURITY DEFINER` choice and the two-function split (`team_authorized` for view, `team_can_submit` for submit-level actions).
-- **§3.3 `requireTeamAuthorization()` application-layer helper.** Garrett ratified 2026-04-30. Confirming the action discrimination (`'view' | 'submit'`) at the call-site level is the right pattern.
-- **§3.4 Exclusivity enforcement.** Garrett ratified 2026-04-30. Confirming the database-level constraint approach is preferred over application-layer.
-- **§3.5 AI team handling.** Garrett ratified 2026-04-30. Confirming the "zero rows in `team_managers`, helpers short-circuit to `false`" approach.
-- **§5 Four-phase migration sequencing (centralize → schema → features → cleanup).** Garrett ratified 2026-04-30. Confirming the conservative phasing is appropriate; alternative is collapsing Phases 1-3 into a single PR.
-- **§4.3 Auto-promote oldest co-manager on head deletion.** Garrett ratified 2026-04-30. Confirming the auto-promote behavior is preferred over explicit commissioner intervention.
-- **§4.4 Notification fanout policy v1 (all managers, all events).** Garrett ratified 2026-04-30 (with v1.1 adding per-event toggles). Confirming the v1 simplicity is the right tradeoff for launch.
+- **§3.1 `team_managers` schema shape (join table with role enum).** ✅ Ratified by Zach 2026-04-30 in-person meeting. Join table with `role` enum, `(team_id, user_id)` PK, `UNIQUE(league_id, user_id)`, denormalized `league_id` for exclusivity enforcement.
+- **§3.2 `team_authorized()` SQL helper as single source of truth.** ✅ Ratified by Zach 2026-04-30 in-person meeting. `STABLE SECURITY DEFINER` two-function split (`team_authorized` for view paths, `team_can_submit` for head-only submit paths).
+- **§3.3 `requireTeamAuthorization()` application-layer helper.** ✅ Ratified by Zach 2026-04-30 in-person meeting. `'view' | 'submit'` action discrimination at the call-site level forces explicit permission consideration.
+- **§3.4 Exclusivity enforcement.** ✅ Ratified by Zach 2026-04-30 in-person meeting. Database-level `UNIQUE(league_id, user_id)` constraint; one role per user per league.
+- **§3.5 AI team handling.** ✅ Ratified by Zach 2026-04-30 in-person meeting. AI teams have zero rows in `team_managers`; authorization helpers short-circuit to `false`.
+- **§5 Four-phase migration sequencing (centralize → schema → features → cleanup).** ✅ Ratified by Zach 2026-04-30 in-person meeting. Conservative phasing keeps each phase independently reversible.
+- **§4.3 Auto-promote oldest co-manager on head deletion.** ✅ Ratified by Zach 2026-04-30 in-person meeting. Auto-promote with `ORDER BY created_at, user_id` deterministic tiebreaker; commissioner override available via Phase 3 promote flow.
+- **§4.4 Notification fanout policy v1 (all managers, all events).** ✅ Ratified by Zach 2026-04-30 in-person meeting. v1 simplicity (all managers, all events); v1.1 adds per-event toggles.
 
 ---
 
@@ -491,3 +491,4 @@ Garrett's recommendations are noted; Zach has authority to confirm, push back, o
 | Date | Author | Change |
 |---|---|---|
 | 2026-04-30 | Garrett Storms | Initial draft. Five architectural decisions captured per Garrett's ratifications 2026-04-30. Pending Zach's broader review. |
+| 2026-04-30 | Zach Drever | Verbally ratified all five architectural decisions (§3.1 `team_managers` schema, §3.2 `team_authorized()` SQL helper, §3.3 `requireTeamAuthorization()` application helper, §3.4 exclusivity enforcement, §3.5 AI team handling) plus 4-phase migration plan, auto-promote on head deletion, and v1 notification fanout policy during in-person meeting with Garrett. ADR-003 fully locked. |
