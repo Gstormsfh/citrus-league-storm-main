@@ -428,15 +428,16 @@ Rejected because:
 - Edge cases proliferate (cross-team trade authorization, notification routing, UI ambiguity).
 - Yahoo/ESPN industry standard is exclusivity.
 
-### A5 — Auto-promote oldest co-manager on head deletion (selected per Garrett 2026-04-30)
+### A5 — Explicit commissioner intervention on head deletion (rejected per Garrett 2026-04-30)
 
-Considered: explicit commissioner intervention required when head manager profile is deleted, with no auto-promote.
+Considered: when a head manager's profile is deleted, the team becomes ownerless and stays that way until a commissioner explicitly intervenes to promote a co-manager or assign a new owner.
 
 Rejected because:
 
-- Auto-promote is more user-friendly. The team continues functioning without commissioner action.
-- "Oldest co-manager wins" is a deterministic tiebreaker that matches the common-sense expectation ("the co-manager who joined first becomes the new head").
-- Commissioner override remains available if the auto-promotion is wrong (commissioner can promote a different co-manager via the Phase 3 promote flow).
+- **Less user-friendly.** The team stops functioning until commissioner action — picks/bids/trades all blocked.
+- **Commissioner burden scales poorly.** In a league with frequent profile churn, this becomes a recurring task the commissioner must handle.
+- **Auto-promote with deterministic tiebreaker is the better default.** "Oldest co-manager wins" matches the common-sense expectation ("the co-manager who joined first becomes the new head") and keeps the team operational.
+- **Commissioner override remains available.** If the auto-promotion is wrong (e.g., the commissioner wanted a different co-manager promoted), the Phase 3 promote flow lets the commissioner re-promote a different co-manager.
 
 ---
 
