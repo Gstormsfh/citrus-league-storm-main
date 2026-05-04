@@ -117,6 +117,7 @@ Legacy `ops/cloudrun/` configuration and CI references to Cloud Run remain in th
 - `docs/PHASE_4_5_ARCHITECTURE_ANSWERS.md` — Citrus-specific answers to the architecture doc's clarifying questions (draft formats, on-call, SLO, expected launch volume, etc.).
 - `docs/adr/ADR-001-persistent-node-draft-engine.md` — full ADR with research, alternatives, Decision History, and consequences.
 - `docs/adr/ADR-002-auction-state-machine.md` — auction draft state machine design (v1 → live engine migration, race condition fix, anti-snipe industry-standard, auto-nominate algorithm).
+- `docs/adr/ADR-003-co-manager-authorization-model.md` — co-manager authorization model (single-owner → head/co schema migration, SECURITY DEFINER + RLS centralization).
 - `docs/PHASE_4_5_PLAN.md` — chunks 11g.0 through 11g.10 implementation plan.
 - `docs/REGISTRY.md` — project-wide known-issues registry. KI-008 (architectural pivot from Edge Functions), KI-009 (Edge Function infrastructure removed entirely), KI-010 (Tier 1 perf optimizations baked in from start) live here.
 
