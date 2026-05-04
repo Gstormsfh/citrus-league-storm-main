@@ -1,0 +1,53 @@
+# ── Citrus Draft Engine — chunk 11g.2 step 1 scaffold ───────────────
+# Multi-stage Debian-based build for the dual-port (Hono + uWS) draft
+# engine entry point at server/src/draft/index.ts.
+#
+# Per docs/PHASE_4_5_GCE_PLATFORM_NOTES.md the uWebSockets.js prebuilt
+# binary is glibc-linked and does not work on Alpine; bookworm-slim is
+# the validated base image. git is required at install time because
+# uWS is installed from a GitHub tarball.
+#
+# Step 1 of chunk 11g.2: scaffold + smoke test only. Production deploy
+# wiring (CI/CD, GCE staging VM, secrets, real Hono app from app.ts)
+# lands in chunk 11g.2 steps 4-5.
+
+# ── Stage 1: Install dependencies ───────────────────────────────────
+FROM node:22-bookworm-slim AS deps
+WORKDIR /app
+
+# uWebSockets.js installs from a GitHub tarball; npm needs git for that.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace root config + all workspace package.json files. npm
+# hoists to root node_modules, so all package.jsons must be present
+# for npm ci to resolve the workspace graph correctly.
+COPY package.json package-lock.json ./
+COPY server/package.json ./server/
+COPY packages/shared/package.json ./packages/shared/
+COPY apps/web/package.json ./apps/web/
+
+RUN npm ci
+
+# ── Stage 2: Runtime ────────────────────────────────────────────────
+FROM node:22-bookworm-slim AS runner
+WORKDIR /app
+
+# Copy installed dependencies from the deps stage.
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json ./
+
+# Copy server source + shared package source.
+COPY server/ ./server/
+COPY packages/shared/ ./packages/shared/
+
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV DRAFT_WS_PORT=3002
+
+EXPOSE 3001 3002
+
+# Use tsx to run TypeScript directly (matches existing server/Dockerfile
+# pattern — @citrus/shared exports raw .ts files, no build step).
+CMD ["npx", "tsx", "server/src/draft/index.ts"]

@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
     "dev:server": "npm run dev --workspace=server",
+    "dev:draft-engine": "npm run dev:draft-engine --workspace=server",
     "dev:all": "npm run dev --workspace=apps/web & npm run dev --workspace=server",
     "build": "npm run build --workspace=packages/shared && npm run build --workspace=apps/web",
     "build:server": "npm run build --workspace=packages/shared && npm run build --workspace=server",
