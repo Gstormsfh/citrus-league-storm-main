@@ -25,55 +25,81 @@ import {
 } from '@/components/citrus2';
 
 // ── Mock shot data — realistic NHL offensive-zone distribution ──
-// Heavy slot concentration, moderate at faceoff circles, sparse along boards
-// and at points. ~80 shots total to mirror the mockup's density.
+// Visual diff iteration #2: bumped from ~74 dots to ~190 dots with much
+// heavier slot concentration (50 + 30 + 20 = 100 dots in slot region alone)
+// to match the mockup's visible heatmap-cluster density. Distribution is
+// gaussian-ish around hot zones, loose elsewhere.
+function jitter(center: number, spread: number): number {
+  // Box-Muller-ish — clusters tighter than uniform random
+  const u = Math.random() + 0.0001;
+  const v = Math.random();
+  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  return Math.max(0, Math.min(1, center + z * spread));
+}
+
 const MOCK_SHOTS: ShotEvent[] = [
-  // High slot — the danger zone, lots of orange
-  ...Array.from({ length: 18 }, (_, i) => ({
+  // SLOT cluster — the dense orange heatmap (50 dots, gaussian around center slot)
+  ...Array.from({ length: 50 }, (_, i) => ({
     id: `slot-${i}`,
-    x: 0.42 + Math.random() * 0.16,
-    y: 0.78 + Math.random() * 0.14,
-    xg_value: 0.18 + Math.random() * 0.12,
-    is_goal: i % 4 === 0,
+    x: jitter(0.50, 0.06),
+    y: jitter(0.84, 0.05),
+    xg_value: 0.18 + Math.random() * 0.14,
+    is_goal: i % 5 === 0,
   })),
-  // Low slot — close to net
-  ...Array.from({ length: 8 }, (_, i) => ({
+  // HIGH SLOT — orange/butter mix above the slot (30 dots)
+  ...Array.from({ length: 30 }, (_, i) => ({
+    id: `highslot-${i}`,
+    x: jitter(0.50, 0.09),
+    y: jitter(0.74, 0.04),
+    xg_value: 0.10 + Math.random() * 0.10,
+    is_goal: i % 8 === 0,
+  })),
+  // LOW SLOT — close to crease, very high xG (20 dots)
+  ...Array.from({ length: 20 }, (_, i) => ({
     id: `lowslot-${i}`,
-    x: 0.45 + Math.random() * 0.10,
-    y: 0.92 + Math.random() * 0.06,
-    xg_value: 0.22 + Math.random() * 0.18,
+    x: jitter(0.50, 0.05),
+    y: jitter(0.93, 0.03),
+    xg_value: 0.22 + Math.random() * 0.20,
     is_goal: i % 3 === 0,
   })),
-  // Faceoff dots (left + right)
-  ...Array.from({ length: 12 }, (_, i) => ({
-    id: `circle-${i}`,
-    x: i % 2 === 0 ? 0.20 + Math.random() * 0.16 : 0.64 + Math.random() * 0.16,
-    y: 0.55 + Math.random() * 0.18,
-    xg_value: 0.06 + Math.random() * 0.06,
-    is_goal: false,
+  // LEFT FACEOFF area — moderate density (24 dots)
+  ...Array.from({ length: 24 }, (_, i) => ({
+    id: `lcircle-${i}`,
+    x: jitter(0.30, 0.07),
+    y: jitter(0.62, 0.10),
+    xg_value: 0.04 + Math.random() * 0.08,
+    is_goal: i % 12 === 0,
   })),
-  // Points (blue line) — low xG
-  ...Array.from({ length: 14 }, (_, i) => ({
+  // RIGHT FACEOFF area — moderate density (24 dots)
+  ...Array.from({ length: 24 }, (_, i) => ({
+    id: `rcircle-${i}`,
+    x: jitter(0.70, 0.07),
+    y: jitter(0.62, 0.10),
+    xg_value: 0.04 + Math.random() * 0.08,
+    is_goal: i % 12 === 0,
+  })),
+  // POINTS (blue line) — sparse, low xG (16 dots)
+  ...Array.from({ length: 16 }, (_, i) => ({
     id: `point-${i}`,
-    x: 0.10 + Math.random() * 0.80,
-    y: 0.04 + Math.random() * 0.18,
+    x: 0.15 + Math.random() * 0.70,
+    y: 0.06 + Math.random() * 0.14,
     xg_value: 0.02 + Math.random() * 0.04,
     is_goal: false,
   })),
-  // Boards
-  ...Array.from({ length: 16 }, (_, i) => ({
-    id: `boards-${i}`,
-    x: i % 2 === 0 ? 0.04 + Math.random() * 0.08 : 0.88 + Math.random() * 0.08,
+  // LEFT BOARDS — sage scatter (12 dots)
+  ...Array.from({ length: 12 }, (_, i) => ({
+    id: `lboards-${i}`,
+    x: 0.04 + Math.random() * 0.10,
     y: 0.20 + Math.random() * 0.60,
-    xg_value: 0.03 + Math.random() * 0.04,
+    xg_value: 0.02 + Math.random() * 0.04,
     is_goal: false,
   })),
-  // Wrap-arounds
-  ...Array.from({ length: 6 }, (_, i) => ({
-    id: `wrap-${i}`,
-    x: 0.30 + Math.random() * 0.40,
-    y: 0.96 + Math.random() * 0.04,
-    xg_value: 0.04 + Math.random() * 0.04,
+  // RIGHT BOARDS — sage scatter (12 dots)
+  ...Array.from({ length: 12 }, (_, i) => ({
+    id: `rboards-${i}`,
+    x: 0.86 + Math.random() * 0.10,
+    y: 0.20 + Math.random() * 0.60,
+    xg_value: 0.02 + Math.random() * 0.04,
     is_goal: false,
   })),
 ];

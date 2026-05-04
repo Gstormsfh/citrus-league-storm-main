@@ -126,8 +126,12 @@ function findHottestShot(shots: ShotEvent[]): number {
 // the mockup spec (functional canvas, not decorative).
 
 function RinkOutline({ className }: { className?: string }) {
+  // All rink lines share the same thin weight per Visual Diff iteration #7 —
+  // mockup reads as elegant hairline geometry, not heavy ink. Boards/circles/
+  // crease all use 0.25 stroke (was 0.4); secondary lines drop to 0.15.
   const stroke = 'rgba(255,255,255,0.30)';
-  const strokeWidth = 0.4;
+  const strokeWidth = 0.25;
+  const strokeWidthSecondary = 0.15;
 
   return (
     <svg
@@ -138,31 +142,30 @@ function RinkOutline({ className }: { className?: string }) {
     >
       {/* Boards (perimeter with rounded corners) */}
       <path
-        d="M 6 0 L 94 0 L 94 0 Q 100 0 100 6 L 100 79 Q 100 85 94 85 L 6 85 Q 0 85 0 79 L 0 6 Q 0 0 6 0 Z"
+        d="M 6 0 L 94 0 Q 100 0 100 6 L 100 79 Q 100 85 94 85 L 6 85 Q 0 85 0 79 L 0 6 Q 0 0 6 0 Z"
         fill="none"
         stroke={stroke}
         strokeWidth={strokeWidth}
       />
 
       {/* Goal line (top) */}
-      <line x1="0" y1="11" x2="100" y2="11" stroke={stroke} strokeWidth={strokeWidth * 0.6} />
+      <line x1="0" y1="11" x2="100" y2="11" stroke={stroke} strokeWidth={strokeWidthSecondary} />
 
-      {/* Goal crease (small half-circle at top-center) */}
+      {/* Goal crease (smaller, thinner half-circle just below goal line) */}
       <path
-        d="M 44 11 A 6 6 0 0 0 56 11"
+        d="M 46 11 A 4 4 0 0 0 54 11"
         fill="none"
         stroke={stroke}
-        strokeWidth={strokeWidth * 1.2}
+        strokeWidth={strokeWidth}
       />
 
-      {/* Goal posts (tiny rectangles inside the crease) */}
-      <line x1="46" y1="11" x2="46" y2="9.5" stroke={stroke} strokeWidth={strokeWidth} />
-      <line x1="54" y1="11" x2="54" y2="9.5" stroke={stroke} strokeWidth={strokeWidth} />
+      {/* Tiny goal-mouth indicator centered on goal line */}
+      <rect x="49" y="9.5" width="2" height="1.5" fill="none" stroke={stroke} strokeWidth={strokeWidthSecondary} />
 
       {/* Two large faceoff circles (offensive deep zone) */}
       {/* Left circle */}
       <circle cx="31" cy="31" r="9" fill="none" stroke={stroke} strokeWidth={strokeWidth} />
-      <circle cx="31" cy="31" r="0.6" fill={stroke} />
+      <circle cx="31" cy="31" r="0.5" fill={stroke} />
       {/* Hashmarks on left circle */}
       <line x1="29" y1="22.4" x2="29" y2="20.4" stroke={stroke} strokeWidth={strokeWidth} />
       <line x1="33" y1="22.4" x2="33" y2="20.4" stroke={stroke} strokeWidth={strokeWidth} />
@@ -171,7 +174,7 @@ function RinkOutline({ className }: { className?: string }) {
 
       {/* Right circle */}
       <circle cx="69" cy="31" r="9" fill="none" stroke={stroke} strokeWidth={strokeWidth} />
-      <circle cx="69" cy="31" r="0.6" fill={stroke} />
+      <circle cx="69" cy="31" r="0.5" fill={stroke} />
       {/* Hashmarks on right circle */}
       <line x1="67" y1="22.4" x2="67" y2="20.4" stroke={stroke} strokeWidth={strokeWidth} />
       <line x1="71" y1="22.4" x2="71" y2="20.4" stroke={stroke} strokeWidth={strokeWidth} />
@@ -179,10 +182,10 @@ function RinkOutline({ className }: { className?: string }) {
       <line x1="71" y1="39.6" x2="71" y2="41.6" stroke={stroke} strokeWidth={strokeWidth} />
 
       {/* Small reference dot near goal-line center */}
-      <circle cx="50" cy="20" r="0.6" fill={stroke} />
+      <circle cx="50" cy="20" r="0.5" fill={stroke} />
 
       {/* Blue line at bottom (entrance to offensive zone) */}
-      <line x1="0" y1="80" x2="100" y2="80" stroke={stroke} strokeWidth={strokeWidth * 0.6} />
+      <line x1="0" y1="80" x2="100" y2="80" stroke={stroke} strokeWidth={strokeWidthSecondary} />
     </svg>
   );
 }
@@ -216,7 +219,11 @@ function ShotDots({
         // Map shot.x [0..1] → 4..96 (inset from boards), shot.y [0..1] → 78..14 (top to bottom)
         const cx = 4 + shot.x * 92;
         const cy = 78 - shot.y * 64;
-        const r = (shot.xg_value ?? 0.05) > 0.15 ? 1.4 : (shot.xg_value ?? 0.05) > 0.06 ? 1.0 : 0.7;
+        // Visual diff iteration #1: dot sizes cut by ~55% — mockup reads as
+        // density-cluster heatmap, not "M&Ms on ice." Target: 5-12px diameter
+        // at 800px-wide render (was 11-22px which read as decorative).
+        const xg = shot.xg_value ?? 0.05;
+        const r = xg > 0.15 ? 0.6 : xg > 0.06 ? 0.45 : 0.35;
         const fill = xgColor(shot.xg_value);
         const isHottest = idx === hottestIndex;
 
@@ -245,12 +252,16 @@ function ShotDots({
                   repeatCount="indefinite"
                 />
               </circle>
-              <circle cx={cx} cy={cy} r={r * 1.4} fill={fill} />
+              {/* Hottest dot inner — slightly larger than peers but still in target range */}
+              <circle cx={cx} cy={cy} r={r * 1.5} fill={fill} />
             </g>
           );
         }
 
-        // Goals are rendered with a thin cream ring to differentiate without color noise
+        // Visual diff iteration #3: NO strokes on any dots, including goals.
+        // White outlines made dots read as buttons/clickable UI. Goal vs miss
+        // differentiation deferred to the Shot Breakdown tile (component spec
+        // §5) where it's encoded as % numerics, not as visual decoration here.
         return (
           <circle
             key={shot.id ?? idx}
@@ -258,8 +269,6 @@ function ShotDots({
             cy={cy}
             r={r}
             fill={fill}
-            stroke={shot.is_goal ? '#FFF8F0' : 'none'}
-            strokeWidth={shot.is_goal ? 0.3 : 0}
           />
         );
       })}
