@@ -61,9 +61,11 @@ def get_team_id_map(db: SupabaseRest) -> dict:
 def upsert_seeds_from_bracket(db: SupabaseRest, bracket: dict, season: int, team_id_map: dict) -> int:
     """Parse NHL bracket response, build seed rows, replace existing for season."""
     seeds = []
-    # NHL API bracket payload: { series: [{ round, topSeedTeam: {...}, bottomSeedTeam: {...}, ... }] }
-    # For R1 only, extract the 8 matchups which fully cover the 16 playoff teams
-    round_1_series = [s for s in bracket.get("series", []) if s.get("roundNumber") == 1]
+    # NHL API bracket payload: { series: [{ playoffRound, topSeedTeam, bottomSeedTeam, ... }] }
+    # For R1 only, extract the 8 matchups which fully cover the 16 playoff teams.
+    # NHL uses `playoffRound` (not `roundNumber` — that key returns None for every
+    # entry, which silently produced empty seeds for the entire 2026 playoff window).
+    round_1_series = [s for s in bracket.get("series", []) if s.get("playoffRound") == 1]
 
     seen_team_ids = set()
     for s in round_1_series:
@@ -126,7 +128,7 @@ def upsert_series_from_bracket(db: SupabaseRest, bracket: dict, season: int, tea
 
     rows = []
     slot = 0
-    for s in sorted(bracket.get("series", []), key=lambda x: (x.get("roundNumber", 0), x.get("seriesLetter", ""))):
+    for s in sorted(bracket.get("series", []), key=lambda x: (x.get("playoffRound", 0), x.get("seriesLetter", ""))):
         slot += 1
         high_abbrev = s.get("topSeedTeam", {}).get("abbrev")
         low_abbrev = s.get("bottomSeedTeam", {}).get("abbrev")

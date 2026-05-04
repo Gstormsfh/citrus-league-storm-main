@@ -11,6 +11,17 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Job-level env so every step sees the same Supabase + proxy creds.
+    # Proxy creds are optional — proxy_manager falls back to direct mode if
+    # missing (NHL public API, low-volume polling). This was the silent
+    # failure mode from April 17 onwards: proxy_manager raised ValueError
+    # on every request because the workflow didn't pass these through.
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      CITRUS_PROXY_USERNAME: ${{ secrets.CITRUS_PROXY_USERNAME }}
+      CITRUS_PROXY_PASSWORD: ${{ secrets.CITRUS_PROXY_PASSWORD }}
+      CITRUS_PROXY_API_URL: ${{ secrets.CITRUS_PROXY_API_URL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,9 +43,6 @@ jobs:
       # spins on "No games found in DB schedule" until someone notices
       # by hand. Fail the run loudly so GitHub emails about it.
       - name: Ingest playoff game schedule
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           START=$(date -d "today" +%Y-%m-%d)
           END=$(date -d "+7 days" +%Y-%m-%d)
@@ -42,25 +50,16 @@ jobs:
 
       # Step 1: Refresh bracket seeds + initial series rows (safe to re-run)
       - name: Ingest NHL playoff bracket
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python data-pipeline/acquisition/ingest_nhl_playoff_bracket.py --season 2025
         continue-on-error: true
 
       # Step 2: Link games to series, update wins, trigger pick scoring
       - name: Sync playoff series results
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python data-pipeline/acquisition/sync_playoff_results.py --season 2025
         continue-on-error: true
 
       # Step 3: Rebuild player_playoff_stats from per-game stats (RPC call)
       - name: Aggregate player playoff stats
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           python -c "
           import os, sys
@@ -76,9 +75,6 @@ jobs:
       # scoring_settings (goals weighted X, hits weighted Y, etc.).
       # This is what keeps roster pool standings dynamic to commissioner settings.
       - name: Score playoff roster pools
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           python -c "
           import sys
