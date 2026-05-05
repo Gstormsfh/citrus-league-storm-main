@@ -143,6 +143,8 @@ Sign-off discipline carries forward from Phase 0–4: each chunk lands as its ow
 
 ### Chunk 11g.2 — uWS Server Bring-Up + GCE Staging Deploy
 
+> **Status:** Complete (2026-05-04). Five execution steps committed on `phase-4-5-implementation`: server scaffold (`50a7983`), JWT middleware (`afd9371`), Docker parity verification (no commit — re-validated step 2 inside the rebuilt container), production Dockerfile cleanup + parameterized GCE startup script (`6985b2f`), GCE staging deploy with Cloud Logging integration via `gcplogs` Docker driver (final commit `fdbc76f`). Staging VM (`citrus-draft-engine-staging` at 34.19.223.135) provisioned, validated end-to-end against five smoke scenarios + `gcloud logging read` proof, then torn down post-validation. Service account, Artifact Registry repo, and `:latest` image preserved for chunk 11g.4 re-provisioning.
+
 **Goal:** stand up a real uWebSockets.js server alongside the existing Hono server in the same Node process, deploy to a real GCE staging VM (not throwaway), and verify the discovery endpoint flow end-to-end against the deployed pair.
 
 **Why reshape from original 11g.2.** The original chunk 11g.2 was written assuming Cloud Run as the deploy target. Cloud Run's one-port-per-container constraint forced a A/B/C topology decision (uWS owns 8080 with Hono adapter / two services / sidecars), and option A would have required a 300–500 line Hono-on-uWS adapter. With the GCE pivot ratified in `PHASE_4_5_ARCHITECTURE.md`, the constraint disappears: GCE containers expose multiple ports trivially. Two ports, one process is the simplest solution, exactly as Zach's architecture doc specifies. The adapter work is gone. The A/B/C decision is moot.
@@ -310,7 +312,7 @@ Reads and writes `leagues.draft_status` using the `DraftStatus` type from `@citr
 
 ---
 
-### Chunk 11g.7 — Snapshot persistence and process bootstrap
+### Chunk 11g.7 — Snapshot persistence + operations & observability foundation
 
 **Deliverable.** `LobbyManager` writes a snapshot to `draft_state` every N picks (suggest N=5) and every 30 seconds, whichever comes first. Snapshot payload is the minimum needed to recover the in-memory projection without replaying the full event log: `pickNumber`, `onClockTeamId`, `pickDeadline`, `lastBroadcastSeq`. The candidate pool is NOT persisted in the snapshot — it gets rebuilt from `player_directory` + `draft_picks_v2` on bootstrap (cheaper than serializing 2000 rows × 14 columns). On process startup, a bootstrap routine queries `leagues WHERE draft_status IN CONNECTABLE_DRAFT_STATUSES` (the `'queued' | 'in_progress' | 'paused'` subset from `@citrus/shared`; **note**: there is no `'drafting'` value in the actual enum — the schema fact established by chunk 11g.1's follow-up) and, for each, instantiates a `LobbyManager` from the latest snapshot + replay of `draft_events` since the snapshot's `lastBroadcastSeq`. Lobbies are registered into `LobbyRegistry` and timers resume. Connected clients reconnect via chunk 11g.5's protocol; the server-side state is already there waiting for them.
 
@@ -329,6 +331,38 @@ Reads and writes `leagues.draft_status` using the `DraftStatus` type from `@citr
 - Snapshot write does not block the single-writer queue (runs as a fire-and-forget side effect after the mutation commits).
 
 **Estimated effort.** 3–4 days.
+
+---
+
+**Additional scope (operations & observability foundation, added 2026-05-04 per chunk 11g.2 step 5 finding):**
+
+Chunk 11g.2 step 5 surfaced that container logs were not reaching Cloud Logging on the Debian-based staging VM (the chunk 11g.2.0 spike's `--metadata=google-logging-enabled=true` assumption was wrong for non-COS images). The fix landed in commit `fdbc76f` (Docker `gcplogs` log driver applied at `docker run` time). With logs now shipping, the world-class observability foundation can be built on top — and is deliberately deferred to here, chunk 11g.7, because dashboards/alerts/metrics should be designed against the real `LobbyManager` + event-sourced state machine (chunks 11g.4–11g.6), not the chunk 11g.2 hello-world echo scaffold.
+
+**Scope of the observability addition:**
+
+- **(a) Structured JSON logging.** `@citrus/shared` `logger` refactor to JSON-by-default output across all services. Today's `console.log`-style strings (`[uws] upgrade rejected lobbyId=lobby-A reason=no_token`) become structured records with explicit fields (`{event: "uws_upgrade_rejected", lobby_id: "lobby-A", reason: "no_token", ts: "..."}`). Cloud Logging parses JSON automatically; queries and log-based metrics gain typed-field semantics.
+- **(b) Cloud Monitoring dashboards-as-code.** New file `infra/gce/observability-setup.sh` provisions dashboards via `gcloud monitoring dashboards create`. Initial dashboard set:
+  - **Live connection count** (per-VM gauge).
+  - **WS upgrade success vs failure rate** (per-minute, with `reason` breakdown for failures).
+  - **Latency distributions** (discovery endpoint p50/p95/p99; WS upgrade handshake p50/p95/p99; pick-submit-to-broadcast p50/p95/p99 once chunk 11g.4 lands).
+  - **Error rate** (5xx + uncaught exception count).
+- **(c) Log-based metric definitions.** Provisioned via `gcloud logging metrics create`. Initial set:
+  - `uws_upgrade_rejection_rate` (counter, labels: reason, environment).
+  - `uws_upgrade_accepted_rate` (counter, labels: environment).
+  - `error_rate` (counter, severity: ERROR).
+- **(d) Alert policies as code.** Provisioned via `gcloud alpha monitoring policies create`. Initial set:
+  - **Rejection-rate spike** — > 10× the rolling 24h baseline for 5 min triggers a P2 alert (likely client misconfiguration or attack).
+  - **Container-exit anomaly** — non-zero exit code or unexpected restart triggers a P1 alert.
+  - **p95 latency breach** — discovery endpoint p95 > 300ms or WS upgrade p95 > 100ms for 5 min triggers a P2 alert (matches the existing performance mandate in `CLAUDE.md`).
+- **(e) On-call runbooks.** New `docs/RUNBOOKS/` files for the most common failure modes: container won't start, secret access denied, image pull fails, port conflict, JWT verification fails systemically. Each runbook is one page: symptom → first diagnostic command → likely cause → remediation.
+
+**Operational principle (per Zach):** native Google tooling only — `gcloud` commands committed as bash scripts under `infra/gce/`. No Terraform. Future migration path to Config Connector when complexity warrants it (i.e., when the alert/dashboard inventory grows past what's comfortable in shell scripts).
+
+**Target window:** pre-launch operations hardening (~6 weeks before NHL season opener, aligned with chunk 11g.11 load test). Dashboards/alerts go live alongside the load test so we can validate them under realistic traffic before launch.
+
+**Additional dependencies:** chunks 11g.4–11g.6 complete (LobbyManager + pick path + timer/autopick exist to instrument). Chunk 11g.2 fully deployed with `gcplogs` driver (✅ done 2026-05-04).
+
+**Additional estimated effort:** 4–6 days (logger refactor 1–2 days; dashboards/metrics/alerts 2–3 days; runbooks 1 day).
 
 ---
 
