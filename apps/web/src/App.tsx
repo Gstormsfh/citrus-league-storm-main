@@ -117,6 +117,7 @@ const PreviewRink = lazyWithErrorHandling(() => import("./pages/PreviewRink"));
 const PreviewBoards = lazyWithErrorHandling(() => import("./pages/PreviewBoards"));
 const PreviewClone = lazyWithErrorHandling(() => import("./pages/PreviewClone"));
 const PreviewDashboardPrimitives = lazyWithErrorHandling(() => import("./pages/PreviewDashboardPrimitives"));
+const PreviewPlayerProfile = lazyWithErrorHandling(() => import("./pages/PreviewPlayerProfile"));
 
 // Use the picturesque LoadingScreen as the Suspense fallback for lazy-loaded routes
 const PageLoader = () => <LoadingScreen />;
@@ -232,6 +233,7 @@ const App = () => {
                 <Route path="/preview-boards" element={<PreviewBoards />} />
                 <Route path="/preview-clone" element={<PreviewClone />} />
                 <Route path="/preview-dashboard-primitives" element={<PreviewDashboardPrimitives />} />
+                <Route path="/preview-player-profile" element={<PreviewPlayerProfile />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
