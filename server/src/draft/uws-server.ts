@@ -1,4 +1,5 @@
 // Phase 4.5 chunk 11g.2 step 2 — JWT validation on uWS upgrade.
+// Phase 4.5 chunk 11g.4 step 4 — LobbyRegistry wiring on open/close.
 //
 // Authenticates incoming WebSocket clients before allowing the upgrade.
 // Tokens are issued by the discovery endpoint (chunk 11g.1) and carried
@@ -6,10 +7,13 @@
 // decision in lib/draftToken.ts §4 (subprotocol header keeps the token
 // out of URLs / logs / referrers).
 //
-// Step 2 of chunk 11g.2: auth only. No LobbyManager, no event sourcing,
-// no DB calls — those land in chunks 11g.3 / 11g.4. Verified claims
-// are attached to the WebSocket's userData so chunk 11g.4 message
-// handlers can read them off `ws.getUserData()`.
+// Step 4 of chunk 11g.4 wires the LobbyRegistry into open/close:
+// the open handler `getOrCreate`s the LobbyManager and calls
+// `addConnection`; the close handler calls `removeConnection`. If
+// the format lookup fails (e.g. league has draftType=offline), the
+// open handler closes the ws with code 1011 (server_error). Lobby
+// eviction on last-disconnect is intentionally deferred to chunk
+// 11g.7's snapshot-and-bootstrap flow.
 //
 // Rejection model: HTTP 401/403 returned during the upgrade handshake
 // (pre-upgrade), not WS close codes (post-upgrade). No half-established
@@ -23,6 +27,7 @@
 import uWS from 'uWebSockets.js';
 import { logger } from '@citrus/shared';
 import { verifyDraftToken } from '../lib/draftToken';
+import type { LobbyRegistry } from './LobbyRegistry';
 import type { DraftSocketUserData } from './types';
 
 export interface UwsServerHandle {
@@ -30,7 +35,19 @@ export interface UwsServerHandle {
   close: () => void;
 }
 
-export function startUwsServer(port: number): Promise<UwsServerHandle> {
+export interface StartUwsServerOptions {
+  port: number;
+  /**
+   * Process-singleton registry of LobbyManager instances. Injected
+   * (rather than module-imported) so tests can pass a mock and
+   * `index.ts` can construct the real one with admin-client-backed
+   * `DraftServiceV2` + a real Supabase `formatLookup`.
+   */
+  lobbyRegistry: LobbyRegistry;
+}
+
+export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHandle> {
+  const { port, lobbyRegistry } = opts;
   return new Promise((resolve, reject) => {
     const app = uWS.App();
     let listenSocket: unknown = null;
@@ -78,10 +95,6 @@ export function startUwsServer(port: number): Promise<UwsServerHandle> {
               logger.debug(
                 `[uws] upgrade accepted lobbyId=${lobbyId} userId=${claims.sub}`,
               );
-              // TODO(chunk 11g.4 step 2+): look up or create the LobbyManager
-              // for this lobbyId via a LobbyRegistry singleton (introduced in
-              // step 4) and call addConnection in the `open` handler below
-              // once that handler has access to the registry.
               res.cork(() => {
                 res.upgrade(
                   {
@@ -120,8 +133,48 @@ export function startUwsServer(port: number): Promise<UwsServerHandle> {
       },
 
       open: (ws) => {
-        const { lobbyId, userId } = ws.getUserData();
+        const userData = ws.getUserData();
+        const { lobbyId, userId, leagueId } = userData;
         logger.info(`[uws] connection opened lobbyId=${lobbyId} userId=${userId}`);
+
+        // Lazy-construct or look up the LobbyManager for this lobby
+        // and attach the WS. The registry's Promise-placeholder map
+        // collapses concurrent same-lobby openings onto one
+        // construction.
+        //
+        // uWS does not await async open handlers — the .catch path
+        // logs + closes the WS if format lookup fails (e.g. league
+        // configured with draftType=offline). Code 1011 = "server
+        // error" so the client retry path differs from auth-rejected
+        // (401/403 pre-upgrade) and from intentional logout.
+        //
+        // Race note: if the user disconnects before getOrCreate
+        // resolves, addConnection still runs and inserts an orphan
+        // ws into the connections set. Step 5's broadcast-and-
+        // backpressure work will introduce a more careful protocol;
+        // for step 4 the orphan is harmless (the WS is closed and
+        // the next removeConnection / lobby teardown will purge it).
+        lobbyRegistry
+          .getOrCreate(lobbyId, leagueId)
+          .then((lobby) => {
+            lobby.addConnection(ws, userData);
+          })
+          .catch((err: unknown) => {
+            logger.error(
+              `[uws] LobbyRegistry.getOrCreate failed lobbyId=${lobbyId}`,
+              err,
+            );
+            try {
+              ws.end(1011, 'server_error');
+            } catch (closeErr) {
+              // ws may already be closed if the user disconnected
+              // in the same tick; swallow.
+              logger.debug(
+                `[uws] ws.end after failed getOrCreate threw lobbyId=${lobbyId}`,
+                closeErr,
+              );
+            }
+          });
       },
 
       message: (ws, message, isBinary) => {
@@ -131,8 +184,12 @@ export function startUwsServer(port: number): Promise<UwsServerHandle> {
 
       close: (ws, code) => {
         const { lobbyId, userId } = ws.getUserData();
+        const lobby = lobbyRegistry.get(lobbyId);
+        if (lobby) {
+          lobby.removeConnection(ws);
+        }
         logger.info(
-          `[uws] connection closed lobbyId=${lobbyId} userId=${userId} code=${code}`,
+          `[uws] connection closed lobbyId=${lobbyId} userId=${userId} code=${code} remainingConnections=${lobby?.connectionCount() ?? 0}`,
         );
       },
     });

@@ -65,6 +65,10 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { logger, createConsoleLogger } from '@citrus/shared';
 import { startUwsServer, type UwsServerHandle } from './uws-server';
+import { LobbyRegistry } from './LobbyRegistry';
+import { DraftServiceV2 } from '../services/DraftServiceV2';
+import { supabaseAdmin } from '../lib/supabase';
+import type { DraftFormat } from './types';
 
 // Enable real console logging on the server (default logger is silent).
 Object.assign(logger, createConsoleLogger());
@@ -88,9 +92,48 @@ const honoServer = serve(
   },
 );
 
+// ── LobbyRegistry: process-singleton mapping lobbyId → LobbyManager ──
+//
+// Construct ONE DraftServiceV2 backed by the admin Supabase client
+// and reuse it across all LobbyManagers. The lazy-Proxy pattern in
+// `server/src/lib/supabase.ts` defers env-var validation until first
+// RPC call, so `new DraftServiceV2(supabaseAdmin)` never throws at
+// import time.
+//
+// **Auth.uid() concern:** see the file-level JSDoc in
+// `server/src/draft/LobbyRegistry.ts` and the
+// PHASE_4_5_PROJECT_PLAN.md Decision Log entry from 2026-05-05.
+// Resolution required before chunks 11g.5/11g.6 land real picks.
+async function lookupDraftFormat(leagueId: string): Promise<DraftFormat> {
+  const { data, error } = await supabaseAdmin
+    .from('leagues')
+    .select('settings')
+    .eq('id', leagueId)
+    .single();
+  if (error) {
+    throw new Error(`leagueLookup failed for ${leagueId}: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error(`league ${leagueId} not found`);
+  }
+  const draftType = (data.settings as { draftType?: string } | null)?.draftType;
+  if (draftType === 'snake' || draftType === 'linear' || draftType === 'auction') {
+    return draftType;
+  }
+  throw new Error(
+    `league ${leagueId} draftType=${draftType ?? 'undefined'} is not a live format ` +
+      `(expected snake | linear | auction)`,
+  );
+}
+
+const lobbyRegistry = new LobbyRegistry({
+  draftService: new DraftServiceV2(supabaseAdmin),
+  formatLookup: lookupDraftFormat,
+});
+
 // ── Start uWS ──
 let uwsHandle: UwsServerHandle | null = null;
-startUwsServer(wsPort)
+startUwsServer({ port: wsPort, lobbyRegistry })
   .then((handle) => {
     uwsHandle = handle;
   })

@@ -1,21 +1,21 @@
 // Phase 4.5 chunk 11g.4 — LobbyManager: in-memory state machine + single-
 // writer queue per active draft.
 //
-// Step 3 of chunk 11g.4: add the recent-events ring buffer that backs
-// chunk 11g.5's `last_seen_seq` resume protocol. `processSubmitPick`
-// now appends a `pick_submitted` event to the buffer on every successful
-// non-duplicate submission; `getEventsSinceSeq` is exposed publicly so
-// reconnect handlers (chunk 11g.5) can replay events strictly after a
-// client's last-seen seq, falling back to a snapshot resync only when
-// the buffer has actually evicted events the client wanted.
+// Step 4 of chunk 11g.4: real `addConnection`/`removeConnection`
+// (set-membership only — no broadcast yet) plus the public
+// `connectionCount()` getter the LobbyRegistry uses for diagnostic
+// logging. The registry (server/src/draft/LobbyRegistry.ts, new in
+// step 4) handles lazy LobbyManager construction with a Promise-
+// placeholder map that collapses concurrent same-lobby callers onto
+// one constructed instance.
 //
 // Future steps:
-//   - Step 4: connection management (real addConnection/removeConnection)
-//             + LobbyRegistry singleton
 //   - Step 5: broadcast via uWS topics post-commit
 //   - Step 6: auction state machine (place_bid + nominate handlers, real
 //             round/pickNumber computation from in-memory state)
-//   - Step 7: snapshot persistence + bootstrap (chunk 11g.7)
+//   - Step 7: snapshot persistence + bootstrap (chunk 11g.7) — owns
+//             lobby eviction once the draft completes; step 4 does
+//             NOT evict on last-disconnect.
 //
 // See docs/PHASE_4_5_ARCHITECTURE.md (Stack Decision; LobbyManager
 // principles — Principle 5 single-writer per lobby; line 147 ring
@@ -95,8 +95,14 @@ export class LobbyManager {
   private readonly draftService: DraftServiceV2;
 
   /**
-   * Connected uWS WebSocket references for this lobby. Step 4
-   * wires add/remove + broadcast.
+   * Connected uWS WebSocket references for this lobby. Populated by
+   * `addConnection` from the uws-server.ts open handler; cleared by
+   * `removeConnection` from the close handler. Set semantics dedupe
+   * — addConnection is naturally idempotent for the same ws.
+   *
+   * Step 5 will additionally subscribe each ws to the lobby's uWS
+   * pub/sub topic for fan-out. Today the set is just a roll call
+   * for diagnostic logging via `connectionCount()`.
    */
   private readonly connections: Set<WebSocket<DraftSocketUserData>> = new Set();
 
@@ -154,28 +160,48 @@ export class LobbyManager {
 
   /**
    * Register a newly-upgraded WebSocket as a connected client.
+   * Set semantics: idempotent — adding the same ws twice is a no-op
+   * for set membership.
    *
-   * **Implementation status (chunk 11g.4 step 1, unchanged in step 2):**
-   * stub (no-op). Step 4 wires connection management — adds to
-   * `this.connections`, records the user's last-seen seq for chunk
-   * 11g.5's resync protocol, optionally sends a snapshot, and emits
-   * a presence event to other connected clients.
+   * Step 5 will additionally subscribe ws to the lobby's broadcast
+   * topic; chunk 11g.5 will record the user's last-seen seq for the
+   * resync protocol. Today: set membership + diagnostic log only.
    */
   addConnection(ws: WebSocket<DraftSocketUserData>, userData: DraftSocketUserData): void {
-    // Step 4 implements. No-op today.
-    void ws;
-    void userData;
+    this.connections.add(ws);
+    logger.info(
+      `[lobby] connection added lobbyId=${this.lobbyId} userId=${userData.userId} size=${this.connections.size}`,
+    );
   }
 
   /**
-   * Deregister a closed/dropped WebSocket.
+   * Deregister a closed/dropped WebSocket. Idempotent — calling for
+   * a ws not in the set is a safe no-op (no log emitted).
    *
-   * **Implementation status (chunk 11g.4 step 1, unchanged in step 2):**
-   * stub (no-op). Step 4 wires connection management.
+   * Step 5 will additionally unsubscribe ws from the broadcast topic.
+   * Lobby eviction on last-disconnect is intentionally NOT done here
+   * — chunk 11g.7's snapshot-and-bootstrap flow owns lobby retirement
+   * (drafts that complete get snapshotted and dropped from the
+   * registry; pre-completion the lobby stays alive for late
+   * reconnects to pick up the ring buffer).
    */
   removeConnection(ws: WebSocket<DraftSocketUserData>): void {
-    // Step 4 implements. No-op today.
-    void ws;
+    const removed = this.connections.delete(ws);
+    if (removed) {
+      logger.info(
+        `[lobby] connection removed lobbyId=${this.lobbyId} size=${this.connections.size}`,
+      );
+    }
+  }
+
+  /**
+   * Number of currently-connected WebSockets. Used by the LobbyRegistry
+   * (and chunk 11g.7's snapshot logic, eventually) for diagnostic
+   * logging. Read-only — connection mutations go through
+   * `addConnection`/`removeConnection`.
+   */
+  connectionCount(): number {
+    return this.connections.size;
   }
 
   /**

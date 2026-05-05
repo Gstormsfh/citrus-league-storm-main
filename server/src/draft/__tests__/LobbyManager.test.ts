@@ -1,20 +1,23 @@
-// Phase 4.5 chunk 11g.4 step 3 — LobbyManager queue + submit_pick +
-// ring-buffer tests.
+// Phase 4.5 chunk 11g.4 step 4 — LobbyManager queue + submit_pick +
+// ring-buffer + connection-management tests.
 //
-// 19 tests total: 5 retained from step 1 (instantiate × 3, getSnapshot,
-// addConnection/removeConnection no-ops), 8 from step 2 (queue
+// 23 tests total: 5 retained from step 1 (instantiate × 3, getSnapshot,
+// addConnection/removeConnection callable smoke), 8 from step 2 (queue
 // serialization, idempotency, error swallowing, snake/linear
 // submit_pick dispatch, auction wrong-format rejection, place_bid +
-// nominate chunk-11g.6 stubs, RPC error mapping), 6 new step-3 tests
+// nominate chunk-11g.6 stubs, RPC error mapping), 6 from step 3
 // (buffer append on success, no-append on duplicate/failed,
 // getEventsSinceSeq strict-after semantics, empty-buffer ok-with-empty,
-// getSnapshot populates recentEvents from buffer).
+// getSnapshot populates recentEvents from buffer), 4 new step-4 tests
+// (addConnection adds + connectionCount, removeConnection removes +
+// decrements, removeConnection of unknown ws is no-op, addConnection
+// same ws twice is idempotent).
 //
 // `makeLobby` and `makeSubmitPick` factories at top eliminate
 // constructor boilerplate per test. Buffer-eviction semantics are
-// covered separately in RingBuffer.test.ts (the LobbyManager just
-// delegates to the buffer; eviction at the LobbyManager's hardcoded
-// 200 cap is impractical to trigger in a unit test).
+// covered separately in RingBuffer.test.ts; LobbyRegistry behavior
+// (lazy construction, singleton-race) is covered separately in
+// LobbyRegistry.test.ts.
 
 import { describe, it, expect, vi } from 'vitest';
 import { LobbyManager, type LobbyManagerOptions } from '../LobbyManager';
@@ -61,7 +64,7 @@ function makeSubmitPick(
 
 // ── Tests ────────────────────────────────────────────────────────────
 
-describe('LobbyManager (chunk 11g.4 step 3)', () => {
+describe('LobbyManager (chunk 11g.4 step 4)', () => {
   // ── Step-1 retained tests ────────────────────────────────────────
 
   it('instantiates with snake format', () => {
@@ -90,7 +93,7 @@ describe('LobbyManager (chunk 11g.4 step 3)', () => {
     expect(snap.recentEvents).toHaveLength(0);
   });
 
-  it('addConnection and removeConnection are callable as no-ops', () => {
+  it('addConnection and removeConnection are callable without throwing', () => {
     const lobby = makeLobby();
     const fakeWs = {} as never;
     const userData: DraftSocketUserData = {
@@ -429,5 +432,70 @@ describe('LobbyManager (chunk 11g.4 step 3)', () => {
       seq: 99,
       teamId: 'team-snap-1',
     });
+  });
+
+  // ── Step-4 new tests (connection management) ─────────────────────
+
+  it('addConnection adds the WebSocket; connectionCount() reflects the change', () => {
+    const lobby = makeLobby();
+    expect(lobby.connectionCount()).toBe(0);
+
+    const ws = {} as never;
+    const userData: DraftSocketUserData = {
+      lobbyId: 'lobby-1',
+      userId: 'user-conn-1',
+      leagueId: 'league-1',
+      draftId: 'lobby-1',
+      expiresAt: Math.floor(Date.now() / 1000) + 300,
+    };
+    lobby.addConnection(ws, userData);
+    expect(lobby.connectionCount()).toBe(1);
+  });
+
+  it('removeConnection removes the WebSocket; connectionCount() decrements', () => {
+    const lobby = makeLobby();
+    const ws = {} as never;
+    const userData: DraftSocketUserData = {
+      lobbyId: 'lobby-1',
+      userId: 'user-conn-2',
+      leagueId: 'league-1',
+      draftId: 'lobby-1',
+      expiresAt: Math.floor(Date.now() / 1000) + 300,
+    };
+
+    lobby.addConnection(ws, userData);
+    expect(lobby.connectionCount()).toBe(1);
+
+    lobby.removeConnection(ws);
+    expect(lobby.connectionCount()).toBe(0);
+  });
+
+  it('removeConnection for a ws not in the set is a safe no-op', () => {
+    const lobby = makeLobby();
+    const ws = {} as never;
+    expect(() => lobby.removeConnection(ws)).not.toThrow();
+    expect(lobby.connectionCount()).toBe(0);
+  });
+
+  it('addConnection for the same ws twice does not double-count (Set semantics)', () => {
+    const lobby = makeLobby();
+    const ws = {} as never;
+    const userData: DraftSocketUserData = {
+      lobbyId: 'lobby-1',
+      userId: 'user-conn-3',
+      leagueId: 'league-1',
+      draftId: 'lobby-1',
+      expiresAt: Math.floor(Date.now() / 1000) + 300,
+    };
+
+    lobby.addConnection(ws, userData);
+    lobby.addConnection(ws, userData);
+    expect(lobby.connectionCount()).toBe(1);
+
+    // Removing once should still bring count to 0 — the second
+    // addConnection didn't double the count, so we don't need a
+    // second remove.
+    lobby.removeConnection(ws);
+    expect(lobby.connectionCount()).toBe(0);
   });
 });
