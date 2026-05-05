@@ -1,12 +1,20 @@
-// Phase 4.5 chunk 11g.4 step 2 — LobbyManager queue + submit_pick tests.
+// Phase 4.5 chunk 11g.4 step 3 — LobbyManager queue + submit_pick +
+// ring-buffer tests.
 //
-// 12 tests total: 5 retained from step 1 (instantiate × 3, getSnapshot,
-// addConnection/removeConnection no-ops), 7 new (queue serialization,
-// idempotency, error swallowing, snake/linear submit_pick dispatch,
-// auction-format wrong-format-for-action rejection, place_bid + nominate
-// chunk-11g.6 stubs).
+// 19 tests total: 5 retained from step 1 (instantiate × 3, getSnapshot,
+// addConnection/removeConnection no-ops), 8 from step 2 (queue
+// serialization, idempotency, error swallowing, snake/linear
+// submit_pick dispatch, auction wrong-format rejection, place_bid +
+// nominate chunk-11g.6 stubs, RPC error mapping), 6 new step-3 tests
+// (buffer append on success, no-append on duplicate/failed,
+// getEventsSinceSeq strict-after semantics, empty-buffer ok-with-empty,
+// getSnapshot populates recentEvents from buffer).
 //
-// `makeLobby` factory at top eliminates constructor boilerplate per test.
+// `makeLobby` and `makeSubmitPick` factories at top eliminate
+// constructor boilerplate per test. Buffer-eviction semantics are
+// covered separately in RingBuffer.test.ts (the LobbyManager just
+// delegates to the buffer; eviction at the LobbyManager's hardcoded
+// 200 cap is impractical to trigger in a unit test).
 
 import { describe, it, expect, vi } from 'vitest';
 import { LobbyManager, type LobbyManagerOptions } from '../LobbyManager';
@@ -53,7 +61,7 @@ function makeSubmitPick(
 
 // ── Tests ────────────────────────────────────────────────────────────
 
-describe('LobbyManager (chunk 11g.4 step 2)', () => {
+describe('LobbyManager (chunk 11g.4 step 3)', () => {
   // ── Step-1 retained tests ────────────────────────────────────────
 
   it('instantiates with snake format', () => {
@@ -272,5 +280,154 @@ describe('LobbyManager (chunk 11g.4 step 2)', () => {
     );
 
     expect(result).toEqual({ ok: false, reason: 'not_on_clock' });
+  });
+
+  // ── Step-3 new tests (ring buffer) ───────────────────────────────
+
+  it('successful submit_pick appends pick_submitted event to the recent-events buffer', async () => {
+    const submitPick = vi.fn().mockResolvedValue({
+      event_id: 1,
+      seq: 5,
+      pick_deadline: null,
+      was_duplicate: false,
+    } satisfies SubmitPickResult);
+
+    const lobby = makeLobby({ format: 'snake', submitPick });
+    await lobby.enqueueAction(
+      makeSubmitPick({
+        teamId: 'team-buf-1',
+        playerId: '8478402',
+        idempotencyKey: 'idem-buf-append-1',
+      }),
+    );
+
+    const result = lobby.getEventsSinceSeq(0);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.events).toHaveLength(1);
+      const event = result.events[0];
+      expect(event).toMatchObject({
+        kind: 'pick_submitted',
+        seq: 5,
+        teamId: 'team-buf-1',
+        playerId: 8478402, // coerced from string at the boundary
+        roundNumber: 1,
+        pickNumber: 1,
+      });
+      // timestamp is generated at append time; verify shape only.
+      if (event.kind === 'pick_submitted') {
+        expect(typeof event.timestamp).toBe('string');
+        expect(() => new Date(event.timestamp).toISOString()).not.toThrow();
+      }
+    }
+  });
+
+  it('duplicate submit_pick (was_duplicate=true) does NOT append a second event to the buffer', async () => {
+    const submitPick = vi.fn().mockResolvedValue({
+      event_id: 1,
+      seq: 5,
+      pick_deadline: null,
+      was_duplicate: true, // RPC reports duplicate idempotency key
+    } satisfies SubmitPickResult);
+
+    const lobby = makeLobby({ format: 'snake', submitPick });
+    const result = await lobby.enqueueAction(
+      makeSubmitPick({ idempotencyKey: 'idem-buf-dup-1' }),
+    );
+
+    // Action still succeeds (returns ok with the seq from the RPC).
+    expect(result).toEqual({ ok: true, eventSeq: 5 });
+
+    // But the buffer is empty — the original event is already there
+    // from the prior non-retried submission; we don't double-append.
+    const events = lobby.getEventsSinceSeq(0);
+    expect(events.ok).toBe(true);
+    if (events.ok) {
+      expect(events.events).toHaveLength(0);
+    }
+  });
+
+  it('failed submit_pick (RPC AppError) does NOT append to the buffer', async () => {
+    const submitPick = vi.fn().mockRejectedValue(
+      new AppError('player_taken: player 8478402 already drafted', 409, 'CONFLICT'),
+    );
+    const lobby = makeLobby({ format: 'snake', submitPick });
+
+    const result = await lobby.enqueueAction(
+      makeSubmitPick({ idempotencyKey: 'idem-buf-failed-1' }),
+    );
+    expect(result).toEqual({ ok: false, reason: 'player_taken' });
+
+    const events = lobby.getEventsSinceSeq(0);
+    expect(events.ok).toBe(true);
+    if (events.ok) {
+      expect(events.events).toHaveLength(0);
+    }
+  });
+
+  it('getEventsSinceSeq returns ok with empty events when no actions have been processed', () => {
+    const lobby = makeLobby();
+
+    expect(lobby.getEventsSinceSeq(0)).toEqual({ ok: true, events: [] });
+    expect(lobby.getEventsSinceSeq(42)).toEqual({ ok: true, events: [] });
+  });
+
+  it('getEventsSinceSeq returns events strictly after the given sinceSeq', async () => {
+    let nextSeq = 10;
+    const submitPick = vi.fn(async () => ({
+      event_id: nextSeq,
+      seq: nextSeq++,
+      pick_deadline: null,
+      was_duplicate: false,
+    } satisfies SubmitPickResult));
+
+    const lobby = makeLobby({ format: 'snake', submitPick });
+    // Three sequential picks → seqs 10, 11, 12 in the buffer.
+    for (let i = 0; i < 3; i++) {
+      await lobby.enqueueAction(
+        makeSubmitPick({ idempotencyKey: `idem-buf-strictly-${i}` }),
+      );
+    }
+
+    const sinceTen = lobby.getEventsSinceSeq(10);
+    expect(sinceTen.ok).toBe(true);
+    if (sinceTen.ok) {
+      expect(sinceTen.events.map((e) => e.seq)).toEqual([11, 12]);
+    }
+
+    const sinceTwelve = lobby.getEventsSinceSeq(12);
+    expect(sinceTwelve.ok).toBe(true);
+    if (sinceTwelve.ok) {
+      expect(sinceTwelve.events).toHaveLength(0);
+    }
+  });
+
+  it('getSnapshot includes recentEvents from the buffer', async () => {
+    const submitPick = vi.fn().mockResolvedValue({
+      event_id: 99,
+      seq: 99,
+      pick_deadline: null,
+      was_duplicate: false,
+    } satisfies SubmitPickResult);
+
+    const lobby = makeLobby({ format: 'snake', submitPick });
+
+    // Empty initially.
+    expect(lobby.getSnapshot().recentEvents).toHaveLength(0);
+
+    await lobby.enqueueAction(
+      makeSubmitPick({
+        teamId: 'team-snap-1',
+        idempotencyKey: 'idem-buf-snap-1',
+      }),
+    );
+
+    const snap = lobby.getSnapshot();
+    expect(snap.recentEvents).toHaveLength(1);
+    expect(snap.recentEvents[0]).toMatchObject({
+      kind: 'pick_submitted',
+      seq: 99,
+      teamId: 'team-snap-1',
+    });
   });
 });

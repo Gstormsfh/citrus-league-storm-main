@@ -1,14 +1,20 @@
-// Phase 4.5 chunk 11g.4 step 1 — LobbyManager type definitions.
+// Phase 4.5 chunk 11g.4 — LobbyManager type definitions.
 //
 // Co-located here so the LobbyManager class file stays focused on
 // behavior. uws-server.ts imports DraftSocketUserData from this
 // module rather than declaring its own copy.
+//
+// Step 3 added the BufferedDraftEvent + GetEventsSinceSeqResult
+// types backing the recent-events ring buffer and chunk 11g.5's
+// resume protocol.
 //
 // See docs/PHASE_4_5_ARCHITECTURE.md (Stack Decision; LobbyManager
 // principles), docs/adr/ADR-002-auction-state-machine.md (auction
 // state machine — auction-specific DraftAction variants), and
 // server/src/lib/draftToken.ts (the JWT contract that produces
 // DraftSocketUserData).
+
+import type { GetSinceSeqResult } from './RingBuffer';
 
 /**
  * Per-connection metadata attached during JWT validation in the
@@ -141,18 +147,84 @@ export type DraftActionResult =
     };
 
 /**
+ * Discriminated union of events stored in the LobbyManager's
+ * recent-events ring buffer (chunk 11g.4 step 3, ~200 events).
+ *
+ * Variants mirror the past-tense event-type names cataloged in
+ * ADR-002 §4.1, NOT the present-tense action verbs in `DraftAction`.
+ * Actions are what clients submit; events are what got recorded.
+ *
+ * Only `pick_submitted` is appended in step 3. The auction variants
+ * are placeholders for chunk 11g.6's auction state machine, which
+ * appends them when the matching `place_bid` / `nominate` actions
+ * succeed. System-generated auction events (`auction_paused`,
+ * `auction_nomination_expired`, `auction_nomination_closed`,
+ * `auction_auto_nominated`, `auction_resumed`,
+ * `auction_bid_extends_timer`, `auction_commissioner_override`)
+ * extend this union when chunk 11g.6's state machine generates them.
+ *
+ * `seq` is the per-league monotonic from the `submit_pick_v2` RPC
+ * (or chunk 11g.6's auction RPC equivalent). `timestamp` is ISO 8601
+ * captured at append time on the server.
+ *
+ * `idempotencyKey` is intentionally excluded — server-internal
+ * concern for the durable event log, not relevant to client UI.
+ */
+export type BufferedDraftEvent =
+  | {
+      kind: 'pick_submitted';
+      seq: number;
+      timestamp: string;
+      teamId: string;
+      playerId: number;
+      roundNumber: number;
+      pickNumber: number;
+    }
+  | {
+      kind: 'auction_bid_placed';
+      seq: number;
+      timestamp: string;
+      nominationId: string;
+      teamId: string;
+      bidAmount: number;
+    }
+  | {
+      kind: 'auction_nomination_started';
+      seq: number;
+      timestamp: string;
+      nominationId: string;
+      playerId: string;
+      openingBid: number;
+      nominatorTeamId: string;
+    };
+
+/**
+ * Result of `LobbyManager.getEventsSinceSeq` (and the underlying
+ * `RingBuffer.getEventsSinceSeq`). Used by chunk 11g.5's reconnect
+ * protocol: client sends `last_seen_seq`, server replies with either
+ * the events strictly after that seq, or a `too_old` signal telling
+ * the client to fall back to a full snapshot resync from Postgres.
+ *
+ * Eviction-aware semantic: an empty buffer returns `ok: true` with
+ * `events: []` (fresh lobby — client is up to date by definition).
+ * `too_old` only fires when the buffer has actually evicted events
+ * the client wanted, i.e. the buffer has reached capacity AND the
+ * client's `sinceSeq` is below the current oldest seq.
+ */
+export type GetEventsSinceSeqResult = GetSinceSeqResult<BufferedDraftEvent>;
+
+/**
  * Minimal client-facing snapshot of a lobby's current state.
  *
- * Step 1 returns identity fields only (`lobbyId`, `format`) plus
- * an empty `recentEvents` list. Steps 3-6 expand this to include:
+ * Steps 1-3 return identity fields plus the recent-events ring
+ * buffer contents. Steps 4-6 expand this to include:
  *   - `currentPick`: pick number + on-clock team
  *   - `timer`: pick deadline + remaining seconds
- *   - `recentEvents`: ring-buffer contents (step 3, ~200 events)
  *   - `candidatePool`: cached available players (step 5)
  *   - format-specific state: current nomination + budgets (auction)
  */
 export interface DraftSnapshot {
   lobbyId: string;
   format: DraftFormat;
-  recentEvents: ReadonlyArray<unknown>;
+  recentEvents: ReadonlyArray<BufferedDraftEvent>;
 }

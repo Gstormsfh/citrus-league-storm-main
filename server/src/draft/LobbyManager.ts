@@ -1,15 +1,15 @@
 // Phase 4.5 chunk 11g.4 — LobbyManager: in-memory state machine + single-
 // writer queue per active draft.
 //
-// Step 2 of chunk 11g.4: implement the single-writer queue, idempotency
-// cache, and the first action handler (`submit_pick` for snake/linear).
-// Auction action variants (`place_bid`, `nominate`) remain stubbed —
-// they land in chunk 11g.6 when the auction state machine arrives.
-// Connection management (addConnection/removeConnection) stays as no-op
-// stubs from step 1; that's step 4's work. Broadcast is step 5.
+// Step 3 of chunk 11g.4: add the recent-events ring buffer that backs
+// chunk 11g.5's `last_seen_seq` resume protocol. `processSubmitPick`
+// now appends a `pick_submitted` event to the buffer on every successful
+// non-duplicate submission; `getEventsSinceSeq` is exposed publicly so
+// reconnect handlers (chunk 11g.5) can replay events strictly after a
+// client's last-seen seq, falling back to a snapshot resync only when
+// the buffer has actually evicted events the client wanted.
 //
 // Future steps:
-//   - Step 3: ring buffer for resync
 //   - Step 4: connection management (real addConnection/removeConnection)
 //             + LobbyRegistry singleton
 //   - Step 5: broadcast via uWS topics post-commit
@@ -18,8 +18,9 @@
 //   - Step 7: snapshot persistence + bootstrap (chunk 11g.7)
 //
 // See docs/PHASE_4_5_ARCHITECTURE.md (Stack Decision; LobbyManager
-// principles — Principle 5 single-writer per lobby), docs/adr/
-// ADR-002-auction-state-machine.md §3.2 (format-aware single class),
+// principles — Principle 5 single-writer per lobby; line 147 ring
+// buffer specification), docs/adr/ADR-002-auction-state-machine.md
+// §3.2 (format-aware single class) and §4.1 (event-types catalog),
 // and docs/adr/ADR-001-persistent-node-draft-engine.md.
 
 import type { WebSocket } from 'uWebSockets.js';
@@ -30,12 +31,15 @@ import {
   type DraftV2Actor,
   type SubmitPickResult,
 } from '../services/DraftServiceV2';
+import { RingBuffer } from './RingBuffer';
 import type {
+  BufferedDraftEvent,
   DraftAction,
   DraftActionResult,
   DraftFormat,
   DraftSnapshot,
   DraftSocketUserData,
+  GetEventsSinceSeqResult,
 } from './types';
 
 export interface LobbyManagerOptions {
@@ -68,6 +72,20 @@ export interface LobbyManagerOptions {
  * may need to grow to ~1,000 or move to time-based eviction.
  */
 const IDEMPOTENCY_CACHE_MAX = 200;
+
+/**
+ * Maximum number of events retained in the recent-events ring buffer.
+ * Sized per docs/PHASE_4_5_ARCHITECTURE.md (line 147: "recent events
+ * ring buffer (~200 events)") — covers a typical snake-draft window
+ * for chunk 11g.5's `last_seen_seq` resume protocol without forcing
+ * DB resync on routine reconnects.
+ *
+ * **Revisit in chunk 11g.6 (auction work):** auction event volume
+ * may exceed snake/linear (one nomination plus many bids per roster
+ * slot). If the buffer evicts before clients can resume reliably,
+ * raise this cap or move to time-based retention.
+ */
+const EVENT_BUFFER_CAPACITY = 200;
 
 export class LobbyManager {
   readonly lobbyId: string;
@@ -109,11 +127,20 @@ export class LobbyManager {
   >();
 
   /**
-   * Recent-events ring buffer placeholder. Step 3 implements the
-   * ~200-event rolling buffer for chunk 11g.5's `last_seen_seq`
-   * resume protocol. Today: empty array stub.
+   * Recent-events ring buffer backing chunk 11g.5's `last_seen_seq`
+   * resume protocol. Sized at `EVENT_BUFFER_CAPACITY` (~200) per
+   * the architecture doc. Eviction-aware semantics: clients whose
+   * `sinceSeq` references events the buffer no longer holds get a
+   * `too_old` reply and fall back to a full snapshot resync from
+   * Postgres; clients within the buffer's window get an incremental
+   * event stream.
+   *
+   * Step 3 appends `pick_submitted` here on every successful non-
+   * duplicate `submit_pick`. Chunk 11g.6 will append the auction
+   * event variants (`auction_bid_placed`, `auction_nomination_started`,
+   * plus the system-generated variants like `auction_paused`).
    */
-  private readonly recentEvents: unknown[] = [];
+  private readonly events = new RingBuffer<BufferedDraftEvent>(EVENT_BUFFER_CAPACITY);
 
   constructor(opts: LobbyManagerOptions) {
     this.lobbyId = opts.lobbyId;
@@ -193,15 +220,31 @@ export class LobbyManager {
   }
 
   /**
-   * Return a snapshot of the current lobby state. Step 1 returns
-   * identity fields only; steps 3-6 fill in pick/timer/buffer state.
+   * Return a snapshot of the current lobby state. Steps 1-3 return
+   * identity fields plus the recent-events ring buffer contents;
+   * steps 4-6 fill in pick/timer/candidate-pool/auction state.
    */
   getSnapshot(): DraftSnapshot {
     return {
       lobbyId: this.lobbyId,
       format: this.format,
-      recentEvents: this.recentEvents,
+      recentEvents: this.events.snapshot(),
     };
+  }
+
+  /**
+   * Return events buffered since `sinceSeq`, or a `too_old` signal
+   * telling the caller to fall back to a full snapshot resync from
+   * Postgres. Used by chunk 11g.5's reconnect handler when a client
+   * resumes with a `last_seen_seq` cursor.
+   *
+   * See `RingBuffer.getEventsSinceSeq` for the eviction-aware rule:
+   * empty buffer or no eviction yet always returns `ok` (with the
+   * filtered events, possibly empty); `too_old` only fires when the
+   * buffer has actually evicted events the client wanted.
+   */
+  getEventsSinceSeq(sinceSeq: number): GetEventsSinceSeqResult {
+    return this.events.getEventsSinceSeq(sinceSeq);
   }
 
   /**
@@ -291,6 +334,23 @@ export class LobbyManager {
         err,
       );
       return { ok: false, reason: 'internal_error' };
+    }
+
+    // Buffer the recorded event for chunk 11g.5's resume protocol.
+    // Skip when the RPC reports `was_duplicate=true` — the original
+    // event is already in the buffer (and the durable log) from the
+    // first non-retried submission; double-appending would let
+    // clients see the same event twice during resync.
+    if (!result.was_duplicate) {
+      this.events.append({
+        kind: 'pick_submitted',
+        seq: result.seq,
+        timestamp: new Date().toISOString(),
+        teamId: action.teamId,
+        playerId: parseInt(action.playerId, 10),
+        roundNumber: HARDCODED_ROUND,
+        pickNumber: HARDCODED_PICK_NUMBER,
+      });
     }
 
     return { ok: true, eventSeq: result.seq };
