@@ -23,14 +23,7 @@
 import uWS from 'uWebSockets.js';
 import { logger } from '@citrus/shared';
 import { verifyDraftToken } from '../lib/draftToken';
-
-interface DraftSocketUserData {
-  lobbyId: string;
-  userId: string;
-  leagueId: string;
-  draftId: string;
-  expiresAt: number;
-}
+import type { DraftSocketUserData } from './types';
 
 export interface UwsServerHandle {
   port: number;
@@ -85,6 +78,10 @@ export function startUwsServer(port: number): Promise<UwsServerHandle> {
               logger.debug(
                 `[uws] upgrade accepted lobbyId=${lobbyId} userId=${claims.sub}`,
               );
+              // TODO(chunk 11g.4 step 2+): look up or create the LobbyManager
+              // for this lobbyId via a LobbyRegistry singleton (introduced in
+              // step 4) and call addConnection in the `open` handler below
+              // once that handler has access to the registry.
               res.cork(() => {
                 res.upgrade(
                   {
