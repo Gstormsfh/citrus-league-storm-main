@@ -18,6 +18,38 @@ import { cn } from '@/lib/utils';
  * Use a `<PercentileBullet />` cluster anywhere JFresh would have
  * stacked horizontal bars — model decomposition, position-percentile
  * rows, comparison drawers.
+ *
+ * REFINEMENT (Component 7 of 7) — Concept 3 mockup alignment.
+ * Day 1 implementation predated the locked Spatial Hero direction.
+ * Per the data-zone Modern Tech precision spec (§2.2: hairline 1px
+ * dividers, no decoration, surface tints for hierarchy) and the
+ * canvas-design-system §Second Pass discipline (Don't add more
+ * graphics. Refine what exists. Make extremely crisp. Polish rather
+ * than expand.), the track is thinned from a 28px chrome rail to a
+ * hairline pill, floor markers / bullet-head / shadow-glow / track
+ * ring all dropped, median tick softened to white/12. The 4-category
+ * color vocabulary survives unchanged; the API is unchanged. Only
+ * the surface treatment shifts — subtraction, not redesign.
+ *
+ * ATTESTATION (per META-RULE protocol — see PLAYER_DASHBOARD_DESIGN_SPEC.md §9):
+ * - 21st.dev primitive: kept hand-built. Prior session research
+ *   surfaced Vercel SegmentedProgress + Modern Vertical Progress as
+ *   alternatives, but the 4-category Citrus vocabulary is already
+ *   locked and in-use across 3+ embedding contexts. A swap would
+ *   cascade. Refine, don't replace.
+ * - Design principle referenced: "Second Pass (Critical) — Don't add
+ *   more graphics. Refine what exists. Make extremely crisp. Respect
+ *   minimalism philosophy. Polish rather than expand." — from
+ *   canvas-design-system.md §Refinement Process. Plus the data-zone
+ *   spec from PLAYER_DASHBOARD_DESIGN_SPEC.md §2.2: "hairline 1px
+ *   dividers, no decoration, surface tints for hierarchy."
+ * - Matched mockup section: SHOT BREAKDOWN tile in
+ *   apps/web/docs/dashboard-mockups/concept-3-spatial-hero.jpg —
+ *   five rows where each shows label LEFT + caption/value RIGHT,
+ *   below them a hairline track (~2-3px) with solid category fill
+ *   to the percentile position and a dim track continuation to the
+ *   right edge. No median tick visible, no bullet-head pill, no
+ *   floor markers, no glow.
  */
 
 export type PercentileCategory = 'offense' | 'defense' | 'special' | 'neutral';
@@ -54,13 +86,6 @@ const CATEGORY_FILL: Record<PercentileCategory, string> = {
   defense: '#84A57D',  // pastel-sage
   special: '#F4E5B8',  // pastel-butter
   neutral: '#FFF8F0',  // pastel-cream
-};
-
-const CATEGORY_GLOW: Record<PercentileCategory, string> = {
-  offense: 'shadow-[0_0_12px_-2px_rgba(255,107,26,0.45)]',
-  defense: 'shadow-[0_0_12px_-2px_rgba(132,165,125,0.45)]',
-  special: 'shadow-[0_0_12px_-2px_rgba(244,229,184,0.45)]',
-  neutral: '',
 };
 
 function clamp(value: number, min = 0, max = 100): number {
@@ -101,13 +126,17 @@ export function PercentileBullet({
   const isBelowMedian = hasPercentile && pct < 50;
   const usePattern = hasPercentile && pct < 30;
 
-  const trackHeight = size === 'md' ? 'h-7' : 'h-5';
+  // Refinement (Component 7) — track thinned from chrome rail to hairline pill
+  // per Concept 3 mockup. md = 8px (h-2), sm = 6px (h-1.5).
+  const trackHeight = size === 'md' ? 'h-2' : 'h-1.5';
   const labelSize = size === 'md' ? 'text-[12px]' : 'text-[11px]';
   const valueSize = size === 'md' ? 'text-[15px]' : 'text-[13px]';
   const captionSize = 'text-[10px]';
 
   const accentColor = CATEGORY_FILL[category];
-  const glowClass = !isBelowMedian && !isLowSample ? CATEGORY_GLOW[category] : '';
+  // isBelowMedian retained for ARIA + future variants; the visual
+  // distinction lives in fill width itself (subtraction over decoration).
+  void isBelowMedian;
 
   const ariaLabel = useMemo(() => {
     if (isLoading) return `Loading ${label}`;
@@ -131,7 +160,7 @@ export function PercentileBullet({
           <div className="h-3 w-24 rounded bg-pastel-surface-high animate-pulse" />
           <div className="h-3 w-12 rounded bg-pastel-surface-high animate-pulse" />
         </div>
-        <div className={cn(trackHeight, 'rounded-md bg-pastel-surface-high animate-pulse')} />
+        <div className={cn(trackHeight, 'rounded-full bg-pastel-surface-high animate-pulse')} />
       </div>
     );
   }
@@ -156,6 +185,14 @@ export function PercentileBullet({
         </div>
         {!compact && (
           <div className="flex items-baseline gap-2 flex-shrink-0">
+            {isLowSample && (
+              <span
+                className="font-jbmono font-bold uppercase tracking-wider text-[8px] text-pastel-butter/85 leading-none"
+                title={`Limited sample (${sampleSize} GP)`}
+              >
+                LOW SAMPLE
+              </span>
+            )}
             {rawValue != null && rawValue !== '' && (
               <span className={cn('font-jbmono font-bold tabular-nums text-pastel-cream', valueSize)}>
                 {rawValue}
@@ -176,15 +213,29 @@ export function PercentileBullet({
                 {Math.round(pct)}{ordinalSuffix(Math.round(pct))}
               </span>
             )}
+            {!hasPercentile && (
+              <span
+                className={cn(
+                  'font-jbmono uppercase tracking-wider text-white/35',
+                  captionSize,
+                )}
+              >
+                No data
+              </span>
+            )}
           </div>
         )}
       </div>
 
-      {/* Bullet track */}
+      {/* Bullet track — refined to a hairline pill per Concept 3 mockup.
+          Track ring + bullet-head + floor markers + shadow glow all dropped.
+          Solid fill (no gradient). Median tick softened from white/30 to
+          white/12 — kept because it's the JFresh-killer comparator. Pattern
+          fill below 30% retained as functional accessibility. */}
       <div
         className={cn(
           trackHeight,
-          'relative w-full rounded-md bg-white/5 ring-1 ring-white/10 overflow-hidden',
+          'relative w-full rounded-full bg-white/[0.04] overflow-hidden',
         )}
       >
         {/* SVG pattern definition for low-percentile color-not-only encoding */}
@@ -204,78 +255,33 @@ export function PercentileBullet({
           </svg>
         )}
 
-        {/* No-data state */}
-        {!hasPercentile && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className={cn('font-jbmono uppercase tracking-wider text-white/35', captionSize)}>
-              No data
-            </span>
-          </div>
-        )}
+        {/* No-data state — caption rendered inline in the readout row.
+            Track stays as an empty rail (no fill) when percentile is null. */}
 
-        {/* Median reference tick at 50% */}
+        {/* Median reference tick at 50% — softened to white/12 per mockup. */}
         {hasPercentile && (
           <div
             aria-hidden="true"
-            className="absolute top-0 bottom-0 w-px bg-white/30"
+            className="absolute top-0 bottom-0 w-px bg-white/12"
             style={{ left: '50%' }}
           />
         )}
 
-        {/* The bullet fill */}
+        {/* The bullet fill — solid category color, transitions on width. */}
         {hasPercentile && (
           <div
             aria-hidden="true"
-            className={cn(
-              'absolute top-0 bottom-0 left-0 transition-[width] duration-500 ease-out',
-              glowClass,
-            )}
+            className="absolute top-0 bottom-0 left-0 transition-[width] duration-500 ease-out"
             style={{
               width: `${pct}%`,
               background: usePattern
                 ? `url(#${patternId}), ${accentColor}`
-                : `linear-gradient(90deg, ${accentColor}99 0%, ${accentColor} 100%)`,
+                : accentColor,
               opacity: isLowSample ? 0.5 : 1,
             }}
           />
         )}
-
-        {/* Bullet head marker — visible at the percentile position for tap target */}
-        {hasPercentile && (
-          <div
-            aria-hidden="true"
-            className="absolute top-1/2 -translate-y-1/2 w-1 h-full bg-pastel-cream/90 rounded-sm"
-            style={{ left: `calc(${pct}% - 2px)` }}
-          />
-        )}
-
-        {/* Low-sample badge — overlaid right edge */}
-        {isLowSample && (
-          <span
-            aria-hidden="true"
-            className={cn(
-              'absolute right-1.5 top-1/2 -translate-y-1/2',
-              'font-jbmono font-bold text-[8px] tracking-tight',
-              'bg-pastel-butter text-pastel-surface',
-              'rounded px-1 py-px ring-1 ring-pastel-surface',
-            )}
-            title={`Limited sample (${sampleSize} GP)`}
-          >
-            SS
-          </span>
-        )}
       </div>
-
-      {/* Ordinal scale floor markers — only render in md size to keep sm tight */}
-      {size === 'md' && hasPercentile && (
-        <div className="flex justify-between font-jbmono uppercase tracking-wider text-white/35 text-[9px] px-0.5">
-          <span>0</span>
-          <span>25</span>
-          <span className="text-white/55">50</span>
-          <span>75</span>
-          <span>100</span>
-        </div>
-      )}
     </div>
   );
 }
