@@ -69,6 +69,21 @@ export type DraftAction =
       kind: 'submit_pick';
       teamId: string;
       playerId: string;
+      /**
+       * The user submitting the pick. Sourced from the connected
+       * client's `DraftSocketUserData.userId` (which is sourced
+       * from the JWT's `sub` claim — see `lib/draftToken.ts`).
+       * Used by `LobbyManager.processSubmitPick` to construct the
+       * actor envelope for `submit_pick_v2` RPC calls.
+       */
+      userId: string;
+      /**
+       * Per-connection session identifier. Sourced from the WS
+       * upgrade flow. Used for the actor's `session_id` field
+       * and the RPC's `p_session_id` parameter — ties pick events
+       * to their originating WS session for tracing.
+       */
+      sessionId: string;
       idempotencyKey: string;
     }
   | {
@@ -88,24 +103,41 @@ export type DraftAction =
 
 /**
  * Result of `LobbyManager.enqueueAction`. Success carries the
- * durable event id (assigned by the `submit_pick_v2` / equivalent
- * RPC); failure carries a typed reason code so client UI can
- * display structured error messages.
+ * per-league monotonic seq (the `seq` returned by `submit_pick_v2`
+ * / equivalent RPC) so clients can use it as a `since_seq`
+ * resume cursor for chunk 11g.5's reconnect protocol. Failure
+ * carries a typed reason code so client UI can display
+ * structured error messages.
  *
- * Reason codes are placeholders today — the full set is finalized
- * in step 2 alongside the queue + dispatch implementation.
- * `'not_yet_implemented'` is the step-1 stub's reason.
+ * Reason enum mirrors the `submit_pick_v2` RPC error surface
+ * (mapped from `RAISE EXCEPTION` prefixes via
+ * `DraftServiceV2.mapRpcError` → `AppError.message` →
+ * `LobbyManager.mapAppErrorToReason`). Three reasons are
+ * LobbyManager-specific (not from the RPC):
+ *   - `'not_yet_implemented_chunk_11g6'`: auction action
+ *     variants (`place_bid`, `nominate`) are stubs until the
+ *     auction state machine lands in chunk 11g.6.
+ *   - `'wrong_format_for_action'`: caller submitted a snake/
+ *     linear `submit_pick` against an auction-format lobby
+ *     (or vice versa once auction handlers exist).
+ *   - `'internal_error'`: `processAction` threw or the queue
+ *     hit an unexpected runtime error. Logged at error level.
  */
 export type DraftActionResult =
-  | { ok: true; eventId: string }
+  | { ok: true; eventSeq: number }
   | {
       ok: false;
       reason:
+        | 'not_yet_implemented_chunk_11g6'
+        | 'wrong_format_for_action'
+        | 'internal_error'
         | 'not_on_clock'
-        | 'duplicate_idempotency_key'
+        | 'player_taken'
+        | 'pick_out_of_order'
+        | 'idempotency_conflict'
+        | 'unauthorized'
         | 'invalid_state'
-        | 'wrong_team'
-        | 'not_yet_implemented';
+        | 'invalid_payload';
     };
 
 /**
