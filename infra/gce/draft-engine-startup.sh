@@ -36,10 +36,24 @@
 #
 # Logging
 # ───────
-# All output goes to /var/log/citrus-startup.log for debugging.
-# View on the VM with: sudo tail -f /var/log/citrus-startup.log
-# Stream from your laptop: gcloud compute ssh <vm-name> -- \
-#   sudo tail -f /var/log/citrus-startup.log
+# Two distinct log streams. Don't conflate them.
+#
+# 1. Startup-script log: this script's own output goes to
+#    /var/log/citrus-startup.log via the `exec >> ... 2>&1` redirect
+#    below. View on the VM: sudo tail -f /var/log/citrus-startup.log
+#
+# 2. Container log: the running draft-engine's stdout/stderr ships
+#    to Cloud Logging via Docker's gcplogs log driver, configured on
+#    the `docker run` invocation in step 6. Query from your laptop:
+#      gcloud logging read 'labels.app="citrus-draft-engine"' \
+#        --project=citrus-fantasy-staging --limit=20 --order=desc
+#
+# The chunk 11g.2.0 spike's `--metadata=google-logging-enabled=true`
+# pattern was insufficient on Debian VMs (it works on Container-
+# Optimized OS where Docker is integrated with the OS logging
+# pipeline; Debian needs an explicit log driver). Chunk 11g.2 step 5
+# surfaced the gap; the gcplogs driver in step 6 fixes it without
+# requiring an Ops Agent install.
 #
 # Security note on the JWT secret
 # ───────────────────────────────
@@ -75,6 +89,9 @@ metadata_get() {
 PROJECT_ID="$(metadata_get project-id)"
 PROJECT_ID="${PROJECT_ID:-citrus-fantasy-staging}"
 
+ENVIRONMENT="$(metadata_get environment)"
+ENVIRONMENT="${ENVIRONMENT:-staging}"
+
 ARTIFACT_REGISTRY_HOST="$(metadata_get artifact-registry-host)"
 ARTIFACT_REGISTRY_HOST="${ARTIFACT_REGISTRY_HOST:-northamerica-northeast1-docker.pkg.dev}"
 
@@ -100,6 +117,7 @@ DRAFT_WS_HOST_PORT="${DRAFT_WS_HOST_PORT:-3002}"
 
 echo "Configuration:"
 echo "  PROJECT_ID=${PROJECT_ID}"
+echo "  ENVIRONMENT=${ENVIRONMENT}"
 echo "  IMAGE_URI=${IMAGE_URI}"
 echo "  SECRET_NAME=${SECRET_NAME}"
 echo "  CONTAINER_NAME=${CONTAINER_NAME}"
@@ -147,6 +165,20 @@ docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
 # ── Step 6: Run the new container ───────────────────────────────────
 # --restart=always: container restarts on crash and on VM reboot.
+# --log-driver=gcplogs: stream container stdout/stderr directly to
+#   Cloud Logging via the VM's metadata-server credentials. No agent
+#   install needed; requires roles/logging.logWriter on the VM
+#   service account (already in the IAM block at the top of this
+#   script). Replaces the chunk 11g.2.0 spike's incorrect-on-Debian
+#   `--metadata=google-logging-enabled=true` assumption — see the
+#   "Logging" header section above for the full narrative.
+# --log-opt gcp-project: directs logs to ${PROJECT_ID}.
+# --log-opt labels: tells the gcplogs driver to forward the named
+#   Docker labels as Cloud Logging labels.
+# --label app, --label environment: the labels themselves. Used for
+#   filtering in Cloud Logging, e.g.
+#     gcloud logging read 'labels.app="citrus-draft-engine"
+#                          AND labels.environment="${ENVIRONMENT}"'
 # -p host:container: maps the configurable host ports to the
 #   container's fixed 3001/3002 (set by ENV in the Dockerfile).
 # -e SUPABASE_JWT_SECRET: injects the secret read in step 3.
@@ -154,6 +186,11 @@ echo "Starting ${CONTAINER_NAME}..."
 docker run -d \
   --name "${CONTAINER_NAME}" \
   --restart=always \
+  --log-driver=gcplogs \
+  --log-opt gcp-project="${PROJECT_ID}" \
+  --log-opt labels=app,environment \
+  --label app=citrus-draft-engine \
+  --label environment="${ENVIRONMENT}" \
   -p "${HONO_HOST_PORT}:3001" \
   -p "${DRAFT_WS_HOST_PORT}:3002" \
   -e SUPABASE_JWT_SECRET="${SUPABASE_JWT_SECRET}" \
