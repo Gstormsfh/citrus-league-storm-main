@@ -401,12 +401,12 @@ export function RinkHeatmap({
           : `Shot heatmap — ${shots.length} shots in ${mode} view`
       }
       className={cn(
-        'relative w-full overflow-hidden',
+        'relative w-full max-w-[1100px] mx-auto overflow-hidden',
         'bg-pastel-surface ring-1 ring-white/10 rounded-2xl',
-        // Iter #4 (Garrett's pragmatic-shrink): aspect 100/55 (was 100/85).
-        // Tighter rink eliminates the empty-void problem; identity composition
-        // sits comfortably at bottom-left without competing with empty space.
-        // Mockup geometry isn't NHL-accurate; visual balance is.
+        // Iter #4: aspect 100/55 — tighter vertical scope eliminates void.
+        // Iter #5: max-w-[1100px] mx-auto — caps horizontal width so the
+        // rink reads as a deliberate hero composition with breathing room,
+        // not stretched-to-fit container. Centered within its parent.
         'aspect-[100/55]',
         className,
       )}
