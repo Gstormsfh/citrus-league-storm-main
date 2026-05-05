@@ -410,6 +410,38 @@ export function SparklineMicroChart({
                 </g>
               )}
 
+              {/* Iteration #2 hover refresh — vertical scrub line + dot marker
+                  at the hovered point's x. Sage at 30% opacity, 1px, top-of-
+                  chart to baseline. Renders only when not on the last point
+                  (endpoint already has its own punctuation). */}
+              {hoveredIdx != null && hoveredIdx !== points.length - 1 && points[hoveredIdx] && (
+                <g pointerEvents="none">
+                  <line
+                    x1={points[hoveredIdx].cx}
+                    x2={points[hoveredIdx].cx}
+                    y1={PAD}
+                    y2={baselineY}
+                    stroke={lineHex}
+                    strokeOpacity="0.32"
+                    strokeWidth="1"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <circle
+                    cx={points[hoveredIdx].cx}
+                    cy={points[hoveredIdx].cy}
+                    r="6"
+                    fill={accentHex}
+                    fillOpacity="0.20"
+                  />
+                  <circle
+                    cx={points[hoveredIdx].cx}
+                    cy={points[hoveredIdx].cy}
+                    r="3"
+                    fill={accentHex}
+                  />
+                </g>
+              )}
+
               {/* Iter #3 fix #1+2: game ticks layer at baseline.
                   Standard ticks at 18% white opacity. Event-flagged points
                   get a slightly larger marker in the event's color. Hit area
@@ -474,6 +506,40 @@ export function SparklineMicroChart({
                   </g>
                 );
               })}
+
+              {/* Iteration #2 hover refresh — chart-wide hit overlay.
+                  Maps cursor x → nearest point index. Pointer events (works
+                  for mouse + touch). Sits ON TOP of ticks so this is the
+                  primary hover handler; tick rects above remain as redundant
+                  small-target shortcuts. */}
+              {points.length > 1 && (
+                <rect
+                  x={0}
+                  y={0}
+                  width={VIEW_W}
+                  height={baselineY}
+                  fill="transparent"
+                  style={{ pointerEvents: 'auto', cursor: 'crosshair' }}
+                  onPointerMove={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    if (rect.width === 0) return;
+                    const fx = (e.clientX - rect.left) / rect.width;
+                    const targetCx = Math.max(0, Math.min(VIEW_W, fx * VIEW_W));
+                    let closest = 0;
+                    let minDist = Infinity;
+                    for (let i = 0; i < points.length; i++) {
+                      const d = Math.abs(points[i].cx - targetCx);
+                      if (d < minDist) {
+                        minDist = d;
+                        closest = i;
+                      }
+                    }
+                    setHoveredIdx(closest);
+                  }}
+                  onPointerLeave={() => setHoveredIdx(null)}
+                  onPointerCancel={() => setHoveredIdx(null)}
+                />
+              )}
             </svg>
 
             {/* Iter #2 fix #5: endpoint value composed with the dot.

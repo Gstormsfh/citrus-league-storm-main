@@ -38,6 +38,8 @@ export interface ShotEvent {
   xg_value?: number | null;
   /** Whether the shot resulted in a goal. */
   is_goal?: boolean;
+  /** Game-state when the shot was taken. Used to filter by mode (5v5/pp/pk). */
+  mode?: '5v5' | 'pp' | 'pk';
   /** Optional id for keying. */
   id?: string | number;
 }

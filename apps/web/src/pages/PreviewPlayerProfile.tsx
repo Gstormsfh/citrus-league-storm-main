@@ -41,7 +41,7 @@
  *   with monumental +4.21 callout (SHARE).
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import {
   DarkLayout,
@@ -77,57 +77,115 @@ function jitter(center: number, spread: number): number {
   return Math.max(0, Math.min(1, center + z * spread));
 }
 
-const MOCK_SHOTS: ShotEvent[] = [
-  ...Array.from({ length: 60 }, (_, i) => ({
-    id: `slot-${i}`,
+// Iter #2 fix #3 — mock shots tagged with `mode` so the 5V5/PP toggle
+// actually filters output. PP shots cluster heavier in the slot + circles
+// (umbrella formation, less defensive pressure), 5v5 shots distribute
+// across all zones.
+const MOCK_SHOTS_5V5: ShotEvent[] = [
+  ...Array.from({ length: 50 }, (_, i) => ({
+    id: `5v5-slot-${i}`,
     x: jitter(0.50, 0.05),
     y: jitter(0.84, 0.04),
     xg_value: 0.18 + Math.random() * 0.14,
     is_goal: i % 5 === 0,
+    mode: '5v5' as const,
   })),
-  ...Array.from({ length: 35 }, (_, i) => ({
-    id: `highslot-${i}`,
+  ...Array.from({ length: 28 }, (_, i) => ({
+    id: `5v5-highslot-${i}`,
     x: jitter(0.50, 0.08),
     y: jitter(0.74, 0.04),
     xg_value: 0.10 + Math.random() * 0.10,
     is_goal: i % 9 === 0,
+    mode: '5v5' as const,
   })),
-  ...Array.from({ length: 22 }, (_, i) => ({
-    id: `lowslot-${i}`,
+  ...Array.from({ length: 18 }, (_, i) => ({
+    id: `5v5-lowslot-${i}`,
     x: jitter(0.50, 0.04),
     y: jitter(0.93, 0.03),
     xg_value: 0.22 + Math.random() * 0.20,
     is_goal: i % 3 === 0,
+    mode: '5v5' as const,
   })),
-  ...Array.from({ length: 24 }, (_, i) => ({
-    id: `lcircle-${i}`,
+  ...Array.from({ length: 18 }, (_, i) => ({
+    id: `5v5-lcircle-${i}`,
     x: jitter(0.30, 0.06),
     y: jitter(0.64, 0.07),
     xg_value: 0.04 + Math.random() * 0.08,
     is_goal: i % 12 === 0,
+    mode: '5v5' as const,
   })),
-  ...Array.from({ length: 24 }, (_, i) => ({
-    id: `rcircle-${i}`,
+  ...Array.from({ length: 18 }, (_, i) => ({
+    id: `5v5-rcircle-${i}`,
     x: jitter(0.70, 0.06),
     y: jitter(0.64, 0.07),
     xg_value: 0.04 + Math.random() * 0.08,
     is_goal: i % 12 === 0,
+    mode: '5v5' as const,
   })),
   ...Array.from({ length: 6 }, (_, i) => ({
-    id: `point-${i}`,
+    id: `5v5-point-${i}`,
     x: 0.20 + Math.random() * 0.60,
     y: 0.08 + Math.random() * 0.10,
     xg_value: 0.02 + Math.random() * 0.04,
     is_goal: false,
+    mode: '5v5' as const,
   })),
   ...Array.from({ length: 4 }, (_, i) => ({
-    id: `boards-${i}`,
+    id: `5v5-boards-${i}`,
     x: i % 2 === 0 ? 0.06 : 0.92,
     y: 0.45 + Math.random() * 0.30,
     xg_value: 0.02 + Math.random() * 0.04,
     is_goal: false,
+    mode: '5v5' as const,
   })),
 ];
+
+// PP — fewer total shots, but the slot + circle volume is dominant.
+// Higher xG averages (less defensive pressure), more goals per shot.
+const MOCK_SHOTS_PP: ShotEvent[] = [
+  ...Array.from({ length: 22 }, (_, i) => ({
+    id: `pp-slot-${i}`,
+    x: jitter(0.50, 0.04),
+    y: jitter(0.86, 0.04),
+    xg_value: 0.24 + Math.random() * 0.16,
+    is_goal: i % 3 === 0,
+    mode: 'pp' as const,
+  })),
+  ...Array.from({ length: 16 }, (_, i) => ({
+    id: `pp-lcircle-${i}`,
+    x: jitter(0.28, 0.04),
+    y: jitter(0.62, 0.05),
+    xg_value: 0.10 + Math.random() * 0.10,
+    is_goal: i % 6 === 0,
+    mode: 'pp' as const,
+  })),
+  ...Array.from({ length: 16 }, (_, i) => ({
+    id: `pp-rcircle-${i}`,
+    x: jitter(0.72, 0.04),
+    y: jitter(0.62, 0.05),
+    xg_value: 0.10 + Math.random() * 0.10,
+    is_goal: i % 6 === 0,
+    mode: 'pp' as const,
+  })),
+  ...Array.from({ length: 10 }, (_, i) => ({
+    id: `pp-bumper-${i}`,
+    x: jitter(0.50, 0.06),
+    y: jitter(0.70, 0.04),
+    xg_value: 0.16 + Math.random() * 0.10,
+    is_goal: i % 5 === 0,
+    mode: 'pp' as const,
+  })),
+  ...Array.from({ length: 4 }, (_, i) => ({
+    id: `pp-point-${i}`,
+    x: 0.30 + Math.random() * 0.40,
+    y: 0.10 + Math.random() * 0.06,
+    xg_value: 0.04 + Math.random() * 0.04,
+    is_goal: false,
+    mode: 'pp' as const,
+  })),
+];
+
+const MOCK_SHOTS_ALL: ShotEvent[] = [...MOCK_SHOTS_5V5, ...MOCK_SHOTS_PP];
 
 const OPPONENTS = ['NYR', 'BOS', 'PIT', 'TOR', 'MTL', 'OTT', 'TBL', 'FLA', 'CAR', 'WSH', 'PHI', 'NJD', 'DET', 'BUF', 'NYI', 'CBJ', 'CHI', 'COL', 'DAL', 'EDM', 'VAN', 'CGY', 'ANA', 'LAK', 'SJS', 'STL', 'NSH', 'WPG', 'MIN', 'VGK'];
 
@@ -184,7 +242,54 @@ const SHOT_ZONES: ShotZoneRow[] = [
   { zone: 'BOARDS',    share: 10, xgPerShot: 0.03, category: 'neutral' },
 ];
 
+// Iter #2 fix #4 — second breakdown tile metrics. JFresh-style standard
+// percentile coverage (offense/defense/special teams), 8 metrics in a
+// 4×2 grid. Mock values realistic for an elite center (McDavid).
+interface PercentileMetric {
+  label: string;
+  context?: string;
+  percentile: number;
+  rawValue: number;
+  rawUnit?: string;
+  sampleSize: number;
+  category: 'offense' | 'defense' | 'special' | 'neutral';
+}
+
+const STANDARD_METRICS: PercentileMetric[] = [
+  { label: 'xG/60',        context: '5v5',  percentile: 96, rawValue: 3.42, rawUnit: '/60', sampleSize: 71, category: 'offense' },
+  { label: 'Goals/60',     context: '5v5',  percentile: 99, rawValue: 1.62, rawUnit: '/60', sampleSize: 71, category: 'offense' },
+  { label: 'Finishing',    context: 'G−xG', percentile: 88, rawValue: 0.48, rawUnit: '/60', sampleSize: 71, category: 'offense' },
+  { label: 'A1/60',        context: '5v5',  percentile: 97, rawValue: 1.84, rawUnit: '/60', sampleSize: 71, category: 'offense' },
+  { label: 'xGA/60',       context: 'on-ice', percentile: 42, rawValue: 2.31, rawUnit: '/60', sampleSize: 71, category: 'defense' },
+  { label: 'xGF%',         context: 'on-ice', percentile: 81, rawValue: 60.4, rawUnit: '%',   sampleSize: 71, category: 'defense' },
+  { label: 'PP1 xGF/60',   context: 'PP',   percentile: 94, rawValue: 9.82, rawUnit: '/60', sampleSize: 71, category: 'special' },
+  { label: 'PEN±',         context: 'diff', percentile: 71, rawValue: 0.42, rawUnit: '/60', sampleSize: 71, category: 'special' },
+];
+
 const TODAY_ISO = new Date().toISOString();
+
+// ── ChapterEyebrow — page-level chapter header above each zone ──────
+// Iter #2 fix #2 — chapter-numbered section header, mirrors WrappedChapter's
+// own eyebrow style for consistency. Page reads as a chaptered narrative.
+function ChapterEyebrow({
+  chapterNumber,
+  title,
+  className = '',
+}: {
+  chapterNumber: number;
+  title: string;
+  className?: string;
+}) {
+  return (
+    <div className={`flex items-center gap-3 ${className}`}>
+      <span className="h-px flex-1 bg-white/[0.08]" aria-hidden="true" />
+      <span className="font-jbmono uppercase tracking-[0.32em] text-[11px] sm:text-[12px] font-bold text-pastel-orange-soft whitespace-nowrap">
+        Chapter {chapterNumber} · {title}
+      </span>
+      <span className="h-px flex-1 bg-white/[0.08]" aria-hidden="true" />
+    </div>
+  );
+}
 
 // ── Local sub-composition: ShotBreakdownTile ─────────────────────────
 // Vertical stack of PercentileBullets — 5 zones with hairline dividers.
@@ -226,6 +331,17 @@ function ShotBreakdownTile() {
 export default function PreviewPlayerProfile() {
   const [rinkMode, setRinkMode] = useState<RinkMode>('5v5');
 
+  // Iter #2 fix #3 — actually filter the shots by mode.
+  // 5v5 → 5v5 only. pp → PP only. xg → all (current xG-color encoding).
+  // g-xg → goals only (talent layer — finishing variance highlighted).
+  const filteredShots = useMemo(() => {
+    if (rinkMode === '5v5') return MOCK_SHOTS_5V5;
+    if (rinkMode === 'pp') return MOCK_SHOTS_PP;
+    if (rinkMode === 'g-xg') return MOCK_SHOTS_ALL.filter((s) => s.is_goal);
+    // default 'xg' or anything else: all shots
+    return MOCK_SHOTS_ALL;
+  }, [rinkMode]);
+
   return (
     <DarkLayout>
       {/* CHROME ZONE — sticky nav (existing Navbar from app shell) */}
@@ -235,12 +351,15 @@ export default function PreviewPlayerProfile() {
         {/* ────────────────────────────────────────────────────────── */}
         {/* HERO ZONE — full-bleed RinkHeatmap, Concrete Poetry         */}
         {/* ────────────────────────────────────────────────────────── */}
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 mb-6">
+          <ChapterEyebrow chapterNumber={1} title="OVERVIEW" />
+        </div>
         <section
           aria-labelledby="player-hero-name"
           className="relative px-4 sm:px-6"
         >
           <RinkHeatmap
-            shots={MOCK_SHOTS}
+            shots={filteredShots}
             mode={rinkMode}
             onModeChange={setRinkMode}
             playerName={PLAYER.fullName}
@@ -252,13 +371,13 @@ export default function PreviewPlayerProfile() {
         </section>
 
         {/* ────────────────────────────────────────────────────────── */}
-        {/* DATA ZONE — asymmetric bento, Modern Tech precision         */}
+        {/* DATA ZONE — sparkline (CHAPTER 2 — Recent Trends)           */}
         {/* ────────────────────────────────────────────────────────── */}
         <section
-          aria-label="Player metrics"
-          className="relative max-w-[1280px] mx-auto px-4 sm:px-6 mt-10 sm:mt-14"
+          aria-label="Recent trends"
+          className="relative max-w-[1280px] mx-auto px-4 sm:px-6 mt-12 sm:mt-16"
         >
-          {/* Wide top tile — sparkline at full data-zone width */}
+          <ChapterEyebrow chapterNumber={2} title="RECENT TRENDS" className="mb-6" />
           <div className="rounded-2xl bg-pastel-surface-tile ring-1 ring-white/10 p-5 sm:p-7">
             <SparklineMicroChart
               data={MOCK_XG_TREND}
@@ -267,11 +386,20 @@ export default function PreviewPlayerProfile() {
               tooltipUnit="/60"
             />
           </div>
+        </section>
+
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* DATA ZONE — bento (CHAPTER 3 — Breakdown)                    */}
+        {/* ────────────────────────────────────────────────────────── */}
+        <section
+          aria-label="Player breakdown"
+          className="relative max-w-[1280px] mx-auto px-4 sm:px-6 mt-12 sm:mt-16"
+        >
+          <ChapterEyebrow chapterNumber={3} title="BREAKDOWN" className="mb-6" />
 
           {/* Asymmetric bento row — Shot Breakdown / Rings / Verdict
-              On lg+, ratio 1.1 / 1 / 1.1 (left + right wider than center).
-              Collapses to single column under lg. */}
-          <div className="mt-5 sm:mt-6 grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1.1fr] gap-5 sm:gap-6 items-stretch">
+              On lg+, ratio 1.1 / 1 / 1.1. Collapses to single column under lg. */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1.1fr] gap-5 sm:gap-6 items-stretch">
             <ShotBreakdownTile />
 
             <div className="rounded-2xl bg-pastel-surface-tile ring-1 ring-white/10 p-5 sm:p-6 flex flex-col items-center justify-center">
@@ -294,6 +422,35 @@ export default function PreviewPlayerProfile() {
             </div>
           </div>
 
+          {/* Iter #2 fix #4 — second breakdown tile: 8 standard percentile
+              metrics in a 2-col grid (1-col under sm, 2-col sm+, 4-col lg+).
+              Sits beneath the asymmetric bento row to extend BREAKDOWN. */}
+          <div className="mt-5 sm:mt-6 rounded-2xl bg-pastel-surface-tile ring-1 ring-white/10 p-5 sm:p-7">
+            <div className="flex items-baseline justify-between gap-3 mb-5">
+              <div className="font-jbmono text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-white/55 font-bold">
+                Standard Percentiles · vs all centers
+              </div>
+              <div className="font-jbmono text-[9px] uppercase tracking-[0.22em] text-white/35 font-bold tabular-nums">
+                71 GP · 906 cohort
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
+              {STANDARD_METRICS.map((m) => (
+                <PercentileBullet
+                  key={m.label}
+                  size="sm"
+                  label={m.label}
+                  context={m.context}
+                  percentile={m.percentile}
+                  rawValue={m.rawValue}
+                  rawUnit={m.rawUnit}
+                  sampleSize={m.sampleSize}
+                  category={m.category}
+                />
+              ))}
+            </div>
+          </div>
+
           {/* Subtle freshness chip below the bento — chrome-zone inline citation */}
           <div className="mt-5 sm:mt-6 flex items-center justify-end gap-2">
             <StaleDataBadge asOf={TODAY_ISO} label="xG model" />
@@ -304,14 +461,14 @@ export default function PreviewPlayerProfile() {
         </section>
 
         {/* ────────────────────────────────────────────────────────── */}
-        {/* SHARE ZONE — Wrapped chapter, Spotify Wrapped storytelling */}
+        {/* SHARE ZONE — Wrapped chapter (CHAPTER 4)                    */}
         {/* ────────────────────────────────────────────────────────── */}
         <section
-          aria-label="Player chapters"
+          aria-label="Position vs league"
           className="relative max-w-[1280px] mx-auto px-4 sm:px-6 mt-12 sm:mt-16"
         >
           <WrappedChapter
-            chapterNumber={1}
+            chapterNumber={4}
             title="POSITION VS LEAGUE"
             subtitle="OFFENSIVE GAR · ALL CENTERS · 906 PLAYERS"
             callout={{
