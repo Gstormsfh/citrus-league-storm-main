@@ -24,7 +24,30 @@ import {
   type ShotEvent,
   PercentileRingCluster,
   type RingMetric,
+  SparklineMicroChart,
+  type SparklinePoint,
 } from '@/components/citrus2';
+
+// Mock 30-day xG/60 trend data
+const MOCK_XG_TREND: SparklinePoint[] = Array.from({ length: 30 }, (_, i) => {
+  // Realistic-ish xG/60 walk: 1.8 baseline, gentle wave, slight upward trend
+  const base = 2.4 + Math.sin(i / 4.5) * 0.7 + (i / 30) * 0.5;
+  return {
+    x: i,
+    y: Math.max(0.5, Number((base + (Math.random() - 0.5) * 0.4).toFixed(2))),
+  };
+});
+
+// Mock data with confidence band (for projection-style sparklines)
+const MOCK_PROJECTION: SparklinePoint[] = Array.from({ length: 20 }, (_, i) => {
+  const y = 1.4 + Math.sin(i / 3) * 0.4 + i * 0.04;
+  return {
+    x: i,
+    y: Number(y.toFixed(2)),
+    high: Number((y + 0.5 + (i / 20) * 0.4).toFixed(2)),
+    low: Number((y - 0.4 - (i / 20) * 0.3).toFixed(2)),
+  };
+});
 
 // Mock GAR percentiles for the ring cluster
 const MOCK_RINGS: RingMetric[] = [
@@ -328,6 +351,75 @@ export default function PreviewDashboardPrimitives() {
                   layout="horizontal"
                   ringSize={70}
                   caption="OFF · DEF · ST"
+                />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* SparklineMicroChart — minimal trend (data zone wide tile)  */}
+        {/* ────────────────────────────────────────────────────────── */}
+        <SectionHeader
+          eyebrow="Data zone · Component 3 of 7"
+          title="SparklineMicroChart"
+          blurb="The wide trend tile beneath the rink hero. Subtraction-as-design — what survives the canvas-design-system Second Pass discipline: line, endpoint accent dot, value, eyebrow caption. No axes, no grid, no decoration. Endpoint value at the right edge in JBMono is the data's punctuation."
+        />
+
+        <SubSection title="Default — full data-zone width treatment">
+          <div className="w-full">
+            <SparklineMicroChart
+              data={MOCK_XG_TREND}
+              eyebrow="Last 30 days · xG/60"
+              endpointUnit="/60"
+            />
+          </div>
+        </SubSection>
+
+        <SubSection title="Variants">
+          <div className="space-y-4">
+            <SparklineMicroChart
+              data={MOCK_XG_TREND}
+              eyebrow="Last 30 days · Goals/60"
+              endpointUnit="/60"
+              accent="orange"
+              lineColor="orange"
+            />
+            <SparklineMicroChart
+              data={MOCK_XG_TREND}
+              eyebrow="Last 30 days · TOI/G"
+              endpointUnit="m"
+              accent="butter"
+              lineColor="butter"
+            />
+            <SparklineMicroChart
+              data={MOCK_PROJECTION}
+              eyebrow="ROS Projection · xG/60 with 90% CI"
+              endpointUnit="/60"
+              accent="orange"
+              lineColor="sage"
+              showConfidenceBand
+            />
+          </div>
+        </SubSection>
+
+        <SubSection title="States">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <VariantCard caption="Loading state — shimmer line">
+              <div className="w-full">
+                <SparklineMicroChart
+                  data={MOCK_XG_TREND}
+                  eyebrow="Last 30 days · xG/60"
+                  isLoading
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="Empty state — no data yet">
+              <div className="w-full">
+                <SparklineMicroChart
+                  data={[]}
+                  eyebrow="Last 30 days · xG/60"
+                  emptyText="Player hasn't logged any games this season"
                 />
               </div>
             </VariantCard>

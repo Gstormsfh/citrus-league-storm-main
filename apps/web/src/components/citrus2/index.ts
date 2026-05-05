@@ -28,6 +28,8 @@ export { RinkHeatmap } from './RinkHeatmap';
 export type { RinkMode, RinkModeOption, ShotEvent } from './RinkHeatmap';
 export { PercentileRingCluster } from './PercentileRingCluster';
 export type { RingCategory, RingMetric } from './PercentileRingCluster';
+export { SparklineMicroChart } from './SparklineMicroChart';
+export type { SparklinePoint, SparklineAccent } from './SparklineMicroChart';
 
 // Brand mark
 export { CitrusLogo, CitrusWordmark } from './CitrusLogo';
