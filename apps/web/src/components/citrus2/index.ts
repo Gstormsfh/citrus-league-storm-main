@@ -30,6 +30,8 @@ export { PercentileRingCluster } from './PercentileRingCluster';
 export type { RingCategory, RingMetric } from './PercentileRingCluster';
 export { SparklineMicroChart } from './SparklineMicroChart';
 export type { SparklinePoint, SparklineAccent } from './SparklineMicroChart';
+export { VerdictTile } from './VerdictTile';
+export type { VerdictVariant, VerdictSize, VerdictAccent } from './VerdictTile';
 
 // Brand mark
 export { CitrusLogo, CitrusWordmark } from './CitrusLogo';

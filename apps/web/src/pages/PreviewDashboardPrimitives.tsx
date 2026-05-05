@@ -26,6 +26,7 @@ import {
   type RingMetric,
   SparklineMicroChart,
   type SparklinePoint,
+  VerdictTile,
 } from '@/components/citrus2';
 
 // Mock helpers — generate game dates + opponent abbreviations
@@ -466,6 +467,150 @@ export default function PreviewDashboardPrimitives() {
                   data={[]}
                   eyebrow="Last 30 days · xG/60"
                   emptyText="Player hasn't logged any games this season"
+                />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* VerdictTile — editorial Stormy verdict primitive            */}
+        {/* ────────────────────────────────────────────────────────── */}
+        <SectionHeader
+          eyebrow="Editorial · Component 4 of 7"
+          title="VerdictTile"
+          blurb="The Stormy verdict primitive — italic editorial body in pastel accent, JBMono caps eyebrow, optional dropcap and signature. Two surfaces: floating (backdrop-blur overlay for the rink hero) and embedded (solid tile for the data-zone right column). The rare exception where prose is allowed on a data surface; treated as visual element via italic + accent + framed architecture."
+        />
+
+        <SubSection title="Default — embedded variant, no signature">
+          <div className="max-w-md">
+            <VerdictTile
+              body="Elite finisher when shooting from the slot; xG conversion sits 31% above league baseline over the last 200 attempts."
+            />
+          </div>
+        </SubSection>
+
+        <SubSection title="Variants — floating (rink hero) vs embedded (data zone)">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <VariantCard caption="floating · backdrop-blur overlay (matches rink hero)">
+              <div className="relative w-full min-h-[200px] rounded-xl bg-gradient-to-br from-pastel-orange/15 via-pastel-surface-tile to-pastel-sage/10 p-6 flex items-start justify-end ring-1 ring-white/5">
+                <div className="w-[320px]">
+                  <VerdictTile
+                    variant="floating"
+                    body="Elite slot generator — 73% of his xG comes from inside the home plate, top decile in the league."
+                    accent="orange"
+                  />
+                </div>
+              </div>
+            </VariantCard>
+            <VariantCard caption="embedded · solid tile (data-zone right column)">
+              <div className="w-full">
+                <VerdictTile
+                  variant="embedded"
+                  body="Elite slot generator — 73% of his xG comes from inside the home plate, top decile in the league."
+                  signature="Stormy · Assistant GM"
+                />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        <SubSection title="Sizes — sm / md / lg">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+            <VariantCard caption="sm · 13px body · table inserts, sub-tile">
+              <div className="w-full">
+                <VerdictTile
+                  size="sm"
+                  body="Sample too small to bet the farm — 11 GP this season."
+                  signature="Stormy"
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="md · 14-15px body · default surface">
+              <div className="w-full">
+                <VerdictTile
+                  size="md"
+                  body="Pace stays elite even in defensive minutes; finishing variance the only knock."
+                  signature="Stormy · Assistant GM"
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="lg · 15-16px body · standalone editorial card">
+              <div className="w-full">
+                <VerdictTile
+                  size="lg"
+                  body="Elite finisher whose underlying xG model overrates volume but underrates his shot selection."
+                  signature="Stormy · Assistant GM"
+                />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        <SubSection title="Accents — orange / sage / butter / cream">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <VariantCard caption="orange · finishing / offense">
+              <div className="w-full">
+                <VerdictTile
+                  body="Elite slot finisher — top decile in inside xG/60 over the last 30 games."
+                  accent="orange"
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="sage · defense / steady">
+              <div className="w-full">
+                <VerdictTile
+                  body="Steady possession driver; nothing flashy, but the underlying numbers are elite."
+                  accent="sage"
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="butter · special teams / context">
+              <div className="w-full">
+                <VerdictTile
+                  body="The PP1 trigger — 9.8 xGF/60 with him on the ice, league-leading among RW units."
+                  accent="butter"
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="cream · neutral / informational">
+              <div className="w-full">
+                <VerdictTile
+                  body="Workhorse minutes; usage trending up since the trade deadline."
+                  accent="cream"
+                />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        <SubSection title="Editorial — dropcap on first letter (lg, embedded right column)">
+          <div className="max-w-md">
+            <VerdictTile
+              size="lg"
+              dropcap
+              body="Elite finisher whose model overrates raw volume but underrates his shot selection — bet the underlying skill, fade the variance."
+              signature="Stormy · Assistant GM"
+            />
+          </div>
+        </SubSection>
+
+        <SubSection title="States — loading + long-text overflow">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            <VariantCard caption="Loading skeleton — eyebrow + body + signature shimmer">
+              <div className="w-full">
+                <VerdictTile
+                  body=""
+                  signature="Stormy · Assistant GM"
+                  isLoading
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="Long-text overflow — wraps without truncation">
+              <div className="w-full">
+                <VerdictTile
+                  body="Elite slot generator who consistently posts top-decile inside xG/60 numbers, even after adjusting for usage and teammate quality; the only meaningful concern is finishing variance over short samples — over a full season he projects as a 35-goal floor with a 50-goal ceiling, and the underlying shot quality data says the ceiling is the more honest read."
+                  signature="Stormy · Assistant GM"
                 />
               </div>
             </VariantCard>
