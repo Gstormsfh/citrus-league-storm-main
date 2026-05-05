@@ -1,33 +1,35 @@
 /**
  * SparklineMicroChart — minimal trend visualization for the data zone.
  *
- * The sparkline is what survives the canvas-design-system "Second Pass"
- * discipline: line, endpoint accent dot, value, eyebrow caption — nothing
- * else. No axes, no grid, no legends, no tooltips on hover (the value
- * IS the hover-equivalent — always visible at the right edge).
+ * Iteration #2: gradient fill + endpoint emphasis + value-near-dot
+ * composition. Subtraction-as-design, NOT subtraction-as-blandness. The
+ * line is the data; the gradient fill is depth; the endpoint dot + halo +
+ * vertical hairline + value label compose as a single visual statement
+ * that punctuates the trend at the most-recent point.
  *
  * Used for the "LAST 30 DAYS · xG/60" wide tile and any other small trend
  * surface in the data zone. Optional confidence band fill below the line
  * for projections / probability ranges.
  *
  * ATTESTATION (per META-RULE protocol — see PLAYER_DASHBOARD_DESIGN_SPEC.md §9):
- * - 21st.dev primitive: hand-built — 21st.dev API returned schema-validation
- *   errors on all 3 inspiration queries (sparkline / trend-line-no-axis /
- *   small-line-with-value). Recharts was the alternative (already installed
- *   at ^2.12.7) but carries chrome we explicitly strip; a chrome-less
- *   sparkline is ~30 lines of raw SVG. Hand-built saves the bundle weight
- *   and gives full control over the Modern Tech precision aesthetic.
+ * - 21st.dev primitive: hand-built. 21st.dev API returned schema-validation
+ *   errors on all 3 inspiration queries. Recharts is installed at ^2.12.7
+ *   but carries chrome we explicitly strip. Adapts the Stripe/Linear
+ *   minimal-sparkline pattern by reference (gradient fill, endpoint halo,
+ *   anchoring hairline, proximal value label).
  * - Design principle referenced: "Second Pass (Critical) — Don't add more
- *   graphics. Refine what exists. Make extremely crisp. Respect minimalism
- *   philosophy. Polish rather than expand." — from canvas-design-system.md
- *   §Refinement Process. Plus spec §2.2 Data Zone: "Tabular numerics in
- *   JetBrains Mono for every number, hairline 1px rgba(255,255,255,0.10)
- *   dividers, no decoration."
+ *   graphics. Refine what exists. Make extremely crisp." — from
+ *   canvas-design-system.md §Refinement Process. Iter #2 honors this by
+ *   refining what exists (line + endpoint) rather than adding chrome.
+ *   Plus: "Subtle Reference Integration — Embed conceptual DNA without
+ *   announcing." The Stripe/Linear sparkline DNA is woven invisibly via
+ *   gradient + halo + hairline conventions.
  * - Matched mockup section: "LAST 30 DAYS · xG/60" wide tile in
  *   apps/web/docs/dashboard-mockups/concept-3-spatial-hero.jpg — caps
- *   eyebrow upper-left, sage horizontal line with gentle waves, no axis
- *   labels, no grid, single orange dot at most-recent point, "3.42" value
- *   in JBMono tabular-nums at right edge.
+ *   eyebrow upper-left, line crossing the tile, endpoint accent at the
+ *   most-recent point, value as the data's punctuation. Iter #2 elevates
+ *   the execution from "lines in SVG" to "from somewhere — Linear, Stripe,
+ *   Apple."
  */
 
 import { useId, useMemo } from 'react';
@@ -36,52 +38,39 @@ import { cn } from '@/lib/utils';
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface SparklinePoint {
-  /** X-axis value (date timestamp, day index, or any monotonic key). */
   x: number | string;
-  /** Y-axis value — the metric being trended. */
   y: number;
-  /** Optional upper bound for confidence band. */
   high?: number;
-  /** Optional lower bound for confidence band. */
   low?: number;
 }
 
 export type SparklineAccent = 'orange' | 'sage' | 'butter' | 'cream';
 
 interface SparklineMicroChartProps {
-  /** Time-series data, in chronological order (oldest first). */
   data: SparklinePoint[];
-  /** Caps eyebrow caption (e.g., "LAST 30 DAYS · xG/60"). */
   eyebrow?: string;
-  /** Endpoint value — overrides the auto-computed last data.y when supplied. */
   endpointValue?: string | number;
-  /** Optional unit suffix on endpoint (e.g., "/60", "%"). */
   endpointUnit?: string;
-  /** Accent color for the trailing dot (orange = recency punctuation). */
   accent?: SparklineAccent;
-  /** Stroke color for the line itself. Default sage. */
   lineColor?: SparklineAccent;
-  /** Render confidence band below line (uses point.high / point.low). */
   showConfidenceBand?: boolean;
-  /** Tile height in px. Default 140 — mockup-scale for the data zone. */
   height?: number;
-  /** Loading state. */
   isLoading?: boolean;
-  /** Empty state caption override (default: "Not enough data yet"). */
   emptyText?: string;
   className?: string;
 }
 
 // ── Color tokens ────────────────────────────────────────────────────
 
-const ACCENT_COLOR: Record<SparklineAccent, string> = {
+const ACCENT_HEX: Record<SparklineAccent, string> = {
   orange: '#FF6B1A',
   sage: '#84A57D',
   butter: '#F4E5B8',
   cream: '#FFF8F0',
 };
 
-const ACCENT_FILL: Record<SparklineAccent, string> = {
+// Confidence-band fill tokens (used by the area path between high/low).
+const BAND_FILL: Record<SparklineAccent, string> = {
   orange: 'rgba(255,107,26,0.12)',
   sage: 'rgba(132,165,125,0.12)',
   butter: 'rgba(244,229,184,0.12)',
@@ -102,17 +91,15 @@ function normalizePoints(
   width: number,
   height: number,
   pad: number,
-): { points: NormalizedPoint[]; minY: number; maxY: number } {
-  if (!data.length) return { points: [], minY: 0, maxY: 0 };
+): { points: NormalizedPoint[]; minY: number; maxY: number; baselineY: number } {
+  if (!data.length) return { points: [], minY: 0, maxY: 0, baselineY: height - pad };
 
-  // Compute full y-range including confidence band when present.
   let minY = Infinity;
   let maxY = -Infinity;
   for (const d of data) {
     minY = Math.min(minY, d.low ?? d.y, d.y);
     maxY = Math.max(maxY, d.high ?? d.y, d.y);
   }
-  // Padding the y-range so the line doesn't sit flush against the edges
   const range = maxY - minY || 1;
   const yPad = range * 0.12;
   minY -= yPad;
@@ -129,7 +116,7 @@ function normalizePoints(
     low: d.low != null ? yScale(d.low) : undefined,
   }));
 
-  return { points, minY, maxY };
+  return { points, minY, maxY, baselineY: height - pad };
 }
 
 function buildLinePath(points: NormalizedPoint[]): string {
@@ -141,22 +128,35 @@ function buildLinePath(points: NormalizedPoint[]): string {
   return cmds.join(' ');
 }
 
+// Build closed area path from line to baseline (for gradient fill below).
+function buildAreaPath(points: NormalizedPoint[], baselineY: number): string {
+  if (!points.length) return '';
+  const cmds: string[] = [
+    `M ${points[0].cx.toFixed(2)} ${baselineY.toFixed(2)}`,
+    `L ${points[0].cx.toFixed(2)} ${points[0].cy.toFixed(2)}`,
+  ];
+  for (let i = 1; i < points.length; i++) {
+    cmds.push(`L ${points[i].cx.toFixed(2)} ${points[i].cy.toFixed(2)}`);
+  }
+  cmds.push(`L ${points[points.length - 1].cx.toFixed(2)} ${baselineY.toFixed(2)}`);
+  cmds.push('Z');
+  return cmds.join(' ');
+}
+
 function buildBandPath(points: NormalizedPoint[]): string {
-  // Only valid if every point has high + low values.
   if (!points.length) return '';
   const valid = points.every((p) => p.high != null && p.low != null);
   if (!valid) return '';
 
-  const upper: string[] = [`M ${points[0].cx.toFixed(2)} ${points[0].high!.toFixed(2)}`];
+  const cmds: string[] = [`M ${points[0].cx.toFixed(2)} ${points[0].high!.toFixed(2)}`];
   for (let i = 1; i < points.length; i++) {
-    upper.push(`L ${points[i].cx.toFixed(2)} ${points[i].high!.toFixed(2)}`);
+    cmds.push(`L ${points[i].cx.toFixed(2)} ${points[i].high!.toFixed(2)}`);
   }
-  // Walk back along the lower bound to close the area
   for (let i = points.length - 1; i >= 0; i--) {
-    upper.push(`L ${points[i].cx.toFixed(2)} ${points[i].low!.toFixed(2)}`);
+    cmds.push(`L ${points[i].cx.toFixed(2)} ${points[i].low!.toFixed(2)}`);
   }
-  upper.push('Z');
-  return upper.join(' ');
+  cmds.push('Z');
+  return cmds.join(' ');
 }
 
 // ── Empty / loading treatments ──────────────────────────────────────
@@ -196,37 +196,44 @@ export function SparklineMicroChart({
 }: SparklineMicroChartProps) {
   const reactId = useId();
   const isEmpty = !isLoading && data.length === 0;
-  const accentColor = ACCENT_COLOR[accent];
-  const lineStroke = ACCENT_COLOR[lineColor];
-  const bandFill = ACCENT_FILL[lineColor];
+  const accentHex = ACCENT_HEX[accent];
+  const lineHex = ACCENT_HEX[lineColor];
+  const bandFill = BAND_FILL[lineColor];
 
-  // Endpoint value display — derived from data when not explicitly provided
   const displayEndpoint = useMemo(() => {
     if (endpointValue !== undefined && endpointValue !== null && endpointValue !== '') {
       return String(endpointValue);
     }
     if (!data.length) return null;
     const last = data[data.length - 1].y;
-    // Smart format: integers stay as ints; floats rounded to 2 decimals.
     return Number.isInteger(last) ? String(last) : last.toFixed(2);
   }, [endpointValue, data]);
 
-  // Use an internal viewBox so coordinate math is independent of rendered px size.
   const VIEW_W = 1000;
   const VIEW_H = height;
   const PAD = 12;
-  const { points } = useMemo(
+  const { points, baselineY } = useMemo(
     () => normalizePoints(data, VIEW_W, VIEW_H, PAD),
     [data, VIEW_H],
   );
 
   const linePath = useMemo(() => buildLinePath(points), [points]);
+  const areaPath = useMemo(() => buildAreaPath(points, baselineY), [points, baselineY]);
   const bandPath = useMemo(
     () => (showConfidenceBand ? buildBandPath(points) : ''),
     [points, showConfidenceBand],
   );
 
   const lastPoint = points[points.length - 1];
+  // Iter #2 fix #5: position value label proximal to endpoint dot.
+  // Compute pixel-relative position from viewBox coords.
+  // SVG uses preserveAspectRatio="none", so y maps linearly across container height.
+  const endpointXPct = lastPoint ? (lastPoint.cx / VIEW_W) * 100 : 100;
+  const endpointYPct = lastPoint ? (lastPoint.cy / VIEW_H) * 100 : 50;
+
+  // Unique gradient ids per instance (multiple sparklines on same page).
+  const gradientId = `${reactId}-grad`;
+  const lineGradId = `${reactId}-line-grad`;
 
   return (
     <section
@@ -237,99 +244,158 @@ export function SparklineMicroChart({
       }
       className={cn(
         'relative w-full overflow-hidden',
-        'bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl',
+        // Iter #2 fix #6: tile ring at 8% white (was 10%, was reading too sharp).
+        // Plus subtle inset highlight via the ring + surface tint stack.
+        'bg-pastel-surface-tile ring-1 ring-white/[0.08] rounded-2xl',
+        // Subtle inner top-edge highlight — a 1px bright line at the top of the tile
+        // gives it presence vs sitting flat. Standard premium-tile move.
+        'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]',
         'p-5',
         className,
       )}
       style={{ minHeight: height + 64 }}
     >
-      {/* Eyebrow + endpoint value row */}
-      <div className="flex items-baseline justify-between gap-4 mb-2">
-        {eyebrow && (
-          <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] sm:text-[11px] font-bold text-white/45 truncate">
-            {eyebrow}
-          </div>
-        )}
-        {displayEndpoint && !isLoading && !isEmpty && (
-          <div className="font-jbmono font-bold tabular-nums text-pastel-cream text-[20px] sm:text-[22px] flex-shrink-0 leading-none">
-            {displayEndpoint}
-            {endpointUnit && (
-              <span className="text-white/55 font-medium ml-0.5 text-[14px] sm:text-[15px]">
-                {endpointUnit}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Eyebrow row — caption only. Endpoint value moved into the chart area
+          near the dot per iter #2 fix #5. */}
+      {eyebrow && (
+        <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] sm:text-[11px] font-bold text-white/45 truncate mb-2">
+          {eyebrow}
+        </div>
+      )}
 
-      {/* Chart area */}
-      <div
-        className="relative w-full"
-        style={{ height }}
-      >
+      {/* Chart area — relative wrapper so we can absolute-position the value label */}
+      <div className="relative w-full" style={{ height }}>
         {!isEmpty && !isLoading && (
-          <svg
-            viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-            preserveAspectRatio="none"
-            className="absolute inset-0 w-full h-full"
-            aria-hidden="true"
-          >
-            {/* Confidence band (optional, behind line) */}
-            {bandPath && (
+          <>
+            <svg
+              viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+              preserveAspectRatio="none"
+              className="absolute inset-0 w-full h-full"
+              aria-hidden="true"
+            >
+              <defs>
+                {/* Iter #2 fix #1: gradient fill below line, accent at 12% opacity
+                    at the line's position → fully transparent at the baseline.
+                    Vertical gradient (top of line = strongest, bottom = transparent). */}
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={lineHex} stopOpacity="0.18" />
+                  <stop offset="60%" stopColor={lineHex} stopOpacity="0.06" />
+                  <stop offset="100%" stopColor={lineHex} stopOpacity="0" />
+                </linearGradient>
+                {/* Subtle gradient on the line stroke itself — adds depth without
+                    breaking the single-color encoding rule (color = meaning).
+                    Goes from slightly-dimmer at left to full saturation at right
+                    (the endpoint = the freshest data, brightest). */}
+                <linearGradient id={lineGradId} x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor={lineHex} stopOpacity="0.7" />
+                  <stop offset="100%" stopColor={lineHex} stopOpacity="1" />
+                </linearGradient>
+              </defs>
+
+              {/* Confidence band (behind everything) */}
+              {bandPath && (
+                <path d={bandPath} fill={bandFill} />
+              )}
+
+              {/* Iter #2 fix #1: gradient area fill below line */}
+              <path d={areaPath} fill={`url(#${gradientId})`} />
+
+              {/* Iter #2 fix #3: endpoint accent column — 1px vertical hairline
+                  from dot to baseline at 5% accent opacity. Anchors the
+                  endpoint visually without competing with the line. */}
+              {lastPoint && (
+                <line
+                  x1={lastPoint.cx}
+                  y1={lastPoint.cy}
+                  x2={lastPoint.cx}
+                  y2={baselineY}
+                  stroke={accentHex}
+                  strokeOpacity="0.18"
+                  strokeWidth="1"
+                  strokeDasharray="2 3"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+
+              {/* Iter #2 fix #4: line stroke bumped 2.5 → 3px, with the
+                  left-to-right opacity gradient defined above. */}
               <path
-                d={bandPath}
-                fill={bandFill}
+                d={linePath}
+                fill="none"
+                stroke={`url(#${lineGradId})`}
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
               />
+
+              {/* Iter #2 fix #2: endpoint upgrade — 9px solid dot + 18px halo
+                  + 28px outer aura at 30% accent opacity. The dot now actually
+                  punctuates instead of sitting as a 4px afterthought. */}
+              {lastPoint && (
+                <g>
+                  {/* Outer aura — softest */}
+                  <circle
+                    cx={lastPoint.cx}
+                    cy={lastPoint.cy}
+                    r="14"
+                    fill={accentHex}
+                    opacity="0.12"
+                  />
+                  {/* Halo */}
+                  <circle
+                    cx={lastPoint.cx}
+                    cy={lastPoint.cy}
+                    r="9"
+                    fill={accentHex}
+                    opacity="0.30"
+                  />
+                  {/* Solid dot */}
+                  <circle
+                    cx={lastPoint.cx}
+                    cy={lastPoint.cy}
+                    r="4.5"
+                    fill={accentHex}
+                  />
+                </g>
+              )}
+            </svg>
+
+            {/* Iter #2 fix #5: endpoint value composed with the dot.
+                Floats above-left of the endpoint position, anchored via
+                the percentage coords from viewBox. */}
+            {displayEndpoint && lastPoint && (
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  // Position to the LEFT of the endpoint so the label trails
+                  // the dot without overlapping. Translate up so it sits
+                  // ABOVE the dot.
+                  left: `min(calc(${endpointXPct}% - 8px), calc(100% - 88px))`,
+                  top: `calc(${endpointYPct}% - 38px)`,
+                  transform: 'translateX(-100%)',
+                }}
+              >
+                <div className="flex items-baseline gap-0.5 px-2 py-1 rounded-md bg-pastel-surface/80 backdrop-blur-sm ring-1 ring-white/10">
+                  <span className="font-jbmono font-bold tabular-nums text-pastel-cream text-[18px] sm:text-[20px] leading-none">
+                    {displayEndpoint}
+                  </span>
+                  {endpointUnit && (
+                    <span className="font-jbmono text-white/55 font-medium text-[12px] leading-none">
+                      {endpointUnit}
+                    </span>
+                  )}
+                </div>
+              </div>
             )}
-
-            {/* Single midline hairline — the only "grid" allowed per spec */}
-            <line
-              x1={PAD}
-              y1={VIEW_H / 2}
-              x2={VIEW_W - PAD}
-              y2={VIEW_H / 2}
-              stroke="rgba(255,255,255,0.06)"
-              strokeWidth="1"
-              strokeDasharray="2 4"
-            />
-
-            {/* Trend line */}
-            <path
-              d={linePath}
-              fill="none"
-              stroke={lineStroke}
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-            />
-
-            {/* Endpoint accent dot — the recency punctuation */}
-            {lastPoint && (
-              <g>
-                <circle
-                  cx={lastPoint.cx}
-                  cy={lastPoint.cy}
-                  r="6"
-                  fill={accentColor}
-                  opacity="0.25"
-                />
-                <circle
-                  cx={lastPoint.cx}
-                  cy={lastPoint.cy}
-                  r="3.5"
-                  fill={accentColor}
-                />
-              </g>
-            )}
-          </svg>
+          </>
         )}
 
         {isLoading && <SparklineSkeleton />}
         {isEmpty && <SparklineEmpty text={emptyText} />}
       </div>
 
-      {/* Hidden id reference for future tooltip hookup if added */}
+      {/* Hidden screen-reader summary */}
       <span id={`${reactId}-sr`} className="sr-only">
         {data.length > 0 && `${data.length} data points trending to ${displayEndpoint}${endpointUnit ?? ''}`}
       </span>
