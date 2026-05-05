@@ -48,6 +48,15 @@ ENV DRAFT_WS_PORT=3002
 
 EXPOSE 3001 3002
 
-# Use tsx to run TypeScript directly (matches existing server/Dockerfile
-# pattern — @citrus/shared exports raw .ts files, no build step).
-CMD ["npx", "tsx", "server/src/draft/index.ts"]
+# Run Node directly with tsx as an --import loader hook (Node 22+ ESM
+# import API). This makes Node PID 1 inside the container — SIGTERM
+# goes straight to the application's signal handlers, exit codes
+# reflect the application's process.exit() calls.
+#
+# Diverges from the legacy server/Dockerfile's `npx tsx ...` shape on
+# purpose: that pattern made `npm exec` PID 1, which logs "command
+# failed signal SIGTERM" and exits with code 1 even when the
+# application exits cleanly with 0. Cloud Run was lenient about
+# wrapper-induced exit codes; GCE + custom orchestration is stricter.
+# Step 1 of chunk 11g.2 documented the issue; step 4 fixes it.
+CMD ["node", "--import", "tsx/esm", "server/src/draft/index.ts"]
