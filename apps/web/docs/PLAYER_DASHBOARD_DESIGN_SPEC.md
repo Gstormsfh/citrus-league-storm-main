@@ -505,6 +505,84 @@ After Garrett's review:
 
 ---
 
+## Post-Web-Summit todos
+
+Captured during Component 6 staging walkthrough on 2026-05-05.
+Web Summit ships the locked 7-component scope; these are explicit
+follow-ups for the next planning cycle.
+
+### PWS-1: PlayerCard (condensed, embedded surface)
+
+A compact glanceable player card component for embedded use
+throughout the app — distinct from the full `PlayerProfile` page
+in job-to-be-done:
+
+| Surface | Job | Time-to-read | Where it lives |
+|---|---|---|---|
+| `PlayerProfile` (full page) | Standalone deep-dive, SEO-indexable, share-zone chapters | 5+ min | `/players/[slug]-[playerId]` |
+| `PlayerCard` (condensed) | Glanceable in lists/tables/drawers, decision-support | 5-10 sec | embedded in PlayerPool, draft board, waiver wire, roster, comparison drawer |
+
+**Specs:**
+- ~280-320px wide × ~180-240px tall
+- **Identity strip (top):** `PlayerMonogram size="sm"` + name + caps eyebrow `POS · TEAM · AGE` + jersey number
+- **Metric stack:** 6-8 PercentileBullets in compact rows — `xG/60`,
+  `Goals/60`, `Finishing` (G−xG), `A1/60`, `xGA/60` on-ice,
+  `xGF%` on-ice, `PP1 xGF/60`, total GAR. Use `PercentileBullet
+  size="sm"` (existing primitive — no new vocabulary)
+- **Verdict line (bottom):** one-line Stormy verdict in italic
+  pastel-orange-soft, abbreviated (~80-100 chars max). No dropcap,
+  no signature in this surface
+- **Click-through:** card is a link to `/players/[slug]-[playerId]`
+- **Hover/tap reveal (optional v1.1):** expanded variant exposing
+  12+ metrics + sparkline thumbnail without leaving the embedding context
+- **Used in:** PlayerPool table modal, draft board cards, waiver
+  wire list rows, roster grid, comparison drawer
+
+**Reference baseline:** JFresh's static cards as the density target,
+but with Citrus 2.0 design vocabulary (PercentileBullet primitives,
+dark forest surfaces, JBMono numerics, hairline rings).
+
+### PWS-2: Profile-page consolidation — condensed card at top of full profile
+
+Garrett's observation post-iter #2 walkthrough: the full
+`PlayerProfile` composition feels long. Open question for the next
+planning cycle:
+
+**Option 1 (recommended):** When someone lands on
+`/players/[slug]-[playerId]`, render the condensed `PlayerCard`
+inline at the top of the full profile, then the deep-dive below
+(hero rink + chapters + share zone). Gives shareable + scannable
+in a single URL — strongest of both worlds.
+
+**Option 2:** Keep `PlayerCard` and `PlayerProfile` as fully
+separate surfaces. Don't double-up.
+
+**Recommendation: Option 1.** The condensed card serves the
+"what's the verdict in 5 seconds?" job that the deep-dive can't
+serve quickly, even for users who landed via direct link. It
+also doubles as a "skip to chapters" anchor and an OG-image-ready
+glance summary. Decide formally during Phase 5 planning; for
+Web Summit demo the current composition stays as-is.
+
+### PWS-3: WrappedChapter library extension
+
+Web Summit ships one chapter (POSITION VS LEAGUE). Future
+chapters per §2.4: "Where He Shoots Live", "Career Arc"
+(post multi-season backfill), "vs Last Season", "Comparison"
+(post comparison drawer build). Each is a new visualization slot;
+the WrappedChapter chrome is already universal.
+
+### PWS-4: G−xG mode true differential color encoding
+
+Component 6 iter #2 implemented `g-xg` mode as a goals-only
+filter with current xG-color encoding (pragmatic shortcut). The
+spec'd intent is a true differential color encoding (cream/orange
+for over-performance, sage for under-performance). Add a
+`colorMode` prop to `RinkHeatmap` and a `g_minus_xg` value on
+`ShotEvent` when this lands.
+
+---
+
 ## Document maintenance
 
 When implementation surfaces design questions not covered here,
@@ -515,3 +593,4 @@ with a dated note. Don't let the spec drift from reality.
 |---|---|---|
 | 2026-05-04 | Initial spec — Concept 3 (Spatial Hero) locked | Garrett + Claude |
 | 2026-05-04 | Added Section 8 (canonical mockup paths) + Section 9 (META-RULE: 4-step resource consultation protocol). Section 10 was previously Section 8. | Garrett + Claude |
+| 2026-05-05 | Added Post-Web-Summit todos section: PWS-1 PlayerCard (condensed), PWS-2 profile-page consolidation, PWS-3 WrappedChapter library extension, PWS-4 G−xG true differential color encoding | Garrett + Claude |
