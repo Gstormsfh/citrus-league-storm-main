@@ -28,17 +28,58 @@ import {
   type SparklinePoint,
 } from '@/components/citrus2';
 
-// Mock 30-day xG/60 trend data
+// Mock helpers — generate game dates + opponent abbreviations
+const OPPONENTS = ['NYR', 'BOS', 'PIT', 'TOR', 'MTL', 'OTT', 'TBL', 'FLA', 'CAR', 'WSH', 'PHI', 'NJD', 'DET', 'BUF', 'NYI', 'CBJ', 'CHI', 'COL', 'DAL', 'EDM', 'VAN', 'CGY', 'ANA', 'LAK', 'SJS', 'STL', 'NSH', 'WPG', 'MIN', 'VGK'];
+
+function gameDateFor(daysAgo: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return `${d.toLocaleString('en-US', { month: 'short' }).toUpperCase()} ${d.getDate()}`;
+}
+
+// Mock 30-day xG/60 trend data — clean (no events, just ticks demonstrating density)
 const MOCK_XG_TREND: SparklinePoint[] = Array.from({ length: 30 }, (_, i) => {
-  // Realistic-ish xG/60 walk: 1.8 baseline, gentle wave, slight upward trend
   const base = 2.4 + Math.sin(i / 4.5) * 0.7 + (i / 30) * 0.5;
   return {
     x: i,
     y: Math.max(0.5, Number((base + (Math.random() - 0.5) * 0.4).toFixed(2))),
+    gameDate: gameDateFor(29 - i),
+    opponent: OPPONENTS[i % OPPONENTS.length],
   };
 });
 
-// Mock data with confidence band (for projection-style sparklines)
+// Mock 30-day Goals/60 — with hat trick on day 12 (event annotation demo)
+const MOCK_GOALS_TREND: SparklinePoint[] = Array.from({ length: 30 }, (_, i) => {
+  const base = 1.2 + Math.sin(i / 5) * 0.5 + (i / 30) * 0.3;
+  const isHatTrick = i === 12;
+  return {
+    x: i,
+    y: isHatTrick
+      ? 3.45
+      : Math.max(0.2, Number((base + (Math.random() - 0.5) * 0.3).toFixed(2))),
+    gameDate: gameDateFor(29 - i),
+    opponent: OPPONENTS[i % OPPONENTS.length],
+    event: isHatTrick ? ('hat_trick' as const) : undefined,
+    eventLabel: isHatTrick ? 'Hat trick · vs PIT' : undefined,
+  };
+});
+
+// Mock 30-day TOI — return-from-injury day 5
+const MOCK_TOI_TREND: SparklinePoint[] = Array.from({ length: 30 }, (_, i) => {
+  const isReturn = i === 5;
+  const isInjured = i < 5;
+  const base = 21.4 + Math.sin(i / 7) * 1.2;
+  return {
+    x: i,
+    y: isInjured ? 0 : isReturn ? 12.4 : Number((base + (Math.random() - 0.5) * 1.6).toFixed(1)),
+    gameDate: gameDateFor(29 - i),
+    opponent: OPPONENTS[i % OPPONENTS.length],
+    event: isReturn ? ('return_from_injury' as const) : undefined,
+    eventLabel: isReturn ? 'Return from IR' : undefined,
+  };
+});
+
+// Mock projection — confidence band, no events (projections shouldn't carry past events)
 const MOCK_PROJECTION: SparklinePoint[] = Array.from({ length: 20 }, (_, i) => {
   const y = 1.4 + Math.sin(i / 3) * 0.4 + i * 0.04;
   return {
@@ -46,6 +87,8 @@ const MOCK_PROJECTION: SparklinePoint[] = Array.from({ length: 20 }, (_, i) => {
     y: Number(y.toFixed(2)),
     high: Number((y + 0.5 + (i / 20) * 0.4).toFixed(2)),
     low: Number((y - 0.4 - (i / 20) * 0.3).toFixed(2)),
+    gameDate: gameDateFor(19 - i),
+    opponent: OPPONENTS[i % OPPONENTS.length],
   };
 });
 
@@ -376,21 +419,23 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Variants">
-          <div className="space-y-4">
+        <SubSection title="Variants — game ticks + event markers + inline annotation (iter #3)">
+          <div className="space-y-7">
             <SparklineMicroChart
-              data={MOCK_XG_TREND}
-              eyebrow="Last 30 days · Goals/60"
+              data={MOCK_GOALS_TREND}
+              eyebrow="Last 30 days · Goals/60 (with hat trick event)"
               endpointUnit="/60"
               accent="orange"
               lineColor="orange"
+              tooltipUnit="/60"
             />
             <SparklineMicroChart
-              data={MOCK_XG_TREND}
-              eyebrow="Last 30 days · TOI/G"
+              data={MOCK_TOI_TREND}
+              eyebrow="Last 30 days · TOI/G (with IR return event)"
               endpointUnit="m"
               accent="butter"
               lineColor="butter"
+              tooltipUnit="m"
             />
             <SparklineMicroChart
               data={MOCK_PROJECTION}
@@ -399,6 +444,7 @@ export default function PreviewDashboardPrimitives() {
               accent="orange"
               lineColor="sage"
               showConfidenceBand
+              tooltipUnit="/60"
             />
           </div>
         </SubSection>

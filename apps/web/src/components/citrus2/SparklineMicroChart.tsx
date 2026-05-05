@@ -1,47 +1,61 @@
 /**
  * SparklineMicroChart — minimal trend visualization for the data zone.
  *
- * Iteration #2: gradient fill + endpoint emphasis + value-near-dot
- * composition. Subtraction-as-design, NOT subtraction-as-blandness. The
- * line is the data; the gradient fill is depth; the endpoint dot + halo +
- * vertical hairline + value label compose as a single visual statement
- * that punctuates the trend at the most-recent point.
+ * Iteration #3: game-level depth via tick layer, event markers, inline
+ * editorial annotation, and hover tooltip. The Trend + Verdict Pair
+ * signature applied to the chart itself — GitHub contribution-graph
+ * tick density meets The Athletic editorial annotation, without
+ * sacrificing the iter #2 minimalism (gradient fill, endpoint pill,
+ * tile hairline, no axes, no grid).
  *
- * Used for the "LAST 30 DAYS · xG/60" wide tile and any other small trend
- * surface in the data zone. Optional confidence band fill below the line
- * for projections / probability ranges.
+ * Earns informational depth without falling into the JFresh trap of
+ * stacked horizontal bars: each new layer (tick / event / annotation /
+ * tooltip) earns its place. Ticks are minimal, events are 1-3 max,
+ * annotation is 1 max, tooltip only on interaction.
  *
  * ATTESTATION (per META-RULE protocol — see PLAYER_DASHBOARD_DESIGN_SPEC.md §9):
  * - 21st.dev primitive: hand-built. 21st.dev API returned schema-validation
  *   errors on all 3 inspiration queries. Recharts is installed at ^2.12.7
  *   but carries chrome we explicitly strip. Adapts the Stripe/Linear
- *   minimal-sparkline pattern by reference (gradient fill, endpoint halo,
- *   anchoring hairline, proximal value label).
- * - Design principle referenced: "Second Pass (Critical) — Don't add more
- *   graphics. Refine what exists. Make extremely crisp." — from
- *   canvas-design-system.md §Refinement Process. Iter #2 honors this by
- *   refining what exists (line + endpoint) rather than adding chrome.
- *   Plus: "Subtle Reference Integration — Embed conceptual DNA without
- *   announcing." The Stripe/Linear sparkline DNA is woven invisibly via
- *   gradient + halo + hairline conventions.
+ *   minimal-sparkline pattern by reference + GitHub contribution-graph
+ *   tick density + The Athletic editorial annotation pattern.
+ * - Design principle referenced: "Subtle Reference Integration — Embed
+ *   conceptual DNA without announcing. Niche reference woven invisibly.
+ *   Those who know feel it intuitively. Others experience masterful
+ *   abstract composition." — from canvas-design-system.md §Implementation
+ *   Guidelines. The tick density quotes GitHub; the inline annotation
+ *   quotes The Athletic; both invisible to the casual viewer, deliberate
+ *   to the data-fluent.
+ *   Plus the iter #2 reference: "Second Pass (Critical) — Don't add more
+ *   graphics. Refine what exists." Iter #3 doesn't add chrome — it adds
+ *   data layers that ARE the data.
  * - Matched mockup section: "LAST 30 DAYS · xG/60" wide tile in
- *   apps/web/docs/dashboard-mockups/concept-3-spatial-hero.jpg — caps
- *   eyebrow upper-left, line crossing the tile, endpoint accent at the
- *   most-recent point, value as the data's punctuation. Iter #2 elevates
- *   the execution from "lines in SVG" to "from somewhere — Linear, Stripe,
- *   Apple."
+ *   apps/web/docs/dashboard-mockups/concept-3-spatial-hero.jpg, extended
+ *   beyond literal mockup geometry per Garrett's iter #3 directive. The
+ *   Trend + Verdict Pair signature from PLAYER_DASHBOARD_DESIGN_SPEC.md §3
+ *   table row 6 lives here.
  */
 
-import { useId, useMemo } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 // ── Types ────────────────────────────────────────────────────────────
+
+export type SparklineEventKind = 'hat_trick' | 'return_from_injury' | 'milestone';
 
 export interface SparklinePoint {
   x: number | string;
   y: number;
   high?: number;
   low?: number;
+  /** Display date for hover tooltip (e.g. "MAR 12"). */
+  gameDate?: string;
+  /** Opponent abbrev for hover tooltip (e.g. "PIT"). */
+  opponent?: string;
+  /** Event kind — drives marker color + qualifies for inline annotation. */
+  event?: SparklineEventKind;
+  /** Override label for the inline annotation (e.g. "HAT TRICK"). */
+  eventLabel?: string;
 }
 
 export type SparklineAccent = 'orange' | 'sage' | 'butter' | 'cream';
@@ -54,11 +68,31 @@ interface SparklineMicroChartProps {
   accent?: SparklineAccent;
   lineColor?: SparklineAccent;
   showConfidenceBand?: boolean;
+  /** Render game-level tick marks at the baseline. Default true. */
+  showTicks?: boolean;
+  /** Format the y value for tooltip display. Defaults to 2-decimal toFixed. */
+  formatTooltipValue?: (y: number) => string;
+  /** Optional unit suffix on tooltip values (defaults to endpointUnit). */
+  tooltipUnit?: string;
   height?: number;
   isLoading?: boolean;
   emptyText?: string;
   className?: string;
 }
+
+// ── Event token mapping ─────────────────────────────────────────────
+
+const EVENT_LABEL_DEFAULT: Record<SparklineEventKind, string> = {
+  hat_trick: 'Hat trick',
+  return_from_injury: 'Return',
+  milestone: 'Milestone',
+};
+
+const EVENT_COLOR_KEY: Record<SparklineEventKind, SparklineAccent> = {
+  hat_trick: 'orange',
+  return_from_injury: 'butter',
+  milestone: 'orange',
+};
 
 // ── Color tokens ────────────────────────────────────────────────────
 
@@ -189,16 +223,30 @@ export function SparklineMicroChart({
   accent = 'orange',
   lineColor = 'sage',
   showConfidenceBand = false,
+  showTicks = true,
+  formatTooltipValue,
+  tooltipUnit,
   height = 140,
   isLoading = false,
   emptyText = 'Not enough data yet',
   className,
 }: SparklineMicroChartProps) {
   const reactId = useId();
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const isEmpty = !isLoading && data.length === 0;
   const accentHex = ACCENT_HEX[accent];
   const lineHex = ACCENT_HEX[lineColor];
   const bandFill = BAND_FILL[lineColor];
+
+  // First event index — used for the single inline annotation
+  const annotationIdx = useMemo(
+    () => data.findIndex((d) => !!d.event),
+    [data],
+  );
+
+  const formatValue = formatTooltipValue ?? ((y: number) =>
+    Number.isInteger(y) ? String(y) : y.toFixed(2));
+  const tooltipUnitText = tooltipUnit ?? endpointUnit ?? '';
 
   const displayEndpoint = useMemo(() => {
     if (endpointValue !== undefined && endpointValue !== null && endpointValue !== '') {
@@ -250,10 +298,12 @@ export function SparklineMicroChart({
         // Subtle inner top-edge highlight — a 1px bright line at the top of the tile
         // gives it presence vs sitting flat. Standard premium-tile move.
         'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]',
-        'p-5',
+        // Iter #3: extra bottom padding when an inline annotation will render
+        // so it stays inside the rounded corners.
+        annotationIdx >= 0 ? 'pt-5 px-5 pb-9' : 'p-5',
         className,
       )}
-      style={{ minHeight: height + 64 }}
+      style={{ minHeight: height + (annotationIdx >= 0 ? 84 : 64) }}
     >
       {/* Eyebrow row — caption only. Endpoint value moved into the chart area
           near the dot per iter #2 fix #5. */}
@@ -359,6 +409,71 @@ export function SparklineMicroChart({
                   />
                 </g>
               )}
+
+              {/* Iter #3 fix #1+2: game ticks layer at baseline.
+                  Standard ticks at 18% white opacity. Event-flagged points
+                  get a slightly larger marker in the event's color. Hit area
+                  is wider (12px) for easier hover. */}
+              {showTicks && points.map((p, i) => {
+                const datum = data[i];
+                const isEvent = !!datum.event;
+                const isLast = i === points.length - 1;
+                if (isLast) return null; // last point = endpoint dot, don't double-mark
+
+                const eventColor = datum.event
+                  ? ACCENT_HEX[EVENT_COLOR_KEY[datum.event]]
+                  : null;
+                const isHovered = hoveredIdx === i;
+
+                return (
+                  <g key={`tick-${i}`}>
+                    {/* Standard tick OR event marker */}
+                    {isEvent ? (
+                      <>
+                        <line
+                          x1={p.cx}
+                          y1={baselineY}
+                          x2={p.cx}
+                          y2={baselineY + 6}
+                          stroke={eventColor ?? '#fff'}
+                          strokeWidth="1.5"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                        <circle
+                          cx={p.cx}
+                          cy={baselineY + 7}
+                          r="2"
+                          fill={eventColor ?? '#fff'}
+                        />
+                      </>
+                    ) : (
+                      <line
+                        x1={p.cx}
+                        y1={baselineY}
+                        x2={p.cx}
+                        y2={baselineY + 4}
+                        stroke="rgba(255,255,255,0.18)"
+                        strokeWidth="1"
+                        vectorEffect="non-scaling-stroke"
+                        opacity={isHovered ? 0.5 : 1}
+                      />
+                    )}
+                    {/* Invisible hit area for hover (12px wide x 16px tall) */}
+                    <rect
+                      x={p.cx - 6}
+                      y={baselineY - 4}
+                      width="12"
+                      height="20"
+                      fill="transparent"
+                      style={{ pointerEvents: 'auto', cursor: 'crosshair' }}
+                      onMouseEnter={() => setHoveredIdx(i)}
+                      onMouseLeave={() =>
+                        setHoveredIdx((curr) => (curr === i ? null : curr))
+                      }
+                    />
+                  </g>
+                );
+              })}
             </svg>
 
             {/* Iter #2 fix #5: endpoint value composed with the dot.
@@ -385,6 +500,72 @@ export function SparklineMicroChart({
                       {endpointUnit}
                     </span>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Iter #3 fix #4: hover tooltip on game ticks.
+                Floats above the hovered tick. Single-line JBMono caps. */}
+            {hoveredIdx != null && hoveredIdx !== points.length - 1 && data[hoveredIdx] && (
+              <div
+                className="absolute pointer-events-none z-10"
+                style={{
+                  left: `${(points[hoveredIdx].cx / VIEW_W) * 100}%`,
+                  top: `calc(${(points[hoveredIdx].cy / VIEW_H) * 100}% - 32px)`,
+                  transform: 'translateX(-50%)',
+                }}
+              >
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-pastel-surface ring-1 ring-white/15 shadow-[0_4px_16px_-2px_rgba(0,0,0,0.4)] whitespace-nowrap">
+                  <span className="font-jbmono uppercase tracking-[0.18em] text-[9px] font-bold text-white/55">
+                    {data[hoveredIdx].gameDate ?? `Game ${hoveredIdx + 1}`}
+                  </span>
+                  {data[hoveredIdx].opponent && (
+                    <span className="font-jbmono uppercase tracking-[0.18em] text-[9px] font-bold text-white/45">
+                      vs {data[hoveredIdx].opponent}
+                    </span>
+                  )}
+                  <span className="font-jbmono font-bold tabular-nums text-pastel-cream text-[10px]">
+                    {formatValue(data[hoveredIdx].y)}{tooltipUnitText}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Iter #3 fix #3: inline editorial annotation for ONE event per chart.
+                Sits just below the chart, anchored to the event's x position
+                via the chart-container's percentage coords. Italic caps eyebrow
+                style. The section's padding-bottom is bumped when an annotation
+                renders, keeping it inside the rounded corners. */}
+            {annotationIdx >= 0 && data[annotationIdx] && (
+              <div
+                className="absolute pointer-events-none z-10"
+                style={{
+                  left: `${(points[annotationIdx].cx / VIEW_W) * 100}%`,
+                  bottom: '-26px',
+                  transform: 'translateX(-50%)',
+                }}
+              >
+                <div className="flex items-center gap-1 font-jbmono uppercase tracking-[0.22em] text-[9px] font-bold text-white/55 italic whitespace-nowrap">
+                  <svg width="6" height="6" viewBox="0 0 6 6" aria-hidden="true">
+                    <line
+                      x1="3"
+                      y1="0"
+                      x2="3"
+                      y2="6"
+                      stroke="rgba(255,255,255,0.30)"
+                      strokeWidth="1"
+                    />
+                  </svg>
+                  {data[annotationIdx].gameDate && (
+                    <>
+                      <span>{data[annotationIdx].gameDate}</span>
+                      <span className="text-white/35">·</span>
+                    </>
+                  )}
+                  <span>
+                    {data[annotationIdx].eventLabel ??
+                      EVENT_LABEL_DEFAULT[data[annotationIdx].event!]}
+                  </span>
                 </div>
               </div>
             )}
