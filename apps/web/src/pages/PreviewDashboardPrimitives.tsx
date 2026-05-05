@@ -22,7 +22,22 @@ import {
   RinkHeatmap,
   type RinkMode,
   type ShotEvent,
+  PercentileRingCluster,
+  type RingMetric,
 } from '@/components/citrus2';
+
+// Mock GAR percentiles for the ring cluster
+const MOCK_RINGS: RingMetric[] = [
+  { category: 'defense', label: 'OFF', percentile: 84, sampleSize: 71 },
+  { category: 'special', label: 'DEF', percentile: 62, sampleSize: 71 },
+  { category: 'offense', label: 'ST', percentile: 91, sampleSize: 71 },
+];
+
+const MOCK_RINGS_LOW_SAMPLE: RingMetric[] = [
+  { category: 'defense', label: 'OFF', percentile: 78, sampleSize: 8 },
+  { category: 'special', label: 'DEF', percentile: 54, sampleSize: 8 },
+  { category: 'offense', label: 'ST', percentile: 88, sampleSize: 8 },
+];
 
 // ── Mock shot data — slot-concentrated NHL distribution ──
 // Visual diff iteration #3: distribution rebalanced. Mockup shows nearly
@@ -242,6 +257,78 @@ export default function PreviewDashboardPrimitives() {
             <VariantCard caption="Mode switching — change segmented control">
               <div className="w-full">
                 <RinkHeatmap shots={MOCK_SHOTS.slice(0, 80)} mode="pp" onModeChange={() => {}} caption="80 attempts · PP only" />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* PercentileRingCluster — component-scale rings (data zone)  */}
+        {/* ────────────────────────────────────────────────────────── */}
+        <SectionHeader
+          eyebrow="Data zone · Component 2 of 7"
+          title="PercentileRingCluster"
+          blurb="Three independent ring gauges stacked vertically — one per metric category (OFF / DEF / ST). Component-scale only, never the hero. Adapts the Vercel Gauge math (gap-percent, primary/secondary stroke pair, animated stroke-dashoffset) into a single SVG-per-ring composition with category-tinted fills."
+        />
+
+        <SubSection title="Default vertical stack — the data-zone treatment">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <VariantCard caption="Vertical 80px (data-zone default)">
+              <div className="w-full flex justify-center">
+                <PercentileRingCluster
+                  metrics={MOCK_RINGS}
+                  caption="OFF · DEF · ST GAR"
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="Vertical larger 120px">
+              <div className="w-full flex justify-center">
+                <PercentileRingCluster
+                  metrics={MOCK_RINGS}
+                  ringSize={120}
+                  caption="OFF · DEF · ST GAR"
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="Vertical compact 60px">
+              <div className="w-full flex justify-center">
+                <PercentileRingCluster
+                  metrics={MOCK_RINGS}
+                  ringSize={60}
+                  caption="OFF · DEF · ST"
+                />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        <SubSection title="States">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <VariantCard caption="Loading skeleton">
+              <div className="w-full flex justify-center">
+                <PercentileRingCluster
+                  metrics={MOCK_RINGS}
+                  isLoading
+                  caption="Loading…"
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="Low sample — muted treatment + value opacity">
+              <div className="w-full flex justify-center">
+                <PercentileRingCluster
+                  metrics={MOCK_RINGS_LOW_SAMPLE}
+                  caption="Limited · 8 GP"
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="Horizontal layout (alternative)">
+              <div className="w-full flex justify-center">
+                <PercentileRingCluster
+                  metrics={MOCK_RINGS}
+                  layout="horizontal"
+                  ringSize={70}
+                  caption="OFF · DEF · ST"
+                />
               </div>
             </VariantCard>
           </div>

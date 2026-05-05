@@ -26,6 +26,8 @@ export type { StaleDataBadgeVariant } from './StaleDataBadge';
 // Spatial Hero (locked Concept 3) — see apps/web/docs/PLAYER_DASHBOARD_DESIGN_SPEC.md
 export { RinkHeatmap } from './RinkHeatmap';
 export type { RinkMode, RinkModeOption, ShotEvent } from './RinkHeatmap';
+export { PercentileRingCluster } from './PercentileRingCluster';
+export type { RingCategory, RingMetric } from './PercentileRingCluster';
 
 // Brand mark
 export { CitrusLogo, CitrusWordmark } from './CitrusLogo';
