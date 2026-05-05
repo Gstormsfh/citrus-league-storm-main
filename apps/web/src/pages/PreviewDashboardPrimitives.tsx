@@ -27,6 +27,8 @@ import {
   SparklineMicroChart,
   type SparklinePoint,
   VerdictTile,
+  WrappedChapter,
+  KDEDistribution,
 } from '@/components/citrus2';
 
 // Mock helpers — generate game dates + opponent abbreviations
@@ -99,6 +101,26 @@ const MOCK_RINGS: RingMetric[] = [
   { category: 'special', label: 'DEF', percentile: 62, sampleSize: 71 },
   { category: 'offense', label: 'ST', percentile: 91, sampleSize: 71 },
 ];
+
+// Mock GAR sample distribution for KDEDistribution — gaussian-ish around 0
+// with a long right tail to simulate the league of all centers.
+const MOCK_CENTER_GAR_SAMPLES: number[] = (() => {
+  const out: number[] = [];
+  const seedRand = (i: number) => {
+    const x = Math.sin(i * 9301 + 49297) * 233280;
+    return x - Math.floor(x);
+  };
+  for (let i = 0; i < 906; i++) {
+    // Box-Muller for a gaussian sample
+    const u1 = Math.max(seedRand(i * 2 + 1), 1e-6);
+    const u2 = seedRand(i * 2 + 2);
+    const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    // mean ~0, sd ~1, skew slightly right
+    const v = z * 1 + (z > 0.8 ? 0.7 : 0);
+    out.push(Number(v.toFixed(3)));
+  }
+  return out;
+})();
 
 const MOCK_RINGS_LOW_SAMPLE: RingMetric[] = [
   { category: 'defense', label: 'OFF', percentile: 78, sampleSize: 8 },
@@ -611,6 +633,198 @@ export default function PreviewDashboardPrimitives() {
                 <VerdictTile
                   body="Elite slot generator who consistently posts top-decile inside xG/60 numbers, even after adjusting for usage and teammate quality; the only meaningful concern is finishing variance over short samples — over a full season he projects as a 35-goal floor with a 50-goal ceiling, and the underlying shot quality data says the ceiling is the more honest read."
                   signature="Stormy · Assistant GM"
+                />
+              </div>
+            </VariantCard>
+          </div>
+        </SubSection>
+
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* WrappedChapter — full-bleed editorial chapter container     */}
+        {/* ────────────────────────────────────────────────────────── */}
+        <SectionHeader
+          eyebrow="Share zone · Component 5 of 7"
+          title="WrappedChapter"
+          blurb="The screenshot-shareable chapter container — Spotify Wrapped's 'one massive number per slide' applied to a player profile section. Each chapter is OG-image-ready (1200×630) and reads as a standalone hockey story. Children-based composition: the chrome (eyebrow divider, callout column, subtitle caption) is universal; the visualization slot is variable per chapter type. KDEDistribution included as the Web Summit launch chapter visualization."
+        />
+
+        <SubSection title="Default — POSITION VS LEAGUE chapter (the canonical Web Summit launch chapter)">
+          <div className="rounded-2xl bg-pastel-surface-tile/40 ring-1 ring-white/5 px-6 sm:px-10">
+            <WrappedChapter
+              chapterNumber={1}
+              title="POSITION VS LEAGUE"
+              subtitle="OFFENSIVE GAR · ALL CENTERS · 906 PLAYERS"
+              callout={{
+                value: '+4.21',
+                label: 'vs league avg',
+                support: 'Top 1% · 9 of 906',
+                accent: 'cream',
+              }}
+            >
+              <KDEDistribution
+                samples={MOCK_CENTER_GAR_SAMPLES}
+                playerValue={4.21}
+                accent="orange"
+                markerValueLabel="MCDAVID · +4.21"
+              />
+            </WrappedChapter>
+          </div>
+        </SubSection>
+
+        <SubSection title="Variant — share (extra padding, optimized for clean OG screenshot crop)">
+          <div className="rounded-2xl bg-pastel-surface-tile/40 ring-1 ring-white/5 px-6 sm:px-10">
+            <WrappedChapter
+              chapterNumber={1}
+              title="POSITION VS LEAGUE"
+              subtitle="OFFENSIVE GAR · ALL CENTERS · 906 PLAYERS"
+              variant="share"
+              callout={{
+                value: '+4.21',
+                label: 'vs league avg',
+                support: 'Top 1% · 9 of 906',
+                accent: 'cream',
+              }}
+            >
+              <KDEDistribution
+                samples={MOCK_CENTER_GAR_SAMPLES}
+                playerValue={4.21}
+                accent="orange"
+                markerValueLabel="MCDAVID · +4.21"
+              />
+            </WrappedChapter>
+          </div>
+        </SubSection>
+
+        <SubSection title="Accent variants — orange / sage / butter / cream callout">
+          <div className="space-y-6">
+            <div className="rounded-2xl bg-pastel-surface-tile/40 ring-1 ring-white/5 px-6 sm:px-10">
+              <WrappedChapter
+                chapterNumber={2}
+                title="WHERE HE SHOOTS LIVE"
+                subtitle="SHOT QUALITY · 5v5 · 188 ATTEMPTS"
+                callout={{
+                  value: '0.342',
+                  label: 'avg xG per shot',
+                  support: 'Top 3% in slot xG share',
+                  accent: 'orange',
+                }}
+              >
+                <KDEDistribution
+                  samples={MOCK_CENTER_GAR_SAMPLES}
+                  playerValue={2.8}
+                  accent="orange"
+                  markerValueLabel="0.342 xG/shot"
+                />
+              </WrappedChapter>
+            </div>
+            <div className="rounded-2xl bg-pastel-surface-tile/40 ring-1 ring-white/5 px-6 sm:px-10">
+              <WrappedChapter
+                chapterNumber={3}
+                title="DEFENSIVE WORKLOAD"
+                subtitle="DEFENSIVE GAR · ALL CENTERS · 906 PLAYERS"
+                callout={{
+                  value: '+1.84',
+                  label: 'vs league avg',
+                  support: 'Top 14% · 127 of 906',
+                  accent: 'sage',
+                }}
+              >
+                <KDEDistribution
+                  samples={MOCK_CENTER_GAR_SAMPLES}
+                  playerValue={1.84}
+                  accent="sage"
+                  markerValueLabel="+1.84"
+                />
+              </WrappedChapter>
+            </div>
+            <div className="rounded-2xl bg-pastel-surface-tile/40 ring-1 ring-white/5 px-6 sm:px-10">
+              <WrappedChapter
+                chapterNumber={4}
+                title="POWERPLAY IMPACT"
+                subtitle="PP1 xGF/60 · ALL CENTERS · 906 PLAYERS"
+                callout={{
+                  value: '9.82',
+                  label: 'PP1 xGF/60',
+                  support: 'League leader',
+                  accent: 'butter',
+                }}
+              >
+                <KDEDistribution
+                  samples={MOCK_CENTER_GAR_SAMPLES}
+                  playerValue={3.6}
+                  accent="butter"
+                  markerValueLabel="9.82"
+                />
+              </WrappedChapter>
+            </div>
+          </div>
+        </SubSection>
+
+        <SubSection title="States — loading + empty">
+          <div className="space-y-6">
+            <div className="rounded-2xl bg-pastel-surface-tile/40 ring-1 ring-white/5 px-6 sm:px-10">
+              <WrappedChapter
+                chapterNumber={1}
+                title="POSITION VS LEAGUE"
+                subtitle="Loading…"
+                isLoading
+              />
+            </div>
+            <div className="rounded-2xl bg-pastel-surface-tile/40 ring-1 ring-white/5 px-6 sm:px-10">
+              <WrappedChapter
+                chapterNumber={1}
+                title="POSITION VS LEAGUE"
+                subtitle="OFFENSIVE GAR · ALL CENTERS · 906 PLAYERS"
+                emptyText="Not enough games played to chart this season"
+              />
+            </div>
+          </div>
+        </SubSection>
+
+        <SubSection title="KDEDistribution standalone — accent + marker label combinations">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <VariantCard caption="orange · player deep in right tail (+4.21)">
+              <div className="w-full">
+                <KDEDistribution
+                  samples={MOCK_CENTER_GAR_SAMPLES}
+                  playerValue={4.21}
+                  accent="orange"
+                  height={180}
+                  markerValueLabel="+4.21"
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="sage · player at median">
+              <div className="w-full">
+                <KDEDistribution
+                  samples={MOCK_CENTER_GAR_SAMPLES}
+                  playerValue={0}
+                  accent="sage"
+                  height={180}
+                  markerValueLabel="MEDIAN"
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="butter · player in left tail (-2.5)">
+              <div className="w-full">
+                <KDEDistribution
+                  samples={MOCK_CENTER_GAR_SAMPLES}
+                  playerValue={-2.5}
+                  accent="butter"
+                  height={180}
+                  markerValueLabel="-2.50"
+                />
+              </div>
+            </VariantCard>
+            <VariantCard caption="cream · no gridlines, minimal chart chrome">
+              <div className="w-full">
+                <KDEDistribution
+                  samples={MOCK_CENTER_GAR_SAMPLES}
+                  playerValue={1.5}
+                  accent="cream"
+                  height={180}
+                  showGridlines={false}
+                  markerValueLabel="+1.50"
                 />
               </div>
             </VariantCard>

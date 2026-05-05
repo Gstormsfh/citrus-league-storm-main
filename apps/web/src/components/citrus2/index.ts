@@ -32,6 +32,12 @@ export { SparklineMicroChart } from './SparklineMicroChart';
 export type { SparklinePoint, SparklineAccent } from './SparklineMicroChart';
 export { VerdictTile } from './VerdictTile';
 export type { VerdictVariant, VerdictSize, VerdictAccent } from './VerdictTile';
+export { WrappedChapter, KDEDistribution } from './WrappedChapter';
+export type {
+  WrappedChapterVariant,
+  WrappedAccent,
+  KDEDistributionProps,
+} from './WrappedChapter';
 
 // Brand mark
 export { CitrusLogo, CitrusWordmark } from './CitrusLogo';
