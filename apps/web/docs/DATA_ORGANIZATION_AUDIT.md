@@ -758,3 +758,179 @@ The README also includes a "When to revisit this archive" section covering onboa
 - **No README copy committed inside the active monorepo.** The README_ARCHIVED.md lives only at the archive root — discoverable via filesystem navigation. The active monorepo's `DATA_INVENTORY.md` §5 + this audit §9 are the in-repo discoverability hooks.
 
 R6 closes the reorganization. Phases R1-R6 + Investigation 1 + R5 dispositions all complete.
+
+---
+
+## §10. Player Directory Orphan Investigation (2026-05-06)
+
+### §10.1 Origin
+
+The R7-2 baseline run (see `apps/web/docs/R7_2_BASELINE.md`) flagged
+`raw_shots_no_orphan_player_ids` as **WARN** with 3 of 200 sampled
+recent `player_id` values missing from `player_directory` for any
+season. Sample IDs:
+
+| `player_id` | shots in `raw_shots` | first shot | last shot |
+|---|---|---|---|
+| 8485406 | 26 | 2026-04-08 | 2026-05-05 |
+| 8484509 | 17 | 2026-02-01 | 2026-05-01 |
+| 8483731 | 27 | 2026-04-08 | 2026-05-05 |
+
+All three are taking shots in late-2025-26 / playoff games but have no
+`player_directory` row, breaking the implicit FK that downstream UI
+queries depend on.
+
+### §10.2 Identity (NHL API)
+
+Fetched from `https://api-web.nhle.com/v1/player/{id}/landing` on
+2026-05-06:
+
+| ID | Name | Pos | Team | # | Born | Draft | NHL career |
+|---|---|---|---|---|---|---|---|
+| 8485406 | **Porter Martone** | RW | PHI | 94 | 2006-10-26 | 2025 R1 P6 (PHI) | Debuted 2025-26, 8 GP, 2G+1A |
+| 8484509 | **Josh Samanski** | C | EDM | 81 | 2002-03-22 | undrafted | Debuted 2025-26, 5 GP, 1G+1A |
+| 8483731 | **Alex Bump** | LW | PHI | 20 | 2003-11-20 | 2022 R5 P133 (PHI) | Debuted 2025-26, 4 GP, 1G+0A |
+
+All three are **2025-26 NHL debutants** — late-season call-ups whose
+first NHL appearance came after the last `player_directory` refresh
+(which writes `updated_at = 2026-04-17` on extant rows, ~18 days before
+the audit was run).
+
+### §10.3 Refresh-script analysis
+
+The canonical refresh script is
+`scripts/utilities/populate_player_directory.py` (CITRUS-CLASSIFICATION:
+ACTIVE; last logic touch 2026-03-01 fixing ARI→UTA team code in commit
+`77d5b4c`).
+
+Three-source discovery flow:
+
+1. **`raw_shots` scan** — collect distinct `player_id`, `passer_id`,
+   `goalie_id` values from existing shot rows.
+2. **`player_toi_by_situation` scan** — collect distinct `player_id`
+   from time-on-ice rows.
+3. **NHL API team rosters** — `/roster/{team}/current` for all 32
+   teams (uses the snapshot at call time).
+
+For each discovered ID it then calls `/player/{id}/landing` to fetch
+metadata and `db.upsert("player_directory", ..., on_conflict="season,player_id")`
+— so it **does** insert new rows, not only update existing ones.
+
+### §10.4 Verdict — data-source gap, not a script bug
+
+The script is **correctly designed** — it would have inserted these
+three players if it had run any time after they appeared in `raw_shots`.
+The orphan situation arises from **execution timing**:
+
+- The script is **manual / season-turnover only** — not present in any
+  `.github/workflows/*.yml` cron, not invoked by any other production
+  script.
+- It last produced any write on **2026-04-17**.
+- All three orphans accumulated `raw_shots` rows between 2026-04-08 and
+  2026-05-05 — i.e., the relevant `raw_shots` rows were ingested
+  **after** the last refresh, so the discovery scan from a later run
+  would now pick them up.
+- The 18-day staleness was already flagged independently by R7-3 (see
+  `R7_3_BASELINE.md` — `player_directory` shows 444h vs 48h threshold).
+
+### §10.5 Fix plan
+
+#### Immediate (one-time, near-zero cost)
+
+Re-run the existing script. It will:
+
+  1. Discover the 3 orphan IDs from `raw_shots` (Step 1 of its flow).
+  2. Fetch metadata for each via `/player/{id}/landing`.
+  3. Insert new rows `(season=20252026, player_id, full_name, ...)`
+     via the existing upsert.
+
+```bash
+# From repo root:
+python scripts/utilities/populate_player_directory.py
+```
+
+No code change required. Estimated wall-clock: 5-10 minutes for the
+full 32-team roster sweep + per-player API calls. Expected post-run
+state: `player_directory` row count grows by ≥3 (more if other recent
+debutants are also missing); `R7-2 raw_shots_no_orphan_player_ids`
+flips from WARN to PASS on the next baseline run.
+
+#### Permanent — ops cadence (zero code change)
+
+Schedule the existing script to run on a cron alongside the existing
+data-pipeline jobs. Recommended cadence: **daily during the regular
+season**, **weekly during offseason** — matches the player_directory
+freshness SLA (48h in-season per R7-3 freshness matrix). Implementation
+options:
+
+- Add a step to the existing `nightly_projection_batch.py` cron (least
+  invasive).
+- Add a dedicated GitHub Actions workflow alongside `staging-deploy.yml`
+  in `.github/workflows/` (more visible, easier to audit).
+
+The choice doesn't affect Phase 0; it is a separate ops task.
+
+#### Optional — defense in depth (small code change)
+
+Add a `verify_directory_coverage` post-step that runs after every
+`raw_shots` write (e.g., at the tail of the data acquisition pipeline)
+to detect new orphans within the same job run rather than waiting for
+the next directory refresh. Logic: `SELECT DISTINCT player_id FROM
+raw_shots WHERE created_at > <last_run_ts>` join-anti
+`player_directory` on `(20252026, player_id)`. If non-empty, surface as
+a warning in `integrity_check_results` (mirrors the R7-2 check pattern,
+already wired in via `critical_table_checks.py`).
+
+This is **optional polish** — the daily cron from the previous bullet
+covers the operational gap. Defer unless directory-staleness becomes a
+recurring incident pattern.
+
+### §10.6 Phase 0 inclusion plan
+
+The orphan fix slots into **Phase 0d** (pipeline gap fixes) — see
+`PHASE_0_EXECUTION_PLAN.md`:
+
+  1. Run `populate_player_directory.py` immediately to clear the
+     baseline 3 orphans (and any others the 200-sample didn't surface).
+  2. Add the daily/weekly cron as part of 0d's pipeline-fixes commit.
+  3. Re-run R7-2 baseline post-Phase-0; expect
+     `raw_shots_no_orphan_player_ids` to flip from WARN to PASS.
+
+Phase 0a (historical CSV load) brings in 786K MoneyPuck shots covering
+2018-19 through 2024-25 — **all of those rows reference `player_id`
+values that won't exist in `player_directory` either** unless we
+pre-populate historical seasons. The `populate_player_directory.py`
+flow as it stands keys on `(season, player_id)` and discovers from
+`raw_shots` — so running it after 0a will discover historical IDs and
+upsert them with the correct historical-season key. Sequence inside 0d:
+
+  - 0d-step-1: Run `populate_player_directory.py` for 2025-26 (clears
+    current orphans).
+  - 0d-step-2: After 0a completes, re-run `populate_player_directory.py`
+    — it picks up the historical IDs and writes one row per
+    `(historical_season, player_id)` tuple. Expected directory growth:
+    on the order of 5,000-7,000 rows (rough estimate: ~1,000 active
+    players per season × 7 historical seasons, minus overlap from
+    multi-season careers).
+  - 0d-step-3: Schedule the cron.
+
+The directory orphan fix is therefore **gated on Phase 0a** for the
+historical-season portion, not a blocker for Phase 0a starting.
+
+### §10.7 Open questions
+
+1. **Are there older historical orphans we haven't surfaced yet?** The
+   R7-2 sample size was 200; the population is 99K. Phase 0 § 0d-step-1
+   should run a full-population orphan scan (not sampled) and document
+   the count before the upsert, so we have a hard number for how many
+   historical IDs the directory was missing.
+2. **Does the script's `/roster/{team}/current` source cover IR /
+   AHL-recall edge cases?** Players currently on IR or recently
+   reassigned to AHL may not appear on `current` rosters. If the
+   discovery-via-`raw_shots` path catches them downstream, the
+   roster-step gap is harmless. If not, switch the third source from
+   `/roster/{team}/current` to `/roster/{team}/{season}/all`.
+3. **Should `player_directory` carry an explicit FK to `raw_shots`?**
+   Currently it's an implicit join; adding the FK would let us catch
+   orphans at insert time on the `raw_shots` side. Out of scope for
+   Phase 0; consider for a post-Phase-0 schema-tightening pass.
