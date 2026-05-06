@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Compute fantasy matchup scores from player game logs and league scoring settings
+# Invoked: imported by run_daily_pbp_processing.py + simulate_matchups.py
+# Reads:   player_game_stats, leagues.scoring_settings
+# Writes:  matchups, matchup_scoring_snapshots
+# ────────────────────────────────────────────────────────────
 """
 calculate_matchup_scores.py
 

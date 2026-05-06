@@ -1,3 +1,10 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: ACTIVE
+// Purpose: Verify RLS is enabled on every table; fail loudly if not
+// Invoked: .github/workflows/rls-audit.yml (cron 0 13 * * 1 — Mondays 07:00 MT)
+// Reads:   Supabase information_schema
+// Writes:  stdout (CI fails on RLS-disabled tables)
+// ────────────────────────────────────────────────────────────
 /**
  * RLS Audit Script — finds SELECT policies that use `USING (true)` on
  * tables holding user-scoped data.

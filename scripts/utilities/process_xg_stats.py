@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Compute per-player xG aggregates from raw_shots
+# Invoked: imported by player_season_stats build path
+# Reads:   raw_shots
+# Writes:  player_season_stats.x_goals + .x_assists
+# ────────────────────────────────────────────────────────────
 """
 process_xg_stats.py
 Phase 2: Process raw JSON data and calculate xG/xA stats.

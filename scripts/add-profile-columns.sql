@@ -1,3 +1,10 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: UTILITY
+-- Purpose: Pre-migration: add columns to profiles (idempotent ADD COLUMN IF NOT EXISTS)
+-- Invoked: manual via Supabase SQL Editor
+-- Reads:   profiles
+-- Writes:  profiles (DDL: ADD COLUMN)
+-- ────────────────────────────────────────────────────────────
 -- Run this in your Supabase SQL Editor to add all profile columns
 -- This will safely add columns only if they don't already exist
 

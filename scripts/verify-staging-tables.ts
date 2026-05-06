@@ -1,3 +1,10 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: UTILITY
+// Purpose: Verify staging-environment tables match prod schema
+// Invoked: manual run during staging-deploy operator runbook
+// Reads:   Supabase staging schema
+// Writes:  stdout
+// ────────────────────────────────────────────────────────────
 
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './env';

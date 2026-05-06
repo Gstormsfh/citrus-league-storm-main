@@ -1,3 +1,10 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: DEBUG-ONLY
+-- Purpose: SQL forensics: verify demo league has expected fixture data
+-- Invoked: ad-hoc, run via Supabase SQL Editor
+-- Reads:   leagues, teams, draft_picks, team_lineups
+-- Writes:  stdout
+-- ────────────────────────────────────────────────────────────
 -- ============================================================================
 -- VERIFICATION: Demo League Complete Setup
 -- ============================================================================

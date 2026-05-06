@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Compute goalie rebound-control component (AdjRP) for G-GAR model
+# Invoked: manual run; currently produces empty output (model gap noted)
+# Reads:   raw_shots
+# Writes:  goalie_rebound_control (currently empty in prod)
+# ────────────────────────────────────────────────────────────
 """
 Calculate Goalie Rebound Control Component (AdjRP - Adjusted Rebound Percentage).
 

@@ -1,3 +1,10 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: UTILITY
+-- Purpose: Fix profiles table schema drift (one-off DDL repair)
+-- Invoked: manual via Supabase SQL Editor; one-off
+-- Reads:   profiles
+-- Writes:  profiles (DDL fixes)
+-- ────────────────────────────────────────────────────────────
 -- Fix profiles table - Add missing columns and verify
 -- Run this in Supabase SQL Editor
 

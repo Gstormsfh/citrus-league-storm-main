@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Pre-shot feature calculations (pass_quality_score, immediacy, goalie_movement)
+# Invoked: imported by data_acquisition.py
+# Reads:   raw_nhl_data PBP events
+# Writes:  raw_shots feature columns (the 7-feature moat)
+# ────────────────────────────────────────────────────────────
 """
 feature_calculations.py
 Calculation functions for derived features that MoneyPuck computes.

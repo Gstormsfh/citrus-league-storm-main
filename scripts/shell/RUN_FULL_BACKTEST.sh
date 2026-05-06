@@ -1,4 +1,11 @@
 #!/bin/bash
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose: Full backtest harness (Linux/macOS) — runs validate_xg_accuracy + variants over multiple seasons
+# Invoked: manual operator run
+# Reads:   models/*.joblib, raw_shots
+# Writes:  (report files)
+# ────────────────────────────────────────────────────────────
 # Full Season Backtest for VOPA Model
 # Date Range: 2025-10-07 to 2026-01-03 (all games with actual stats)
 # Season: 2025

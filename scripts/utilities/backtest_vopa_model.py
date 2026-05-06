@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose: Backtest VOPA (Value Over Position Average) projection model
+# Invoked: manual analytical run
+# Reads:   player_projected_stats, player_season_stats
+# Writes:  (reports)
+# ────────────────────────────────────────────────────────────
 """
 backtest_vopa_model.py
 

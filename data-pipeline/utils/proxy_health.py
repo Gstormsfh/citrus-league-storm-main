@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Per-proxy health tracking (success rate, response time)
+# Invoked: imported by proxy_manager.py + monitor_proxy_health.py
+# Reads:   (proxy pool state)
+# Writes:  (in-memory state)
+# ────────────────────────────────────────────────────────────
 """
 proxy_health.py - Enterprise Proxy Health Monitoring & Metrics
 

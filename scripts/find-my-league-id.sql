@@ -1,3 +1,10 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: UTILITY
+-- Purpose: Look up a user's league_id by email (debug helper)
+-- Invoked: manual query during support
+-- Reads:   auth.users, leagues, teams
+-- Writes:  stdout
+-- ────────────────────────────────────────────────────────────
 -- Quick script to find your league ID
 -- Run this to see all your leagues and their IDs
 

@@ -1,3 +1,10 @@
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: DEBUG-ONLY
+# Purpose: Forensics: verify team abbreviation consistency
+# Invoked: ad-hoc
+# Reads:   nhl_teams, team_mapping_config
+# Writes:  stdout
+# ────────────────────────────────────────────────────────────
 import os
 from dotenv import load_dotenv
 import sys, os

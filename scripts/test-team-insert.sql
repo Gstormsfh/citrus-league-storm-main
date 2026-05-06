@@ -1,3 +1,10 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: UTILITY
+-- Purpose: Test team INSERT against current RLS policies
+-- Invoked: manual debugging
+-- Reads:   teams
+-- Writes:  teams (test row)
+-- ────────────────────────────────────────────────────────────
 -- Test script to diagnose team INSERT issues
 -- Run this in Supabase SQL Editor after applying the migration
 

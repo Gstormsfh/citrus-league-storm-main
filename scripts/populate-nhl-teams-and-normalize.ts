@@ -1,3 +1,10 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: UTILITY
+// Purpose: Populate nhl_teams + normalize team abbreviations (setup-era seeder)
+// Invoked: manual run during initial setup; team_mapping_config maintained separately
+// Reads:   NHL teams API
+// Writes:  nhl_teams, team_mapping_config
+// ────────────────────────────────────────────────────────────
 /**
  * Script to populate NHL teams table and normalize existing data
  * 

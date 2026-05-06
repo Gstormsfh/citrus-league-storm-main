@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: DEBUG-ONLY
+# Purpose: Forensics: locate games scraped but not stat-extracted (or vice versa)
+# Invoked: ad-hoc
+# Reads:   raw_nhl_data, player_game_stats
+# Writes:  stdout
+# ────────────────────────────────────────────────────────────
 """
 Find which game has missing stats for McDavid
 Compare our per-game data to find the missing goal/shots

@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Compute goalie GSAx (Goals Saved Above Expected) — raw + Bayesian regressed
+# Invoked: manual run after raw_shots refresh
+# Reads:   raw_shots
+# Writes:  goalie_gsax
+# ────────────────────────────────────────────────────────────
 """
 calculate_goalie_gsax.py
 Calculate Goals Saved Above Expected (GSAx) for goaltenders using Bayesian regression.

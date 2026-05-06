@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose: Gap-fill helper: re-fetch shots for games missing from raw_shots
+# Invoked: manual run when monitor_data_scraping flags gaps
+# Reads:   raw_nhl_data, NHL API
+# Writes:  raw_shots
+# ────────────────────────────────────────────────────────────
 """
 backfill_missing_shots.py
 

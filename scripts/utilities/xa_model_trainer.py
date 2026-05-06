@@ -1,3 +1,10 @@
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Train xA (Expected Assists) model — sibling to xG v3
+# Invoked: manual operator run
+# Reads:   data-pipeline/data/historical/* + raw_shots
+# Writes:  models/xa_model.joblib + xa_model_features.joblib
+# ────────────────────────────────────────────────────────────
 # xa_model_trainer.py
 # Trains XGBoost model for Expected Assists (xA)
 

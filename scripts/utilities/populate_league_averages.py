@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose: Compute + populate position-specific league averages (Bayesian shrinkage baseline)
+# Invoked: manual run after season totals stabilize
+# Reads:   player_season_stats
+# Writes:  league_averages
+# ────────────────────────────────────────────────────────────
 """
 populate_league_averages.py
 

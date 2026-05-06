@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: 100-IP proxy rotation manager — picks healthy proxy per request
+# Invoked: imported by citrus_request.py
+# Reads:   (proxy pool config)
+# Writes:  (returns proxy URL)
+# ────────────────────────────────────────────────────────────
 """
 proxy_manager.py - Enterprise-Grade Proxy Management for Citrus Scraping
 

@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Cron entrypoint for nightly projection refresh
+# Invoked: .github/workflows/main.yml (cron 0 7 * * * — daily 7am UTC / 2am ET)
+# Reads:   raw_shots, player_season_stats, player_talent_metrics
+# Writes:  player_projected_stats, projection_cache
+# ────────────────────────────────────────────────────────────
 """
 CITRUS NIGHTLY PROJECTION BATCH
 ================================

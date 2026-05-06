@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Compute daily fantasy projections (Citrus Projections 2.0 with Bayesian shrinkage + finishing talent)
+# Invoked: imported by nightly_projection_batch.py
+# Reads:   player_season_stats, player_talent_metrics, league_averages, models/*.joblib
+# Writes:  player_projected_stats, projection_cache
+# ────────────────────────────────────────────────────────────
 """
 calculate_daily_projections.py
 

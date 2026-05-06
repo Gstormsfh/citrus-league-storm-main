@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Monitor scraper completeness — flag missing games or low row counts
+# Invoked: scheduled monitoring
+# Reads:   raw_nhl_data, raw_shots, player_game_stats
+# Writes:  alerts
+# ────────────────────────────────────────────────────────────
 """
 monitor_data_scraping.py
 

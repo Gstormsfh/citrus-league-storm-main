@@ -1,3 +1,11 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: ORPHAN-SUSPECTED
+// Purpose: Import schedule from Excel (one-off setup tool)
+// Invoked: no current invocations found
+// Reads:   user-supplied .xlsx
+// Writes:  nhl_games
+// Note:    RESOLVE: confirm not used anymore
+// ────────────────────────────────────────────────────────────
 /**
  * Script to import NHL schedule from Excel file
  * Run with: npx tsx scripts/import-schedule-from-excel.ts

@@ -1,3 +1,10 @@
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose: Per-zone shot heatmap visualization (slot, low slot, high slot, point, boards)
+# Invoked: manual visualization tool
+# Reads:   raw_shots
+# Writes:  image files
+# ────────────────────────────────────────────────────────────
 # zone_heatmap.py
 # Create zone-based heatmaps showing xG/pass quality by zone
 

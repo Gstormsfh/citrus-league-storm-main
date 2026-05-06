@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Fetch per-game player stats from NHL landing endpoint (canonical NHL stats)
+# Invoked: imported by data_scraping_service.py + scrape_per_game_nhl_stats.py
+# Reads:   NHL public API (game landing endpoint)
+# Writes:  player_game_stats (nhl_* columns), goalie_gsax inputs
+# ────────────────────────────────────────────────────────────
 """
 fetch_nhl_stats_from_landing.py
 

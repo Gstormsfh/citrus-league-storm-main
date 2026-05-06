@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Manual entrypoint for daily projection run (mirrors nightly_projection_batch with progress UI)
+# Invoked: manual operator run
+# Reads:   (same as nightly_projection_batch)
+# Writes:  (same as nightly_projection_batch)
+# ────────────────────────────────────────────────────────────
 """
 run_daily_projections.py
 

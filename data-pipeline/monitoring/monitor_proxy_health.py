@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Monitor 100-IP proxy rotation health — flag dead proxies
+# Invoked: imported by data_scraping_service.py
+# Reads:   (proxy pool config)
+# Writes:  alerts + proxy-pool state
+# ────────────────────────────────────────────────────────────
 """
 monitor_proxy_health.py - Real-time Proxy Health Dashboard
 

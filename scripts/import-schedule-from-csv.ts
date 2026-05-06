@@ -1,3 +1,11 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: ORPHAN-SUSPECTED
+// Purpose: Import schedule from CSV (one-off setup tool)
+// Invoked: no current invocations found
+// Reads:   user-supplied CSV
+// Writes:  nhl_games
+// Note:    RESOLVE: confirm not used anymore
+// ────────────────────────────────────────────────────────────
 /**
  * Script to import NHL schedule from CSV file
  * Run with: npx tsx scripts/import-schedule-from-csv.ts

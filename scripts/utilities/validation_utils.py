@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Shared validation helpers (imported by validate_xg_accuracy + others)
+# Invoked: imported by validate_xg_accuracy.py
+# Reads:   (varies)
+# Writes:  (returns metrics)
+# ────────────────────────────────────────────────────────────
 """
 validation_utils.py
 Shared utilities for GSAx and GAR validation framework.

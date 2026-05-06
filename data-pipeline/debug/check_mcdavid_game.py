@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: DEBUG-ONLY
+# Purpose: Forensics: inspect McDavid's recent game records
+# Invoked: ad-hoc
+# Reads:   player_game_stats, raw_shots
+# Writes:  stdout
+# ────────────────────────────────────────────────────────────
 """
 Check specific McDavid game that has zero stats
 Game ID: 2025020139

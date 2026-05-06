@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: DEBUG-ONLY
+# Purpose: Forensics: final verification step for McDavid data after a fix
+# Invoked: ad-hoc
+# Reads:   player_game_stats, raw_shots, player_season_stats
+# Writes:  stdout
+# ────────────────────────────────────────────────────────────
 """
 Final verification that McDavid's stats match NHL.com
 """

@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Cross-table integrity checks (orphan player_ids, FK violations, NULL rates)
+# Invoked: scheduled monitoring
+# Reads:   every analytical table
+# Writes:  integrity_check_results
+# ────────────────────────────────────────────────────────────
 """
 verify_data_integrity.py
 

@@ -1,3 +1,10 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: UTILITY
+-- Purpose: Idempotent variant of add-profile-columns.sql
+-- Invoked: manual via Supabase SQL Editor
+-- Reads:   profiles
+-- Writes:  profiles (DDL: ADD COLUMN IF NOT EXISTS)
+-- ────────────────────────────────────────────────────────────
 -- Comprehensive script to ensure ALL profile columns exist
 -- Run this in your Supabase SQL Editor
 -- This will add any missing columns without affecting existing data

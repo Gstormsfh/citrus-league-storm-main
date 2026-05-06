@@ -1,3 +1,10 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: UTILITY
+// Purpose: Check draft freeze state for a league (debugging tool)
+// Invoked: manual run when investigating draft state
+// Reads:   leagues, draft_events
+// Writes:  stdout
+// ────────────────────────────────────────────────────────────
 /**
  * Change Freeze Guard — blocks deploys within 24 hours of any scheduled draft.
  *

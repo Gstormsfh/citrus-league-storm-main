@@ -1,3 +1,10 @@
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Master scraper module — fetches PBP from NHL API and derives raw_shots feature columns (xG, pre-shot context, shooting talent)
+# Invoked: imported by data_scraping_service.py + scripts/utilities/populate_raw_shots.py
+# Reads:   NHL public API (api-web.nhle.com), models/*.joblib, raw_nhl_data
+# Writes:  raw_shots, raw_nhl_data
+# ────────────────────────────────────────────────────────────
 # data_acquisition.py
 
 import pandas as pd

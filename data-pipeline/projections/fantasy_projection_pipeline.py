@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Top-level fantasy projection pipeline orchestrator (physical → fantasy translation)
+# Invoked: imported by nightly_projection_batch.py + run_daily_projections.py
+# Reads:   projection_cache, leagues.scoring_settings
+# Writes:  fantasy_matchup_lines
+# ────────────────────────────────────────────────────────────
 """
 fantasy_projection_pipeline.py
 Fantasy projection pipeline with GSAx integration.

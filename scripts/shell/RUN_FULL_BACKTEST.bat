@@ -1,3 +1,10 @@
+REM CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+REM CATEGORY: UTILITY
+REM Purpose: Full backtest harness (Windows) — equivalent of RUN_FULL_BACKTEST.sh
+REM Invoked: manual operator run on Windows
+REM Reads:   (same as .sh)
+REM Writes:  (same as .sh)
+REM ────────────────────────────────────────────────────────────
 @echo off
 REM Full Season Backtest for VOPA Model
 REM Date Range: 2025-10-07 to 2026-01-03 (all games with actual stats)

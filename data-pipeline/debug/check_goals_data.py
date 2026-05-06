@@ -1,3 +1,10 @@
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: DEBUG-ONLY
+# Purpose: Forensics: verify goals data across tables
+# Invoked: ad-hoc
+# Reads:   player_game_stats, raw_shots
+# Writes:  stdout
+# ────────────────────────────────────────────────────────────
 import os
 from dotenv import load_dotenv
 import sys, os

@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Train xG v3 model on 786K MoneyPuck + 77K Citrus PBP shots (XGBoost, AUC 0.817)
+# Invoked: manual operator run after raw_shots refresh; produces models/xg_model_moneypuck.joblib
+# Reads:   data-pipeline/data/historical/shots_2018-2024.csv, data/shots_full_features_2025.csv
+# Writes:  models/xg_model_moneypuck.joblib + feature/encoder joblibs
+# ────────────────────────────────────────────────────────────
 """
 train_xg_v3.py  --  xG Model v3 Training Pipeline
 ===================================================

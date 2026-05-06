@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose: Deep analysis: compare Citrus xG model vs MoneyPuck xG on overlapping shots
+# Invoked: manual analytical run
+# Reads:   raw_shots, MoneyPuck CSVs
+# Writes:  (reports)
+# ────────────────────────────────────────────────────────────
 """
 Deep analysis of MoneyPuck's xG model using their own features.
 """

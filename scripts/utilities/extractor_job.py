@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Stat extraction orchestrator (raw_nhl_data → player_game_stats)
+# Invoked: imported by data_scraping_service.py
+# Reads:   raw_nhl_data
+# Writes:  player_game_stats
+# ────────────────────────────────────────────────────────────
 """
 extractor_job.py
 

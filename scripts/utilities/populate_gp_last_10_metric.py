@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose: Daily refresh of player_talent_metrics.gp_last_10 (rolling 10-game count)
+# Invoked: scheduled daily (per CLAUDE.md note: 'Updated daily by populate_gp_last_10_metric.py')
+# Reads:   player_game_stats
+# Writes:  player_talent_metrics.gp_last_10
+# ────────────────────────────────────────────────────────────
 """
 populate_gp_last_10_metric.py
 

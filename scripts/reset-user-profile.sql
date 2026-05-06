@@ -1,3 +1,11 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: DESTRUCTIVE
+-- Purpose: Reset a user's profile back to default state
+-- Invoked: manual support tool
+-- Reads:   auth.users
+-- Writes:  profiles, user-scoped writes — DELETEs/UPDATEs
+-- Note:    RECOVERY: PITR.
+-- ────────────────────────────────────────────────────────────
 -- Reset script to delete a specific user's profile and related data
 -- Replace 'YOUR_EMAIL@example.com' with your actual email
 
