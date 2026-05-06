@@ -237,20 +237,103 @@ export type BufferedDraftEvent =
  */
 export type GetEventsSinceSeqResult = GetSinceSeqResult<BufferedDraftEvent>;
 
+// ── State machine (step 6a) ────────────────────────────────────────
+
+/**
+ * One pick slot in the pre-computed draft order. Snake/linear are
+ * pre-flattened into a list of slots — the slot's `round` and
+ * `pickNumber` already account for snake reversal (even rounds have
+ * teams listed in reverse order). The state machine consumes the
+ * list directly without computing reversal at pick time.
+ *
+ * Source of truth: the existing v1 `public.draft_order` Postgres
+ * table (one row per round, `team_order` JSONB array per row).
+ * `lobbyConfigLookup` in `index.ts` flattens the rows into this
+ * shape at LobbyManager construction time. The same data feeds
+ * `submit_pick_v2`'s on-clock check (per migration line 783-799),
+ * so the engine and the RPC validate against an identical view.
+ *
+ * `format` is intentionally NOT carried per-slot — the format
+ * discriminator lives on the LobbyManager itself; the snake-vs-linear
+ * difference is already baked into the round-by-round teamId
+ * ordering.
+ */
+export interface DraftOrderSlot {
+  round: number;
+  pickNumber: number;
+  teamId: string;
+}
+
+/**
+ * Lifecycle phase of the in-memory draft state machine. Step 6a
+ * implements the linear progression `not_started → in_progress →
+ * completed`; step 6c (deadline + autopick) and ADR-002 §6 (auction
+ * pause/resume) will introduce additional terminal/transient states.
+ */
+export type DraftStatus = 'not_started' | 'in_progress' | 'completed';
+
+/**
+ * Bare state-machine view of a lobby's current draft state. Returned
+ * by `LobbyManager.getCurrentState()` for diagnostics, observability,
+ * and direct test access. Distinct from `DraftSnapshot` (the wire-
+ * envelope shape) so internal callers don't pay the wire-format
+ * shaping cost when they only need the state values.
+ *
+ * `onClockTeamId` is `null` when the draft is `not_started` or
+ * `completed`. During `in_progress`, it's always the team whose pick
+ * is at index `picksMade` of the draft order.
+ */
+export interface DraftStateSnapshot {
+  currentPickNumber: number | null;
+  currentRoundNumber: number | null;
+  onClockTeamId: string | null;
+  totalPicks: number;
+  picksMade: number;
+  draftStatus: DraftStatus;
+}
+
+/**
+ * Discriminated union returned by the engine-side
+ * `verifyTeamAuthorization` callback (per ADR-004 §5.3 — engine MUST
+ * verify team authorization before calling `submit_pick_v2` with
+ * `actor.kind = 'user'`).
+ *
+ * Today's `index.ts` implementation only emits `'not_owner'` and
+ * `'team_not_found'` (queries `teams.owner_id` directly). The richer
+ * `'team_archived'` and `'co_manager_disabled'` reasons are forward-
+ * compat for ADR-003 Phase 2's `team_authorized()` SQL helper —
+ * which can distinguish "user is a co-manager but co-managers are
+ * disabled for this league" from "user has no relationship to this
+ * team at all." Adding the shape now keeps that integration a
+ * drop-in rather than a callback-signature refactor.
+ *
+ * **Wire-side handling:** the engine logs the granular `reason` at
+ * info level for observability, but returns the coarse-grained
+ * `'unauthorized'` to the client to avoid information disclosure
+ * (clients should not differentiate on the auth-failure mode).
+ */
+export type TeamAuthorizationResult =
+  | { authorized: true }
+  | {
+      authorized: false;
+      reason: 'not_owner' | 'team_not_found' | 'team_archived' | 'co_manager_disabled';
+    };
+
 /**
  * Minimal client-facing snapshot of a lobby's current state.
  *
- * Steps 1-3 return identity fields plus the recent-events ring
- * buffer contents. Steps 4-6 expand this to include:
- *   - `currentPick`: pick number + on-clock team
- *   - `timer`: pick deadline + remaining seconds
- *   - `candidatePool`: cached available players (step 5)
- *   - format-specific state: current nomination + budgets (auction)
+ * Steps 1-3 returned identity fields plus the recent-events ring
+ * buffer; step 6a adds the state-machine view (`stateSnapshot`)
+ * carrying current pick / round / on-clock team. Future steps:
+ *   - 6c: pick deadline + remaining seconds
+ *   - 11g.6 / ADR-002: format-specific auction state (current
+ *     nomination + budgets) layered on top
  */
 export interface DraftSnapshot {
   lobbyId: string;
   format: DraftFormat;
   recentEvents: ReadonlyArray<BufferedDraftEvent>;
+  stateSnapshot: DraftStateSnapshot;
 }
 
 // ── Wire protocol (step 5) ─────────────────────────────────────────

@@ -43,7 +43,25 @@
 import { logger } from '@citrus/shared';
 import type { DraftServiceV2 } from '../services/DraftServiceV2';
 import { LobbyManager } from './LobbyManager';
-import type { DraftFormat } from './types';
+import type { DraftFormat, DraftOrderSlot, TeamAuthorizationResult } from './types';
+
+/**
+ * Configuration the registry needs from the application layer to
+ * construct a `LobbyManager`. Returned by the injected
+ * `lobbyConfigLookup` callback (per chunk-6a recon Path B: the draft
+ * order is loaded from `public.draft_order` rather than regenerated
+ * in-engine, so the engine and `submit_pick_v2`'s on-clock check
+ * validate against the identical view).
+ *
+ * For auction lobbies, `draftOrder` MAY be empty — auction has
+ * nominations rather than slots; chunk 11g.6 / ADR-002 §3 introduces
+ * auction-specific state. The LobbyManager's `processSubmitPick`
+ * gates on `format === 'auction'` before consulting `draftOrder`.
+ */
+export interface LobbyConfig {
+  format: DraftFormat;
+  draftOrder: ReadonlyArray<DraftOrderSlot>;
+}
 
 export interface LobbyRegistryOptions {
   /**
@@ -55,16 +73,38 @@ export interface LobbyRegistryOptions {
   draftService: DraftServiceV2;
 
   /**
-   * Resolves the live-draft format for a given league. Called once
-   * per lobby on first `getOrCreate`; the result is cached by the
-   * LobbyManager itself (its `format` field is set at construction
-   * and never mutates).
+   * Resolves the live-draft configuration for a given league.
+   * Called once per lobby on first `getOrCreate`; the result feeds
+   * the LobbyManager constructor and is fixed for the lobby's
+   * lifetime.
    *
-   * Should throw on missing/invalid draftType so the caller (the
-   * uWS upgrade handler) can close the WS cleanly. The thrown error
-   * is logged at registry level and re-thrown to the caller.
+   * Step 6a expansion (renamed from `formatLookup`): returns both
+   * `format` AND the pre-flattened `draftOrder` slot list loaded
+   * from `public.draft_order`. Per chunk-6a recon Path B, this
+   * keeps the engine's on-clock check aligned with what
+   * `submit_pick_v2` validates — eliminates the divergence risk
+   * from commissioner `customTeamOrder` overrides.
+   *
+   * Should throw on missing/invalid configuration so the caller
+   * (the uWS upgrade handler) can close the WS cleanly. The thrown
+   * error is logged at registry level and re-thrown to the caller.
    */
-  formatLookup: (leagueId: string) => Promise<DraftFormat>;
+  lobbyConfigLookup: (leagueId: string) => Promise<LobbyConfig>;
+
+  /**
+   * Engine-side team-authorization callback per ADR-004 §5.3.
+   * Forwarded into every `LobbyManager`; verified before each
+   * `submit_pick_v2` call to satisfy the trusted-executor contract.
+   *
+   * Today: `index.ts` queries `teams.owner_id`. Switches to
+   * `team_authorized()` SQL helper post-ADR-003 Phase 2 — the
+   * `TeamAuthorizationResult` discriminated union is forward-compat
+   * for that integration as a clean drop-in.
+   */
+  verifyTeamAuthorization: (
+    userId: string,
+    teamId: string,
+  ) => Promise<TeamAuthorizationResult>;
 
   /**
    * uWS app-level publish callback — forwarded into every
@@ -82,7 +122,11 @@ export interface LobbyRegistryOptions {
 
 export class LobbyRegistry {
   private readonly draftService: DraftServiceV2;
-  private readonly formatLookup: (leagueId: string) => Promise<DraftFormat>;
+  private readonly lobbyConfigLookup: (leagueId: string) => Promise<LobbyConfig>;
+  private readonly verifyTeamAuthorization: (
+    userId: string,
+    teamId: string,
+  ) => Promise<TeamAuthorizationResult>;
   private readonly publish: (topic: string, message: string) => void;
 
   /**
@@ -99,7 +143,8 @@ export class LobbyRegistry {
 
   constructor(opts: LobbyRegistryOptions) {
     this.draftService = opts.draftService;
-    this.formatLookup = opts.formatLookup;
+    this.lobbyConfigLookup = opts.lobbyConfigLookup;
+    this.verifyTeamAuthorization = opts.verifyTeamAuthorization;
     this.publish = opts.publish;
   }
 
@@ -187,13 +232,15 @@ export class LobbyRegistry {
   // ── Private ────────────────────────────────────────────────────
 
   private async constructLobby(lobbyId: string, leagueId: string): Promise<LobbyManager> {
-    const format = await this.formatLookup(leagueId);
+    const config = await this.lobbyConfigLookup(leagueId);
     return new LobbyManager({
       lobbyId,
-      format,
+      format: config.format,
       leagueId,
       draftService: this.draftService,
       publish: this.publish,
+      draftOrder: config.draftOrder,
+      verifyTeamAuthorization: this.verifyTeamAuthorization,
     });
   }
 }

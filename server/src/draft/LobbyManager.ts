@@ -1,6 +1,31 @@
 // Phase 4.5 chunk 11g.4 — LobbyManager: in-memory state machine + single-
 // writer queue per active draft.
 //
+// Step 6a of chunk 11g.4: the state machine. Replaces the hardcoded
+// round=1/pickNumber=1 from step 2 with values computed from a
+// pre-loaded draft-order slot list (Path B per chunk-6a recon: load
+// from `public.draft_order` rather than regenerate in-engine, so the
+// engine and `submit_pick_v2`'s on-clock check validate against the
+// identical view — eliminates the commissioner-customTeamOrder
+// divergence risk). Adds engine-side team-authorization verification
+// per ADR-004 §5.3 (engine MUST verify before calling submit_pick_v2
+// with actor.kind='user'); auth runs BEFORE on-clock check so a
+// non-manager probing the WS doesn't get on-clock information leaked
+// via differentiated error reasons.
+//
+// **Step 6a is fresh-start-only.** A LobbyManager constructed in 6a
+// assumes the draft starts at picksMade=0. Production server restart
+// mid-draft is incorrect until step 6b ships event-log bootstrap. The
+// `existingPicksMade` constructor option is the forward-compat hook
+// that 6b populates after replaying the durable event log; in 6a it
+// defaults to 0 and zero callers exercise it.
+//
+// Future sub-steps:
+//   - 6b: bootstrap from event log on construction (process restart
+//          recovery for already-in-progress drafts)
+//   - 6c: pick deadlines + autopick (timer per lobby; deadline
+//          expiry triggers autopick via the queue)
+//
 // Step 5 of chunk 11g.4: live-multiplayer fundamentals.
 //   - **Broadcast** on successful pick: serialized DraftServerMessage
 //     of type 'event' published to `draft:${lobbyId}` via the injected
@@ -54,10 +79,14 @@ import {
   type DraftAction,
   type DraftActionResult,
   type DraftFormat,
+  type DraftOrderSlot,
   type DraftServerMessage,
   type DraftSnapshot,
   type DraftSocketUserData,
+  type DraftStateSnapshot,
+  type DraftStatus,
   type GetEventsSinceSeqResult,
+  type TeamAuthorizationResult,
 } from './types';
 
 export interface LobbyManagerOptions {
@@ -83,6 +112,56 @@ export interface LobbyManagerOptions {
    * follows the architecture doc convention (`draft:${lobbyId}`).
    */
   publish: (topic: string, message: string) => void;
+
+  /**
+   * Pre-flattened draft order loaded from `public.draft_order` by
+   * `lobbyConfigLookup` in `index.ts` (Path B per chunk-6a recon).
+   * One entry per pick of the entire draft; snake reversal is baked
+   * into the per-round teamId ordering.
+   *
+   * For auction lobbies this list MAY be empty (auction has
+   * nominations rather than slots — chunk 11g.6 / ADR-002 §3
+   * introduces the auction-specific state); `processSubmitPick`
+   * gates on `format === 'auction'` before consulting this list.
+   *
+   * Source-of-truth note: the same `public.draft_order` rows are
+   * read by `submit_pick_v2`'s on-clock check at migration line
+   * 783-799 of `20260425140000_draft_engine_v2_rpcs.sql`. Engine
+   * and RPC validate against an identical view by construction.
+   */
+  draftOrder: ReadonlyArray<DraftOrderSlot>;
+
+  /**
+   * Engine-side team-authorization callback per ADR-004 §5.3.
+   * Verifies that `userId` is authorized to act on behalf of
+   * `teamId` BEFORE the engine calls `submit_pick_v2` with
+   * `actor.kind = 'user'`. Required for the trusted-executor
+   * contract — the RPC's relaxed permission check (per ADR-004
+   * §5.1) trusts the engine to have done this verification.
+   *
+   * Today's `index.ts` implementation queries `teams.owner_id`
+   * directly. Switches to the `team_authorized()` SQL helper once
+   * ADR-003 Phase 2 ships; the callback's shape (richer
+   * discriminated-union result) is forward-compat for that
+   * integration as a drop-in.
+   */
+  verifyTeamAuthorization: (
+    userId: string,
+    teamId: string,
+  ) => Promise<TeamAuthorizationResult>;
+
+  /**
+   * **Forward-compat hook for chunk 11g.4 step 6b** (event-log
+   * bootstrap on process restart). When step 6b replays the durable
+   * event log, it sets this to the count of `pick_submitted` events
+   * already recorded for the league; the LobbyManager resumes from
+   * that index in the draft order.
+   *
+   * Step 6a always passes 0 (or omits — defaults to 0). 6a is
+   * fresh-start-only by design; production server restart mid-draft
+   * remains incorrect until 6b ships.
+   */
+  existingPicksMade?: number;
 }
 
 /**
@@ -138,6 +217,46 @@ export class LobbyManager {
 
   private readonly draftService: DraftServiceV2;
   private readonly publish: (topic: string, message: string) => void;
+  private readonly verifyTeamAuthorization: (
+    userId: string,
+    teamId: string,
+  ) => Promise<TeamAuthorizationResult>;
+
+  /**
+   * Pre-flattened draft order — one slot per pick of the entire
+   * draft. Source: `public.draft_order` rows loaded by
+   * `lobbyConfigLookup` (Path B). For auction lobbies this is the
+   * empty array; auction state lives in chunk 11g.6's separate
+   * structures per ADR-002 §3.2.
+   *
+   * Read at slot index `picksMade` to determine the on-clock team
+   * for the current pick. Length is `totalPicks` for the lobby.
+   */
+  private readonly draftOrder: ReadonlyArray<DraftOrderSlot>;
+
+  /**
+   * Number of successful, non-duplicate picks recorded so far.
+   * Advances by 1 on every `processSubmitPick` success path that
+   * gets a `was_duplicate=false` from the RPC.
+   *
+   * **Step 6a starts at `existingPicksMade ?? 0`** — production
+   * restart mid-draft is incorrect until step 6b's event-log
+   * bootstrap sets this from the durable record.
+   */
+  private picksMade: number;
+
+  /**
+   * Lifecycle phase per `DraftStatus`. Transitions:
+   *   - constructor: `not_started` (or `in_progress` / `completed`
+   *     if `existingPicksMade > 0` per the 6b forward-compat hook)
+   *   - first successful pick: `not_started → in_progress`
+   *   - final pick (`picksMade === draftOrder.length`):
+   *     `in_progress → completed`
+   *
+   * Auction lobbies stay at `not_started` until chunk 11g.6
+   * introduces auction-specific lifecycle wiring.
+   */
+  private draftStatus: DraftStatus;
 
   /**
    * uWS pub/sub topic name for this lobby. Step-5 broadcasts
@@ -217,10 +336,41 @@ export class LobbyManager {
     this.leagueId = opts.leagueId;
     this.draftService = opts.draftService;
     this.publish = opts.publish;
+    this.verifyTeamAuthorization = opts.verifyTeamAuthorization;
+    this.draftOrder = opts.draftOrder;
     this.topicName = `draft:${opts.lobbyId}`;
+
+    // Step 6b forward-compat: start at `existingPicksMade` if the
+    // bootstrap path supplies it; otherwise zero. Step 6a always
+    // takes the zero path.
+    this.picksMade = opts.existingPicksMade ?? 0;
+    this.draftStatus = this.computeInitialStatus();
+
     logger.info(
-      `[lobby] LobbyManager constructed lobbyId=${opts.lobbyId} format=${opts.format} leagueId=${opts.leagueId} topic=${this.topicName}`,
+      `[lobby] LobbyManager constructed lobbyId=${opts.lobbyId} format=${opts.format} leagueId=${opts.leagueId} topic=${this.topicName} totalPicks=${this.draftOrder.length} picksMade=${this.picksMade} status=${this.draftStatus}`,
     );
+  }
+
+  /**
+   * Determine the initial `draftStatus` based on `picksMade` vs the
+   * draft order length. For step 6a this is always `not_started`
+   * (picksMade=0). Step 6b's bootstrap path may construct a lobby
+   * with picksMade > 0, in which case the status is `in_progress`
+   * (or `completed` if all picks have been recorded). Auction lobbies
+   * with empty draftOrder stay `not_started` — chunk 11g.6 owns
+   * auction-status lifecycle.
+   */
+  private computeInitialStatus(): DraftStatus {
+    if (this.draftOrder.length === 0) {
+      return 'not_started';
+    }
+    if (this.picksMade === 0) {
+      return 'not_started';
+    }
+    if (this.picksMade >= this.draftOrder.length) {
+      return 'completed';
+    }
+    return 'in_progress';
   }
 
   /**
@@ -407,15 +557,51 @@ export class LobbyManager {
   }
 
   /**
-   * Return a snapshot of the current lobby state. Steps 1-3 return
-   * identity fields plus the recent-events ring buffer contents;
-   * steps 4-6 fill in pick/timer/candidate-pool/auction state.
+   * Return a wire-envelope snapshot of the current lobby state.
+   * This is what new connections receive on join (step 5 wired the
+   * send via uws-server.ts open handler; step 6a populates the
+   * state-machine fields via `stateSnapshot`).
+   *
+   * Steps 1-3 returned identity + ring buffer; step 6a adds the
+   * state-machine view. Future steps add pick deadlines (6c) and
+   * format-specific state (chunk 11g.6 / ADR-002 for auction).
+   *
+   * For internal callers that only need the bare state-machine
+   * values, use `getCurrentState()` — it skips the ring-buffer
+   * snapshot and identity shaping.
    */
   getSnapshot(): DraftSnapshot {
     return {
       lobbyId: this.lobbyId,
       format: this.format,
       recentEvents: this.events.snapshot(),
+      stateSnapshot: this.getCurrentState(),
+    };
+  }
+
+  /**
+   * Return the bare state-machine view of the lobby. Distinct from
+   * `getSnapshot()` (which builds the full wire envelope including
+   * recent events) so internal callers — diagnostics, observability,
+   * direct test access — don't pay the wire-shaping cost.
+   *
+   * `onClockTeamId` is `null` when the draft is `not_started` or
+   * `completed`. During `in_progress`, it's
+   * `draftOrder[picksMade].teamId`.
+   *
+   * `currentPickNumber` and `currentRoundNumber` follow the same
+   * `null`-when-not-active convention.
+   */
+  getCurrentState(): DraftStateSnapshot {
+    const slot =
+      this.draftStatus === 'in_progress' ? this.draftOrder[this.picksMade] : null;
+    return {
+      currentPickNumber: slot ? slot.pickNumber : null,
+      currentRoundNumber: slot ? slot.round : null,
+      onClockTeamId: slot ? slot.teamId : null,
+      totalPicks: this.draftOrder.length,
+      picksMade: this.picksMade,
+      draftStatus: this.draftStatus,
     };
   }
 
@@ -506,33 +692,91 @@ export class LobbyManager {
   }
 
   /**
-   * Snake/linear pick handler. Calls `DraftServiceV2.submitPick`
-   * which writes to `draft_events` via the `submit_pick_v2` RPC
-   * (atomic envelope: payload validation, idempotency-key check,
-   * payload-hash conflict detection, projection-trigger fire).
+   * Snake/linear pick handler. Step 6a sequence:
    *
-   * **Auction format:** returns `'wrong_format_for_action'` —
-   * auction picks happen via `place_bid` + `nominate` + automatic
-   * close, not direct `submit_pick`. Chunk 11g.6 wires those.
+   *   1. **Format gate** — auction returns `wrong_format_for_action`
+   *      (chunk 11g.6 introduces auction-specific handlers).
+   *   2. **Authorization (ADR-004 §5.3)** — engine MUST verify
+   *      `userId` is authorized to act on behalf of `teamId` BEFORE
+   *      calling the RPC. Auth failure logs the granular reason at
+   *      info level for observability but returns coarse-grained
+   *      `'unauthorized'` to the client (no information disclosure
+   *      on the wire).
+   *   3. **On-clock check** — engine-side fail-fast: if the action's
+   *      `teamId` doesn't match the slot at `draftOrder[picksMade]`,
+   *      return `'not_on_clock'` without round-tripping to the RPC.
+   *      Auth runs FIRST so a non-manager probing the WS doesn't get
+   *      on-clock information leaked through differentiated error
+   *      reasons.
+   *   4. **Status check** — already-completed drafts reject with
+   *      `'invalid_state'`; the RPC's `illegal_state` would also
+   *      catch this but the engine fails fast.
+   *   5. **Compute round + pickNumber** from `draftOrder[picksMade]`
+   *      (replaces the step-2 hardcoded 1/1).
+   *   6. **Call RPC** — `submit_pick_v2` does its own atomic
+   *      validation; idempotency replays are still handled there.
+   *   7. **Advance state** — on success + `was_duplicate=false`,
+   *      increment `picksMade`, transition `draftStatus`, append to
+   *      ring buffer, broadcast the event message.
    *
-   * **TODO(chunk 11g.4 step 6):** replace the hardcoded round=1 /
-   * pickNumber=1 with computation from the in-memory state machine.
-   * The submit_pick_v2 RPC validates pick ordering (`pick_out_of_order`
-   * is one of its rejection reasons), so the values must be the
-   * actual current pick — not 1/1 — once the state machine exists.
-   * For step 2's queue/idempotency tests, fixed values are sufficient
-   * because the tests mock `DraftServiceV2.submitPick`.
+   * Auction format never reaches step 5 — the format gate at step 1
+   * short-circuits before consulting `draftOrder` (which is empty
+   * for auction lobbies).
    */
   private async processSubmitPick(
     action: Extract<DraftAction, { kind: 'submit_pick' }>,
   ): Promise<DraftActionResult> {
+    // Step 1: format gate.
     if (this.format === 'auction') {
       return { ok: false, reason: 'wrong_format_for_action' };
     }
 
-    // TODO(chunk 11g.4 step 6): compute from in-memory state machine.
-    const HARDCODED_ROUND = 1;
-    const HARDCODED_PICK_NUMBER = 1;
+    // Step 2: ADR-004 §5.3 engine-side authorization.
+    let authResult: TeamAuthorizationResult;
+    try {
+      authResult = await this.verifyTeamAuthorization(action.userId, action.teamId);
+    } catch (err) {
+      logger.error(
+        `[lobby] verifyTeamAuthorization threw lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId}`,
+        err,
+      );
+      return { ok: false, reason: 'internal_error' };
+    }
+    if ('reason' in authResult) {
+      // Narrow via property-existence (`'reason' in result`) rather
+      // than via the `authorized` discriminator — narrowing on the
+      // discriminator is unreliable under server/tsconfig.json's
+      // `strict: false` setting; `in`-based narrowing works in either
+      // mode (same pattern as uws-server.ts verifyDraftToken handling).
+      //
+      // Granular reason for ops; coarse-grained for the wire (no
+      // information disclosure beyond "you can't do that").
+      logger.info(
+        `[lobby] unauthorized pick attempt lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId} reason=${authResult.reason}`,
+      );
+      return { ok: false, reason: 'unauthorized' };
+    }
+
+    // Step 3: status check. Already-completed drafts cannot accept
+    // more picks — return `invalid_state` for an informative client
+    // signal. Runs BEFORE on-clock so the response distinguishes
+    // "draft is over" from "your team isn't on the clock" (which
+    // would be the misleading reading of a completed-draft slot
+    // lookup, since `draftOrder[picksMade]` is undefined past the
+    // last pick).
+    if (this.draftStatus === 'completed') {
+      return { ok: false, reason: 'invalid_state' };
+    }
+
+    // Step 4: on-clock check.
+    const expectedSlot = this.draftOrder[this.picksMade];
+    if (!expectedSlot || expectedSlot.teamId !== action.teamId) {
+      return { ok: false, reason: 'not_on_clock' };
+    }
+
+    // Step 5: compute round + pickNumber from the loaded draft order.
+    const roundNumber = expectedSlot.round;
+    const pickNumber = expectedSlot.pickNumber;
 
     const actor: DraftV2Actor = {
       kind: 'user',
@@ -540,6 +784,10 @@ export class LobbyManager {
       session_id: action.sessionId,
     };
 
+    // Step 6: call the RPC. submit_pick_v2 runs its own atomic
+    // validation (idempotency, on-clock, player-taken, etc.) so the
+    // engine's fail-fast checks above are an optimization, not a
+    // replacement for RPC-side guards.
     let result: SubmitPickResult;
     try {
       result = await this.draftService.submitPick({
@@ -549,8 +797,8 @@ export class LobbyManager {
         // submit_pick_v2 RPC expects int (NHL player ID from staging
         // files). Coerce at the boundary.
         playerId: parseInt(action.playerId, 10),
-        round: HARDCODED_ROUND,
-        pickNumber: HARDCODED_PICK_NUMBER,
+        round: roundNumber,
+        pickNumber,
         sessionId: action.sessionId,
         idempotencyKey: action.idempotencyKey,
         actor,
@@ -566,13 +814,21 @@ export class LobbyManager {
       return { ok: false, reason: 'internal_error' };
     }
 
-    // Buffer the recorded event for chunk 11g.5's resume protocol,
-    // then broadcast to all subscribers of the lobby topic.
-    // Skip when the RPC reports `was_duplicate=true` — the original
-    // event is already in the buffer (and the durable log) from the
-    // first non-retried submission; double-appending or
-    // double-broadcasting would let clients see the same event twice.
+    // Step 7: advance state on the non-duplicate success path.
+    // Skip on `was_duplicate=true` — the original event is already
+    // in the buffer + durable log; the state machine already
+    // advanced when the original first landed.
     if (!result.was_duplicate) {
+      this.picksMade++;
+      // Status transition: not_started → in_progress on first pick;
+      // in_progress → completed on the final pick.
+      if (this.draftStatus === 'not_started') {
+        this.draftStatus = 'in_progress';
+      }
+      if (this.picksMade >= this.draftOrder.length) {
+        this.draftStatus = 'completed';
+      }
+
       const timestamp = new Date().toISOString();
       const event: BufferedDraftEvent = {
         kind: 'pick_submitted',
@@ -580,8 +836,8 @@ export class LobbyManager {
         timestamp,
         teamId: action.teamId,
         playerId: parseInt(action.playerId, 10),
-        roundNumber: HARDCODED_ROUND,
-        pickNumber: HARDCODED_PICK_NUMBER,
+        roundNumber,
+        pickNumber,
         // Mirror the action's idempotencyKey under the client-facing
         // `correlationId` name. Lets the submitter's optimistic UI
         // settle when the broadcast comes back.

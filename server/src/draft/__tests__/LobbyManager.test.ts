@@ -1,14 +1,16 @@
-// Phase 4.5 chunk 11g.4 step 5 — LobbyManager queue + submit_pick +
+// Phase 4.5 chunk 11g.4 step 6a — LobbyManager queue + submit_pick +
 // ring-buffer + connection-management + broadcast/snapshot/presence/
-// resync/backpressure tests.
+// resync/backpressure + state-machine tests.
 //
-// 39 tests total: 5 retained from step 1, 8 from step 2, 6 from step 3,
-// 4 from step 4 (= 23 base), plus 16 new step-5 tests covering broadcast
-// on success / no-broadcast on duplicate-failed-stub paths, wire
-// envelope shape, snapshot-on-connect, snapshot send to closed ws,
-// presence join + dedup + leave + held, subscribe + unsubscribe
-// plumbing, handleResyncRequest happy + too_old, backpressure ws.end
-// + below-threshold survival.
+// 51 tests total: 23 retained baseline (steps 1-4), 16 step-5 tests,
+// plus 12 new step-6a tests covering: pick-numbers advance through
+// snake draft, on-clock rejection without RPC call, auth rejection
+// without RPC call, auth-before-on-clock ordering proof, draftStatus
+// transitions (not_started → in_progress → completed), completed-
+// state rejection, getCurrentState shape, getSnapshot.stateSnapshot
+// population, RPC + buffer event use computed round/pickNumber
+// (regression for the step-2 hardcoded 1/1), verifyTeamAuthorization
+// throw → internal_error, existingPicksMade forward-compat hook.
 //
 // `makeLobby`, `makeSubmitPick`, `makeMockWs`, and `makeUserData`
 // factories at top eliminate constructor boilerplate per test.
@@ -21,14 +23,50 @@ import { describe, it, expect, vi } from 'vitest';
 import { LobbyManager, type LobbyManagerOptions } from '../LobbyManager';
 import { AppError } from '../../lib/errors';
 import type { DraftServiceV2, SubmitPickResult } from '../../services/DraftServiceV2';
-import type { DraftAction, DraftSocketUserData } from '../types';
+import type {
+  DraftAction,
+  DraftOrderSlot,
+  DraftSocketUserData,
+  TeamAuthorizationResult,
+} from '../types';
+import { generateDraftOrder } from '../draftOrderGenerator';
 
 // ── Test helpers ─────────────────────────────────────────────────────
 
-interface MakeLobbyOpts extends Partial<Omit<LobbyManagerOptions, 'draftService' | 'publish'>> {
+interface MakeLobbyOpts
+  extends Partial<
+    Omit<LobbyManagerOptions, 'draftService' | 'publish' | 'verifyTeamAuthorization'>
+  > {
   submitPick?: (params: unknown) => Promise<SubmitPickResult>;
   publish?: (topic: string, message: string) => void;
+  verifyTeamAuthorization?: (
+    userId: string,
+    teamId: string,
+  ) => Promise<TeamAuthorizationResult>;
 }
+
+/**
+ * Default draft order used when a test doesn't override it: 3 teams
+ * × 3 rounds = 9 picks (snake). Team IDs are 'team-1', 'team-2',
+ * 'team-3'. Generated via `generateDraftOrder` so the slot list
+ * matches what production `lobbyConfigLookup` would produce for the
+ * same inputs.
+ */
+const DEFAULT_TEAM_IDS = ['team-1', 'team-2', 'team-3'];
+const DEFAULT_DRAFT_ORDER: DraftOrderSlot[] = generateDraftOrder(
+  DEFAULT_TEAM_IDS,
+  3,
+  'snake',
+);
+
+/**
+ * Default-allow auth callback for tests that aren't asserting on
+ * authorization; returns `{ authorized: true }` for any input.
+ */
+const ALLOW_ALL_AUTH: (
+  userId: string,
+  teamId: string,
+) => Promise<TeamAuthorizationResult> = async () => ({ authorized: true });
 
 function makeLobby(opts: MakeLobbyOpts = {}): LobbyManager {
   const submitPick = opts.submitPick ?? vi.fn().mockResolvedValue({
@@ -40,12 +78,20 @@ function makeLobby(opts: MakeLobbyOpts = {}): LobbyManager {
 
   const draftService = { submitPick } as unknown as DraftServiceV2;
   const publish = opts.publish ?? vi.fn();
+  const verifyTeamAuthorization = opts.verifyTeamAuthorization ?? ALLOW_ALL_AUTH;
+  // Default draftOrder matches the existing default teamIds — pre-step-6a
+  // tests that exercised submit_pick with team='team-1' still pass
+  // because team-1 is on the clock at picksMade=0.
+  const draftOrder = opts.draftOrder ?? DEFAULT_DRAFT_ORDER;
   return new LobbyManager({
     lobbyId: opts.lobbyId ?? 'lobby-1',
     format: opts.format ?? 'snake',
     leagueId: opts.leagueId ?? 'league-1',
     draftService,
     publish,
+    draftOrder,
+    verifyTeamAuthorization,
+    existingPicksMade: opts.existingPicksMade,
   });
 }
 
@@ -108,7 +154,7 @@ function makeSubmitPick(
 
 // ── Tests ────────────────────────────────────────────────────────────
 
-describe('LobbyManager (chunk 11g.4 step 5)', () => {
+describe('LobbyManager (chunk 11g.4 step 6a)', () => {
   // ── Step-1 retained tests ────────────────────────────────────────
 
   it('instantiates with snake format', () => {
@@ -172,7 +218,14 @@ describe('LobbyManager (chunk 11g.4 step 5)', () => {
       } satisfies SubmitPickResult;
     });
 
-    const lobby = makeLobby({ submitPick });
+    // 5-team single-round draft order so each team-i is on the clock
+    // at picksMade=i.
+    const draftOrder = generateDraftOrder(
+      ['team-0', 'team-1', 'team-2', 'team-3', 'team-4'],
+      1,
+      'linear',
+    );
+    const lobby = makeLobby({ submitPick, draftOrder });
 
     // Fire 5 concurrently — all should complete in submission order.
     const actions = Array.from({ length: 5 }, (_, i) =>
@@ -257,7 +310,9 @@ describe('LobbyManager (chunk 11g.4 step 5)', () => {
       was_duplicate: false,
     } satisfies SubmitPickResult);
 
-    const lobby = makeLobby({ format: 'snake', submitPick });
+    // Single-slot draft order with team-A on the clock at picksMade=0.
+    const draftOrder = [{ round: 1, pickNumber: 1, teamId: 'team-A' }];
+    const lobby = makeLobby({ format: 'snake', submitPick, draftOrder });
     const action = makeSubmitPick({
       teamId: 'team-A',
       playerId: '8478402',
@@ -275,6 +330,8 @@ describe('LobbyManager (chunk 11g.4 step 5)', () => {
         leagueId: 'league-1',
         teamId: 'team-A',
         playerId: 8478402, // coerced from string at the boundary
+        round: 1,
+        pickNumber: 1,
         idempotencyKey: 'idem-snake-1',
         sessionId: 'sess-A',
         actor: { kind: 'user', id: 'user-A', session_id: 'sess-A' },
@@ -339,7 +396,11 @@ describe('LobbyManager (chunk 11g.4 step 5)', () => {
       was_duplicate: false,
     } satisfies SubmitPickResult);
 
-    const lobby = makeLobby({ format: 'snake', submitPick });
+    const lobby = makeLobby({
+      format: 'snake',
+      submitPick,
+      draftOrder: [{ round: 1, pickNumber: 1, teamId: 'team-buf-1' }],
+    });
     await lobby.enqueueAction(
       makeSubmitPick({
         teamId: 'team-buf-1',
@@ -430,9 +491,17 @@ describe('LobbyManager (chunk 11g.4 step 5)', () => {
 
     const lobby = makeLobby({ format: 'snake', submitPick });
     // Three sequential picks → seqs 10, 11, 12 in the buffer.
+    // The default draftOrder is 3 teams × 3 rounds (snake), so picks
+    // 1/2/3 are team-1, team-2, team-3. Match the picksMade-driven
+    // on-clock progression.
+    const teamProgression = ['team-1', 'team-2', 'team-3'];
     for (let i = 0; i < 3; i++) {
       await lobby.enqueueAction(
-        makeSubmitPick({ idempotencyKey: `idem-buf-strictly-${i}` }),
+        makeSubmitPick({
+          idempotencyKey: `idem-buf-strictly-${i}`,
+          teamId: teamProgression[i],
+          playerId: String(8478000 + i),
+        }),
       );
     }
 
@@ -457,7 +526,11 @@ describe('LobbyManager (chunk 11g.4 step 5)', () => {
       was_duplicate: false,
     } satisfies SubmitPickResult);
 
-    const lobby = makeLobby({ format: 'snake', submitPick });
+    const lobby = makeLobby({
+      format: 'snake',
+      submitPick,
+      draftOrder: [{ round: 1, pickNumber: 1, teamId: 'team-snap-1' }],
+    });
 
     // Empty initially.
     expect(lobby.getSnapshot().recentEvents).toHaveLength(0);
@@ -558,6 +631,7 @@ describe('LobbyManager (chunk 11g.4 step 5)', () => {
       format: 'snake',
       submitPick,
       publish,
+      draftOrder: [{ round: 1, pickNumber: 1, teamId: 'team-bcast-1' }],
     });
 
     await lobby.enqueueAction(
@@ -786,10 +860,16 @@ describe('LobbyManager (chunk 11g.4 step 5)', () => {
     } satisfies SubmitPickResult));
     const lobby = makeLobby({ format: 'snake', submitPick });
 
-    // Populate buffer with seqs 10, 11, 12.
+    // Populate buffer with seqs 10, 11, 12 by walking through the
+    // default 3-team draft order (picks 1/2/3 are team-1/team-2/team-3).
+    const teamProgression = ['team-1', 'team-2', 'team-3'];
     for (let i = 0; i < 3; i++) {
       await lobby.enqueueAction(
-        makeSubmitPick({ idempotencyKey: `idem-resync-${i}` }),
+        makeSubmitPick({
+          idempotencyKey: `idem-resync-${i}`,
+          teamId: teamProgression[i],
+          playerId: String(8478000 + i),
+        }),
       );
     }
 
@@ -900,5 +980,355 @@ describe('LobbyManager (chunk 11g.4 step 5)', () => {
     expect(typeof parsed.timestamp).toBe('string');
     // ISO 8601 round-trip — Date.parse should produce a finite number.
     expect(Number.isFinite(Date.parse(parsed.timestamp))).toBe(true);
+  });
+
+  // ── Step-6a new tests (state machine + engine auth) ────────────────
+
+  it('pick numbers advance through a snake draft (3 teams × 3 rounds = 9 picks, snake reverses on even rounds)', async () => {
+    let nextSeq = 100;
+    const submitPickCalls: Array<{ round: number; pickNumber: number; teamId: string }> = [];
+    const submitPick = vi.fn(async (params: { round: number; pickNumber: number; teamId: string }) => {
+      submitPickCalls.push({
+        round: params.round,
+        pickNumber: params.pickNumber,
+        teamId: params.teamId,
+      });
+      return {
+        event_id: nextSeq,
+        seq: nextSeq++,
+        pick_deadline: null,
+        was_duplicate: false,
+      } satisfies SubmitPickResult;
+    });
+
+    const lobby = makeLobby({ format: 'snake', submitPick });
+    // Default draft order is 3 teams × 3 rounds snake — exercise all 9.
+    const expectedProgression = [
+      { round: 1, pickNumber: 1, teamId: 'team-1' },
+      { round: 1, pickNumber: 2, teamId: 'team-2' },
+      { round: 1, pickNumber: 3, teamId: 'team-3' },
+      { round: 2, pickNumber: 4, teamId: 'team-3' },
+      { round: 2, pickNumber: 5, teamId: 'team-2' },
+      { round: 2, pickNumber: 6, teamId: 'team-1' },
+      { round: 3, pickNumber: 7, teamId: 'team-1' },
+      { round: 3, pickNumber: 8, teamId: 'team-2' },
+      { round: 3, pickNumber: 9, teamId: 'team-3' },
+    ];
+
+    for (let i = 0; i < expectedProgression.length; i++) {
+      const expected = expectedProgression[i];
+      const result = await lobby.enqueueAction(
+        makeSubmitPick({
+          idempotencyKey: `idem-state-${i}`,
+          teamId: expected.teamId,
+          playerId: String(8478000 + i),
+        }),
+      );
+      expect(result).toEqual({ ok: true, eventSeq: 100 + i });
+    }
+
+    // Every RPC call received the right round + pickNumber + teamId.
+    expect(submitPickCalls).toEqual(expectedProgression);
+
+    // Lobby should have advanced through all 9 picks and transitioned to completed.
+    const state = lobby.getCurrentState();
+    expect(state.picksMade).toBe(9);
+    expect(state.totalPicks).toBe(9);
+    expect(state.draftStatus).toBe('completed');
+    expect(state.onClockTeamId).toBeNull();
+  });
+
+  it('on-clock check rejects pick from wrong team without calling the RPC', async () => {
+    const submitPick = vi.fn();
+    const lobby = makeLobby({ format: 'snake', submitPick });
+
+    // team-2 is NOT on the clock at picksMade=0 (team-1 is). Reject.
+    const result = await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-2', idempotencyKey: 'idem-wrong-team-1' }),
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'not_on_clock' });
+    expect(submitPick).not.toHaveBeenCalled();
+  });
+
+  it('engine-side authorization check rejects pick from non-manager without calling the RPC (ADR-004 §5.3)', async () => {
+    const submitPick = vi.fn();
+    const verifyTeamAuthorization = vi.fn(async () => ({
+      authorized: false as const,
+      reason: 'not_owner' as const,
+    }));
+    const lobby = makeLobby({ format: 'snake', submitPick, verifyTeamAuthorization });
+
+    const result = await lobby.enqueueAction(
+      makeSubmitPick({ idempotencyKey: 'idem-non-manager-1' }),
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'unauthorized' });
+    expect(verifyTeamAuthorization).toHaveBeenCalledWith('user-1', 'team-1');
+    expect(submitPick).not.toHaveBeenCalled();
+  });
+
+  it('auth check runs BEFORE on-clock check (non-manager submitting wrong team gets unauthorized, not not_on_clock)', async () => {
+    const submitPick = vi.fn();
+    const verifyTeamAuthorization = vi.fn(async () => ({
+      authorized: false as const,
+      reason: 'not_owner' as const,
+    }));
+    const lobby = makeLobby({ format: 'snake', submitPick, verifyTeamAuthorization });
+
+    // Both fail conditions: non-manager (auth fails) AND wrong team
+    // (would also fail on-clock at picksMade=0 since team-2 isn't on
+    // the clock). The engine MUST report 'unauthorized' — proving auth
+    // runs first, NOT 'not_on_clock' (which would leak on-clock info).
+    const result = await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-2', idempotencyKey: 'idem-double-fail-1' }),
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'unauthorized' });
+    expect(verifyTeamAuthorization).toHaveBeenCalled();
+    expect(submitPick).not.toHaveBeenCalled();
+  });
+
+  it('draftStatus transitions: not_started → in_progress on first pick', async () => {
+    const submitPick = vi.fn().mockResolvedValue({
+      event_id: 1,
+      seq: 1,
+      pick_deadline: null,
+      was_duplicate: false,
+    } satisfies SubmitPickResult);
+    const lobby = makeLobby({ format: 'snake', submitPick });
+
+    expect(lobby.getCurrentState().draftStatus).toBe('not_started');
+
+    await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-1', idempotencyKey: 'idem-status-1' }),
+    );
+
+    expect(lobby.getCurrentState().draftStatus).toBe('in_progress');
+  });
+
+  it('draftStatus transitions: in_progress → completed after final pick', async () => {
+    let nextSeq = 1;
+    const submitPick = vi.fn(async () => ({
+      event_id: nextSeq,
+      seq: nextSeq++,
+      pick_deadline: null,
+      was_duplicate: false,
+    } satisfies SubmitPickResult));
+
+    // Tiny 2-team × 1-round draft (2 picks total) for a fast finish.
+    const draftOrder = [
+      { round: 1, pickNumber: 1, teamId: 'team-1' },
+      { round: 1, pickNumber: 2, teamId: 'team-2' },
+    ];
+    const lobby = makeLobby({ format: 'snake', submitPick, draftOrder });
+
+    await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-1', idempotencyKey: 'idem-final-1' }),
+    );
+    expect(lobby.getCurrentState().draftStatus).toBe('in_progress');
+
+    await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-2', playerId: '8478001', idempotencyKey: 'idem-final-2' }),
+    );
+    expect(lobby.getCurrentState().draftStatus).toBe('completed');
+  });
+
+  it('rejects pick attempts after the draft is completed with invalid_state', async () => {
+    let nextSeq = 1;
+    const submitPick = vi.fn(async () => ({
+      event_id: nextSeq,
+      seq: nextSeq++,
+      pick_deadline: null,
+      was_duplicate: false,
+    } satisfies SubmitPickResult));
+
+    // Complete a 1-team × 1-round draft (single pick).
+    const draftOrder = [{ round: 1, pickNumber: 1, teamId: 'team-1' }];
+    const lobby = makeLobby({ format: 'snake', submitPick, draftOrder });
+
+    // First pick succeeds — draft transitions to completed.
+    await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-1', idempotencyKey: 'idem-finish-1' }),
+    );
+    expect(lobby.getCurrentState().draftStatus).toBe('completed');
+
+    // Second pick attempt: should reject with invalid_state.
+    const result = await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-1', idempotencyKey: 'idem-after-complete-1' }),
+    );
+    expect(result).toEqual({ ok: false, reason: 'invalid_state' });
+    expect(submitPick).toHaveBeenCalledTimes(1); // only the first pick hit the RPC
+  });
+
+  it('getCurrentState returns the expected shape at not_started, in_progress, and completed', async () => {
+    let nextSeq = 1;
+    const submitPick = vi.fn(async () => ({
+      event_id: nextSeq,
+      seq: nextSeq++,
+      pick_deadline: null,
+      was_duplicate: false,
+    } satisfies SubmitPickResult));
+    const draftOrder = [
+      { round: 1, pickNumber: 1, teamId: 'team-1' },
+      { round: 1, pickNumber: 2, teamId: 'team-2' },
+    ];
+    const lobby = makeLobby({ format: 'snake', submitPick, draftOrder });
+
+    // not_started
+    expect(lobby.getCurrentState()).toEqual({
+      currentPickNumber: null,
+      currentRoundNumber: null,
+      onClockTeamId: null,
+      totalPicks: 2,
+      picksMade: 0,
+      draftStatus: 'not_started',
+    });
+
+    // in_progress (after pick 1)
+    await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-1', idempotencyKey: 'idem-state-shape-1' }),
+    );
+    expect(lobby.getCurrentState()).toEqual({
+      currentPickNumber: 2,
+      currentRoundNumber: 1,
+      onClockTeamId: 'team-2',
+      totalPicks: 2,
+      picksMade: 1,
+      draftStatus: 'in_progress',
+    });
+
+    // completed (after pick 2)
+    await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-2', playerId: '8478001', idempotencyKey: 'idem-state-shape-2' }),
+    );
+    expect(lobby.getCurrentState()).toEqual({
+      currentPickNumber: null,
+      currentRoundNumber: null,
+      onClockTeamId: null,
+      totalPicks: 2,
+      picksMade: 2,
+      draftStatus: 'completed',
+    });
+  });
+
+  it('getSnapshot wire envelope includes the stateSnapshot field', async () => {
+    const submitPick = vi.fn().mockResolvedValue({
+      event_id: 1,
+      seq: 1,
+      pick_deadline: null,
+      was_duplicate: false,
+    } satisfies SubmitPickResult);
+    const lobby = makeLobby({ format: 'snake', submitPick });
+
+    const snap = lobby.getSnapshot();
+    expect(snap.stateSnapshot).toMatchObject({
+      currentPickNumber: null,
+      onClockTeamId: null,
+      totalPicks: 9,
+      picksMade: 0,
+      draftStatus: 'not_started',
+    });
+
+    await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-1', idempotencyKey: 'idem-snap-state-1' }),
+    );
+
+    const snap2 = lobby.getSnapshot();
+    expect(snap2.stateSnapshot).toMatchObject({
+      currentPickNumber: 2,
+      currentRoundNumber: 1,
+      onClockTeamId: 'team-2',
+      picksMade: 1,
+      draftStatus: 'in_progress',
+    });
+  });
+
+  it('RPC receives computed round/pickNumber from draftOrder, not the step-2 hardcoded 1/1', async () => {
+    const submitPick = vi.fn().mockResolvedValue({
+      event_id: 1,
+      seq: 1,
+      pick_deadline: null,
+      was_duplicate: false,
+    } satisfies SubmitPickResult);
+
+    // Skip ahead via existingPicksMade so we exercise a non-trivial slot.
+    // Default draft order: 3 teams × 3 rounds snake. Slot at index 4
+    // (picksMade=4) should be { round: 2, pickNumber: 5, teamId: 'team-2' }.
+    const lobby = makeLobby({
+      format: 'snake',
+      submitPick,
+      existingPicksMade: 4,
+    });
+
+    await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-2', idempotencyKey: 'idem-computed-1' }),
+    );
+
+    expect(submitPick).toHaveBeenCalledWith(
+      expect.objectContaining({
+        round: 2,
+        pickNumber: 5,
+        teamId: 'team-2',
+      }),
+    );
+  });
+
+  it('buffer event uses the computed round/pickNumber (not hardcoded 1/1)', async () => {
+    const submitPick = vi.fn().mockResolvedValue({
+      event_id: 5,
+      seq: 5,
+      pick_deadline: null,
+      was_duplicate: false,
+    } satisfies SubmitPickResult);
+
+    const lobby = makeLobby({
+      format: 'snake',
+      submitPick,
+      existingPicksMade: 4, // slot 4 of default order: {round:2, pickNumber:5, teamId:'team-2'}
+    });
+
+    await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-2', idempotencyKey: 'idem-buf-computed-1' }),
+    );
+
+    const events = lobby.getEventsSinceSeq(0);
+    expect(events.ok).toBe(true);
+    if (events.ok) {
+      expect(events.events[0]).toMatchObject({
+        kind: 'pick_submitted',
+        roundNumber: 2,
+        pickNumber: 5,
+        teamId: 'team-2',
+      });
+    }
+  });
+
+  it('verifyTeamAuthorization throw is caught and surfaced as internal_error', async () => {
+    const submitPick = vi.fn();
+    const verifyTeamAuthorization = vi.fn(async () => {
+      throw new Error('synthetic auth lookup failure');
+    });
+    const lobby = makeLobby({ format: 'snake', submitPick, verifyTeamAuthorization });
+
+    const result = await lobby.enqueueAction(
+      makeSubmitPick({ idempotencyKey: 'idem-auth-throw-1' }),
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'internal_error' });
+    expect(submitPick).not.toHaveBeenCalled();
+  });
+
+  it('existingPicksMade=N initializes the lobby in_progress at slot N (forward-compat for chunk 6b bootstrap)', () => {
+    // Default draftOrder has 9 slots. existingPicksMade=4 means picks
+    // 1-4 already happened; slot 4 (round 2, pick 5, team-2) is on the clock.
+    const lobby = makeLobby({ format: 'snake', existingPicksMade: 4 });
+
+    const state = lobby.getCurrentState();
+    expect(state.picksMade).toBe(4);
+    expect(state.draftStatus).toBe('in_progress');
+    expect(state.currentPickNumber).toBe(5);
+    expect(state.currentRoundNumber).toBe(2);
+    expect(state.onClockTeamId).toBe('team-2');
   });
 });

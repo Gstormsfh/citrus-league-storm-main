@@ -66,10 +66,10 @@ import { Hono } from 'hono';
 import uWS from 'uWebSockets.js';
 import { logger, createConsoleLogger } from '@citrus/shared';
 import { startUwsServer, type UwsServerHandle } from './uws-server';
-import { LobbyRegistry } from './LobbyRegistry';
+import { LobbyRegistry, type LobbyConfig } from './LobbyRegistry';
 import { DraftServiceV2 } from '../services/DraftServiceV2';
 import { supabaseAdmin } from '../lib/supabase';
-import type { DraftFormat } from './types';
+import type { DraftFormat, DraftOrderSlot, TeamAuthorizationResult } from './types';
 
 // Enable real console logging on the server (default logger is silent).
 Object.assign(logger, createConsoleLogger());
@@ -121,33 +121,138 @@ const publishToLobbyTopic: (topic: string, message: string) => void = (
 //
 // **Auth.uid() concern:** see the file-level JSDoc in
 // `server/src/draft/LobbyRegistry.ts` and the
-// PHASE_4_5_PROJECT_PLAN.md Decision Log entry from 2026-05-05.
-// Resolution required before chunks 11g.5/11g.6 land real picks.
-async function lookupDraftFormat(leagueId: string): Promise<DraftFormat> {
-  const { data, error } = await supabaseAdmin
+// PHASE_4_5_PROJECT_PLAN.md Decision Log entry from 2026-05-05
+// (ADR-004). Engine-side `verifyTeamAuthorization` below satisfies
+// the trusted-executor contract that ADR-004 §5.3 requires.
+
+/**
+ * Step-6a `lobbyConfigLookup` (Path B per chunk-6a recon).
+ *
+ * Two queries:
+ *   1. `leagues.settings.draftType` → format
+ *   2. `draft_order` rows for the league → flattened slot list
+ *
+ * Snake reversal is already baked into each row's `team_order`
+ * JSONB array per `DraftService.initializeDraftOrder`
+ * (`server/src/services/DraftService.ts:336-338`). The same data
+ * feeds `submit_pick_v2`'s on-clock check (migration line 783-799),
+ * so loading from the DB rather than regenerating in-engine
+ * eliminates the divergence risk if a commissioner used
+ * `customTeamOrder` at draft setup.
+ *
+ * Throws on missing/invalid configuration so the uWS upgrade
+ * handler can close the WS cleanly with code 1011.
+ */
+async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
+  const { data: leagueRow, error: leagueErr } = await supabaseAdmin
     .from('leagues')
     .select('settings')
     .eq('id', leagueId)
     .single();
-  if (error) {
-    throw new Error(`leagueLookup failed for ${leagueId}: ${error.message}`);
+  if (leagueErr) {
+    throw new Error(`leagueLookup failed for ${leagueId}: ${leagueErr.message}`);
   }
-  if (!data) {
+  if (!leagueRow) {
     throw new Error(`league ${leagueId} not found`);
   }
-  const draftType = (data.settings as { draftType?: string } | null)?.draftType;
-  if (draftType === 'snake' || draftType === 'linear' || draftType === 'auction') {
-    return draftType;
+  const draftType = (leagueRow.settings as { draftType?: string } | null)?.draftType;
+  if (draftType !== 'snake' && draftType !== 'linear' && draftType !== 'auction') {
+    throw new Error(
+      `league ${leagueId} draftType=${draftType ?? 'undefined'} is not a live format ` +
+        `(expected snake | linear | auction)`,
+    );
   }
-  throw new Error(
-    `league ${leagueId} draftType=${draftType ?? 'undefined'} is not a live format ` +
-      `(expected snake | linear | auction)`,
-  );
+  const format: DraftFormat = draftType;
+
+  // Auction lobbies have no slot-based order — chunk 11g.6 / ADR-002
+  // owns auction state. Return empty draftOrder so the LobbyManager's
+  // `processSubmitPick` short-circuits at the format gate before
+  // consulting the (intentionally empty) order.
+  if (format === 'auction') {
+    return { format, draftOrder: [] };
+  }
+
+  // Load `public.draft_order` rows for the league. Each row has a
+  // round_number and a `team_order` JSONB array (already in pick
+  // order for that round, with snake reversal baked in).
+  const { data: orderRows, error: orderErr } = await supabaseAdmin
+    .from('draft_order')
+    .select('round_number, team_order')
+    .eq('league_id', leagueId)
+    .order('round_number', { ascending: true });
+  if (orderErr) {
+    throw new Error(
+      `draftOrderLookup failed for ${leagueId}: ${orderErr.message}`,
+    );
+  }
+  if (!orderRows || orderRows.length === 0) {
+    throw new Error(
+      `league ${leagueId} has no draft_order rows; ` +
+        `DraftService.initializeDraftOrder must run before the lobby opens`,
+    );
+  }
+
+  // Flatten the per-round rows into a monotonically-numbered slot
+  // list. pickNumber is 1-indexed and global across the entire draft.
+  const draftOrder: DraftOrderSlot[] = [];
+  let pickNumber = 1;
+  for (const row of orderRows) {
+    const roundNumber = row.round_number as number;
+    const teamOrder = row.team_order as unknown;
+    if (!Array.isArray(teamOrder)) {
+      throw new Error(
+        `league ${leagueId} round ${roundNumber} team_order is not an array`,
+      );
+    }
+    for (const teamId of teamOrder) {
+      if (typeof teamId !== 'string') {
+        throw new Error(
+          `league ${leagueId} round ${roundNumber} team_order contains non-string entry`,
+        );
+      }
+      draftOrder.push({ round: roundNumber, pickNumber, teamId });
+      pickNumber++;
+    }
+  }
+
+  return { format, draftOrder };
+}
+
+/**
+ * Engine-side team-authorization callback per ADR-004 §5.3.
+ *
+ * Today's implementation: query `teams.owner_id` for the team and
+ * compare to the user's id. Returns the richer
+ * `TeamAuthorizationResult` discriminated union so ADR-003 Phase 2's
+ * `team_authorized()` SQL helper integration is a clean drop-in
+ * (just swap the implementation; callsites unchanged).
+ *
+ * Co-manager support is explicitly out of scope here per ADR-003's
+ * deferred timing — head manager (`teams.owner_id`) is the only
+ * authorized actor pre-ADR-003 Phase 2.
+ */
+async function verifyTeamAuthorization(
+  userId: string,
+  teamId: string,
+): Promise<TeamAuthorizationResult> {
+  const { data, error } = await supabaseAdmin
+    .from('teams')
+    .select('owner_id')
+    .eq('id', teamId)
+    .single();
+  if (error || !data) {
+    return { authorized: false, reason: 'team_not_found' };
+  }
+  if (data.owner_id !== userId) {
+    return { authorized: false, reason: 'not_owner' };
+  }
+  return { authorized: true };
 }
 
 const lobbyRegistry = new LobbyRegistry({
   draftService: new DraftServiceV2(supabaseAdmin),
-  formatLookup: lookupDraftFormat,
+  lobbyConfigLookup: lookupLobbyConfig,
+  verifyTeamAuthorization,
   publish: publishToLobbyTopic,
 });
 
