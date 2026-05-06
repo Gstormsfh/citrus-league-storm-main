@@ -29,15 +29,22 @@ Total time: **~10 min of script execution + 15 min of click-through testing.**
    ```
    Get the key from the staging project dashboard:
    `https://supabase.com/dashboard/project/<staging-project-ref>/settings/api-keys`
-3. The repo's untracked SQL dumps must exist at the repo root (these are not
-   checked in — they're produced by `pg_dump --inserts` against prod):
-   - `prod_data_inserts_clean.sql` (nhl_teams + nhl_games + players)
-   - `chunk_player_directory.sql`, `chunk_player_season_stats.sql`,
+3. The repo's untracked SQL dumps must exist at their canonical paths (these
+   are not checked in — `data/exports/` is gitignored — they're produced by
+   `pg_dump --inserts` against prod):
+   - `data/exports/2026-04-26-prod-snapshot/prod_data_inserts_clean.sql` —
+     nhl_teams + nhl_games + players (consumed by step 4 below)
+   - `data/exports/2026-04-26-staging-load/` containing the six chunked tables:
+     `chunk_player_directory.sql`, `chunk_player_season_stats.sql`,
      `chunk_player_projected_stats.sql`, `chunk_player_ros_projections.sql`,
      `chunk_player_talent_metrics.sql`, `chunk_goalie_gsax_primary.sql`
+     (consumed by step 3 below — `04-load-stats-data.mjs` reads from this
+     directory by default)
 
-   If these are missing, regenerate them from prod with `pg_dump`. They contain
-   read-only reference data only — never league/team/draft/user data.
+   If these are missing, regenerate them from prod with `pg_dump` and drop
+   them into the appropriate `data/exports/<date>/` subdirectory. They
+   contain read-only reference data only — never league/team/draft/user
+   data. See `data/exports/README.md` for the directory convention.
 
 ---
 
