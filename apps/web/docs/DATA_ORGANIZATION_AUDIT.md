@@ -709,3 +709,52 @@ Archive the Dec 2024 repo with framing as **"experimental ML exploration archive
 - **`monitor_model_performance.py` and other Dec 2024 retrain variants** weren't deeply inspected (only `retrain_xg_with_moneypuck.py` was read in full). It's possible one of the variants used XGBoost — but the canonical `moneypuck_xg_predictor.joblib` artifact loads as `RandomForestRegressor`, so the architectural break is established.
 - **The `xg_model_moneypuck.joblib` filename collision** (Dec 2024 has 747 KB version, current has ~2.5 MB v3 version) creates risk if anyone accidentally copies between repos. Worth surfacing — the filename is the same, the content is incompatible. Mitigation already in place: each repo's models live in its own `data-pipeline/models/` (current) or repo-root (Dec 2024); no cross-contamination path.
 - **No new code, no migrations, no data writes** during this investigation. Read-only inspection of model metadata via `joblib.load()` and Python introspection.
+
+---
+---
+
+## §9 — R6 Archive Execution (2026-05-05)
+
+Per Garrett's R6 approval, the Dec 2024 pre-monorepo repo was moved to `~/Documents/_archive/citrus-pre-monorepo/` along with the Downloads-era backup zips. The framing is **experimental ML exploration archive** (per Investigation 1 in §8) — NOT production model lineage.
+
+### §9.1 Files moved
+
+| Before | After |
+|---|---|
+| `~/Documents/citrus-league-storm/` | `~/Documents/_archive/citrus-pre-monorepo/citrus-league-storm/` |
+| `~/Downloads/citrus-league-storm-main-master.zip` | `~/Documents/_archive/citrus-pre-monorepo/downloads/citrus-league-storm-main-master.zip` |
+| `~/Downloads/citrus-league-storm-main-master/` (extracted folder) | `~/Documents/_archive/citrus-pre-monorepo/downloads/citrus-league-storm-main-master/` |
+| `~/Downloads/citrus-league-storm-main (1).zip` | `~/Documents/_archive/citrus-pre-monorepo/downloads/citrus-league-storm-main (1).zip` |
+
+Internal structure preserved (no flattening, no rename of internal files).
+
+### §9.2 Pre-archive grep clean
+
+`grep -rIE` across all 3 active worktrees (`citrus-league-storm-main`, `citrus-league-storm-staging`, `citrus-league-storm-phase45`) for any reference to the old `~/Documents/citrus-league-storm/` path. Results:
+
+- **citrus-league-storm-main:** 0 references
+- **citrus-league-storm-phase45:** 0 references
+- **citrus-league-storm-staging:** 6 references — **all in audit documentation** (`apps/web/docs/DATA_ORGANIZATION_AUDIT.md` describing the path that was about to move + `DATA_INVENTORY.md` §5 listing it as "OLD pre-monorepo repo, archive — see audit reorg plan"). No functional code dependencies.
+
+The DOC references update as part of this commit (DATA_INVENTORY.md §5 + this §9 section).
+
+### §9.3 README_ARCHIVED.md authored at archive root
+
+A `README_ARCHIVED.md` lives at `~/Documents/_archive/citrus-pre-monorepo/README_ARCHIVED.md` carrying all 5 points from the R6 spec:
+
+1. **Explicit non-lineage statement** — these `.joblib` artifacts are NOT production lineage, with the side-by-side architecture comparison (sklearn RF Regressor with 5 features vs XGBoost Classifier with 31 features) directly cited from §8.2 of this audit.
+2. **Pointer to current production model** — `citrus-league-storm-main/data-pipeline/models/xg_model_moneypuck.joblib`, with full specs (XGBoost classifier, 31 features, 863K training rows, AUC 0.817, training entrypoint at `scripts/utilities/train_xg_v3.py`).
+3. **Index of valuable design-decision MD files** preserved in the archive (12 highlighted with one-line summaries: `EXPECTED_GOALS_EXPLAINED.md`, `FINAL_RESULTS_SUMMARY.md`, `FEATURE_IMPACT_COMPARISON.md`, `GAR_IMPLEMENTATION_SUMMARY.md`, `GSAX_FINAL_SUMMARY.md`, `GAR_SHIFT_TRACKING_ANALYSIS.md`, `CALIBRATION_IMPROVEMENTS.md`, `ENHANCE_FEATURE_EXTRACTION_PLAN.md`, `EXECUTE_FEATURE_POPULATION.md`, `BRAINSTORM_LAST_EVENT_FIX.md`, `COMPLETE_PIPELINE_EXPLANATION.md`, `DATA_PIPELINE_MASTER_GUIDE.md`).
+4. **Cross-links to current artifacts that absorbed the thematic lineage** — `data/TRAINING_DATA_MANIFEST.md`, `scripts/utilities/train_xg_v3.py`, `data-pipeline/data/historical/shots_2018-2024.csv`, plus the prod tables (`raw_shots`'s `shooting_talent_adjusted_xg` / `flurry_adjusted_xg` / `expected_rebound_probability` / `created_expected_goals` columns; `player_gar_components` schema; `goalie_gsax*` family).
+5. **Filename collision warning** — both archive and active monorepo carry `xg_model_moneypuck.joblib` / `rebound_model.joblib` / `xa_model.joblib` / `xg_model.joblib` plus several encoder/feature joblibs. Different architectures, NOT interchangeable. The README enumerates each colliding filename and tells operators to always reference by full path.
+
+The README also includes a "When to revisit this archive" section covering onboarding, debugging, disaster recovery, and the explicit "NEVER import or copy artifacts from this archive into the active monorepo without explicit retraining" rule.
+
+### §9.4 What R6 did NOT do
+
+- **The `~/citrus-league-storm-main/` user-root stub directory** (only contains `logs/`) was left in place. R6 scoped to the Dec 2024 repo + Downloads zips per the original plan; this stub is a separate ORPHAN candidate captured in `DATA_INVENTORY.md` §5 for follow-up investigation.
+- **The Downloads-era `shots_*.zip` files** (the per-season MoneyPuck zips kept as backups by R3) remain in `~/Downloads/` per Garrett's R3 directive: "leave the .zip files in Downloads UNTOUCHED... cleanup happens AFTER we've validated the canonical location works for actual training runs over multiple weeks."
+- **No git history rewriting.** The Dec 2024 repo had its own .git directory which moved with it to the archive. The history is preserved inside the archive but not merged into the active monorepo.
+- **No README copy committed inside the active monorepo.** The README_ARCHIVED.md lives only at the archive root — discoverable via filesystem navigation. The active monorepo's `DATA_INVENTORY.md` §5 + this audit §9 are the in-repo discoverability hooks.
+
+R6 closes the reorganization. Phases R1-R6 + Investigation 1 + R5 dispositions all complete.

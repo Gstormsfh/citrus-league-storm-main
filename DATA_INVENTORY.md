@@ -1,7 +1,9 @@
 # Citrus Data Inventory
 
-**Last updated:** 2026-05-05 · **Status:** Pre-reorganization snapshot
-**Maintainer protocol:** When adding any new data artifact (table, file, model, script), update this doc inline. The companion `apps/web/docs/DATA_ORGANIZATION_AUDIT.md` holds the full audit + proposed reorg plan; this file is the day-to-day "where does data live?" reference.
+**Last updated:** 2026-05-05 (post-R6 reorganization) · **Status:** Stable canonical structure
+**Maintainer protocol:** When adding any new data artifact (table, file, model, script), update this doc inline. The companion `apps/web/docs/DATA_ORGANIZATION_AUDIT.md` holds the full audit + reorganization history (phases R1-R6 complete); this file is the day-to-day "where does data live?" reference.
+
+**Reorganization complete:** see [`apps/web/docs/DATA_ORGANIZATION_AUDIT.md`](./apps/web/docs/DATA_ORGANIZATION_AUDIT.md) §§7-8 for R5 dispositions + Investigation 1 model-lineage findings. R6 archived the Dec 2024 pre-monorepo repo to `~/Documents/_archive/citrus-pre-monorepo/` — see `README_ARCHIVED.md` at that location for the full lineage map.
 
 ---
 
@@ -183,13 +185,13 @@ These are the parts of the entropy that the audit surfaced. **They should NOT be
 
 | Path | Status | Action |
 |---|---|---|
-| `C:\Users\garre\Documents\citrus-league-storm\` | OLD pre-monorepo repo (Dec 2024). Has `data/`, `dist/`, `assets/`, `android/`, `ios/`, plus 5 `.joblib` files at root and `moneypuck_shots_2023.csv`/`2024.csv`/`2025.csv.csv` in `data/` | Archive — see audit reorg plan |
+| `C:\Users\garre\Documents\_archive\citrus-pre-monorepo\citrus-league-storm\` | **ARCHIVED 2026-05-05** (R6) — Dec 2024 pre-monorepo repo. Has `data/`, `dist/`, `assets/`, `android/`, `ios/`, plus 14 `.joblib` files at root and ~30 design-decision MD files | See `_archive/citrus-pre-monorepo/README_ARCHIVED.md` for the lineage map + filename collision warning |
+| `C:\Users\garre\Documents\_archive\citrus-pre-monorepo\downloads\` | **ARCHIVED 2026-05-05** (R6) — pre-monorepo repo backup zips (`citrus-league-storm-main-master.zip`, `citrus-league-storm-main (1).zip`) plus the extracted master copy | Same archive, same README |
 | `C:\Users\garre\Documents\citrus-league-storm-main\` | Current main worktree | **CANONICAL** for prod-deploy work |
 | `C:\Users\garre\Documents\citrus-league-storm-staging\` | Staging worktree (this doc lives here) | Active for staging |
 | `C:\Users\garre\Documents\citrus-league-storm-phase45\` | Phase 4-5 worktree | Active for player-dashboard work |
-| `C:\Users\garre\citrus-league-storm-main\` | Stub directory with only `logs/` | Likely orphan; investigate |
+| `C:\Users\garre\citrus-league-storm-main\` | Stub directory with only `logs/` | Likely orphan; out-of-scope for R6 — investigate in a follow-up |
 | `C:\Users\garre\Documents\citrus-draft-elixir\` | Separate Elixir-based draft project | Not part of current Citrus product. Independent decision |
-| `C:\Users\garre\Downloads\citrus-league-storm-main-master.zip` + extracted folder | Pre-monorepo repo backup zip | Archive — keep but flag |
 | `C:\Users\garre\.cursor\worktrees\citrus-league-storm__Workspace_` | Cursor IDE worktree | IDE artifact; ignore |
 
 ---
