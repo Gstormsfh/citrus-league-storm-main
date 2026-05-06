@@ -3,8 +3,12 @@
 train_xg_v3.py  --  xG Model v3 Training Pipeline
 ===================================================
 Trains on ~863K real NHL shots:
-  - 786K MoneyPuck historical  (data/shots_2018-2024.csv)
+  - 786K MoneyPuck historical  (data-pipeline/data/historical/shots_2018-2024.csv)
   -  77K from our PBP pipeline (data/shots_full_features_2025.csv)
+
+Per the R3 reorg (2026-05-05) the historical training data lives at
+data-pipeline/data/historical/ instead of data/. See that directory's
+README.md for re-download instructions if the file is missing locally.
 
 Key design principle:
   Every feature MUST be derivable from live NHL play-by-play data.
@@ -37,7 +41,10 @@ warnings.filterwarnings("ignore", category=UserWarning)
 ROOT = Path(__file__).resolve().parent.parent.parent          # two dirs up
 DATA_DIR = ROOT / "data"
 MODEL_DIR = ROOT / "models"
-MP_HISTORICAL = DATA_DIR / "shots_2018-2024.csv"
+# Historical MoneyPuck CSV moved to data-pipeline/data/historical/ in the
+# R2/R3 data-reorg. Current-season Citrus PbP exports stay at data/.
+HISTORICAL_DIR = ROOT / "data-pipeline" / "data" / "historical"
+MP_HISTORICAL = HISTORICAL_DIR / "shots_2018-2024.csv"
 OUR_SHOTS = DATA_DIR / "shots_full_features_2025.csv"
 
 # 31 features the v3 model uses  (order matters at prediction time)
