@@ -45,20 +45,11 @@ export interface DraftSocketUserData {
 }
 
 /**
- * Live-draftable formats. Subset of `@citrus/shared`'s `DraftType`,
- * excluding `'autopick'` and `'offline'` (operational modes — drafts
- * in those modes don't get a LobbyManager).
- *
- * Defined as a literal alias rather than `Extract<DraftType, ...>`
- * so future `DraftType` additions in `@citrus/shared` (e.g. a
- * hypothetical `'best-ball'` or `'turbo'`) don't silently expand
- * LobbyManager's supported set. Opt-in by design — when a new
- * format is added, this alias must be updated explicitly, which
- * forces the dispatch logic in LobbyManager to be reviewed.
- *
- * See ADR-002 §3.2 for the format-aware single-class decision.
+ * `DraftFormat` lives in `@citrus/shared` (chunk 11g.5a moved
+ * cross-boundary types out of server-only space). Re-exported here
+ * so existing server imports keep working without churn.
  */
-export type DraftFormat = 'snake' | 'linear' | 'auction';
+export type { DraftFormat } from '@citrus/shared';
 
 /**
  * Discriminated union of mutating actions a connected client can
@@ -182,132 +173,11 @@ export type DraftActionResult =
     };
 
 /**
- * Discriminated union of events stored in the LobbyManager's
- * recent-events ring buffer (chunk 11g.4 step 3, ~200 events).
- *
- * Variants mirror the past-tense event-type names cataloged in
- * ADR-002 §4.1, NOT the present-tense action verbs in `DraftAction`.
- * Actions are what clients submit; events are what got recorded.
- *
- * Only `pick_submitted` is appended in step 3. The auction variants
- * are placeholders for chunk 11g.6's auction state machine, which
- * appends them when the matching `place_bid` / `nominate` actions
- * succeed. System-generated auction events (`auction_paused`,
- * `auction_nomination_expired`, `auction_nomination_closed`,
- * `auction_auto_nominated`, `auction_resumed`,
- * `auction_bid_extends_timer`, `auction_commissioner_override`)
- * extend this union when chunk 11g.6's state machine generates them.
- *
- * `seq` is the per-league monotonic from the `submit_pick_v2` RPC
- * (or chunk 11g.6's auction RPC equivalent). `timestamp` is ISO 8601
- * captured at append time on the server.
- *
- * `idempotencyKey` is intentionally excluded — server-internal
- * concern for the durable event log, not relevant to client UI.
+ * `BufferedDraftEvent` lives in `@citrus/shared` (chunk 11g.5a
+ * moved cross-boundary types). Re-exported here so existing server
+ * imports keep working without churn.
  */
-export type BufferedDraftEvent =
-  | {
-      kind: 'pick_submitted';
-      seq: number;
-      timestamp: string;
-      teamId: string;
-      playerId: number;
-      roundNumber: number;
-      pickNumber: number;
-      /**
-       * Same value as the originating action's `idempotencyKey`,
-       * exposed under a client-facing name. Lets the originator's
-       * client match the server's broadcast against their optimistic
-       * action — they submit a pick with `idempotencyKey=K`, then
-       * see an `event` message arrive with `correlationId=K` and
-       * settle their optimistic state.
-       *
-       * Step 3 deliberately excluded the idempotency key as a
-       * "server-internal concern"; step 5 reverses that decision
-       * because the resync path needs to deliver the correlation
-       * context the same way the live broadcast does (otherwise
-       * resync events can't settle optimistic state on the client
-       * that submitted them).
-       */
-      correlationId: string;
-      /**
-       * `true` when the pick was server-authored on deadline expiry
-       * (chunk 11g.4 step 6c). Mirrors `draft_events.payload.is_autopick`
-       * and `actor.kind === 'autopick'`. Surfaces in the ring buffer
-       * so client UI can render the "AP" / "Autopick" badge during
-       * resync (matches Sleeper / ESPN / Yahoo conventions). Optional
-       * for backwards compatibility with pre-6c-buffered events.
-       */
-      isAutopick?: boolean;
-    }
-  | {
-      /**
-       * A previously-recorded pick was rolled back (commissioner
-       * action). Step 6b's bootstrap appends this when it encounters
-       * a `pick_undone` event in the durable log.
-       *
-       * `undoneSeq` is the seq of the original `pick_submitted`
-       * event being rolled back — clients can correlate the undo
-       * to the displayed pick for animation / history rendering.
-       *
-       * On the in-memory state machine: bootstrap decrements
-       * `picksMade` by 1 and may transition `draftStatus` from
-       * `completed` back to `in_progress` (or from `in_progress`
-       * back to `not_started` if it was the only pick).
-       */
-      kind: 'pick_undone';
-      seq: number;
-      timestamp: string;
-      teamId: string;
-      playerId: number;
-      roundNumber: number;
-      pickNumber: number;
-      correlationId: string;
-      undoneSeq: number;
-    }
-  | {
-      /**
-       * Commissioner-issued pick that bypasses the on-clock check
-       * (commissioner has authoritatively decided). Step 6b's
-       * bootstrap appends this when it encounters a
-       * `commissioner_override` event; mirrors the `pick_submitted`
-       * shape for client-rendering symmetry plus an optional
-       * `reason` field for justification text.
-       *
-       * On the in-memory state machine: advances `picksMade` like
-       * a regular pick. The on-clock check is skipped during
-       * bootstrap (and would be skipped at the action layer too if
-       * the engine ever exposed a commissioner-override action,
-       * which it currently does not — picks come only from
-       * `submit_pick_v2`).
-       */
-      kind: 'commissioner_override';
-      seq: number;
-      timestamp: string;
-      teamId: string;
-      playerId: number;
-      roundNumber: number;
-      pickNumber: number;
-      correlationId: string;
-      reason?: string;
-    }
-  | {
-      kind: 'auction_bid_placed';
-      seq: number;
-      timestamp: string;
-      nominationId: string;
-      teamId: string;
-      bidAmount: number;
-    }
-  | {
-      kind: 'auction_nomination_started';
-      seq: number;
-      timestamp: string;
-      nominationId: string;
-      playerId: string;
-      openingBid: number;
-      nominatorTeamId: string;
-    };
+export type { BufferedDraftEvent } from '@citrus/shared';
 
 /**
  * Result of `LobbyManager.getEventsSinceSeq` (and the underlying
@@ -322,7 +192,8 @@ export type BufferedDraftEvent =
  * the client wanted, i.e. the buffer has reached capacity AND the
  * client's `sinceSeq` is below the current oldest seq.
  */
-export type GetEventsSinceSeqResult = GetSinceSeqResult<BufferedDraftEvent>;
+import type { BufferedDraftEvent as _BufferedDraftEvent } from '@citrus/shared';
+export type GetEventsSinceSeqResult = GetSinceSeqResult<_BufferedDraftEvent>;
 
 // ── State machine (step 6a) ────────────────────────────────────────
 
@@ -352,49 +223,15 @@ export interface DraftOrderSlot {
 }
 
 /**
- * Lifecycle phase of the in-memory draft state machine. Step 6a
- * implements the linear progression `not_started → in_progress →
- * completed`; step 6b adds `cancelled` as a terminal state set
- * explicitly by the durable `draft_cancelled` event during bootstrap.
- *
- * Step 6c (deadline + autopick) and ADR-002 §6 (auction pause/resume)
- * will introduce additional transient states (e.g. `paused`).
- *
- * Both `completed` and `cancelled` are terminal — `processSubmitPick`
- * rejects with `invalid_state` once either is reached.
+ * `LobbyStatus` and `DraftStateSnapshot` live in `@citrus/shared`
+ * (chunk 11g.5a moved cross-boundary types). Re-exported here as
+ * `DraftStatus` to preserve the existing engine-facing name —
+ * `LobbyStatus` is the canonical name in the wire types because
+ * `DraftStatus` already meant a different (product-level) enum in
+ * `league.ts`. The engine's lifecycle alias stays `DraftStatus`
+ * server-side; the cross-boundary export is `LobbyStatus`.
  */
-export type DraftStatus = 'not_started' | 'in_progress' | 'completed' | 'cancelled';
-
-/**
- * Bare state-machine view of a lobby's current draft state. Returned
- * by `LobbyManager.getCurrentState()` for diagnostics, observability,
- * and direct test access. Distinct from `DraftSnapshot` (the wire-
- * envelope shape) so internal callers don't pay the wire-format
- * shaping cost when they only need the state values.
- *
- * `onClockTeamId` is `null` when the draft is `not_started` or
- * `completed`. During `in_progress`, it's always the team whose pick
- * is at index `picksMade` of the draft order.
- */
-export interface DraftStateSnapshot {
-  currentPickNumber: number | null;
-  currentRoundNumber: number | null;
-  onClockTeamId: string | null;
-  totalPicks: number;
-  picksMade: number;
-  draftStatus: DraftStatus;
-  /**
-   * Wall-clock ISO timestamp when the on-clock pick's deadline
-   * expires. `null` when no team is on the clock (`not_started`,
-   * `completed`, `cancelled`) or when the draft is `paused`.
-   * Chunk 11g.4 step 6c populates this from the LobbyManager's
-   * timer state; clients use it to render countdown UI without
-   * relying on the local clock as authoritative (server time is
-   * the source of truth — local clock smooths between server
-   * ticks per `PHASE_4_5_ARCHITECTURE.md` line 176).
-   */
-  currentPickDeadline: string | null;
-}
+export type { LobbyStatus as DraftStatus, DraftStateSnapshot } from '@citrus/shared';
 
 /**
  * Discriminated union returned by the engine-side
@@ -424,115 +261,32 @@ export type TeamAuthorizationResult =
     };
 
 /**
- * Minimal client-facing snapshot of a lobby's current state.
- *
- * Steps 1-3 returned identity fields plus the recent-events ring
- * buffer; step 6a adds the state-machine view (`stateSnapshot`)
- * carrying current pick / round / on-clock team. Future steps:
- *   - 6c: pick deadline + remaining seconds
- *   - 11g.6 / ADR-002: format-specific auction state (current
- *     nomination + budgets) layered on top
+ * `DraftSnapshot` lives in `@citrus/shared` (chunk 11g.5a moved
+ * cross-boundary types). Re-exported here so existing server
+ * imports keep working without churn.
  */
-export interface DraftSnapshot {
-  lobbyId: string;
-  format: DraftFormat;
-  recentEvents: ReadonlyArray<BufferedDraftEvent>;
-  stateSnapshot: DraftStateSnapshot;
-}
+export type { DraftSnapshot } from '@citrus/shared';
 
-// ── Wire protocol (step 5) ─────────────────────────────────────────
+// ── Wire protocol (chunk 11g.5a moved to @citrus/shared) ───────────
+//
+// `WIRE_PROTOCOL_VERSION`, `DraftServerMessage`, and
+// `DraftClientMessage` live in `packages/shared/src/types/draftWire.ts`
+// so the client can import them too. Re-exported here so existing
+// server imports keep working without churn.
 
-/**
- * Current wire-protocol version. Bump when the envelope shape or
- * required fields change. Clients gate on this — older clients
- * receiving a higher `v` should reconnect with a forced upgrade
- * prompt rather than silently mishandling unknown fields.
- *
- * Adding new variants to `DraftServerMessage` does NOT require a
- * version bump (forward-compatible: clients ignore unknown variants).
- * Renaming or removing fields, or changing semantic meaning, does.
- */
-export const WIRE_PROTOCOL_VERSION = 1 as const;
-
-/**
- * Discriminated union of server-to-client messages.
- *
- * Every variant shares the wire envelope:
- *   - `v`: protocol version (always `1` today)
- *   - `type`: discriminant
- *   - `seq?`: per-league monotonic, present for `event`; absent
- *     elsewhere (presence/snapshot/resync_response/error are not
- *     sequenced — they're either snapshots or transient signals)
- *   - `timestamp`: ISO 8601 server-side capture
- *   - `correlationId?`: present on `event` variants that originated
- *     from a client action (mirrors `payload.correlationId`); absent
- *     for system-generated events, snapshots, presence, error
- *   - `payload`: variant-specific
- *
- * Wire format: serialized as JSON via `serializeServerMessage`.
- * Clients parse via `JSON.parse` then narrow on `type`.
- */
-export type DraftServerMessage =
-  | {
-      v: typeof WIRE_PROTOCOL_VERSION;
-      type: 'event';
-      seq: number;
-      timestamp: string;
-      correlationId: string;
-      payload: BufferedDraftEvent;
-    }
-  | {
-      v: typeof WIRE_PROTOCOL_VERSION;
-      type: 'snapshot';
-      timestamp: string;
-      payload: DraftSnapshot;
-    }
-  | {
-      v: typeof WIRE_PROTOCOL_VERSION;
-      type: 'presence';
-      timestamp: string;
-      payload: {
-        kind: 'joined' | 'left';
-        userId: string;
-        presentUserIds: string[];
-      };
-    }
-  | {
-      v: typeof WIRE_PROTOCOL_VERSION;
-      type: 'resync_response';
-      timestamp: string;
-      payload:
-        | { ok: true; events: ReadonlyArray<BufferedDraftEvent> }
-        | { ok: false; reason: 'too_old'; oldestAvailableSeq: number };
-    }
-  | {
-      v: typeof WIRE_PROTOCOL_VERSION;
-      type: 'error';
-      timestamp: string;
-      payload: { code: string; message: string };
-    };
-
-/**
- * Discriminated union of client-to-server messages.
- *
- * Today: only `resync` (chunk 11g.5's reconnect protocol primitive
- * is the server-side `handleResyncRequest`; the client lives in
- * chunk 11g.5). Pick submissions, bids, nominations route through
- * `LobbyManager.enqueueAction` directly via `DraftAction`, NOT
- * through this wire union — they require server-issued correlation
- * IDs and structured validation that the action API provides.
- */
-export type DraftClientMessage = {
-  type: 'resync';
-  payload: { sinceSeq: number };
-};
+export { WIRE_PROTOCOL_VERSION } from '@citrus/shared';
+export type { DraftServerMessage, DraftClientMessage } from '@citrus/shared';
+import type {
+  DraftServerMessage as _DraftServerMessage,
+  DraftClientMessage as _DraftClientMessage,
+} from '@citrus/shared';
 
 /**
  * Serialize a server-to-client message to its wire form. Pure JSON
  * encoding today; centralized so future encoding changes (e.g.,
  * MessagePack for bandwidth) live in one place.
  */
-export function serializeServerMessage(msg: DraftServerMessage): string {
+export function serializeServerMessage(msg: _DraftServerMessage): string {
   return JSON.stringify(msg);
 }
 
@@ -547,7 +301,7 @@ export function serializeServerMessage(msg: DraftServerMessage): string {
  * dispatch. Deep field validation belongs in the action handlers
  * (which already validate via Zod / typed payload checks).
  */
-export function parseClientMessage(raw: string): DraftClientMessage | null {
+export function parseClientMessage(raw: string): _DraftClientMessage | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);

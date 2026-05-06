@@ -1,0 +1,282 @@
+// Phase 4.5 chunk 11g.5a — wire-protocol types shared between server
+// and client. Moved from `server/src/draft/types.ts` so the contract
+// lives in one place; the server re-exports for backwards-compat.
+//
+// **What lives here:** types that flow over the WebSocket wire
+// (DraftServerMessage / DraftClientMessage), the payloads they
+// carry (BufferedDraftEvent, DraftSnapshot, DraftStateSnapshot),
+// and the lifecycle enums those payloads reference (DraftStatus,
+// DraftFormat).
+//
+// **What stays server-internal:** DraftAction, DraftActionResult,
+// DraftSocketUserData, DraftOrderSlot, GetEventsSinceSeqResult,
+// TeamAuthorizationResult, the (de)serializer helpers. Those are
+// implementation details of the LobbyManager / RPC layer that the
+// client doesn't consume.
+
+// ── Format / status enums ──────────────────────────────────────────
+
+/**
+ * Live-draftable formats. Subset of `@citrus/shared`'s `DraftType`,
+ * excluding `'autopick'` and `'offline'` (operational modes — drafts
+ * in those modes don't get a LobbyManager).
+ *
+ * Defined as a literal alias rather than `Extract<DraftType, ...>`
+ * so future `DraftType` additions in `@citrus/shared` (e.g. a
+ * hypothetical `'best-ball'` or `'turbo'`) don't silently expand
+ * LobbyManager's supported set. Opt-in by design — when a new
+ * format is added, this alias must be updated explicitly, which
+ * forces the dispatch logic in LobbyManager to be reviewed.
+ *
+ * See ADR-002 §3.2 for the format-aware single-class decision.
+ */
+export type DraftFormat = 'snake' | 'linear' | 'auction';
+
+/**
+ * Lifecycle phase of the in-memory draft state machine. Step 6a
+ * implements the linear progression `not_started → in_progress →
+ * completed`; step 6b adds `cancelled` as a terminal state set
+ * explicitly by the durable `draft_cancelled` event during bootstrap.
+ *
+ * Step 6c (deadline + autopick) and ADR-002 §6 (auction pause/resume)
+ * will introduce additional transient states (e.g. `paused`).
+ *
+ * Both `completed` and `cancelled` are terminal — `processSubmitPick`
+ * rejects with `invalid_state` once either is reached.
+ */
+export type LobbyStatus = 'not_started' | 'in_progress' | 'completed' | 'cancelled';
+
+// ── Buffered event union ───────────────────────────────────────────
+
+/**
+ * Discriminated union of events stored in the LobbyManager's
+ * recent-events ring buffer (chunk 11g.4 step 3, ~200 events).
+ *
+ * Variants mirror the past-tense event-type names cataloged in
+ * ADR-002 §4.1, NOT the present-tense action verbs in `DraftAction`.
+ * Actions are what clients submit; events are what got recorded.
+ *
+ * Only `pick_submitted` is appended in step 3. The auction variants
+ * are placeholders for chunk 11g.6's auction state machine, which
+ * appends them when the matching `place_bid` / `nominate` actions
+ * succeed. System-generated auction events (`auction_paused`,
+ * `auction_nomination_expired`, `auction_nomination_closed`,
+ * `auction_auto_nominated`, `auction_resumed`,
+ * `auction_bid_extends_timer`, `auction_commissioner_override`)
+ * extend this union when chunk 11g.6's state machine generates them.
+ *
+ * `seq` is the per-league monotonic from the `submit_pick_v2` RPC
+ * (or chunk 11g.6's auction RPC equivalent). `timestamp` is ISO 8601
+ * captured at append time on the server.
+ */
+export type BufferedDraftEvent =
+  | {
+      kind: 'pick_submitted';
+      seq: number;
+      timestamp: string;
+      teamId: string;
+      playerId: number;
+      roundNumber: number;
+      pickNumber: number;
+      /**
+       * Same value as the originating action's `idempotencyKey`,
+       * exposed under a client-facing name. Lets the originator's
+       * client match the server's broadcast against their optimistic
+       * action — they submit a pick with `idempotencyKey=K`, then
+       * see an `event` message arrive with `correlationId=K` and
+       * settle their optimistic state.
+       */
+      correlationId: string;
+      /**
+       * `true` when the pick was server-authored on deadline expiry
+       * (chunk 11g.4 step 6c). Mirrors `draft_events.payload.is_autopick`
+       * and `actor.kind === 'autopick'`. Surfaces in the ring buffer
+       * so client UI can render the "AP" / "Autopick" badge during
+       * resync (matches Sleeper / ESPN / Yahoo conventions). Optional
+       * for backwards compatibility with pre-6c-buffered events.
+       */
+      isAutopick?: boolean;
+    }
+  | {
+      /**
+       * A previously-recorded pick was rolled back (commissioner
+       * action). Step 6b's bootstrap appends this when it encounters
+       * a `pick_undone` event in the durable log.
+       *
+       * `undoneSeq` is the seq of the original `pick_submitted`
+       * event being rolled back — clients can correlate the undo
+       * to the displayed pick for animation / history rendering.
+       */
+      kind: 'pick_undone';
+      seq: number;
+      timestamp: string;
+      teamId: string;
+      playerId: number;
+      roundNumber: number;
+      pickNumber: number;
+      correlationId: string;
+      undoneSeq: number;
+    }
+  | {
+      /**
+       * Commissioner-issued pick that bypasses the on-clock check
+       * (commissioner has authoritatively decided). Mirrors the
+       * `pick_submitted` shape for client-rendering symmetry plus
+       * an optional `reason` field for justification text.
+       */
+      kind: 'commissioner_override';
+      seq: number;
+      timestamp: string;
+      teamId: string;
+      playerId: number;
+      roundNumber: number;
+      pickNumber: number;
+      correlationId: string;
+      reason?: string;
+    }
+  | {
+      kind: 'auction_bid_placed';
+      seq: number;
+      timestamp: string;
+      nominationId: string;
+      teamId: string;
+      bidAmount: number;
+    }
+  | {
+      kind: 'auction_nomination_started';
+      seq: number;
+      timestamp: string;
+      nominationId: string;
+      playerId: string;
+      openingBid: number;
+      nominatorTeamId: string;
+    };
+
+// ── Snapshot payloads ──────────────────────────────────────────────
+
+/**
+ * Bare state-machine view of a lobby's current draft state. Returned
+ * by `LobbyManager.getCurrentState()` on the server; nested in
+ * `DraftSnapshot` when delivered over the wire.
+ *
+ * `onClockTeamId` is `null` when the draft is `not_started` or
+ * `completed`. During `in_progress`, it's always the team whose pick
+ * is at index `picksMade` of the draft order.
+ *
+ * `currentPickDeadline` is a wall-clock ISO timestamp; `null` when
+ * no team is on the clock or the draft is `paused`. Clients use it
+ * to render countdown UI without relying on the local clock as
+ * authoritative (server time is the source of truth — local clock
+ * smooths between server ticks per `PHASE_4_5_ARCHITECTURE.md`
+ * line 176).
+ */
+export interface DraftStateSnapshot {
+  currentPickNumber: number | null;
+  currentRoundNumber: number | null;
+  onClockTeamId: string | null;
+  totalPicks: number;
+  picksMade: number;
+  draftStatus: LobbyStatus;
+  currentPickDeadline: string | null;
+}
+
+/**
+ * Minimal client-facing snapshot of a lobby's current state.
+ * Carried in the `snapshot` server message (sent on first connect)
+ * and the chunk-11g.5 fallback HTTP snapshot endpoint (when the
+ * resync ring buffer is too_old).
+ */
+export interface DraftSnapshot {
+  lobbyId: string;
+  format: DraftFormat;
+  recentEvents: ReadonlyArray<BufferedDraftEvent>;
+  stateSnapshot: DraftStateSnapshot;
+}
+
+// ── Wire envelope ──────────────────────────────────────────────────
+
+/**
+ * Current wire-protocol version. Bump when the envelope shape or
+ * required fields change. Clients gate on this — older clients
+ * receiving a higher `v` should reconnect with a forced upgrade
+ * prompt rather than silently mishandling unknown fields.
+ *
+ * Adding new variants to `DraftServerMessage` does NOT require a
+ * version bump (forward-compatible: clients ignore unknown variants).
+ * Renaming or removing fields, or changing semantic meaning, does.
+ */
+export const WIRE_PROTOCOL_VERSION = 1 as const;
+
+/**
+ * Discriminated union of server-to-client messages.
+ *
+ * Every variant shares the wire envelope:
+ *   - `v`: protocol version (always `1` today)
+ *   - `type`: discriminant
+ *   - `seq?`: per-league monotonic, present for `event`; absent
+ *     elsewhere (presence/snapshot/resync_response/error are not
+ *     sequenced — they're either snapshots or transient signals)
+ *   - `timestamp`: ISO 8601 server-side capture
+ *   - `correlationId?`: present on `event` variants that originated
+ *     from a client action (mirrors `payload.correlationId`); absent
+ *     for system-generated events, snapshots, presence, error
+ *   - `payload`: variant-specific
+ *
+ * Wire format: JSON. Clients parse via `JSON.parse` then narrow
+ * on `type`.
+ */
+export type DraftServerMessage =
+  | {
+      v: typeof WIRE_PROTOCOL_VERSION;
+      type: 'event';
+      seq: number;
+      timestamp: string;
+      correlationId: string;
+      payload: BufferedDraftEvent;
+    }
+  | {
+      v: typeof WIRE_PROTOCOL_VERSION;
+      type: 'snapshot';
+      timestamp: string;
+      payload: DraftSnapshot;
+    }
+  | {
+      v: typeof WIRE_PROTOCOL_VERSION;
+      type: 'presence';
+      timestamp: string;
+      payload: {
+        kind: 'joined' | 'left';
+        userId: string;
+        presentUserIds: string[];
+      };
+    }
+  | {
+      v: typeof WIRE_PROTOCOL_VERSION;
+      type: 'resync_response';
+      timestamp: string;
+      payload:
+        | { ok: true; events: ReadonlyArray<BufferedDraftEvent> }
+        | { ok: false; reason: 'too_old'; oldestAvailableSeq: number };
+    }
+  | {
+      v: typeof WIRE_PROTOCOL_VERSION;
+      type: 'error';
+      timestamp: string;
+      payload: { code: string; message: string };
+    };
+
+/**
+ * Discriminated union of client-to-server messages.
+ *
+ * Today: only `resync` (chunk 11g.5's reconnect protocol primitive
+ * is the server-side `handleResyncRequest`; chunk 11g.5a is the
+ * client-side state machine that issues these). Pick submissions,
+ * bids, nominations route through `LobbyManager.enqueueAction`
+ * directly via `DraftAction`, NOT through this wire union — they
+ * require server-issued correlation IDs and structured validation
+ * that the action API provides.
+ */
+export type DraftClientMessage = {
+  type: 'resync';
+  payload: { sinceSeq: number };
+};

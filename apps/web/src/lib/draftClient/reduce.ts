@@ -1,0 +1,528 @@
+// Phase 4.5 chunk 11g.5a — pure state-machine transition function.
+//
+// `reduce(state, event): { state, sideEffects[] }` is the brain of
+// the client. It is intentionally I/O-free: every effect is described
+// as a typed `SideEffect` value and returned for the runner to
+// execute. This makes the entire state machine trivially unit-
+// testable — assert on the returned `state` and `sideEffects` array
+// without spinning up a WebSocket or mocking timers.
+//
+// The top-level shape is `switch (event.type)` then per-event
+// branching on `state.kind`. Most state transitions only fire from
+// specific source states; everything else is a no-op (event ignored).
+// The exhaustiveness pattern uses a `_exhaustive: never` assertion
+// at the bottom of each branch so TypeScript catches a missing case
+// at compile time.
+
+import type {
+  DraftClientEvent,
+  DraftClientState,
+  ReduceResult,
+  SideEffect,
+} from './types';
+import { classifyCloseCode } from './closeCodes';
+import { computeBackoffMs } from './backoff';
+
+/**
+ * Random function used by `reduce` to compute backoff delays. Default
+ * is `Math.random`; tests pass a seeded RNG to assert deterministic
+ * delays without mocking modules.
+ */
+export type RandomFn = () => number;
+
+/**
+ * Pure state-machine transition. Given a current state and an
+ * incoming event, return the next state plus a list of side effects
+ * for the runner to execute. NO I/O — all asynchronous work is
+ * described in the side-effect list.
+ *
+ * Unhandled (state, event) combinations return the state unchanged
+ * with no side effects — the state machine is silent on irrelevant
+ * events rather than throwing. This is by design: events like
+ * `network_changed` arrive at any time and we shouldn't
+ * over-constrain when they're acceptable.
+ */
+export function reduce(
+  state: DraftClientState,
+  event: DraftClientEvent,
+  randomFn: RandomFn = Math.random,
+): ReduceResult {
+  switch (event.type) {
+    case 'connect_requested':
+      return handleConnectRequested(state);
+    case 'disconnect_requested':
+      return handleDisconnectRequested(state);
+    case 'token_fetched':
+      return handleTokenFetched(state, event);
+    case 'token_fetch_failed':
+      return handleTokenFetchFailed(state, event, randomFn);
+    case 'ws_opened':
+      return handleWsOpened(state, event);
+    case 'ws_message':
+      return handleWsMessage(state, event);
+    case 'ws_closed':
+      return handleWsClosed(state, event, randomFn);
+    case 'ws_error':
+      return handleWsError(state, event);
+    case 'snapshot_fetched':
+      return handleSnapshotFetched(state, event);
+    case 'snapshot_fetch_failed':
+      return handleSnapshotFetchFailed(state, event, randomFn);
+    case 'backoff_timer_fired':
+      return handleBackoffTimerFired(state);
+    case 'visibility_changed':
+      return handleVisibilityChanged(state, event);
+    case 'network_changed':
+      return handleNetworkChanged(state, event, randomFn);
+  }
+}
+
+// ── Event handlers ─────────────────────────────────────────────────
+
+/**
+ * `connect_requested` is valid from `idle` (initial connect) or
+ * `fatal` (caller is explicitly retrying after a fatal — e.g. user
+ * re-logged-in and is reattempting). Other states ignore.
+ *
+ * Real reconnects (post-disconnect) flow through `backoff_timer_fired`
+ * after the timer expires, NOT through caller-initiated
+ * `connect_requested`.
+ */
+function handleConnectRequested(state: DraftClientState): ReduceResult {
+  if (state.kind === 'idle' || state.kind === 'fatal') {
+    return {
+      state: { kind: 'fetching_token', attempt: 0 },
+      sideEffects: [{ kind: 'fetch_token', draftId: '' }],
+    };
+  }
+  return noTransition(state);
+}
+
+/**
+ * `disconnect_requested` is valid from any active state. Cleanly
+ * tears down: cancels timers, closes the WS if open, returns to
+ * `idle`. Any future event is ignored until the next
+ * `connect_requested`.
+ */
+function handleDisconnectRequested(state: DraftClientState): ReduceResult {
+  const sideEffects: SideEffect[] = [];
+  if (
+    state.kind === 'connecting' ||
+    state.kind === 'connected' ||
+    state.kind === 'resyncing' ||
+    state.kind === 'snapshot_required'
+  ) {
+    sideEffects.push({ kind: 'close_websocket', code: 1000, reason: 'disconnect_requested' });
+  }
+  if (state.kind === 'reconnecting') {
+    sideEffects.push({ kind: 'cancel_backoff_timer' });
+  }
+  return {
+    state: { kind: 'idle' },
+    sideEffects,
+  };
+}
+
+function handleTokenFetched(
+  state: DraftClientState,
+  event: Extract<DraftClientEvent, { type: 'token_fetched' }>,
+): ReduceResult {
+  if (state.kind !== 'fetching_token') {
+    return noTransition(state);
+  }
+  return {
+    state: { kind: 'connecting', wsUrl: event.wsUrl, attempt: state.attempt },
+    sideEffects: [
+      {
+        kind: 'open_websocket',
+        url: event.wsUrl,
+        subprotocol: event.token,
+      },
+    ],
+  };
+}
+
+function handleTokenFetchFailed(
+  state: DraftClientState,
+  event: Extract<DraftClientEvent, { type: 'token_fetch_failed' }>,
+  randomFn: RandomFn,
+): ReduceResult {
+  if (state.kind !== 'fetching_token') {
+    return noTransition(state);
+  }
+  // 401/403 from the discovery endpoint = user not authorized for
+  // this league. Terminal — no retry.
+  if (event.statusCode === 401 || event.statusCode === 403) {
+    return {
+      state: {
+        kind: 'fatal',
+        reason: 'auth_failure',
+        errorMessage: event.error,
+      },
+      sideEffects: [],
+    };
+  }
+  // Transient — back off and retry.
+  return scheduleReconnect(state.attempt, event.error, randomFn);
+}
+
+function handleWsOpened(
+  state: DraftClientState,
+  event: Extract<DraftClientEvent, { type: 'ws_opened' }>,
+): ReduceResult {
+  if (state.kind !== 'connecting') {
+    return noTransition(state);
+  }
+  // Two paths from `connecting → ws_opened`:
+  //   - First connection (attempt 0): no prior `lastSeenSeq`, so
+  //     just transition to `connected`. The server's first
+  //     `snapshot` message will populate state.
+  //   - Reconnection (attempt > 0): we have a `lastSeenSeq` from
+  //     before — but `connecting` doesn't carry it. The runner
+  //     stores `lastSeenSeq` separately and includes it in the
+  //     resync request via the `send_message` side effect that
+  //     fires on `ws_opened`.
+  //
+  // For 5a's design, we transition straight to `connected` with
+  // lastSeenSeq=0 and let the runner decide whether to issue a
+  // resync (it tracks the prior `lastSeenSeq` across reconnects).
+  // The resync flow is driven by an explicit caller decision in
+  // the runner, not by the state machine — keeps `reduce` simple.
+  return {
+    state: {
+      kind: 'connected',
+      wsUrl: state.wsUrl,
+      lastSeenSeq: 0,
+      sessionId: event.sessionId,
+    },
+    sideEffects: [],
+  };
+}
+
+function handleWsMessage(
+  state: DraftClientState,
+  event: Extract<DraftClientEvent, { type: 'ws_message' }>,
+): ReduceResult {
+  const message = event.message;
+
+  // `event` server message: live broadcast of a draft action.
+  // Update lastSeenSeq, deliver to caller. Valid from `connected`
+  // and `resyncing` (live events can arrive concurrently with the
+  // resync response).
+  if (message.type === 'event') {
+    if (state.kind === 'connected') {
+      return {
+        state: { ...state, lastSeenSeq: Math.max(state.lastSeenSeq, message.seq) },
+        sideEffects: [{ kind: 'deliver_event', event: message.payload }],
+      };
+    }
+    if (state.kind === 'resyncing') {
+      return {
+        state,
+        sideEffects: [{ kind: 'deliver_event', event: message.payload }],
+      };
+    }
+    return noTransition(state);
+  }
+
+  // `snapshot` server message: typically arrives on first connect.
+  // Replace state with the snapshot's `lastSeenSeq` (= the highest
+  // event seq in the snapshot). Valid from `connected` and from
+  // first-connect (server may push a snapshot before any resync).
+  if (message.type === 'snapshot') {
+    const snapshotSeq = computeSnapshotSeq(message.payload);
+    if (state.kind === 'connected') {
+      return {
+        state: { ...state, lastSeenSeq: Math.max(state.lastSeenSeq, snapshotSeq) },
+        sideEffects: [{ kind: 'deliver_snapshot', snapshot: message.payload }],
+      };
+    }
+    return {
+      state,
+      sideEffects: [{ kind: 'deliver_snapshot', snapshot: message.payload }],
+    };
+  }
+
+  // `presence` server message: someone joined / left.
+  if (message.type === 'presence') {
+    return {
+      state,
+      sideEffects: [
+        {
+          kind: 'deliver_presence',
+          payload: {
+            kind: message.payload.kind,
+            userId: message.payload.userId,
+            presentUserIds: message.payload.presentUserIds,
+          },
+        },
+      ],
+    };
+  }
+
+  // `resync_response`: result of our resync request.
+  if (message.type === 'resync_response') {
+    if (state.kind !== 'resyncing') {
+      return noTransition(state);
+    }
+    if (message.payload.ok) {
+      // Server returned events strictly after our `sinceSeq`.
+      // Deliver them, advance lastSeenSeq, transition to connected.
+      const newLastSeq = message.payload.events.reduce(
+        (max, ev) => Math.max(max, ev.seq),
+        state.sinceSeq,
+      );
+      return {
+        state: {
+          kind: 'connected',
+          wsUrl: state.wsUrl,
+          lastSeenSeq: newLastSeq,
+          sessionId: state.sessionId,
+        },
+        sideEffects: [{ kind: 'deliver_events', events: message.payload.events }],
+      };
+    }
+    // Server's ring buffer evicted past our cursor — full snapshot needed.
+    return {
+      state: {
+        kind: 'snapshot_required',
+        wsUrl: state.wsUrl,
+        sessionId: state.sessionId,
+      },
+      // The runner attaches the leagueId when it receives this
+      // side effect; the state machine doesn't carry it here.
+      sideEffects: [{ kind: 'fetch_snapshot', leagueId: '' }],
+    };
+  }
+
+  // `error`: server-initiated error notification. Deliver to caller.
+  if (message.type === 'error') {
+    return {
+      state,
+      sideEffects: [{ kind: 'deliver_error', payload: message.payload }],
+    };
+  }
+
+  return noTransition(state);
+}
+
+function handleWsClosed(
+  state: DraftClientState,
+  event: Extract<DraftClientEvent, { type: 'ws_closed' }>,
+  randomFn: RandomFn,
+): ReduceResult {
+  // Caller-initiated close (idle state) — already torn down; no-op.
+  if (state.kind === 'idle') {
+    return noTransition(state);
+  }
+
+  const disposition = classifyCloseCode(event.code, event.reason);
+
+  if (disposition === 'normal') {
+    return { state: { kind: 'idle' }, sideEffects: [] };
+  }
+  if (disposition === 'permanent_auth') {
+    return {
+      state: {
+        kind: 'fatal',
+        reason: 'auth_failure',
+        errorMessage: `WebSocket closed with auth code ${event.code}: ${event.reason}`,
+      },
+      sideEffects: [],
+    };
+  }
+  if (disposition === 'permanent_lobby') {
+    return {
+      state: {
+        kind: 'fatal',
+        reason: 'invalid_lobby',
+        errorMessage: `WebSocket closed with lobby code ${event.code}: ${event.reason}`,
+      },
+      sideEffects: [],
+    };
+  }
+  if (disposition === 'permanent_server') {
+    return {
+      state: {
+        kind: 'fatal',
+        reason: 'permanent_server_error',
+        errorMessage: `WebSocket closed with server code ${event.code}: ${event.reason}`,
+      },
+      sideEffects: [],
+    };
+  }
+
+  // Transient — schedule backoff + retry.
+  const attempt = currentAttempt(state) + 1;
+  return scheduleReconnect(
+    attempt,
+    `WebSocket closed: code=${event.code} reason=${event.reason}`,
+    randomFn,
+  );
+}
+
+function handleWsError(
+  state: DraftClientState,
+  event: Extract<DraftClientEvent, { type: 'ws_error' }>,
+): ReduceResult {
+  // WS errors typically precede a `ws_closed`. Don't transition on
+  // the error alone — let the close handle the reconnect logic so
+  // we don't double-schedule. Just record the last-error string for
+  // diagnostic.
+  if (state.kind === 'reconnecting') {
+    return {
+      state: { ...state, lastError: event.error },
+      sideEffects: [],
+    };
+  }
+  return noTransition(state);
+}
+
+function handleSnapshotFetched(
+  state: DraftClientState,
+  event: Extract<DraftClientEvent, { type: 'snapshot_fetched' }>,
+): ReduceResult {
+  if (state.kind !== 'snapshot_required') {
+    return noTransition(state);
+  }
+  const newLastSeq = computeSnapshotSeq(event.snapshot);
+  return {
+    state: {
+      kind: 'connected',
+      wsUrl: state.wsUrl,
+      lastSeenSeq: newLastSeq,
+      sessionId: state.sessionId,
+    },
+    sideEffects: [{ kind: 'deliver_snapshot', snapshot: event.snapshot }],
+  };
+}
+
+function handleSnapshotFetchFailed(
+  state: DraftClientState,
+  event: Extract<DraftClientEvent, { type: 'snapshot_fetch_failed' }>,
+  randomFn: RandomFn,
+): ReduceResult {
+  if (state.kind !== 'snapshot_required') {
+    return noTransition(state);
+  }
+  // Snapshot fetch failed (today: always fails because the endpoint
+  // doesn't exist yet — deferred per Decision Log). Treat as a
+  // transient error and retry the whole reconnect cycle.
+  return scheduleReconnect(1, event.error, randomFn);
+}
+
+function handleBackoffTimerFired(state: DraftClientState): ReduceResult {
+  if (state.kind !== 'reconnecting') {
+    return noTransition(state);
+  }
+  return {
+    state: { kind: 'fetching_token', attempt: state.attempt },
+    sideEffects: [{ kind: 'fetch_token', draftId: '' }],
+  };
+}
+
+function handleVisibilityChanged(
+  state: DraftClientState,
+  _event: Extract<DraftClientEvent, { type: 'visibility_changed' }>,
+): ReduceResult {
+  // Step-5a behavior: pure state-machine doesn't need to do
+  // anything on visibility change. The runner's
+  // visibilitychange listener may issue a manual resync (sent as
+  // `send_message` with a resync action), but that's an
+  // imperative call from the runner, not a state transition.
+  // Forward-compat hook for chunk 11g.7's heartbeat / liveness
+  // detection.
+  return noTransition(state);
+}
+
+function handleNetworkChanged(
+  state: DraftClientState,
+  event: Extract<DraftClientEvent, { type: 'network_changed' }>,
+  randomFn: RandomFn,
+): ReduceResult {
+  if (event.isOnline) {
+    // Network came back. If we're reconnecting, fire the timer
+    // immediately to retry; if connected, no-op (the WS will
+    // detect dead-connection on its own via close events).
+    if (state.kind === 'reconnecting') {
+      return {
+        state: { kind: 'fetching_token', attempt: state.attempt },
+        sideEffects: [
+          { kind: 'cancel_backoff_timer' },
+          { kind: 'fetch_token', draftId: '' },
+        ],
+      };
+    }
+    return noTransition(state);
+  }
+  // Network went offline. If we're connected, we'll eventually
+  // see a `ws_closed`; for now just record the state and let the
+  // close handler do its thing. If we're already reconnecting,
+  // extend the backoff window — no point retrying on a known-dead
+  // network.
+  if (state.kind === 'reconnecting') {
+    // Extended delay; will be replaced when network comes back.
+    const attempt = state.attempt;
+    const delayMs = computeBackoffMs(Math.min(attempt + 1, 10), randomFn);
+    return {
+      state: {
+        ...state,
+        nextAttemptAt: Date.now() + delayMs,
+        lastError: 'network_offline',
+      },
+      sideEffects: [
+        { kind: 'cancel_backoff_timer' },
+        { kind: 'schedule_backoff_timer', delayMs },
+      ],
+    };
+  }
+  return noTransition(state);
+}
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+function noTransition(state: DraftClientState): ReduceResult {
+  return { state, sideEffects: [] };
+}
+
+function currentAttempt(state: DraftClientState): number {
+  if (state.kind === 'fetching_token' || state.kind === 'connecting') {
+    return state.attempt;
+  }
+  if (state.kind === 'reconnecting') {
+    return state.attempt;
+  }
+  return 0;
+}
+
+function scheduleReconnect(
+  attempt: number,
+  errorMessage: string,
+  randomFn: RandomFn,
+): ReduceResult {
+  const delayMs = computeBackoffMs(attempt, randomFn);
+  return {
+    state: {
+      kind: 'reconnecting',
+      attempt,
+      nextAttemptAt: Date.now() + delayMs,
+      lastError: errorMessage,
+    },
+    sideEffects: [{ kind: 'schedule_backoff_timer', delayMs }],
+  };
+}
+
+/**
+ * The lastSeenSeq derivable from a `DraftSnapshot`: the max `seq`
+ * across all events in `recentEvents`. If the buffer is empty
+ * (fresh draft, no picks yet), 0 is the sentinel cursor.
+ */
+function computeSnapshotSeq(snapshot: import('@citrus/shared').DraftSnapshot): number {
+  if (snapshot.recentEvents.length === 0) {
+    return 0;
+  }
+  return snapshot.recentEvents.reduce(
+    (max, ev) => Math.max(max, ev.seq),
+    0,
+  );
+}
