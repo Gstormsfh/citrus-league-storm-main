@@ -72,6 +72,12 @@ const GMOffice = lazyWithErrorHandling(() => import("./pages/GMOffice"));
 const StormyAssistant = lazyWithErrorHandling(() => import("./pages/StormyAssistant"));
 const News = lazyWithErrorHandling(() => import("./pages/News"));
 const DraftRoom = lazyWithErrorHandling(() => import("./pages/DraftRoom"));
+// Phase 4.5 chunk 11g.5b: parallel v2 draft room consuming the
+// chunk-11g.4 persistent engine via chunk-11g.5a's state machine.
+// v1 DraftRoom continues to serve `/draft` and `/draft-room` for the
+// cutover-safety window — chunk 11g.9 retires v1 once leagues have
+// migrated. League-by-league rollout via the v2 URL.
+const DraftRoomV2 = lazyWithErrorHandling(() => import("./pages/DraftRoomV2"));
 const Profile = lazyWithErrorHandling(() => import("./pages/Profile"));
 const TeamAnalytics = lazyWithErrorHandling(() => import("./pages/TeamAnalytics"));
 const WaiverWire = lazyWithErrorHandling(() => import("./pages/WaiverWire"));
@@ -190,6 +196,8 @@ const App = () => {
                 <Route path="/news" element={<News />} />
                 <Route path="/draft-room" element={<ProtectedRoute><ErrorBoundary><DraftRoom /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/draft" element={<ProtectedRoute><ErrorBoundary><DraftRoom /></ErrorBoundary></ProtectedRoute>} /> {/* Fallback route */}
+                {/* Phase 4.5 chunk 11g.5b — v2 draft room (chunk-11g.4 persistent engine path). */}
+                <Route path="/draft-v2/:leagueId/:draftId?" element={<ProtectedRoute><ErrorBoundary><DraftRoomV2 /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/create-league" element={<ProtectedRoute><CreateLeague /></ProtectedRoute>} />
                 <Route path="/league/:leagueId" element={<ProtectedRoute><ErrorBoundary><LeagueDashboard /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><ErrorBoundary><Profile /></ErrorBoundary></ProtectedRoute>} />

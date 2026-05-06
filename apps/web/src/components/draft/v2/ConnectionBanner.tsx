@@ -1,0 +1,210 @@
+// Phase 4.5 chunk 11g.5b — connection banner consuming chunk-11g.5a's
+// state machine.
+//
+// Renders a state-aware banner driven by `useDraftConnectionState()`.
+// State-by-state visual treatment:
+//
+//   - idle: nothing (unmounted or pre-connect).
+//   - fetching_token / connecting: subtle inline "Connecting…"
+//     indicator (no full-width banner — initial connect should not
+//     dominate the UI).
+//   - connected: nothing (steady state).
+//   - resyncing / snapshot_required: subtle "Catching up…" indicator.
+//   - reconnecting: full-width destructive banner with countdown
+//     ("Reconnecting in 3s") and a "Retry now" button. Countdown
+//     ticks every 250ms via `setInterval`.
+//   - fatal (auth_failure): destructive banner — "You're no longer
+//     authorized to access this draft" + return-to-dashboard link.
+//   - fatal (invalid_lobby): default-variant banner — "This draft
+//     is no longer available" + back-to-league link.
+//   - fatal (permanent_server_error): destructive banner with
+//     technical-details accordion.
+//
+// Accessibility:
+//   - role="alert" for error states (fatal / reconnecting).
+//   - aria-live="polite" for transient states (connecting / resyncing).
+//   - Keyboard-accessible Retry button on reconnecting state.
+
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { useDraftConnectionState } from '@/stores/draftClientStore';
+import type { DraftClientState } from '@/lib/draftClient/types';
+
+interface ConnectionBannerProps {
+  /**
+   * Caller passes a function that triggers the runner's manual
+   * retry — wraps `runner.connect()` (after disconnecting if
+   * needed). Lets the banner stay decoupled from the runner
+   * instance.
+   */
+  onRetryNow?: () => void;
+}
+
+export function ConnectionBanner({ onRetryNow }: ConnectionBannerProps) {
+  const state = useDraftConnectionState();
+
+  switch (state.kind) {
+    case 'idle':
+    case 'connected':
+      return null;
+    case 'fetching_token':
+    case 'connecting':
+      return (
+        <InlineIndicator
+          ariaLive="polite"
+          message="Connecting to draft…"
+        />
+      );
+    case 'resyncing':
+    case 'snapshot_required':
+      return (
+        <InlineIndicator
+          ariaLive="polite"
+          message="Catching up…"
+        />
+      );
+    case 'reconnecting':
+      return (
+        <ReconnectingBanner state={state} onRetryNow={onRetryNow} />
+      );
+    case 'fatal':
+      return <FatalBanner state={state} />;
+  }
+}
+
+// ── Inline indicator (transient states) ────────────────────────────
+
+interface InlineIndicatorProps {
+  ariaLive: 'polite' | 'assertive';
+  message: string;
+}
+
+function InlineIndicator({ ariaLive, message }: InlineIndicatorProps) {
+  return (
+    <div
+      aria-live={ariaLive}
+      className="text-sm text-muted-foreground italic px-4 py-2"
+      data-banner-kind="transient"
+    >
+      {message}
+    </div>
+  );
+}
+
+// ── Reconnecting banner with countdown ─────────────────────────────
+
+interface ReconnectingBannerProps {
+  state: Extract<DraftClientState, { kind: 'reconnecting' }>;
+  onRetryNow?: () => void;
+}
+
+function ReconnectingBanner({ state, onRetryNow }: ReconnectingBannerProps) {
+  const secondsRemaining = useCountdown(state.nextAttemptAt);
+
+  return (
+    <Alert variant="destructive" role="alert" data-banner-kind="reconnecting">
+      <AlertTitle>Connection lost</AlertTitle>
+      <AlertDescription className="flex items-center justify-between gap-4">
+        <span>
+          Reconnecting in {Math.max(0, secondsRemaining)}s
+          {state.lastError ? ` — ${state.lastError}` : ''}
+        </span>
+        {onRetryNow && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRetryNow}
+          >
+            Retry now
+          </Button>
+        )}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/**
+ * Tick every 250ms to refresh the displayed countdown. Granularity
+ * is intentionally coarse-ish (250ms vs 100ms / 16ms) to avoid
+ * unnecessary re-renders for a UI element that updates at human-
+ * perception cadence.
+ */
+function useCountdown(targetAt: number): number {
+  const [remaining, setRemaining] = useState(() =>
+    Math.ceil((targetAt - Date.now()) / 1000),
+  );
+
+  useEffect(() => {
+    const tick = () => {
+      setRemaining(Math.ceil((targetAt - Date.now()) / 1000));
+    };
+    tick();
+    const interval = setInterval(tick, 250);
+    return () => clearInterval(interval);
+  }, [targetAt]);
+
+  return remaining;
+}
+
+// ── Fatal banner ───────────────────────────────────────────────────
+
+interface FatalBannerProps {
+  state: Extract<DraftClientState, { kind: 'fatal' }>;
+}
+
+function FatalBanner({ state }: FatalBannerProps) {
+  if (state.reason === 'auth_failure') {
+    return (
+      <Alert variant="destructive" role="alert" data-banner-kind="fatal-auth">
+        <AlertTitle>You’re no longer authorized to access this draft</AlertTitle>
+        <AlertDescription>
+          {state.errorMessage}
+          {' '}
+          <Link to="/dashboard" className="underline font-medium">
+            Return to dashboard
+          </Link>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  if (state.reason === 'invalid_lobby') {
+    return (
+      <Alert role="alert" data-banner-kind="fatal-lobby">
+        <AlertTitle>This draft is no longer available</AlertTitle>
+        <AlertDescription>
+          {state.errorMessage}
+          {' '}
+          <Link to="/dashboard" className="underline font-medium">
+            Back to dashboard
+          </Link>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  // permanent_server_error
+  return (
+    <Alert variant="destructive" role="alert" data-banner-kind="fatal-server">
+      <AlertTitle>Connection error</AlertTitle>
+      <AlertDescription>
+        <details>
+          <summary className="cursor-pointer">Technical details</summary>
+          <pre className="text-xs mt-2 whitespace-pre-wrap">
+            {state.errorMessage}
+          </pre>
+        </details>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-2"
+          onClick={() => window.location.reload()}
+        >
+          Reload page
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
