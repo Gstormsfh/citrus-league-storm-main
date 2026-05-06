@@ -1,12 +1,12 @@
 # Backup & Restore Verification Runbook
 
-> **Purpose:** end-to-end verification that Supabase backups exist and
-> actually restore. Cheapest disaster-recovery test — execute once,
-> document, sleep better.
+> **Purpose:** end-to-end verification that Supabase daily backups exist
+> and actually restore. Cheapest disaster-recovery test that fits the
+> current pre-launch tier — execute once, document, sleep better.
 >
 > **Cadence:** annually, and before any major schema migration.
 >
-> **Author:** R7-5 (2026-05-06)
+> **Author:** R7-5 (revised 2026-05-06)
 >
 > **Last verified:** _PENDING — see § Verification log at the bottom._
 
@@ -15,75 +15,83 @@
 ## 1. Why this matters
 
 A backup that has never been restored is a **wish**, not a backup. Until
-we have observed a successful PITR (Point-in-Time Recovery) of Citrus
-data and verified the restored database matches expectations, we don't
-actually know that:
+we have observed a successful restore of Citrus data and verified the
+restored database matches expectations, we don't actually know that:
 
 - Backups are running
 - Backups are complete (no missing tables / RLS / functions)
 - The restore procedure works under our actual project configuration
 - We know how long a restore takes
 
-**Solo-founder context:** one corrupted-prod incident could be existential.
-Knowing PITR works = knowing the worst-case recovery time + procedure.
+**Solo-founder context:** one corrupted-prod incident could be
+existential. Knowing the restore procedure works = knowing the
+worst-case recovery time + the steps to follow under pressure.
 
----
+## 2. Recovery posture (current vs target)
 
-## 2. Project topology
+| Phase | Mechanism | RTO | RPO | Cost |
+|---|---|---|---|---|
+| **Pre-launch (NOW)** | Daily snapshots, 7-day retention (Supabase free tier) | ~24h | up to 24h of writes | $0 |
+| **At launch** | Daily snapshots + PITR (Supabase Pro add-on) | ~minutes | seconds | ~$100/mo |
 
-| Project | Ref | Use | PITR target |
+The PITR upgrade is gated on user state — see
+`docs/RECOVERY_STRATEGY.md` for the principled trigger rules.
+
+This runbook documents the **pre-launch** procedure (free tier daily
+backups). When PITR is enabled, § 5 below grows a PITR variant; the
+fingerprint queries in § 4 and verification queries in § 6 stay the
+same.
+
+## 3. Project topology
+
+| Project | Ref | Use | Restore target |
 |---|---|---|---|
-| Production | `iezwazccqqrhrjupxzvf` (CitrusFantasySports) | Live user data | **DO NOT** restore against this |
-| Staging | `jjgspcpvqaiitloglxbb` (citrus-staging) | Test environment | Safe to restore against |
+| Production | `iezwazccqqrhrjupxzvf` (CitrusFantasySports) | Live data | **NEVER** restore-over (destructive) |
+| Staging | `jjgspcpvqaiitloglxbb` (citrus-staging) | Test environment | OK to restore over |
 
-Both are in `ca-central-1`, both run Postgres 17, owned by org
+Both: `ca-central-1`, Postgres 17, owned by org
 `zgxmcbfbwwbspmtxjmtk`.
 
+For **the verification test** the recommended target is staging — the
+pre-launch flow is "use staging to prove restore works against a
+sacrificial project so prod stays untouched."
+
+For **a real incident**, you'll restore over prod itself; the procedure
+is the same, just a different project ref.
+
 ---
 
-## 3. Pre-checks (do these in the dashboard)
+## 4. Pre-checks (do these in the dashboard)
 
-### 3.1 Verify automatic backups are enabled
+### 4.1 Verify automatic backups are enabled
 
 1. Open https://supabase.com/dashboard/project/iezwazccqqrhrjupxzvf/database/backups
-2. Confirm the **Backups** tab shows daily backups for at least the last
-   N days where N = your retention window.
-3. Note the retention window:
-   - **Free tier:** 7 days, daily snapshots, no PITR
-   - **Pro tier:** 7 days daily + PITR available as paid add-on
-   - **Team / Enterprise:** longer retention available
+2. Confirm **Backups** tab shows daily backups for the last 7 days.
+   - Free tier: 7 daily snapshots, retention rolls forward
+   - Pro tier: 7 daily + PITR add-on
+3. Note the backup timestamps and click into one to confirm it's
+   restorable from the UI.
 4. Document below:
    ```
    Retention observed: ___ days
    Latest backup ts:   ___
    PITR enabled:       yes / no
-   PITR retention:     ___ days (if enabled)
    ```
 
-### 3.2 If PITR is NOT enabled
+### 4.2 If retention is fewer than 7 days
 
-PITR is the only mechanism for restoring to an arbitrary point — daily
-snapshot restores are your other option. Decide:
-
-- **Enable PITR** (recommended at our scale; ~$N/month per Supabase
-  pricing) — gives us per-second granularity for ~7 days
-- **Stay on daily snapshots** — restores are bounded to once-per-day
-  resolution; acceptable for early-stage but increases potential data
-  loss window to up to 24h
-
-If staying on daily snapshots, this runbook still applies but the
-restore step becomes "select most recent snapshot" rather than "select
-PITR timestamp".
+Investigate. The free tier should always show 7 daily snapshots when
+the project has been alive ≥7 days.
 
 ---
 
-## 4. Pre-restore: capture prod fingerprint
+## 5. Pre-restore: capture prod fingerprint
 
 Before triggering a restore, capture a **schema + row-count fingerprint**
 of prod at a known timestamp. This is what we'll compare the restored
 project against.
 
-### 4.1 Schema fingerprint
+### 5.1 Schema fingerprint
 
 ```sql
 -- Total table count by schema
@@ -100,7 +108,7 @@ GROUP BY n.nspname ORDER BY n.nspname;
 | public | 84 |
 | storage | 8 |
 
-### 4.2 Top-20 row-count fingerprint
+### 5.2 Top-20 row-count fingerprint
 
 ```sql
 SELECT schemaname || '.' || relname AS table_name, n_live_tup AS approx_rows
@@ -137,11 +145,11 @@ ORDER BY n_live_tup DESC LIMIT 20;
 restore-equivalence check, ±5% drift is acceptable. For an exact match,
 run `SELECT COUNT(*)` on each table — slower but deterministic.)
 
-### 4.3 RLS fingerprint
+### 5.3 RLS fingerprint
 
 ```sql
 -- Tables with RLS enabled
-SELECT schemaname, tablename, rowsecurity, forcerowsecurity
+SELECT schemaname, tablename, rowsecurity
 FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = true
 ORDER BY tablename;
 ```
@@ -149,10 +157,9 @@ ORDER BY tablename;
 Save the count and a sample (~5 rows). After restore, verify the count
 matches and the sampled tables still have RLS on.
 
-### 4.4 Functions fingerprint
+### 5.4 Functions fingerprint
 
 ```sql
--- Count of public-schema functions
 SELECT COUNT(*) AS function_count
 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid
 WHERE n.nspname = 'public';
@@ -160,189 +167,225 @@ WHERE n.nspname = 'public';
 
 ---
 
-## 5. Restore procedure (PITR variant)
+## 6. Restore procedure (free-tier daily backup)
 
-**⚠️ Decision required first:** restore _into staging_ (overwrites it) or
-_into a brand-new project_ (cleaner but costs an extra project slot for
-the duration of the test).
+**⚠️ Decision required first:** the free-tier daily-backup restore
+generally **overwrites the target project**. There's no
+"restore-into-new-project" path on free tier — that's a Pro-tier
+feature. Therefore, the verification target is **staging**, not
+prod.
 
-**Recommended:** restore into a **brand-new short-lived project** named
-`citrus-restore-test-YYYYMMDD`. After verification, delete it. This
-keeps staging undisturbed and proves cross-project restore works.
+> **Real-incident restore against prod is the same procedure run with
+> the prod project ref. We use staging here because it's the only safe
+> sandbox.**
 
-### 5.1 Trigger restore (dashboard)
+### 6.1 Pick the most recent staging backup
 
-1. Go to https://supabase.com/dashboard/project/iezwazccqqrhrjupxzvf/database/backups
-2. Click **Point-in-time recovery** tab.
-3. Select a target timestamp **15 minutes before now** (gives the WAL
-   archive time to settle).
-4. Click **Restore** → choose **Restore into new project**.
-5. Name the new project `citrus-restore-test-2026-05-06` (or current
-   date).
-6. Confirm the cost estimate. **Note start time.**
-7. Wait for the restore to complete. Expected duration:
-   - Small DB (<1 GB): 5–15 min
-   - Medium (1–10 GB): 15–60 min
-   - Citrus current size: ~100MB-ish, expect <15 min
+1. Open https://supabase.com/dashboard/project/jjgspcpvqaiitloglxbb/database/backups
+2. Identify the most recent daily snapshot (top of the list).
+3. Note the snapshot timestamp:
+   ```
+   Snapshot timestamp: ___
+   ```
 
-### 5.2 Capture restore duration
+### 6.2 Capture staging pre-restore fingerprint
 
+Run § 5.1 / 5.2 / 5.3 / 5.4 against staging — but expect lower row
+counts than prod since staging is the sparse reload target.
+
+This becomes our "what staging looked like before" baseline for the
+verification.
+
+### 6.3 Trigger the restore (dashboard)
+
+1. From the staging Backups page, click **Restore** on the chosen
+   snapshot.
+2. Read the warning carefully — restore typically:
+   - Replaces all DB content with the snapshot
+   - Locks writes during restore
+   - May reset auth providers / SMTP / etc. depending on what's stored
+     where
+3. Confirm and **note start time**.
+4. Wait for restore to complete.
+   ```
+   Restore start (UTC): ___
+   Restore complete (UTC): ___
+   Total duration: ___
+   ```
+5. This **RTO data point** (total duration) is the worst-case "how long
+   until we're back" number you can quote when the next person asks.
+
+### 6.4 Verify nothing leaked into prod during the test
+
+Before celebrating, run:
+```sql
+-- Against prod
+SELECT n.nspname AS schema, COUNT(*) AS table_count
+FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid
+WHERE c.relkind = 'r' AND n.nspname IN ('auth','public','storage')
+GROUP BY n.nspname;
 ```
-Restore start (UTC): ___
-Restore complete (UTC): ___
-Total duration: ___
-```
 
-This is your **RTO (Recovery Time Objective) data point** — the worst
-case you can quote when someone asks "how fast can we recover?"
+Compare to § 5.1 baseline. Counts must match exactly. If they don't,
+**stop and investigate** — something hit prod that shouldn't have.
 
 ---
 
-## 6. Post-restore verification
+## 7. Post-restore verification
 
-Connect to the restored project (new project ref shown in the dashboard
-once restore completes). Then run each fingerprint query from § 4 and
-compare.
+Connect to staging (now restored). Run each fingerprint query from § 5
+and compare against the **pre-restore staging fingerprint** captured in
+§ 6.2.
 
-### 6.1 Schema fingerprint match
+For real incidents, you would compare the restored prod against the §
+5 prod baseline.
 
-Run the table-count query from § 4.1 against the restored project.
+### 7.1 Schema fingerprint match
 
-| Schema | Prod (4.1 baseline) | Restored | Match? |
+| Schema | Pre-restore | Post-restore | Match? |
 |---|---|---|---|
-| auth | 23 | ___ | ☐ |
-| public | 84 | ___ | ☐ |
-| storage | 8 | ___ | ☐ |
+| auth | ___ | ___ | ☐ |
+| public | ___ | ___ | ☐ |
+| storage | ___ | ___ | ☐ |
 
-If counts differ by more than 0, **stop and investigate** — the restore
-is incomplete.
+If any count differs, the restore is incomplete.
 
-### 6.2 Row-count fingerprint match
+### 7.2 Row-count fingerprint match
 
-Run the top-20 query from § 4.2. For each table, compare:
+Run § 5.2 against the restored project. For the top-20 tables on prod
+that also exist in staging, expect:
+  - Pre-launch staging is a sparse subset of prod, so absolute counts
+    will not match prod
+  - But pre-restore staging vs post-restore staging should be **identical**
+    (because restore goes back to a snapshot taken before this run)
 
-- Within ±5% of baseline → ✅ acceptable drift (PITR target may be
-  slightly off from when baseline was captured)
-- More than ±5% → ⚠️ check whether the table had unusual write activity
-  in the gap between baseline-capture and PITR-target
+### 7.3 RLS preserved
 
-### 6.3 RLS preserved
+Run § 5.3 against restored. **Count must match the pre-restore staging
+count exactly.** Missing RLS on any table = critical finding; pause
+runbook and surface immediately.
 
-Run the RLS query from § 4.3. **Count must match exactly.**
-If RLS is missing on any table that had it on prod, that is a
-**critical finding** — surface it immediately and pause the runbook.
+### 7.4 Functions preserved
 
-### 6.4 Functions preserved
+Run § 5.4. Count must match.
 
-Run § 4.4 against the restored project. Count must match.
+### 7.5 Sample data spot-check
 
-### 6.5 Sample data spot-check
-
-Pick 3 tables and verify a known row exists:
+Pick 3 critical tables and verify a known row pattern exists:
 
 ```sql
--- 1. Most recent NHL game
-SELECT game_id, game_date, home_team, away_team, status FROM nhl_games
+-- 1. Most recent NHL game (if staging has any)
+SELECT game_id, game_date, status FROM nhl_games
 ORDER BY game_date DESC LIMIT 1;
 
--- 2. A specific user's roster from a recent date
-SELECT * FROM fantasy_daily_rosters
-WHERE roster_date = '2026-04-08' ORDER BY locked_at DESC LIMIT 5;
+-- 2. raw_shots sample (Phase 0 target table)
+SELECT COUNT(*) FROM raw_shots;
 
--- 3. The xG model artifact (should be in a deterministic table)
-SELECT player_id, player_name, season FROM player_directory LIMIT 5;
+-- 3. player_shifts_official (Phase 0 target table)
+SELECT COUNT(*) FROM player_shifts_official;
+
+-- 4. Model output table (Phase 0d target)
+SELECT COUNT(*) FROM goalie_gar;
 ```
 
-Each query should return rows. If any table is empty when prod has
-data, escalate.
+Each should match what was there before the restore.
 
-### 6.6 Run the freshness SLA matrix against the restored project
+### 7.6 Run the freshness SLA matrix against the restored project
 
 ```bash
-# Set env vars to point to the restored project, then:
+# Set env vars to point at the restored staging project, then:
 python data-pipeline/monitoring/check_data_freshness.py --baseline --no-log
 ```
 
 This validates that the SLA matrix's table list and timestamp columns
-all exist on the restored project. Useful end-to-end smoke test that
-captures schema + RLS + data + column conventions all at once.
+all exist on the restored project. End-to-end smoke test that captures
+schema + RLS + data + column conventions all at once.
+
+### 7.7 Run the critical-table data-quality checks
+
+```bash
+# Against the restored staging project:
+python data-pipeline/monitoring/critical_table_checks.py --baseline --no-log
+```
+
+Same logic — validates the R7-2 checks against the restored DB.
 
 ---
 
-## 7. Cleanup
+## 8. Post-test — restore the staging working state
 
-After verification:
+If your verification test overwrote staging with a snapshot, **the
+ongoing staging-deploy.yml workflow may be affected.** Either:
 
-1. **Delete** the `citrus-restore-test-YYYYMMDD` project from the
-   dashboard. Costs ~5 minutes of pro-rated billing.
-2. Confirm in dashboard: **Settings → General → Delete project**.
-3. Document the verification outcome in § 9 below.
+  - Let it heal naturally over the next deploy cycle, OR
+  - Re-run `scripts/staging/04-load-stats-data.mjs` to repopulate
+    staging from the canonical export chunks
+
+Document what you did in the verification log.
 
 ---
 
-## 8. Limitations & known gotchas
+## 9. Limitations & known gotchas (free-tier daily backups)
 
-- **PITR window:** bounded by your Supabase tier's retention. Beyond
-  that, only daily snapshots are available.
-- **PITR resolution:** per-second within the window, but the WAL must
-  have settled (don't pick a timestamp within the last 5–10 minutes).
-- **Cross-project restore:** Supabase preserves schema + data + RLS
-  policies, but **does NOT preserve**:
+- **RPO is up to 24h.** A daily snapshot taken at 02:00 UTC means a
+  loss/corruption event at 23:59 UTC the same day costs you ~22 hours
+  of writes.
+- **Free-tier restore is destructive to the target project.** No
+  "restore into new project" path until you're on Pro.
+- **Cross-region failover is not available** at any tier without
+  explicit replication setup. Out of scope.
+- **Restore preserves:** schema + data + RLS policies + most extensions.
+- **Restore does NOT preserve:**
   - Edge Functions deployment state (re-deploy from CLI/CI)
-  - Storage bucket _objects_ (the data) — only bucket _metadata_
+  - Storage bucket _objects_ (the bytes) — only bucket _metadata_
   - Custom auth providers / SMTP config (re-configure in dashboard)
   - Realtime subscription policies (re-apply via migrations)
-  - Cron schedules (defined in `pg_cron` and migrated, but verify they
-    re-enable)
-- **Restore cannot be partial** at the table level via dashboard PITR
-  — it's all-or-nothing for the entire database. For single-table
-  restore you'd need to:
-  1. PITR-restore into a new project
-  2. `pg_dump --table=foo` from the restored project
-  3. `pg_restore` into the live project
-  This is non-trivial; don't do it without a runbook entry of its own.
-- **Region:** restored project lands in the same region as the source.
-  Cross-region failover is a separate Supabase feature (not in scope).
+  - Cron schedules in `pg_cron` (verify they re-enable post-restore)
+- **Single-table restore is not possible** via dashboard restore — it's
+  all-or-nothing. For targeted recovery, use `pg_dump --table=foo`
+  against a Pro-tier PITR clone (post-launch path).
 
 ---
 
-## 9. Verification log
+## 10. Verification log
 
 Append a row each time this runbook is executed.
 
-| Date executed | Operator | PITR target | Restored project ref | RTO observed | Schema match? | Row-count match? | RLS match? | Notes |
+| Date | Operator | Snapshot ts | Target project | RTO | Schema match? | Row-count match? | RLS match? | Notes |
 |---|---|---|---|---|---|---|---|---|
-| _PENDING_ | _Garrett_ | _TBD_ | _TBD_ | _TBD_ | ☐ | ☐ | ☐ | First-ever verification — see R7-5 |
+| _PENDING_ | _Garrett_ | _TBD_ | staging (`jjgspcpvqaiitloglxbb`) | _TBD_ | ☐ | ☐ | ☐ | First-ever verification — see R7-5 (revised) |
 
 ---
 
-## 10. Pre-incident usage
+## 11. Pre-incident usage
 
 > **If you suspect prod is corrupted or data is lost:**
 >
 > 1. **Don't restore yet.** First, identify what's broken — a recent
->    bad migration, a runaway delete, a schema accident? The fix may not
->    require restore.
-> 2. **Pause writes.** Stop the data pipeline cron jobs to prevent
->    further damage. Identify the latest known-good timestamp.
-> 3. **Choose restore type:**
->    - **Whole DB rollback:** PITR back to known-good ts. Fast but loses
->      all writes since.
->    - **Targeted recovery:** PITR to a new project, `pg_dump` the
->      affected tables, `pg_restore` into live prod. Slower, lossless
->      for unrelated tables.
-> 4. **Communicate.** Post in #incidents (or DM key users) with the
->    incident timeline + ETA for restore.
-> 5. **Execute restore** following § 5 above, but targeting prod.
-> 6. **Post-restore verification** following § 6.
+>    bad migration, a runaway delete, a schema accident? The fix may
+>    not require restore.
+> 2. **Pause writes.** Stop data-pipeline cron jobs and any in-flight
+>    deploys. Identify the latest known-good snapshot.
+> 3. **Decide RPO tolerance.** Free-tier restore costs up to 24h of
+>    writes. If that's unacceptable for your incident, the answer is
+>    "we can't fully recover" — document the loss and proceed.
+> 4. **Communicate.** Post in your incident channel + DM key users with
+>    the timeline and ETA.
+> 5. **Execute restore** following § 6 above, but targeting prod.
+> 6. **Post-restore verification** following § 7.
 > 7. **Resume writes.** Re-enable cron, monitor `check_data_freshness.py`
->    for stale tables.
-> 8. **Postmortem.** Use `docs/POSTMORTEM_TEMPLATE.md`.
+>    + `critical_table_checks.py` for stale/inconsistent tables.
+> 8. **Postmortem.** Use `docs/POSTMORTEM_TEMPLATE.md`. Include the
+>    "should we have had PITR by now?" question — see
+>    `docs/RECOVERY_STRATEGY.md` for the trigger criteria.
 
 ---
 
-## 11. Related references
+## 12. Related references
 
+- [RECOVERY_STRATEGY.md](../RECOVERY_STRATEGY.md) — when to upgrade
+  to PITR (principled deferral rule)
 - [DATA_INVENTORY.md](../../DATA_INVENTORY.md) — what's stored where
 - [check_data_freshness.py](../../data-pipeline/monitoring/check_data_freshness.py) — post-restore freshness validation
-- [Supabase PITR docs](https://supabase.com/docs/guides/platform/backups#point-in-time-recovery)
+- [critical_table_checks.py](../../data-pipeline/monitoring/critical_table_checks.py) — post-restore data-quality validation
+- [Supabase backup docs](https://supabase.com/docs/guides/platform/backups)

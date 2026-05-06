@@ -269,16 +269,26 @@ master.]
 
 ---
 
-## R7-5 — Backup verification  🟡 RUNBOOK LANDED 2026-05-06; restore pending user action
+## R7-5 (revised) — Backup verification (FREE daily-backup approach)  🟡 RUNBOOK LANDED 2026-05-06; restore pending user action
 
-**Status:** runbook landed at `docs/RUNBOOKS/BACKUP_RESTORE_VERIFICATION.md`
-with prod schema fingerprint baseline (84 public tables, top-20 row counts,
-auth + storage schema counts) captured 2026-05-06. The runbook covers:
-pre-checks, fingerprint capture, PITR trigger procedure, post-restore
-verification queries, cleanup, limitations, and a pre-incident usage
-section. **What remains:** the actual PITR restore execution — requires
-manual dashboard action by the operator (cost + permissions). Verification
-log table at the bottom of the runbook is empty pending first execution.
+**Revision (2026-05-06):** PITR ($~100/mo) deferred to launch — not
+justified for pre-launch product. R7-5 pivoted to free-tier daily-backup
+verification.
+
+**Status:** runbook rewritten at `docs/RUNBOOKS/BACKUP_RESTORE_VERIFICATION.md`
+for free-tier daily-backup approach (RTO ~24h, RPO up to 24h, $0/mo).
+Prod fingerprint baseline (84 public tables, top-20 row counts, auth +
+storage schema counts) preserved from initial run.
+
+New companion doc: `docs/RECOVERY_STRATEGY.md` documents the principled
+PITR-upgrade trigger rules (first paid user, first irreproducible
+user-state, first user-table migration, demo events). DATA_INVENTORY.md
+references both.
+
+**What remains:** the actual daily-backup restore-on-staging execution
+— requires manual dashboard action by the operator. Verification log
+table at the bottom of the runbook is empty pending first execution.
+Estimate: 30-60 min wall-clock when convenient.
 
 **Goal:** confirm that Supabase's automatic backups actually restore.
 Cheapest disaster-recovery test in the world: do it once, document

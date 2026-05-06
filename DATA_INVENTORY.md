@@ -16,6 +16,12 @@
 | **CitrusFantasySports (prod)** | `iezwazccqqrhrjupxzvf` | 2025-09-01 | Primary user-facing database. Read by `apps/web/`, `server/`, `data-pipeline/`. Mountain-Time, region `ca-central-1` |
 | **citrus-staging** | `jjgspcpvqaiitloglxbb` | 2026-04-23 | Staging environment for `staging-deploy.yml`. Mostly empty; populated via the `scripts/staging/04-load-stats-data.mjs` flow |
 
+**Recovery posture:** pre-launch on free-tier daily backups (RTO ~24h,
+RPO up to 24h, $0/mo). PITR upgrade ($~100/mo) is gated on user state —
+see [`docs/RECOVERY_STRATEGY.md`](docs/RECOVERY_STRATEGY.md) for the
+trigger rules. Verification procedure:
+[`docs/RUNBOOKS/BACKUP_RESTORE_VERIFICATION.md`](docs/RUNBOOKS/BACKUP_RESTORE_VERIFICATION.md).
+
 ### 1.2 What lives in prod (Supabase, by storage size)
 
 | Table | Rows | Size | Owner / writer |
