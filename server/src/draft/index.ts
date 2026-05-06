@@ -126,11 +126,13 @@ const publishToLobbyTopic: (topic: string, message: string) => void = (
 // the trusted-executor contract that ADR-004 §5.3 requires.
 
 /**
- * Step-6a `lobbyConfigLookup` (Path B per chunk-6a recon).
+ * Step-6a/c `lobbyConfigLookup` (Path B per chunk-6a recon).
  *
  * Two queries:
- *   1. `leagues.settings.draftType` → format
- *   2. `draft_order` rows for the league → flattened slot list
+ *   1. `leagues` row → format (`settings.draftType`), pick clock
+ *      (`settings.pickTimeLimit`), live deadline (`pick_deadline`),
+ *      draft state (`draft_state`).
+ *   2. `draft_order` rows for the league → flattened slot list.
  *
  * Snake reversal is already baked into each row's `team_order`
  * JSONB array per `DraftService.initializeDraftOrder`
@@ -140,13 +142,24 @@ const publishToLobbyTopic: (topic: string, message: string) => void = (
  * eliminates the divergence risk if a commissioner used
  * `customTeamOrder` at draft setup.
  *
+ * Step 6c additions:
+ *   - `pickClockSeconds`: `pickTimeLimit + 1` (matches
+ *     `submit_pick_v2`'s deadline-computation pad at migration
+ *     line 896-898 — the +1s ensures the user-visible client timer
+ *     hits zero before server-side autopick fires).
+ *   - `initialPickDeadline`: `leagues.pick_deadline` parsed to a
+ *     `Date`. The RPC has authoritatively maintained this column
+ *     since Phase 2; engine consumes directly rather than
+ *     reconstructing from event timestamps.
+ *   - `initialDraftState`: raw `leagues.draft_state` value.
+ *
  * Throws on missing/invalid configuration so the uWS upgrade
  * handler can close the WS cleanly with code 1011.
  */
 async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
   const { data: leagueRow, error: leagueErr } = await supabaseAdmin
     .from('leagues')
-    .select('settings')
+    .select('settings, pick_deadline, draft_state')
     .eq('id', leagueId)
     .single();
   if (leagueErr) {
@@ -155,7 +168,10 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
   if (!leagueRow) {
     throw new Error(`league ${leagueId} not found`);
   }
-  const draftType = (leagueRow.settings as { draftType?: string } | null)?.draftType;
+  const settings = leagueRow.settings as
+    | { draftType?: string; pickTimeLimit?: number }
+    | null;
+  const draftType = settings?.draftType;
   if (draftType !== 'snake' && draftType !== 'linear' && draftType !== 'auction') {
     throw new Error(
       `league ${leagueId} draftType=${draftType ?? 'undefined'} is not a live format ` +
@@ -164,12 +180,28 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
   }
   const format: DraftFormat = draftType;
 
+  // pickClockSeconds = pickTimeLimit + 1 (RPC pad). Default 90 + 1 = 91.
+  const pickTimeLimit =
+    typeof settings?.pickTimeLimit === 'number' ? settings.pickTimeLimit : 90;
+  const pickClockSeconds = pickTimeLimit + 1;
+
+  const initialPickDeadline = leagueRow.pick_deadline
+    ? new Date(leagueRow.pick_deadline as string)
+    : null;
+  const initialDraftState = (leagueRow.draft_state as string | null) ?? null;
+
   // Auction lobbies have no slot-based order — chunk 11g.6 / ADR-002
   // owns auction state. Return empty draftOrder so the LobbyManager's
   // `processSubmitPick` short-circuits at the format gate before
   // consulting the (intentionally empty) order.
   if (format === 'auction') {
-    return { format, draftOrder: [] };
+    return {
+      format,
+      draftOrder: [],
+      pickClockSeconds,
+      initialPickDeadline,
+      initialDraftState,
+    };
   }
 
   // Load `public.draft_order` rows for the league. Each row has a
@@ -215,7 +247,13 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
     }
   }
 
-  return { format, draftOrder };
+  return {
+    format,
+    draftOrder,
+    pickClockSeconds,
+    initialPickDeadline,
+    initialDraftState,
+  };
 }
 
 /**
@@ -254,6 +292,10 @@ const lobbyRegistry = new LobbyRegistry({
   lobbyConfigLookup: lookupLobbyConfig,
   verifyTeamAuthorization,
   publish: publishToLobbyTopic,
+  // Step 6c: same admin client backs autopick read queries
+  // (player projections, already-drafted lookup). Forwarded
+  // through the registry to every constructed LobbyManager.
+  supabase: supabaseAdmin,
 });
 
 // ── Start uWS ──

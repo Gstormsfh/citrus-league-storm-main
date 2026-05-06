@@ -41,6 +41,7 @@
 // `Map<lobbyId, LobbyManager>`).
 
 import { logger } from '@citrus/shared';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DraftServiceV2 } from '../services/DraftServiceV2';
 import { LobbyManager } from './LobbyManager';
 import type { DraftFormat, DraftOrderSlot, TeamAuthorizationResult } from './types';
@@ -57,10 +58,42 @@ import type { DraftFormat, DraftOrderSlot, TeamAuthorizationResult } from './typ
  * nominations rather than slots; chunk 11g.6 / ADR-002 §3 introduces
  * auction-specific state. The LobbyManager's `processSubmitPick`
  * gates on `format === 'auction'` before consulting `draftOrder`.
+ *
+ * **Step 6c expansion:** the lookup also returns the timer-state
+ * inputs (`pickClockSeconds`, `initialPickDeadline`,
+ * `initialDraftState`) so the LobbyManager can reconstruct the
+ * autopick deadline at bootstrap. The values come from the same
+ * `leagues` row that supplies `format` — single query, no extra
+ * round-trip per lobby. JSDoc on each field below explains the
+ * column source and engine-side consumption.
  */
 export interface LobbyConfig {
   format: DraftFormat;
   draftOrder: ReadonlyArray<DraftOrderSlot>;
+  /**
+   * Pick clock duration in seconds INCLUDING the +1s pad. Source:
+   * `leagues.settings.pickTimeLimit` + 1 (the +1 mirrors
+   * `submit_pick_v2`'s deadline computation at migration line
+   * 896-898). Default fallback if missing: 91 (= 90 + 1).
+   */
+  pickClockSeconds: number;
+  /**
+   * Wall-clock deadline for the on-clock pick at construction
+   * time, sourced from `leagues.pick_deadline`. The RPC has been
+   * authoritatively maintaining this column since Phase 2;
+   * bootstrap consumes it directly rather than reconstructing
+   * from event timestamps. `null` for fresh / paused / completed
+   * / cancelled drafts.
+   */
+  initialPickDeadline: Date | null;
+  /**
+   * Raw `leagues.draft_state` value at construction time. The
+   * engine's `init()` reads this after event replay to decide
+   * whether to schedule a timer. Snake/linear values:
+   * `'active' | 'paused' | 'completed' | 'cancelled'` (or
+   * `'pre_draft'` for fresh-start).
+   */
+  initialDraftState: string | null;
 }
 
 export interface LobbyRegistryOptions {
@@ -118,6 +151,15 @@ export interface LobbyRegistryOptions {
    * state machine events; chunk 11g.7 will broadcast timer ticks.
    */
   publish: (topic: string, message: string) => void;
+
+  /**
+   * Supabase client forwarded to every constructed LobbyManager
+   * for autopick read queries (player projections, already-drafted
+   * lookup). Same admin client backing `DraftServiceV2`; passed
+   * separately so tests can stub the projection-reads path
+   * without affecting the RPC-write path.
+   */
+  supabase: SupabaseClient;
 }
 
 export class LobbyRegistry {
@@ -128,6 +170,7 @@ export class LobbyRegistry {
     teamId: string,
   ) => Promise<TeamAuthorizationResult>;
   private readonly publish: (topic: string, message: string) => void;
+  private readonly supabase: SupabaseClient;
 
   /**
    * Lobby map: `lobbyId -> LobbyManager | Promise<LobbyManager>`.
@@ -146,6 +189,7 @@ export class LobbyRegistry {
     this.lobbyConfigLookup = opts.lobbyConfigLookup;
     this.verifyTeamAuthorization = opts.verifyTeamAuthorization;
     this.publish = opts.publish;
+    this.supabase = opts.supabase;
   }
 
   /**
@@ -250,6 +294,10 @@ export class LobbyRegistry {
       publish: this.publish,
       draftOrder: config.draftOrder,
       verifyTeamAuthorization: this.verifyTeamAuthorization,
+      supabase: this.supabase,
+      pickClockSeconds: config.pickClockSeconds,
+      initialPickDeadline: config.initialPickDeadline,
+      initialDraftState: config.initialDraftState,
     });
     // Step 6b: bootstrap from the durable event log BEFORE returning.
     // A failed init() throws; the existing try/catch in getOrCreate

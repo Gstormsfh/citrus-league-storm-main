@@ -1,6 +1,28 @@
 // Phase 4.5 chunk 11g.4 — LobbyManager: in-memory state machine + single-
 // writer queue per active draft.
 //
+// Step 6c of chunk 11g.4: pick deadline tracking + autopick on
+// timeout. Per-lobby `setTimeout` fires `handleAutopickTimeout` at
+// the on-clock pick's deadline; the autopick action constructs an
+// engine-authored `submit_pick` (actorKind='autopick') that flows
+// through the standard single-writer queue. Player selection is
+// delegated to the chain-of-strategies in `autopickStrategy.ts`
+// (today: `projectionsStrategy` only — highest-projected available;
+// future strategies layer in via the chain). Pause/resume captures
+// in-memory state mirroring the `draft_pause` / `draft_resume` RPC
+// behavior (resume gives a fresh full pick clock, not remaining-
+// from-pause). Bootstrap reconstructs the deadline from
+// `leagues.pick_deadline` directly (the column the RPC has been
+// authoritatively maintaining since Phase 2), so the engine survives
+// process restarts mid-draft with timer state intact.
+//
+// **Chunk 11g.4 is functionally complete after this step.** The
+// LobbyManager is a full live-draft engine for snake/linear
+// formats: state machine, ring buffer, broadcast, snapshot,
+// presence, resync primitive, backpressure, ADR-004 engine-side
+// auth, bootstrap, and autopick. Auction format remains stubbed
+// for chunk 11g.6 (auction state machine + anti-snipe per ADR-002).
+//
 // Step 6b of chunk 11g.4: bootstrap from the durable event log. The
 // `init()` method (called by `LobbyRegistry.constructLobby` after
 // construction) replays every `draft_events` row for the league via
@@ -71,6 +93,7 @@
 // and docs/adr/ADR-001-persistent-node-draft-engine.md.
 
 import type { WebSocket } from 'uWebSockets.js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '@citrus/shared';
 import { AppError } from '../lib/errors';
 import {
@@ -79,7 +102,12 @@ import {
   type DraftV2Actor,
   type SubmitPickResult,
 } from '../services/DraftServiceV2';
+import { randomUUID } from 'node:crypto';
 import { RingBuffer } from './RingBuffer';
+import {
+  selectAutopickPlayer,
+  type AutopickStrategy,
+} from './autopickStrategy';
 import {
   serializeServerMessage,
   WIRE_PROTOCOL_VERSION,
@@ -122,6 +150,41 @@ export interface LobbyManagerOptions {
   publish: (topic: string, message: string) => void;
 
   /**
+   * Pick clock duration in seconds, INCLUDING the +1s pad that
+   * `submit_pick_v2` applies (per migration line 896-898). Index.ts
+   * computes this as `pickTimeLimit + 1` from `leagues.settings.pickTimeLimit`
+   * (default 90 → engine sees 91).
+   *
+   * The +1s pad is intentional: it ensures the user-visible client
+   * timer hits zero BEFORE the server-side autopick fires. Eliminates
+   * the "submitted at the last millisecond and got rejected" UX bug
+   * where client and server clocks diverge by sub-second amounts.
+   */
+  pickClockSeconds: number;
+
+  /**
+   * Initial pick deadline loaded from `leagues.pick_deadline` at
+   * lobby construction time. The RPC has authoritatively maintained
+   * this column since Phase 2 — bootstrap consumes it directly
+   * rather than reconstructing from event timestamps + pickTimeLimit
+   * (more robust against clock drift between event creation and
+   * engine startup).
+   *
+   * `null` for fresh drafts (not yet started), paused drafts
+   * (RPC clears the column), and completed/cancelled drafts.
+   */
+  initialPickDeadline: Date | null;
+
+  /**
+   * Initial draft state from `leagues.draft_state` at construction.
+   * Used after bootstrap event replay to decide whether to schedule
+   * a timer. Snake/linear values: `'active' | 'paused' | 'completed'
+   * | 'cancelled'` (or `'pre_draft'` for fresh-start). The engine's
+   * `DraftStatus` enum normalizes these.
+   */
+  initialDraftState: string | null;
+
+  /**
    * Pre-flattened draft order loaded from `public.draft_order` by
    * `lobbyConfigLookup` in `index.ts` (Path B per chunk-6a recon).
    * One entry per pick of the entire draft; snake reversal is baked
@@ -158,6 +221,26 @@ export interface LobbyManagerOptions {
     teamId: string,
   ) => Promise<TeamAuthorizationResult>;
 
+  /**
+   * Supabase client for autopick read queries (player projections,
+   * already-drafted player lookup). Distinct from `draftService`'s
+   * internal client because autopick reads are unrelated to RPC
+   * writes — keeping them separate lets tests stub one without the
+   * other and keeps the strategy chain trivially mockable.
+   *
+   * Production: same admin client passed to `DraftServiceV2`. Tests
+   * pass a mock with `from()` returning the right shape.
+   */
+  supabase: SupabaseClient;
+
+  /**
+   * Optional autopick strategy chain override. Defaults to the
+   * shipping `[projectionsStrategy]` chain in
+   * `autopickStrategy.ts`. Tests pass custom strategies to exercise
+   * the chain semantics; commissioner UI override (future) could
+   * pass a different chain too.
+   */
+  autopickStrategies?: ReadonlyArray<AutopickStrategy>;
 }
 
 /**
@@ -217,6 +300,11 @@ export class LobbyManager {
     userId: string,
     teamId: string,
   ) => Promise<TeamAuthorizationResult>;
+  private readonly supabase: SupabaseClient;
+  private readonly autopickStrategies: ReadonlyArray<AutopickStrategy> | undefined;
+  private readonly pickClockMs: number;
+  private readonly initialPickDeadline: Date | null;
+  private readonly initialDraftState: string | null;
 
   /**
    * Pre-flattened draft order — one slot per pick of the entire
@@ -264,6 +352,36 @@ export class LobbyManager {
    * error — caller forgot to await `init()`).
    */
   private initialized = false;
+
+  /**
+   * Step-6c timer state.
+   *
+   * `currentPickDeadline`: wall-clock timestamp when the on-clock
+   * pick's deadline expires. Wall-clock (not relative) so it
+   * survives bootstrap correctly — at bootstrap the engine reads
+   * the deadline from `leagues.pick_deadline` and computes
+   * `setTimeout(handleAutopickTimeout, deadline - now())`.
+   *
+   * `currentPickTimerHandle`: the live `setTimeout` handle. Cleared
+   * by `cancelPickTimer` on pick advance, pause, completion,
+   * cancellation, and shutdown. `null` when no timer is scheduled.
+   *
+   * `pauseState`: present iff the draft is paused. Captures the
+   * pause moment AND the time-remaining-when-paused for audit /
+   * diagnostic. **Not used to reconstruct the resume deadline** —
+   * the `draft_resume` RPC gives a fresh full pick clock (per
+   * migration line 1136-1141), and the engine mirrors that
+   * behavior. Single source of truth principle: engine state
+   * derives from RPC behavior, not engine-internal computation.
+   *
+   * `shutDown`: once true, no further timers may be scheduled and
+   * `setPickDeadline` becomes a no-op. Set by `shutdown()` (called
+   * by chunk 11g.7's graceful-shutdown path; today only by tests).
+   */
+  private currentPickDeadline: Date | null = null;
+  private currentPickTimerHandle: NodeJS.Timeout | null = null;
+  private pauseState: { pausedAt: Date; remainingMs: number } | null = null;
+  private shutDown = false;
 
   /**
    * uWS pub/sub topic name for this lobby. Step-5 broadcasts
@@ -344,13 +462,19 @@ export class LobbyManager {
     this.draftService = opts.draftService;
     this.publish = opts.publish;
     this.verifyTeamAuthorization = opts.verifyTeamAuthorization;
+    this.supabase = opts.supabase;
+    this.autopickStrategies = opts.autopickStrategies;
+    this.pickClockMs = opts.pickClockSeconds * 1000;
+    this.initialPickDeadline = opts.initialPickDeadline;
+    this.initialDraftState = opts.initialDraftState;
     this.draftOrder = opts.draftOrder;
     this.topicName = `draft:${opts.lobbyId}`;
-    // `picksMade`, `draftStatus`, `initialized` are zero-initialized
-    // at the field declaration above. `init()` mutates them during
-    // event-log replay.
+    // `picksMade`, `draftStatus`, `initialized`, timer state are
+    // zero-initialized at the field declaration above. `init()`
+    // mutates them during event-log replay + sets the deadline
+    // timer from `initialPickDeadline` per chunk 11g.4 step 6c.
     logger.info(
-      `[lobby] LobbyManager constructed (pre-init) lobbyId=${opts.lobbyId} format=${opts.format} leagueId=${opts.leagueId} topic=${this.topicName} totalPicks=${this.draftOrder.length}`,
+      `[lobby] LobbyManager constructed (pre-init) lobbyId=${opts.lobbyId} format=${opts.format} leagueId=${opts.leagueId} topic=${this.topicName} totalPicks=${this.draftOrder.length} pickClockSeconds=${opts.pickClockSeconds}`,
     );
   }
 
@@ -384,8 +508,28 @@ export class LobbyManager {
     }
     await this.bootstrap();
     this.initialized = true;
+
+    // Step 6c: reconstruct timer state from `leagues.pick_deadline`.
+    // The RPC has authoritatively maintained this column since
+    // Phase 2; reading it directly is cleaner than reconstructing
+    // from event timestamps + pickTimeLimit (no clock-drift concerns).
+    //
+    // - `paused` / `completed` / `cancelled`: no timer.
+    // - `active` + deadline in the future: schedule normally.
+    // - `active` + deadline already passed (engine started after
+    //   the on-clock team's clock expired): fire autopick
+    //   immediately. This is the "process restarted mid-deadline"
+    //   recovery path.
+    if (
+      this.draftStatus === 'in_progress' &&
+      this.pauseState === null &&
+      this.initialPickDeadline !== null
+    ) {
+      this.setPickDeadline(this.initialPickDeadline);
+    }
+
     logger.info(
-      `[lobby] init complete lobbyId=${this.lobbyId} picksMade=${this.picksMade} status=${this.draftStatus} bufferSize=${this.events.size()}`,
+      `[lobby] init complete lobbyId=${this.lobbyId} picksMade=${this.picksMade} status=${this.draftStatus} bufferSize=${this.events.size()} timerScheduled=${this.currentPickTimerHandle !== null}`,
     );
   }
 
@@ -633,6 +777,10 @@ export class LobbyManager {
       totalPicks: this.draftOrder.length,
       picksMade: this.picksMade,
       draftStatus: this.draftStatus,
+      currentPickDeadline:
+        this.currentPickDeadline !== null
+          ? this.currentPickDeadline.toISOString()
+          : null,
     };
   }
 
@@ -694,17 +842,6 @@ export class LobbyManager {
     };
   }
 
-  /**
-   * Gracefully shut down the lobby.
-   *
-   * **Implementation status (chunk 11g.4 step 1, unchanged in step 2):**
-   * stub (no-op). Step 7 wires this alongside chunk 11g.7's snapshot-
-   * persistence + process-bootstrap pair.
-   */
-  async shutdown(): Promise<void> {
-    // Step 7 implements. No-op today.
-  }
-
   // ── Private: queue + dispatch ─────────────────────────────────────
 
   /**
@@ -762,30 +899,40 @@ export class LobbyManager {
       return { ok: false, reason: 'wrong_format_for_action' };
     }
 
-    // Step 2: ADR-004 §5.3 engine-side authorization.
-    let authResult: TeamAuthorizationResult;
-    try {
-      authResult = await this.verifyTeamAuthorization(action.userId, action.teamId);
-    } catch (err) {
-      logger.error(
-        `[lobby] verifyTeamAuthorization threw lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId}`,
-        err,
-      );
-      return { ok: false, reason: 'internal_error' };
-    }
-    if ('reason' in authResult) {
-      // Narrow via property-existence (`'reason' in result`) rather
-      // than via the `authorized` discriminator — narrowing on the
-      // discriminator is unreliable under server/tsconfig.json's
-      // `strict: false` setting; `in`-based narrowing works in either
-      // mode (same pattern as uws-server.ts verifyDraftToken handling).
-      //
-      // Granular reason for ops; coarse-grained for the wire (no
-      // information disclosure beyond "you can't do that").
-      logger.info(
-        `[lobby] unauthorized pick attempt lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId} reason=${authResult.reason}`,
-      );
-      return { ok: false, reason: 'unauthorized' };
+    const isAutopick = action.actorKind === 'autopick';
+
+    // Step 2: ADR-004 §5.3 engine-side authorization. **Skipped for
+    // engine-authored autopick actions** — per ADR-004 §5's
+    // trusted-executor extension, the engine is the trusted author
+    // of these actions and there is no human user whose
+    // authorization to verify. The on-clock check at step 4 still
+    // fires as a defensive guard against bugs constructing autopick
+    // actions for the wrong team.
+    if (!isAutopick) {
+      let authResult: TeamAuthorizationResult;
+      try {
+        authResult = await this.verifyTeamAuthorization(action.userId, action.teamId);
+      } catch (err) {
+        logger.error(
+          `[lobby] verifyTeamAuthorization threw lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId}`,
+          err,
+        );
+        return { ok: false, reason: 'internal_error' };
+      }
+      if ('reason' in authResult) {
+        // Narrow via property-existence (`'reason' in result`) rather
+        // than via the `authorized` discriminator — narrowing on the
+        // discriminator is unreliable under server/tsconfig.json's
+        // `strict: false` setting; `in`-based narrowing works in either
+        // mode (same pattern as uws-server.ts verifyDraftToken handling).
+        //
+        // Granular reason for ops; coarse-grained for the wire (no
+        // information disclosure beyond "you can't do that").
+        logger.info(
+          `[lobby] unauthorized pick attempt lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId} reason=${authResult.reason}`,
+        );
+        return { ok: false, reason: 'unauthorized' };
+      }
     }
 
     // Step 3: status check. Already-completed/cancelled drafts cannot
@@ -811,7 +958,7 @@ export class LobbyManager {
     const pickNumber = expectedSlot.pickNumber;
 
     const actor: DraftV2Actor = {
-      kind: 'user',
+      kind: isAutopick ? 'autopick' : 'user',
       id: action.userId,
       session_id: action.sessionId,
     };
@@ -874,6 +1021,7 @@ export class LobbyManager {
         // `correlationId` name. Lets the submitter's optimistic UI
         // settle when the broadcast comes back.
         correlationId: action.idempotencyKey,
+        ...(isAutopick ? { isAutopick: true } : {}),
       };
       this.events.append(event);
       this.broadcast({
@@ -884,6 +1032,24 @@ export class LobbyManager {
         correlationId: action.idempotencyKey,
         payload: event,
       });
+
+      // Step 6c: set / cancel the deadline timer based on new state.
+      if (this.draftStatus === 'in_progress') {
+        // Prefer the RPC's authoritative `pick_deadline` (it carries
+        // the +1s pad already); fall back to engine-side computation
+        // if the RPC didn't return one (defensive — shouldn't happen
+        // for snake/linear picks).
+        const nextDeadline = result.pick_deadline
+          ? new Date(result.pick_deadline)
+          : new Date(Date.now() + this.pickClockMs);
+        this.setPickDeadline(nextDeadline);
+      } else {
+        // Draft completed. Clear timer + deadline; no team is on
+        // the clock anymore, so getCurrentState should reflect
+        // that with currentPickDeadline=null.
+        this.cancelPickTimer();
+        this.currentPickDeadline = null;
+      }
     }
 
     return { ok: true, eventSeq: result.seq };
@@ -1091,13 +1257,38 @@ export class LobbyManager {
           skippedCount++;
           break;
         case 'draft_paused':
+          // Step 6c: capture pause state for the in-memory timer.
+          // No picksMade impact. The `pauseState.remainingMs` is
+          // captured for diagnostic / audit only — the engine does
+          // NOT use it to reconstruct the resume deadline because
+          // the `draft_resume` RPC gives a fresh full pick clock
+          // (per migration line 1136-1141). Single source of truth:
+          // engine state mirrors RPC behavior.
+          this.pauseState = {
+            pausedAt: new Date(
+              ((event.payload as Record<string, unknown>).paused_at as string) ?? event.created_at,
+            ),
+            remainingMs:
+              ((((event.payload as Record<string, unknown>).remaining_seconds as number) ?? 0) * 1000),
+          };
+          skippedCount++;
+          break;
         case 'draft_resumed':
+          // Step 6c: clear pause state. Bootstrap doesn't need to
+          // schedule the timer here — `init()`'s post-replay step
+          // reads `leagues.pick_deadline` (which the resume RPC
+          // updated) and schedules from there. This keeps bootstrap
+          // single-pass and idempotent.
+          this.pauseState = null;
+          skippedCount++;
+          break;
         case 'draft_extended':
-          // Timer/deadline state. No picksMade impact. Becomes
-          // 6c-relevant when timers land. Decision Log entry on
-          // 2026-05-05 tracks the deferral.
+          // Deadline-extension event (commissioner adds time to the
+          // current pick's clock). No picksMade impact; timer
+          // reconstruction at `init()` end picks up the updated
+          // `leagues.pick_deadline`.
           logger.debug(
-            `[lobby] bootstrap skipping timer-state event_type=${event.event_type} ` +
+            `[lobby] bootstrap skipping draft_extended event ` +
               `seq=${event.seq} lobbyId=${this.lobbyId}`,
           );
           skippedCount++;
@@ -1181,6 +1372,13 @@ export class LobbyManager {
     // Translate from durable wire form ('pick') to application-layer
     // form ('pick_submitted') per the action-vs-event naming
     // convention (chunk 11g.4 step 3 / ADR-002 §4.1).
+    //
+    // `is_autopick` from the durable payload surfaces as the
+    // step-6c `isAutopick` flag on the buffered event, so resync'd
+    // clients see the autopick badge for picks made while they
+    // were disconnected.
+    const isAutopick =
+      ((event.payload as Record<string, unknown>).is_autopick as boolean) === true;
     const buffered: BufferedDraftEvent = {
       kind: 'pick_submitted',
       seq: event.seq,
@@ -1190,6 +1388,7 @@ export class LobbyManager {
       roundNumber: slot.round,
       pickNumber: slot.pickNumber,
       correlationId: event.idempotency_key ?? '',
+      ...(isAutopick ? { isAutopick: true } : {}),
     };
     this.events.append(buffered);
 
@@ -1305,5 +1504,232 @@ export class LobbyManager {
     if (this.picksMade >= this.draftOrder.length) {
       this.draftStatus = 'completed';
     }
+  }
+
+  // ── Step 6c: pick deadline timer + autopick on timeout ─────────────
+
+  /**
+   * Schedule (or reschedule) the autopick timer for the on-clock
+   * pick. Cancels any existing timer first so concurrent calls
+   * don't double-schedule.
+   *
+   * If `deadline <= now()`, the timer fires on the next event-loop
+   * tick (via `setTimeout(..., 0)`). This handles the bootstrap-
+   * recovery path where the engine starts after the on-clock team's
+   * deadline already passed — autopick fires immediately rather
+   * than leaving the draft stuck.
+   *
+   * No-op if `shutDown` is true (graceful-shutdown protection
+   * against late-firing timers post-shutdown).
+   */
+  private setPickDeadline(deadline: Date): void {
+    this.cancelPickTimer();
+    if (this.shutDown) {
+      return;
+    }
+    this.currentPickDeadline = deadline;
+    const delayMs = Math.max(0, deadline.getTime() - Date.now());
+    this.currentPickTimerHandle = setTimeout(() => {
+      this.currentPickTimerHandle = null;
+      void this.handleAutopickTimeout();
+    }, delayMs);
+    logger.debug(
+      `[lobby] pick deadline scheduled lobbyId=${this.lobbyId} deadline=${deadline.toISOString()} delayMs=${delayMs}`,
+    );
+  }
+
+  /**
+   * Cancel the pending autopick timer (if any). Idempotent — safe
+   * to call when no timer is set. Does NOT clear
+   * `currentPickDeadline` because callers may want to inspect it
+   * (e.g., for observability after shutdown). Set to null
+   * explicitly when the deadline truly no longer applies.
+   */
+  private cancelPickTimer(): void {
+    if (this.currentPickTimerHandle !== null) {
+      clearTimeout(this.currentPickTimerHandle);
+      this.currentPickTimerHandle = null;
+    }
+  }
+
+  /**
+   * Timer-fired entry point. Constructs an autopick action and
+   * feeds it through `enqueueAction` so it serializes through the
+   * single-writer queue alongside any concurrent user submits
+   * (first-one-wins by queue order; the loser sees
+   * `not_on_clock` from the RPC's idempotency / state checks).
+   *
+   * Defensive guards: drop if shut down, not in_progress, or
+   * paused (timer should have been cancelled by the relevant
+   * transition; if it fires anyway, treat as stale and ignore).
+   */
+  private async handleAutopickTimeout(): Promise<void> {
+    if (this.shutDown) {
+      logger.debug(`[lobby] autopick fired post-shutdown — ignored lobbyId=${this.lobbyId}`);
+      return;
+    }
+    if (this.draftStatus !== 'in_progress') {
+      logger.warn(
+        `[lobby] autopick fired but draftStatus=${this.draftStatus} — ignored (timer should have been cancelled) lobbyId=${this.lobbyId}`,
+      );
+      return;
+    }
+    if (this.pauseState !== null) {
+      logger.warn(
+        `[lobby] autopick fired while paused — ignored (pauseDraft should have cancelled) lobbyId=${this.lobbyId}`,
+      );
+      return;
+    }
+
+    const slot = this.draftOrder[this.picksMade];
+    if (!slot) {
+      logger.error(
+        `[lobby] autopick fired with no slot at picksMade=${this.picksMade} lobbyId=${this.lobbyId}`,
+      );
+      return;
+    }
+
+    let result;
+    try {
+      result = await selectAutopickPlayer(
+        {
+          leagueId: this.leagueId,
+          teamId: slot.teamId,
+          supabase: this.supabase,
+        },
+        this.autopickStrategies,
+      );
+    } catch (err) {
+      logger.error(
+        `[lobby] autopick strategy threw lobbyId=${this.lobbyId} teamId=${slot.teamId}`,
+        err,
+      );
+      // Treat as stuck-draft — clear deadline, surface for ops.
+      this.currentPickDeadline = null;
+      return;
+    }
+
+    if (!result.ok) {
+      // Stuck-draft condition: every strategy returned no_eligible_players.
+      // Real production issue requiring commissioner intervention. Chunk
+      // 11g.7's alert policy fires on this log line.
+      logger.error(
+        `[lobby] autopick STUCK — no eligible players lobbyId=${this.lobbyId} teamId=${slot.teamId} picksMade=${this.picksMade}`,
+      );
+      this.currentPickDeadline = null;
+      return;
+    }
+
+    logger.info(
+      `[lobby] autopick fired lobbyId=${this.lobbyId} teamId=${slot.teamId} playerId=${result.playerId} source=${result.source}`,
+    );
+
+    // Construct the engine-authored action. Synthetic userId
+    // (`'autopick-engine'`) and a per-call sessionId (UUID) so the
+    // audit trail records the engine as the actor and ties the
+    // resulting `draft_events` row back to this fire.
+    const autopickAction: DraftAction = {
+      kind: 'submit_pick',
+      teamId: slot.teamId,
+      playerId: String(result.playerId),
+      userId: 'autopick-engine',
+      sessionId: randomUUID(),
+      idempotencyKey: randomUUID(),
+      actorKind: 'autopick',
+    };
+
+    // Route through enqueueAction so it serializes through the
+    // single-writer queue. processSubmitPick will skip the auth
+    // check (per `actorKind === 'autopick'`) and submit with
+    // `actor.kind = 'autopick'` to the RPC.
+    try {
+      await this.enqueueAction(autopickAction);
+    } catch (err) {
+      logger.error(
+        `[lobby] autopick enqueueAction threw lobbyId=${this.lobbyId}`,
+        err,
+      );
+    }
+  }
+
+  /**
+   * Pause the draft (in-memory bookkeeping). Mirror of the
+   * `draft_pause` RPC behavior; called by the engine when it
+   * observes a `draft_paused` event (cross-process notification
+   * lands in chunk 11g.7) or by tests.
+   *
+   * Cancels the pending pick timer and captures `pauseState` for
+   * audit. The `remainingMs` is informational only — the engine
+   * does NOT use it to reconstruct the resume deadline because
+   * the `draft_resume` RPC gives a fresh full pick clock (single
+   * source of truth: engine state mirrors RPC behavior).
+   *
+   * Idempotent — calling on an already-paused draft is a no-op.
+   * Throws if the draft isn't `in_progress` (illegal state).
+   */
+  pauseDraft(): void {
+    if (this.pauseState !== null) {
+      logger.debug(`[lobby] pauseDraft on already-paused draft — no-op lobbyId=${this.lobbyId}`);
+      return;
+    }
+    if (this.draftStatus !== 'in_progress') {
+      throw new Error(
+        `[lobby] pauseDraft called from invalid status=${this.draftStatus} lobbyId=${this.lobbyId}`,
+      );
+    }
+    const now = new Date();
+    const remainingMs = this.currentPickDeadline
+      ? Math.max(0, this.currentPickDeadline.getTime() - now.getTime())
+      : 0;
+    this.pauseState = { pausedAt: now, remainingMs };
+    this.cancelPickTimer();
+    this.currentPickDeadline = null;
+    logger.info(
+      `[lobby] paused lobbyId=${this.lobbyId} remainingMs=${remainingMs}`,
+    );
+  }
+
+  /**
+   * Resume a paused draft (in-memory bookkeeping). Sets a fresh
+   * full pick-clock deadline (matching the `draft_resume` RPC
+   * behavior at migration line 1136-1141).
+   *
+   * Throws if the draft isn't paused (illegal state).
+   */
+  resumeDraft(): void {
+    if (this.pauseState === null) {
+      throw new Error(
+        `[lobby] resumeDraft called on non-paused draft lobbyId=${this.lobbyId}`,
+      );
+    }
+    this.pauseState = null;
+    const newDeadline = new Date(Date.now() + this.pickClockMs);
+    this.setPickDeadline(newDeadline);
+    logger.info(
+      `[lobby] resumed lobbyId=${this.lobbyId} newDeadline=${newDeadline.toISOString()}`,
+    );
+  }
+
+  /**
+   * Graceful shutdown (chunk 11g.4 step 6c — partial; chunk 11g.7
+   * extends with connection-teardown + final-state persistence).
+   *
+   * Today: cancel pending timers and mark the lobby as shut down
+   * so any late-firing callbacks become no-ops. Subsequent
+   * `setPickDeadline` calls are no-ops; `handleAutopickTimeout`
+   * early-returns. Idempotent.
+   *
+   * Future expansion (chunk 11g.7): close all WebSocket
+   * connections, await in-flight queue actions, persist a final
+   * snapshot to `draft_state` for fast subsequent bootstrap.
+   */
+  async shutdown(): Promise<void> {
+    if (this.shutDown) {
+      return;
+    }
+    this.shutDown = true;
+    this.cancelPickTimer();
+    this.currentPickDeadline = null;
+    logger.info(`[lobby] shutdown lobbyId=${this.lobbyId}`);
   }
 }

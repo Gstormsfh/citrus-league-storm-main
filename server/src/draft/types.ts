@@ -89,6 +89,11 @@ export type DraftAction =
        * from the JWT's `sub` claim — see `lib/draftToken.ts`).
        * Used by `LobbyManager.processSubmitPick` to construct the
        * actor envelope for `submit_pick_v2` RPC calls.
+       *
+       * For engine-authored autopick actions
+       * (`actorKind === 'autopick'`), the engine populates this
+       * with a synthetic identifier (e.g. `'autopick-engine'`) so
+       * the durable audit trail records the engine as the actor.
        */
       userId: string;
       /**
@@ -96,9 +101,31 @@ export type DraftAction =
        * upgrade flow. Used for the actor's `session_id` field
        * and the RPC's `p_session_id` parameter — ties pick events
        * to their originating WS session for tracing.
+       *
+       * For autopick actions: a per-call generated UUID; ties the
+       * autopick fire to its trigger event in the audit trail.
        */
       sessionId: string;
       idempotencyKey: string;
+      /**
+       * Discriminator: `'user'` (default — submitted by a connected
+       * client through the WS message handler) or `'autopick'`
+       * (engine-authored, fires on pick-deadline expiry). Defaults
+       * to `'user'` if absent for backwards compatibility.
+       *
+       * **Auth-skip when `'autopick'`:** `processSubmitPick`
+       * bypasses the engine-side `verifyTeamAuthorization` callback
+       * for autopick actions per ADR-004 §5's trusted-executor
+       * extension — the engine is the trusted author of these
+       * actions. The on-clock check still runs as a defensive
+       * guard against bugs constructing autopick actions for the
+       * wrong team.
+       *
+       * **Wire-format note:** the durable `draft_events.actor.kind`
+       * matches this value (`'user'` or `'autopick'`); the persisted
+       * `payload.is_autopick` boolean mirrors `actorKind === 'autopick'`.
+       */
+      actorKind?: 'user' | 'autopick';
     }
   | {
       kind: 'place_bid';
@@ -203,6 +230,15 @@ export type BufferedDraftEvent =
        * that submitted them).
        */
       correlationId: string;
+      /**
+       * `true` when the pick was server-authored on deadline expiry
+       * (chunk 11g.4 step 6c). Mirrors `draft_events.payload.is_autopick`
+       * and `actor.kind === 'autopick'`. Surfaces in the ring buffer
+       * so client UI can render the "AP" / "Autopick" badge during
+       * resync (matches Sleeper / ESPN / Yahoo conventions). Optional
+       * for backwards compatibility with pre-6c-buffered events.
+       */
+      isAutopick?: boolean;
     }
   | {
       /**
@@ -347,6 +383,17 @@ export interface DraftStateSnapshot {
   totalPicks: number;
   picksMade: number;
   draftStatus: DraftStatus;
+  /**
+   * Wall-clock ISO timestamp when the on-clock pick's deadline
+   * expires. `null` when no team is on the clock (`not_started`,
+   * `completed`, `cancelled`) or when the draft is `paused`.
+   * Chunk 11g.4 step 6c populates this from the LobbyManager's
+   * timer state; clients use it to render countdown UI without
+   * relying on the local clock as authoritative (server time is
+   * the source of truth — local clock smooths between server
+   * ticks per `PHASE_4_5_ARCHITECTURE.md` line 176).
+   */
+  currentPickDeadline: string | null;
 }
 
 /**
