@@ -835,25 +835,103 @@ The orphan situation arises from **execution timing**:
 
 ### §10.5 Fix plan
 
-#### Immediate (one-time, near-zero cost)
+#### Immediate fix landed 2026-05-06
 
-Re-run the existing script. It will:
+Originally planned: re-run `populate_player_directory.py` to discover
+all 3 orphans from `raw_shots` and insert them via the script's own
+upsert path.
 
-  1. Discover the 3 orphan IDs from `raw_shots` (Step 1 of its flow).
-  2. Fetch metadata for each via `/player/{id}/landing`.
-  3. Insert new rows `(season=20252026, player_id, full_name, ...)`
-     via the existing upsert.
+**What actually happened:** the script ran (Garrett-authorized) and
+*partially* succeeded — it grew `player_directory` 938 → 1053 (+115
+new) and refreshed 389 existing rows from the 32-team roster sweep,
+but its **raw_shots discovery pass missed the 3 known orphans**
+specifically. See §10.5.1 below for the bug analysis. The 3 orphans
+were instead inserted via a targeted SQL `INSERT ... ON CONFLICT`
+using the same NHL `/player/{id}/landing` data the script would have
+written. Result: `raw_shots_no_orphan_player_ids` flipped from WARN to
+PASS on the next R7-2 baseline run (11 pass / 0 warning / 1 fail; the
+remaining fail is the expected pre-Phase-0 `raw_shots_season_populated`
+sentinel).
 
-```bash
-# From repo root:
-python scripts/utilities/populate_player_directory.py
+Two collateral fixes from the run:
+
+  - `scripts/utilities/populate_player_directory.py` import paths fixed
+    (`src.utils.citrus_request` → `data_pipeline.utils.citrus_request`
+    + bare `supabase_rest` → fully-qualified package path + bootstrap
+    sys.path setup). The script was unrunnable post-monorepo until
+    these landed.
+  - Removed the `✓` Unicode glyph from the success print, replaced with
+    `OK:` — Windows cp1252 console encoding crashed the script at the
+    end of the upsert step (the upsert had already succeeded; only the
+    success message print failed).
+
+#### §10.5.1 Bug — script's raw_shots discovery pagination skips rows
+
+The script's Step 1 paginates `raw_shots` via PostgREST in 1000-row
+batches with `offset=N` increasing by 1000. The query has **no
+`ORDER BY`**:
+
+```python
+# scripts/utilities/populate_player_directory.py:118
+shots = db.select("raw_shots", select="player_id,passer_id,goalie_id",
+                  limit=batch_size, offset=offset)
 ```
 
-No code change required. Estimated wall-clock: 5-10 minutes for the
-full 32-team roster sweep + per-player API calls. Expected post-run
-state: `player_directory` row count grows by ≥3 (more if other recent
-debutants are also missing); `R7-2 raw_shots_no_orphan_player_ids`
-flips from WARN to PASS on the next baseline run.
+PostgREST without an `order` parameter returns rows in non-deterministic
+order, and the order can shift between requests as new rows are
+inserted into the underlying table. Offset-based pagination over a
+non-stable order is a well-known anti-pattern: rows can be returned
+multiple times across batches **or** skipped entirely. The 3 orphans
+landed in batches that the pagination skipped on this run.
+
+**Permanent fix (Phase 0d-pre):**
+
+```python
+# Before:
+shots = db.select("raw_shots", select="...", limit=batch_size, offset=offset)
+# After:
+shots = db.select("raw_shots", select="...", order="id.asc",
+                  limit=batch_size, offset=offset)
+```
+
+(Same pattern applies to the `player_toi_by_situation` scan a few
+lines below.) Track this as a 0d-pre #5 line item: **add stable-order
+pagination to populate_player_directory.py's discovery loops.**
+
+#### Permanent — daily cron (LANDED 2026-05-06)
+
+Daily cron added at `.github/workflows/refresh-player-directory.yml`.
+Runs at 08:15 UTC daily (~02:15 MDT / 03:15 MST), invokes
+`populate_player_directory.py`, then runs the
+`check_raw_shots_no_orphan_player_ids` check post-refresh and surfaces
+the result. The cadence beats both the in-season (48h) and offseason
+(168h) freshness SLA thresholds for `player_directory`.
+
+The pagination bug (§10.5.1) means the cron will recover from missing
+new debutants via the **roster sweep** path (which uses
+`/roster/{team}/current` directly, not paginated `raw_shots`), so the
+operational cron is correct even before the pagination fix lands. The
+pagination fix is still wanted for one specific case: **players in
+`raw_shots` who are NOT on a current NHL roster** (e.g., recently
+released, traded mid-game, called up but immediately reassigned). For
+those, only the `raw_shots` discovery path catches them, and the
+pagination bug means it might miss them. Phase 0d-pre #5 closes this
+gap.
+
+#### Optional — defense in depth (small code change)
+
+Add a `verify_directory_coverage` post-step that runs after every
+`raw_shots` write (e.g., at the tail of the data acquisition pipeline)
+to detect new orphans within the same job run rather than waiting for
+the next directory refresh. Logic: `SELECT DISTINCT player_id FROM
+raw_shots WHERE created_at > <last_run_ts>` join-anti
+`player_directory` on `(20252026, player_id)`. If non-empty, surface as
+a warning in `integrity_check_results` (mirrors the R7-2 check pattern,
+already wired in via `critical_table_checks.py`).
+
+This is **optional polish** — the daily cron above covers the
+operational gap. Defer unless directory-staleness becomes a recurring
+incident pattern.
 
 #### Permanent — ops cadence (zero code change)
 

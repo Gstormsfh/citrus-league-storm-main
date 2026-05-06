@@ -1,7 +1,7 @@
 # Phase 0 — Multi-Season Backfill Execution Plan
 
 **Date:** 2026-05-06
-**Status:** Planning doc for Garrett review. **No execution until approved.**
+**Status:** Garrett approved 2026-05-06; sequence + 6 design decisions locked (see § 7). Execution gated only on R7-5 daily-backup restore test completion (proven rollback path).
 **Trigger:** R7 Tier 1 infrastructure (R7-2, R7-3, R7-5 runbook) is in place. Baseline integrity_check_results captured (R7-2 BASELINE: 1 FAIL + 1 WARN; R7-3 BASELINE: 14 WARN). Phase 0 brings prod up to 8 seasons of shot data and resolves the bulk of pre-existing freshness/quality breaches.
 **Companions:**
 - `apps/web/docs/DATA_ORGANIZATION_AUDIT.md` (R1-R6 history)
@@ -329,18 +329,62 @@ python data-pipeline/monitoring/critical_table_checks.py
 
 ---
 
-## 7. Open questions for Garrett review
+## 7. Six design decisions (LOCKED 2026-05-06)
 
-Before execution, please decide:
+All six open questions answered by Garrett 2026-05-06. Decisions are locked; deviating from any of them mid-execution requires re-surfacing for review.
 
-1. **0a/0c parallelism.** Default recommendation: sequential (0a fully completes before 0c starts). Counter-option: per-season partitioning could shave ~1 day of wall-clock at the cost of orchestration complexity. **Recommendation: sequential.**
-2. **0d-pre #3 (defender-geometry) vs 0c timing.** If 0d-pre #3 lands before 0c, 0c picks up defender-geometry for free (one pass instead of two). **Open: confirm 0d-pre #3 can be coded + tested in 1-2 days.**
-3. **Sidecar table or merged into `raw_shots`?** Default recommendation: merged (Option A). Simpler downstream queries, leverages existing nullable moat columns.
-4. **2017-18 inclusion (Item)** Loading `shots_2017.csv` for 8th-season coverage is included by default. Alternative: skip 2017 to keep historical to 7 seasons aligned with the model training corpus. **Recommendation: include** — career-arc value for veterans (Crosby, Ovechkin, etc.).
-5. **0c season-level partition vs single batch.** Default: 7 parallel `--season` jobs. Cuts compute time from 40 hr to ~6 hr per parallel slot. Confirms the 100-IP rotation handles parallel load.
-6. **Where 0c runs.** Local workstation (operator-attached, 3-5 calendar days) vs Cloud Run job (background-detached, ~6-8 hours of billable compute). **Recommendation: Cloud Run job** for 0c; local for 0a/0b/0d.
+| # | Question | **Decision** | Notes |
+|---|---|---|---|
+| Q1 | 0a/0c parallelism | **SEQUENTIAL.** 0a completes + validates, then 0c starts. | Coordination cost of parallel writers exceeds the ~1-day savings. Conservative path. |
+| Q2 | 0d-pre #3 (defender geometry) timing vs 0c | **0d-pre #3 LANDS IN 0d-pre BEFORE 0c.** | Pipeline fixes always order before pipeline replay so the replay benefits. 0c picks up fixed extraction for free in a single pass. |
+| Q3 | Sidecar table vs merged into raw_shots | **MERGED INTO raw_shots.** | Schema already supports nullable moat columns (migration `20250122000000`). Single-table simpler than JOIN-everywhere. Sidecars drift over time. |
+| Q4 | 2017-18 inclusion (`shots_2017.csv`) | **YES — include.** Total 905K rows. | Veteran career arcs need pre-2018 data. Trivial cost for meaningful coverage improvement. |
+| Q5 | 0c partition strategy | **7 parallel `--season` jobs, with a small pre-test first.** | **Pre-test:** 7 concurrent scrapers × 5 games each = 35 games. Verify no rate limiting / Cloudflare 403. If rate-limited, throttle to 3-4 parallel for the full run. **Full run:** 7 parallel jobs, each handling one season's PbP replay independently. |
+| Q6 | Where 0c runs | **CLOUD RUN for 0c specifically.** 0a/0b/0d run local. | Cloud Run validates existing GCP infrastructure with real workload while not tying up local machine for 3-5 calendar days. |
 
-Each is decoupled — Garrett can approve a subset.
+The decisions interact:
+- Q1 + Q2 together yield the locked sequence: `0d-pre → 0a → 0b → 0c → 0d-post` (with 0b parallelizable to 0c per the dependency analysis but no longer to 0a).
+- Q5 + Q6 together yield the 0c execution shape: 7 Cloud Run jobs in parallel after a 35-game pre-test on 1-2 jobs to confirm rate-limit behavior under concurrent load.
+- Q3 means downstream queries don't need a JOIN to access moat features — `SELECT pass_quality_score FROM raw_shots` works regardless of season once 0c completes.
+
+### Locked Phase 0 sequence
+
+```
+0d-pre  (foundation fixes)
+   ├─ Defender geometry extraction logic fix
+   ├─ Shooter shift context extraction fix
+   ├─ Season column population on raw_shots / player_shifts / player_toi_by_situation
+   ├─ populate_player_directory.py one-time backfill (3 known orphans)
+   ├─ populate_player_directory.py daily cron schedule (.github/workflows/refresh-player-directory.yml)
+   ├─ Extraction backlog drain (~485 reg-season + 45 playoff games stuck in raw_nhl_data)
+   └─ Defensive GAR pipeline fix
+       ↓
+0a  (historical CSV load — local)
+   ├─ Load shots_2017.csv (119K rows, 2017-18 season) + shots_2018-2024.csv (786K rows, 7 seasons) into raw_shots
+   ├─ Moat features set to NULL for historical rows (NOT 0)
+   └─ Validate: row counts per season, schema integrity, no orphan player_ids
+       ↓ (raw_shots_season_populated FAIL → PASS)
+0b  (Oct-Dec 2025-26 gap fill — local)
+   ├─ Run scraper against ~360 missing games
+   └─ Validate: extraction backlog cleared, season totals match expected
+       ↓
+0c  (PbP API replay for moat features — Cloud Run)
+   ├─ PRE-TEST: 7 concurrent scrapers × 5 games each = 35 games. Verify no rate limits.
+   └─ FULL RUN: 7 parallel --season jobs in Cloud Run
+       Each season independent; failure of one doesn't block others
+       Validate: per-season moat NULL rates flip from 100% to low %
+       ↓
+0d-post  (full-corpus recomputes — local)
+   ├─ GAR recomputation against full multi-season data
+   ├─ Talent metrics recomputation
+   ├─ ROS projections refresh
+   └─ Validate: 14 freshness WARN tables flip to OK, model output baselines match expectations
+```
+
+### Items A and B status (2026-05-06)
+
+- **Item A approved with cron addition.** `populate_player_directory.py` re-run as the immediate orphan backfill (Garrett-authorized 2026-05-06); `.github/workflows/refresh-player-directory.yml` added for the daily cron going forward.
+- **Item B all 6 questions answered.** Locked above.
 
 ---
 

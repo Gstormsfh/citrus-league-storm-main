@@ -20,19 +20,26 @@ Also discovers players from our pipeline data that may not be on current rosters
 """
 
 import os
+import sys
 import time
 import datetime as dt
 from typing import Dict, Optional, Set
 import requests
 
+# Bootstrap data_pipeline package so imports work after R4 reorg moved this file
+# under scripts/utilities/ (was at repo root pre-monorepo, when bare imports worked).
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "data-pipeline"))
+import _bootstrap  # noqa: F401
+
 from dotenv import load_dotenv
-from src.utils.citrus_request import citrus_request
+from data_pipeline.utils.citrus_request import citrus_request
 
 print("[populate_player_directory] Loading environment variables...")
 load_dotenv()
 
 print("[populate_player_directory] Importing supabase_rest...")
-from supabase_rest import SupabaseRest
+from data_pipeline.utils.supabase_rest import SupabaseRest
 
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -410,7 +417,7 @@ def main() -> int:
       players_to_upsert = list(seen.values())
       print(f"[populate_player_directory] Upserting {len(players_to_upsert)} players...")
       db.upsert("player_directory", players_to_upsert, on_conflict="season,player_id")
-      print(f"[populate_player_directory] ✓ Successfully upserted {len(seen)} players")
+      print(f"[populate_player_directory] OK: Successfully upserted {len(seen)} players")
     except Exception as e:
       print(f"[populate_player_directory] ERROR: Failed to upsert players: {e}")
       import traceback

@@ -10,6 +10,13 @@ python data-pipeline/monitoring/critical_table_checks.py --baseline
 
 Run timestamp: `2026-05-06T07:01:04Z`
 
+**Update 2026-05-06 (later same day):** Item A orphan fix landed —
+`raw_shots_no_orphan_player_ids` flipped from WARN to PASS. Latest
+re-run: 11 PASS / 0 WARN / 1 FAIL (the FAIL is still the expected
+pre-Phase-0 `raw_shots_season_populated` sentinel). See
+`apps/web/docs/DATA_ORGANIZATION_AUDIT.md` § 10 for the orphan
+investigation + fix details.
+
 ## Summary
 
 | Status | Count |
