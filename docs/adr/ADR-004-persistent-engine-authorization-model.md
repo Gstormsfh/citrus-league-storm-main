@@ -2,7 +2,7 @@
 
 ## §1. Status & Authority
 
-**Status:** Proposed. Pending Zach ratification (async Slack or in-person review per the ADR-002/-003 ratification pattern).
+**Status:** All architectural decisions ratified by Zach 2026-05-06. ADR locked.
 
 **Date:** 2026-05-05.
 
@@ -346,9 +346,9 @@ ADR-004 establishes a two-layer security boundary for the persistent draft engin
 
 Garrett's recommendations are noted; Zach has authority to confirm, push back, or revise.
 
-- **§4 — Option 3 selection (extend service-role-trust pattern from commissioner-kind to user-kind).** ⏳ Pending Zach ratification. The existing `draft_pause` / `draft_resume` / `draft_extend` precedent is the strongest argument; if Zach disagrees with extending the pattern, ADR-004 needs to revisit Option 1 (per-connection Supabase JWT) as the next-best path.
-- **§5.1 — Migration shape (SQL `OR auth.role() IN ('service_role', 'postgres')` modification to user-kind branch).** ⏳ Pending Zach ratification. Five-line SQL change with a documented warning comment block. Migration filename and chunk slot (likely chunk 11g.6) are implementation-time decisions; the architectural shape is what's pending.
-- **§5.3 — Engine-side verification contract (engine MUST verify identity + team authorization before calling the RPC).** ⏳ Pending Zach ratification. This is the load-bearing requirement that makes Option 3 safe; if Zach pushes back on the engine-as-trusted-layer framing, the security model in §7 needs to be revisited.
+- **§4 — Option 3 selection (extend service-role-trust pattern from commissioner-kind to user-kind).** ✅ Ratified by Zach 2026-05-06. The existing `draft_pause` / `draft_resume` / `draft_extend` precedent was the load-bearing argument; Zach confirmed the extension is consistent with shipped Citrus convention rather than a novel pattern.
+- **§5.1 — Migration shape (SQL `OR auth.role() IN ('service_role', 'postgres')` modification to user-kind branch).** ✅ Ratified by Zach 2026-05-06. Five-line SQL change with a documented warning comment block. Migration lands in chunk 11g.6.
+- **§5.3 — Engine-side verification contract (engine MUST verify identity + team authorization before calling the RPC).** ✅ Ratified by Zach 2026-05-06. The load-bearing requirement that makes Option 3 safe is locked. Engine-side `verifyTeamAuthorization` callback (already shipped in chunk 11g.4 step 4) satisfies the contract today.
 
 ---
 
@@ -357,6 +357,7 @@ Garrett's recommendations are noted; Zach has authority to confirm, push back, o
 | Date | Author | Change |
 |---|---|---|
 | 2026-05-05 | Garrett Storms | Initial draft. Three options analyzed; Option 3 recommended grounded in (a) audit-trail integrity, (b) architectural cleanness, (c) consistency with the existing `service_role` trust pattern in `draft_pause` / `draft_resume` / `draft_extend` from migration `20260425140000_draft_engine_v2_rpcs.sql`. Pending Zach ratification per the ADR-002/-003 review pattern. |
+| 2026-05-06 | Zach Drever | Verbally ratified all three architectural decisions (§4 Option 3 selection, §5.1 migration shape, §5.3 engine-side verification contract). ADR-004 fully locked. Migration to modify `submit_pick_v2`'s user-kind branch + engine-side team-authorization verification both unblocked for chunk 11g.6 implementation. |
 
 ---
 
