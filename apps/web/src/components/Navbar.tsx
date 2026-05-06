@@ -382,7 +382,7 @@ const Navbar = () => {
 
       {/* ===== MOBILE: Slide-in menu ===== */}
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-pastel-surface/98 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
+        <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-pastel-surface animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
           <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3">
             {/* League context + switcher */}
             {user && !leagueLoading && userLeagues.length === 0 && (

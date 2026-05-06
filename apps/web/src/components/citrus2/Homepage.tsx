@@ -381,7 +381,10 @@ export function Homepage() {
             Scroll for more →
           </span>
         </div>
-        <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6 snap-x snap-mandatory">
+        <div
+          className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6 snap-x snap-mandatory"
+          style={{ touchAction: 'pan-x' }}
+        >
           {GAME_MODES.map((g) => (
             <GameModeCard key={g.label} {...g} />
           ))}
