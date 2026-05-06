@@ -1,11 +1,11 @@
 // CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
-// CATEGORY: ORPHAN-SUSPECTED
-// Purpose:     Import schedule from Excel (one-off setup tool)
-// Last active: 2026-03-01
-// Invoked:     no current invocations found
+// CATEGORY: DEPRECATED
+// Purpose:     Import schedule from Excel (one-off setup tool, kept for reference)
+// Last active: (uncommitted)
+// Invoked:     (none — moved out of scripts/ root by R5)
 // Reads:       user-supplied .xlsx
-// Writes:      nhl_games
-// Note:        RESOLVE: confirm not used anymore
+// Writes:      (not invoked)
+// Note:        No current canonical replacement — was a one-time offline-import path during initial setup.
 // ────────────────────────────────────────────────────────────
 /**
  * Script to import NHL schedule from Excel file

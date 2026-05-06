@@ -79,7 +79,7 @@ Every move has a paired before/after location. Rollback is `git mv -k` reversal 
 
 | Table | Rows | Status | Concern |
 |---|---|---|---|
-| `player_shifts_official` | 198,110 (pg_class) / 0 (list_tables) | **MYSTERY** | List_tables and pg_class disagree by 198K rows. Possibly a recently-loaded table with stale ANALYZE statistics |
+| `player_shifts_official` | 198,988 (verified by COUNT) | **CONFIRMED ACTIVE** *(R5 §7.6)* | Daily writes via `data-pipeline/acquisition/ingest_shiftcharts.py`; read by `simulate_matchups.py` + `extractor_job.py`. Earlier "list_tables=0" reading was a tool false-signal, not a real data state. |
 | `raw_player_stats` | 15,489 | **RLS-DISABLED** | Source unclear; never seen in app queries; advisory flagged |
 | `staging_2024_skaters` | 4,600 | **RLS-DISABLED + LIKELY-ORPHAN** | Naming suggests 2024-25 staging that was never cleaned up |
 | `staging_2025_skaters` | 3,945 | **RLS-DISABLED + LIKELY-ORPHAN** | Same |
@@ -87,9 +87,9 @@ Every move has a paired before/after location. Rollback is `git mv -k` reversal 
 | `staging_2025_goalies` | 390 | **RLS-DISABLED + LIKELY-ORPHAN** | Same |
 | `team_stats` | 32 | **RLS-DISABLED** | App-data flavor; possibly used somewhere |
 | `players` (lowercase, 801 rows) | 801 | **RLS-DISABLED** | Distinct from the regular Supabase `auth.users`/`profiles` flow. Source unclear |
-| `public.public.players` | 0 / -1 (-1 means never analyzed) | **DEFINITELY-BROKEN** | Table literally named `public.players` inside the public schema. Almost certainly an artifact of a malformed migration |
+| `public.public.players` | 0 / -1 (-1 means never analyzed) | **DROPPED 2026-05-05** *(R5 disposition)* | Was a malformed-migration artifact. Removed via `supabase/migrations/20260505200000_drop_legacy_public_players_table.sql` with self-defending row-count guard. |
 | `2025_Skaters` | 0 / -1 | **LIKELY-ORPHAN** | Capital-letter name suggests a one-off CSV import that never got cleaned up |
-| `integrity_check_results` | 65,431 | **CHECK USAGE** | Large; written by some monitoring script but unclear which |
+| `integrity_check_results` | 68,693 (current) | **CONFIRMED ACTIVE** *(R5 §7.4)* | Production integrity logging since 2026-01-16. 5 distinct check types, daily writes through 2026-05-06. Writers: `verify_data_integrity.py`, `reconcile_player_stats.py`, plus stored procs in `20260116000003_create_integrity_checks.sql` + `20260402000000_repair_stale_team_lineups.sql`. RLS-protected (commissioner-only view). |
 | `team_lineups_backup_log` | 0 | **EMPTY** | Defined but never written; may be unused safety-net |
 
 **staging (`jjgspcpvqaiitloglxbb`):** mostly empty mirror; **`goalie_gsax_primary` has 82 rows here vs 0 in prod** — likely from an earlier staging-load test that wasn't synchronized to prod.

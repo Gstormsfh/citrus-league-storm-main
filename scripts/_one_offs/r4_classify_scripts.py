@@ -14,6 +14,7 @@ Categories applied:
 - UTILITY: manual operator tool, kept available
 - DEBUG-ONLY: forensics tooling, not invoked by any pipeline
 - ORPHAN-SUSPECTED: no clear references found, R5 should resolve
+- DEPRECATED: confirmed orphan, moved to scripts/_deprecated/ (R5 disposition)
 - DESTRUCTIVE: writes/deletes that could damage prod data — extreme caution
 """
 from __future__ import annotations
@@ -858,37 +859,46 @@ HEADERS: dict[str, tuple[str, str, str, str, str, str]] = {
         "(returns validated config)",
         "",
     ),
-    "scripts/fetch-nhl-players.ts": (
-        "ORPHAN-SUSPECTED",
-        "Fetch NHL player metadata (likely setup-era; superseded by populate_player_directory.py)",
-        "no current invocations found",
+    # ── Deprecated (moved 2026-05-05 by R5 dispositions) ────────────
+    "scripts/_deprecated/fetch-nhl-players.ts": (
+        "DEPRECATED",
+        "Fetch NHL player metadata (setup-era TS one-off, kept for reference)",
+        "(none — moved out of scripts/ root by R5)",
         "NHL API",
-        "(early-era table; possibly players)",
-        "RESOLVE: grep for invocations; remove if confirmed orphan after R5",
+        "(early-era table; not invoked)",
+        "Superseded by data-pipeline/acquisition/data_acquisition.py + scripts/utilities/populate_player_directory.py. See scripts/_deprecated/README.md.",
     ),
-    "scripts/fetch-nhl-schedule.ts": (
-        "ORPHAN-SUSPECTED",
-        "Fetch NHL schedule (likely setup-era; superseded by Python ingest_playoff_schedule.py)",
-        "no current invocations found",
+    "scripts/_deprecated/fetch-nhl-schedule.ts": (
+        "DEPRECATED",
+        "Fetch NHL schedule (setup-era TS one-off, kept for reference)",
+        "(none — moved out of scripts/ root by R5)",
         "NHL API",
-        "nhl_games (probably)",
-        "RESOLVE: grep for invocations; remove if confirmed orphan after R5",
+        "(not invoked)",
+        "Superseded by data-pipeline/acquisition/ingest_playoff_schedule.py + the schedule discovery in data_scraping_service.py.",
     ),
-    "scripts/import-schedule-from-csv.ts": (
-        "ORPHAN-SUSPECTED",
-        "Import schedule from CSV (one-off setup tool)",
-        "no current invocations found",
+    "scripts/_deprecated/import-schedule-from-csv.ts": (
+        "DEPRECATED",
+        "Import schedule from CSV (one-off setup tool, kept for reference)",
+        "(none — moved out of scripts/ root by R5)",
         "user-supplied CSV",
-        "nhl_games",
-        "RESOLVE: confirm not used anymore",
+        "(not invoked)",
+        "No current canonical replacement — was a one-time offline-import path during initial setup.",
     ),
-    "scripts/import-schedule-from-excel.ts": (
-        "ORPHAN-SUSPECTED",
-        "Import schedule from Excel (one-off setup tool)",
-        "no current invocations found",
+    "scripts/_deprecated/import-schedule-from-excel.ts": (
+        "DEPRECATED",
+        "Import schedule from Excel (one-off setup tool, kept for reference)",
+        "(none — moved out of scripts/ root by R5)",
         "user-supplied .xlsx",
-        "nhl_games",
-        "RESOLVE: confirm not used anymore",
+        "(not invoked)",
+        "No current canonical replacement — was a one-time offline-import path during initial setup.",
+    ),
+    "scripts/_deprecated/delete-all-draft-data.sql": (
+        "DEPRECATED",
+        "Wipe all draft data (functional near-duplicate of nuke-all-draft-data.sql)",
+        "(none — moved out of scripts/ root by R5)",
+        "(none)",
+        "(not invoked)",
+        "Superseded by scripts/nuke-all-draft-data.sql which uses a safer WHERE clause on the leagues UPDATE. See scripts/_deprecated/README.md.",
     ),
     "scripts/populate-nhl-teams-and-normalize.ts": (
         "UTILITY",
@@ -950,11 +960,11 @@ HEADERS: dict[str, tuple[str, str, str, str, str, str]] = {
     # ── scripts/ root SQL — DESTRUCTIVE family ──────────────────────
     "scripts/nuke-all-draft-data.sql": (
         "DESTRUCTIVE",
-        "Wipe all draft-related rows for a league",
+        "Wipe all draft-related rows across all leagues",
         "manual via Supabase SQL Editor; review before run",
         "(none)",
-        "draft_events, draft_picks, draft_picks_v2, draft_order, draft_queues — DELETEs",
-        "RECOVERY: Supabase 7-day PITR. Take a backup before running.",
+        "draft_picks (DELETE all), draft_order (DELETE all), leagues.draft_status (UPDATE in_progress|completed → not_started)",
+        "RECOVERY: Supabase 7-day PITR. Take a backup before running. Note: does NOT touch draft_events / draft_picks_v2 / draft_queues — earlier headers were aspirational; corrected per R5 §7.7 audit.",
     ),
     "scripts/nuke-all-teams-comprehensive.sql": (
         "DESTRUCTIVE",
@@ -972,14 +982,9 @@ HEADERS: dict[str, tuple[str, str, str, str, str, str]] = {
         "teams (DELETE + INSERT)",
         "RECOVERY: PITR + manual re-seeding via populate-nhl-teams-and-normalize.ts.",
     ),
-    "scripts/delete-all-draft-data.sql": (
-        "DESTRUCTIVE",
-        "Wipe all draft data (alternate spelling of nuke-all-draft-data — possibly duplicate)",
-        "manual via Supabase SQL Editor; review before run",
-        "(none)",
-        "draft_events, draft_picks, draft_picks_v2 — DELETEs",
-        "RECOVERY: PITR. Confirm whether duplicate of nuke-all-draft-data.sql.",
-    ),
+    # scripts/delete-all-draft-data.sql moved to scripts/_deprecated/ during
+    # R5 dispositions (2026-05-05). Manifest entry now lives in the
+    # _deprecated section above with DEPRECATED category.
     "scripts/complete-draft-reset.sql": (
         "DESTRUCTIVE",
         "Full draft reset (combination of delete-all-draft-data + reset draft state)",
@@ -1121,10 +1126,20 @@ def comment_prefix_for(path: Path) -> str:
 
 
 _CLASSIFICATION_SUBJECT_TOKENS = (
+    # Anything that mentions the per-script header system
     "CITRUS-CLASSIFICATION",
+    # R4 phase commit subjects (initial + patches)
     "R4 — classify",
     "R4: classify",
+    "R4 patch",
     "classify pipeline + utility scripts",
+    # R5 phase commit subjects (audit doc + dispositions)
+    "R5 — orphan triage",
+    "R5 — orphan",
+    "R5 dispositions",
+    "Last active date field",
+    # Forward compatibility — any future reorg phase committing to the
+    # classification system should add its subject signature here.
 )
 
 

@@ -1,11 +1,11 @@
 // CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
-// CATEGORY: ORPHAN-SUSPECTED
-// Purpose:     Fetch NHL schedule (likely setup-era; superseded by Python ingest_playoff_schedule.py)
-// Last active: 2026-02-27
-// Invoked:     no current invocations found
+// CATEGORY: DEPRECATED
+// Purpose:     Fetch NHL schedule (setup-era TS one-off, kept for reference)
+// Last active: (uncommitted)
+// Invoked:     (none — moved out of scripts/ root by R5)
 // Reads:       NHL API
-// Writes:      nhl_games (probably)
-// Note:        RESOLVE: grep for invocations; remove if confirmed orphan after R5
+// Writes:      (not invoked)
+// Note:        Superseded by data-pipeline/acquisition/ingest_playoff_schedule.py + the schedule discovery in data_scraping_service.py.
 // ────────────────────────────────────────────────────────────
 /**
  * Script to fetch and store NHL schedule data from NHL Stats API
