@@ -11,7 +11,7 @@ import http from 'node:http';
 import WebSocket from 'ws';
 
 const PORT = Number(process.env.PORT || 14002);
-const HOST = '127.0.0.1';
+const HOST = process.env.HOST || '127.0.0.1';
 const { TOKEN_VALID_A, TOKEN_VALID_B, TOKEN_WRONG_SECRET } = process.env;
 
 if (!TOKEN_VALID_A || !TOKEN_VALID_B || !TOKEN_WRONG_SECRET) {
