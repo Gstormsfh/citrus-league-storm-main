@@ -64,7 +64,16 @@ graph + renders it as a static HTML page committed to the repo.
 
 ---
 
-## R7-2 — Data quality checks on critical tables
+## R7-2 — Data quality checks on critical tables  ✅ COMPLETE 2026-05-06
+
+**Status:** landed at `data-pipeline/monitoring/critical_table_checks.py`.
+12 checks declared, all wired into `integrity_check_results` writes and
+`AlertManager` dispatch (PAGE → PagerDuty + Slack, WARN → Slack only).
+Baseline captured in `R7_2_BASELINE.md`: 10 PASS, 1 WARN (real signal —
+3 raw_shots player_ids with 17-27 playoff shots each are missing from
+player_directory; ticket-worthy follow-up), 1 FAIL (raw_shots.season is
+100% NULL — expected pre-Phase-0 sentinel that should flip to PASS after
+Phase 0a season backfill).
 
 **Goal:** automated tests run nightly on `raw_shots`, `player_game_stats`,
 `player_season_stats`, `player_gar_components`, etc. Catch silent
