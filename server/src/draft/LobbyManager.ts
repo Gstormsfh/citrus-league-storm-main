@@ -1,28 +1,35 @@
 // Phase 4.5 chunk 11g.4 — LobbyManager: in-memory state machine + single-
 // writer queue per active draft.
 //
-// Step 6a of chunk 11g.4: the state machine. Replaces the hardcoded
-// round=1/pickNumber=1 from step 2 with values computed from a
-// pre-loaded draft-order slot list (Path B per chunk-6a recon: load
-// from `public.draft_order` rather than regenerate in-engine, so the
-// engine and `submit_pick_v2`'s on-clock check validate against the
-// identical view — eliminates the commissioner-customTeamOrder
-// divergence risk). Adds engine-side team-authorization verification
-// per ADR-004 §5.3 (engine MUST verify before calling submit_pick_v2
-// with actor.kind='user'); auth runs BEFORE on-clock check so a
-// non-manager probing the WS doesn't get on-clock information leaked
-// via differentiated error reasons.
+// Step 6b of chunk 11g.4: bootstrap from the durable event log. The
+// `init()` method (called by `LobbyRegistry.constructLobby` after
+// construction) replays every `draft_events` row for the league via
+// `DraftServiceV2.listDraftEvents`, dispatching on `event_type` to
+// hydrate the in-memory state machine. Process restart, eviction,
+// and horizontal scaling no longer cost user-visible state.
 //
-// **Step 6a is fresh-start-only.** A LobbyManager constructed in 6a
-// assumes the draft starts at picksMade=0. Production server restart
-// mid-draft is incorrect until step 6b ships event-log bootstrap. The
-// `existingPicksMade` constructor option is the forward-compat hook
-// that 6b populates after replaying the durable event log; in 6a it
-// defaults to 0 and zero callers exercise it.
+// Step 6b dispatches all 11 currently-shipping `event_type` values:
+//   - `pick`: validate payload against `draftOrder[picksMade]`,
+//     append to ring buffer (translated to application-layer kind
+//     `pick_submitted`), advance state.
+//   - `pick_undone`: validate payload against `draftOrder[picksMade-1]`,
+//     append to ring buffer, decrement state, transition status if
+//     applicable.
+//   - `commissioner_override`: advance state without on-clock check
+//     (commissioner authoritatively decides).
+//   - `draft_completed`: explicit transition to `completed`.
+//   - `draft_cancelled`: explicit transition to `cancelled`.
+//   - `draft_paused` / `draft_resumed` / `draft_extended`: skip-with-
+//     debug-log; chunk 11g.4 step 6c picks these up when timers land.
+//   - `autopick_failed` / `generation_bumped`: skip-with-debug-log;
+//     diagnostic / internal.
+//   - unknown event types: skip-with-warn-log; forward-compat for
+//     chunk 11g.6 auction event types and any future additions.
+//
+// Step 6a's `existingPicksMade` forward-compat hook is removed —
+// bootstrap replaces it entirely.
 //
 // Future sub-steps:
-//   - 6b: bootstrap from event log on construction (process restart
-//          recovery for already-in-progress drafts)
 //   - 6c: pick deadlines + autopick (timer per lobby; deadline
 //          expiry triggers autopick via the queue)
 //
@@ -68,6 +75,7 @@ import { logger } from '@citrus/shared';
 import { AppError } from '../lib/errors';
 import {
   DraftServiceV2,
+  type DraftEventRow,
   type DraftV2Actor,
   type SubmitPickResult,
 } from '../services/DraftServiceV2';
@@ -150,18 +158,6 @@ export interface LobbyManagerOptions {
     teamId: string,
   ) => Promise<TeamAuthorizationResult>;
 
-  /**
-   * **Forward-compat hook for chunk 11g.4 step 6b** (event-log
-   * bootstrap on process restart). When step 6b replays the durable
-   * event log, it sets this to the count of `pick_submitted` events
-   * already recorded for the league; the LobbyManager resumes from
-   * that index in the draft order.
-   *
-   * Step 6a always passes 0 (or omits — defaults to 0). 6a is
-   * fresh-start-only by design; production server restart mid-draft
-   * remains incorrect until 6b ships.
-   */
-  existingPicksMade?: number;
 }
 
 /**
@@ -237,26 +233,37 @@ export class LobbyManager {
   /**
    * Number of successful, non-duplicate picks recorded so far.
    * Advances by 1 on every `processSubmitPick` success path that
-   * gets a `was_duplicate=false` from the RPC.
-   *
-   * **Step 6a starts at `existingPicksMade ?? 0`** — production
-   * restart mid-draft is incorrect until step 6b's event-log
-   * bootstrap sets this from the durable record.
+   * gets a `was_duplicate=false` from the RPC. Step 6b's bootstrap
+   * sets the initial value from the durable event log on `init()`.
    */
-  private picksMade: number;
+  private picksMade = 0;
 
   /**
    * Lifecycle phase per `DraftStatus`. Transitions:
-   *   - constructor: `not_started` (or `in_progress` / `completed`
-   *     if `existingPicksMade > 0` per the 6b forward-compat hook)
+   *   - constructor: `not_started` (always — bootstrap mutates during
+   *     `init()` if the durable log shows in-progress / completed /
+   *     cancelled state)
    *   - first successful pick: `not_started → in_progress`
    *   - final pick (`picksMade === draftOrder.length`):
    *     `in_progress → completed`
+   *   - durable `draft_completed` event: explicit `completed`
+   *   - durable `draft_cancelled` event: explicit `cancelled`
+   *   - durable `pick_undone` event: rewinds picksMade and may
+   *     transition `completed → in_progress` or `in_progress →
+   *     not_started` if the undo was the only pick
    *
    * Auction lobbies stay at `not_started` until chunk 11g.6
    * introduces auction-specific lifecycle wiring.
    */
-  private draftStatus: DraftStatus;
+  private draftStatus: DraftStatus = 'not_started';
+
+  /**
+   * Bootstrap-completion flag. The constructor leaves this `false`;
+   * `init()` flips it to `true` after replaying the event log.
+   * `processSubmitPick` throws if invoked while `false` (programmer
+   * error — caller forgot to await `init()`).
+   */
+  private initialized = false;
 
   /**
    * uWS pub/sub topic name for this lobby. Step-5 broadcasts
@@ -339,38 +346,47 @@ export class LobbyManager {
     this.verifyTeamAuthorization = opts.verifyTeamAuthorization;
     this.draftOrder = opts.draftOrder;
     this.topicName = `draft:${opts.lobbyId}`;
-
-    // Step 6b forward-compat: start at `existingPicksMade` if the
-    // bootstrap path supplies it; otherwise zero. Step 6a always
-    // takes the zero path.
-    this.picksMade = opts.existingPicksMade ?? 0;
-    this.draftStatus = this.computeInitialStatus();
-
+    // `picksMade`, `draftStatus`, `initialized` are zero-initialized
+    // at the field declaration above. `init()` mutates them during
+    // event-log replay.
     logger.info(
-      `[lobby] LobbyManager constructed lobbyId=${opts.lobbyId} format=${opts.format} leagueId=${opts.leagueId} topic=${this.topicName} totalPicks=${this.draftOrder.length} picksMade=${this.picksMade} status=${this.draftStatus}`,
+      `[lobby] LobbyManager constructed (pre-init) lobbyId=${opts.lobbyId} format=${opts.format} leagueId=${opts.leagueId} topic=${this.topicName} totalPicks=${this.draftOrder.length}`,
     );
   }
 
   /**
-   * Determine the initial `draftStatus` based on `picksMade` vs the
-   * draft order length. For step 6a this is always `not_started`
-   * (picksMade=0). Step 6b's bootstrap path may construct a lobby
-   * with picksMade > 0, in which case the status is `in_progress`
-   * (or `completed` if all picks have been recorded). Auction lobbies
-   * with empty draftOrder stay `not_started` — chunk 11g.6 owns
-   * auction-status lifecycle.
+   * Bootstrap from the durable `draft_events` log. MUST be called
+   * after construction and BEFORE any `processSubmitPick` invocation.
+   * `LobbyRegistry.constructLobby` (chunk 11g.4 step 4 / 6b) awaits
+   * this before returning the LobbyManager.
+   *
+   * Idempotent — calling twice is a safe no-op (the `initialized`
+   * flag short-circuits). Bootstrap-twice would double-replay the
+   * event log and corrupt state, so this guard is load-bearing.
+   *
+   * Construction failures (DB query rejection, event log integrity
+   * error) propagate as thrown errors. The registry's existing
+   * Promise-placeholder pattern handles the propagation: the failed
+   * placeholder is deleted from the map so the next caller can
+   * retry from scratch (chunk 11g.4 step 4 design).
+   *
+   * Future replacement contract (chunk 11g.7): bootstrap will read
+   * from a snapshot table + events-since-snapshot rather than full
+   * replay. The init() interface stays the same; only the internal
+   * `bootstrap()` implementation changes.
    */
-  private computeInitialStatus(): DraftStatus {
-    if (this.draftOrder.length === 0) {
-      return 'not_started';
+  async init(): Promise<void> {
+    if (this.initialized) {
+      logger.debug(
+        `[lobby] init() called more than once — no-op lobbyId=${this.lobbyId}`,
+      );
+      return;
     }
-    if (this.picksMade === 0) {
-      return 'not_started';
-    }
-    if (this.picksMade >= this.draftOrder.length) {
-      return 'completed';
-    }
-    return 'in_progress';
+    await this.bootstrap();
+    this.initialized = true;
+    logger.info(
+      `[lobby] init complete lobbyId=${this.lobbyId} picksMade=${this.picksMade} status=${this.draftStatus} bufferSize=${this.events.size()}`,
+    );
   }
 
   /**
@@ -531,6 +547,21 @@ export class LobbyManager {
    * stubs until the auction state machine lands.
    */
   async enqueueAction(action: DraftAction): Promise<DraftActionResult> {
+    // Step 6b init guard. The LobbyManager state machine MUST be
+    // bootstrapped before any action can be processed — running an
+    // action with picksMade=0 / draftStatus='not_started' when the
+    // durable log says otherwise would silently corrupt state. This
+    // is a programmer error (caller forgot to await `init()`), not a
+    // runtime condition. Logged at error level + thrown synchronously
+    // BEFORE the queue chain — so it propagates as a rejected Promise
+    // (visible to `await enqueueAction`) rather than getting masked
+    // by the queue's catch-and-convert-to-internal_error pattern.
+    if (!this.initialized) {
+      const msg = `[lobby] enqueueAction called before init() — caller MUST await LobbyManager.init() lobbyId=${this.lobbyId} actionKind=${action.kind}`;
+      logger.error(msg);
+      throw new Error(msg);
+    }
+
     // Idempotency check: if we've seen this key (either in-flight or
     // resolved), return the same promise. Concurrent same-key callers
     // get a shared promise; processAction runs at most once.
@@ -757,14 +788,15 @@ export class LobbyManager {
       return { ok: false, reason: 'unauthorized' };
     }
 
-    // Step 3: status check. Already-completed drafts cannot accept
-    // more picks — return `invalid_state` for an informative client
-    // signal. Runs BEFORE on-clock so the response distinguishes
-    // "draft is over" from "your team isn't on the clock" (which
-    // would be the misleading reading of a completed-draft slot
-    // lookup, since `draftOrder[picksMade]` is undefined past the
-    // last pick).
-    if (this.draftStatus === 'completed') {
+    // Step 3: status check. Already-completed/cancelled drafts cannot
+    // accept more picks — return `invalid_state` for an informative
+    // client signal. Runs BEFORE on-clock so the response
+    // distinguishes "draft is over" from "your team isn't on the
+    // clock" (which would be the misleading reading of a completed-
+    // draft slot lookup, since `draftOrder[picksMade]` is undefined
+    // past the last pick). Step 6b adds `cancelled` as a terminal
+    // state alongside `completed`.
+    if (this.draftStatus === 'completed' || this.draftStatus === 'cancelled') {
       return { ok: false, reason: 'invalid_state' };
     }
 
@@ -977,5 +1009,301 @@ export class LobbyManager {
       }
     }
     this.seenIdempotencyKeys.set(key, result);
+  }
+
+  // ── Step 6b: bootstrap from event log ──────────────────────────────
+
+  /**
+   * Read the durable event log for this lobby's `leagueId` and
+   * replay each row into the in-memory state machine. Validates
+   * seq contiguity, payload-vs-draftOrder consistency for pick
+   * events, and emits typed errors on any inconsistency.
+   *
+   * Performance: typical 12-team × 21-round draft (252 events) is a
+   * single index scan on `(league_id, seq)` plus an in-memory walk;
+   * end-to-end latency is dominated by the round-trip to Postgres
+   * (~10-50ms in production, <1ms in unit tests with mocked service).
+   */
+  private async bootstrap(): Promise<void> {
+    const startTime = Date.now();
+
+    let events: DraftEventRow[];
+    try {
+      events = await this.draftService.listDraftEvents(this.leagueId);
+    } catch (err) {
+      logger.error(
+        `[lobby] bootstrap listDraftEvents failed lobbyId=${this.lobbyId} leagueId=${this.leagueId}`,
+        err,
+      );
+      throw err;
+    }
+
+    let prevSeq: number | null = null;
+    let pickEventCount = 0;
+    let undoneEventCount = 0;
+    let overrideEventCount = 0;
+    let skippedCount = 0;
+
+    for (const event of events) {
+      // Seq contiguity: every event's seq is exactly prevSeq + 1.
+      // Gaps mean either silent log corruption or a missing event
+      // that the snapshot path should fix (chunk 11g.7); fail loudly.
+      if (prevSeq !== null && event.seq !== prevSeq + 1) {
+        throw new Error(
+          `[lobby] bootstrap seq gap detected lobbyId=${this.lobbyId} ` +
+            `prevSeq=${prevSeq} got=${event.seq}`,
+        );
+      }
+      prevSeq = event.seq;
+
+      switch (event.event_type) {
+        case 'pick':
+          // **Wire-format note:** durable `event_type === 'pick'` per
+          // the migration's CHECK enum
+          // (`20260425130000_draft_engine_v2_foundation.sql:36-48`).
+          // Application-layer `BufferedDraftEvent.kind ===
+          // 'pick_submitted'` is the client-facing rename per the
+          // action-vs-event naming convention from chunk 11g.4 step 3
+          // / ADR-002 §4.1. Translation happens inside
+          // `applyPickEvent` below.
+          this.applyPickEvent(event);
+          pickEventCount++;
+          break;
+        case 'pick_undone':
+          this.applyPickUndoneEvent(event);
+          undoneEventCount++;
+          break;
+        case 'commissioner_override':
+          this.applyCommissionerOverrideEvent(event);
+          overrideEventCount++;
+          break;
+        case 'draft_completed':
+          // Belt-and-suspenders alongside the natural picksMade ===
+          // draftOrder.length derivation in applyPickEvent. A draft
+          // can be marked complete by the commissioner before all
+          // slots are filled (early termination); in that case the
+          // explicit event is the source of truth.
+          this.draftStatus = 'completed';
+          skippedCount++;
+          break;
+        case 'draft_cancelled':
+          this.draftStatus = 'cancelled';
+          skippedCount++;
+          break;
+        case 'draft_paused':
+        case 'draft_resumed':
+        case 'draft_extended':
+          // Timer/deadline state. No picksMade impact. Becomes
+          // 6c-relevant when timers land. Decision Log entry on
+          // 2026-05-05 tracks the deferral.
+          logger.debug(
+            `[lobby] bootstrap skipping timer-state event_type=${event.event_type} ` +
+              `seq=${event.seq} lobbyId=${this.lobbyId}`,
+          );
+          skippedCount++;
+          break;
+        case 'autopick_failed':
+        case 'generation_bumped':
+          // Diagnostic / internal versioning. No state-machine impact.
+          logger.debug(
+            `[lobby] bootstrap skipping diagnostic event_type=${event.event_type} ` +
+              `seq=${event.seq} lobbyId=${this.lobbyId}`,
+          );
+          skippedCount++;
+          break;
+        default:
+          // Forward-compat for chunk 11g.6 auction events
+          // (`auction_*` per ADR-002 §4.1) and any future additions.
+          // Today the migration's CHECK enum doesn't admit these, so
+          // encountering one means the CHECK was ALTERed by a newer
+          // chunk that this engine doesn't understand yet.
+          logger.warn(
+            `[lobby] bootstrap unknown event_type=${event.event_type} ` +
+              `seq=${event.seq} lobbyId=${this.lobbyId} ` +
+              `(forward-compat skip — chunk 11g.6 / ADR-002 §4.1 may handle)`,
+          );
+          skippedCount++;
+          break;
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    logger.info(
+      `[lobby] bootstrap replay complete lobbyId=${this.lobbyId} ` +
+        `totalEvents=${events.length} pickEvents=${pickEventCount} ` +
+        `undoneEvents=${undoneEventCount} overrideEvents=${overrideEventCount} ` +
+        `skipped=${skippedCount} picksMade=${this.picksMade} ` +
+        `status=${this.draftStatus} duration=${duration}ms`,
+    );
+  }
+
+  /**
+   * Bootstrap handler for `event_type === 'pick'`. Validates the
+   * payload against the expected slot at `draftOrder[picksMade]`,
+   * appends a translated `pick_submitted` entry to the ring buffer,
+   * advances `picksMade` and `draftStatus`.
+   */
+  private applyPickEvent(event: DraftEventRow): void {
+    if (this.picksMade >= this.draftOrder.length) {
+      throw new Error(
+        `[lobby] bootstrap pick event past draft order ` +
+          `lobbyId=${this.lobbyId} seq=${event.seq} ` +
+          `picksMade=${this.picksMade} totalPicks=${this.draftOrder.length}`,
+      );
+    }
+    const slot = this.draftOrder[this.picksMade];
+    const payload = event.payload as Record<string, unknown>;
+    const teamId = payload.team_id;
+    const pickNumber = payload.pick_number;
+    const round = payload.round;
+    const playerId = payload.player_id;
+
+    if (teamId !== slot.teamId) {
+      throw new Error(
+        `[lobby] bootstrap pick team mismatch lobbyId=${this.lobbyId} ` +
+          `seq=${event.seq} slot=${this.picksMade} expected=${slot.teamId} ` +
+          `got=${String(teamId)}`,
+      );
+    }
+    if (pickNumber !== slot.pickNumber) {
+      throw new Error(
+        `[lobby] bootstrap pick number mismatch lobbyId=${this.lobbyId} ` +
+          `seq=${event.seq} expected=${slot.pickNumber} got=${String(pickNumber)}`,
+      );
+    }
+    if (round !== slot.round) {
+      throw new Error(
+        `[lobby] bootstrap pick round mismatch lobbyId=${this.lobbyId} ` +
+          `seq=${event.seq} expected=${slot.round} got=${String(round)}`,
+      );
+    }
+
+    // Translate from durable wire form ('pick') to application-layer
+    // form ('pick_submitted') per the action-vs-event naming
+    // convention (chunk 11g.4 step 3 / ADR-002 §4.1).
+    const buffered: BufferedDraftEvent = {
+      kind: 'pick_submitted',
+      seq: event.seq,
+      timestamp: event.created_at,
+      teamId: slot.teamId,
+      playerId: typeof playerId === 'number' ? playerId : 0,
+      roundNumber: slot.round,
+      pickNumber: slot.pickNumber,
+      correlationId: event.idempotency_key ?? '',
+    };
+    this.events.append(buffered);
+
+    this.picksMade++;
+    if (this.draftStatus === 'not_started') {
+      this.draftStatus = 'in_progress';
+    }
+    if (this.picksMade >= this.draftOrder.length) {
+      this.draftStatus = 'completed';
+    }
+  }
+
+  /**
+   * Bootstrap handler for `event_type === 'pick_undone'`. Validates
+   * the payload against the slot at `draftOrder[picksMade - 1]`
+   * (the most-recent completed pick), appends a `pick_undone`
+   * entry to the ring buffer, decrements `picksMade`, and may
+   * transition `draftStatus` backwards (`completed → in_progress`,
+   * or `in_progress → not_started` if the undo was the only pick).
+   */
+  private applyPickUndoneEvent(event: DraftEventRow): void {
+    if (this.picksMade === 0) {
+      throw new Error(
+        `[lobby] bootstrap pick_undone with no prior picks ` +
+          `lobbyId=${this.lobbyId} seq=${event.seq}`,
+      );
+    }
+    const slotIndex = this.picksMade - 1;
+    const slot = this.draftOrder[slotIndex];
+    const payload = event.payload as Record<string, unknown>;
+    const teamId = payload.team_id;
+    const pickNumber = payload.pick_number;
+    const round = payload.round;
+    const playerId = payload.player_id;
+    const undoneSeq = payload.undone_seq;
+
+    if (
+      teamId !== slot.teamId ||
+      pickNumber !== slot.pickNumber ||
+      round !== slot.round
+    ) {
+      throw new Error(
+        `[lobby] bootstrap pick_undone payload mismatch ` +
+          `lobbyId=${this.lobbyId} seq=${event.seq} slot=${slotIndex} ` +
+          `expected={team:${slot.teamId},pick:${slot.pickNumber},round:${slot.round}} ` +
+          `got={team:${String(teamId)},pick:${String(pickNumber)},round:${String(round)}}`,
+      );
+    }
+
+    const buffered: BufferedDraftEvent = {
+      kind: 'pick_undone',
+      seq: event.seq,
+      timestamp: event.created_at,
+      teamId: slot.teamId,
+      playerId: typeof playerId === 'number' ? playerId : 0,
+      roundNumber: slot.round,
+      pickNumber: slot.pickNumber,
+      correlationId: event.idempotency_key ?? '',
+      undoneSeq: typeof undoneSeq === 'number' ? undoneSeq : 0,
+    };
+    this.events.append(buffered);
+
+    this.picksMade--;
+    if (this.draftStatus === 'completed') {
+      this.draftStatus = 'in_progress';
+    }
+    if (this.picksMade === 0) {
+      this.draftStatus = 'not_started';
+    }
+  }
+
+  /**
+   * Bootstrap handler for `event_type === 'commissioner_override'`.
+   * Advances `picksMade` and `draftStatus` like a regular pick BUT
+   * without validating against `draftOrder[picksMade]` — the
+   * commissioner has authoritatively decided the pick. The
+   * commissioner's payload values (team_id, pick_number, round,
+   * player_id) are taken at face value and stored on the buffered
+   * event for client rendering.
+   */
+  private applyCommissionerOverrideEvent(event: DraftEventRow): void {
+    if (this.picksMade >= this.draftOrder.length) {
+      throw new Error(
+        `[lobby] bootstrap commissioner_override past draft order ` +
+          `lobbyId=${this.lobbyId} seq=${event.seq} ` +
+          `picksMade=${this.picksMade} totalPicks=${this.draftOrder.length}`,
+      );
+    }
+    const payload = event.payload as Record<string, unknown>;
+    const teamId = payload.team_id;
+    const pickNumber = payload.pick_number;
+    const round = payload.round;
+    const playerId = payload.player_id;
+    const reason = payload.reason;
+
+    const buffered: BufferedDraftEvent = {
+      kind: 'commissioner_override',
+      seq: event.seq,
+      timestamp: event.created_at,
+      teamId: typeof teamId === 'string' ? teamId : '',
+      playerId: typeof playerId === 'number' ? playerId : 0,
+      roundNumber: typeof round === 'number' ? round : 0,
+      pickNumber: typeof pickNumber === 'number' ? pickNumber : 0,
+      correlationId: event.idempotency_key ?? '',
+      ...(typeof reason === 'string' ? { reason } : {}),
+    };
+    this.events.append(buffered);
+
+    this.picksMade++;
+    if (this.draftStatus === 'not_started') {
+      this.draftStatus = 'in_progress';
+    }
+    if (this.picksMade >= this.draftOrder.length) {
+      this.draftStatus = 'completed';
+    }
   }
 }

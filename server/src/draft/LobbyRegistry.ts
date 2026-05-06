@@ -150,14 +150,23 @@ export class LobbyRegistry {
 
   /**
    * Get the LobbyManager for `lobbyId`, constructing it lazily on
-   * first call. Concurrent same-key calls share one Promise — the
-   * format lookup + LobbyManager construction happens at most once
-   * per lobby lifetime.
+   * first call AND bootstrapping it from the durable event log
+   * before returning. Concurrent same-key calls share one Promise
+   * — the format lookup + LobbyManager construction + event-log
+   * replay happens at most once per lobby lifetime.
    *
-   * On error (formatLookup throws, LobbyManager constructor throws),
+   * **Step 6b expanded the contract:** getOrCreate is no longer just
+   * lookup-or-construct; it's lookup-or-construct-or-bootstrap. The
+   * bootstrap step (`LobbyManager.init()`) reads `draft_events` and
+   * walks the log to hydrate in-memory state. For typical draft
+   * sizes (12-team × 21-round = 252 events) this adds ~10-50ms to
+   * the WS-upgrade path; the handshake budget tolerates it.
+   *
+   * On error (formatLookup throws, LobbyManager constructor throws,
+   * bootstrap throws — DB query rejection or log integrity error),
    * the in-flight Promise is removed from the map so the next caller
-   * can retry. The original rejection is re-thrown to the current
-   * caller.
+   * can retry from scratch. The original rejection is re-thrown to
+   * the current caller.
    */
   async getOrCreate(lobbyId: string, leagueId: string): Promise<LobbyManager> {
     const existing = this.lobbies.get(lobbyId);
@@ -233,7 +242,7 @@ export class LobbyRegistry {
 
   private async constructLobby(lobbyId: string, leagueId: string): Promise<LobbyManager> {
     const config = await this.lobbyConfigLookup(leagueId);
-    return new LobbyManager({
+    const lobby = new LobbyManager({
       lobbyId,
       format: config.format,
       leagueId,
@@ -242,5 +251,11 @@ export class LobbyRegistry {
       draftOrder: config.draftOrder,
       verifyTeamAuthorization: this.verifyTeamAuthorization,
     });
+    // Step 6b: bootstrap from the durable event log BEFORE returning.
+    // A failed init() throws; the existing try/catch in getOrCreate
+    // deletes the placeholder and re-throws to the awaiter, so the
+    // next caller can retry from scratch (chunk 11g.4 step 4 design).
+    await lobby.init();
+    return lobby;
   }
 }

@@ -205,6 +205,57 @@ export type BufferedDraftEvent =
       correlationId: string;
     }
   | {
+      /**
+       * A previously-recorded pick was rolled back (commissioner
+       * action). Step 6b's bootstrap appends this when it encounters
+       * a `pick_undone` event in the durable log.
+       *
+       * `undoneSeq` is the seq of the original `pick_submitted`
+       * event being rolled back — clients can correlate the undo
+       * to the displayed pick for animation / history rendering.
+       *
+       * On the in-memory state machine: bootstrap decrements
+       * `picksMade` by 1 and may transition `draftStatus` from
+       * `completed` back to `in_progress` (or from `in_progress`
+       * back to `not_started` if it was the only pick).
+       */
+      kind: 'pick_undone';
+      seq: number;
+      timestamp: string;
+      teamId: string;
+      playerId: number;
+      roundNumber: number;
+      pickNumber: number;
+      correlationId: string;
+      undoneSeq: number;
+    }
+  | {
+      /**
+       * Commissioner-issued pick that bypasses the on-clock check
+       * (commissioner has authoritatively decided). Step 6b's
+       * bootstrap appends this when it encounters a
+       * `commissioner_override` event; mirrors the `pick_submitted`
+       * shape for client-rendering symmetry plus an optional
+       * `reason` field for justification text.
+       *
+       * On the in-memory state machine: advances `picksMade` like
+       * a regular pick. The on-clock check is skipped during
+       * bootstrap (and would be skipped at the action layer too if
+       * the engine ever exposed a commissioner-override action,
+       * which it currently does not — picks come only from
+       * `submit_pick_v2`).
+       */
+      kind: 'commissioner_override';
+      seq: number;
+      timestamp: string;
+      teamId: string;
+      playerId: number;
+      roundNumber: number;
+      pickNumber: number;
+      correlationId: string;
+      reason?: string;
+    }
+  | {
       kind: 'auction_bid_placed';
       seq: number;
       timestamp: string;
@@ -267,10 +318,16 @@ export interface DraftOrderSlot {
 /**
  * Lifecycle phase of the in-memory draft state machine. Step 6a
  * implements the linear progression `not_started → in_progress →
- * completed`; step 6c (deadline + autopick) and ADR-002 §6 (auction
- * pause/resume) will introduce additional terminal/transient states.
+ * completed`; step 6b adds `cancelled` as a terminal state set
+ * explicitly by the durable `draft_cancelled` event during bootstrap.
+ *
+ * Step 6c (deadline + autopick) and ADR-002 §6 (auction pause/resume)
+ * will introduce additional transient states (e.g. `paused`).
+ *
+ * Both `completed` and `cancelled` are terminal — `processSubmitPick`
+ * rejects with `invalid_state` once either is reached.
  */
-export type DraftStatus = 'not_started' | 'in_progress' | 'completed';
+export type DraftStatus = 'not_started' | 'in_progress' | 'completed' | 'cancelled';
 
 /**
  * Bare state-machine view of a lobby's current draft state. Returned

@@ -39,7 +39,10 @@ interface MakeRegistryOpts {
 
 function makeRegistry(opts: MakeRegistryOpts = {}) {
   const submitPick = vi.fn();
-  const draftService = { submitPick } as unknown as DraftServiceV2;
+  // Step 6b: registry's bootstrap path (LobbyManager.init) calls
+  // listDraftEvents. Default mock returns empty array (fresh-start).
+  const listDraftEvents = vi.fn(async () => []);
+  const draftService = { submitPick, listDraftEvents } as unknown as DraftServiceV2;
   const lobbyConfigLookup =
     opts.lobbyConfigLookup ??
     vi.fn(
@@ -208,7 +211,10 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
       pick_deadline: null,
       was_duplicate: false,
     });
-    const draftService = { submitPick } as unknown as DraftServiceV2;
+    const draftService = {
+      submitPick,
+      listDraftEvents: vi.fn(async () => []),
+    } as unknown as DraftServiceV2;
     const lobbyConfigLookup = vi.fn(async () => ({
       format: 'snake' as DraftFormat,
       draftOrder: DEFAULT_DRAFT_ORDER,
@@ -246,7 +252,10 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
       authorized: false as const,
       reason: 'not_owner' as const,
     }));
-    const draftService = { submitPick } as unknown as DraftServiceV2;
+    const draftService = {
+      submitPick,
+      listDraftEvents: vi.fn(async () => []),
+    } as unknown as DraftServiceV2;
     const lobbyConfigLookup = vi.fn(async () => ({
       format: 'snake' as DraftFormat,
       draftOrder: DEFAULT_DRAFT_ORDER,
@@ -287,5 +296,98 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
     const lobby = await registry.getOrCreate('lobby-cfg-fwd-1', 'league-1');
     expect(lobby.getCurrentState().totalPicks).toBe(20); // 4 teams × 5 rounds
     expect(lobby.format).toBe('snake');
+  });
+
+  // ── Step-6b new tests (bootstrap integration) ──────────────────────
+
+  it('getOrCreate awaits LobbyManager.init() before resolving the Promise', async () => {
+    // Slow-mock listDraftEvents that resolves after a delay. If
+    // getOrCreate forgot to await init(), the caller would receive
+    // a LobbyManager whose state machine is still uninitialized —
+    // and any action would throw synchronously. The fact that the
+    // returned LobbyManager has picksMade reflecting the bootstrap
+    // result proves init() was awaited.
+    let resolveLog!: (rows: unknown[]) => void;
+    const listDraftEventsPromise = new Promise<unknown[]>((resolve) => {
+      resolveLog = resolve;
+    });
+    const submitPick = vi.fn();
+    const draftService = {
+      submitPick,
+      listDraftEvents: vi.fn(() => listDraftEventsPromise),
+    } as unknown as DraftServiceV2;
+    const lobbyConfigLookup = vi.fn(async () => ({
+      format: 'snake' as DraftFormat,
+      draftOrder: DEFAULT_DRAFT_ORDER,
+    }));
+    const registry = new LobbyRegistry({
+      draftService,
+      lobbyConfigLookup,
+      publish: vi.fn(),
+      verifyTeamAuthorization: ALLOW_ALL_AUTH,
+    });
+
+    let resolved = false;
+    const getOrCreatePromise = registry
+      .getOrCreate('lobby-await-init-1', 'league-1')
+      .then((lobby) => {
+        resolved = true;
+        return lobby;
+      });
+
+    // Yield a few microtasks; getOrCreate should still be pending
+    // because init() is awaiting listDraftEvents.
+    await new Promise((r) => setTimeout(r, 5));
+    expect(resolved).toBe(false);
+
+    // Now resolve the bootstrap query. getOrCreate completes after
+    // init() finishes processing the (empty) event log.
+    resolveLog([]);
+    const lobby = await getOrCreatePromise;
+    expect(resolved).toBe(true);
+    expect(lobby.getCurrentState().picksMade).toBe(0);
+  });
+
+  it('bootstrap failure clears the placeholder so the next getOrCreate retries from scratch', async () => {
+    let callCount = 0;
+    const listDraftEvents = vi.fn(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error('synthetic bootstrap failure');
+      }
+      return [];
+    });
+    const submitPick = vi.fn();
+    const draftService = {
+      submitPick,
+      listDraftEvents,
+    } as unknown as DraftServiceV2;
+    const lobbyConfigLookup = vi.fn(async () => ({
+      format: 'snake' as DraftFormat,
+      draftOrder: DEFAULT_DRAFT_ORDER,
+    }));
+    const registry = new LobbyRegistry({
+      draftService,
+      lobbyConfigLookup,
+      publish: vi.fn(),
+      verifyTeamAuthorization: ALLOW_ALL_AUTH,
+    });
+
+    // First getOrCreate rejects with the bootstrap error.
+    await expect(
+      registry.getOrCreate('lobby-bootstrap-fail-1', 'league-1'),
+    ).rejects.toThrow('synthetic bootstrap failure');
+
+    // The placeholder should have been cleared from the registry —
+    // size returns to 0, get() returns undefined.
+    expect(registry.size()).toBe(0);
+    expect(registry.get('lobby-bootstrap-fail-1')).toBeUndefined();
+
+    // Second getOrCreate hits the same lobby and retries from
+    // scratch (the listDraftEvents mock's second call succeeds).
+    const lobby = await registry.getOrCreate('lobby-bootstrap-fail-1', 'league-1');
+    expect(lobby).toBeInstanceOf(LobbyManager);
+    expect(listDraftEvents).toHaveBeenCalledTimes(2);
+    expect(registry.size()).toBe(1);
   });
 });

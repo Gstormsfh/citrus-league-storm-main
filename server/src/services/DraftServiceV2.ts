@@ -117,6 +117,58 @@ export class DraftServiceV2 {
   constructor(private readonly supabase: SupabaseClient) {}
 
   /**
+   * Read all `draft_events` rows for a league in seq order.
+   *
+   * **Wire-format note:** the durable `event_type` for picks is
+   * `'pick'` per the migration's CHECK constraint
+   * (`20260425130000_draft_engine_v2_foundation.sql:36-48`), NOT
+   * `'pick_submitted'`. Application-layer naming
+   * (`BufferedDraftEvent.kind === 'pick_submitted'`) is a separate
+   * convention — bootstrap performs the rename when consuming these
+   * rows. Callers operating on the wire form should match
+   * `event.event_type === 'pick'` not `'pick_submitted'`.
+   *
+   * Used by `LobbyManager.bootstrap()` (chunk 11g.4 step 6b) to
+   * reconstruct in-memory state from the durable event log.
+   * Single indexed query on `(league_id, seq)` per the
+   * `draft_events_league_seq_uniq` UNIQUE INDEX.
+   *
+   * @param leagueId — the league to read for.
+   * @param sinceSeq — optional. If provided, returns only events
+   *   with `seq > sinceSeq`. Used by chunk 11g.7's snapshot path
+   *   (read events emitted after the last snapshot); 6b's bootstrap
+   *   always passes `undefined` for full replay.
+   */
+  async listDraftEvents(
+    leagueId: string,
+    sinceSeq?: number,
+  ): Promise<DraftEventRow[]> {
+    let query = this.supabase
+      .from('draft_events')
+      .select(
+        'id, league_id, seq, event_type, payload, payload_hash, ' +
+          'idempotency_key, actor, correlation_id, created_at',
+      )
+      .eq('league_id', leagueId)
+      .order('seq', { ascending: true });
+
+    if (sinceSeq !== undefined) {
+      query = query.gt('seq', sinceSeq);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new AppError(
+        `Failed to read draft_events: ${error.message}`,
+        500,
+        'INTERNAL_ERROR',
+        error.code,
+      );
+    }
+    return (data ?? []) as unknown as DraftEventRow[];
+  }
+
+  /**
    * Submit a pick via `submit_pick_v2`. Returns the RPC result.
    * Does NOT broadcast — call `broadcastEvent` from the route handler
    * with an admin client AFTER this resolves successfully.
