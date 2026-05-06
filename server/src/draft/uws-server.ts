@@ -1,5 +1,10 @@
 // Phase 4.5 chunk 11g.2 step 2 — JWT validation on uWS upgrade.
 // Phase 4.5 chunk 11g.4 step 4 — LobbyRegistry wiring on open/close.
+// Phase 4.5 chunk 11g.4 step 5 — JSON-aware message handler routes
+// resync requests through `uws-helpers.handleClientMessage`. App is
+// constructed in `index.ts` (not here) so its `publish` callback
+// can also feed the LobbyRegistry — see uws-helpers.ts and
+// LobbyManager.ts step-5 broadcast wiring.
 //
 // Authenticates incoming WebSocket clients before allowing the upgrade.
 // Tokens are issued by the discovery endpoint (chunk 11g.1) and carried
@@ -28,6 +33,7 @@ import uWS from 'uWebSockets.js';
 import { logger } from '@citrus/shared';
 import { verifyDraftToken } from '../lib/draftToken';
 import type { LobbyRegistry } from './LobbyRegistry';
+import { handleClientMessage } from './uws-helpers';
 import type { DraftSocketUserData } from './types';
 
 export interface UwsServerHandle {
@@ -38,6 +44,13 @@ export interface UwsServerHandle {
 export interface StartUwsServerOptions {
   port: number;
   /**
+   * uWS application instance. Constructed in `index.ts` so its
+   * `publish` callback can also feed the `LobbyRegistry` — keeping
+   * the broadcast plumbing in one place avoids the temporal coupling
+   * a setter-based late-bind would introduce.
+   */
+  app: uWS.TemplatedApp;
+  /**
    * Process-singleton registry of LobbyManager instances. Injected
    * (rather than module-imported) so tests can pass a mock and
    * `index.ts` can construct the real one with admin-client-backed
@@ -47,9 +60,8 @@ export interface StartUwsServerOptions {
 }
 
 export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHandle> {
-  const { port, lobbyRegistry } = opts;
+  const { port, app, lobbyRegistry } = opts;
   return new Promise((resolve, reject) => {
-    const app = uWS.App();
     let listenSocket: unknown = null;
 
     app.ws<DraftSocketUserData>('/ws/draft/:lobbyId', {
@@ -177,9 +189,25 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
           });
       },
 
-      message: (ws, message, isBinary) => {
+      message: (ws, message) => {
+        // Step-5 wiring: parse incoming JSON via the pure helper
+        // (uws-helpers.ts handleClientMessage), dispatch to the
+        // appropriate LobbyManager method, send the response back.
+        // The pure-function extraction lets us unit-test the message
+        // path without spinning up real uWS in tests.
         const text = Buffer.from(message).toString('utf8');
-        ws.send(`echo: ${text}`, isBinary);
+        const userData = ws.getUserData();
+        try {
+          handleClientMessage(ws, lobbyRegistry, text, userData);
+        } catch (err) {
+          // Defensive: handleClientMessage swallows expected errors
+          // internally. Anything bubbling here is an unexpected bug;
+          // log + continue rather than crash the entire WS thread.
+          logger.error(
+            `[uws] handleClientMessage threw lobbyId=${userData.lobbyId} userId=${userData.userId}`,
+            err,
+          );
+        }
       },
 
       close: (ws, code) => {

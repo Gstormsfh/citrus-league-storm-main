@@ -8,6 +8,14 @@
 // types backing the recent-events ring buffer and chunk 11g.5's
 // resume protocol.
 //
+// Step 5 added the wire-protocol layer: DraftServerMessage (the
+// envelope every server-to-client message uses) + DraftClientMessage
+// (incoming client requests, resync only for now), plus the
+// serializeServerMessage / parseClientMessage helpers. The wire
+// envelope is forward-compatible: a top-level `v: 1` lets future
+// protocol revisions coexist; new variants extend the discriminated
+// union without breaking existing clients.
+//
 // See docs/PHASE_4_5_ARCHITECTURE.md (Stack Decision; LobbyManager
 // principles), docs/adr/ADR-002-auction-state-machine.md (auction
 // state machine — auction-specific DraftAction variants), and
@@ -179,6 +187,22 @@ export type BufferedDraftEvent =
       playerId: number;
       roundNumber: number;
       pickNumber: number;
+      /**
+       * Same value as the originating action's `idempotencyKey`,
+       * exposed under a client-facing name. Lets the originator's
+       * client match the server's broadcast against their optimistic
+       * action — they submit a pick with `idempotencyKey=K`, then
+       * see an `event` message arrive with `correlationId=K` and
+       * settle their optimistic state.
+       *
+       * Step 3 deliberately excluded the idempotency key as a
+       * "server-internal concern"; step 5 reverses that decision
+       * because the resync path needs to deliver the correlation
+       * context the same way the live broadcast does (otherwise
+       * resync events can't settle optimistic state on the client
+       * that submitted them).
+       */
+      correlationId: string;
     }
   | {
       kind: 'auction_bid_placed';
@@ -227,4 +251,150 @@ export interface DraftSnapshot {
   lobbyId: string;
   format: DraftFormat;
   recentEvents: ReadonlyArray<BufferedDraftEvent>;
+}
+
+// ── Wire protocol (step 5) ─────────────────────────────────────────
+
+/**
+ * Current wire-protocol version. Bump when the envelope shape or
+ * required fields change. Clients gate on this — older clients
+ * receiving a higher `v` should reconnect with a forced upgrade
+ * prompt rather than silently mishandling unknown fields.
+ *
+ * Adding new variants to `DraftServerMessage` does NOT require a
+ * version bump (forward-compatible: clients ignore unknown variants).
+ * Renaming or removing fields, or changing semantic meaning, does.
+ */
+export const WIRE_PROTOCOL_VERSION = 1 as const;
+
+/**
+ * Discriminated union of server-to-client messages.
+ *
+ * Every variant shares the wire envelope:
+ *   - `v`: protocol version (always `1` today)
+ *   - `type`: discriminant
+ *   - `seq?`: per-league monotonic, present for `event`; absent
+ *     elsewhere (presence/snapshot/resync_response/error are not
+ *     sequenced — they're either snapshots or transient signals)
+ *   - `timestamp`: ISO 8601 server-side capture
+ *   - `correlationId?`: present on `event` variants that originated
+ *     from a client action (mirrors `payload.correlationId`); absent
+ *     for system-generated events, snapshots, presence, error
+ *   - `payload`: variant-specific
+ *
+ * Wire format: serialized as JSON via `serializeServerMessage`.
+ * Clients parse via `JSON.parse` then narrow on `type`.
+ */
+export type DraftServerMessage =
+  | {
+      v: typeof WIRE_PROTOCOL_VERSION;
+      type: 'event';
+      seq: number;
+      timestamp: string;
+      correlationId: string;
+      payload: BufferedDraftEvent;
+    }
+  | {
+      v: typeof WIRE_PROTOCOL_VERSION;
+      type: 'snapshot';
+      timestamp: string;
+      payload: DraftSnapshot;
+    }
+  | {
+      v: typeof WIRE_PROTOCOL_VERSION;
+      type: 'presence';
+      timestamp: string;
+      payload: {
+        kind: 'joined' | 'left';
+        userId: string;
+        presentUserIds: string[];
+      };
+    }
+  | {
+      v: typeof WIRE_PROTOCOL_VERSION;
+      type: 'resync_response';
+      timestamp: string;
+      payload:
+        | { ok: true; events: ReadonlyArray<BufferedDraftEvent> }
+        | { ok: false; reason: 'too_old'; oldestAvailableSeq: number };
+    }
+  | {
+      v: typeof WIRE_PROTOCOL_VERSION;
+      type: 'error';
+      timestamp: string;
+      payload: { code: string; message: string };
+    };
+
+/**
+ * Discriminated union of client-to-server messages.
+ *
+ * Today: only `resync` (chunk 11g.5's reconnect protocol primitive
+ * is the server-side `handleResyncRequest`; the client lives in
+ * chunk 11g.5). Pick submissions, bids, nominations route through
+ * `LobbyManager.enqueueAction` directly via `DraftAction`, NOT
+ * through this wire union — they require server-issued correlation
+ * IDs and structured validation that the action API provides.
+ */
+export type DraftClientMessage = {
+  type: 'resync';
+  payload: { sinceSeq: number };
+};
+
+/**
+ * Serialize a server-to-client message to its wire form. Pure JSON
+ * encoding today; centralized so future encoding changes (e.g.,
+ * MessagePack for bandwidth) live in one place.
+ */
+export function serializeServerMessage(msg: DraftServerMessage): string {
+  return JSON.stringify(msg);
+}
+
+/**
+ * Parse and validate a raw client message. Returns the typed
+ * message on success, `null` on any failure (JSON parse error,
+ * missing/invalid fields, unknown `type`). Callers should log at
+ * debug level and ignore — never raise to the user, since malformed
+ * input from the wire is not actionable client-side.
+ *
+ * Validation is intentionally minimal — only enough to safely
+ * dispatch. Deep field validation belongs in the action handlers
+ * (which already validate via Zod / typed payload checks).
+ */
+export function parseClientMessage(raw: string): DraftClientMessage | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    !('type' in parsed) ||
+    typeof (parsed as { type?: unknown }).type !== 'string'
+  ) {
+    return null;
+  }
+
+  const obj = parsed as { type: string; payload?: unknown };
+
+  if (obj.type === 'resync') {
+    const payload = obj.payload;
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      !('sinceSeq' in payload) ||
+      typeof (payload as { sinceSeq?: unknown }).sinceSeq !== 'number' ||
+      !Number.isFinite((payload as { sinceSeq: number }).sinceSeq)
+    ) {
+      return null;
+    }
+    return {
+      type: 'resync',
+      payload: { sinceSeq: (payload as { sinceSeq: number }).sinceSeq },
+    };
+  }
+
+  return null;
 }

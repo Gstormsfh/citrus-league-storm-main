@@ -63,6 +63,7 @@ if (proxyUrl) {
 
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
+import uWS from 'uWebSockets.js';
 import { logger, createConsoleLogger } from '@citrus/shared';
 import { startUwsServer, type UwsServerHandle } from './uws-server';
 import { LobbyRegistry } from './LobbyRegistry';
@@ -91,6 +92,24 @@ const honoServer = serve(
     logger.info(`[hono] listening on http://localhost:${info.port}`);
   },
 );
+
+// ── uWS app + publish callback for the LobbyRegistry ──
+//
+// App is hoisted out of `startUwsServer` so its `publish` method can
+// also feed the `LobbyRegistry` — every LobbyManager gets the same
+// publish callback, so broadcasts on `draft:${lobbyId}` reach all
+// subscribed WebSockets via the uWS pub/sub fast path.
+//
+// Constructor injection (here) beats a setter-based late-bind on
+// the registry — no temporal coupling, no null-deref window.
+const draftApp = uWS.App();
+
+const publishToLobbyTopic: (topic: string, message: string) => void = (
+  topic,
+  message,
+) => {
+  draftApp.publish(topic, message);
+};
 
 // ── LobbyRegistry: process-singleton mapping lobbyId → LobbyManager ──
 //
@@ -129,11 +148,12 @@ async function lookupDraftFormat(leagueId: string): Promise<DraftFormat> {
 const lobbyRegistry = new LobbyRegistry({
   draftService: new DraftServiceV2(supabaseAdmin),
   formatLookup: lookupDraftFormat,
+  publish: publishToLobbyTopic,
 });
 
 // ── Start uWS ──
 let uwsHandle: UwsServerHandle | null = null;
-startUwsServer({ port: wsPort, lobbyRegistry })
+startUwsServer({ port: wsPort, app: draftApp, lobbyRegistry })
   .then((handle) => {
     uwsHandle = handle;
   })

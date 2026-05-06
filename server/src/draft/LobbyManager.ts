@@ -1,21 +1,36 @@
 // Phase 4.5 chunk 11g.4 — LobbyManager: in-memory state machine + single-
 // writer queue per active draft.
 //
-// Step 4 of chunk 11g.4: real `addConnection`/`removeConnection`
-// (set-membership only — no broadcast yet) plus the public
-// `connectionCount()` getter the LobbyRegistry uses for diagnostic
-// logging. The registry (server/src/draft/LobbyRegistry.ts, new in
-// step 4) handles lazy LobbyManager construction with a Promise-
-// placeholder map that collapses concurrent same-lobby callers onto
-// one constructed instance.
+// Step 5 of chunk 11g.4: live-multiplayer fundamentals.
+//   - **Broadcast** on successful pick: serialized DraftServerMessage
+//     of type 'event' published to `draft:${lobbyId}` via the injected
+//     `publish` callback (uWS app.publish under the hood).
+//   - **Snapshot-on-connect**: addConnection sends the joining client
+//     a 'snapshot' message immediately so they don't need a separate
+//     HTTP round-trip to know current state.
+//   - **Presence**: addConnection / removeConnection broadcast
+//     'presence' join/left, deduplicated per userId (co-manager case:
+//     same user from multiple devices counts as one presence entry).
+//   - **Resync server primitive**: handleResyncRequest wraps the step-3
+//     ring buffer's getEventsSinceSeq into a 'resync_response' message
+//     for chunk 11g.5's reconnect-state-machine to consume.
+//   - **Backpressure sweep**: after every broadcast, iterate connections
+//     and forcibly disconnect any WS whose buffered amount exceeds the
+//     1MB industry threshold (slow consumer protection — one wedged
+//     client cannot block the rest of the lobby).
 //
 // Future steps:
-//   - Step 5: broadcast via uWS topics post-commit
 //   - Step 6: auction state machine (place_bid + nominate handlers, real
 //             round/pickNumber computation from in-memory state)
 //   - Step 7: snapshot persistence + bootstrap (chunk 11g.7) — owns
-//             lobby eviction once the draft completes; step 4 does
+//             lobby eviction once the draft completes; step 5 does
 //             NOT evict on last-disconnect.
+//
+// **Three step-5-adjacent concerns are deferred and tracked in
+// PHASE_4_5_PROJECT_PLAN.md Decision Log (2026-05-05):**
+//   - Heartbeat / keepalive — chunk 11g.7 (operations layer)
+//   - Per-event-type rate limiting + prioritization — chunk 11g.11
+//   - O(connections) backpressure sweep cost — chunk 11g.11 revisit
 //
 // See docs/PHASE_4_5_ARCHITECTURE.md (Stack Decision; LobbyManager
 // principles — Principle 5 single-writer per lobby; line 147 ring
@@ -32,14 +47,17 @@ import {
   type SubmitPickResult,
 } from '../services/DraftServiceV2';
 import { RingBuffer } from './RingBuffer';
-import type {
-  BufferedDraftEvent,
-  DraftAction,
-  DraftActionResult,
-  DraftFormat,
-  DraftSnapshot,
-  DraftSocketUserData,
-  GetEventsSinceSeqResult,
+import {
+  serializeServerMessage,
+  WIRE_PROTOCOL_VERSION,
+  type BufferedDraftEvent,
+  type DraftAction,
+  type DraftActionResult,
+  type DraftFormat,
+  type DraftServerMessage,
+  type DraftSnapshot,
+  type DraftSocketUserData,
+  type GetEventsSinceSeqResult,
 } from './types';
 
 export interface LobbyManagerOptions {
@@ -54,6 +72,17 @@ export interface LobbyManagerOptions {
    * across lobbies, and so unit tests can pass a mocked service.
    */
   draftService: DraftServiceV2;
+
+  /**
+   * uWS app-level publish callback. Injected (not module-imported)
+   * so the LobbyManager stays uWS-agnostic — tests pass a `vi.fn()`
+   * to assert broadcast behavior without spinning up a real uWS
+   * server.
+   *
+   * Production: bound from `app.publish` in `index.ts`. Topic naming
+   * follows the architecture doc convention (`draft:${lobbyId}`).
+   */
+  publish: (topic: string, message: string) => void;
 }
 
 /**
@@ -87,24 +116,58 @@ const IDEMPOTENCY_CACHE_MAX = 200;
  */
 const EVENT_BUFFER_CAPACITY = 200;
 
+/**
+ * Backpressure threshold in bytes. Industry-standard floor for
+ * WebSocket broadcast applications (Discord engineering, uWS
+ * examples both cite ~1MB). When a connection's buffered amount
+ * exceeds this, the LobbyManager forcibly disconnects with code
+ * 1013 ("try again later") rather than letting one slow consumer
+ * accumulate unbounded memory and block the rest of the lobby.
+ *
+ * **Revisit in chunk 11g.11 (load test):** real bandwidth profiles
+ * + auction-format event volume may suggest a different threshold
+ * or a tiered approach (drop chat first, preserve state events).
+ * Tracked in PHASE_4_5_PROJECT_PLAN.md Decision Log (2026-05-05).
+ */
+const BACKPRESSURE_THRESHOLD_BYTES = 1_048_576; // 1 MiB
+
 export class LobbyManager {
   readonly lobbyId: string;
   readonly format: DraftFormat;
   readonly leagueId: string;
 
   private readonly draftService: DraftServiceV2;
+  private readonly publish: (topic: string, message: string) => void;
 
   /**
-   * Connected uWS WebSocket references for this lobby. Populated by
-   * `addConnection` from the uws-server.ts open handler; cleared by
-   * `removeConnection` from the close handler. Set semantics dedupe
-   * — addConnection is naturally idempotent for the same ws.
+   * uWS pub/sub topic name for this lobby. Step-5 broadcasts
+   * publish to this topic; addConnection / removeConnection
+   * subscribe / unsubscribe each ws.
    *
-   * Step 5 will additionally subscribe each ws to the lobby's uWS
-   * pub/sub topic for fan-out. Today the set is just a roll call
-   * for diagnostic logging via `connectionCount()`.
+   * Naming follows the architecture doc convention
+   * (PHASE_4_5_ARCHITECTURE.md lines 138, 143): `draft:${lobbyId}`.
    */
-  private readonly connections: Set<WebSocket<DraftSocketUserData>> = new Set();
+  private readonly topicName: string;
+
+  /**
+   * Connected uWS WebSockets keyed by ws reference, mapping to the
+   * userData captured at upgrade time. Map (not Set) so
+   * `removeConnection` can recover the closing user's identity for
+   * presence-leave broadcasts without a separate parallel structure.
+   *
+   * Map.set on the same key is idempotent — addConnection on the
+   * same ws twice is a safe no-op for membership.
+   */
+  private readonly connections = new Map<WebSocket<DraftSocketUserData>, DraftSocketUserData>();
+
+  /**
+   * Set of distinct userIds currently present in the lobby. A user
+   * with multiple WebSocket connections (co-manager case: same user
+   * on phone + laptop) appears once. Presence join is broadcast on
+   * the FIRST connection for a userId; presence leave on the LAST
+   * disconnect for that userId.
+   */
+  private readonly presentUserIds = new Set<string>();
 
   /**
    * Single-writer queue. The `this.queue = this.queue.then(...)` chain
@@ -153,32 +216,99 @@ export class LobbyManager {
     this.format = opts.format;
     this.leagueId = opts.leagueId;
     this.draftService = opts.draftService;
+    this.publish = opts.publish;
+    this.topicName = `draft:${opts.lobbyId}`;
     logger.info(
-      `[lobby] LobbyManager constructed lobbyId=${opts.lobbyId} format=${opts.format} leagueId=${opts.leagueId}`,
+      `[lobby] LobbyManager constructed lobbyId=${opts.lobbyId} format=${opts.format} leagueId=${opts.leagueId} topic=${this.topicName}`,
     );
   }
 
   /**
    * Register a newly-upgraded WebSocket as a connected client.
-   * Set semantics: idempotent — adding the same ws twice is a no-op
-   * for set membership.
+   * Step 5 wiring:
+   *   1. Record `ws → userData` mapping
+   *   2. Subscribe ws to the lobby's broadcast topic
+   *   3. Send the joining client a `snapshot` message so they have
+   *      current state immediately (no separate HTTP round-trip)
+   *   4. If this is the first ws for this `userId`, broadcast a
+   *      `presence` join (deduplicated for co-manager / multi-device)
    *
-   * Step 5 will additionally subscribe ws to the lobby's broadcast
-   * topic; chunk 11g.5 will record the user's last-seen seq for the
-   * resync protocol. Today: set membership + diagnostic log only.
+   * Idempotent for the same ws: the Map.set + Set.add no-op on
+   * duplicate keys, and the snapshot send is harmless (the client
+   * already has state but treats snapshots as authoritative).
+   *
+   * Race tolerance: if the user disconnects during the open-handler
+   * race window from step 4 (getOrCreate resolves AFTER the user
+   * disconnected), `ws.send` for the snapshot may throw. Caught and
+   * logged at debug — the orphan registration self-cleans on the
+   * next removeConnection or lobby teardown.
    */
   addConnection(ws: WebSocket<DraftSocketUserData>, userData: DraftSocketUserData): void {
-    this.connections.add(ws);
+    const alreadyRegistered = this.connections.has(ws);
+    this.connections.set(ws, userData);
+
+    if (!alreadyRegistered) {
+      try {
+        ws.subscribe(this.topicName);
+      } catch (err) {
+        logger.debug(
+          `[lobby] ws.subscribe threw during addConnection lobbyId=${this.lobbyId} userId=${userData.userId}`,
+          err,
+        );
+      }
+    }
+
+    // Snapshot send — point-to-point, not via the broadcast topic.
+    try {
+      const snapshot: DraftServerMessage = {
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'snapshot',
+        timestamp: new Date().toISOString(),
+        payload: this.getSnapshot(),
+      };
+      ws.send(serializeServerMessage(snapshot));
+    } catch (err) {
+      logger.debug(
+        `[lobby] snapshot ws.send threw during addConnection lobbyId=${this.lobbyId} userId=${userData.userId}`,
+        err,
+      );
+    }
+
     logger.info(
       `[lobby] connection added lobbyId=${this.lobbyId} userId=${userData.userId} size=${this.connections.size}`,
     );
+
+    // Presence join — only on the FIRST connection for this userId.
+    // Subsequent connections (co-manager multi-device) don't re-emit.
+    if (!this.presentUserIds.has(userData.userId)) {
+      this.presentUserIds.add(userData.userId);
+      this.broadcast({
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'presence',
+        timestamp: new Date().toISOString(),
+        payload: {
+          kind: 'joined',
+          userId: userData.userId,
+          presentUserIds: [...this.presentUserIds],
+        },
+      });
+    }
   }
 
   /**
-   * Deregister a closed/dropped WebSocket. Idempotent — calling for
-   * a ws not in the set is a safe no-op (no log emitted).
+   * Deregister a closed/dropped WebSocket. Step 5 wiring:
+   *   1. Recover userData from the connection map
+   *   2. Drop the entry
+   *   3. Unsubscribe ws from the topic (best-effort — the ws may
+   *      already be closed, in which case unsubscribe throws and we
+   *      swallow at debug)
+   *   4. If no other connection for this userId remains, remove from
+   *      presentUserIds and broadcast a `presence` left event
    *
-   * Step 5 will additionally unsubscribe ws from the broadcast topic.
+   * Idempotent — calling for a ws not in the map is a no-op (early
+   * return on map lookup miss). No presence churn for ws not
+   * recognized.
+   *
    * Lobby eviction on last-disconnect is intentionally NOT done here
    * — chunk 11g.7's snapshot-and-bootstrap flow owns lobby retirement
    * (drafts that complete get snapshotted and dropped from the
@@ -186,11 +316,42 @@ export class LobbyManager {
    * reconnects to pick up the ring buffer).
    */
   removeConnection(ws: WebSocket<DraftSocketUserData>): void {
-    const removed = this.connections.delete(ws);
-    if (removed) {
-      logger.info(
-        `[lobby] connection removed lobbyId=${this.lobbyId} size=${this.connections.size}`,
+    const userData = this.connections.get(ws);
+    if (!userData) {
+      // ws was never registered (or already removed); idempotent no-op.
+      return;
+    }
+    this.connections.delete(ws);
+
+    try {
+      ws.unsubscribe(this.topicName);
+    } catch (err) {
+      logger.debug(
+        `[lobby] ws.unsubscribe threw during removeConnection lobbyId=${this.lobbyId} userId=${userData.userId}`,
+        err,
       );
+    }
+
+    logger.info(
+      `[lobby] connection removed lobbyId=${this.lobbyId} userId=${userData.userId} size=${this.connections.size}`,
+    );
+
+    // Presence leave — only when this was the LAST connection for
+    // the userId (co-manager / multi-device case keeps presence
+    // alive while at least one ws remains).
+    const stillPresent = this.hasOtherConnectionForUser(userData.userId);
+    if (!stillPresent) {
+      this.presentUserIds.delete(userData.userId);
+      this.broadcast({
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'presence',
+        timestamp: new Date().toISOString(),
+        payload: {
+          kind: 'left',
+          userId: userData.userId,
+          presentUserIds: [...this.presentUserIds],
+        },
+      });
     }
   }
 
@@ -271,6 +432,49 @@ export class LobbyManager {
    */
   getEventsSinceSeq(sinceSeq: number): GetEventsSinceSeqResult {
     return this.events.getEventsSinceSeq(sinceSeq);
+  }
+
+  /**
+   * Server-side primitive for chunk 11g.5's reconnect protocol.
+   * Wraps `getEventsSinceSeq` in a `resync_response` server message
+   * envelope. The caller (uws-helpers.ts `handleClientMessage`) is
+   * responsible for `ws.send`-ing the serialized result back to the
+   * requesting WebSocket.
+   *
+   * Point-to-point reply, NOT broadcast — only the requesting client
+   * needs the response. The userData parameter is currently used for
+   * diagnostic logging; chunk 11g.5 may also use it for per-user
+   * rate-limit decisions.
+   */
+  handleResyncRequest(
+    userData: DraftSocketUserData,
+    sinceSeq: number,
+  ): DraftServerMessage {
+    const result = this.events.getEventsSinceSeq(sinceSeq);
+    logger.debug(
+      `[lobby] resync request lobbyId=${this.lobbyId} userId=${userData.userId} sinceSeq=${sinceSeq} ok=${result.ok}`,
+    );
+
+    // Narrow via property-existence (`'events' in result`) rather
+    // than via the `ok` discriminator — narrowing on `result.ok` is
+    // unreliable under server/tsconfig.json's `strict: false`
+    // setting; `in`-based narrowing works in either mode (same
+    // pattern as uws-server.ts verifyDraftToken handling).
+    const payload =
+      'events' in result
+        ? { ok: true as const, events: result.events }
+        : {
+            ok: false as const,
+            reason: result.reason,
+            oldestAvailableSeq: result.oldestAvailableSeq,
+          };
+
+    return {
+      v: WIRE_PROTOCOL_VERSION,
+      type: 'resync_response',
+      timestamp: new Date().toISOString(),
+      payload,
+    };
   }
 
   /**
@@ -362,24 +566,110 @@ export class LobbyManager {
       return { ok: false, reason: 'internal_error' };
     }
 
-    // Buffer the recorded event for chunk 11g.5's resume protocol.
+    // Buffer the recorded event for chunk 11g.5's resume protocol,
+    // then broadcast to all subscribers of the lobby topic.
     // Skip when the RPC reports `was_duplicate=true` — the original
     // event is already in the buffer (and the durable log) from the
-    // first non-retried submission; double-appending would let
-    // clients see the same event twice during resync.
+    // first non-retried submission; double-appending or
+    // double-broadcasting would let clients see the same event twice.
     if (!result.was_duplicate) {
-      this.events.append({
+      const timestamp = new Date().toISOString();
+      const event: BufferedDraftEvent = {
         kind: 'pick_submitted',
         seq: result.seq,
-        timestamp: new Date().toISOString(),
+        timestamp,
         teamId: action.teamId,
         playerId: parseInt(action.playerId, 10),
         roundNumber: HARDCODED_ROUND,
         pickNumber: HARDCODED_PICK_NUMBER,
+        // Mirror the action's idempotencyKey under the client-facing
+        // `correlationId` name. Lets the submitter's optimistic UI
+        // settle when the broadcast comes back.
+        correlationId: action.idempotencyKey,
+      };
+      this.events.append(event);
+      this.broadcast({
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'event',
+        seq: result.seq,
+        timestamp,
+        correlationId: action.idempotencyKey,
+        payload: event,
       });
     }
 
     return { ok: true, eventSeq: result.seq };
+  }
+
+  /**
+   * Serialize and publish a server message to the lobby's topic,
+   * then sweep connections for backpressure overflow. Centralized so
+   * every broadcast path goes through the same backpressure check —
+   * a slow consumer cannot block the rest of the lobby.
+   */
+  private broadcast(message: DraftServerMessage): void {
+    const serialized = serializeServerMessage(message);
+    this.publish(this.topicName, serialized);
+    this.sweepBackpressure();
+  }
+
+  /**
+   * Iterate connections and forcibly disconnect any whose buffered
+   * amount exceeds `BACKPRESSURE_THRESHOLD_BYTES`. Called after every
+   * broadcast.
+   *
+   * Cost: O(connections) per broadcast. Trivial for 12-team drafts
+   * (~12 connections); revisit at chunk 11g.11 load test if 1000+
+   * concurrent connections per lobby become real (then: lazy check
+   * only on WS that received recent broadcasts, or async sweep
+   * timer). Tracked in PHASE_4_5_PROJECT_PLAN.md Decision Log
+   * (2026-05-05).
+   */
+  private sweepBackpressure(): void {
+    for (const [ws, userData] of this.connections) {
+      let buffered: number;
+      try {
+        buffered = ws.getBufferedAmount();
+      } catch (err) {
+        // ws may have closed mid-iteration. Skip — close handler
+        // will purge it from the map shortly.
+        logger.debug(
+          `[lobby] getBufferedAmount threw during sweep lobbyId=${this.lobbyId} userId=${userData.userId}`,
+          err,
+        );
+        continue;
+      }
+      if (buffered > BACKPRESSURE_THRESHOLD_BYTES) {
+        logger.warn(
+          `[lobby] backpressure threshold exceeded — disconnecting slow consumer lobbyId=${this.lobbyId} userId=${userData.userId} bufferedAmount=${buffered} threshold=${BACKPRESSURE_THRESHOLD_BYTES}`,
+        );
+        try {
+          // Code 1013 = "Try Again Later" — signals transient server
+          // congestion to the client retry path (vs 1011 server_error
+          // for failures, or 1000 normal close for intentional logout).
+          ws.end(1013, 'backpressure');
+        } catch (err) {
+          logger.debug(
+            `[lobby] ws.end after backpressure threw lobbyId=${this.lobbyId} userId=${userData.userId}`,
+            err,
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * True iff at least one connection (other than the one that just
+   * left) is still registered for the given userId. Used to decide
+   * whether removeConnection should emit a presence-leave event.
+   */
+  private hasOtherConnectionForUser(userId: string): boolean {
+    for (const data of this.connections.values()) {
+      if (data.userId === userId) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

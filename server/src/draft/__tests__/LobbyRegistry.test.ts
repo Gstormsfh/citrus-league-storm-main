@@ -21,6 +21,7 @@ import type { DraftFormat } from '../types';
 
 interface MakeRegistryOpts {
   formatLookup?: (leagueId: string) => Promise<DraftFormat>;
+  publish?: (topic: string, message: string) => void;
 }
 
 function makeRegistry(opts: MakeRegistryOpts = {}) {
@@ -28,8 +29,9 @@ function makeRegistry(opts: MakeRegistryOpts = {}) {
   const draftService = { submitPick } as unknown as DraftServiceV2;
   const formatLookup =
     opts.formatLookup ?? vi.fn(async (_leagueId: string) => 'snake' as DraftFormat);
-  const registry = new LobbyRegistry({ draftService, formatLookup });
-  return { registry, formatLookup, draftService };
+  const publish = opts.publish ?? vi.fn();
+  const registry = new LobbyRegistry({ draftService, formatLookup, publish });
+  return { registry, formatLookup, draftService, publish };
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -156,5 +158,39 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
     }
     expect(formatLookup).toHaveBeenCalledTimes(1);
     expect(registry.size()).toBe(1);
+  });
+
+  // ── Step-5 new test (publish callback forwarding) ──────────────────
+
+  it('forwards the publish callback to constructed LobbyManagers (step 5)', async () => {
+    // We can't read LobbyManager's private `publish` field directly,
+    // but we can prove the forwarding by exercising broadcast via a
+    // submit_pick. The registry's draftService is mocked to return
+    // a successful SubmitPickResult; the LobbyManager will then
+    // broadcast, which calls the registry's publish callback.
+    const publish = vi.fn();
+    const submitPick = vi.fn().mockResolvedValue({
+      event_id: 1,
+      seq: 1,
+      pick_deadline: null,
+      was_duplicate: false,
+    });
+    const draftService = { submitPick } as unknown as DraftServiceV2;
+    const formatLookup = vi.fn(async () => 'snake' as DraftFormat);
+    const registry = new LobbyRegistry({ draftService, formatLookup, publish });
+
+    const lobby = await registry.getOrCreate('lobby-fwd-1', 'league-1');
+    await lobby.enqueueAction({
+      kind: 'submit_pick',
+      teamId: 'team-1',
+      playerId: '8478402',
+      userId: 'user-1',
+      sessionId: 'session-1',
+      idempotencyKey: 'idem-fwd-1',
+    });
+
+    expect(publish).toHaveBeenCalled();
+    const [topic] = publish.mock.calls[0];
+    expect(topic).toBe('draft:lobby-fwd-1');
   });
 });

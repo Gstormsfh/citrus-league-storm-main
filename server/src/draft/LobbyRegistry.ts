@@ -65,11 +65,25 @@ export interface LobbyRegistryOptions {
    * is logged at registry level and re-thrown to the caller.
    */
   formatLookup: (leagueId: string) => Promise<DraftFormat>;
+
+  /**
+   * uWS app-level publish callback — forwarded into every
+   * `LobbyManager` constructed by this registry so they can
+   * broadcast events to all subscribers of their `draft:${lobbyId}`
+   * topic. Index.ts builds this from `app.publish.bind(app)` so the
+   * LobbyManager stays uWS-agnostic for testability.
+   *
+   * Step 5 wires broadcast on every successful pick (event message)
+   * plus presence join/leave; chunk 11g.6 will broadcast auction
+   * state machine events; chunk 11g.7 will broadcast timer ticks.
+   */
+  publish: (topic: string, message: string) => void;
 }
 
 export class LobbyRegistry {
   private readonly draftService: DraftServiceV2;
   private readonly formatLookup: (leagueId: string) => Promise<DraftFormat>;
+  private readonly publish: (topic: string, message: string) => void;
 
   /**
    * Lobby map: `lobbyId -> LobbyManager | Promise<LobbyManager>`.
@@ -86,6 +100,7 @@ export class LobbyRegistry {
   constructor(opts: LobbyRegistryOptions) {
     this.draftService = opts.draftService;
     this.formatLookup = opts.formatLookup;
+    this.publish = opts.publish;
   }
 
   /**
@@ -178,6 +193,7 @@ export class LobbyRegistry {
       format,
       leagueId,
       draftService: this.draftService,
+      publish: this.publish,
     });
   }
 }
