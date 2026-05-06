@@ -601,3 +601,111 @@ For Garrett review before any execution:
 - No scripts/_deprecated/ directory created yet (waiting on approval)
 
 Garrett review gate before any of the §7.7 dispositions execute.
+
+**Update (2026-05-05): All 7 dispositions executed via commit `c2893b0`. R5 is closed.**
+
+---
+---
+
+## §8 — Investigation 1: xG Model Lineage (2026-05-05)
+
+The Dec 2024 pre-monorepo repo at `C:\Users\garre\Documents\citrus-league-storm\` carries `moneypuck_xg_predictor.joblib` plus 13 other model artifacts at the repo root. Before R6 archives that repo, this investigation establishes whether the Dec 2024 artifacts are precursors of the current production xG v3 model (lineage chain) or independent experimental attempts.
+
+### §8.1 Inventory comparison
+
+**Dec 2024 repo `.joblib` artifacts at the root:**
+- `xg_model.joblib` — 213 KB
+- `xg_model_moneypuck.joblib` — 747 KB *(same filename as current monorepo's, different artifact)*
+- `moneypuck_xg_predictor.joblib` — **11 MB**
+- `rebound_model.joblib` — 598 KB
+- `xa_model.joblib` — 273 KB
+- `last_event_category_encoder.joblib`, `model_features.joblib`, `model_features_moneypuck.joblib`, `moneypuck_xg_features.joblib`, `pass_zone_encoder.joblib`, `player_shooting_talent.joblib`, `rebound_model_features.joblib`, `shot_type_encoder.joblib`, `xa_model_features.joblib`
+
+**Current monorepo `data-pipeline/models/`** (committed via R3-aware reorg):
+- `xg_model_moneypuck.joblib` (production v3) + `xg_model_moneypuck_v2.joblib` (predecessor)
+- `xg_model.joblib` (legacy v1) + `xg_shot_type_calibration.joblib`
+- `xa_model.joblib`, `rebound_model.joblib`, `player_shooting_talent.joblib`
+- Plus 11 feature/encoder support files
+
+### §8.2 Architecture comparison
+
+Direct introspection of the loaded model objects:
+
+| Property | **Dec 2024 `moneypuck_xg_predictor.joblib`** | **Current `xg_model_moneypuck.joblib` (v3)** |
+|---|---|---|
+| Library | sklearn (`RandomForestRegressor`) | XGBoost (`XGBClassifier`) |
+| Objective | Regression (predict MoneyPuck's continuous `xGoal`) | `binary:logistic` (predict actual `is_goal` Y/N) |
+| `n_features_in_` | **5** | **31** |
+| Feature list | `our_distance`, `our_angle`, `our_is_rebound`, `our_is_slot_shot`, `our_has_pass` | full v3 list including the 7 pass-context moat features (`pass_quality_score`, `pass_immediacy_score`, `goalie_movement_score`, `pass_zone_encoded`, `pass_lateral_distance`, `pass_to_net_distance`, `has_pass_before_shot`) plus 24 context features |
+| `n_estimators` | 200 | 1,000 |
+| `max_depth` | 10 | 7 |
+| Disk size | ~11 MB (RF artifacts are large) | ~2.5 MB (XGBoost compact format) |
+| sklearn version | 1.7.2 (artifact dates Dec 2024) | n/a (XGBoost native) |
+
+**Conclusion:** these are **fundamentally different model architectures**, not iterations of the same model.
+
+### §8.3 Training-script comparison
+
+**Dec 2024:** `retrain_xg_with_moneypuck.py` at the Dec 2024 repo root:
+- Header docstring: *"Retrain xG model using MoneyPuck xG values as the target. This creates a model that learns to predict MoneyPuck's xG given our extracted features."*
+- Imports `XGBRegressor` (regression target)
+- Loads `data/matched_shots_2025.csv` — only ~41,000 shots
+- Target column: `mp_xGoal` (MoneyPuck's xG, not actual goal outcomes)
+- This is a **mimicry / reverse-engineering** approach: train Citrus's feature extraction to predict MoneyPuck's xG output.
+
+The Dec 2024 repo also has:
+- `retrain_optimized.py`, `retrain_final_optimized.py` — iterative variants of the same mimicry approach
+- `reverse_engineer_moneypuck_xg.py` — explicitly named for the reverse-engineering goal
+- `compare_xg_variants.py`, `analyze_moneypuck_xg.py`, `deep_analyze_moneypuck_model.py` — exploratory analysis tools
+
+**Current:** `scripts/utilities/train_xg_v3.py` (per R3 update):
+- Header docstring: *"Trains on ~863K real NHL shots"* with `XGBClassifier` predicting `is_goal`
+- Target: `is_goal` boolean (real outcome)
+- Sources: 786K MoneyPuck historical (2018-2024) + 77K Citrus PBP 2025-26
+- This is a **direct outcome-prediction** approach: train on actual goals, not predicted xG.
+
+### §8.4 Lineage assessment — INDEPENDENT, NOT A CHAIN
+
+The Dec 2024 model and current v3 model differ on every meaningful axis:
+
+1. **ML framework:** sklearn → XGBoost
+2. **Model type:** Regressor → Classifier
+3. **Target:** predicted MoneyPuck xG → actual goal outcome
+4. **Feature count:** 5 → 31 (6× expansion, including 7 brand-new pass-context features)
+5. **Training data scale:** 41K → 863K (21× increase)
+6. **Training data scope:** single-season matched-with-MoneyPuck → 7-season MoneyPuck bulk + Citrus PBP
+
+These are not parameter updates or feature additions on the same architecture; they're a different paradigm entirely.
+
+**The thematic lineage** (always trying to predict goals well using MoneyPuck-inspired features) is intact. **The architectural lineage** (a chain where v_n+1 inherits from v_n's parameters) is broken.
+
+The Dec 2024 era was the **experimental exploration phase**:
+- Multiple retrain scripts (`retrain_xg_with_moneypuck`, `retrain_optimized`, `retrain_final_optimized`) suggest iterative architecture tinkering
+- 30+ MD files in the Dec 2024 repo document the empirical comparison (FINAL_RESULTS_SUMMARY.md catalogs 4 xG variants with shot-level R² and player-season R² metrics)
+- The "Talent-Adjusted xG +37% improvement" finding documented in FINAL_RESULTS_SUMMARY.md *did* inform the v3 architecture (current v3 includes `shooting_talent_adjusted_xg` and `flurry_adjusted_xg` columns in `raw_shots`)
+
+The current era (post-monorepo, v3) consolidated the design lessons (talent adjustment, flurry adjustment, the 7-feature pass-context moat from PBP) into a single XGBoost classifier trained on a 21× larger corpus.
+
+### §8.5 Implications for R6 archival
+
+**The Dec 2024 repo is an EXPERIMENTAL EXPLORATION ARCHIVE, not a production lineage anchor.**
+
+Practical disposition implications:
+- **The trained `.joblib` artifacts in the Dec 2024 repo are NOT production lineage.** They are experimental precursors with different architectures + targets. Loading them via `joblib.load()` produces a useable RF regressor predicting MoneyPuck's xG, which is a DIFFERENT thing than the current v3 classifier predicting `is_goal`.
+- **The 30+ MD files in the Dec 2024 repo ARE valuable historical reference** documenting the empirical exploration (FINAL_RESULTS_SUMMARY, EXPECTED_GOALS_EXPLAINED, FEATURE_IMPACT_COMPARISON, GAR_IMPLEMENTATION_SUMMARY, GSAX_FINAL_SUMMARY). They explain WHY v3 is shaped the way it is.
+- **The training scripts (`retrain_xg_with_moneypuck.py`, etc.) are valuable** as documentation of the experimentation path, but should NOT be re-run against current data — they target an architecture (RandomForestRegressor predicting MoneyPuck xG) that's been superseded.
+
+**Recommendation for R6:**
+
+Archive the Dec 2024 repo with framing as **"experimental ML exploration archive (Dec 2024 era), preserved for design-decision reproducibility."** The README_ARCHIVED.md should:
+
+- State explicitly: "These models are NOT production lineage. Production xG v3 is `data-pipeline/models/xg_model_moneypuck.joblib` in the monorepo, with a different architecture (XGBClassifier vs RandomForestRegressor) and target (actual goals vs MoneyPuck xG mimicry)."
+- Index the valuable design-decision MD files: which ones explain talent adjustment, which explain flurry adjustment, which explain the GAR component layout. Future reads of v3 model code can refer back to these for "why we shaped it this way."
+- Note that the .joblib artifacts are sklearn 1.7.2 — pinned version; any attempt to load in newer sklearn will warn (already verified during this investigation).
+- Cross-link to `data/TRAINING_DATA_MANIFEST.md` and `scripts/utilities/train_xg_v3.py` in the current monorepo for the current state-of-the-art training pipeline.
+
+### §8.6 Honest disclosures
+
+- **`monitor_model_performance.py` and other Dec 2024 retrain variants** weren't deeply inspected (only `retrain_xg_with_moneypuck.py` was read in full). It's possible one of the variants used XGBoost — but the canonical `moneypuck_xg_predictor.joblib` artifact loads as `RandomForestRegressor`, so the architectural break is established.
+- **The `xg_model_moneypuck.joblib` filename collision** (Dec 2024 has 747 KB version, current has ~2.5 MB v3 version) creates risk if anyone accidentally copies between repos. Worth surfacing — the filename is the same, the content is incompatible. Mitigation already in place: each repo's models live in its own `data-pipeline/models/` (current) or repo-root (Dec 2024); no cross-contamination path.
+- **No new code, no migrations, no data writes** during this investigation. Read-only inspection of model metadata via `joblib.load()` and Python introspection.
