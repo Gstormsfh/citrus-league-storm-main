@@ -432,3 +432,172 @@ Things found during the audit that triggered "huh, that's odd":
 3. **Phases R2-R6 ship in order** with each phase's validation gate before the next starts
 4. **After all phases land**, Phase 0 (historical CSV → Supabase backfill, multi-season) executes against the cleaned-up foundation
 5. **The reorg is documented**, future contributors find data + scripts where they expect them, and the next data audit takes hours instead of days
+
+---
+---
+
+## §7 — R5 Orphan Triage Findings (2026-05-05)
+
+Read-only investigation. No moves, drops, or renames executed. Output is recommendations for follow-up commits.
+
+### §7.1 ORPHAN-SUSPECTED triage results — all 4 confirmed orphan
+
+`grep -rIE` across the entire monorepo (excluding `node_modules`, `dist`, `.git`) for each script across `*.ts`, `*.tsx`, `*.mjs`, `*.js`, `*.json`, `*.yml`, `*.yaml`, `*.md`, `*.py`. Results:
+
+| Script | Real-code references | Documentation references | Self-references | Status |
+|---|---|---|---|---|
+| `scripts/fetch-nhl-players.ts` | **0** | 2 (audit docs only) | 1 (R4 helper manifest) | **CONFIRMED ORPHAN** |
+| `scripts/fetch-nhl-schedule.ts` | **0** | 2 (audit docs only) | 1 (R4 helper) + 1 self-docstring | **CONFIRMED ORPHAN** |
+| `scripts/import-schedule-from-csv.ts` | **0** | 2 (audit docs only) | 1 (R4 helper) + 1 self-docstring | **CONFIRMED ORPHAN** |
+| `scripts/import-schedule-from-excel.ts` | **0** | 2 (audit docs only) | 1 (R4 helper) + 1 self-docstring | **CONFIRMED ORPHAN** |
+
+**Zero invocations from any production code, workflow, or sibling script.** Self-references inside each script's own docstring (`Run with: npx tsx scripts/foo.ts`) are not real references.
+
+**Recommendation: move all 4 to `scripts/_deprecated/` with a `README.md` documenting:**
+- Why each was created (setup-era seeding for nhl_teams / nhl_games / players tables)
+- What replaced them (Python equivalents in `data-pipeline/acquisition/`):
+  - `fetch-nhl-players.ts` → superseded by `data-pipeline/acquisition/data_acquisition.py` + `scripts/utilities/populate_player_directory.py`
+  - `fetch-nhl-schedule.ts` → superseded by `data-pipeline/acquisition/ingest_playoff_schedule.py` + the schedule-discovery logic inside `data_scraping_service.py`
+  - `import-schedule-from-csv.ts` → ad-hoc setup tool, no canonical replacement (one-time use case)
+  - `import-schedule-from-excel.ts` → ad-hoc setup tool, no canonical replacement (one-time use case)
+- That each script's classification header should be updated to `# CATEGORY: DEPRECATED` with a `SUPERSEDED BY:` line
+
+### §7.2 DESTRUCTIVE consolidation findings — 12 distinct, near-duplicate identified
+
+Direct `diff` comparison of the 12 DESTRUCTIVE scripts:
+
+#### Confirmed near-duplicate
+
+**`scripts/delete-all-draft-data.sql` ≈ `scripts/nuke-all-draft-data.sql`** — functionally near-identical:
+- Both: `DELETE FROM public.draft_picks` and `DELETE FROM public.draft_order`
+- Difference: the leagues UPDATE
+  - `delete-`: `UPDATE public.leagues SET draft_status = 'not_started'` (writes to every league, including those already at 'not_started')
+  - `nuke-`: `UPDATE public.leagues SET draft_status = 'not_started' WHERE draft_status IN ('in_progress', 'completed')` (only writes to leagues that need the change)
+
+The `nuke-` version is slightly safer (smaller write surface, idempotent re-run). **Recommendation: retain `nuke-all-draft-data.sql` as canonical; mark `delete-all-draft-data.sql` as deprecated-duplicate via header note + move to `scripts/_deprecated/`.**
+
+**Header correction note:** my R4 classification header for both scripts incorrectly listed writes to `draft_events`, `draft_picks_v2`, `draft_queues` — but the actual SQL only touches `draft_picks`, `draft_order`, `leagues`. The Writes: line should be corrected when the deprecated move happens. (Header is aspirational about scope — actual scope is narrower.)
+
+#### Confirmed NOT duplicates — different scopes
+
+**`scripts/nuke-all-teams-comprehensive.sql` vs `scripts/nuke-and-reset-teams.sql`:**
+- `nuke-all-teams-comprehensive.sql` — investigates teams across **ALL leagues** with no scoping. Reports + cleans.
+- `nuke-and-reset-teams.sql` — scoped to a single `'YOUR_LEAGUE_ID'::uuid` placeholder. Operator fills in. AI teams deleted, user teams kept. DELETE is **commented out** by default — operator must uncomment.
+- **Different use cases. Keep both.**
+
+**`scripts/cleanup-duplicate-teams.sql` vs `scripts/cleanup-duplicate-teams-simple.sql`:**
+- `cleanup-duplicate-teams.sql` — scoped to a single league via `'YOUR_LEAGUE_ID'::uuid` placeholder. Looks for `team_name LIKE 'AI Team %'`. DELETE commented out.
+- `cleanup-duplicate-teams-simple.sql` — same logic but **NO league scoping** (operates across all leagues). Different output format.
+- **Different scopes. Keep both.**
+
+#### Recommendation summary for the 12 destructive scripts
+
+| Script | Disposition |
+|---|---|
+| `nuke-all-draft-data.sql` | **Keep** — canonical |
+| `delete-all-draft-data.sql` | **Move to `scripts/_deprecated/`** (near-duplicate; nuke- is canonical) |
+| `nuke-all-teams-comprehensive.sql` | **Keep** — distinct scope (cross-league investigation) |
+| `nuke-and-reset-teams.sql` | **Keep** — distinct scope (single-league with safety placeholder) |
+| `complete-draft-reset.sql` | **Keep** — adds league draft-state reset on top of data wipe |
+| `cleanup-duplicate-teams.sql` | **Keep** — single-league scoped |
+| `cleanup-duplicate-teams-simple.sql` | **Keep** — all-leagues scoped |
+| `quick-reset-by-email.sql` | **Keep** — distinct user-scope use case |
+| `reset-league-teams.sql` | **Keep** — single-league reset preserving league row |
+| `reset-user-profile.sql` | **Keep** — user-profile-specific |
+| `data-pipeline/debug/fix_mcdavid_games.py` | **Keep in place** with current DESTRUCTIVE header — historical incident reference |
+| `data-pipeline/debug/fix_stuck_pbp_games.py` | **Keep in place** with current DESTRUCTIVE header — historical incident reference |
+
+**Recommendation on isolation:** all destructive scripts already carry prominent CITRUS-CLASSIFICATION DESTRUCTIVE headers with RECOVERY notes. Moving the kept set to `scripts/_destructive/` would add isolation but also break the simple `scripts/foo.sql` paths used in operator manuals + READMEs. **Don't move them** — the headers do the work.
+
+### §7.3 Supabase mystery #1 — `public.public.players` resolved
+
+Investigation:
+- pg_class confirms a table with the literal name `public.players` lives in schema `public`. It carries:
+  - 2 columns: `id bigint NOT NULL`, `created_at timestamptz NOT NULL`
+  - A primary-key index `public.players_pkey`
+  - A sequence `public.players_id_seq`
+  - `estimated_rows = -1` (never analyzed → effectively empty)
+  - No comment, no triggers
+- **No migration file in `supabase/migrations/` creates a table with this literal name.** `git grep -E "public\.public\.players|\\\"public\\.players\\\""` returned zero hits.
+- The table is vestigial — likely an artifact of an early-era migration that mishandled schema-qualification (e.g., `CREATE TABLE "public.players"` instead of `CREATE TABLE public.players`). Or it was created via the Supabase dashboard UI with an accidental dot in the name.
+- The canonical players table is `player_directory` (938 rows, 2025 season).
+
+**Recommendation:** create a follow-up migration `YYYYMMDDHHMMSS_drop_legacy_public_players_table.sql` that issues:
+```sql
+DROP TABLE IF EXISTS public."public.players" CASCADE;
+DROP SEQUENCE IF EXISTS public."public.players_id_seq" CASCADE;
+```
+The CASCADE handles any FK references (none expected since the table is empty and unused). **Do not execute** this migration via this audit; it's a separate write PR for Garrett review.
+
+### §7.4 Supabase mystery #2 — `integrity_check_results` resolved
+
+**NOT an orphan. Active production logging table.**
+
+Investigation:
+- 68,693 rows spanning **2026-01-16 → 2026-05-06** (today)
+- 5 distinct `check_name` values, all legitimate integrity invariants:
+  - `missing_players_check` — 59,241 rows. Scans rosters/lineups for player_ids not in player_directory.
+  - `phantom_players_check` — 4,673 rows. Inverse — flags player_ids that reference non-existent records.
+  - `fantasy_daily_rosters_sync_today` — 3,271 rows. Daily roster-sync verification.
+  - `team_lineups_vs_draft_picks_count` — 1,497 rows. Invariant check.
+  - `repair_stale_team_lineups` — 11 rows from 2026-04-02 (one-time repair audit trail).
+- Latest write 2026-05-06 — actively logging today.
+
+**Writers identified:**
+- `data-pipeline/monitoring/verify_data_integrity.py` — Python pipeline check (already documented in R4 header)
+- `data-pipeline/scoring/reconcile_player_stats.py` — reconciliation logging (already documented)
+- **Multiple SQL functions inside `supabase/migrations/20260116000003_create_integrity_checks.sql`** — the migration itself defines stored procedures that INSERT INTO integrity_check_results. Trigger-driven.
+- `supabase/migrations/20260402000000_repair_stale_team_lineups.sql` — the one-time repair migration logs to this table.
+- `supabase/migrations/20260402000001_add_team_lineups_integrity_trigger.sql` — installs a trigger on team_lineups that writes here on certain edits.
+- RLS policy added by `supabase/migrations/20260206000001_security_hardening_soc_compliance.sql` — commissioner-only view.
+
+**Recommendation:** leave as-is. Active and healthy. Update the audit's earlier flag in §1.4 (which marked this table as `CHECK USAGE`) to **CONFIRMED ACTIVE — production integrity logging**.
+
+### §7.5 Supabase mystery #3 — `data/moneypuck_shots_2025.csv.csv` doubled extension resolved
+
+Investigation:
+- One consumer: `scripts/utilities/deep_analyze_moneypuck_model.py` hardcodes the path `pd.read_csv('data/moneypuck_shots_2025.csv.csv')`.
+- Zero scripts CREATE the file via writes — it was downloaded manually (browser save quirk: MoneyPuck's zipped download `shots_2025.csv.zip` unzips to `shots_2025.csv`, then was renamed to `moneypuck_shots_2025.csv` via a tool that re-appended the extension, OR the original zip contained a file already named with `.csv` and was unzipped to a directory + the user double-clicked through which added another extension).
+- **NOT a script bug.** No fix to the data pipeline needed.
+
+**Recommendation:**
+1. Rename the file: `data/moneypuck_shots_2025.csv.csv` → `data/moneypuck_shots_2025.csv` (single extension)
+2. Update the one consumer line in `scripts/utilities/deep_analyze_moneypuck_model.py`
+3. Single small follow-up commit; can ride along with R6 or a later cleanup PR
+
+### §7.6 Bonus mystery resolved — `player_shifts_official` 198K vs 0 row discrepancy
+
+Investigation:
+- Direct `SELECT COUNT(*) FROM player_shifts_official` returns **198,988 rows** (matches pg_class estimate of 198,110 within ANALYZE staleness margin).
+- The earlier "list_tables returned 0" finding was **a false signal from the Supabase MCP's list_tables tool** — likely a tool-side caching or RLS-perspective rendering issue. The table is fully populated and ACTIVE.
+- Writers: `data-pipeline/acquisition/ingest_shiftcharts.py` (production scraper, upserts via `shift_id`), with `data_scraping_service.py` orchestrating + `scripts/utilities/run_shiftcharts_with_progress.py` as a manual wrapper.
+- Readers: `data-pipeline/scoring/simulate_matchups.py` (uses shift overlap for matchup correlation), `scripts/utilities/extractor_job.py` (validates shifts present before allowing further processing — comments call this "MOST ACCURATE shifts source, 21.76 min/game for top players"), `scripts/scan-pipeline-tables.ts` (inventory tool).
+- Created by migration `20251219100000_create_player_shifts_official.sql`.
+
+**Recommendation:** close this mystery. The table is healthy production data; the audit's earlier flag in §1.4 should be updated to **CONFIRMED ACTIVE — official NHL shift charts (~199K rows, daily writes)**. The list_tables tool's 0 reading was a tool artifact, not a data integrity issue.
+
+### §7.7 Summary of R5 dispositions
+
+For Garrett review before any execution:
+
+| Item | Recommendation | Risk |
+|---|---|---|
+| 4 ORPHAN-SUSPECTED scripts | Move to `scripts/_deprecated/` + README documenting supersession | Low — no consumers exist |
+| `delete-all-draft-data.sql` | Move to `scripts/_deprecated/` (near-duplicate of `nuke-all-draft-data.sql`) | Low — operators use `nuke-` |
+| Other 11 destructive scripts | Keep in place; current DESTRUCTIVE headers are sufficient isolation | None — pure docs |
+| `public.public.players` | New migration to DROP via `supabase/migrations/` | Low — table is empty + unused |
+| `integrity_check_results` | Update audit flag to CONFIRMED ACTIVE; no code change | None |
+| `moneypuck_shots_2025.csv.csv` | Rename to single-`.csv` + update 1 line in `deep_analyze_moneypuck_model.py` | Low |
+| `player_shifts_official` mystery | Update audit flag to CONFIRMED ACTIVE; no code change | None |
+
+**Header metadata correction needed (low-priority):**
+- Both `delete-all-draft-data.sql` and `nuke-all-draft-data.sql` headers list Writes including `draft_events, draft_picks_v2, draft_queues` — actual SQL only touches `draft_picks, draft_order, leagues`. Correct in the helper manifest at next refresh.
+
+### §7.8 What R5 did NOT do
+
+- No file moves, renames, or deletions executed
+- No SQL DROP / DELETE / UPDATE statements run
+- No header rewrites or classification changes (those would happen in a follow-up commit if Garrett approves the dispositions above)
+- No scripts/_deprecated/ directory created yet (waiting on approval)
+
+Garrett review gate before any of the §7.7 dispositions execute.
