@@ -1,10 +1,11 @@
 -- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 -- CATEGORY: DESTRUCTIVE
--- Purpose: Wipe all teams + cascade dependents (team_lineups, roster_assignments, etc.)
--- Invoked: manual via Supabase SQL Editor; review before run
--- Reads:   (none)
--- Writes:  teams + cascading deletes across multiple tables
--- Note:    RECOVERY: Supabase 7-day PITR. Take a backup before running.
+-- Purpose:     Wipe all teams + cascade dependents (team_lineups, roster_assignments, etc.)
+-- Last active: 2025-12-17
+-- Invoked:     manual via Supabase SQL Editor; review before run
+-- Reads:       (none)
+-- Writes:      teams + cascading deletes across multiple tables
+-- Note:        RECOVERY: Supabase 7-day PITR. Take a backup before running.
 -- ────────────────────────────────────────────────────────────
 -- Comprehensive cleanup: See and delete ALL AI teams
 -- This script helps you see everything and clean it up

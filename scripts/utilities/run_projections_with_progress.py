@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: UTILITY
-# Purpose: Manual projection run with progress bar (operator-facing wrapper)
-# Invoked: manual operator tool
-# Reads:   (same as run_daily_projections)
-# Writes:  (same as run_daily_projections)
+# Purpose:     Manual projection run with progress bar (operator-facing wrapper)
+# Last active: 2026-01-05
+# Invoked:     manual operator tool
+# Reads:       (same as run_daily_projections)
+# Writes:      (same as run_daily_projections)
 # ────────────────────────────────────────────────────────────
 """
 Run projections with enhanced progress tracking.

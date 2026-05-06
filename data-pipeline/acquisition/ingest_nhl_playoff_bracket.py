@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Populate NHL playoff bracket (seeds + series) from NHL API
-# Invoked: .github/workflows/playoff-sync.yml (cron */15 * * * *)
-# Reads:   NHL playoff endpoint
-# Writes:  nhl_playoff_seeds, nhl_playoff_series
+# Purpose:     Populate NHL playoff bracket (seeds + series) from NHL API
+# Last active: 2026-04-21
+# Invoked:     .github/workflows/playoff-sync.yml (cron */15 * * * *)
+# Reads:       NHL playoff endpoint
+# Writes:      nhl_playoff_seeds, nhl_playoff_series
 # ────────────────────────────────────────────────────────────
 """
 ingest_nhl_playoff_bracket.py

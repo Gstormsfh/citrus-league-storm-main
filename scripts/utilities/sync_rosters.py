@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: UTILITY
-# Purpose: Sync fantasy team rosters with current NHL rosters
-# Invoked: manual run when teams change
-# Reads:   team_lineups, NHL roster API
-# Writes:  team_lineups
+# Purpose:     Sync fantasy team rosters with current NHL rosters
+# Last active: 2026-03-01
+# Invoked:     manual run when teams change
+# Reads:       team_lineups, NHL roster API
+# Writes:      team_lineups
 # ────────────────────────────────────────────────────────────
 """
 sync_rosters.py

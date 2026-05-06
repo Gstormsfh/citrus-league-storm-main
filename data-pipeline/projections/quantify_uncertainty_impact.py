@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: UTILITY
-# Purpose: Analysis: quantify uncertainty band impact on lineup decisions
-# Invoked: manual run; backtest tool
-# Reads:   player_projected_stats
-# Writes:  (reports)
+# Purpose:     Analysis: quantify uncertainty band impact on lineup decisions
+# Last active: 2026-03-03
+# Invoked:     manual run; backtest tool
+# Reads:       player_projected_stats
+# Writes:      (reports)
 # ────────────────────────────────────────────────────────────
 """
 quantify_uncertainty_impact.py

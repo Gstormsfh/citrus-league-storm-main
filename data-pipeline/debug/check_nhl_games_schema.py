@@ -1,9 +1,10 @@
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: DEBUG-ONLY
-# Purpose: Forensics: dump nhl_games column-level schema
-# Invoked: ad-hoc
-# Reads:   information_schema
-# Writes:  stdout
+# Purpose:     Forensics: dump nhl_games column-level schema
+# Last active: 2026-03-03
+# Invoked:     ad-hoc
+# Reads:       information_schema
+# Writes:      stdout
 # ────────────────────────────────────────────────────────────
 import os
 from dotenv import load_dotenv

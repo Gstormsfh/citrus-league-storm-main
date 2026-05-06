@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Supabase REST API client for pipeline writes (service-role JWT)
-# Invoked: imported by EVERY data-pipeline write path
-# Reads:   (env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-# Writes:  (any Supabase table)
+# Purpose:     Supabase REST API client for pipeline writes (service-role JWT)
+# Last active: 2026-03-02
+# Invoked:     imported by EVERY data-pipeline write path
+# Reads:       (env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+# Writes:      (any Supabase table)
 # ────────────────────────────────────────────────────────────
 """
 supabase_rest.py

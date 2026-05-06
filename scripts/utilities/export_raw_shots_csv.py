@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Export prod raw_shots to CSV for training / analysis (--training flag for xG v3)
-# Invoked: manual operator run before training; documented in TRAINING_DATA_MANIFEST.md
-# Reads:   raw_shots
-# Writes:  data/shots_full_features_2025.csv
+# Purpose:     Export prod raw_shots to CSV for training / analysis (--training flag for xG v3)
+# Last active: 2026-02-18
+# Invoked:     manual operator run before training; documented in TRAINING_DATA_MANIFEST.md
+# Reads:       raw_shots
+# Writes:      data/shots_full_features_2025.csv
 # ────────────────────────────────────────────────────────────
 """
 export_raw_shots_csv.py

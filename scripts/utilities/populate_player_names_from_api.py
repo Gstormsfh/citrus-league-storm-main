@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: UTILITY
-# Purpose: Backfill player names into tables that have player_id but no name (forensics-grade fix)
-# Invoked: manual; one-off-style
-# Reads:   NHL public API, player_directory
-# Writes:  various tables (depends on invocation)
+# Purpose:     Backfill player names into tables that have player_id but no name (forensics-grade fix)
+# Last active: 2026-01-08
+# Invoked:     manual; one-off-style
+# Reads:       NHL public API, player_directory
+# Writes:      various tables (depends on invocation)
 # ────────────────────────────────────────────────────────────
 """
 Populate player_names table with player and goalie names from NHL API.

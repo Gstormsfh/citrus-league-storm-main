@@ -1081,18 +1081,28 @@ HEADERS: dict[str, tuple[str, str, str, str, str, str]] = {
 }
 
 
-def render_header(category: str, purpose: str, invoked: str, reads: str, writes: str, extra: str, comment_prefix: str) -> str:
+def render_header(
+    category: str,
+    purpose: str,
+    invoked: str,
+    reads: str,
+    writes: str,
+    extra: str,
+    last_active: str,
+    comment_prefix: str,
+) -> str:
     bar = "─" * 60
     lines = [
         f"{comment_prefix} CITRUS-CLASSIFICATION {bar}",
         f"{comment_prefix} CATEGORY: {category}",
-        f"{comment_prefix} Purpose: {purpose}",
-        f"{comment_prefix} Invoked: {invoked}",
-        f"{comment_prefix} Reads:   {reads}",
-        f"{comment_prefix} Writes:  {writes}",
+        f"{comment_prefix} Purpose:     {purpose}",
+        f"{comment_prefix} Last active: {last_active}",
+        f"{comment_prefix} Invoked:     {invoked}",
+        f"{comment_prefix} Reads:       {reads}",
+        f"{comment_prefix} Writes:      {writes}",
     ]
     if extra:
-        lines.append(f"{comment_prefix} Note:    {extra}")
+        lines.append(f"{comment_prefix} Note:        {extra}")
     lines.append(f"{comment_prefix} {bar}")
     return "\n".join(lines) + "\n"
 
@@ -1110,23 +1120,82 @@ def comment_prefix_for(path: Path) -> str:
     raise ValueError(f"Unsupported extension {suffix} for {path}")
 
 
-def insert_after_shebang(content: str, header: str) -> str:
-    """Insert classification header after shebang/header comment line."""
-    if "CITRUS-CLASSIFICATION" in content:
-        return content  # already injected
+_CLASSIFICATION_SUBJECT_TOKENS = (
+    "CITRUS-CLASSIFICATION",
+    "R4 — classify",
+    "R4: classify",
+    "classify pipeline + utility scripts",
+)
+
+
+def git_last_active(rel_path: str) -> str:
+    """Return YYYY-MM-DD of the most recent meaningful commit touching this
+    file, skipping commits whose subject is the R4 classification work
+    itself. Returns "(uncommitted)" if git has no record."""
+    import subprocess
+    try:
+        # Walk recent commits; first whose subject isn't a classification
+        # commit wins. -10 is plenty given how rarely scripts churn.
+        # encoding='utf-8' is critical on Windows: git emits UTF-8, but
+        # text=True without explicit encoding falls back to cp1252 which
+        # mangles em-dashes and breaks subject token matching.
+        result = subprocess.run(
+            ["git", "log", "--format=%cs%x09%s", "-10", "--", rel_path],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+        )
+        out = result.stdout.strip()
+        if not out:
+            return "(uncommitted)"
+        for line in out.splitlines():
+            if "\t" not in line:
+                continue
+            date, subject = line.split("\t", 1)
+            if any(tok in subject for tok in _CLASSIFICATION_SUBJECT_TOKENS):
+                continue
+            return date
+        # Every recent commit was a classification commit (file unchanged
+        # since classification first ran). Return oldest seen date.
+        return out.splitlines()[-1].split("\t", 1)[0]
+    except Exception:
+        return "(unknown)"
+
+
+# Match a previously-injected CITRUS-CLASSIFICATION block of any of the four
+# supported comment styles, from the opening "CITRUS-CLASSIFICATION" line
+# through the closing horizontal-bar line. Multiline + dotall.
+import re
+_BLOCK_RE = re.compile(
+    r"(?:^[ \t]*(?:#|//|--|REM)[^\n]*CITRUS-CLASSIFICATION[^\n]*\n"
+    r"(?:[ \t]*(?:#|//|--|REM)[^\n]*\n)+?"
+    r"[ \t]*(?:#|//|--|REM)[^\n]*─{20,}[^\n]*\n)",
+    re.MULTILINE,
+)
+
+
+def upsert_header(content: str, header: str) -> tuple[str, bool]:
+    """If a CITRUS-CLASSIFICATION block is already present, replace it with
+    `header` (refresh). Otherwise insert `header` after the shebang line.
+
+    Returns (new_content, was_replaced). was_replaced=True means an existing
+    block was found and refreshed; False means the file was newly classified."""
+    match = _BLOCK_RE.search(content)
+    if match:
+        new_content = content[: match.start()] + header + content[match.end() :]
+        return new_content, True
+    # No existing block — insert after shebang if present, else at top
     lines = content.splitlines(keepends=True)
-    if not lines:
-        return header + content
-    # Detect shebang or single-line filename comment
-    insert_idx = 0
-    if lines[0].startswith("#!"):
-        insert_idx = 1
-    return "".join(lines[:insert_idx]) + header + "".join(lines[insert_idx:])
+    if lines and lines[0].startswith("#!"):
+        return "".join(lines[:1]) + header + "".join(lines[1:]), False
+    return header + content, False
 
 
 def main(dry_run: bool = False) -> None:
     injected = 0
-    skipped_already = 0
+    refreshed = 0
     missing = []
     for rel_path, fields in HEADERS.items():
         category, purpose, invoked, reads, writes, extra = fields
@@ -1135,22 +1204,26 @@ def main(dry_run: bool = False) -> None:
             missing.append(rel_path)
             continue
         prefix = comment_prefix_for(path)
-        header = render_header(category, purpose, invoked, reads, writes, extra, prefix)
+        last_active = git_last_active(rel_path)
+        header = render_header(category, purpose, invoked, reads, writes, extra, last_active, prefix)
         original = path.read_text(encoding="utf-8")
-        if "CITRUS-CLASSIFICATION" in original:
-            skipped_already += 1
-            continue
-        new_content = insert_after_shebang(original, header)
+        new_content, was_replaced = upsert_header(original, header)
+        if new_content == original:
+            continue  # no change (header byte-identical to existing)
+        action = "REF" if was_replaced else "INJ"
         if dry_run:
-            print(f"[DRY] would inject {category} into {rel_path}")
+            print(f"[DRY-{action}] {category:<20s} {rel_path} (last active {last_active})")
         else:
             path.write_text(new_content, encoding="utf-8")
-            print(f"[INJ] {category:<20s} {rel_path}")
-        injected += 1
+            print(f"[{action}] {category:<20s} {rel_path} (last active {last_active})")
+        if was_replaced:
+            refreshed += 1
+        else:
+            injected += 1
     print()
     print(f"Total entries in manifest: {len(HEADERS)}")
-    print(f"Injected/would-inject: {injected}")
-    print(f"Skipped (already classified): {skipped_already}")
+    print(f"Newly injected: {injected}")
+    print(f"Refreshed:      {refreshed}")
     if missing:
         print(f"Missing files ({len(missing)}):")
         for p in missing:

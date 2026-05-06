@@ -1,9 +1,10 @@
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: UTILITY
-# Purpose: Archive old prod tables to CSV files (for retention / cold-storage moves)
-# Invoked: manual; preserved for retention work that isn't currently scheduled
-# Reads:   (any table)
-# Writes:  CSV files at user-specified path
+# Purpose:     Archive old prod tables to CSV files (for retention / cold-storage moves)
+# Last active: 2025-12-23
+# Invoked:     manual; preserved for retention work that isn't currently scheduled
+# Reads:       (any table)
+# Writes:      CSV files at user-specified path
 # ────────────────────────────────────────────────────────────
 import os
 import sys

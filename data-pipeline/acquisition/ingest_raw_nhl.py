@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Phase-1 fast parallel raw data ingestion from NHL API
-# Invoked: imported by data_scraping_service.py + acquisition orchestrators
-# Reads:   NHL public API
-# Writes:  raw_nhl_data
+# Purpose:     Phase-1 fast parallel raw data ingestion from NHL API
+# Last active: 2026-03-03
+# Invoked:     imported by data_scraping_service.py + acquisition orchestrators
+# Reads:       NHL public API
+# Writes:      raw_nhl_data
 # ────────────────────────────────────────────────────────────
 """
 ingest_raw_nhl.py

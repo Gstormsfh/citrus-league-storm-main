@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: DEBUG-ONLY
-# Purpose: Forensics: inspect a specific game (2025020818) from a past investigation
-# Invoked: kept for reference; one-off
-# Reads:   raw_nhl_data, raw_shots
-# Writes:  stdout
+# Purpose:     Forensics: inspect a specific game (2025020818) from a past investigation
+# Last active: 2026-03-03
+# Invoked:     kept for reference; one-off
+# Reads:       raw_nhl_data, raw_shots
+# Writes:      stdout
 # ────────────────────────────────────────────────────────────
 """
 Check Game 2025020818 in detail - this is the game with missing stats

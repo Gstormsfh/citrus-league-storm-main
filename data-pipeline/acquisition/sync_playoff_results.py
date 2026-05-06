@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Sync playoff series wins + scoring during playoff window
-# Invoked: .github/workflows/playoff-sync.yml (cron */15 * * * *)
-# Reads:   nhl_playoff_series, player_game_stats
-# Writes:  nhl_playoff_series.wins, matchup_scoring_snapshots
+# Purpose:     Sync playoff series wins + scoring during playoff window
+# Last active: 2026-04-17
+# Invoked:     .github/workflows/playoff-sync.yml (cron */15 * * * *)
+# Reads:       nhl_playoff_series, player_game_stats
+# Writes:      nhl_playoff_series.wins, matchup_scoring_snapshots
 # ────────────────────────────────────────────────────────────
 """
 sync_playoff_results.py

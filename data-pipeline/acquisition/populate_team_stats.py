@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: UTILITY
-# Purpose: Aggregate team defensive metrics from player_game_stats for matchup-difficulty calc
-# Invoked: manual run; not in any workflow
-# Reads:   player_game_stats
-# Writes:  team_stats (RLS-disabled — see audit)
+# Purpose:     Aggregate team defensive metrics from player_game_stats for matchup-difficulty calc
+# Last active: 2026-03-03
+# Invoked:     manual run; not in any workflow
+# Reads:       player_game_stats
+# Writes:      team_stats (RLS-disabled — see audit)
 # ────────────────────────────────────────────────────────────
 """
 Populate team_stats table with defensive metrics for matchup difficulty calculations.

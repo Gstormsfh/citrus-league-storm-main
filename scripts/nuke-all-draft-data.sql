@@ -1,10 +1,11 @@
 -- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 -- CATEGORY: DESTRUCTIVE
--- Purpose: Wipe all draft-related rows for a league
--- Invoked: manual via Supabase SQL Editor; review before run
--- Reads:   (none)
--- Writes:  draft_events, draft_picks, draft_picks_v2, draft_order, draft_queues — DELETEs
--- Note:    RECOVERY: Supabase 7-day PITR. Take a backup before running.
+-- Purpose:     Wipe all draft-related rows for a league
+-- Last active: 2025-12-17
+-- Invoked:     manual via Supabase SQL Editor; review before run
+-- Reads:       (none)
+-- Writes:      draft_events, draft_picks, draft_picks_v2, draft_order, draft_queues — DELETEs
+-- Note:        RECOVERY: Supabase 7-day PITR. Take a backup before running.
 -- ────────────────────────────────────────────────────────────
 -- NUCLEAR OPTION: Delete ALL draft data from ALL leagues
 -- This completely wipes all draft history

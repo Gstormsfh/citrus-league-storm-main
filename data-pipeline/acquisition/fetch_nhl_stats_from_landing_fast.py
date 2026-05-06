@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Fast/parallel variant of fetch_nhl_stats_from_landing.py for batch backfill
-# Invoked: scripts/utilities/backfill_missing_shots.py + manual catch-up runs
-# Reads:   NHL public API
-# Writes:  player_game_stats
+# Purpose:     Fast/parallel variant of fetch_nhl_stats_from_landing.py for batch backfill
+# Last active: 2026-03-03
+# Invoked:     scripts/utilities/backfill_missing_shots.py + manual catch-up runs
+# Reads:       NHL public API
+# Writes:      player_game_stats
 # ────────────────────────────────────────────────────────────
 """
 fetch_nhl_stats_from_landing_fast.py

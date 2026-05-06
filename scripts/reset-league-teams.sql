@@ -1,10 +1,11 @@
 -- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 -- CATEGORY: DESTRUCTIVE
--- Purpose: Reset teams for a single league (preserving the league row)
--- Invoked: manual via Supabase SQL Editor
--- Reads:   leagues
--- Writes:  teams, team_lineups, roster_assignments — scoped DELETEs
--- Note:    RECOVERY: PITR.
+-- Purpose:     Reset teams for a single league (preserving the league row)
+-- Last active: 2025-12-17
+-- Invoked:     manual via Supabase SQL Editor
+-- Reads:       leagues
+-- Writes:      teams, team_lineups, roster_assignments — scoped DELETEs
+-- Note:        RECOVERY: PITR.
 -- ────────────────────────────────────────────────────────────
 -- Nuclear option: Delete ALL AI teams from a league and start fresh
 -- Use this if you want to completely reset the teams in a league

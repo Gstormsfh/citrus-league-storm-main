@@ -1,9 +1,10 @@
 // CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 // CATEGORY: ACTIVE
-// Purpose: Pre-deploy migration validator (npm run validate-migration)
-// Invoked: package.json scripts; CI gate
-// Reads:   supabase/migrations/*.sql
-// Writes:  stdout
+// Purpose:     Pre-deploy migration validator (npm run validate-migration)
+// Last active: 2026-01-17
+// Invoked:     package.json scripts; CI gate
+// Reads:       supabase/migrations/*.sql
+// Writes:      stdout
 // ────────────────────────────────────────────────────────────
 /**
  * Migration Validator

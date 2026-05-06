@@ -1,10 +1,11 @@
 -- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 -- CATEGORY: DESTRUCTIVE
--- Purpose: Wipe + recreate teams from scratch for a league
--- Invoked: manual via Supabase SQL Editor; review before run
--- Reads:   (none)
--- Writes:  teams (DELETE + INSERT)
--- Note:    RECOVERY: PITR + manual re-seeding via populate-nhl-teams-and-normalize.ts.
+-- Purpose:     Wipe + recreate teams from scratch for a league
+-- Last active: 2025-12-17
+-- Invoked:     manual via Supabase SQL Editor; review before run
+-- Reads:       (none)
+-- Writes:      teams (DELETE + INSERT)
+-- Note:        RECOVERY: PITR + manual re-seeding via populate-nhl-teams-and-normalize.ts.
 -- ────────────────────────────────────────────────────────────
 -- Nuclear option: Delete ALL AI teams from a league, keep user teams
 -- This will clean up everything so you can start fresh

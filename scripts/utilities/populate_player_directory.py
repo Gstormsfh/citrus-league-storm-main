@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Populate canonical player_directory from NHL roster API
-# Invoked: manual run + setup-era seeder; refreshed at season turnover
-# Reads:   NHL roster API
-# Writes:  player_directory
+# Purpose:     Populate canonical player_directory from NHL roster API
+# Last active: 2026-03-01
+# Invoked:     manual run + setup-era seeder; refreshed at season turnover
+# Reads:       NHL roster API
+# Writes:      player_directory
 # ────────────────────────────────────────────────────────────
 """
 populate_player_directory.py

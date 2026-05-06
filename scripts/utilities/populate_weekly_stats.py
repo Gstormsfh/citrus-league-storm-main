@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Roll up player_game_stats into player_weekly_stats (Sun-Sat windows)
-# Invoked: scheduled (currently empty target table — pipeline gap noted)
-# Reads:   player_game_stats
-# Writes:  player_weekly_stats (currently 0 rows in prod)
+# Purpose:     Roll up player_game_stats into player_weekly_stats (Sun-Sat windows)
+# Last active: 2026-02-15
+# Invoked:     scheduled (currently empty target table — pipeline gap noted)
+# Reads:       player_game_stats
+# Writes:      player_weekly_stats (currently 0 rows in prod)
 # ────────────────────────────────────────────────────────────
 """
 Populate player_weekly_stats table from player_game_stats.

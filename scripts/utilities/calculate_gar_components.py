@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Compute GAR component rates (EVO/EVD/PPO/PPD/PEN) per player
-# Invoked: manual run; pipeline gap noted — defensive components currently 0 league-wide
-# Reads:   raw_shots, player_shifts, player_toi_by_situation
-# Writes:  player_gar_components
+# Purpose:     Compute GAR component rates (EVO/EVD/PPO/PPD/PEN) per player
+# Last active: 2026-01-05
+# Invoked:     manual run; pipeline gap noted — defensive components currently 0 league-wide
+# Reads:       raw_shots, player_shifts, player_toi_by_situation
+# Writes:      player_gar_components
 # ────────────────────────────────────────────────────────────
 """
 calculate_gar_components.py

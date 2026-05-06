@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Bayesian regression of raw GAR rates toward league means
-# Invoked: imported by calculate_gar_components.py
-# Reads:   player_gar_components.*_raw
-# Writes:  player_gar_components.*_regressed
+# Purpose:     Bayesian regression of raw GAR rates toward league means
+# Last active: 2026-01-05
+# Invoked:     imported by calculate_gar_components.py
+# Reads:       player_gar_components.*_raw
+# Writes:      player_gar_components.*_regressed
 # ────────────────────────────────────────────────────────────
 """
 calculate_gar_regression.py

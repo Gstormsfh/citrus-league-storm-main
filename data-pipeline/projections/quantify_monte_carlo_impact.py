@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: UTILITY
-# Purpose: Analysis: quantify how much MC simulation changes projections vs point estimate
-# Invoked: manual run; backtest tool
-# Reads:   player_projected_stats
-# Writes:  (reports — no DB writes)
+# Purpose:     Analysis: quantify how much MC simulation changes projections vs point estimate
+# Last active: 2026-03-03
+# Invoked:     manual run; backtest tool
+# Reads:       player_projected_stats
+# Writes:      (reports — no DB writes)
 # ────────────────────────────────────────────────────────────
 """
 quantify_monte_carlo_impact.py

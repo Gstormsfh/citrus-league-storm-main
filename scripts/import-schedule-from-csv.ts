@@ -1,10 +1,11 @@
 // CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 // CATEGORY: ORPHAN-SUSPECTED
-// Purpose: Import schedule from CSV (one-off setup tool)
-// Invoked: no current invocations found
-// Reads:   user-supplied CSV
-// Writes:  nhl_games
-// Note:    RESOLVE: confirm not used anymore
+// Purpose:     Import schedule from CSV (one-off setup tool)
+// Last active: 2026-03-01
+// Invoked:     no current invocations found
+// Reads:       user-supplied CSV
+// Writes:      nhl_games
+// Note:        RESOLVE: confirm not used anymore
 // ────────────────────────────────────────────────────────────
 /**
  * Script to import NHL schedule from CSV file

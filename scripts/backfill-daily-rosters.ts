@@ -1,9 +1,10 @@
 // CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 // CATEGORY: UTILITY
-// Purpose: Backfill fantasy_daily_rosters for a date range (gap-fill helper)
-// Invoked: manual run after migration 20260111000000 fix
-// Reads:   team_lineups, leagues
-// Writes:  fantasy_daily_rosters
+// Purpose:     Backfill fantasy_daily_rosters for a date range (gap-fill helper)
+// Last active: 2026-02-27
+// Invoked:     manual run after migration 20260111000000 fix
+// Reads:       team_lineups, leagues
+// Writes:      fantasy_daily_rosters
 // ────────────────────────────────────────────────────────────
 /**
  * Backfill script for daily rosters

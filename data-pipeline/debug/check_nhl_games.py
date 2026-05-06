@@ -1,9 +1,10 @@
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: DEBUG-ONLY
-# Purpose: Forensics: nhl_games table sanity check
-# Invoked: ad-hoc
-# Reads:   nhl_games
-# Writes:  stdout
+# Purpose:     Forensics: nhl_games table sanity check
+# Last active: 2026-03-03
+# Invoked:     ad-hoc
+# Reads:       nhl_games
+# Writes:      stdout
 # ────────────────────────────────────────────────────────────
 import os
 from dotenv import load_dotenv

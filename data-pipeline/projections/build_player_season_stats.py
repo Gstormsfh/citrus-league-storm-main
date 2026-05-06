@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Roll up per-game stats into season totals
-# Invoked: imported by nightly_projection_batch.py
-# Reads:   player_game_stats
-# Writes:  player_season_stats
+# Purpose:     Roll up per-game stats into season totals
+# Last active: 2026-04-02
+# Invoked:     imported by nightly_projection_batch.py
+# Reads:       player_game_stats
+# Writes:      player_season_stats
 # ────────────────────────────────────────────────────────────
 """
 build_player_season_stats.py

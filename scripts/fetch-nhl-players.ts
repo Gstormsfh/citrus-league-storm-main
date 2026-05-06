@@ -1,10 +1,11 @@
 // CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 // CATEGORY: ORPHAN-SUSPECTED
-// Purpose: Fetch NHL player metadata (likely setup-era; superseded by populate_player_directory.py)
-// Invoked: no current invocations found
-// Reads:   NHL API
-// Writes:  (early-era table; possibly players)
-// Note:    RESOLVE: grep for invocations; remove if confirmed orphan after R5
+// Purpose:     Fetch NHL player metadata (likely setup-era; superseded by populate_player_directory.py)
+// Last active: 2026-02-27
+// Invoked:     no current invocations found
+// Reads:       NHL API
+// Writes:      (early-era table; possibly players)
+// Note:        RESOLVE: grep for invocations; remove if confirmed orphan after R5
 // ────────────────────────────────────────────────────────────
 
 import { createClient } from '@supabase/supabase-js';

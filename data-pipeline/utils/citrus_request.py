@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Throttled NHL API client with retries + proxy rotation
-# Invoked: imported by EVERY data-pipeline/acquisition/* script
-# Reads:   NHL public API
-# Writes:  (returns parsed JSON)
+# Purpose:     Throttled NHL API client with retries + proxy rotation
+# Last active: 2026-03-03
+# Invoked:     imported by EVERY data-pipeline/acquisition/* script
+# Reads:       NHL public API
+# Writes:      (returns parsed JSON)
 # ────────────────────────────────────────────────────────────
 """
 citrus_request.py - Resilient HTTP Request Wrapper with Proxy Rotation

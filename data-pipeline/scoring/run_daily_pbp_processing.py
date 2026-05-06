@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Daily PBP-processing orchestrator: ingest → derive → score
-# Invoked: data_scraping_service.py nightly cycle
-# Reads:   raw_nhl_data
-# Writes:  raw_shots, player_game_stats, matchup_scoring_snapshots
+# Purpose:     Daily PBP-processing orchestrator: ingest → derive → score
+# Last active: 2026-04-03
+# Invoked:     data_scraping_service.py nightly cycle
+# Reads:       raw_nhl_data
+# Writes:      raw_shots, player_game_stats, matchup_scoring_snapshots
 # ────────────────────────────────────────────────────────────
 """
 run_daily_pbp_processing.py

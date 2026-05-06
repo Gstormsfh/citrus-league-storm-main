@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Ingest official NHL shift charts (per-shift intervals)
-# Invoked: imported by data_scraping_service.py + manual catch-up
-# Reads:   NHL shiftcharts endpoint
-# Writes:  player_shifts_official
+# Purpose:     Ingest official NHL shift charts (per-shift intervals)
+# Last active: 2026-03-03
+# Invoked:     imported by data_scraping_service.py + manual catch-up
+# Reads:       NHL shiftcharts endpoint
+# Writes:      player_shifts_official
 # ────────────────────────────────────────────────────────────
 """
 ingest_shiftcharts.py

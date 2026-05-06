@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Backtest projection accuracy vs actual results (per-position MAE)
-# Invoked: manual + scheduled monitoring
-# Reads:   player_projected_stats, player_game_stats
-# Writes:  (reports — no DB writes)
+# Purpose:     Backtest projection accuracy vs actual results (per-position MAE)
+# Last active: 2026-03-03
+# Invoked:     manual + scheduled monitoring
+# Reads:       player_projected_stats, player_game_stats
+# Writes:      (reports — no DB writes)
 # ────────────────────────────────────────────────────────────
 """
 audit_projection_accuracy.py

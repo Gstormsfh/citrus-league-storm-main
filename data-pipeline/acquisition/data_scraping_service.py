@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Long-running scraper service: parallel live sync + nightly PBP processing with 100-IP rotation
-# Invoked: long-running daemon (Dockerized; deployed separately from web/api)
-# Reads:   NHL public API
-# Writes:  raw_nhl_data, raw_shots, player_game_stats, player_shifts_official
+# Purpose:     Long-running scraper service: parallel live sync + nightly PBP processing with 100-IP rotation
+# Last active: 2026-04-26
+# Invoked:     long-running daemon (Dockerized; deployed separately from web/api)
+# Reads:       NHL public API
+# Writes:      raw_nhl_data, raw_shots, player_game_stats, player_shifts_official
 # ────────────────────────────────────────────────────────────
 """
 data_scraping_service.py - THE TOTAL CITRUS ENGINE (MASTER EDITION)

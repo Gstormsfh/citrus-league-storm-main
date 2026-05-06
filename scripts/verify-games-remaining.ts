@@ -1,9 +1,10 @@
 // CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 // CATEGORY: UTILITY
-// Purpose: Verify games_remaining column is correct on player_ros_projections
-// Invoked: manual sanity check
-// Reads:   player_ros_projections, nhl_games
-// Writes:  stdout
+// Purpose:     Verify games_remaining column is correct on player_ros_projections
+// Last active: 2026-02-27
+// Invoked:     manual sanity check
+// Reads:       player_ros_projections, nhl_games
+// Writes:      stdout
 // ────────────────────────────────────────────────────────────
 /**
  * Verify games remaining calculations for Week 1 (Dec 8-14, 2025)

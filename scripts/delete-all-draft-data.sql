@@ -1,10 +1,11 @@
 -- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 -- CATEGORY: DESTRUCTIVE
--- Purpose: Wipe all draft data (alternate spelling of nuke-all-draft-data — possibly duplicate)
--- Invoked: manual via Supabase SQL Editor; review before run
--- Reads:   (none)
--- Writes:  draft_events, draft_picks, draft_picks_v2 — DELETEs
--- Note:    RECOVERY: PITR. Confirm whether duplicate of nuke-all-draft-data.sql.
+-- Purpose:     Wipe all draft data (alternate spelling of nuke-all-draft-data — possibly duplicate)
+-- Last active: 2025-12-17
+-- Invoked:     manual via Supabase SQL Editor; review before run
+-- Reads:       (none)
+-- Writes:      draft_events, draft_picks, draft_picks_v2 — DELETEs
+-- Note:        RECOVERY: PITR. Confirm whether duplicate of nuke-all-draft-data.sql.
 -- ────────────────────────────────────────────────────────────
 -- Delete ALL draft data and reset all leagues
 -- WARNING: This is a destructive operation - it will permanently delete all draft data!

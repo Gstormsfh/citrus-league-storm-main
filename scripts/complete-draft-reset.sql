@@ -1,10 +1,11 @@
 -- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 -- CATEGORY: DESTRUCTIVE
--- Purpose: Full draft reset (combination of delete-all-draft-data + reset draft state)
--- Invoked: manual via Supabase SQL Editor; review before run
--- Reads:   (none)
--- Writes:  draft_events, draft_picks, draft_order, draft_queues, leagues.draft_state
--- Note:    RECOVERY: PITR.
+-- Purpose:     Full draft reset (combination of delete-all-draft-data + reset draft state)
+-- Last active: 2025-12-17
+-- Invoked:     manual via Supabase SQL Editor; review before run
+-- Reads:       (none)
+-- Writes:      draft_events, draft_picks, draft_order, draft_queues, leagues.draft_state
+-- Note:        RECOVERY: PITR.
 -- ────────────────────────────────────────────────────────────
 -- Complete Draft Reset Script
 -- This will HARD DELETE all draft data from Supabase

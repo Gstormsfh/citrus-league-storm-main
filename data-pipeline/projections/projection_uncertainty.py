@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Add uncertainty bands (Monte Carlo style) to point projections
-# Invoked: imported by calculate_daily_projections.py
-# Reads:   player_projected_stats
-# Writes:  player_projected_stats (uncertainty columns)
+# Purpose:     Add uncertainty bands (Monte Carlo style) to point projections
+# Last active: 2026-03-02
+# Invoked:     imported by calculate_daily_projections.py
+# Reads:       player_projected_stats
+# Writes:      player_projected_stats (uncertainty columns)
 # ────────────────────────────────────────────────────────────
 """
 projection_uncertainty.py

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Producer: discover games via NHL schedule, ingest LIVE/CRIT play-by-play
-# Invoked: imported by data_scraping_service.py
-# Reads:   NHL schedule + game-center API
-# Writes:  raw_nhl_data
+# Purpose:     Producer: discover games via NHL schedule, ingest LIVE/CRIT play-by-play
+# Last active: 2026-03-03
+# Invoked:     imported by data_scraping_service.py
+# Reads:       NHL schedule + game-center API
+# Writes:      raw_nhl_data
 # ────────────────────────────────────────────────────────────
 """
 ingest_live_raw_nhl.py

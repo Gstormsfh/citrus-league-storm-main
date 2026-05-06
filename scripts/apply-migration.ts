@@ -1,9 +1,10 @@
 // CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 // CATEGORY: UTILITY
-// Purpose: Manual migration applier with confirmation prompt
-// Invoked: manual operator tool when supabase CLI unavailable
-// Reads:   supabase/migrations/*.sql
-// Writes:  Supabase migrations table
+// Purpose:     Manual migration applier with confirmation prompt
+// Last active: 2026-02-27
+// Invoked:     manual operator tool when supabase CLI unavailable
+// Reads:       supabase/migrations/*.sql
+// Writes:      Supabase migrations table
 // ────────────────────────────────────────────────────────────
 /**
  * Script to apply the team_lineups migration to Supabase

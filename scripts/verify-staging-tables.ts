@@ -1,9 +1,10 @@
 // CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 // CATEGORY: UTILITY
-// Purpose: Verify staging-environment tables match prod schema
-// Invoked: manual run during staging-deploy operator runbook
-// Reads:   Supabase staging schema
-// Writes:  stdout
+// Purpose:     Verify staging-environment tables match prod schema
+// Last active: 2026-02-27
+// Invoked:     manual run during staging-deploy operator runbook
+// Reads:       Supabase staging schema
+// Writes:      stdout
 // ────────────────────────────────────────────────────────────
 
 import { createClient } from '@supabase/supabase-js';

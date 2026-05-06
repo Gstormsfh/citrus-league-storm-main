@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: End-to-end verification of projection pipeline outputs
-# Invoked: scheduled + post-deploy
-# Reads:   player_projected_stats, projection_cache
-# Writes:  alerts (no DB writes)
+# Purpose:     End-to-end verification of projection pipeline outputs
+# Last active: 2026-03-03
+# Invoked:     scheduled + post-deploy
+# Reads:       player_projected_stats, projection_cache
+# Writes:      alerts (no DB writes)
 # ────────────────────────────────────────────────────────────
 """
 Verify complete projection pipeline from DB to frontend

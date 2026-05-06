@@ -1,9 +1,10 @@
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: UTILITY
-# Purpose: Generate per-player xG heatmap visualizations
-# Invoked: manual visualization tool
-# Reads:   raw_shots
-# Writes:  image files (no DB writes)
+# Purpose:     Generate per-player xG heatmap visualizations
+# Last active: 2026-02-27
+# Invoked:     manual visualization tool
+# Reads:       raw_shots
+# Writes:      image files (no DB writes)
 # ────────────────────────────────────────────────────────────
 """
 Create a showcase-ready heatmap visualization of Expected Goals (xG) across the ice.

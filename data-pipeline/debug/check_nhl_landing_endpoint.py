@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: DEBUG-ONLY
-# Purpose: Forensics: check NHL landing endpoint shape for a sample game
-# Invoked: ad-hoc
-# Reads:   NHL public API
-# Writes:  stdout
+# Purpose:     Forensics: check NHL landing endpoint shape for a sample game
+# Last active: 2026-03-02
+# Invoked:     ad-hoc
+# Reads:       NHL public API
+# Writes:      stdout
 # ────────────────────────────────────────────────────────────
 """
 Check NHL Landing Endpoint for McDavid's 2025-2026 season stats

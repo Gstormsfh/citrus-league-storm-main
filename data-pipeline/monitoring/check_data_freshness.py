@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose: Verify all critical tables have updated_at within freshness SLA; alert on stale
-# Invoked: manual + scheduled monitoring + alerting.py
-# Reads:   every analytical table's updated_at
-# Writes:  alerts (no DB writes)
+# Purpose:     Verify all critical tables have updated_at within freshness SLA; alert on stale
+# Last active: 2026-03-03
+# Invoked:     manual + scheduled monitoring + alerting.py
+# Reads:       every analytical table's updated_at
+# Writes:      alerts (no DB writes)
 # ────────────────────────────────────────────────────────────
 """
 check_data_freshness.py
