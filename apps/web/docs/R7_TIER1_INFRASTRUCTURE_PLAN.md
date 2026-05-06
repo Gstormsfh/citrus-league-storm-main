@@ -260,7 +260,16 @@ master.]
 
 ---
 
-## R7-5 — Backup verification
+## R7-5 — Backup verification  🟡 RUNBOOK LANDED 2026-05-06; restore pending user action
+
+**Status:** runbook landed at `docs/RUNBOOKS/BACKUP_RESTORE_VERIFICATION.md`
+with prod schema fingerprint baseline (84 public tables, top-20 row counts,
+auth + storage schema counts) captured 2026-05-06. The runbook covers:
+pre-checks, fingerprint capture, PITR trigger procedure, post-restore
+verification queries, cleanup, limitations, and a pre-incident usage
+section. **What remains:** the actual PITR restore execution — requires
+manual dashboard action by the operator (cost + permissions). Verification
+log table at the bottom of the runbook is empty pending first execution.
 
 **Goal:** confirm that Supabase's automatic backups actually restore.
 Cheapest disaster-recovery test in the world: do it once, document
