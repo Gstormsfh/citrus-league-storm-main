@@ -129,7 +129,16 @@ For `player_projected_stats`:
 
 ---
 
-## R7-3 — Freshness SLA monitoring
+## R7-3 — Freshness SLA monitoring  ✅ COMPLETE 2026-05-06
+
+**Status:** landed. SLA matrix declared in
+`data-pipeline/monitoring/freshness_sla.py` (22 SLAs across 5 tiers, 2 PAGE +
+20 WARN). `check_data_freshness.py` refactored to drive off the matrix, write
+results to `integrity_check_results`, dispatch alerts via `AlertManager` with
+PAGE→PagerDuty+Slack and WARN→Slack, and gate via dynamic `nhl_games` query
+(both any-game and regular-season-only windows). Baseline captured in
+`R7_3_BASELINE.md`: 0 PAGE breaches, 14 pre-existing WARN breaches (most of
+which Phase 0 will resolve), 6 OK, 2 correctly skipped during playoffs.
 
 **Goal:** the `StaleDataBadge` UI primitive (player dashboard) is the
 last-mile signal for fans. R7-3 makes it the FIRST-mile signal too —
