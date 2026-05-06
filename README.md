@@ -60,6 +60,12 @@ src/
   └── utils/         # Utility functions
 ```
 
+## Data
+
+**Where does Citrus data live?** See [`DATA_INVENTORY.md`](./DATA_INVENTORY.md) — the canonical reference for Supabase projects, historical training archives, pipeline scripts, model artifacts, and the database schema. Update it in the same PR whenever you add a new table, data file, trained model, or pipeline script.
+
+Full data organization audit and reorganization plan: [`apps/web/docs/DATA_ORGANIZATION_AUDIT.md`](./apps/web/docs/DATA_ORGANIZATION_AUDIT.md).
+
 ## License
 
 Private project - All rights reserved
