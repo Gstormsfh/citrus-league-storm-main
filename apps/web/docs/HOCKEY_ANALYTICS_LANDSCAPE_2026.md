@@ -212,3 +212,411 @@ This document does NOT design any roadmap — that's the next step. With this in
 3. **Data-pipeline gap-fill list** — what derived tables (xT location grid, anomaly rolling window, sample-size reliability table, multi-season percentile cohorts) need to exist before the design surfaces ship
 
 That's the next conversation. This doc is the input.
+
+---
+---
+
+# PASS 2 — Broader ecosystem survey (added 2026-05-05)
+
+The first pass covered established public products + academic conferences. Pass 2 surveys the ecosystem layers that the analyst-product-survey lens missed: independent analyst Substacks, community discussions, fantasy products, betting / prospects / goalie verticals, podcasts, international hockey, and explicit fan frustration.
+
+**Strategic reframe (locked by Garrett mid-research):** Citrus is BOTH the analyst product ("is this player good?") AND the fantasy decision product ("should I start them tonight?"). Not two products — two lenses on the same data. This expanded the scope to Parts L-O on analyst-fantasy translation, projection methodology gaps, fantasy community pain points, and DFS analytics.
+
+Same fetch-status legend applies: ✅ direct fetch · ⚠️ partial · 🔍 search-snippets · ❌ blocked · 📚 training-window context.
+
+---
+
+## §7 Hockey analyst Substacks + blogs (Part E)
+
+### 7.1 Active independent analyst Substacks
+
+| Author | Substack / Site | Subs | Distinctive frame | 2024-25 surface area |
+|---|---|---|---|---|
+| **Jack Han** | jhanhky.substack.com + Hockey Tactics ebook annual | 9k+ | **Coach-perspective tactical breakdowns** — DZ / NZ / OZ / special-teams schemes per team, illustrated. Bridges X's-and-O's with analytics | Hockey Tactics 2025 (294 pages, all 32 NHL teams + Four Nations Final). Recent Substack posts: "TBL Powerplay Breakout Variations", "Playoff Playbook: Carolina's Forecheck Secret" |
+| **Greg Revak** | hockeysarsenal.substack.com (Hockey IQ Newsletter) | 8k+ | **Hockey sense / IQ as primary analytical frame** — pattern recognition, decision-making rather than counting stats | ⚠️ Specific 2025 post titles not surfaced from landing page |
+| **Garret Hohl** | thefivehohl.substack.com (The Five Hohl) | (smaller) | **Winnipeg Jets-focused** with broader analytics framework. Recent essay frame: "Financial Markets vs Hockey Analytics" comparing investment-style risk/return thinking to player analytics | ⚠️ Article archive not directly fetched |
+| **David Castillo** | dcastillo.substack.com (Stars Stack) | 1k+ | **Dallas Stars + broader NHL** — player breakdowns + bigger-picture storytelling. Wrote "A 2025 Casual Fan's Guide to Advanced Stats and Hockey Analytics" — onboarding for new fans | Lian Bichsel defensive performance breakdown; casual-fan-guide explainer |
+| **Patrick Bacon** | topdownhockey.medium.com + hockeystats.com | (Medium quiet since 2021) | **NHL Equivalency (NHLe) modeling** + xGAR + projections. Medium archive 2017-2021 covered draft analytics, prospect projection, Python-based xG building tutorials | Active surface migrated to hockeystats.com (joint with JFresh) and X/@TopDownHockey |
+| **JFresh** | jfresh.substack.com | (10k+ across sub + Patreon) | **Player-card analytical writing + projections** — 3-yr weighted RAPM/WAR with isolated impact. Acknowledged limitation: model isn't tuned to coaching-change effects | "The NHL Scouting Report 2026" (full league projection essay), "2025-26 Season Preview, I guess", player-card explainer (returning) |
+| **JFresh (alongside Patrick Bacon)** | hockeystats.com — productized version | — | Free tier: NHL WAR, playoff odds, bracket sim. **$5/mo:** weighted 3-yr WAR cards. **$10/mo:** scouting reports + microstat cards (passes, zone entries, entry denials) | 2025-26 scouting report library |
+
+### 7.2 Adjacent analyst voices
+
+- **Dom Luszczyszyn (The Athletic)** — *Game Score Value Added (GSVA)*. Game Score (originally 2016, redesigned 2020 to use xG instead of Corsi with separate forward/D weightings) is summed to season GSVA, scaled to wins. Used for The Athletic's NHL **player tiers** (5 tiers across 150 players including goalies — co-developed with Shayna Goldman). One of the rare projection systems where pre-season aggregation projects whole team standings.
+- **Shayna Goldman (The Athletic)** — Data + video. Co-creator of BehindtheBenches.com, 1/3 of *Too Many Men* podcast. Authored hockey-analytics primers (GAR, GSVA, goalie metrics). Heavy on goalie analysis.
+- **Dimitri Filipovic (Sportsnet)** — Hosts the **Hockey PDOcast** (since 2015 — longest-running hockey-analytics podcast). Recent: HALO conference, used AHL tracking data to analyze passes for D-zone risk-of-losing-possession factors.
+- **Sean Tierney (Charting Hockey)** — Built reputation on Tableau dashboards, regular TSN Hockey Analytics segments. **Now Director of Analytics at Ottawa Senators (2023+)** — moved in-house, public-facing output reduced.
+- **Mike Kelly (Sportlogiq + NHL Network + FanDuel Sports Midwest)** — Director of Analytics & Insights at Sportlogiq, on-air NHL Network analyst. Voice that frequently bridges the private SPORTLOGiQ data lens to public TV.
+- **Alison Lukan** — **Now in-house at Seattle Kraken** ("Analytics with Alison" on Kraken Hockey Network 2024-25+). Wrote the original Columbus Blue Jackets Hockey Analytics Conference. Public surface narrowed since the in-house move.
+- **Charlie O'Connor** — At PHLY Sports + The Athletic (NOT ESPN — earlier guess corrected). PHLY Flyers Podcast.
+- **Eric Tulsky (Carolina Hurricanes)** — **In-house** as manager of analytics. Was a major public voice 2010s; now silent publicly.
+
+### 7.3 Pattern: the public-to-private migration
+
+A meaningful structural shift in 2022-2025: **the strongest independent analyst voices have been hired by NHL teams.** Tulsky → Hurricanes, Tierney → Senators, Lukan → Kraken (in-house broadcast role). This thins the public analyst layer continually. The remaining independent voices (JFresh, Bacon, Boulet, McCurdy, Han, Revak) are more concentrated and more product-monetized than ever.
+
+**Implication for Citrus:** there's room for a public analyst voice + product because the field is being depleted by team poaches. Citrus could be the new shared platform for the next Tulsky-/Tierney-tier voices that haven't yet been hired in-house.
+
+---
+
+## §8 Community discussions (Part F)
+
+### 8.1 Reddit + HF Boards
+
+- **r/HockeyStats** is the larger of the two analytics subreddits ("Reddit's #1 hockey analytics community" — covers NHL, AHL, NCAA, CHL, Europe, IIHF). **r/hockeyanalytics** is small (~185 subs).
+- **HF Boards "By The Numbers" forum** — dedicated analytics subforum. Active threads: "Which Website Do You Consider More Reliable for Advanced Stats: Natural Stat Trick or Moneypuck?", advanced-stats-overrated debates.
+- **Common community-level critique** (from HF Boards thread synthesis): advanced stats *are* useful but get used poorly — fans cherry-pick chart screenshots without context; the limited number of discrete events compared to baseball makes single-game stat reads unreliable; Quantum Pro Hockey (private) has 462 metrics that public products don't expose.
+
+### 8.2 What people are actually arguing about
+
+- **Inter-model disagreement** is the dominant meta-conversation. JFresh ≠ HockeyViz ≠ Evolving ≠ The Athletic projections often differ by 5-10 standings points/team. Community asks: "which model is right when?"
+- **Garbage-time / score-effect handling** is uneven — Score-Adjusted Corsi exists but no public product implements Cleaning-the-Glass-style "discard garbage time entirely."
+- **Public-vs-private data divide** — fans know SPORTLOGiQ has 500+ metrics that public products don't, generating ongoing "if only we had X" conversation.
+
+### 8.3 Community wishlist (synthesized from threads)
+
+- Better in-game live-update analytics (current public products are season-aggregated)
+- Real-time injury-impact projection
+- Tools to identify regression candidates without manual cross-referencing of expected vs actual
+- More accessible explanations for non-stats fans
+
+---
+
+## §9 Fantasy hockey ecosystem (Parts G + M + N + O)
+
+This is the layer that the Pass 1 doc almost entirely missed — and per Garrett's strategic reframe, **it's half the product mandate**.
+
+### 9.1 Dominant fantasy hockey hubs
+
+| Product | Scope | Distinctive | Methodology surfaced |
+|---|---|---|---|
+| **Daily Faceoff** | Lineups, projections, news, betting picks, weekly streaming | The dominant fantasy + DFS hub. Hosts Daily Faceoff Live (Yaremchuk, Cohen, Seravalli, M-F noon EST). DFO Fantasy Show (Brock Seguin) | **Customizable rankings**, weekly Strength-of-Schedule + streaming targets per week, line-combo and PP-unit pages |
+| **DobberHockey** + **Frozen Tools** | Season-long fantasy analytics powerhouse | Frozen Tools "Big Board" custom reports, **Frozen Tools Forensics** weekly column (player MVPs by position, post-deadline performance, multi-category performers) | Reports incorporate ADP, % of team's PP, 82-game scoring pace, multi-category basic stats. Buys vs Dobber's 2025-26 fantasy guide ($) |
+| **5V5 Hockey** | DFS-focused | Lineup optimizer, projections, cash-game vs GPP guides | DFS projection model + line-stacking optimizer |
+| **Stokastic** | DFS-focused | Stokastic NHL projections + ownership + sims for DK/FD | Backtested 5+ years historical |
+| **Daily Fantasy Fuel** | DFS-focused | DraftKings + FanDuel projections | Standard inputs |
+| **RotoWire** | Cross-fantasy | Daily projections, season rankings, news | Standard inputs |
+| **LineStar** | DFS-focused | Projections + tools | Standard inputs |
+| **SaberSim** | DFS-focused | "Best NHL DFS projections" — sims-based optimizer | Monte Carlo sim approach |
+| **Yahoo Fantasy** | Season-long platform leader | Default platform for most leagues | Pianowski's pre-draft rankings (methodology not publicly stated) |
+| **ESPN Fantasy** | Season-long platform | Default rankings + projections | Methodology not publicly stated |
+| **CBS Fantasy** | Season-long platform | "Proven computer model" projections | Backtested 3 years on DK |
+| **FantasyPros** | Cross-platform consensus | Aggregates multiple analysts' rankings | Consensus = mean of N rankers |
+| **Hashtag Hockey** | Tools (rankings + utility) | Fantasy hockey rankings + tools | — |
+| **FantasyHockeyHelper** | Community-built | Yahoo OAuth integration, player performance graphs over season, sync from Yahoo | Independent open project |
+| **NHL.com fantasy** | League-affiliated | Sleeper picks, expert content | Editorial |
+
+### 9.2 What goes INTO current fantasy projections
+
+Per **Daily Faceoff / DraftKings / FanDuel / Stokastic / 5V5** methodology synthesis (search-snippet sourced):
+- **Recent N-game scoring rate** (form / pace)
+- **Ice time + PP ice time** (deployment)
+- **Vegas odds / implied team total** (game environment)
+- **Back-to-back schedule** (rest)
+- **Head-to-head historical** (matchup)
+- **Line combinations** (linemate strength)
+- **Goalie matchup** (opponent goalie quality)
+- **Power-play unit assignment** (PP1 vs PP2)
+- **Average draft position (ADP)** as a value reference
+
+### 9.3 What is NOT in current fantasy projections
+
+This is the gap Garrett's reframe targets. **Public fantasy projections do NOT use:**
+- **xG-based individual evaluation** (xG/60, finishing % = G−xG, xA1/60)
+- **Pre-shot pass context** (`pass_quality_score`, `pass_immediacy`, `goalie_movement_score`)
+- **Score-state purified rates** (CtG-style garbage-time stripping)
+- **Anomaly detection** (high xG vs low G regression candidates)
+- **Multi-season percentile context** (this player is at his career 73rd percentile this season)
+- **Talent-vs-variance separation** (volume comes from talent, finishing has variance)
+- **Confidence / sample-size reliability layer** (this rate is stable at this sample size)
+- **Defensive impact in projections** (most fantasy formats ignore — but pure-points formats like Yahoo H2H still benefit from on-ice impact for line-mate context)
+- **Career-arc / age-curve adjustment** with explicit aging-curve regression
+- **xT-style transition value** (carries / passes that move puck to dangerous areas)
+
+**This is the methodological moat.** Daily Faceoff is the dominant hub by *coverage and frequency*, not by depth of model. Citrus could ship a fantasy projection that adopts MoneyPuck-class xG+talent inputs as its baseline, then layer on:
+- Anomaly chip ("running hot/cold by N goals")
+- Sample-size reliability indicator
+- Multi-season percentile context
+- Score-state purified rates
+
+### 9.4 Fantasy community pain points
+
+Synthesized from search results + community discussions:
+- **Projection accuracy is low and variance is high.** Hockey is "one of the most volatile DFS sports" (per Stokastic backtesting language). Daily projections shift hourly.
+- **Playoff/end-of-season weirdness** — projections degrade when teams rest, tank, or shift roles.
+- **Goalie projection is shaky** — backup goalie assignments cause overreaction/underreaction.
+- **"Streaming" is heuristic** — schedule strength is dominated by light-night calculations, not opponent-quality projection.
+- **No tool unifies analyst-grade evaluation with daily-decision projection.** Analyst tools tell you "is this player good," fantasy tools tell you "what's tonight's projection." Nobody bridges them.
+
+### 9.5 DFS-specific frames worth importing into season-long
+
+- **Stack correlation** — playing the goalie of the team you've stacked skaters on (positive correlation: their wins → wins for your goalie). Season-long doesn't currently use this.
+- **Leverage / ownership** — GPP DFS gameplay focuses on *underowned* stacks; the analytical frame is "what's the field doing wrong, and how do I bet against it?"
+- **Game-environment / pace** — Vegas implied total → pace → projection floor. Season-long projections rarely surface pace context.
+- **Line-stacking optimization** — DFS optimizers explicitly model line-combo correlation. Season-long doesn't.
+- **Cash vs GPP framing** — different decision mode (floor vs ceiling). Maps to "safe start" vs "boom-or-bust" for season-long fantasy.
+
+---
+
+## §10 Adjacent communities — betting / prospects / goalie (Part H)
+
+### 10.1 Hockey betting
+
+- **Pinnacle** — sharpest market judge by closing-line value
+- **Action Network** — provides projections (spread, ML, total) compared to market with edge % + letter grades. Distinctive frame: identifies "sharp money" via line-movement signals
+- **EVAnalytics, Wunderdog, SportBot AI, Underdogchance, SportsLine** — model-driven NHL pick services. SportsLine reports 78-54 record on top-rated NHL puck-line + over/under for 2024-25 ($1,600 ROI on $100 stakes per their marketing)
+- **Sharp betting analytical frames** that fantasy and analyst products don't surface:
+  - **Closing-line-value (CLV)** — model accuracy proxy. *Citrus could measure its own model accuracy this way.*
+  - **Sharp money detection** — market-action divergence as signal
+  - **Backup-goalie value** — public over/under-reaction patterns
+  - **Game-environment betting context** — implied team totals, weather / building proxies (less relevant to hockey)
+
+### 10.2 Prospects analytics
+
+- **Will Scouch (Scouching)** — hand-tracked NHL Draft prospect performance database. Subscribers get private question inbox + Discord + custom data tables. **Co-founder of Fractal Hockey.** Ranked 82 skaters for 2025 NHL Draft consensus.
+- **Mitch Brown (Elite Prospects)** — Director of North American Scouting at EP. CHL/USHL/NCAA tracking data analysis. Heavy on draft eligibility analysis. **Embedded with EP** rather than independent.
+- **Byron Bader (Hockey Prospecting)** — *Hero Charts* + NHLe-based prospect projection model. **Used by 25+ NHL personnel** as a draft/trade aid + thousands of fans + dynasty fantasy players. 2025 Top 32 Draft Rankings published on X.
+- **Patrick Bacon's NHLe model** — the canonical academic NHL Equivalency framework. KHL→AHL→NHL chain conversion (KHL→NHL aggregate ~0.63 NHLe). Implemented in `frozenpool.dobbersports.com/frozenpool_nhle.php` as a public calculator.
+- **Lassi Alanen** — European leagues (SHL/Liiga/KHL) tracking + scouting. Embedded in Elite Prospects coverage.
+
+**Imports for Citrus:**
+- NHLe-based aging/league context as a Phase 2 metric — multi-league percentile
+- Draft-tier prospect projection as a separable surface (dynasty fantasy crossover)
+- Hand-tracked microstats are NOT replicable — but the *idea* of giving each prospect a tracked-performance card is
+
+### 10.3 Goalie-specific analytics
+
+- **Clear Sight Analytics (Steve Valiquette)** — **34 variables per shot** including shot type, screens, deflections, **pre-shot movement (passes + carries + flow)**. Founded post-2012-retirement. Tracks data NHL play-by-play doesn't. **Direct competitor frame to Citrus's `raw_shots` schema** — Citrus has `pass_quality_score`, `goalie_movement_score`, `pass_immediacy`, etc. that map almost 1:1.
+- **JFresh's goalie cards** — pull from MoneyPuck + Evolving-Hockey. Quality Start % + Really Good Start % computed manually from game logs (0+ and 2+ goals saved above expected).
+- **HockeyViz goalie analysis** — McCurdy says publicly that goalie variance is so noisy that even GSAx-class metrics feel underwhelming. This is where Citrus's `goalie_rebound_control` + `goalie_gsax_primary` decomposition becomes a differentiator if/when populated.
+
+---
+
+## §11 Podcasts / video / international (Parts I + J)
+
+### 11.1 Podcasts where analytical frames emerge
+
+- **The Athletic Hockey Show** — daily M-F. Tier-list-style player analysis, betting picks, prospect coverage. Dom Luszczyszyn + Shayna Goldman regularly dive into projection methodology + tier debates.
+- **Hockey PDOcast (Dimitri Filipovic)** — since 2015. Casual-friendly analytics. Recent: AHL tracking data, HALO conference recaps.
+- **Glass and Out (The Coaches Site)** — coach-perspective analytics. Jack Han + John Becanic appearances. Frames: tactical systems, video-as-analytics, hockey IQ measurement.
+- **DFO Fantasy Show + Daily Faceoff Live** — fantasy + DFS methodology. Listener critique: format shouting/static issues.
+- **Apples & Ginos (fantasy hockey)** — deep dives on fantasy with prospects analysts (Byron Bader appeared for 2025 Draft dynasty)
+
+**Frames that emerge in spoken-word but aren't productized:**
+- **Tier-based projection** — "tier 1 vs tier 2 player" framing for trade/draft decisions; more digestible than continuous percentile
+- **Coach-speak translated** — Jack Han's framework reads tactical patterns from systems (forecheck pressure types, breakout variations) that current analytical products don't expose at the player level
+- **Hockey IQ measurement** — Greg Revak's framing — pattern recognition vs raw stat output. Hard to operationalize but real
+- **Listener questions** as a discovery surface — what fans actually want to know
+
+### 11.2 International hockey
+
+- **IIHF World Junior Championship** (Dec 2024 - Jan 2025: USA defeated Finland 4-3 OT). Tournament stats published via stats.iihf.com (basic counting stats only, no advanced).
+- **Liiga (Finland)**, **SHL (Sweden)**, **KHL (Russia)**, **Allsvenskan (Sweden 2nd-tier)** — analytics primarily through **Elite Prospects** and **DobberHockey "The Journey"** column for prospect performance
+- **NHLe conversion factors** are the dominant international-to-NHL bridge. KHL aggregate ~0.63 NHLe, AHL ~0.38 NHLe relative to KHL.
+- **Lassi Alanen + Mitch Brown** are the public-facing voices for European prospects analytics
+
+**Frames international hockey uses that NHL coverage hasn't fully adopted:**
+- **Multi-league percentile context** — when a player moves SHL→AHL→NHL, comparing him to peers at each level is standard in scouting communities but not in public NHL analytics
+- **Tournament-pressure context** — World Juniors / WCH are short-sample high-pressure environments; analytical narratives integrate "how did he perform when the lights were brightest" naturally. NHL public analytics rarely does this for playoff vs regular-season performance
+
+---
+
+## §12 Critique + frustration synthesis (Part K)
+
+Surfaced from community threads, critiques, and absent-from-results signals:
+
+| Frustration | Source | What's missing |
+|---|---|---|
+| Inter-model disagreement is unresolved | HF Boards, Reddit | Meta-tool that reconciles JFresh vs Evolving vs HockeyViz vs Athletic for a single player and explains which is *more right when* |
+| Real-time / live updates | Reddit r/hockey, HF Boards | Most public products are nightly or season-aggregate. No public live-game analytics dashboard |
+| Score-effect / situational handling is uneven | HF Boards | Cleaning-the-Glass-style garbage-time stripping has no public hockey product |
+| Goalie analytics plateau | McCurdy explicit, community implicit | Need rebound-control / pre-shot-context / screened-shot decomposition. Citrus schema has the columns; nobody has shipped this |
+| Fantasy projections are recency-biased + form-driven | DFS / season-long communities | Projections lack xG, pre-shot, score-state, talent-vs-variance, multi-season percentile context |
+| Cherry-picked-chart misuse | HF Boards thread | Need confidence/reliability layer on every metric so non-stats fans don't read noise as signal |
+| Public-vs-private data divide | Reddit, HF Boards | SPORTLOGiQ has 500+ metrics that public never sees. Citrus's `raw_shots` 57+ features narrows this gap if exposed |
+| Analyst voices keep getting hired in-house | Pattern observation | Public ecosystem thins as Tulsky/Tierney/Lukan etc. go private. Room for a new platform that makes the analytics-public role economically sustainable |
+| No tool unifies analyst evaluation + fantasy decision | Implicit gap | **The Citrus dual-lens product opportunity** |
+
+---
+
+## §13 NEW — Analyst-fantasy translation matrix (Part L)
+
+Per Garrett's strategic reframe: every metric should have BOTH an analyst reading and a fantasy-decision reading. Below is the matrix for the metrics surfaced across Pass 1 + Pass 2 research. **This becomes the design contract: every stat tile in the Citrus product needs both a "is the player good" panel and a "should I start them" panel.**
+
+| Metric / framework | Analyst reading ("is the player good?") | Fantasy reading ("should I start / draft / trade for?") |
+|---|---|---|
+| **xG/60 (5v5)** percentile | Top decile = elite shot generator regardless of finishing luck | Floor indicator — high xG/60 means production won't crater even in cold streaks |
+| **Goals/60 vs xG/60 delta** | Finishing talent — sustained delta = real skill, recent delta = variance | **Anomaly trigger** — high xG / low G = buy-low / hold; high G / low xG = sell-high / regression target |
+| **A1/60 (primary assists per 60)** | Shot-creation talent independent of teammate finishing | Multi-cat fantasy floor — A1 is more sustainable than A2 |
+| **xGA/60 on-ice** | Defensive impact — does the player suppress opposing chances | Plus-minus floor + linemate quality signal |
+| **xGF% on-ice** | Net possession impact — best single-number player-driving metric | H2H format edge — player-driving wingers carry their linemates |
+| **PP1 xGF/60** | Power-play deployment + skill | PPP fantasy projection — top-PP-unit is the dominant predictor of PPP volume |
+| **PEN± per 60 (drawn − taken)** | Composure + pressure-drawing ability | Penalty minutes (PIM) leagues + power-play exposure |
+| **Pre-shot pass quality** (`pass_quality_score`) | Shooting context — top-decile pass quality means even average finishers hit | **Linemate volatility indicator** — a player with great pass-quality dependence will tank if his linemate sits |
+| **Shooting talent multiplier** | Career-stable Bayesian shooter prior | Long-term hold value — buy this player as multi-year fantasy asset |
+| **GAR / WAR (multi-component)** | Total impact aggregated to wins | Dynasty / keeper league valuation; ADP comparison shows where the market is wrong |
+| **Sample-size reliability** (Pierre-Louis frame) | "This rate stabilizes after N games" | "Don't drop based on 5-game cold streak — this metric needs 25 games" |
+| **Career arc / age curve** | Where is the player on their development trajectory | Trade target (ascending), sleeper (pre-peak), decline candidate (post-29 forward / post-30 D) |
+| **xT (Expected Threat) location value** | Decision-making quality with the puck | Off-ball production indicator — A2/SOG floor in possession-heavy systems |
+| **Score-state-pure rates** (CtG-style stripping) | True talent rate without garbage-time inflation/deflation | "Real production rate" projection that doesn't get fooled by blowouts |
+| **Linemate impact decomposition (RAPM)** | Player's effect isolated from teammates | **Tonight-specific volatility** — if his linemate is scratched, projection drops by N% |
+| **Anomaly chip (running hot/cold)** | Regression-to-mean expectation framework | **Sell-high / buy-low timing primitive** |
+| **PP unit assignment (PP1 vs PP2)** | Coaching trust / role | Direct fantasy point projection delta — PP1 is ~2× PP2 production |
+| **Goalie GSAx + rebound control** | Goalie skill decomposition | Start-or-sit decision; expected wins projection |
+| **Defensive geometry inside xG** (`distance_to_nearest_defender`, screening box) | Shot-quality context | Quality-shot projection — better than raw shot count |
+| **Career-percentile-vs-current** | Where is the player relative to his own ceiling | Hold-vs-trade decision — at career peak vs ascending |
+| **Stack correlation (DFS frame)** | Tactical insight on linemate complementarity | DFS lineup construction primitive |
+| **Schedule strength + light-night density** | Less analyst-relevant | Season-long streaming + DFS slate-building primitive |
+| **xG / pace per game** | Shot-suppression vs shot-creation game-flow context | DFS game-environment / over-under lean |
+
+**Design implication:** the player profile page needs *two readings of every analytical surface*. Either as toggle ("Analyst view" / "Fantasy view"), or as a persistent secondary annotation under each chart, or as a fantasy-specific panel that appears when "Add to roster watchlist" / "Compare to my team" gestures fire.
+
+---
+
+## §14 Updated gaps + uncopied territory (synthesis update)
+
+### 14.1 New gaps surfaced in Pass 2 (additive to Pass 1 §3)
+
+13. **No public reconciliation tool for inter-model disagreement** — when JFresh says 94 points and Evolving says 99, no product explains *why* and which is more right when
+14. **No live-game analytics surface** — every public product is at the season or per-60 aggregation level
+15. **Tier-based projection framing is podcast-only** — The Athletic does player tiers in podcast/article form but no product exposes "tier 1/2/3" as a UI primitive
+16. **Hockey IQ / decision-quality is unmeasured publicly** — Revak's frame, Han's tactical-pattern reads have no productized analog
+17. **No public model accuracy disclosure** — Closing-Line-Value-style accountability that betting markets enforce doesn't exist for analytics products
+18. **Analyst-to-fantasy bridge is absent** — Daily Faceoff serves fantasy decisions; Evolving-Hockey serves analyst evaluation. **Nobody serves both with one product.**
+19. **Multi-league percentile context** — when prospect moves SHL→AHL→NHL, no public NHL product shows the player's percentile arc through leagues
+20. **Tournament / playoff-pressure splits** — public products rarely separate playoff from regular-season talent reads
+21. **Stack-correlation analytics** in season-long fantasy — DFS has it; season-long ignores
+22. **Confidence-on-projection** as a UI primitive — every fantasy projection is a single number; nobody shows the distribution / variance band
+23. **Coaching change effects on projection** — JFresh explicitly identified as a model limitation
+24. **Anomaly engine + sell-high/buy-low timing** — implicit in DFS regression analysis, never productized as a standalone surface
+
+### 14.2 Updated Citrus uncopied territory (additive to Pass 1 §4)
+
+- **Dual-lens player profile** — every metric annotated with both analyst and fantasy reading. This is the single biggest differentiator and the new strategic spine
+- **Anomaly + sell-high/buy-low chip** — productize the regression-to-mean concept fantasy DFS players already operate by intuition
+- **Inter-model reconciliation panel** — show JFresh + Evolving + Athletic + Citrus side-by-side and flag where they disagree, with our model's confidence level
+- **Closing-Line-Value-style model accountability** — publish own-model accuracy each week; nobody else does this and betting markets show it builds trust
+- **Tier-level projection framing** — adopt The Athletic's tier framing as a UI primitive backed by GAR + xGAR + projection
+- **Live game analytics surface** — leverage `raw_shots` real-time updates + `player_shifts` to publish a live "what just happened analytically" feed during games
+- **Multi-league percentile arc** — for every NHL player who came through SHL/Liiga/KHL/AHL, show his percentile rank at each level. Differentiator for international + prospect crossover
+- **Fantasy projection with analyst-grade inputs** — adopt MoneyPuck-class xG + talent inputs as the projection baseline + layer on anomaly + sample-size + multi-season context. **The methodological moat versus Daily Faceoff / DK / Yahoo / ESPN projections.**
+- **DFS frames imported to season-long** — stack correlation, leverage / ownership context, game-environment lean, line-stacking. Surface as fantasy-mode toggles
+- **Tactical-pattern reads** — Jack Han / Coach-perspective analytics. Hard to fully replicate without manual tagging but Citrus could expose the data primitives (forecheck pressure proxies via `time_since_last_event` + zone, breakout variations via `pass_zone` + `pass_to_net_distance`)
+- **Playoff-pressure splits** — separate playoff and regular-season talent reads with explicit cohort comparison
+- **Confidence-on-projection as UI primitive** — every projected stat ships with its sample-size-derived confidence band
+
+### 14.3 What still doesn't change from Pass 1
+
+The "what we can't compete on" list remains: NHL EDGE puck-tracking primitives we don't own, manual microstats we can't backfill (ATZ-class), SPORTLOGiQ-class private analytics we don't have. Pass 2 doesn't add to that list.
+
+---
+
+## §15 Strategic synthesis — the dual-lens product
+
+**The Citrus play, post-Pass-2:**
+
+> Citrus is the first hockey analytics product where every analytical surface has a fantasy decision reading, and every fantasy decision has analyst-grade evaluation behind it. The gap exists because the analyst products (Evolving, JFresh, MoneyPuck) ignore fantasy decisions, and the fantasy products (Daily Faceoff, Dobber, DraftKings) ignore analyst-grade evaluation. **Nobody bridges them. Citrus is that bridge.**
+
+### 15.1 Three things this synthesis implies
+
+1. **Every player profile component needs two readings.** Not toggle-modal — both visible. The xG/60 percentile bullet is *also* labeled "fantasy floor: high consistency." The anomaly chip is *also* "buy-low candidate (regression up expected)." The career-arc viewer is *also* "trade target (ascending phase)."
+
+2. **The fantasy projection itself is a hero surface, not a footer.** Currently Citrus's product spec treats fantasy as a side feature. Post-reframe, the fantasy projection — backed by analyst-grade xG + pre-shot + score-state + talent-vs-variance + multi-season percentile inputs — is a primary product surface. **It's the only fantasy projection in market with that input depth.** That's the pitch.
+
+3. **The "Stormy verdict" Editorial layer can speak in dual language naturally.** Stormy already exists as the editorial voice. Stormy can render verdicts that explicitly use both lenses: *"Elite slot generator — top decile in inside xG/60. Fantasy: floor is high but ceiling is linemate-dependent. Hold in points-only, sell-high in multi-cat where his rate-stat slump masks underlying skill."*
+
+### 15.2 What changes in the roadmap-in-progress
+
+The Pass-1 doc gestured at: differentiation roadmap, component-spec extensions, data-pipeline gap-fill list. Post Pass-2:
+
+- **Component spec extension list grows** — add: dual-lens metric annotation primitive, fantasy-projection panel, anomaly chip, sample-size reliability indicator, inter-model reconciliation panel, tier-projection chip, multi-league percentile arc viewer, live-game analytics strip, playoff-pressure split toggle, confidence-on-projection band primitive
+- **Data-pipeline gap-fill list grows** — add: Bayesian shooter-talent table, score-state-purified rate aggregations, multi-league percentile cohort tables, multi-season RAPM rolling, anomaly engine output table (rolling actual-vs-expected), closing-line-value-style own-model accuracy log
+- **Roadmap order changes** — *fantasy projection is now Phase 1*, not a side track. Multi-season backfill (already locked) plus xG-based projection plus anomaly chip together make the dual-lens MVP.
+- **Strategic copy / pitch changes** — Citrus is "the first hockey analytics product that's also the smartest fantasy decision tool" or vice versa. Either framing works; both are accurate.
+
+### 15.3 What's still unanswered
+
+These remain open for the next planning conversation:
+- **Does the dual-lens framing apply to Stormy's tone?** I.e., is Stormy more analyst (clinical) or more fantasy (decision-driving) in voice? Or context-switching by user mode?
+- **What's the priority order between the new Pass-2 surfaces?** (Anomaly chip vs inter-model reconciliation vs live-game vs multi-league arc vs playoff splits — they can't all be Phase 1.)
+- **How do we handle the goalie sequential-track integration with the dual-lens?** — the fantasy decision around goalie starts is highly time-sensitive; the analyst evaluation is multi-season. Do they live in the same surface?
+- **What's the explicit "analyst-only" vs "fantasy-only" cohort?** Some users will only care about one lens. Do we hide the other? Default it off? Settings toggle?
+
+These are roadmap-design questions, not research questions. The research is done. Next move: the roadmap.
+
+---
+
+## §16 Pass 2 sources — additional citations
+
+**Hockey analyst Substacks + voices:**
+- ✅ Patrick Bacon Medium archive — https://topdownhockey.medium.com (content stops 2021; active surface migrated)
+- ✅ JFresh Substack landing — https://jfresh.substack.com
+- ✅ Jack Han Hockey Tactics Newsletter — https://jhanhky.substack.com (+ Gumroad ebooks 2023, 2024, 2025)
+- ✅ Hockey IQ Newsletter (Greg Revak) — https://hockeysarsenal.substack.com
+- ✅ Stars Stack (David Castillo) — https://dcastillo.substack.com
+- ✅ The Five Hohl (Garret Hohl) — https://thefivehohl.substack.com
+- ✅ Hockey PDOcast (Dimitri Filipovic) — https://hockeypdocast.com/about-2/
+- 🔍 Mike Kelly (Sportlogiq + NHL Network + FanDuel Sports Midwest) — https://x.com/mikekellynhl
+- 🔍 Sean Tierney (Charting Hockey → Ottawa Senators) — https://x.com/chartinghockey + https://medium.com/@ChartingHockey
+- 🔍 Alison Lukan (Seattle Kraken) — https://www.nhl.com/kraken/news/topic/analytics-with-alison/
+- 🔍 Shayna Goldman (The Athletic) — https://muckrack.com/shayna-goldman
+- 🔍 Dom Luszczyszyn GSVA — https://medium.com/@b-marsh92 + adjacent explainers
+- 🔍 Charlie O'Connor — PHLY Sports/Athletic (NOT ESPN — corrected)
+- 🔍 LB-Hockey Multi-Year Cards — https://lb-hockey.com/player-cards-multi-year/
+- 🔍 Jack Han Hockey Tactics 2025 X announcement — https://x.com/JhanHky/status/1898010356699529560
+- 🔍 Sneak Peek: Hockey Tactics 2025 — https://jhanhky.substack.com/p/sneak-peek-hockey-tactics-2025
+
+**Community discussions:**
+- 🔍 HF Boards "By The Numbers" + advanced stats threads — https://forums.hfboards.com/forums/by-the-numbers.241/
+- 🔍 r/HockeyStats — https://reddit.rtrace.io/r/HockeyStats
+- 🔍 r/hockeyanalytics (small) — referenced
+
+**Fantasy hockey ecosystem:**
+- ✅ Daily Faceoff — https://www.dailyfaceoff.com (line combos + projections + streaming targets)
+- 🔍 DobberHockey + Frozen Tools — https://dobberhockey.com (Frozen Tools Forensics weekly column)
+- 🔍 Stokastic NHL — https://www.stokastic.com/nhl/nhl-projections/ (DFS projections + sims)
+- 🔍 Daily Fantasy Fuel NHL — https://www.dailyfantasyfuel.com/nhl/projections/
+- 🔍 5V5 Hockey — https://5v5hockey.com (DFS projections + cash-game guide)
+- 🔍 RotoWire NHL daily — https://www.rotowire.com/hockey/projections-daily.php
+- 🔍 LineStar NHL — https://www.linestarapp.com/Projections/Sport/NHL
+- 🔍 SaberSim NHL — https://www.sabersim.com/nhl/projections
+- 🔍 Hashtag Hockey — https://hashtaghockey.com/
+- 🔍 FantasyHockeyHelper — https://tompedron.medium.com/fantasyhockeyhelper-technical-improvements-2024-2025-eb82e14e1454
+- 🔍 Fantasy Hockey Geek (mentioned, not directly fetched)
+- 🔍 NHL.com Fantasy — https://www.nhl.com/news/fantasy-hockey-top-10-sleeper-picks-deep-sleepers
+- 🔍 DraftKings + FanDuel methodology synthesized via FantasyData / RotoGrinders / Stokastic guides
+- 🔍 Daily Faceoff Weekly Strength of Schedule — https://www.dailyfaceoff.com/news/fantasy-hockey-2025-26-weekly-strength-of-schedule-and-streaming-targets-week-13
+
+**Adjacent communities:**
+- 🔍 Pinnacle NHL totals — https://www.pinnacle.com/betting-resources/en/hockey/finding-potential-value-in-2024-2025-nhl-team-totals
+- 🔍 Action Network NHL — https://www.actionnetwork.com/nhl
+- 🔍 Will Scouch Scouching — https://www.scouching.ca/
+- 🔍 Mitch Brown Elite Prospects — https://muckrack.com/mitchlbrown/articles
+- 🔍 Byron Bader Hockey Prospecting — https://hockeyprospecting.com/
+- 🔍 Frozen Tools NHLe Calculator — https://frozenpool.dobbersports.com/frozenpool_nhle.php
+- 🔍 Steve Valiquette Clear Sight Analytics — https://ingoalmag.com/2021/05/16/a-guide-to-the-data-of-clear-sight-analytics-csa/ + 2025 InGoal updates
+
+**Podcasts + video:**
+- 🔍 The Athletic Hockey Show — https://open.spotify.com/show/1ELJDK8J8DXMN2X9TicBQ5
+- 🔍 Hockey PDOcast — referenced
+- 🔍 Glass and Out (The Coaches Site) — https://thecoachessite.com/john-becanic-hockey-iq-think-fast-play-fast/
+- 🔍 Apples & Ginos Fantasy Hockey podcast — https://creators.spotify.com/pod/profile/apples-and-ginos
+- 🔍 DFO Fantasy Show — https://podcasts.apple.com/us/podcast/dfo-fantasy-show/id1046192515
+
+**International:**
+- 🔍 IIHF stats — https://stats.iihf.com (basic counting only)
+- 🔍 Liiga / SHL / KHL via Elite Prospects — https://www.eliteprospects.com/league/liiga/stats/2024-2025 (and similar)
+- 🔍 Patrick Bacon NHLe modeling — https://hockeystats.com/methodology/nhle
+
+---
+
+## Pass 2 honest disclosures
+
+- **Most analyst Substack landing pages return only the masthead** in WebFetch responses — the substantive archives sit behind subscriber-list rendering. What I have on Han / Revak / Hohl / Castillo is the publisher-stated topic + stray titles surfaced via search. Specific 2024-25 essay claims should be considered "directionally accurate" rather than verbatim-cited.
+- **Reddit was poorly searchable** — my `site:reddit.com` queries returned no hits. The community discussion synthesis in §8 leans on HF Boards threads + secondary blog summaries. The "fan wishlist" claims are inferred from the absence-of-tools rather than direct quoted threads.
+- **The Athletic's "Strange Game" podcast** — couldn't confirm existence with that name; The Athletic Hockey Show is their daily flagship and what I substituted.
+- **Hockey-Statistics building xG models series** — referenced multiple times; I have the URLs but didn't deep-fetch each post (https://hockey-statistics.com/2025/05/18/hockey-analytics-building-xg-models-in-python/, https://hockey-statistics.com/2025/08/26/hockey-analytics-xg-models-v-2-0/).
+- **Specific projection-model accuracy numbers** for Daily Faceoff, Dobber, Yahoo, ESPN, RotoWire — not publicly disclosed by those products. Methodology summaries are search-snippet inferences.
+- **r/fantasyhockey "tools wish existed" thread** — couldn't surface a specific thread despite searching. The community-pain-point synthesis in §9.4 is patterns-from-the-aggregate, not direct quotes.
+- **Sleeper hockey** — Garrett's question whether Sleeper launched NHL fantasy. Search returned only "sleeper picks" articles for 2024-25 (the term, not the platform). **No evidence the Sleeper platform launched NHL fantasy** as of May 2026 from the search-result level. Worth confirming directly.
+- **Specific PFF / NGS comparisons to hockey** — Pass 1 covered PFF + NFL NGS adequately; Pass 2 didn't deepen these.
