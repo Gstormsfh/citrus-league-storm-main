@@ -1616,9 +1616,10 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                 'shooting_team_defencemen_on_ice': None,
                 'defending_team_forwards_on_ice': None,
                 'defending_team_defencemen_on_ice': None,
-                'distance_to_nearest_defender': None,
-                'skaters_in_screening_box': None,
-                'nearest_defender_to_net_distance': None,
+                # Defender geometry columns dropped 2026-05-07 (Phase 0 / 0d-pre #1).
+                # NHL public PBP carries no defender coordinates; v2 unlock requires
+                # NHL EDGE licensing / SPORTLOGiQ feed / internal CV pipeline. See
+                # apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md.
                 'angle_change_from_last_event': angle_change_from_last_event,
                 'angle_change_squared': angle_change_squared,
                 'distance_change_from_last_event': distance_change_from_last_event,
@@ -3054,13 +3055,22 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 defending_team_defencemen_on_ice = None
                 
                 # ============================================================
-                # PHASE 3: DEFENDER PROXIMITY FEATURES (3 features)
+                # PHASE 3: DEFENDER PROXIMITY FEATURES — REMOVED 2026-05-07
                 # ============================================================
-                # Note: Requires tracking last known positions of defenders
-                distance_to_nearest_defender = None  # Would need defender position tracking
-                skaters_in_screening_box = None  # Would need position tracking
-                nearest_defender_to_net_distance = None
-                
+                # Three columns previously declared here (distance_to_nearest_defender,
+                # skaters_in_screening_box, nearest_defender_to_net_distance) were dropped
+                # in migration 20260507223000_phase0_pre_drop_vestigial_defender_geometry.sql
+                # after the 2026-05-07 investigation established that:
+                #
+                #   - NHL public PBP feed carries no per-event on-ice player IDs and no
+                #     defender coordinates (only shooter/goalie + situationCode strength).
+                #   - NHL EDGE granular tracking is not exposed for per-event consumption.
+                #   - MoneyPuck themselves don't publish positional defender geometry.
+                #
+                # Defender geometric features remain a v2 capability — see
+                # apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md for unlock paths
+                # (NHL EDGE licensing / SPORTLOGiQ feed / internal CV pipeline).
+
                 # ============================================================
                 # PHASE 4: ADVANCED SHOT QUALITY FEATURES (7 features)
                 # ============================================================
@@ -3284,12 +3294,8 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     'shooting_team_defencemen_on_ice': shooting_team_defencemen_on_ice,
                     'defending_team_forwards_on_ice': defending_team_forwards_on_ice,
                     'defending_team_defencemen_on_ice': defending_team_defencemen_on_ice,
-                    # ============================================================
-                    # PHASE 3: DEFENDER PROXIMITY FEATURES (3 features)
-                    # ============================================================
-                    'distance_to_nearest_defender': distance_to_nearest_defender,
-                    'skaters_in_screening_box': skaters_in_screening_box,
-                    'nearest_defender_to_net_distance': nearest_defender_to_net_distance,
+                    # PHASE 3 (defender proximity, 3 columns) removed 2026-05-07 —
+                    # see GAPS_AND_FUTURE_CAPABILITIES.md for v2 unlock paths.
                     # ============================================================
                     # PHASE 4: ADVANCED SHOT QUALITY FEATURES (7 features)
                     # ============================================================

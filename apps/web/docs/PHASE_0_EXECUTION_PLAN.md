@@ -350,14 +350,20 @@ The decisions interact:
 ### Locked Phase 0 sequence
 
 ```
-0d-pre  (foundation fixes)
-   ├─ Defender geometry extraction logic fix
-   ├─ Shooter shift context extraction fix
-   ├─ Season column population on raw_shots / player_shifts / player_toi_by_situation
-   ├─ populate_player_directory.py one-time backfill (3 known orphans)
-   ├─ populate_player_directory.py daily cron schedule (.github/workflows/refresh-player-directory.yml)
-   ├─ Extraction backlog drain (~485 reg-season + 45 playoff games stuck in raw_nhl_data)
-   └─ Defensive GAR pipeline fix
+0d-pre  (foundation fixes; status as of 2026-05-07)
+   ├─ #1 [✅ DROPPED] Defender geometry capability — vestigial columns
+   │      removed; v2 unlock paths documented in GAPS_AND_FUTURE_CAPABILITIES.md § 1.
+   │      NHL public PBP feed has no defender coordinates; deferring is the
+   │      world-class call (see HOCKEY_ANALYTICS_LANDSCAPE_2026.md § 17).
+   ├─ #2 Shooter shift context extraction fix
+   ├─ #3 [✅ DONE] Season column population on raw_shots / player_shifts /
+   │      player_toi_by_situation (commit 422ffb5)
+   ├─ #4 [✅ DONE — Item A] populate_player_directory.py one-time backfill
+   ├─ #5 [✅ DONE — Item A] populate_player_directory.py daily cron
+   │      (.github/workflows/refresh-player-directory.yml)
+   ├─ #6 Extraction backlog drain (~485 reg-season + 45 playoff games stuck
+   │      in raw_nhl_data; combined retrofit pass per Q1+Q2 finding 2026-05-07)
+   └─ #7 Defensive GAR pipeline fix
        ↓
 0a  (historical CSV load — local)
    ├─ Load shots_2017.csv (119K rows, 2017-18 season) + shots_2018-2024.csv (786K rows, 7 seasons) into raw_shots

@@ -94,7 +94,7 @@ Cross-referencing the Citrus prod schema (per `PHASE_5_STEP_1_FINDINGS.md` + `ra
 - **Pre-shot pass quality leaderboards** — `pass_quality_score`, `pass_immediacy_score`, `pass_zone`, `pass_lateral_distance`, `pass_to_net_distance`, `time_before_shot`, `pass_angle`, `goalie_movement_score`. None of these are exposed publicly. Citrus is the only place that could publish, e.g., "Players whose passes generate the highest-quality shots, controlling for shot location."
 - **Rebound generation vs rebound suppression** — `is_rebound`, `expected_rebound_probability`, `expected_goals_of_expected_rebounds`, `shot_generated_rebound`, `shot_goalie_froze`, `shot_play_continued_in_zone`. Lets us split: who creates rebounds (offensive value), who controls them (goalie / defender value).
 - **Pace-of-play metrics** — `time_since_last_event`, `speed_from_last_event`, `distance_from_last_event`, `shooter_time_on_ice`, `time_since_faceoff`. Lets us classify shot context: rush-driven vs cycle-driven vs broken-play. No public product exposes this as a player-level analytic.
-- **Defensive context inside xG** — `distance_to_nearest_defender`, `nearest_defender_to_net_distance`, `skaters_in_screening_box`, `defending_team_skaters_on_ice`. Defense-Quality competitor that uses pre-shot defender geometry, not just "shots suppressed."
+- **Defensive context inside xG (TOI/composition only — see § 17 for the geometry caveat)** — `defending_team_skaters_on_ice`, `defending_team_forwards_on_ice`, `defending_team_defencemen_on_ice`, `defending_team_average_time_on_ice` and TOI-since-faceoff variants. These are derivable from `player_shifts_official` + `situationCode` and present in MoneyPuck CSVs. **Positional defender geometry** (`distance_to_nearest_defender`, `nearest_defender_to_net_distance`, `skaters_in_screening_box`) was dropped 2026-05-07 — the data is not available in NHL public PBP feeds. See § 17 "What we don't have and why."
 - **Special-teams pass routes** — `is_power_play`, `time_since_powerplay_started`, full pass-context columns. PP1 / PP2 unit pass-route maps no public product has.
 - **Score-state pure rates** — `score_differential`, `home_skaters_on_ice`, `away_skaters_on_ice`, `period`, `time_remaining_seconds`, `is_empty_net`. Cleaning-the-Glass-style garbage-time stripping (e.g., empty-net + lead) for hockey is straightforward with these columns and has no public equivalent.
 
@@ -106,7 +106,7 @@ Cross-referencing the Citrus prod schema (per `PHASE_5_STEP_1_FINDINGS.md` + `ra
 - **Career-arc viewer** — multi-season backfill (Garrett locked) + age-curve overlay + percentile-rank-over-time chart. HockeyViz / LB-Hockey have fragments; nobody has this as a primary product surface.
 - **Comparison drawer** — JFresh-style cards for two players side-by-side, with delta highlighting. BBall-Index has Role Fits; hockey has nothing equivalent.
 - **Shift narratives** — surface a player's best/worst 90-second shifts of the season, with the sequence of events (entry → pass → shot) reconstructed. This would be the most editorial / shareable product surface in public hockey.
-- **Style typology classifier** — apply Boulet's SPAR-style 25-skill framework to Citrus's data, with the advantage that we have raw_shots feature granularity (passes, rebounds, defender geometry) that LB-Hockey synthesized from ATZ manual tracking.
+- **Style typology classifier** — apply Boulet's SPAR-style 25-skill framework to Citrus's data, with the advantage that we have raw_shots feature granularity (pre-shot pass context, rebounds, TOI/composition; see § 17 for what's deliberately out of scope at v1).
 
 ### 4.3 Goalie-side differentiator (Sequential Track per Garrett)
 
@@ -463,7 +463,7 @@ Per Garrett's strategic reframe: every metric should have BOTH an analyst readin
 | **Anomaly chip (running hot/cold)** | Regression-to-mean expectation framework | **Sell-high / buy-low timing primitive** |
 | **PP unit assignment (PP1 vs PP2)** | Coaching trust / role | Direct fantasy point projection delta — PP1 is ~2× PP2 production |
 | **Goalie GSAx + rebound control** | Goalie skill decomposition | Start-or-sit decision; expected wins projection |
-| **Defensive geometry inside xG** (`distance_to_nearest_defender`, screening box) | Shot-quality context | Quality-shot projection — better than raw shot count |
+| **Defensive geometry inside xG** (`distance_to_nearest_defender`, screening box) ⚠️ v2 | Shot-quality context | Quality-shot projection — better than raw shot count. **Deferred to v2** — see § 17, requires NHL EDGE / SPORTLOGiQ / CV unlock. |
 | **Career-percentile-vs-current** | Where is the player relative to his own ceiling | Hold-vs-trade decision — at career peak vs ascending |
 | **Stack correlation (DFS frame)** | Tactical insight on linemate complementarity | DFS lineup construction primitive |
 | **Schedule strength + light-night density** | Less analyst-relevant | Season-long streaming + DFS slate-building primitive |
@@ -620,3 +620,64 @@ These are roadmap-design questions, not research questions. The research is done
 - **r/fantasyhockey "tools wish existed" thread** — couldn't surface a specific thread despite searching. The community-pain-point synthesis in §9.4 is patterns-from-the-aggregate, not direct quotes.
 - **Sleeper hockey** — Garrett's question whether Sleeper launched NHL fantasy. Search returned only "sleeper picks" articles for 2024-25 (the term, not the platform). **No evidence the Sleeper platform launched NHL fantasy** as of May 2026 from the search-result level. Worth confirming directly.
 - **Specific PFF / NGS comparisons to hockey** — Pass 1 covered PFF + NFL NGS adequately; Pass 2 didn't deepen these.
+
+---
+
+## §17. What we don't have and why — capability boundaries
+
+This section documents capabilities that **sound** like they should be in
+v1 but aren't, and the data-availability reasons. World-class doesn't
+mean every advertised metric is present — it means every shipped metric
+has meaningful accuracy. This list is the inverse: what's deferred,
+with the unlock path explicitly stated.
+
+### 17.1 Positional defender geometry (`distance_to_nearest_defender`, `nearest_defender_to_net_distance`, `skaters_in_screening_box`)
+
+**Status:** dropped from `raw_shots` schema 2026-05-07 (Phase 0 / 0d-pre #1).
+
+**What we investigated 2026-05-07:**
+
+1. **NHL public PBP feed (api-web.nhle.com `/v1/gamecenter/{id}/play-by-play`)** carries:
+   - Per-event actor IDs (shooter, goalie, blocker, hitter, scorer + assists)
+   - Per-event xy coordinates (where the action happened)
+   - `situationCode` (4-digit strength code, e.g. "1551")
+   - **NOT carried:** on-ice player ID arrays, defender coordinates, per-frame tracking
+2. **NHL EDGE granular tracking** (60Hz puck IR, 15Hz skater IR — fully operational since 2021-22) **is captured by the league but exposed publicly only at aggregate granularity** — `/v1/edge/` endpoints return season-level skating distance / speed / zone time per player. No per-event coordinate data is surfaced for third-party consumption.
+3. **MoneyPuck doesn't compute it either.** Direct inspection of `shots_2018-2024.csv`: zero columns matching `defender|screening|screen`. Their TOI/composition columns (`defendingTeamForwardsOnIce`, `defendingTeamAverageTimeOnIce`) are derivable from `situationCode` + shifts, but positional geometry isn't there.
+4. **HockeyViz, Evolving Hockey, Natural Stat Trick** — all derive from the same NHL public PBP. None publish positional defender features.
+
+**Why this matters:** every public hockey analytics product sits in the same data ceiling. Synthesizing fake `distance_to_nearest_defender` from "shifts + recent defender event proximity" puts noise in the moat — every subsequent xG retrain either weights it toward zero (best case) or chases spurious correlations (worst case). MoneyPuck doesn't ship this. We don't ship it either.
+
+**v2 unlock paths** — see [GAPS_AND_FUTURE_CAPABILITIES.md](GAPS_AND_FUTURE_CAPABILITIES.md) for cost/timeline. Three are known to work:
+1. **NHL EDGE granular licensing** — direct relationship with NHL Stats group; per-event coordinate access. ~$50k–$500k/year, 6–12 month BD cycle.
+2. **SPORTLOGiQ partnership** (or equivalent: Stathletes, InStat) — pre-computed positional features from broadcast CV. ~$100k–$1M/year, 3–9 month sales cycle.
+3. **Internal CV pipeline on broadcast video** — build position tracking on top of NHL game video. ~$100k–$300k upfront engineering, ~$50k–$150k/year operations, 6–12 months to first production data.
+
+**Strategic recommendation:** defer. None justify the spend pre-launch. Revisit when revenue or distribution justifies — first paying user / first major-league pitch / first ESPN-tier deal. At that point Path 2 (SPORTLOGiQ-style partnership) is the cheapest accuracy-per-dollar.
+
+### 17.2 What we DO have on the defensive context axis
+
+The TOI/composition layer is present and consumable — these *are* the v1 defensive-context features:
+
+| Feature | Source | Notes |
+|---|---|---|
+| `defending_team_skaters_on_ice` | derivable from `situationCode` | already in the extractor |
+| `defending_team_forwards_on_ice` / `_defencemen_on_ice` | join `player_shifts_official` × `player_directory.position_code` | MoneyPuck CSV provides for 2018-2024 |
+| `defending_team_average_time_on_ice` (fatigue proxy) | aggregate of on-ice players' shift duration | MoneyPuck CSV provides; computable from shifts for live data |
+| `defending_team_max/min_time_on_ice` | same | MoneyPuck CSV provides |
+| TOI-since-faceoff variants | reset at each faceoff | MoneyPuck CSV provides |
+
+These give us **fatigue/strength context** (a tired top D-pairing is genuinely worse than fresh fourth-liners, and that's measurable from shift duration alone). This is the right v1 floor.
+
+### 17.3 Other deliberate v1 gaps
+
+- **Per-frame puck/player tracking** — same constraint as defender geometry; same v2 unlock paths.
+- **Shot speed / release velocity** — captured by NHL EDGE infrared but only published at season aggregate. Per-shot speed is v2.
+- **Pass speed / route geometry beyond `pass_x` / `pass_y` / `pass_to_net_distance`** — current 7-feature moat is what's possible from PBP event coordinates. Fine-grained pass trajectory is v2.
+- **Zone-entry quality** — derivable but not in v1 schema. Add post-launch when xT (Expected Threat) lands per § 4.2.
+
+### 17.4 What this section is NOT
+
+- Not a roadmap. Roadmap items go through normal product prioritization.
+- Not a complete deferred-features list. It enumerates only the *capability boundaries* tied to data-availability constraints. Engineering choices (e.g. "we don't ship a comparison drawer in v1") belong in the product backlog, not here.
+- Not a request to relax accuracy standards. Anything we ship in v1 still has to meet the world-class accuracy bar — this section just establishes which features can't meet that bar with current data and so aren't in v1 at all.

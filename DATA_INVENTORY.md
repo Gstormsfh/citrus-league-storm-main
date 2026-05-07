@@ -181,7 +181,7 @@ See §1.2 for the full table-by-table inventory in prod. **Critical schema quirk
 - `goalie_gar` has no `season` column (single-cohort).
 - `goalie_gsax_primary` is empty in prod (0 rows) but has 82 rows in staging — origin unclear.
 - `player_gar_components` defensive components (`evd_gar_per_60`, `ppd_gar_per_60`, `penalty_gar_per_60`) are **0.0 league-wide** — pipeline gap.
-- `raw_shots` defender-geometry + shooter-shift-context columns (`distance_to_nearest_defender`, `skaters_in_screening_box`, `nearest_defender_to_net_distance`, `shooter_time_on_ice`, `shooting_team_average_time_on_ice`, `time_difference_since_change`) are **0/NULL on every row** — schema reserved, pipeline doesn't populate.
+- `raw_shots` shooter-shift-context columns (`shooter_time_on_ice`, `shooting_team_average_time_on_ice`, `time_difference_since_change`) are **NULL on every row** — extractor's upstream calculator returns None despite the columns being in the INSERT list (Phase 0 / 0d-pre #2 fix). The three defender-geometry columns (`distance_to_nearest_defender`, `skaters_in_screening_box`, `nearest_defender_to_net_distance`) were **dropped 2026-05-07** (Phase 0 / 0d-pre #1) — NHL public PBP feed has no defender coordinates; v2 unlock paths in `apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md` § 1.
 
 ---
 
