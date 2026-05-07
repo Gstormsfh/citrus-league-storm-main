@@ -269,26 +269,37 @@ master.]
 
 ---
 
-## R7-5 (revised) — Backup verification (FREE daily-backup approach)  🟡 RUNBOOK LANDED 2026-05-06; restore pending user action
+## R7-5 (revised) — Backup verification (FREE daily-backup approach)  ✅ COMPLETE 2026-05-07
 
 **Revision (2026-05-06):** PITR ($~100/mo) deferred to launch — not
 justified for pre-launch product. R7-5 pivoted to free-tier daily-backup
 verification.
 
-**Status:** runbook rewritten at `docs/RUNBOOKS/BACKUP_RESTORE_VERIFICATION.md`
-for free-tier daily-backup approach (RTO ~24h, RPO up to 24h, $0/mo).
-Prod fingerprint baseline (84 public tables, top-20 row counts, auth +
-storage schema counts) preserved from initial run.
+**Verification executed 2026-05-07** (live walkthrough). Recovery path
+proven end-to-end against staging (`jjgspcpvqaiitloglxbb`):
 
-New companion doc: `docs/RECOVERY_STRATEGY.md` documents the principled
-PITR-upgrade trigger rules (first paid user, first irreproducible
-user-state, first user-table migration, demo events). DATA_INVENTORY.md
-references both.
+  - **Restore mechanism works** — Supabase free-tier daily-snapshot
+    restore-in-place completed successfully on the first attempt.
+  - **Schema integrity preserved** — all 95 public tables, 87 RLS
+    policies, 129 functions, 23 auth tables, 8 storage tables intact.
+  - **Sparse-data round-trip exact** — 10/10 row-count metrics match
+    pre-restore baseline (nhl_games 1336, player_directory 938, etc.).
+  - **RTO empirically measured: < 2 minutes** on sparse staging.
+    Significantly faster than the dashboard's "minutes to hours"
+    warning. Future RTO data point on a populated DB still wanted; for
+    now this lower-bound is documented.
+  - **Cost: $0** confirmed (no upgrade prompt, no billing language in
+    confirmation dialog).
+  - **Known gap (deferred):** in-progress-query behavior during the
+    restore window not validated — restore completed too fast to test.
+    Re-run on a more populated DB or post-PITR upgrade.
 
-**What remains:** the actual daily-backup restore-on-staging execution
-— requires manual dashboard action by the operator. Verification log
-table at the bottom of the runbook is empty pending first execution.
-Estimate: 30-60 min wall-clock when convenient.
+Full run notes + verification table in
+`docs/RUNBOOKS/BACKUP_RESTORE_VERIFICATION.md` § 10.1.
+
+Companion doc `docs/RECOVERY_STRATEGY.md` remains the principled
+upgrade trigger reference: PITR enables on first paid user, first
+irreproducible user-state, first user-table migration, or demo events.
 
 **Goal:** confirm that Supabase's automatic backups actually restore.
 Cheapest disaster-recovery test in the world: do it once, document

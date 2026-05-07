@@ -8,7 +8,7 @@
 >
 > **Author:** R7-5 (revised 2026-05-06)
 >
-> **Last verified:** _PENDING — see § Verification log at the bottom._
+> **Last verified:** 2026-05-07 — first-ever verification successful. RTO observed: < 2 min on sparse staging. See § 10 verification log.
 
 ---
 
@@ -353,7 +353,38 @@ Append a row each time this runbook is executed.
 
 | Date | Operator | Snapshot ts | Target project | RTO | Schema match? | Row-count match? | RLS match? | Notes |
 |---|---|---|---|---|---|---|---|---|
-| _PENDING_ | _Garrett_ | _TBD_ | staging (`jjgspcpvqaiitloglxbb`) | _TBD_ | ☐ | ☐ | ☐ | First-ever verification — see R7-5 (revised) |
+| 2026-05-07 | Garrett | 2026-05-07T11:53:43Z | staging (`jjgspcpvqaiitloglxbb`) | **< 2 min** | ✅ 95 / 23 / 8 / 129 | ✅ exact match (10/10 metrics) | ✅ 87 tables | First-ever verification (R7-5 revised, free-tier path). Live walkthrough — see § 10.1 below for the run notes. |
+
+### § 10.1 Run notes — 2026-05-07
+
+**Snapshot picked:** most recent daily, ~9 hours old at restore time. Snapshot type: `physical` (full filesystem-level, not logical pg_dump).
+
+**Confirmation dialog matched expectations:**
+- Title: "Restore from backup"
+- Body: standard "this will restore your database to the backup made on …"
+- Yellow warning: "This action cannot be undone — your project will be offline during restoration; any new data since this backup will be lost."
+- Single Restore button, no name-typing confirmation, no cost language. ✅ runbook § 9 was accurate.
+
+**Restore completed in < 2 minutes** — significantly faster than the dashboard's "minutes to hours" warning hint. **Calibration note for future operators:** on a sparse staging (~95 tables, ~2K total content rows), expect single-digit minutes. The "hours" upper bound likely applies to multi-GB databases. Future runs against a more populated DB (post-Phase-0 staging or a Pro-tier project) will produce a more representative RTO data point.
+
+**Verification queries (§§ 6.1–6.3) passed cleanly:** 10/10 metrics matched the pre-restore baseline exactly:
+
+| Metric | Pre | Post | Match |
+|---|---:|---:|:---:|
+| `auth_tables` | 23 | 23 | ✅ |
+| `public_tables` | 95 | 95 | ✅ |
+| `storage_tables` | 8 | 8 | ✅ |
+| `public_functions` | 129 | 129 | ✅ |
+| `rls_protected_tables` | 87 | 87 | ✅ |
+| `raw_nhl_data_rows` | 0 | 0 | ✅ |
+| `nhl_games_rows` | 1336 | 1336 | ✅ |
+| `player_directory_rows` | 938 | 938 | ✅ |
+| `player_game_stats_rows` | 0 | 0 | ✅ |
+| `integrity_check_results_rows` | 0 | 0 | ✅ |
+
+**Skipped:** the in-progress-query observation step (try a `SELECT 1` while the restore was running). Restore completed too fast for the test to land. Capture as **known gap**: when next opportunity arises (more populated DB or PITR upgrade), redo the test to validate whether app code hits "project unavailable" cleanly or hangs during the recovery window.
+
+**Note for the verification log table above:** staging has 11 more public tables than prod (95 vs 84). This is **expected** — staging-specific tables documented in `DATA_INVENTORY.md` § 1.2 (`staging_2024_skaters`, `staging_2025_skaters`, plus other RLS-disabled scratch/legacy tables). Not a regression.
 
 ---
 
