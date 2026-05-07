@@ -30,7 +30,8 @@ import { createUserClient } from '../lib/supabase';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { issueDraftToken } from '../lib/draftToken';
 import { CONNECTABLE_DRAFT_STATUSES, type DraftStatus } from '@citrus/shared';
-import { logger } from '@citrus/shared';
+import { logger, structuredLogger } from '@citrus/shared';
+import { buildSnapshot } from '../services/snapshotService';
 
 const draftsRoutes = new Hono<Env>();
 
@@ -119,6 +120,149 @@ draftsRoutes.get('/:draftId/server', async (c) => {
   }
 
   return c.json({ host, port, token });
+});
+
+/**
+ * GET /api/drafts/:draftId/snapshot
+ *
+ * Phase 4.5 chunk 11g.7 sub-step 7b — HTTP snapshot endpoint for
+ * client resync when WS resync returns `too_old`. Reads durable
+ * state from Postgres and reconstructs a `DraftSnapshot` matching
+ * the wire shape from `packages/shared/src/types/draftWire.ts`.
+ *
+ * **Path A architecture (Decision Log 2026-05-07)**: snapshot
+ * lives in main API server, NOT engine process. Engine's in-memory
+ * `LobbyRegistry` is in a separate Node process; reconstructing
+ * from durable state is the cross-process bridge. Staleness <1 sec
+ * is acceptable per the existing resync architecture — client
+ * issues `resync(sinceSeq=snapshot.lastSeenSeq)` after reconnect
+ * and recovers any events that landed during the gap.
+ *
+ * **Auth**: Supabase JWT via `authMiddleware` (route-group
+ * convention) + LeagueMembershipService check. Same as the
+ * discovery endpoint above. Decision Log 2026-05-07: auth scheme
+ * matches the route group's existing convention, not the
+ * underlying resource's other access patterns.
+ *
+ * Status codes:
+ *   - 200: snapshot reconstructed; body matches `DraftSnapshot`
+ *   - 400: malformed `:draftId` (not a UUID)
+ *   - 401: unauthenticated (handled by `authMiddleware`)
+ *   - 403: user not a member of the league
+ *   - 404: league/draft not found OR no draft format configured
+ *   - 409: league exists, member, but draft not connectable
+ *     (`not_started` / `completed` / `cancelled`)
+ *   - 500: DB lookup failure (logged with full context)
+ */
+draftsRoutes.get('/:draftId/snapshot', async (c) => {
+  const draftId = c.req.param('draftId');
+  const userId = c.get('userId');
+  const userToken = c.get('userToken');
+
+  if (!draftId || !/^[0-9a-f-]{36}$/i.test(draftId)) {
+    return c.json(
+      { error: { code: 'BAD_REQUEST', message: 'Invalid draftId' } },
+      400,
+    );
+  }
+
+  const supabase = createUserClient(userToken);
+
+  // Read draft_status for connectability gating; the full snapshot
+  // reconstruction reads this row again, but the explicit gate
+  // here keeps the response semantics close to the discovery
+  // endpoint's contract (404/403/409 before any reconstruction work).
+  const { data: league, error: leagueErr } = await supabase
+    .from('leagues')
+    .select('id, draft_status')
+    .eq('id', draftId)
+    .maybeSingle();
+
+  if (leagueErr) {
+    structuredLogger.error(
+      'snapshot.endpoint.league_lookup_failed',
+      { draftId, userId },
+      leagueErr,
+    );
+    return c.json(
+      { error: { code: 'SERVICE_UNAVAILABLE', message: 'Snapshot lookup failed' } },
+      500,
+    );
+  }
+  if (!league) {
+    return c.json(
+      { error: { code: 'NOT_FOUND', message: 'Draft not found' } },
+      404,
+    );
+  }
+
+  const leagueId = league.id as string;
+  const draftStatus = league.draft_status as DraftStatus;
+
+  // Membership check — same belt-and-suspenders pattern as the
+  // discovery endpoint. Non-members get 403 regardless of draft
+  // state to minimize information disclosure.
+  const membership = new LeagueMembershipService(supabase);
+  const memberCheck = await membership.checkMembership(leagueId, userId);
+  if (!memberCheck.isMember) {
+    structuredLogger.warn(
+      'snapshot.endpoint.not_member',
+      { draftId, userId },
+    );
+    return c.json(
+      { error: { code: 'FORBIDDEN', message: 'Not a member of this league' } },
+      403,
+    );
+  }
+
+  if (!CONNECTABLE_DRAFT_STATUSES.includes(draftStatus)) {
+    return c.json(
+      {
+        error: {
+          code: 'DRAFT_NOT_CONNECTABLE',
+          message: `Draft is not active. Current status: ${draftStatus}`,
+          status: draftStatus,
+        },
+      },
+      409,
+    );
+  }
+
+  let snapshot;
+  try {
+    snapshot = await buildSnapshot(leagueId, supabase);
+  } catch (err) {
+    structuredLogger.error(
+      'snapshot.endpoint.build_failed',
+      { draftId, userId },
+      err,
+    );
+    return c.json(
+      { error: { code: 'SERVICE_UNAVAILABLE', message: 'Snapshot build failed' } },
+      500,
+    );
+  }
+  if (!snapshot) {
+    // League exists + connectable but `buildSnapshot` returned null
+    // (e.g., draft_type missing). Treat as 404 — there is no draft
+    // to snapshot.
+    return c.json(
+      { error: { code: 'NOT_FOUND', message: 'Draft not configured' } },
+      404,
+    );
+  }
+
+  structuredLogger.debug(
+    'snapshot.endpoint.success',
+    {
+      draftId,
+      userId,
+      format: snapshot.format,
+      eventsReturned: snapshot.recentEvents.length,
+    },
+  );
+
+  return c.json(snapshot);
 });
 
 export { draftsRoutes };

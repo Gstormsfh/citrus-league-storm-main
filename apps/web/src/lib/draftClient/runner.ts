@@ -79,11 +79,11 @@ export interface DraftClientRunnerOptions {
   fetchDiscovery?: (draftId: string) => Promise<DraftServerDiscovery>;
   /**
    * Override the snapshot-endpoint fetcher. Tests pass a stub.
-   * Production: the endpoint doesn't exist yet (Decision Log
-   * followup); the default throws so the state machine routes
-   * through `reconnecting`.
+   * Production fetches `GET /api/drafts/:draftId/snapshot` (chunk
+   * 11g.7 sub-step 7b). The parameter is the draftId (= leagueId
+   * per Citrus's data model).
    */
-  fetchSnapshot?: (leagueId: string) => Promise<DraftSnapshot>;
+  fetchSnapshot?: (draftId: string) => Promise<DraftSnapshot>;
   /**
    * Override the WebSocket constructor. Tests substitute a
    * `MockWebSocket`; production uses `globalThis.WebSocket`.
@@ -124,7 +124,7 @@ export class DraftClientRunner {
 
   private readonly randomFn: RandomFn;
   private readonly fetchDiscovery: (draftId: string) => Promise<DraftServerDiscovery>;
-  private readonly fetchSnapshot: (leagueId: string) => Promise<DraftSnapshot>;
+  private readonly fetchSnapshot: (draftId: string) => Promise<DraftSnapshot>;
   private readonly webSocketCtor: WebSocketLike;
   private readonly wsProtocolOverride: 'ws:' | 'wss:' | undefined;
 
@@ -401,7 +401,10 @@ export class DraftClientRunner {
       return;
     }
     try {
-      const snapshot = await this.fetchSnapshot(this.params.leagueId);
+      // Pass draftId (= leagueId per Citrus's data model — see
+      // server/src/routes/drafts.ts header comment). Chunk 11g.7
+      // sub-step 7b renamed the parameter for naming hygiene.
+      const snapshot = await this.fetchSnapshot(this.params.draftId);
       this.dispatch({ type: 'snapshot_fetched', snapshot });
     } catch (err) {
       this.dispatch({
@@ -488,18 +491,29 @@ async function defaultFetchDiscovery(draftId: string): Promise<DraftServerDiscov
 }
 
 /**
- * Default snapshot fetcher. **Endpoint not implemented yet**
- * (Decision Log followup 2026-05-05). Throws `not_implemented`;
- * the state machine handles `snapshot_fetch_failed` by routing
- * through `reconnecting`. Once the endpoint exists, replace this
- * body with the real fetch — no state-machine change needed.
+ * Default snapshot fetcher (chunk 11g.7 sub-step 7b). Calls
+ * `GET /api/drafts/:draftId/snapshot` via the apiClient pattern.
+ * On success, returns the parsed `DraftSnapshot`. On failure,
+ * throws an Error whose `message` is propagated to
+ * `snapshot_fetch_failed` event for the reduce function to
+ * classify. The current `apiClient` doesn't surface `statusCode`
+ * — 4xx vs 5xx classification falls through to the reduce
+ * function's existing error-message-pattern handling. If real
+ * production data shows 4xx/5xx mis-routing, enhance apiClient
+ * at that point (Decision Log 2026-05-07).
  */
-async function defaultFetchSnapshot(_leagueId: string): Promise<DraftSnapshot> {
-  throw new Error(
-    'snapshot_fetch_not_implemented: HTTP snapshot endpoint for the chunk-11g.4 ' +
-      'in-memory DraftSnapshot shape is deferred (Decision Log followup ' +
-      '2026-05-05)',
+async function defaultFetchSnapshot(draftId: string): Promise<DraftSnapshot> {
+  const { apiClient } = await import('@/api/client');
+  const response = await apiClient.get<DraftSnapshot>(
+    `/api/drafts/${encodeURIComponent(draftId)}/snapshot`,
   );
+  if (response.error || !response.data) {
+    const err = new Error(response.error ?? 'Snapshot fetch failed') as Error & {
+      statusCode?: number;
+    };
+    throw err;
+  }
+  return response.data;
 }
 
 function generateSessionId(): string {
