@@ -355,7 +355,12 @@ The decisions interact:
    │      removed; v2 unlock paths documented in GAPS_AND_FUTURE_CAPABILITIES.md § 1.
    │      NHL public PBP feed has no defender coordinates; deferring is the
    │      world-class call (see HOCKEY_ANALYTICS_LANDSCAPE_2026.md § 17).
-   ├─ #2 Shooter shift context extraction fix
+   ├─ #2 [✅ CODE FIXED — pending #6 retrofit] Shooter shift context extraction fix
+   │      4-line typeCode modernization in data_acquisition.py (lines 1384, 2860,
+   │      2881, 2959). Mapping tables at lines 1326+2812 left intentionally with
+   │      DO-NOT-FIX guard comments — fixing them requires coordinated xG v3
+   │      retrain (see GAPS § 10). TOI columns will populate as proxy values
+   │      after #6 retrofit pass picks up corrected extraction logic.
    ├─ #3 [✅ DONE] Season column population on raw_shots / player_shifts /
    │      player_toi_by_situation (commit 422ffb5)
    ├─ #4 [✅ DONE — Item A] populate_player_directory.py one-time backfill

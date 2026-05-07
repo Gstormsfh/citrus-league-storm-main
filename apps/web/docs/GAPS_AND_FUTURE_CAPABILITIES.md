@@ -172,7 +172,90 @@ After Phase 0 closes. This one is closer to the active roadmap than to "deferred
 
 ---
 
-## §9. CV-extracted on-ice formations + tactics
+## §9. Real per-player TOI from `player_shifts_official` join
+
+**Capability:** replace the `time_since_faceoff` proxy used in `data_acquisition.py:calculate_toi_features_proxy` with actual shift-derived per-player TOI computed by joining `player_shifts_official` against shot timestamps. Yields true `shooter_time_on_ice`, `shooting_team_average_time_on_ice`, distinct values per player on the ice (not the same proxy value collapsed across all 36 TOI columns).
+
+**Why deferred (2026-05-07):** the v1 fix in 0d-pre #2 unlocks the proxy values from "always NULL" to "populated proxy" via the typeCode 502 fix. That gets us *something* honest in the columns. But it's still a proxy — every player on ice is reported with the same `time_since_faceoff` value, and the column names imply per-player accuracy that the data doesn't have.
+
+The real version requires:
+
+1. Per-shot lookup against `player_shifts_official` to identify the 5+1 players on ice
+2. Per-player TOI computed as `shot_timestamp - shift.start_time` for each on-ice player
+3. Aggregate (avg / max / min / forward-only / defenceman-only) statistics across the 5 skaters
+4. Same for defending team
+5. Replace the 36 proxy column writes with the real values
+6. Retrofit existing 99,394 rows + the post-0a 905K historical rows via #6-style sweep
+
+This is a **larger engineering lift** (~1-2 weeks) but produces honestly named columns and unlocks finer-grained shot-quality features (e.g., "tired-D-pairing penalty" in xG retraining).
+
+### Unlock path
+
+**One path: build internally.** No external dependency. Cost is engineering time only.
+
+### Strategic trigger to revisit
+
+After Phase 0 closes. Combine with the xG v3 → xG v4 retrain that includes:
+- Real TOI features (this entry)
+- Corrected `last_event_category` labels (§ 11)
+- 7 historical seasons of moat features from 0c
+
+The retrains are bundled because they all touch the same training corpus.
+
+---
+
+## §10. Legacy NHL API `last_event_category` labels — coordinated retrain required
+
+**Capability:** correct the `last_event_category` labels (`'TAKE'`, `'FAC'`, `'HIT'`, etc.) in `raw_shots` so they semantically match what the events actually are.
+
+**Current state (audited 2026-05-07):** lines 1326 + 2812 in `data-pipeline/acquisition/data_acquisition.py` contain a typeCode → label mapping with stale values from the older NHL Stats API era. Wrong assignments in the modern api-web.nhle.com world:
+
+| typeCode | actually | mapped to |
+|---:|---|---|
+| 502 | faceoff | `'TAKE'` (wrong — should be `'FAC'`) |
+| 503 | hit | `'FAC'` (wrong — should be `'HIT'`) |
+| 504 | giveaway | `'HIT'` (wrong — should be `'GIVE'`) |
+| 508 | blocked-shot | not in map → `'OTHER'` |
+| 509 | penalty | `'BLOCK'` (wrong — should be `'PENL'`) |
+| 516 | stoppage | `'PENL'` (wrong — should be `'STOP'`) |
+| 525 | takeaway | not in map → `'OTHER'` |
+
+The labels are nonetheless **internally consistent with `models/last_event_category_encoder.joblib` and the trained xG v3 model** — every faceoff event has been encoded as the same `'TAKE'`-derived integer since training, so model predictions remain numerically correct despite wrong labels. The `last_event_category` column is currently 99.4% populated in prod but ~62% of rows carry semantically wrong labels (sum of TAKE + FAC + HIT + BLOCK rows).
+
+**Why deferred:** fixing the labels without retraining would silently degrade xG v3 accuracy. The encoder would either (a) reject the newly-relabelled rows because `'FAC'` was never seen during training of those slots, or (b) fall back to a default integer the model doesn't expect. Either way, ~24% of all shots (faceoff-prior ones) get wrong xG predictions.
+
+### Unlock path — coordinated retrain
+
+**One path: full retrain pipeline.** No external dependency.
+
+1. Phase 0a complete (905K-row historical corpus loaded into raw_shots)
+2. Phase 0c complete (moat features extracted for 7 historical seasons)
+3. Update map labels in `data_acquisition.py` lines 1326 + 2812
+4. Retrofit `raw_shots.last_event_category` via #6-style sweep (UPSERT all rows with corrected labels)
+5. Retrain `last_event_category_encoder.joblib` on corrected labels
+6. Retrain xG v3 on retrofitted training data
+7. Validation gate: new xG v3 AUC ≥ 0.817 (current production benchmark)
+8. Coordinated deploy: new encoder + new model artifacts in atomic commit
+
+**Estimated effort:** 1-2 days (mostly compute time for retrain + validation).
+
+### Strategic trigger to revisit
+
+**Post-0c, before any feature work that depends on `last_event_category` semantic correctness.** Examples that would surface as triggers:
+
+- Phase 1 anomaly engine "shot taken right after stoppage" detection (would need real `STOP` labels)
+- "Rebound generation right after faceoff" leaderboards (would need real `FAC` labels)
+- Public-facing UI surfaces that show event type labels (currently OK because we don't surface them)
+
+Until then, predictions remain accurate via the consistent-but-wrong-labels approach.
+
+### Why a single fix-and-retrain rather than incremental updates
+
+The encoder is a categorical-one-hot transformer. Adding new categories (e.g., correcting `'TAKE'` → `'FAC'`) shifts every category's encoded position. There's no incremental path — it's atomic retrain or no change.
+
+---
+
+## §11. CV-extracted on-ice formations + tactics
 
 **Capability:** classify shifts by tactical pattern (1-3-1 PP, 2-2-1 forecheck, etc.) using CV on broadcast video. Powers coach-tier tactical intelligence.
 
@@ -188,7 +271,7 @@ When the user base is professional / coach-tier. Pre-launch fantasy doesn't need
 
 ---
 
-## §10. Bookkeeping summary
+## §12. Bookkeeping summary
 
 | § | Capability | Status | Cheapest unlock | Trigger to revisit |
 |---|---|---|---|---|
@@ -200,11 +283,13 @@ When the user base is professional / coach-tier. Pre-launch fantasy doesn't need
 | 6 | Multi-league percentile arcs | not v1 scope | EliteProspects API ($5–25k/yr) | When prospects surface enters product |
 | 7 | Real-time streaming | partial (15-min cadence today) | poll at higher cadence ($1–5k/yr) | DFS / live-betting product surface |
 | 8 | Per-shot goalie probability | engineering gap, post-Phase-0 | build internally | After Phase 0 closes |
-| 9 | CV-extracted tactics | deferred | internal CV pipeline | Coach-tier user base |
+| 9 | Real per-player TOI from shifts | engineering gap, post-Phase-0 | build internally (~1-2 weeks) | After 0c, bundled with xG v4 retrain |
+| 10 | Legacy `last_event_category` labels | engineering gap; retrain-coupled | full retrain pipeline (~1-2 days) | Post-0c, bundled with xG v4 retrain |
+| 11 | CV-extracted tactics | deferred | internal CV pipeline | Coach-tier user base |
 
 ---
 
-## §11. Document maintenance
+## §13. Document maintenance
 
 Add a row here when:
 - A capability moves from active roadmap to deferred

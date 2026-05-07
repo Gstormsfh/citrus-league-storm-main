@@ -1322,13 +1322,36 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                 last_event_type_code = last_event_state['type_code']
                 last_event_period = last_event_state['period']
                 
+                # ============================================================
+                # ⚠️ DO NOT "FIX" THIS MAPPING WITHOUT A COORDINATED MODEL RETRAIN
+                # ============================================================
+                # The labels below are stale from the older NHL Stats API era —
+                # in the modern api-web.nhle.com endpoints typeCode 502 = faceoff
+                # (not 'TAKE'), 503 = hit (not 'FAC'), 504 = giveaway (not 'HIT'),
+                # etc. The labels are nonetheless internally consistent with
+                # `models/last_event_category_encoder.joblib` and the trained
+                # xG v3 model — every faceoff event has been encoded as the
+                # same `'TAKE'`-derived int since training, so model predictions
+                # remain numerically correct despite wrong labels.
+                #
+                # Fixing these labels without a coordinated retrain would silently
+                # degrade xG v3 accuracy: the encoder would either reject the
+                # newly-relabelled rows or fall back to a default int the model
+                # doesn't expect. The result would be ~24% of all shots
+                # (faceoff-prior shots) getting wrong xG predictions.
+                #
+                # Full unlock path: see apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md
+                # § 11 "Legacy NHL API last_event_category labels" — schedule for
+                # post-0c v1.5 retrain when the 7-historical-season corpus is
+                # available.
+                # ============================================================
                 type_code_to_category = {
                     505: 'GOAL', 506: 'SHOT', 507: 'MISS', 503: 'FAC', 504: 'HIT',
                     509: 'BLOCK', 516: 'PENL', 517: 'STOP', 520: 'GIVE', 521: 'TAKE',
                     502: 'TAKE', 518: 'CHL', 519: 'GIVE'
                 }
                 last_event_category = type_code_to_category.get(last_event_type_code, 'OTHER')
-                
+
                 distance_from_last_event = math.sqrt(
                     (shot_coord_x - last_event_x)**2 + 
                     (shot_coord_y - last_event_y)**2
@@ -1381,7 +1404,7 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
             
             time_since_faceoff = None
             for prev_play in reversed(previous_plays[-20:]):
-                if prev_play.get('typeCode') == 503:
+                if prev_play.get('typeCode') == 502:  # 502 = faceoff in modern api-web.nhle.com
                     time_since_faceoff = calculate_time_difference(prev_play, play)
                     break
             
@@ -2807,7 +2830,14 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     last_event_type_code = last_event_state['type_code']
                     last_event_period = last_event_state['period']
                     
-                    # Map type codes to event categories
+                    # ============================================================
+                    # ⚠️ DO NOT "FIX" THIS MAPPING WITHOUT A COORDINATED MODEL RETRAIN
+                    # See the matching guard above the duplicate mapping in this file
+                    # (introduced 2026-05-07 with 0d-pre #2). Labels are stale but
+                    # internally consistent with last_event_category_encoder.joblib +
+                    # xG v3. Full unlock path:
+                    # apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md § 10.
+                    # ============================================================
                     type_code_to_category = {
                         505: 'GOAL', 506: 'SHOT', 507: 'MISS', 503: 'FAC', 504: 'HIT',
                         509: 'BLOCK', 516: 'PENL', 517: 'STOP', 520: 'GIVE', 521: 'TAKE',
@@ -2857,7 +2887,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     # (fallback for player info, but coordinates come from state)
                     previous_play_for_context = None
                     for prev_play in reversed(previous_plays):
-                        if prev_play.get('typeCode') not in [517]:  # Skip stoppages
+                        if prev_play.get('typeCode') not in [516]:  # Skip stoppages (516 in modern api-web.nhle.com)
                             previous_play_for_context = prev_play
                             break
                     
@@ -2878,7 +2908,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                             player_num_that_did_last_event = prev_details.get('scoringPlayerId')
                         elif prev_type_code in [506, 507]:  # Shot
                             player_num_that_did_last_event = prev_details.get('shootingPlayerId')
-                        elif prev_type_code == 503:  # Faceoff
+                        elif prev_type_code == 502:  # Faceoff (502 in modern api-web.nhle.com; was 503 pre-EDGE rewrite)
                             player_num_that_did_last_event = prev_details.get('winningPlayerId')
                         else:
                             player_num_that_did_last_event = prev_details.get('eventOwnerTeamId')  # Fallback
@@ -2956,7 +2986,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 # Time since faceoff (find last faceoff)
                 time_since_faceoff = None
                 for prev_play in reversed(previous_plays[-20:]):  # Look back 20 plays
-                    if prev_play.get('typeCode') == 503:  # Faceoff
+                    if prev_play.get('typeCode') == 502:  # 502 = faceoff in modern api-web.nhle.com (was 503 pre-EDGE rewrite)
                         time_since_faceoff = calculate_time_difference(prev_play, play)
                         break
                 
