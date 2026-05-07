@@ -108,6 +108,7 @@ import {
   selectAutopickPlayer,
   type AutopickStrategy,
 } from './autopickStrategy';
+import { computeMinimumNextBid } from './auctionBidIncrement';
 import {
   serializeServerMessage,
   WIRE_PROTOCOL_VERSION,
@@ -277,6 +278,14 @@ export interface LobbyManagerOptions {
    */
   auctionAntiSnipeThresholdSeconds: number;
   auctionAntiSnipeExtensionSeconds: number;
+  /**
+   * Tiered minimum-bid-increment table (chunk 11g.6 sub-step 6c2
+   * per ADR-002 §4.3). Engine threads through to every
+   * `place_bid_v2` call AND uses for fail-fast rejection in
+   * `processPlaceBid`. Default = flat $1 preserves v1 behavior.
+   * Snake/linear lobbies pass the default (unused).
+   */
+  auctionMinBidIncrementTiers: ReadonlyArray<{ below: number; increment: number }>;
 }
 
 /**
@@ -552,6 +561,19 @@ export class LobbyManager {
   private readonly antiSnipeThresholdSeconds: number;
   private readonly antiSnipeExtensionSeconds: number;
 
+  /**
+   * Tiered minimum-bid-increment table (chunk 11g.6 sub-step 6c2
+   * per ADR-002 §4.3). The tier whose `below` (strictly) exceeds
+   * the leading bid determines the next-bid increment. Engine
+   * fail-fast in `processPlaceBid` mirrors the SQL
+   * `compute_min_next_bid()` for cheap rejection; RPC enforces
+   * the same rule durably (defense-in-depth).
+   */
+  private readonly auctionMinBidIncrementTiers: ReadonlyArray<{
+    below: number;
+    increment: number;
+  }>;
+
   constructor(opts: LobbyManagerOptions) {
     this.lobbyId = opts.lobbyId;
     this.format = opts.format;
@@ -579,6 +601,7 @@ export class LobbyManager {
     this.teamPlayersWon = new Map(opts.initialPlayersWon);
     this.antiSnipeThresholdSeconds = opts.auctionAntiSnipeThresholdSeconds;
     this.antiSnipeExtensionSeconds = opts.auctionAntiSnipeExtensionSeconds;
+    this.auctionMinBidIncrementTiers = opts.auctionMinBidIncrementTiers;
 
     // `picksMade`, `draftStatus`, `initialized`, timer state are
     // zero-initialized at the field declaration above. `init()`
@@ -1525,10 +1548,19 @@ export class LobbyManager {
     if (action.bidAmount <= this.currentNomination.leadingBid) {
       return { ok: false, reason: 'bid_too_low' };
     }
-    // Min increment in 6a is flat `auctionMinBid` ($1 default).
-    // ADR-002 §4.3 tiered increments land in 6c.
-    if (action.bidAmount - this.currentNomination.leadingBid < this.auctionMinBid) {
-      return { ok: false, reason: 'bid_increment_violation' };
+    // Tiered minimum-bid increment per ADR-002 §4.3 (chunk 11g.6
+    // sub-step 6c2). Default tier is flat $1 — preserves the 6a
+    // behavior for leagues that haven't configured custom tiers.
+    // The tier of the LEADING bid determines the increment for
+    // the next bid. RPC also enforces this (defense-in-depth);
+    // engine populates `minimumNextBid` on rejection so clients
+    // can render "Minimum next bid: $X" instead of generic error.
+    const minimumNextBid = computeMinimumNextBid(
+      this.currentNomination.leadingBid,
+      this.auctionMinBidIncrementTiers,
+    );
+    if (action.bidAmount < minimumNextBid) {
+      return { ok: false, reason: 'bid_increment_violation', minimumNextBid };
     }
     const budget = this.teamBudgets.get(action.teamId) ?? 0;
     const playersWon = this.teamPlayersWon.get(action.teamId) ?? 0;
@@ -1563,6 +1595,7 @@ export class LobbyManager {
         actor,
         antiSnipeThresholdSeconds: this.antiSnipeThresholdSeconds,
         antiSnipeExtensionSeconds: this.antiSnipeExtensionSeconds,
+        minBidIncrementTiers: this.auctionMinBidIncrementTiers,
       });
     } catch (err: unknown) {
       if (err instanceof AppError) {

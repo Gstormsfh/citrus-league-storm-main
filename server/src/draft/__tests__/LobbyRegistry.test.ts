@@ -71,6 +71,9 @@ const AUCTION_FIELDS_EMPTY = {
   initialActiveNomination: null,
   auctionAntiSnipeThresholdSeconds: 0,
   auctionAntiSnipeExtensionSeconds: 0,
+  auctionMinBidIncrementTiers: [
+    { below: Number.MAX_SAFE_INTEGER, increment: 1 },
+  ] as ReadonlyArray<{ below: number; increment: number }>,
 };
 
 const DEFAULT_LOBBY_CONFIG: LobbyConfig = {

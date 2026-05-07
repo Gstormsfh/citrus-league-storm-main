@@ -194,10 +194,18 @@ export interface LeagueFormatSettings {
   draftRounds: number;
   pickTimeLimit: number;         // Seconds per pick (snake/linear)
   auctionBudget?: number;        // $ budget per team (auction only)
-  auctionMinBid?: number;        // Minimum bid amount
+  auctionMinBid?: number;        // Minimum opening bid (NOT minimum increment — see auctionMinBidIncrementTiers per ADR-002 §4.3 chunk 11g.6 6c2 decoupling).
   auctionNominationTime?: number;// Seconds to nominate (auction only)
   auctionAntiSnipeThresholdSeconds?: number; // Bid in last N s extends clock (0 disables). ADR-002 §3.3 / §4.3.
   auctionAntiSnipeExtensionSeconds?: number; // Extension duration when threshold fires. ADR-002 §3.3 / §4.3.
+  /**
+   * Tiered minimum-bid-increment table per ADR-002 §4.3. Each tier:
+   * `{below: number, increment: number}`. The tier whose `below`
+   * (strictly) exceeds the leading bid determines the next-bid
+   * increment. Default = flat $1 (single tier covering all bids).
+   * Chunk 11g.6 sub-step 6c2.
+   */
+  auctionMinBidIncrementTiers?: Array<{ below: number; increment: number }>;
 
   // === Season Settings ===
   playoffTeams?: number;         // 0 = no playoffs, 4, 6, or 8
@@ -465,6 +473,16 @@ export function extractFormatSettings(settings: Record<string, unknown>): Partia
       (settings.auctionAntiSnipeThresholdSeconds as number) ?? 30,
     auctionAntiSnipeExtensionSeconds:
       (settings.auctionAntiSnipeExtensionSeconds as number) ?? 30,
+    // Default = flat $1 per ADR-002 §4.3. Single tier covers all
+    // bids; commissioners opt-in to tiered increments via league
+    // settings. Number.MAX_SAFE_INTEGER is the spec's intent of "no
+    // upper bound" expressed as a finite-but-effectively-unbounded
+    // value (the schema uses `below` exclusive bounds with no null
+    // sentinel).
+    auctionMinBidIncrementTiers:
+      (settings.auctionMinBidIncrementTiers as Array<{ below: number; increment: number }>) ?? [
+        { below: Number.MAX_SAFE_INTEGER, increment: 1 },
+      ],
 
     // Season
     playoffTeams: (settings.playoffTeams as number) ?? 6,

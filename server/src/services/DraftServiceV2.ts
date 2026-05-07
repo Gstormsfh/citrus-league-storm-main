@@ -110,6 +110,14 @@ export interface PlaceBidParams {
    */
   antiSnipeThresholdSeconds: number;
   antiSnipeExtensionSeconds: number;
+  /**
+   * Chunk 11g.6 sub-step 6c2 — tiered minimum-bid increments per
+   * ADR-002 §4.3. Each tier `{below: number, increment: number}`;
+   * RPC's `compute_min_next_bid()` walks the tiers to compute the
+   * minimum next bid based on the leading bid. Engine threads
+   * through; RPC enforces durably.
+   */
+  minBidIncrementTiers: ReadonlyArray<{ below: number; increment: number }>;
 }
 
 export interface PlaceBidResult {
@@ -433,6 +441,7 @@ export class DraftServiceV2 {
       p_correlation_id:               params.correlationId ?? null,
       p_anti_snipe_threshold_seconds: params.antiSnipeThresholdSeconds,
       p_anti_snipe_extension_seconds: params.antiSnipeExtensionSeconds,
+      p_min_bid_increment_tiers:      params.minBidIncrementTiers,
     });
 
     if (error) throw mapRpcError(error);

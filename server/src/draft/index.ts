@@ -70,6 +70,10 @@ import { LobbyRegistry, type LobbyConfig } from './LobbyRegistry';
 import { DraftServiceV2 } from '../services/DraftServiceV2';
 import { supabaseAdmin } from '../lib/supabase';
 import type { DraftFormat, DraftOrderSlot, TeamAuthorizationResult } from './types';
+import {
+  DEFAULT_BID_INCREMENT_TIERS,
+  validateBidIncrementTiers,
+} from './auctionBidIncrement';
 
 // Enable real console logging on the server (default logger is silent).
 Object.assign(logger, createConsoleLogger());
@@ -177,6 +181,7 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
         auctionMinBid?: number;
         auctionAntiSnipeThresholdSeconds?: number;
         auctionAntiSnipeExtensionSeconds?: number;
+        auctionMinBidIncrementTiers?: unknown;
         rosterSize?: number;
         draftRounds?: number;
       }
@@ -231,6 +236,17 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
       typeof settings?.auctionAntiSnipeExtensionSeconds === 'number'
         ? settings.auctionAntiSnipeExtensionSeconds
         : 30;
+
+    // Tiered minimum-bid increments (chunk 11g.6 sub-step 6c2 per
+    // ADR-002 §4.3). Default = flat $1. Validate at lookup time so
+    // commissioner setup errors surface at lobby construction
+    // rather than at first bid.
+    const rawTiers =
+      settings?.auctionMinBidIncrementTiers !== undefined
+        ? settings.auctionMinBidIncrementTiers
+        : DEFAULT_BID_INCREMENT_TIERS;
+    const auctionMinBidIncrementTiers = validateBidIncrementTiers(rawTiers);
+
     return {
       format,
       draftOrder: [],
@@ -240,6 +256,7 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
       ...auctionConfig,
       auctionAntiSnipeThresholdSeconds,
       auctionAntiSnipeExtensionSeconds,
+      auctionMinBidIncrementTiers,
     };
   }
 
@@ -304,6 +321,10 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
     initialActiveNomination: null,
     auctionAntiSnipeThresholdSeconds: 0,
     auctionAntiSnipeExtensionSeconds: 0,
+    // Snake/linear lobbies don't call place_bid_v2; tier table is
+    // unused but `LobbyConfig` requires the field. Default flat-$1
+    // is the safe placeholder.
+    auctionMinBidIncrementTiers: DEFAULT_BID_INCREMENT_TIERS,
   };
 }
 

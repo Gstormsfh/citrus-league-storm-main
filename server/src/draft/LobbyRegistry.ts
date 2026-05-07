@@ -172,6 +172,13 @@ export interface LobbyConfig {
    */
   auctionAntiSnipeThresholdSeconds: number;
   auctionAntiSnipeExtensionSeconds: number;
+  /**
+   * Tiered minimum-bid-increment table per ADR-002 §4.3 (chunk
+   * 11g.6 sub-step 6c2). Validated at lookup time via
+   * `validateBidIncrementTiers`. Snake/linear lobbies pass the
+   * default flat-$1 table (unused — no `place_bid_v2` calls).
+   */
+  auctionMinBidIncrementTiers: ReadonlyArray<{ below: number; increment: number }>;
 }
 
 export interface LobbyRegistryOptions {
@@ -385,6 +392,7 @@ export class LobbyRegistry {
       initialActiveNomination: config.initialActiveNomination,
       auctionAntiSnipeThresholdSeconds: config.auctionAntiSnipeThresholdSeconds,
       auctionAntiSnipeExtensionSeconds: config.auctionAntiSnipeExtensionSeconds,
+      auctionMinBidIncrementTiers: config.auctionMinBidIncrementTiers,
     });
     // Step 6b: bootstrap from the durable event log BEFORE returning.
     // A failed init() throws; the existing try/catch in getOrCreate

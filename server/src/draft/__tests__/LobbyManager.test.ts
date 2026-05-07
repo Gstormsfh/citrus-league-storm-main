@@ -220,6 +220,14 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
       opts.auctionAntiSnipeThresholdSeconds ?? 0,
     auctionAntiSnipeExtensionSeconds:
       opts.auctionAntiSnipeExtensionSeconds ?? 0,
+    // Chunk 11g.6 6c2 default: flat $1 (preserves all 6a/6b/6c1
+    // test behavior — every existing auction test bids in the
+    // single-digit-to-low-double-digit range, all of which fall
+    // under the default tier with +$1 minimum increment).
+    auctionMinBidIncrementTiers:
+      opts.auctionMinBidIncrementTiers ?? [
+        { below: Number.MAX_SAFE_INTEGER, increment: 1 },
+      ],
   });
 }
 
@@ -3812,5 +3820,277 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     expect(r1).toEqual(r2);
     // Second call returned the cached promise; RPC was called only once.
     expect(pauseAuction).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Chunk 11g.6 sub-step 6c2 — tiered bid increments ────────────────
+  //
+  // Engine-side fail-fast for the tiered minimum-next-bid check.
+  // RPC-side enforcement is exercised by the auctionBidIncrement
+  // pure-function tests + the SQL migration's inline examples;
+  // these tests verify the engine integration: tier table threaded
+  // through, increment check rejects bids below the tier's minimum,
+  // rejection result populates `minimumNextBid` for client UX.
+  //
+  // Per ADR-002 §4.3 / §4.5.
+
+  /** §4.5 example tier table for 6c2 integration tests. */
+  const SPEC_EXAMPLE_TIERS = [
+    { below: 10, increment: 1 },
+    { below: 50, increment: 5 },
+    { below: 999, increment: 10 },
+  ];
+
+  it('6c2 tiered: leading $5 in below-10 tier — bid $6 accepted, bid $5.5 below min would also accept (wait — strict-greater catches $5.5 against $5 so bid_too_low first)', async () => {
+    // This is mostly a sanity check that the default tier path
+    // still admits a +$1 bid, regardless of the tier configuration.
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        auctionMinBidIncrementTiers: SPEC_EXAMPLE_TIERS,
+        nominatePlayer: vi.fn(async (_p: unknown) => ({
+          event_id: 1,
+          seq: 1,
+          nomination_id: 'nom-1',
+          clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+          was_duplicate: false,
+        })),
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 6 }));
+    expect(result.ok).toBe(true);
+  });
+
+  it('6c2 tiered: leading $9 — bid $10 accepted (still in below-10 tier, +$1)', async () => {
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        auctionMinBidIncrementTiers: SPEC_EXAMPLE_TIERS,
+        nominatePlayer: vi.fn(async (_p: unknown) => ({
+          event_id: 1,
+          seq: 1,
+          nomination_id: 'nom-1',
+          clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+          was_duplicate: false,
+        })),
+      }),
+    );
+    // Get to leading $9 via openingBid.
+    await lobby.enqueueAction(nominateAction({ openingBid: 9 }));
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 10 }));
+    expect(result.ok).toBe(true);
+  });
+
+  it('6c2 tiered: leading $10 — bid $11 REJECTED (tier transition: $10 in below-50 tier needs +$5 → min $15)', async () => {
+    const placeBid = vi.fn();
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        auctionMinBidIncrementTiers: SPEC_EXAMPLE_TIERS,
+        nominatePlayer: vi.fn(async (_p: unknown) => ({
+          event_id: 1,
+          seq: 1,
+          nomination_id: 'nom-1',
+          clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+          was_duplicate: false,
+        })),
+        placeBid,
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 10 }));
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 11 }));
+    expect(result).toEqual({
+      ok: false,
+      reason: 'bid_increment_violation',
+      minimumNextBid: 15,
+    });
+    expect(placeBid).not.toHaveBeenCalled();
+  });
+
+  it('6c2 tiered: leading $10 — bid $15 accepted (exactly the minimum next)', async () => {
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        auctionMinBidIncrementTiers: SPEC_EXAMPLE_TIERS,
+        nominatePlayer: vi.fn(async (_p: unknown) => ({
+          event_id: 1,
+          seq: 1,
+          nomination_id: 'nom-1',
+          clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+          was_duplicate: false,
+        })),
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 10 }));
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 15 }));
+    expect(result.ok).toBe(true);
+  });
+
+  it('6c2 tiered: leading $50 — bid $55 REJECTED (tier transition: $50 in below-999 tier needs +$10 → min $60)', async () => {
+    const placeBid = vi.fn();
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        auctionBudget: 1000, // larger budget so $50 nominate is affordable
+        auctionMinBidIncrementTiers: SPEC_EXAMPLE_TIERS,
+        nominatePlayer: vi.fn(async (_p: unknown) => ({
+          event_id: 1,
+          seq: 1,
+          nomination_id: 'nom-1',
+          clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+          was_duplicate: false,
+        })),
+        placeBid,
+        initialTeamBudgets: new Map([
+          ['team-1', 1000],
+          ['team-2', 1000],
+          ['team-3', 1000],
+        ]),
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 50 }));
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 55 }));
+    expect(result).toEqual({
+      ok: false,
+      reason: 'bid_increment_violation',
+      minimumNextBid: 60,
+    });
+    expect(placeBid).not.toHaveBeenCalled();
+  });
+
+  it('6c2 tiered: Path A fallback — leading $1500 (above all tiers) accepts +last-tier-increment ($10) → min $1510', async () => {
+    const placeBid = vi.fn();
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        auctionBudget: 5000,
+        auctionMinBidIncrementTiers: SPEC_EXAMPLE_TIERS,
+        nominatePlayer: vi.fn(async (_p: unknown) => ({
+          event_id: 1,
+          seq: 1,
+          nomination_id: 'nom-1',
+          clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+          was_duplicate: false,
+        })),
+        placeBid,
+        initialTeamBudgets: new Map([
+          ['team-1', 5000],
+          ['team-2', 5000],
+          ['team-3', 5000],
+        ]),
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 1500 }));
+    // $1505 < $1510 → reject.
+    const tooLow = await lobby.enqueueAction(bidAction({ bidAmount: 1505, idempotencyKey: 'idem-bid-1' }));
+    expect(tooLow).toEqual({
+      ok: false,
+      reason: 'bid_increment_violation',
+      minimumNextBid: 1510,
+    });
+    expect(placeBid).not.toHaveBeenCalled();
+  });
+
+  it('6c2 default tier (flat $1) preserves 6a behavior — leading $50 + $51 accepted', async () => {
+    // No custom tiers configured → engine uses the default flat-$1
+    // tier. This is the backward-compat regression lock for all
+    // existing 6a/6b/6c1 tests that bid in any value range.
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        // (no auctionMinBidIncrementTiers override — uses default)
+        auctionBudget: 1000,
+        nominatePlayer: vi.fn(async (_p: unknown) => ({
+          event_id: 1,
+          seq: 1,
+          nomination_id: 'nom-1',
+          clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+          was_duplicate: false,
+        })),
+        initialTeamBudgets: new Map([
+          ['team-1', 1000],
+          ['team-2', 1000],
+          ['team-3', 1000],
+        ]),
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 50 }));
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 51 }));
+    expect(result.ok).toBe(true);
+  });
+
+  it('6c2 RPC plumbing: engine threads minBidIncrementTiers to placeBid RPC', async () => {
+    const placeBid = vi.fn(async (_p: unknown) => ({
+      event_id: 2,
+      seq: 2,
+      clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+      was_duplicate: false,
+      was_extended: false,
+    }));
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        auctionMinBidIncrementTiers: SPEC_EXAMPLE_TIERS,
+        nominatePlayer: vi.fn(async (_p: unknown) => ({
+          event_id: 1,
+          seq: 1,
+          nomination_id: 'nom-1',
+          clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+          was_duplicate: false,
+        })),
+        placeBid,
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+    await lobby.enqueueAction(bidAction({ bidAmount: 6 }));
+    // RPC received the tier table.
+    expect(placeBid.mock.calls[0]?.[0]).toMatchObject({
+      minBidIncrementTiers: SPEC_EXAMPLE_TIERS,
+    });
+  });
+
+  it('6c2 minimumNextBid only populated on bid_increment_violation rejection (not on bid_too_low)', async () => {
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        auctionMinBidIncrementTiers: SPEC_EXAMPLE_TIERS,
+        nominatePlayer: vi.fn(async (_p: unknown) => ({
+          event_id: 1,
+          seq: 1,
+          nomination_id: 'nom-1',
+          clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+          was_duplicate: false,
+        })),
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+    // bid_too_low (bid <= leading) does NOT carry minimumNextBid.
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 5 }));
+    expect(result).toEqual({ ok: false, reason: 'bid_too_low' });
+    expect(result).not.toHaveProperty('minimumNextBid');
+  });
+
+  it('6c2 custom tier with very small increments (fractional dollars) — engine accepts + threads through', async () => {
+    const fractionalTiers = [
+      { below: 10, increment: 0.5 },
+      { below: 1000, increment: 1 },
+    ];
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        auctionMinBidIncrementTiers: fractionalTiers,
+        nominatePlayer: vi.fn(async (_p: unknown) => ({
+          event_id: 1,
+          seq: 1,
+          nomination_id: 'nom-1',
+          clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+          was_duplicate: false,
+        })),
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+    // $5 + $0.5 = $5.5 minimum
+    const tooLow = await lobby.enqueueAction(
+      bidAction({ bidAmount: 5.25, idempotencyKey: 'idem-bid-1' }),
+    );
+    expect(tooLow).toEqual({
+      ok: false,
+      reason: 'bid_increment_violation',
+      minimumNextBid: 5.5,
+    });
+    const accepted = await lobby.enqueueAction(
+      bidAction({ bidAmount: 5.5, idempotencyKey: 'idem-bid-2' }),
+    );
+    expect(accepted.ok).toBe(true);
   });
 });

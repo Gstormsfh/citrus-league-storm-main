@@ -209,6 +209,16 @@ export type DraftActionResult =
         // 'invalid_state'. Engine fail-fast in processPlaceBid /
         // processNominate during pauseState !== null.
         | 'auction_paused';
+      /**
+       * Chunk 11g.6 sub-step 6c2: when `reason ===
+       * 'bid_increment_violation'`, engine populates the computed
+       * minimum-next-bid so clients can render the actionable error
+       * "Minimum next bid: $X" instead of a generic increment
+       * violation. Optional because the field is only meaningful
+       * for that one reason value (and RPC-side admin rejections
+       * don't go through the engine path that knows the value).
+       */
+      minimumNextBid?: number;
     };
 
 /**
