@@ -202,7 +202,13 @@ export type DraftActionResult =
         | 'no_active_nomination'
         | 'bid_too_low'
         | 'bid_increment_violation'
-        | 'insufficient_budget';
+        | 'insufficient_budget'
+        // Chunk 11g.6 sub-step 6c1 (auction pause/resume): explicit
+        // typed rejection so clients can render "Auction paused —
+        // bids reopen on resume" toast instead of generic
+        // 'invalid_state'. Engine fail-fast in processPlaceBid /
+        // processNominate during pauseState !== null.
+        | 'auction_paused';
     };
 
 /**

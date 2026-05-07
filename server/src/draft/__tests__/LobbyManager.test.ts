@@ -58,6 +58,9 @@ interface MakeLobbyOpts
   nominatePlayer?: (params: unknown) => Promise<unknown>;
   placeBid?: (params: unknown) => Promise<unknown>;
   closeNomination?: (params: unknown) => Promise<unknown>;
+  /** Chunk 11g.6 6c1: pause/resume RPC stubs. */
+  pauseAuction?: (params: unknown) => Promise<unknown>;
+  resumeAuction?: (params: unknown) => Promise<unknown>;
   publish?: (topic: string, message: string) => void;
   verifyTeamAuthorization?: (
     userId: string,
@@ -150,6 +153,27 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
       no_sale: false,
       was_duplicate: false,
     }));
+  const pauseAuction =
+    opts.pauseAuction ??
+    vi.fn(async (_params: unknown) => ({
+      event_id: 10,
+      seq: 10,
+      paused_at: new Date().toISOString(),
+      paused_nomination_id: null,
+      captured_remaining_seconds: null,
+      was_duplicate: false,
+    }));
+  const resumeAuction =
+    opts.resumeAuction ??
+    vi.fn(async (_params: unknown) => ({
+      event_id: 11,
+      seq: 11,
+      resumed_at: new Date().toISOString(),
+      prior_pause_event_id: 10,
+      restored_nomination_id: null,
+      new_expires_at: null,
+      was_duplicate: false,
+    }));
 
   const draftService = {
     submitPick,
@@ -157,6 +181,8 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
     nominatePlayer,
     placeBid,
     closeNomination,
+    pauseAuction,
+    resumeAuction,
   } as unknown as DraftServiceV2;
   const publish = opts.publish ?? vi.fn();
   const verifyTeamAuthorization = opts.verifyTeamAuthorization ?? ALLOW_ALL_AUTH;
@@ -3306,5 +3332,485 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // ── Chunk 11g.6 sub-step 6c1 — auction pause/resume ─────────────────
+  //
+  // ADR-002 §4.4: a commissioner pause suspends the bid window;
+  // resume restores the captured remaining time (NOT a fresh full
+  // window — divergent from snake/linear). Engine routes
+  // pauseAuction/resumeAuction through the single-writer queue so
+  // they serialize against in-flight bids deterministically.
+  // Bootstrap APPLIES auction_paused / auction_resumed events
+  // during replay per the canonical-replay principle from 6b.
+
+  it('auction pause: happy path — RPC called, pauseState set, timer cancelled, ring buffer + broadcast fire', async () => {
+    vi.useFakeTimers();
+    try {
+      const publish = vi.fn();
+      const pauseAuction = vi.fn(async (_params: unknown) => ({
+        event_id: 5,
+        seq: 5,
+        paused_at: new Date().toISOString(),
+        paused_nomination_id: 'nom-1',
+        captured_remaining_seconds: 22,
+        was_duplicate: false,
+      }));
+      const lobby = await makeLobby(
+        auctionLobbyOpts({
+          publish,
+          nominatePlayer: vi.fn(async (_p: unknown) => ({
+            event_id: 1,
+            seq: 1,
+            nomination_id: 'nom-1',
+            clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+            was_duplicate: false,
+          })),
+          pauseAuction,
+        }),
+      );
+      // Open a nomination (timer running).
+      await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+      publish.mockClear();
+
+      const result = await lobby.pauseAuction({
+        commissionerUserId: 'commish-1',
+        reason: 'commissioner pause',
+        idempotencyKey: 'pause-1',
+      });
+
+      expect(result).toEqual({ ok: true, eventSeq: 5 });
+      expect(pauseAuction).toHaveBeenCalledTimes(1);
+      expect(pauseAuction.mock.calls[0]?.[0]).toMatchObject({
+        leagueId: 'league-1',
+        reason: 'commissioner pause',
+        actor: { kind: 'commissioner', id: 'commish-1' },
+      });
+
+      // pauseState set with captured remaining ms.
+      const broadcastJson = JSON.parse(publish.mock.calls[0][1] as string);
+      expect(broadcastJson.payload.kind).toBe('auction_paused');
+      expect(broadcastJson.payload.capturedRemainingSeconds).toBe(22);
+      expect(broadcastJson.payload.pausedNominationId).toBe('nom-1');
+
+      // Timer cancelled — advancing past the original deadline does
+      // NOT trigger close (because pauseState was set + timer
+      // cancelled).
+      await vi.advanceTimersByTimeAsync(60_000);
+      // closeNomination uses the default mock; it should NOT have
+      // fired because the timer was cancelled by pauseAuction.
+      // (Default mock has been called 0 times.)
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('auction pause: snake-format lobby returns wrong_format_for_action', async () => {
+    const lobby = await makeLobby({ format: 'snake' });
+    const result = await lobby.pauseAuction({
+      commissionerUserId: 'commish-1',
+      reason: 'pause',
+      idempotencyKey: 'p-1',
+    });
+    expect(result).toEqual({ ok: false, reason: 'wrong_format_for_action' });
+  });
+
+  it('auction pause: rejected when already paused (engine returns invalid_state)', async () => {
+    const pauseAuction = vi.fn(async (_p: unknown) => ({
+      event_id: 5,
+      seq: 5,
+      paused_at: new Date().toISOString(),
+      paused_nomination_id: null,
+      captured_remaining_seconds: null,
+      was_duplicate: false,
+    }));
+    const lobby = await makeLobby(auctionLobbyOpts({ pauseAuction }));
+    // First pause succeeds.
+    await lobby.pauseAuction({
+      commissionerUserId: 'commish-1',
+      reason: 'pause',
+      idempotencyKey: 'p-A',
+    });
+    // Second pause (different idempotency key) sees pauseState
+    // already set and rejects without calling RPC.
+    const result = await lobby.pauseAuction({
+      commissionerUserId: 'commish-1',
+      reason: 'pause again',
+      idempotencyKey: 'p-B',
+    });
+    expect(result).toEqual({ ok: false, reason: 'invalid_state' });
+    expect(pauseAuction).toHaveBeenCalledTimes(1);
+  });
+
+  it('auction resume: happy path — pauseState cleared, expiresAt restored, timer rescheduled', async () => {
+    vi.useFakeTimers();
+    try {
+      const publish = vi.fn();
+      // Resume returns new_expires_at = now + 22s (the captured
+      // remaining seconds from the pause). Engine reschedules timer.
+      const resumeAuction = vi.fn(async (_p: unknown) => ({
+        event_id: 6,
+        seq: 6,
+        resumed_at: new Date().toISOString(),
+        prior_pause_event_id: 5,
+        restored_nomination_id: 'nom-1',
+        new_expires_at: new Date(Date.now() + 22_000).toISOString(),
+        was_duplicate: false,
+      }));
+      const closeNomination = vi.fn(async () => ({
+        event_id: 7,
+        seq: 7,
+        event_type: 'auction_nomination_closed' as const,
+        no_sale: false,
+        was_duplicate: false,
+      }));
+      const lobby = await makeLobby(
+        auctionLobbyOpts({
+          publish,
+          nominatePlayer: vi.fn(async (_p: unknown) => ({
+            event_id: 1,
+            seq: 1,
+            nomination_id: 'nom-1',
+            clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+            was_duplicate: false,
+          })),
+          pauseAuction: vi.fn(async (_p: unknown) => ({
+            event_id: 5,
+            seq: 5,
+            paused_at: new Date().toISOString(),
+            paused_nomination_id: 'nom-1',
+            captured_remaining_seconds: 22,
+            was_duplicate: false,
+          })),
+          resumeAuction,
+          closeNomination,
+        }),
+      );
+      await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+      await lobby.pauseAuction({
+        commissionerUserId: 'commish-1',
+        reason: 'pause',
+        idempotencyKey: 'p-1',
+      });
+      publish.mockClear();
+
+      const result = await lobby.resumeAuction({
+        commissionerUserId: 'commish-1',
+        idempotencyKey: 'r-1',
+      });
+
+      expect(result).toEqual({ ok: true, eventSeq: 6 });
+      expect(resumeAuction).toHaveBeenCalledTimes(1);
+
+      // Broadcast fired with auction_resumed.
+      const broadcastJson = JSON.parse(publish.mock.calls[0][1] as string);
+      expect(broadcastJson.payload.kind).toBe('auction_resumed');
+      expect(broadcastJson.payload.priorPauseEventId).toBe(5);
+      expect(broadcastJson.payload.restoredNominationId).toBe('nom-1');
+
+      // Timer rescheduled: advancing 23s should fire closeNomination.
+      await vi.advanceTimersByTimeAsync(23_000);
+      expect(closeNomination).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('auction resume: rejected when not paused (engine returns invalid_state)', async () => {
+    const resumeAuction = vi.fn();
+    const lobby = await makeLobby(auctionLobbyOpts({ resumeAuction }));
+    const result = await lobby.resumeAuction({
+      commissionerUserId: 'commish-1',
+      idempotencyKey: 'r-1',
+    });
+    expect(result).toEqual({ ok: false, reason: 'invalid_state' });
+    expect(resumeAuction).not.toHaveBeenCalled();
+  });
+
+  it('place_bid rejected during pause: engine returns auction_paused without calling RPC', async () => {
+    const placeBid = vi.fn();
+    const pauseAuction = vi.fn(async (_p: unknown) => ({
+      event_id: 5,
+      seq: 5,
+      paused_at: new Date().toISOString(),
+      paused_nomination_id: 'nom-1',
+      captured_remaining_seconds: 22,
+      was_duplicate: false,
+    }));
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        nominatePlayer: vi.fn(async (_p: unknown) => ({
+          event_id: 1,
+          seq: 1,
+          nomination_id: 'nom-1',
+          clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+          was_duplicate: false,
+        })),
+        placeBid,
+        pauseAuction,
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+    await lobby.pauseAuction({
+      commissionerUserId: 'commish-1',
+      reason: 'pause',
+      idempotencyKey: 'p-1',
+    });
+
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 10 }));
+    expect(result).toEqual({ ok: false, reason: 'auction_paused' });
+    expect(placeBid).not.toHaveBeenCalled();
+  });
+
+  it('nominate rejected during pause: engine returns auction_paused without calling RPC', async () => {
+    const nominatePlayer = vi.fn(async (_p: unknown) => ({
+      event_id: 1,
+      seq: 1,
+      nomination_id: 'nom-1',
+      clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+      was_duplicate: false,
+    }));
+    const pauseAuction = vi.fn(async (_p: unknown) => ({
+      event_id: 5,
+      seq: 5,
+      paused_at: new Date().toISOString(),
+      paused_nomination_id: null,
+      captured_remaining_seconds: null,
+      was_duplicate: false,
+    }));
+    const lobby = await makeLobby(
+      auctionLobbyOpts({ nominatePlayer, pauseAuction }),
+    );
+    // Pause BEFORE any nomination.
+    await lobby.pauseAuction({
+      commissionerUserId: 'commish-1',
+      reason: 'pause',
+      idempotencyKey: 'p-1',
+    });
+
+    const result = await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+    expect(result).toEqual({ ok: false, reason: 'auction_paused' });
+    // nominatePlayer was never called (pause gates fail-fast).
+    expect(nominatePlayer).not.toHaveBeenCalled();
+  });
+
+  it('queue ordering: bid in flight when pause queues — bid is processed BEFORE pause (deterministic)', async () => {
+    // Routes pauseAuction through the single-writer queue alongside
+    // bid actions. The bid was enqueued first, so it MUST process
+    // first (deterministic order). The pause then sets pauseState,
+    // and a third action (another bid) sees pauseState and rejects.
+    const placeBid = vi.fn(async (_p: unknown) => ({
+      event_id: 2,
+      seq: 2,
+      clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+      was_duplicate: false,
+      was_extended: false,
+    }));
+    const pauseAuction = vi.fn(async (_p: unknown) => ({
+      event_id: 5,
+      seq: 5,
+      paused_at: new Date().toISOString(),
+      paused_nomination_id: 'nom-1',
+      captured_remaining_seconds: 22,
+      was_duplicate: false,
+    }));
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        nominatePlayer: vi.fn(async (_p: unknown) => ({
+          event_id: 1,
+          seq: 1,
+          nomination_id: 'nom-1',
+          clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+          was_duplicate: false,
+        })),
+        placeBid,
+        pauseAuction,
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+
+    // Enqueue bid, then pause, then bid — without awaiting between.
+    const bid1 = lobby.enqueueAction(bidAction({ bidAmount: 10, idempotencyKey: 'b1' }));
+    const pause = lobby.pauseAuction({
+      commissionerUserId: 'commish-1',
+      reason: 'pause',
+      idempotencyKey: 'p-1',
+    });
+    const bid2 = lobby.enqueueAction(bidAction({ bidAmount: 20, idempotencyKey: 'b2' }));
+
+    const [r1, rPause, r2] = await Promise.all([bid1, pause, bid2]);
+
+    expect(r1).toEqual({ ok: true, eventSeq: 2 }); // first bid succeeds
+    expect(rPause.ok).toBe(true);                  // pause then succeeds
+    expect(r2).toEqual({ ok: false, reason: 'auction_paused' }); // second bid blocked
+    expect(placeBid).toHaveBeenCalledTimes(1);
+  });
+
+  it('bootstrap: auction_paused event applied during replay sets pauseState', async () => {
+    const events: DraftEventRow[] = [
+      makeEventRow({
+        seq: 1,
+        event_type: 'auction_nomination_started',
+        payload: {
+          nomination_id: 'nom-1',
+          player_id: '8478402',
+          player_name: 'McDavid',
+          opening_bid: 5,
+          nominator_team_id: 'team-1',
+          expires_at: new Date(Date.now() + 31_000).toISOString(),
+        },
+      }),
+      makeEventRow({
+        seq: 2,
+        event_type: 'auction_paused',
+        payload: {
+          commissioner_user_id: 'commish-1',
+          reason: 'pause',
+          paused_at: new Date().toISOString(),
+          paused_nomination_id: 'nom-1',
+          captured_remaining_seconds: 22,
+        },
+      }),
+    ];
+    const lobby = await makeLobby(
+      auctionLobbyOpts({ listDraftEvents: vi.fn(async () => events) }),
+    );
+    // pauseState set; init() did NOT schedule a timer (gated on
+    // pauseState===null). Bid attempt would be rejected.
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 10 }));
+    expect(result).toEqual({ ok: false, reason: 'auction_paused' });
+  });
+
+  it('bootstrap: auction_paused → auction_resumed cycle clears pauseState and restores deadline', async () => {
+    const restoredDeadline = new Date('2026-05-07T13:00:30Z');
+    const events: DraftEventRow[] = [
+      makeEventRow({
+        seq: 1,
+        event_type: 'auction_nomination_started',
+        payload: {
+          nomination_id: 'nom-1',
+          player_id: '8478402',
+          player_name: 'McDavid',
+          opening_bid: 5,
+          nominator_team_id: 'team-1',
+          expires_at: new Date('2026-05-07T13:00:00Z').toISOString(),
+        },
+      }),
+      makeEventRow({
+        seq: 2,
+        event_type: 'auction_paused',
+        payload: {
+          commissioner_user_id: 'commish-1',
+          reason: 'pause',
+          paused_at: new Date().toISOString(),
+          paused_nomination_id: 'nom-1',
+          captured_remaining_seconds: 30,
+        },
+      }),
+      makeEventRow({
+        seq: 3,
+        event_type: 'auction_resumed',
+        payload: {
+          commissioner_user_id: 'commish-1',
+          resumed_at: new Date().toISOString(),
+          prior_pause_event_id: 2,
+          restored_nomination_id: 'nom-1',
+          new_expires_at: restoredDeadline.toISOString(),
+        },
+      }),
+    ];
+    const lobby = await makeLobby(
+      auctionLobbyOpts({ listDraftEvents: vi.fn(async () => events) }),
+    );
+    // pauseState cleared; expiresAt restored to the resume payload.
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.currentNomination?.clockDeadline).toBe(
+      restoredDeadline.toISOString(),
+    );
+    // Buffer has all three events.
+    const snap = lobby.getSnapshot();
+    expect(snap.recentEvents.map((e) => e.kind)).toEqual([
+      'auction_nomination_started',
+      'auction_paused',
+      'auction_resumed',
+    ]);
+  });
+
+  it('bootstrap: multi-cycle pause/resume final state has no pauseState', async () => {
+    const events: DraftEventRow[] = [
+      makeEventRow({
+        seq: 1,
+        event_type: 'auction_paused',
+        payload: {
+          commissioner_user_id: 'commish-1',
+          reason: 'pause-1',
+          paused_at: new Date().toISOString(),
+          paused_nomination_id: null,
+          captured_remaining_seconds: null,
+        },
+      }),
+      makeEventRow({
+        seq: 2,
+        event_type: 'auction_resumed',
+        payload: {
+          commissioner_user_id: 'commish-1',
+          resumed_at: new Date().toISOString(),
+          prior_pause_event_id: 1,
+          restored_nomination_id: null,
+          new_expires_at: null,
+        },
+      }),
+      makeEventRow({
+        seq: 3,
+        event_type: 'auction_paused',
+        payload: {
+          commissioner_user_id: 'commish-1',
+          reason: 'pause-2',
+          paused_at: new Date().toISOString(),
+          paused_nomination_id: null,
+          captured_remaining_seconds: null,
+        },
+      }),
+      makeEventRow({
+        seq: 4,
+        event_type: 'auction_resumed',
+        payload: {
+          commissioner_user_id: 'commish-1',
+          resumed_at: new Date().toISOString(),
+          prior_pause_event_id: 3,
+          restored_nomination_id: null,
+          new_expires_at: null,
+        },
+      }),
+    ];
+    const lobby = await makeLobby(
+      auctionLobbyOpts({ listDraftEvents: vi.fn(async () => events) }),
+    );
+    // Final state: not paused (a bid attempt would NOT be rejected
+    // for auction_paused — it would be rejected for no_active_nomination).
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 10 }));
+    expect(result).toEqual({ ok: false, reason: 'no_active_nomination' });
+  });
+
+  it('idempotent retry: same pauseAuction idempotencyKey returns the cached promise', async () => {
+    const pauseAuction = vi.fn(async (_p: unknown) => ({
+      event_id: 5,
+      seq: 5,
+      paused_at: new Date().toISOString(),
+      paused_nomination_id: null,
+      captured_remaining_seconds: null,
+      was_duplicate: false,
+    }));
+    const lobby = await makeLobby(auctionLobbyOpts({ pauseAuction }));
+    const params = {
+      commissionerUserId: 'commish-1',
+      reason: 'pause',
+      idempotencyKey: 'p-same',
+    };
+    const r1 = await lobby.pauseAuction(params);
+    const r2 = await lobby.pauseAuction(params);
+    expect(r1).toEqual(r2);
+    // Second call returned the cached promise; RPC was called only once.
+    expect(pauseAuction).toHaveBeenCalledTimes(1);
   });
 });

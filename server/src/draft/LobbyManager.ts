@@ -1297,6 +1297,13 @@ export class LobbyManager {
       return { ok: false, reason: 'wrong_format_for_action' };
     }
 
+    // Step 1b: pause gate (chunk 11g.6 sub-step 6c1 per ADR-002 §4.4).
+    // Engine fail-fast — RPC also gates via `leagues.draft_state` as
+    // defense-in-depth.
+    if (this.pauseState !== null) {
+      return { ok: false, reason: 'auction_paused' };
+    }
+
     const isAutopick = action.actorKind === 'autopick';
 
     // Step 2: ADR-004 §5.3 engine-side authorization (skip for
@@ -1472,6 +1479,13 @@ export class LobbyManager {
     // Step 1: format gate.
     if (this.format !== 'auction') {
       return { ok: false, reason: 'wrong_format_for_action' };
+    }
+
+    // Step 1b: pause gate (chunk 11g.6 sub-step 6c1 per ADR-002 §4.4).
+    // Engine fail-fast; RPC also gates via `leagues.draft_state` as
+    // defense-in-depth.
+    if (this.pauseState !== null) {
+      return { ok: false, reason: 'auction_paused' };
     }
 
     const isAutopick = action.actorKind === 'autopick';
@@ -1901,18 +1915,10 @@ export class LobbyManager {
           this.applyAuctionNominationExpiredEvent(event);
           break;
         case 'auction_paused':
+          this.applyAuctionPausedEvent(event);
+          break;
         case 'auction_resumed':
-          // Auction pause/resume mirror the snake/linear flow. Engine-
-          // side pause state lives in `pauseState`; the chunks that
-          // drive these (commissioner override + cross-process
-          // notification) land in 6c. Replay them as state-only events
-          // for now — no in-memory mutation beyond the existing
-          // `pauseState` field.
-          logger.debug(
-            `[lobby] bootstrap auction pause/resume placeholder event_type=${event.event_type} ` +
-              `seq=${event.seq} lobbyId=${this.lobbyId} (chunk 11g.6 6c handles fully)`,
-          );
-          skippedCount++;
+          this.applyAuctionResumedEvent(event);
           break;
         default:
           // Forward-compat for any future additions. Today the
@@ -2336,6 +2342,118 @@ export class LobbyManager {
     }
   }
 
+  /**
+   * Bootstrap handler for `event_type === 'auction_paused'` (chunk
+   * 11g.6 sub-step 6c1 per ADR-002 §4.4).
+   *
+   * **Apply during replay** per the canonical-replay principle from
+   * 6b — the in-memory `pauseState` is the source of truth for
+   * "engine knows the auction is paused", and bootstrap must mutate
+   * it from event log replay. Without this, an engine that
+   * bootstraps mid-pause would not know to suppress the bid-window
+   * timer in `init()`'s post-replay schedule pass.
+   *
+   * Also cancels any pending pick-deadline timer that the START
+   * event's apply may have scheduled (defensive — bootstrap doesn't
+   * schedule timers itself, only `init()` post-replay does, and that
+   * step gates on `pauseState === null`).
+   */
+  private applyAuctionPausedEvent(event: DraftEventRow): void {
+    const payload = event.payload as Record<string, unknown>;
+    const pausedAt = new Date(String(payload.paused_at ?? event.created_at));
+    const capturedRemainingSeconds =
+      payload.captured_remaining_seconds == null
+        ? null
+        : Number(payload.captured_remaining_seconds);
+    const pausedNominationId =
+      payload.paused_nomination_id == null
+        ? null
+        : String(payload.paused_nomination_id);
+    const reason = String(payload.reason ?? 'commissioner');
+    const commissionerUserId =
+      payload.commissioner_user_id == null
+        ? null
+        : String(payload.commissioner_user_id);
+
+    this.pauseState = {
+      pausedAt,
+      remainingMs:
+        capturedRemainingSeconds === null
+          ? 0
+          : capturedRemainingSeconds * 1000,
+    };
+
+    this.events.append({
+      kind: 'auction_paused',
+      seq: event.seq,
+      timestamp: event.created_at,
+      correlationId: event.idempotency_key ?? '',
+      commissionerUserId,
+      reason,
+      pausedAt: pausedAt.toISOString(),
+      ...(pausedNominationId !== null
+        ? { pausedNominationId }
+        : {}),
+      ...(capturedRemainingSeconds !== null
+        ? { capturedRemainingSeconds }
+        : {}),
+    });
+  }
+
+  /**
+   * Bootstrap handler for `event_type === 'auction_resumed'` (chunk
+   * 11g.6 sub-step 6c1 per ADR-002 §4.4).
+   *
+   * Clears `pauseState`. If the event payload carries
+   * `new_expires_at`, mutates `currentNomination.expiresAt` to it
+   * (the resume RPC computed `now() +
+   * captured_remaining_seconds * interval` and persisted it). Per
+   * canonical-replay principle: in-memory state mirrors event-log
+   * truth.
+   */
+  private applyAuctionResumedEvent(event: DraftEventRow): void {
+    const payload = event.payload as Record<string, unknown>;
+    const resumedAt = new Date(String(payload.resumed_at ?? event.created_at));
+    const priorPauseEventId = Number(payload.prior_pause_event_id);
+    const restoredNominationId =
+      payload.restored_nomination_id == null
+        ? null
+        : String(payload.restored_nomination_id);
+    const newExpiresAtRaw = payload.new_expires_at;
+    const newExpiresAt =
+      newExpiresAtRaw == null ? null : new Date(String(newExpiresAtRaw));
+    const commissionerUserId =
+      payload.commissioner_user_id == null
+        ? null
+        : String(payload.commissioner_user_id);
+
+    this.pauseState = null;
+
+    if (
+      newExpiresAt !== null &&
+      this.currentNomination !== null &&
+      restoredNominationId === this.currentNomination.nominationId
+    ) {
+      this.currentNomination.expiresAt = newExpiresAt;
+    }
+
+    this.events.append({
+      kind: 'auction_resumed',
+      seq: event.seq,
+      timestamp: event.created_at,
+      correlationId: event.idempotency_key ?? '',
+      commissionerUserId,
+      resumedAt: resumedAt.toISOString(),
+      priorPauseEventId,
+      ...(restoredNominationId !== null
+        ? { restoredNominationId }
+        : {}),
+      ...(newExpiresAt !== null
+        ? { newClockDeadline: newExpiresAt.toISOString() }
+        : {}),
+    });
+  }
+
   // ── Step 6c: pick deadline timer + autopick on timeout ─────────────
 
   /**
@@ -2693,6 +2811,264 @@ export class LobbyManager {
     logger.info(
       `[lobby] resumed lobbyId=${this.lobbyId} newDeadline=${newDeadline.toISOString()}`,
     );
+  }
+
+  /**
+   * Pause the auction (chunk 11g.6 sub-step 6c1 per ADR-002 §4.4).
+   * Routed through the single-writer queue so it serializes against
+   * any in-flight bid / nomination — the audit trail in event-seq
+   * order matches wall-clock action order, and the in-flight-bid
+   * race that snake/linear's sync `pauseDraft` accepts is
+   * eliminated. **Divergent from snake/linear's sync `pauseDraft`**;
+   * the queue routing is the right shape for runtime commissioner
+   * actions even though it's overkill for snake/linear's existing
+   * bootstrap-replay use case.
+   *
+   * Format gate, auth (RPC enforces commissioner identity), and
+   * state-machine guard ('active' → 'paused') happen at the RPC
+   * layer. Engine: cancel timer, capture `pauseState`, append the
+   * `auction_paused` event to the ring buffer, broadcast.
+   *
+   * Idempotency: caller-supplied `idempotencyKey`. Same-key retries
+   * exit early at the RPC's idempotency check (returns
+   * `was_duplicate=true`); engine surfaces the cached resolved
+   * promise.
+   */
+  async pauseAuction(params: {
+    commissionerUserId: string;
+    reason: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    if (!this.initialized) {
+      const msg = `[lobby] pauseAuction called before init() lobbyId=${this.lobbyId}`;
+      logger.error(msg);
+      throw new Error(msg);
+    }
+    if (this.format !== 'auction') {
+      return { ok: false, reason: 'wrong_format_for_action' };
+    }
+    const cached = this.seenIdempotencyKeys.get(params.idempotencyKey);
+    if (cached) {
+      return cached;
+    }
+
+    const next: Promise<DraftActionResult> = this.queue
+      .then(() => this.processPauseAuction(params))
+      .catch((err: unknown) => {
+        logger.error(
+          `[lobby] pauseAuction queue error lobbyId=${this.lobbyId}`,
+          err,
+        );
+        return { ok: false, reason: 'internal_error' as const };
+      });
+
+    this.queue = next;
+    this.cacheIdempotencyResult(params.idempotencyKey, next);
+    return next;
+  }
+
+  /**
+   * Resume a paused auction (chunk 11g.6 sub-step 6c1 per ADR-002
+   * §4.4). Same queue-routed shape as `pauseAuction`. **Restores
+   * the captured remaining bid window** from the paired
+   * `auction_paused` event payload — NOT a fresh full window.
+   * Divergent from snake/linear's `resumeDraft`.
+   */
+  async resumeAuction(params: {
+    commissionerUserId: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    if (!this.initialized) {
+      const msg = `[lobby] resumeAuction called before init() lobbyId=${this.lobbyId}`;
+      logger.error(msg);
+      throw new Error(msg);
+    }
+    if (this.format !== 'auction') {
+      return { ok: false, reason: 'wrong_format_for_action' };
+    }
+    const cached = this.seenIdempotencyKeys.get(params.idempotencyKey);
+    if (cached) {
+      return cached;
+    }
+
+    const next: Promise<DraftActionResult> = this.queue
+      .then(() => this.processResumeAuction(params))
+      .catch((err: unknown) => {
+        logger.error(
+          `[lobby] resumeAuction queue error lobbyId=${this.lobbyId}`,
+          err,
+        );
+        return { ok: false, reason: 'internal_error' as const };
+      });
+
+    this.queue = next;
+    this.cacheIdempotencyResult(params.idempotencyKey, next);
+    return next;
+  }
+
+  private async processPauseAuction(params: {
+    commissionerUserId: string;
+    reason: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    if (this.pauseState !== null) {
+      // Already paused — return invalid_state. RPC would also reject.
+      return { ok: false, reason: 'invalid_state' };
+    }
+
+    let result: Awaited<ReturnType<DraftServiceV2['pauseAuction']>>;
+    try {
+      result = await this.draftService.pauseAuction({
+        leagueId: this.leagueId,
+        reason: params.reason,
+        idempotencyKey: params.idempotencyKey,
+        actor: {
+          kind: 'commissioner',
+          id: params.commissionerUserId,
+          session_id: params.sessionId ?? randomUUID(),
+        },
+      });
+    } catch (err: unknown) {
+      if (err instanceof AppError) {
+        return { ok: false, reason: this.mapAppErrorToReason(err) };
+      }
+      logger.error(
+        `[lobby] processPauseAuction: unexpected throw lobbyId=${this.lobbyId}`,
+        err,
+      );
+      return { ok: false, reason: 'internal_error' };
+    }
+
+    if (!result.was_duplicate) {
+      // Mutate engine state. The RPC has already updated
+      // `leagues.draft_state='paused'` + recorded the event.
+      const pausedAt = new Date(result.paused_at);
+      const remainingMs =
+        result.captured_remaining_seconds === null
+          ? 0
+          : result.captured_remaining_seconds * 1000;
+      this.pauseState = { pausedAt, remainingMs };
+      this.cancelPickTimer();
+
+      const timestamp = new Date().toISOString();
+      const event: BufferedDraftEvent = {
+        kind: 'auction_paused',
+        seq: result.seq,
+        timestamp,
+        correlationId: params.idempotencyKey,
+        commissionerUserId: params.commissionerUserId,
+        reason: params.reason,
+        pausedAt: pausedAt.toISOString(),
+        ...(result.paused_nomination_id !== null
+          ? { pausedNominationId: result.paused_nomination_id }
+          : {}),
+        ...(result.captured_remaining_seconds !== null
+          ? { capturedRemainingSeconds: result.captured_remaining_seconds }
+          : {}),
+      };
+      this.events.append(event);
+      this.broadcast({
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'event',
+        seq: result.seq,
+        timestamp,
+        correlationId: params.idempotencyKey,
+        payload: event,
+      });
+
+      logger.info(
+        `[lobby] auction paused lobbyId=${this.lobbyId} remainingMs=${remainingMs}`,
+      );
+    }
+
+    return { ok: true, eventSeq: result.seq };
+  }
+
+  private async processResumeAuction(params: {
+    commissionerUserId: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    if (this.pauseState === null) {
+      // Not paused — RPC would also reject.
+      return { ok: false, reason: 'invalid_state' };
+    }
+
+    let result: Awaited<ReturnType<DraftServiceV2['resumeAuction']>>;
+    try {
+      result = await this.draftService.resumeAuction({
+        leagueId: this.leagueId,
+        idempotencyKey: params.idempotencyKey,
+        actor: {
+          kind: 'commissioner',
+          id: params.commissionerUserId,
+          session_id: params.sessionId ?? randomUUID(),
+        },
+      });
+    } catch (err: unknown) {
+      if (err instanceof AppError) {
+        return { ok: false, reason: this.mapAppErrorToReason(err) };
+      }
+      logger.error(
+        `[lobby] processResumeAuction: unexpected throw lobbyId=${this.lobbyId}`,
+        err,
+      );
+      return { ok: false, reason: 'internal_error' };
+    }
+
+    if (!result.was_duplicate) {
+      this.pauseState = null;
+      const resumedAt = new Date(result.resumed_at);
+
+      // ADR-002 §4.4: restore captured remaining time. The RPC has
+      // already updated `auction_nominations.expires_at = now() +
+      // captured_remaining_seconds * interval`. Engine mirrors via
+      // `currentNomination.expiresAt` and reschedules the timer.
+      if (
+        result.new_expires_at !== null &&
+        this.currentNomination !== null &&
+        result.restored_nomination_id === this.currentNomination.nominationId
+      ) {
+        const newDeadline = new Date(result.new_expires_at);
+        this.currentNomination.expiresAt = newDeadline;
+        this.setPickDeadline(newDeadline);
+      }
+
+      const timestamp = new Date().toISOString();
+      const event: BufferedDraftEvent = {
+        kind: 'auction_resumed',
+        seq: result.seq,
+        timestamp,
+        correlationId: params.idempotencyKey,
+        commissionerUserId: params.commissionerUserId,
+        resumedAt: resumedAt.toISOString(),
+        priorPauseEventId: result.prior_pause_event_id,
+        ...(result.restored_nomination_id !== null
+          ? { restoredNominationId: result.restored_nomination_id }
+          : {}),
+        ...(result.new_expires_at !== null
+          ? { newClockDeadline: result.new_expires_at }
+          : {}),
+      };
+      this.events.append(event);
+      this.broadcast({
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'event',
+        seq: result.seq,
+        timestamp,
+        correlationId: params.idempotencyKey,
+        payload: event,
+      });
+
+      logger.info(
+        `[lobby] auction resumed lobbyId=${this.lobbyId} newExpiresAt=${result.new_expires_at ?? 'null'}`,
+      );
+    }
+
+    return { ok: true, eventSeq: result.seq };
   }
 
   /**

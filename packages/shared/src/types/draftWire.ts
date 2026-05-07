@@ -239,6 +239,57 @@ export type BufferedDraftEvent =
       finalAmount: number;
       totalBids: number;
       playerId: string;
+    }
+  | {
+      /**
+       * Commissioner paused the auction (chunk 11g.6 sub-step 6c1
+       * per ADR-002 §4.4). The bid window timer is suspended; new
+       * bids and nominations are rejected until `auction_resumed`.
+       *
+       * `pausedNominationId` and `capturedRemainingSeconds` are
+       * present only when there was an active nomination at pause
+       * time. The captured remaining-seconds value is the
+       * source-of-truth for resume math — auction `auction_resumed`
+       * restores `auction_nominations.expires_at = now() +
+       * captured_remaining_seconds`. **This diverges from
+       * snake/linear's `draft_resumed` which gives a fresh full
+       * pick clock**; auction's bid window represents all teams'
+       * opportunity to react, so restoring remaining-time is
+       * fairness-correct.
+       */
+      kind: 'auction_paused';
+      seq: number;
+      timestamp: string;
+      correlationId: string;
+      commissionerUserId: string | null;
+      reason: string;
+      pausedAt: string;
+      pausedNominationId?: string;
+      capturedRemainingSeconds?: number;
+    }
+  | {
+      /**
+       * Commissioner resumed the auction (chunk 11g.6 sub-step 6c1
+       * per ADR-002 §4.4). The bid window resumes from where it
+       * stopped (NOT a fresh full window). `restoredNominationId`
+       * and `newClockDeadline` are present only when a paused
+       * nomination is being unfrozen — `newClockDeadline = now() +
+       * captured_remaining_seconds` from the paired pause event.
+       *
+       * `priorPauseEventId` is the durable `draft_events.id` of
+       * the matching `auction_paused` row, so clients can
+       * correlate pause/resume pairs without payload-equality
+       * checks.
+       */
+      kind: 'auction_resumed';
+      seq: number;
+      timestamp: string;
+      correlationId: string;
+      commissionerUserId: string | null;
+      resumedAt: string;
+      priorPauseEventId: number;
+      restoredNominationId?: string;
+      newClockDeadline?: string;
     };
 
 // ── Snapshot payloads ──────────────────────────────────────────────

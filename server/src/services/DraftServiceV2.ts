@@ -150,6 +150,62 @@ export interface CloseNominationParams {
   correlationId?: string | null;
 }
 
+// ── Chunk 11g.6 sub-step 6c1 — auction pause/resume ──────────────────
+
+export interface PauseAuctionParams {
+  leagueId: string;
+  reason: string;
+  idempotencyKey: string;
+  /**
+   * Per ADR-002 §4.4 + ADR-004 §5: actor.kind must be
+   * 'commissioner'. RPC enforces both this and
+   * `auth.uid() = leagues.commissioner_id`.
+   */
+  actor: DraftV2Actor;
+}
+
+export interface PauseAuctionResult {
+  event_id: number;
+  seq: number;
+  paused_at: string;
+  /**
+   * UUID of the active nomination at pause time, or `null` when
+   * the auction was paused between nominations.
+   */
+  paused_nomination_id: string | null;
+  /**
+   * `ceil(remaining_seconds)` of the paused bid window. `null`
+   * when paused between nominations. Source-of-truth for resume
+   * math — `auction_resume_v2` reads this back from the
+   * durable event payload to compute the new `expires_at`.
+   */
+  captured_remaining_seconds: number | null;
+  was_duplicate: boolean;
+}
+
+export interface ResumeAuctionParams {
+  leagueId: string;
+  idempotencyKey: string;
+  actor: DraftV2Actor;
+}
+
+export interface ResumeAuctionResult {
+  event_id: number;
+  seq: number;
+  resumed_at: string;
+  /** `draft_events.id` of the paired `auction_paused` event row. */
+  prior_pause_event_id: number;
+  restored_nomination_id: string | null;
+  /**
+   * Post-restore `auction_nominations.expires_at` (= `resumed_at +
+   * captured_remaining_seconds * interval`). `null` when no
+   * nomination was active at pause time. Engine uses this to
+   * reschedule the bid-window timer.
+   */
+  new_expires_at: string | null;
+  was_duplicate: boolean;
+}
+
 export interface CloseNominationResult {
   event_id: number;
   seq: number;
@@ -416,6 +472,57 @@ export class DraftServiceV2 {
 
     if (error) throw mapRpcError(error);
     return data as CloseNominationResult;
+  }
+
+  /**
+   * Pause the auction via `auction_pause_v2` (chunk 11g.6 sub-step 6c1
+   * per ADR-002 §4.4). Atomic 4-write block: row-locks the active
+   * nomination (if any), flips `leagues.draft_state` to `'paused'`,
+   * advances the event counter, and INSERTs an `auction_paused`
+   * event whose payload carries `captured_remaining_seconds` for the
+   * paired `auction_resume_v2` to read back.
+   *
+   * Auth (per ADR-004 §5): actor.kind must be 'commissioner'; RPC
+   * additionally verifies `auth.uid() = leagues.commissioner_id`
+   * unless caller is service_role.
+   */
+  async pauseAuction(params: PauseAuctionParams): Promise<PauseAuctionResult> {
+    const { data, error } = await this.supabase.rpc('auction_pause_v2', {
+      p_league_id:       params.leagueId,
+      p_actor:           params.actor,
+      p_reason:          params.reason,
+      p_idempotency_key: params.idempotencyKey,
+    });
+
+    if (error) throw mapRpcError(error);
+    return data as PauseAuctionResult;
+  }
+
+  /**
+   * Resume a paused auction via `auction_resume_v2` (chunk 11g.6
+   * sub-step 6c1 per ADR-002 §4.4).
+   *
+   * Atomic 4-or-5-write block. The RPC `SELECT ... FOR UPDATE`s the
+   * most recent `auction_paused` event for this league to recover
+   * the captured remaining-seconds — the row lock is the
+   * world-class race-protection that prevents two simultaneous
+   * commissioner clicks from both succeeding.
+   *
+   * Per ADR-002 §4.4: resume restores the captured remaining time,
+   * NOT a fresh full window. **Divergent from snake/linear
+   * `draft_resume`** (which gives a fresh full pick clock); auction
+   * resume restores `auction_nominations.expires_at = now() +
+   * captured_remaining_seconds * interval`.
+   */
+  async resumeAuction(params: ResumeAuctionParams): Promise<ResumeAuctionResult> {
+    const { data, error } = await this.supabase.rpc('auction_resume_v2', {
+      p_league_id:       params.leagueId,
+      p_actor:           params.actor,
+      p_idempotency_key: params.idempotencyKey,
+    });
+
+    if (error) throw mapRpcError(error);
+    return data as ResumeAuctionResult;
   }
 
   /**
