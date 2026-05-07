@@ -10,7 +10,7 @@
 // object with a `send` vi.fn() and assert against it. The
 // LobbyRegistry is also injected — tests pass a stub.
 
-import { logger } from '@citrus/shared';
+import { structuredLogger } from '@citrus/shared';
 import {
   parseClientMessage,
   serializeServerMessage,
@@ -54,9 +54,11 @@ export function handleClientMessage(
 ): void {
   const parsed = parseClientMessage(raw);
   if (!parsed) {
-    logger.debug(
-      `[uws] dropped malformed client message lobbyId=${userData.lobbyId} userId=${userData.userId} rawLength=${raw.length}`,
-    );
+    structuredLogger.debug('uws.message.malformed_dropped', {
+      lobbyId: userData.lobbyId,
+      userId: userData.userId,
+      rawLength: raw.length,
+    });
     return;
   }
 
@@ -79,10 +81,16 @@ export function handleClientMessage(
       try {
         ws.send(serializeServerMessage(errorMessage));
       } catch (err) {
-        logger.debug(
-          `[uws] ws.send for lobby_not_ready error threw lobbyId=${userData.lobbyId} userId=${userData.userId}`,
-          err,
+        structuredLogger.debug(
+          'uws.send.lobby_not_ready_error_threw',
+          {
+            lobbyId: userData.lobbyId,
+            userId: userData.userId,
+          },
         );
+        // err intentionally not threaded — debug-level + send-throws
+        // are noisy + non-actionable; engine drops the message.
+        void err;
       }
       return;
     }
@@ -91,10 +99,11 @@ export function handleClientMessage(
     try {
       ws.send(serializeServerMessage(response));
     } catch (err) {
-      logger.debug(
-        `[uws] ws.send for resync response threw lobbyId=${userData.lobbyId} userId=${userData.userId}`,
-        err,
-      );
+      structuredLogger.debug('uws.send.resync_response_threw', {
+        lobbyId: userData.lobbyId,
+        userId: userData.userId,
+      });
+      void err;
     }
     return;
   }

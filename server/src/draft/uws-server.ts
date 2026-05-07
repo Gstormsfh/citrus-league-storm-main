@@ -30,7 +30,7 @@
 // server/src/lib/draftToken.ts for the token-format contract.
 
 import uWS from 'uWebSockets.js';
-import { logger } from '@citrus/shared';
+import { structuredLogger } from '@citrus/shared';
 import { verifyDraftToken } from '../lib/draftToken';
 import type { LobbyRegistry } from './LobbyRegistry';
 import { handleClientMessage } from './uws-helpers';
@@ -82,7 +82,10 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
 
         // No subprotocol == no token. Fail fast, no async work needed.
         if (!secProto) {
-          logger.info(`[uws] upgrade rejected lobbyId=${lobbyId} reason=no_token`);
+          structuredLogger.info('uws.upgrade.rejected', {
+            lobbyId,
+            reason: 'no_token',
+          });
           res.cork(() => {
             res.writeStatus('401 Unauthorized').end();
           });
@@ -104,9 +107,10 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
             // setting; `in`-based narrowing works in either mode.
             if ('claims' in result) {
               const { claims } = result;
-              logger.debug(
-                `[uws] upgrade accepted lobbyId=${lobbyId} userId=${claims.sub}`,
-              );
+              structuredLogger.debug('uws.upgrade.accepted', {
+                lobbyId,
+                userId: claims.sub,
+              });
               res.cork(() => {
                 res.upgrade(
                   {
@@ -125,9 +129,10 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
             } else {
               const status =
                 result.reason === 'draft_mismatch' ? '403 Forbidden' : '401 Unauthorized';
-              logger.info(
-                `[uws] upgrade rejected lobbyId=${lobbyId} reason=${result.reason}`,
-              );
+              structuredLogger.info('uws.upgrade.rejected', {
+                lobbyId,
+                reason: result.reason,
+              });
               res.cork(() => {
                 res.writeStatus(status).end();
               });
@@ -137,7 +142,11 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
             if (aborted) return;
             // Defensive: verifyDraftToken returns typed errors, never
             // throws under normal operation. If we get here, treat as 401.
-            logger.error('[uws] verifyDraftToken threw unexpectedly:', err);
+            structuredLogger.error(
+              'uws.upgrade.verify_token_threw',
+              { lobbyId },
+              err,
+            );
             res.cork(() => {
               res.writeStatus('401 Unauthorized').end();
             });
@@ -147,7 +156,11 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
       open: (ws) => {
         const userData = ws.getUserData();
         const { lobbyId, userId, leagueId } = userData;
-        logger.info(`[uws] connection opened lobbyId=${lobbyId} userId=${userId}`);
+        structuredLogger.info('uws.connection.opened', {
+          lobbyId,
+          userId,
+          leagueId,
+        });
 
         // Lazy-construct or look up the LobbyManager for this lobby
         // and attach the WS. The registry's Promise-placeholder map
@@ -172,8 +185,9 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
             lobby.addConnection(ws, userData);
           })
           .catch((err: unknown) => {
-            logger.error(
-              `[uws] LobbyRegistry.getOrCreate failed lobbyId=${lobbyId}`,
+            structuredLogger.error(
+              'uws.lobby_get_or_create_failed',
+              { lobbyId, leagueId },
               err,
             );
             try {
@@ -181,10 +195,11 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
             } catch (closeErr) {
               // ws may already be closed if the user disconnected
               // in the same tick; swallow.
-              logger.debug(
-                `[uws] ws.end after failed getOrCreate threw lobbyId=${lobbyId}`,
-                closeErr,
+              structuredLogger.debug(
+                'uws.ws_end_threw_after_failed_get_or_create',
+                { lobbyId },
               );
+              void closeErr;
             }
           });
       },
@@ -203,8 +218,12 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
           // Defensive: handleClientMessage swallows expected errors
           // internally. Anything bubbling here is an unexpected bug;
           // log + continue rather than crash the entire WS thread.
-          logger.error(
-            `[uws] handleClientMessage threw lobbyId=${userData.lobbyId} userId=${userData.userId}`,
+          structuredLogger.error(
+            'uws.message_handler_threw',
+            {
+              lobbyId: userData.lobbyId,
+              userId: userData.userId,
+            },
             err,
           );
         }
@@ -216,29 +235,32 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
         if (lobby) {
           lobby.removeConnection(ws);
         }
-        logger.info(
-          `[uws] connection closed lobbyId=${lobbyId} userId=${userId} code=${code} remainingConnections=${lobby?.connectionCount() ?? 0}`,
-        );
+        structuredLogger.info('uws.connection.closed', {
+          lobbyId,
+          userId,
+          code,
+          remainingConnections: lobby?.connectionCount() ?? 0,
+        });
       },
     });
 
     app.listen(port, (token) => {
       if (token) {
         listenSocket = token;
-        logger.info(`[uws] listening on port ${port}`);
+        structuredLogger.info('uws.listening', { port });
         resolve({
           port,
           close: () => {
             if (listenSocket) {
               uWS.us_listen_socket_close(listenSocket);
               listenSocket = null;
-              logger.info('[uws] listen socket closed');
+              structuredLogger.info('uws.listen_socket_closed', { port });
             }
           },
         });
       } else {
         const err = new Error(`[uws] FAILED to listen on port ${port}`);
-        logger.error(err.message);
+        structuredLogger.error('uws.listen_failed', { port }, err);
         reject(err);
       }
     });

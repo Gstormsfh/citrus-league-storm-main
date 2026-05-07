@@ -94,7 +94,7 @@
 
 import type { WebSocket } from 'uWebSockets.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { logger } from '@citrus/shared';
+import { structuredLogger } from '@citrus/shared';
 import { AppError } from '../lib/errors';
 import {
   DraftServiceV2,
@@ -737,7 +737,7 @@ export class LobbyManager {
     // zero-initialized at the field declaration above. `init()`
     // mutates them during event-log replay + sets the deadline
     // timer from `initialPickDeadline` per chunk 11g.4 step 6c.
-    logger.info(
+    structuredLogger.info(
       `[lobby] LobbyManager constructed (pre-init) lobbyId=${opts.lobbyId} format=${opts.format} leagueId=${opts.leagueId} topic=${this.topicName} totalPicks=${this.draftOrder.length} pickClockSeconds=${opts.pickClockSeconds} auctionTeams=${opts.nominationOrder.length} auctionRounds=${opts.draftRounds}`,
     );
   }
@@ -765,7 +765,7 @@ export class LobbyManager {
    */
   async init(): Promise<void> {
     if (this.initialized) {
-      logger.debug(
+      structuredLogger.debug(
         `[lobby] init() called more than once — no-op lobbyId=${this.lobbyId}`,
       );
       return;
@@ -840,7 +840,7 @@ export class LobbyManager {
       this.setPickDeadline(this.initialPickDeadline, 'pick');
     }
 
-    logger.info(
+    structuredLogger.info(
       `[lobby] init complete lobbyId=${this.lobbyId} format=${this.format} picksMade=${this.picksMade} status=${this.draftStatus} bufferSize=${this.events.size()} timerScheduled=${this.currentTimerHandle !== null} activeNomination=${this.currentNomination !== null}`,
     );
   }
@@ -873,9 +873,8 @@ export class LobbyManager {
       try {
         ws.subscribe(this.topicName);
       } catch (err) {
-        logger.debug(
+        structuredLogger.debug(
           `[lobby] ws.subscribe threw during addConnection lobbyId=${this.lobbyId} userId=${userData.userId}`,
-          err,
         );
       }
     }
@@ -890,13 +889,12 @@ export class LobbyManager {
       };
       ws.send(serializeServerMessage(snapshot));
     } catch (err) {
-      logger.debug(
+      structuredLogger.debug(
         `[lobby] snapshot ws.send threw during addConnection lobbyId=${this.lobbyId} userId=${userData.userId}`,
-        err,
       );
     }
 
-    logger.info(
+    structuredLogger.info(
       `[lobby] connection added lobbyId=${this.lobbyId} userId=${userData.userId} size=${this.connections.size}`,
     );
 
@@ -948,13 +946,12 @@ export class LobbyManager {
     try {
       ws.unsubscribe(this.topicName);
     } catch (err) {
-      logger.debug(
+      structuredLogger.debug(
         `[lobby] ws.unsubscribe threw during removeConnection lobbyId=${this.lobbyId} userId=${userData.userId}`,
-        err,
       );
     }
 
-    logger.info(
+    structuredLogger.info(
       `[lobby] connection removed lobbyId=${this.lobbyId} userId=${userData.userId} size=${this.connections.size}`,
     );
 
@@ -1014,7 +1011,7 @@ export class LobbyManager {
     // by the queue's catch-and-convert-to-internal_error pattern.
     if (!this.initialized) {
       const msg = `[lobby] enqueueAction called before init() — caller MUST await LobbyManager.init() lobbyId=${this.lobbyId} actionKind=${action.kind}`;
-      logger.error(msg);
+      structuredLogger.error(msg);
       throw new Error(msg);
     }
 
@@ -1209,7 +1206,7 @@ export class LobbyManager {
     sinceSeq: number,
   ): DraftServerMessage {
     const result = this.events.getEventsSinceSeq(sinceSeq);
-    logger.debug(
+    structuredLogger.debug(
       `[lobby] resync request lobbyId=${this.lobbyId} userId=${userData.userId} sinceSeq=${sinceSeq} ok=${result.ok}`,
     );
 
@@ -1307,9 +1304,9 @@ export class LobbyManager {
       try {
         authResult = await this.verifyTeamAuthorization(action.userId, action.teamId);
       } catch (err) {
-        logger.error(
+        structuredLogger.error(
           `[lobby] verifyTeamAuthorization threw lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId}`,
-          err,
+          {}, err,
         );
         return { ok: false, reason: 'internal_error' };
       }
@@ -1322,7 +1319,7 @@ export class LobbyManager {
         //
         // Granular reason for ops; coarse-grained for the wire (no
         // information disclosure beyond "you can't do that").
-        logger.info(
+        structuredLogger.info(
           `[lobby] unauthorized pick attempt lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId} reason=${authResult.reason}`,
         );
         return { ok: false, reason: 'unauthorized' };
@@ -1380,9 +1377,9 @@ export class LobbyManager {
       if (err instanceof AppError) {
         return { ok: false, reason: this.mapAppErrorToReason(err) };
       }
-      logger.error(
+      structuredLogger.error(
         `[lobby] processSubmitPick: unexpected throw lobbyId=${this.lobbyId}`,
-        err,
+        {}, err,
       );
       return { ok: false, reason: 'internal_error' };
     }
@@ -1511,14 +1508,14 @@ export class LobbyManager {
       try {
         authResult = await this.verifyTeamAuthorization(action.userId, action.teamId);
       } catch (err) {
-        logger.error(
+        structuredLogger.error(
           `[lobby] processNominate verifyTeamAuthorization threw lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId}`,
-          err,
+          {}, err,
         );
         return { ok: false, reason: 'internal_error' };
       }
       if ('reason' in authResult) {
-        logger.info(
+        structuredLogger.info(
           `[lobby] unauthorized nominate attempt lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId} reason=${authResult.reason}`,
         );
         return { ok: false, reason: 'unauthorized' };
@@ -1591,9 +1588,9 @@ export class LobbyManager {
       if (err instanceof AppError) {
         return { ok: false, reason: this.mapAppErrorToReason(err) };
       }
-      logger.error(
+      structuredLogger.error(
         `[lobby] processNominate: unexpected throw lobbyId=${this.lobbyId}`,
-        err,
+        {}, err,
       );
       return { ok: false, reason: 'internal_error' };
     }
@@ -1693,14 +1690,14 @@ export class LobbyManager {
       try {
         authResult = await this.verifyTeamAuthorization(action.userId, action.teamId);
       } catch (err) {
-        logger.error(
+        structuredLogger.error(
           `[lobby] processPlaceBid verifyTeamAuthorization threw lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId}`,
-          err,
+          {}, err,
         );
         return { ok: false, reason: 'internal_error' };
       }
       if ('reason' in authResult) {
-        logger.info(
+        structuredLogger.info(
           `[lobby] unauthorized place_bid attempt lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId} reason=${authResult.reason}`,
         );
         return { ok: false, reason: 'unauthorized' };
@@ -1775,9 +1772,9 @@ export class LobbyManager {
       if (err instanceof AppError) {
         return { ok: false, reason: this.mapAppErrorToReason(err) };
       }
-      logger.error(
+      structuredLogger.error(
         `[lobby] processPlaceBid: unexpected throw lobbyId=${this.lobbyId}`,
-        err,
+        {}, err,
       );
       return { ok: false, reason: 'internal_error' };
     }
@@ -1892,14 +1889,13 @@ export class LobbyManager {
       } catch (err) {
         // ws may have closed mid-iteration. Skip — close handler
         // will purge it from the map shortly.
-        logger.debug(
+        structuredLogger.debug(
           `[lobby] getBufferedAmount threw during sweep lobbyId=${this.lobbyId} userId=${userData.userId}`,
-          err,
         );
         continue;
       }
       if (buffered > BACKPRESSURE_THRESHOLD_BYTES) {
-        logger.warn(
+        structuredLogger.warn(
           `[lobby] backpressure threshold exceeded — disconnecting slow consumer lobbyId=${this.lobbyId} userId=${userData.userId} bufferedAmount=${buffered} threshold=${BACKPRESSURE_THRESHOLD_BYTES}`,
         );
         try {
@@ -1908,9 +1904,8 @@ export class LobbyManager {
           // for failures, or 1000 normal close for intentional logout).
           ws.end(1013, 'backpressure');
         } catch (err) {
-          logger.debug(
+          structuredLogger.debug(
             `[lobby] ws.end after backpressure threw lobbyId=${this.lobbyId} userId=${userData.userId}`,
-            err,
           );
         }
       }
@@ -1957,9 +1952,9 @@ export class LobbyManager {
    * keeps running. The next enqueueAction call still gets to execute.
    */
   private handleQueueError(err: unknown, action: DraftAction): DraftActionResult {
-    logger.error(
+    structuredLogger.error(
       `[lobby] queue error lobbyId=${this.lobbyId} actionKind=${action.kind}`,
-      err,
+      {}, err,
     );
     return { ok: false, reason: 'internal_error' };
   }
@@ -2002,9 +1997,9 @@ export class LobbyManager {
     try {
       events = await this.draftService.listDraftEvents(this.leagueId);
     } catch (err) {
-      logger.error(
+      structuredLogger.error(
         `[lobby] bootstrap listDraftEvents failed lobbyId=${this.lobbyId} leagueId=${this.leagueId}`,
-        err,
+        {}, err,
       );
       throw err;
     }
@@ -2098,7 +2093,7 @@ export class LobbyManager {
           // current pick's clock). No picksMade impact; timer
           // reconstruction at `init()` end picks up the updated
           // `leagues.pick_deadline`.
-          logger.debug(
+          structuredLogger.debug(
             `[lobby] bootstrap skipping draft_extended event ` +
               `seq=${event.seq} lobbyId=${this.lobbyId}`,
           );
@@ -2107,7 +2102,7 @@ export class LobbyManager {
         case 'autopick_failed':
         case 'generation_bumped':
           // Diagnostic / internal versioning. No state-machine impact.
-          logger.debug(
+          structuredLogger.debug(
             `[lobby] bootstrap skipping diagnostic event_type=${event.event_type} ` +
               `seq=${event.seq} lobbyId=${this.lobbyId}`,
           );
@@ -2151,7 +2146,7 @@ export class LobbyManager {
           // migration's CHECK enum admits the 9 event types listed
           // in the cases above; encountering an unknown type means
           // a newer chunk added one that this engine doesn't handle.
-          logger.warn(
+          structuredLogger.warn(
             `[lobby] bootstrap unknown event_type=${event.event_type} ` +
               `seq=${event.seq} lobbyId=${this.lobbyId} ` +
               `(forward-compat skip)`,
@@ -2162,7 +2157,7 @@ export class LobbyManager {
     }
 
     const duration = Date.now() - startTime;
-    logger.info(
+    structuredLogger.info(
       `[lobby] bootstrap replay complete lobbyId=${this.lobbyId} ` +
         `totalEvents=${events.length} pickEvents=${pickEventCount} ` +
         `undoneEvents=${undoneEventCount} overrideEvents=${overrideEventCount} ` +
@@ -2944,7 +2939,7 @@ export class LobbyManager {
       this.currentTimerHandle = null;
       void this.handleClockExpired();
     }, delayMs);
-    logger.debug(
+    structuredLogger.debug(
       `[lobby] timer scheduled lobbyId=${this.lobbyId} kind=${kind} deadline=${deadline.toISOString()} delayMs=${delayMs}`,
     );
   }
@@ -2958,17 +2953,17 @@ export class LobbyManager {
    */
   private async handleClockExpired(): Promise<void> {
     if (this.shutDown) {
-      logger.debug(`[lobby] clock fired post-shutdown — ignored lobbyId=${this.lobbyId}`);
+      structuredLogger.debug(`[lobby] clock fired post-shutdown — ignored lobbyId=${this.lobbyId}`);
       return;
     }
     if (this.draftStatus !== 'in_progress') {
-      logger.warn(
+      structuredLogger.warn(
         `[lobby] clock fired but draftStatus=${this.draftStatus} — ignored (timer should have been cancelled) lobbyId=${this.lobbyId}`,
       );
       return;
     }
     if (this.pauseState !== null) {
-      logger.warn(
+      structuredLogger.warn(
         `[lobby] clock fired while paused — ignored (pauseDraft should have cancelled) lobbyId=${this.lobbyId}`,
       );
       return;
@@ -3024,7 +3019,7 @@ export class LobbyManager {
 
     const slot = this.draftOrder[this.picksMade];
     if (!slot) {
-      logger.error(
+      structuredLogger.error(
         `[lobby] autopick fired with no slot at picksMade=${this.picksMade} lobbyId=${this.lobbyId}`,
       );
       return;
@@ -3041,9 +3036,9 @@ export class LobbyManager {
         this.autopickStrategies,
       );
     } catch (err) {
-      logger.error(
+      structuredLogger.error(
         `[lobby] autopick strategy threw lobbyId=${this.lobbyId} teamId=${slot.teamId}`,
-        err,
+        {}, err,
       );
       // Treat as stuck-draft — clear deadline, surface for ops.
       this.currentTimerDeadline = null;
@@ -3054,14 +3049,14 @@ export class LobbyManager {
       // Stuck-draft condition: every strategy returned no_eligible_players.
       // Real production issue requiring commissioner intervention. Chunk
       // 11g.7's alert policy fires on this log line.
-      logger.error(
+      structuredLogger.error(
         `[lobby] autopick STUCK — no eligible players lobbyId=${this.lobbyId} teamId=${slot.teamId} picksMade=${this.picksMade}`,
       );
       this.currentTimerDeadline = null;
       return;
     }
 
-    logger.info(
+    structuredLogger.info(
       `[lobby] autopick fired lobbyId=${this.lobbyId} teamId=${slot.teamId} playerId=${result.playerId} source=${result.source}`,
     );
 
@@ -3086,9 +3081,9 @@ export class LobbyManager {
     try {
       await this.enqueueAction(autopickAction);
     } catch (err) {
-      logger.error(
+      structuredLogger.error(
         `[lobby] autopick enqueueAction threw lobbyId=${this.lobbyId}`,
-        err,
+        {}, err,
       );
     }
   }
@@ -3123,7 +3118,7 @@ export class LobbyManager {
    */
   private async handleNominationTimeout(): Promise<void> {
     if (this.currentNomination === null) {
-      logger.warn(
+      structuredLogger.warn(
         `[lobby] nomination timeout fired with no active nomination — ignored lobbyId=${this.lobbyId}`,
       );
       return;
@@ -3143,9 +3138,9 @@ export class LobbyManager {
         },
       });
     } catch (err) {
-      logger.error(
+      structuredLogger.error(
         `[lobby] closeNomination RPC threw lobbyId=${this.lobbyId} nominationId=${nomination.nominationId}`,
-        err,
+        {}, err,
       );
       // Stuck-auction condition. Surface for ops; clear timer and
       // currentNomination so the lobby doesn't deadlock. Chunk 11g.7
@@ -3224,7 +3219,7 @@ export class LobbyManager {
     const totalNominations = this.nominationOrder.length * this.draftRounds;
     if (this.nominationsCompleted >= totalNominations) {
       this.draftStatus = 'completed';
-      logger.info(
+      structuredLogger.info(
         `[lobby] auction completed lobbyId=${this.lobbyId} totalNominations=${totalNominations}`,
       );
     } else {
@@ -3289,7 +3284,7 @@ export class LobbyManager {
     if (this.nominationsCompleted >= totalNominations) {
       this.draftStatus = 'completed';
       this.currentTimerDeadline = null;
-      logger.info(
+      structuredLogger.info(
         `[lobby] auction completed via cascade exhaustion lobbyId=${this.lobbyId}`,
       );
       return;
@@ -3297,7 +3292,7 @@ export class LobbyManager {
 
     // Step 2: active-nomination guard (race resolution).
     if (this.currentNomination !== null) {
-      logger.debug(
+      structuredLogger.debug(
         `[lobby] nomination-window timer fired with active nomination — race lost, no-op lobbyId=${this.lobbyId}`,
       );
       return;
@@ -3306,7 +3301,7 @@ export class LobbyManager {
     // Step 3: determine current nominator.
     const teamCount = this.nominationOrder.length;
     if (teamCount === 0) {
-      logger.error(
+      structuredLogger.error(
         `[lobby] handleNominationWindowTimeout: empty nominationOrder lobbyId=${this.lobbyId}`,
       );
       this.currentTimerDeadline = null;
@@ -3328,9 +3323,9 @@ export class LobbyManager {
         this.auctionAutoNominateStrategies,
       );
     } catch (err) {
-      logger.error(
+      structuredLogger.error(
         `[lobby] auto-nominate strategy threw lobbyId=${this.lobbyId} teamId=${nominatorTeamId}`,
-        err,
+        {}, err,
       );
       // Treat as stuck — clear timer + surface for ops. Chunk 11g.7
       // alerting consumes this log line.
@@ -3393,9 +3388,9 @@ export class LobbyManager {
         clockSeconds: Math.floor(this.bidWindowMs / 1000),
       });
     } catch (err: unknown) {
-      logger.error(
+      structuredLogger.error(
         `[lobby] auto-nominate RPC threw lobbyId=${this.lobbyId} teamId=${nominatorTeamId}`,
-        err,
+        {}, err,
       );
       this.currentTimerDeadline = null;
       return;
@@ -3473,9 +3468,9 @@ export class LobbyManager {
         },
       });
     } catch (err) {
-      logger.error(
+      structuredLogger.error(
         `[lobby] skipNomination RPC threw lobbyId=${this.lobbyId} teamId=${skippedTeamId} reason=${reason}`,
-        err,
+        {}, err,
       );
       this.currentTimerDeadline = null;
       return;
@@ -3503,7 +3498,7 @@ export class LobbyManager {
         payload: event,
       });
 
-      logger.info(
+      structuredLogger.info(
         `[lobby] auction nomination skipped lobbyId=${this.lobbyId} teamId=${skippedTeamId} reason=${reason}`,
       );
 
@@ -3513,7 +3508,7 @@ export class LobbyManager {
       if (this.nominationsCompleted >= totalNominations) {
         this.draftStatus = 'completed';
         this.currentTimerDeadline = null;
-        logger.info(
+        structuredLogger.info(
           `[lobby] auction completed via skip-cascade exhaustion lobbyId=${this.lobbyId}`,
         );
       } else {
@@ -3556,7 +3551,7 @@ export class LobbyManager {
    */
   pauseDraft(): void {
     if (this.pauseState !== null) {
-      logger.debug(`[lobby] pauseDraft on already-paused draft — no-op lobbyId=${this.lobbyId}`);
+      structuredLogger.debug(`[lobby] pauseDraft on already-paused draft — no-op lobbyId=${this.lobbyId}`);
       return;
     }
     if (this.draftStatus !== 'in_progress') {
@@ -3573,7 +3568,7 @@ export class LobbyManager {
     this.pauseState = { pausedAt: now, remainingMs, pausedTimerKind: 'bid_window' };
     this.cancelPickTimer();
     this.currentTimerDeadline = null;
-    logger.info(
+    structuredLogger.info(
       `[lobby] paused lobbyId=${this.lobbyId} remainingMs=${remainingMs}`,
     );
   }
@@ -3594,7 +3589,7 @@ export class LobbyManager {
     this.pauseState = null;
     const newDeadline = new Date(Date.now() + this.pickClockMs);
     this.setPickDeadline(newDeadline);
-    logger.info(
+    structuredLogger.info(
       `[lobby] resumed lobbyId=${this.lobbyId} newDeadline=${newDeadline.toISOString()}`,
     );
   }
@@ -3628,7 +3623,7 @@ export class LobbyManager {
   }): Promise<DraftActionResult> {
     if (!this.initialized) {
       const msg = `[lobby] pauseAuction called before init() lobbyId=${this.lobbyId}`;
-      logger.error(msg);
+      structuredLogger.error(msg);
       throw new Error(msg);
     }
     if (this.format !== 'auction') {
@@ -3642,9 +3637,9 @@ export class LobbyManager {
     const next: Promise<DraftActionResult> = this.queue
       .then(() => this.processPauseAuction(params))
       .catch((err: unknown) => {
-        logger.error(
+        structuredLogger.error(
           `[lobby] pauseAuction queue error lobbyId=${this.lobbyId}`,
-          err,
+          {}, err,
         );
         return { ok: false, reason: 'internal_error' as const };
       });
@@ -3668,7 +3663,7 @@ export class LobbyManager {
   }): Promise<DraftActionResult> {
     if (!this.initialized) {
       const msg = `[lobby] resumeAuction called before init() lobbyId=${this.lobbyId}`;
-      logger.error(msg);
+      structuredLogger.error(msg);
       throw new Error(msg);
     }
     if (this.format !== 'auction') {
@@ -3682,9 +3677,9 @@ export class LobbyManager {
     const next: Promise<DraftActionResult> = this.queue
       .then(() => this.processResumeAuction(params))
       .catch((err: unknown) => {
-        logger.error(
+        structuredLogger.error(
           `[lobby] resumeAuction queue error lobbyId=${this.lobbyId}`,
-          err,
+          {}, err,
         );
         return { ok: false, reason: 'internal_error' as const };
       });
@@ -3721,9 +3716,9 @@ export class LobbyManager {
       if (err instanceof AppError) {
         return { ok: false, reason: this.mapAppErrorToReason(err) };
       }
-      logger.error(
+      structuredLogger.error(
         `[lobby] processPauseAuction: unexpected throw lobbyId=${this.lobbyId}`,
-        err,
+        {}, err,
       );
       return { ok: false, reason: 'internal_error' };
     }
@@ -3776,7 +3771,7 @@ export class LobbyManager {
         payload: event,
       });
 
-      logger.info(
+      structuredLogger.info(
         `[lobby] auction paused lobbyId=${this.lobbyId} remainingMs=${remainingMs}`,
       );
     }
@@ -3809,9 +3804,9 @@ export class LobbyManager {
       if (err instanceof AppError) {
         return { ok: false, reason: this.mapAppErrorToReason(err) };
       }
-      logger.error(
+      structuredLogger.error(
         `[lobby] processResumeAuction: unexpected throw lobbyId=${this.lobbyId}`,
-        err,
+        {}, err,
       );
       return { ok: false, reason: 'internal_error' };
     }
@@ -3874,7 +3869,7 @@ export class LobbyManager {
         payload: event,
       });
 
-      logger.info(
+      structuredLogger.info(
         `[lobby] auction resumed lobbyId=${this.lobbyId} newExpiresAt=${result.new_expires_at ?? 'null'}`,
       );
     }
@@ -3919,7 +3914,7 @@ export class LobbyManager {
   }): Promise<DraftActionResult> {
     if (!this.initialized) {
       const msg = `[lobby] commissionerOverride called before init() lobbyId=${this.lobbyId}`;
-      logger.error(msg);
+      structuredLogger.error(msg);
       throw new Error(msg);
     }
     if (this.format !== 'auction') {
@@ -3933,9 +3928,9 @@ export class LobbyManager {
     const next: Promise<DraftActionResult> = this.queue
       .then(() => this.processCommissionerOverride(params))
       .catch((err: unknown) => {
-        logger.error(
+        structuredLogger.error(
           `[lobby] commissionerOverride queue error lobbyId=${this.lobbyId}`,
-          err,
+          {}, err,
         );
         return { ok: false, reason: 'internal_error' as const };
       });
@@ -3961,14 +3956,14 @@ export class LobbyManager {
         this.leagueId,
       );
     } catch (err) {
-      logger.error(
+      structuredLogger.error(
         `[lobby] verifyCommissionerAuthorization threw lobbyId=${this.lobbyId} userId=${params.commissionerUserId}`,
-        err,
+        {}, err,
       );
       return { ok: false, reason: 'internal_error' };
     }
     if ('reason' in authResult) {
-      logger.info(
+      structuredLogger.info(
         `[lobby] unauthorized commissioner override attempt lobbyId=${this.lobbyId} userId=${params.commissionerUserId} reason=${authResult.reason}`,
       );
       return { ok: false, reason: 'unauthorized' };
@@ -4027,9 +4022,9 @@ export class LobbyManager {
       if (err instanceof AppError) {
         return { ok: false, reason: this.mapAppErrorToReason(err) };
       }
-      logger.error(
+      structuredLogger.error(
         `[lobby] commissionerOverride RPC threw lobbyId=${this.lobbyId} action=${params.action.kind}`,
-        err,
+        {}, err,
       );
       return { ok: false, reason: 'internal_error' };
     }
@@ -4348,6 +4343,6 @@ export class LobbyManager {
     this.shutDown = true;
     this.cancelPickTimer();
     this.currentTimerDeadline = null;
-    logger.info(`[lobby] shutdown lobbyId=${this.lobbyId}`);
+    structuredLogger.info(`[lobby] shutdown lobbyId=${this.lobbyId}`);
   }
 }

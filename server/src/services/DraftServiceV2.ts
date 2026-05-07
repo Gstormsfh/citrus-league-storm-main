@@ -22,7 +22,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { AppError, type ErrorCode } from '../lib/errors';
-import { logger, computePickPayloadHash } from '@citrus/shared';
+import { structuredLogger, computePickPayloadHash } from '@citrus/shared';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -705,7 +705,7 @@ export class DraftServiceV2 {
         .eq('id', opts.eventId)
         .single();
       if (error) {
-        logger.warn('draft_v2.broadcast_fetch_failed', {
+        structuredLogger.warn('draft_v2.broadcast_fetch_failed', {
           event_id: opts.eventId,
           error: error.message,
         });
@@ -713,7 +713,7 @@ export class DraftServiceV2 {
       }
       row = data as unknown as DraftEventRow;
     } catch (err) {
-      logger.warn('draft_v2.broadcast_fetch_threw', {
+      structuredLogger.warn('draft_v2.broadcast_fetch_threw', {
         event_id: opts.eventId,
         err: err instanceof Error ? err.message : String(err),
       });
@@ -755,13 +755,13 @@ export class DraftServiceV2 {
             payload: row,
           });
         } catch (err) {
-          logger.warn('draft_v2.broadcast_send_failed', {
+          structuredLogger.warn('draft_v2.broadcast_send_failed', {
             event_id: opts.eventId,
             err: err instanceof Error ? err.message : String(err),
           });
         }
       } else {
-        logger.warn('draft_v2.broadcast_channel_failed', {
+        structuredLogger.warn('draft_v2.broadcast_channel_failed', {
           event_id: opts.eventId,
           status:   subscribeResult,
         });
@@ -773,13 +773,13 @@ export class DraftServiceV2 {
       try {
         await opts.admin.removeChannel(channel);
       } catch (err) {
-        logger.warn('draft_v2.broadcast_remove_channel_failed', {
+        structuredLogger.warn('draft_v2.broadcast_remove_channel_failed', {
           event_id: opts.eventId,
           err: err instanceof Error ? err.message : String(err),
         });
       }
     } catch (err) {
-      logger.warn('draft_v2.broadcast_channel_failed', {
+      structuredLogger.warn('draft_v2.broadcast_channel_failed', {
         event_id: opts.eventId,
         err: err instanceof Error ? err.message : String(err),
       });

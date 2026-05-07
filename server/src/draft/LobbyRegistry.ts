@@ -40,7 +40,7 @@
 // principles — Principle 1 lobby-id sharding; line 145
 // `Map<lobbyId, LobbyManager>`).
 
-import { logger } from '@citrus/shared';
+import { structuredLogger } from '@citrus/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DraftServiceV2 } from '../services/DraftServiceV2';
 import { LobbyManager } from './LobbyManager';
@@ -358,8 +358,9 @@ export class LobbyRegistry {
       // retry. Otherwise everyone gets the same rejected Promise
       // forever.
       this.lobbies.delete(lobbyId);
-      logger.error(
-        `[registry] lobby construction failed lobbyId=${lobbyId} leagueId=${leagueId}`,
+      structuredLogger.error(
+        'registry.lobby_construction_failed',
+        { lobbyId, leagueId },
         err,
       );
       throw err;
@@ -394,7 +395,7 @@ export class LobbyRegistry {
    */
   remove(lobbyId: string): void {
     if (this.lobbies.delete(lobbyId)) {
-      logger.info(`[registry] lobby removed lobbyId=${lobbyId}`);
+      structuredLogger.info('registry.lobby_removed', { lobbyId });
     }
   }
 

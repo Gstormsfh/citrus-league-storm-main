@@ -64,7 +64,12 @@ if (proxyUrl) {
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import uWS from 'uWebSockets.js';
-import { logger, createConsoleLogger } from '@citrus/shared';
+import {
+  logger,
+  createConsoleLogger,
+  structuredLogger,
+  createConsoleStructuredLogger,
+} from '@citrus/shared';
 import { startUwsServer, type UwsServerHandle } from './uws-server';
 import { LobbyRegistry, type LobbyConfig } from './LobbyRegistry';
 import { DraftServiceV2 } from '../services/DraftServiceV2';
@@ -82,6 +87,11 @@ import {
 
 // Enable real console logging on the server (default logger is silent).
 Object.assign(logger, createConsoleLogger());
+// Chunk 11g.7 sub-step 7a: activate the structured engine-side logger.
+// Default singleton is no-op; this swap makes it emit single-line JSON
+// to stdout (info/debug) and stderr (warn/error). The GCP Cloud
+// Logging Agent on GCE auto-parses the JSON.
+Object.assign(structuredLogger, createConsoleStructuredLogger());
 
 const honoPort = parseInt(process.env.PORT || '3001', 10);
 const wsPort = parseInt(process.env.DRAFT_WS_PORT || '3002', 10);
@@ -98,7 +108,7 @@ const honoServer = serve(
     port: honoPort,
   },
   (info) => {
-    logger.info(`[hono] listening on http://localhost:${info.port}`);
+    structuredLogger.info('hono.listening', { port: info.port });
   },
 );
 
@@ -546,7 +556,7 @@ startUwsServer({ port: wsPort, app: draftApp, lobbyRegistry })
     uwsHandle = handle;
   })
   .catch((err) => {
-    logger.error('[uws] Startup failed:', err);
+    structuredLogger.error('uws.startup_failed', {}, err);
     process.exit(1);
   });
 
@@ -555,7 +565,7 @@ let shuttingDown = false;
 function shutdown(signal: string) {
   if (shuttingDown) return;
   shuttingDown = true;
-  logger.info(`[${signal}] Shutting down both servers...`);
+  structuredLogger.info('shutdown.initiated', { signal });
 
   if (uwsHandle) {
     uwsHandle.close();
@@ -563,12 +573,14 @@ function shutdown(signal: string) {
   }
 
   honoServer.close(() => {
-    logger.info('[hono] server closed. Goodbye.');
+    structuredLogger.info('hono.closed');
     process.exit(0);
   });
 
   setTimeout(() => {
-    logger.error('Forced shutdown after 10s timeout.');
+    structuredLogger.error('shutdown.forced_after_timeout', {
+      timeoutMs: 10_000,
+    });
     process.exit(1);
   }, 10_000).unref();
 }

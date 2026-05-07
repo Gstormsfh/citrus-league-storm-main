@@ -19,7 +19,7 @@
 // any of those without an entry-point refactor.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { logger } from '@citrus/shared';
+import { structuredLogger } from '@citrus/shared';
 
 /** Input to every autopick strategy. */
 export interface AutopickInput {
@@ -102,8 +102,9 @@ export const projectionsStrategy: AutopickStrategy = async ({
     .select('player_id')
     .eq('league_id', leagueId);
   if (draftedErr) {
-    logger.error(
-      `[autopick] projectionsStrategy: failed to read draft_picks_v2 leagueId=${leagueId}`,
+    structuredLogger.error(
+      'autopick.projections.draft_picks_read_failed',
+      { leagueId, message: draftedErr.message ?? null },
       draftedErr,
     );
     return { ok: false, reason: 'no_eligible_players' };
@@ -119,8 +120,9 @@ export const projectionsStrategy: AutopickStrategy = async ({
     .select('player_id, total_projected_points')
     .order('total_projected_points', { ascending: false, nullsFirst: false });
   if (projErr) {
-    logger.error(
-      `[autopick] projectionsStrategy: failed to read player_ros_projections leagueId=${leagueId}`,
+    structuredLogger.error(
+      'autopick.projections.read_failed',
+      { leagueId, message: projErr.message ?? null },
       projErr,
     );
     return { ok: false, reason: 'no_eligible_players' };

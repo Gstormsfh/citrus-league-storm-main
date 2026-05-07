@@ -34,7 +34,7 @@
 // Per ADR-002 §3.4 + §4.2.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { logger } from '@citrus/shared';
+import { structuredLogger } from '@citrus/shared';
 
 /** Input to every auction auto-nominate strategy. */
 export interface AuctionAutoNominateInput {
@@ -134,8 +134,9 @@ export const projectionsAuctionStrategy: AuctionAutoNominateStrategy = async ({
     .select('player_id')
     .eq('league_id', leagueId);
   if (nomErr) {
-    logger.error(
-      `[auction-autonom] projectionsAuctionStrategy: failed to read auction_nominations leagueId=${leagueId}`,
+    structuredLogger.error(
+      'auction.autonominate.nominations_read_failed',
+      { leagueId, message: nomErr.message ?? null },
       nomErr,
     );
     return { ok: false, reason: 'no_eligible_players' };
@@ -154,8 +155,9 @@ export const projectionsAuctionStrategy: AuctionAutoNominateStrategy = async ({
     .order('total_projected_points', { ascending: false, nullsFirst: false })
     .order('player_id', { ascending: true });
   if (projErr) {
-    logger.error(
-      `[auction-autonom] projectionsAuctionStrategy: failed to read player_ros_projections leagueId=${leagueId}`,
+    structuredLogger.error(
+      'auction.autonominate.projections_read_failed',
+      { leagueId, message: projErr.message ?? null },
       projErr,
     );
     return { ok: false, reason: 'no_eligible_players' };
