@@ -135,6 +135,18 @@ import {
 } from './autopickStrategy';
 import { computeMinimumNextBid } from './auctionBidIncrement';
 import {
+  ENGINE_SNAPSHOT_VERSION,
+  deserializeEngineState,
+  findMaxEventSeq,
+  findMinEventSeq,
+  readMostRecentSnapshot,
+  serializeEngineState,
+  validateSnapshotForBootstrap,
+  writeSnapshot,
+  type SnapshotRecord,
+} from './snapshotPersistence';
+import { buildSnapshot } from '../services/snapshotService';
+import {
   selectAuctionAutoNominate,
   type AuctionAutoNominateStrategy,
 } from './auctionAutoNominateStrategy';
@@ -694,6 +706,38 @@ export class LobbyManager {
     | ReadonlyArray<AuctionAutoNominateStrategy>
     | undefined;
 
+  // ── Snapshot persistence (chunk 11g.7 sub-step 7c) ────────────────
+
+  /**
+   * Periodic snapshot timer handle. Fires every
+   * `SNAPSHOT_INTERVAL_MS` (env, default 30000ms). Gated on
+   * `draftStatus !== 'not_started'` AND `pauseState === null` —
+   * snapshot generation skipped during pause (nothing new to
+   * capture; previous snapshot remains current).
+   */
+  private snapshotIntervalHandle: NodeJS.Timeout | null = null;
+
+  /**
+   * Counter for the milestone trigger. Incremented by
+   * `appendEventAndCount` on every runtime event emission; reset to
+   * 0 after each successful snapshot write. Replay-time
+   * `events.append` calls do NOT increment this — replay should
+   * reflect only post-bootstrap activity in the milestone counter.
+   * Persisted in the `engine_state` JSONB so milestone continuity
+   * survives bootstrap.
+   */
+  private eventsSinceLastSnapshot = 0;
+
+  /**
+   * Cadence configuration (env-overridable for tests + tuning).
+   * Tests typically pass `0` for `intervalMs` to disable the
+   * periodic timer and trigger snapshots manually via
+   * `lobby.scheduleSnapshot()` (test-only). Production defaults
+   * land at 30s + 50 events.
+   */
+  private readonly snapshotIntervalMs: number;
+  private readonly snapshotEventMilestone: number;
+
   constructor(opts: LobbyManagerOptions) {
     this.lobbyId = opts.lobbyId;
     this.format = opts.format;
@@ -732,6 +776,16 @@ export class LobbyManager {
     }
     this.nominationWindowMs = opts.auctionNominationWindowSeconds * 1000;
     this.auctionAutoNominateStrategies = opts.auctionAutoNominateStrategies;
+
+    // Chunk 11g.7 sub-step 7c: snapshot cadence configuration.
+    // Tests pass `0` to disable the periodic timer and trigger
+    // snapshots manually via `lobby.scheduleSnapshot()`.
+    const intervalMsEnv = process.env.SNAPSHOT_INTERVAL_MS;
+    this.snapshotIntervalMs =
+      intervalMsEnv !== undefined ? Number(intervalMsEnv) : 30_000;
+    const milestoneEnv = process.env.SNAPSHOT_EVENT_MILESTONE;
+    this.snapshotEventMilestone =
+      milestoneEnv !== undefined ? Number(milestoneEnv) : 50;
 
     // `picksMade`, `draftStatus`, `initialized`, timer state are
     // zero-initialized at the field declaration above. `init()`
@@ -839,6 +893,12 @@ export class LobbyManager {
     ) {
       this.setPickDeadline(this.initialPickDeadline, 'pick');
     }
+
+    // Chunk 11g.7 sub-step 7c: start the periodic snapshot timer
+    // after bootstrap completes. Tests pass SNAPSHOT_INTERVAL_MS=0
+    // to disable the periodic timer; manual triggers via
+    // `scheduleSnapshot()` still work.
+    this.startSnapshotTimer();
 
     structuredLogger.info(
       `[lobby] init complete lobbyId=${this.lobbyId} format=${this.format} picksMade=${this.picksMade} status=${this.draftStatus} bufferSize=${this.events.size()} timerScheduled=${this.currentTimerHandle !== null} activeNomination=${this.currentNomination !== null}`,
@@ -1414,7 +1474,7 @@ export class LobbyManager {
         correlationId: action.idempotencyKey,
         ...(isAutopick ? { isAutopick: true } : {}),
       };
-      this.events.append(event);
+      this.appendEventAndCount(event);
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'event',
@@ -1625,7 +1685,7 @@ export class LobbyManager {
         clockDeadline: expiresAt.toISOString(),
         correlationId: action.idempotencyKey,
       };
-      this.events.append(event);
+      this.appendEventAndCount(event);
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'event',
@@ -1803,7 +1863,7 @@ export class LobbyManager {
         clockDeadline: newExpiresAt.toISOString(),
         correlationId: action.idempotencyKey,
       };
-      this.events.append(bidEvent);
+      this.appendEventAndCount(bidEvent);
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'event',
@@ -1842,7 +1902,7 @@ export class LobbyManager {
           triggeringBidAmount: action.bidAmount,
           correlationId: action.idempotencyKey,
         };
-        this.events.append(extendsEvent);
+        this.appendEventAndCount(extendsEvent);
         this.broadcast({
           v: WIRE_PROTOCOL_VERSION,
           type: 'event',
@@ -1977,7 +2037,443 @@ export class LobbyManager {
     this.seenIdempotencyKeys.set(key, result);
   }
 
-  // ── Step 6b: bootstrap from event log ──────────────────────────────
+  // ── Chunk 11g.7 sub-step 7c — snapshot persistence ────────────────
+
+  /**
+   * Append an event to the ring buffer AND increment the snapshot
+   * milestone counter. **Use this method for runtime event emissions
+   * (action processing).** DO NOT use during bootstrap event-replay
+   * — replay should call `this.events.append` directly so
+   * `eventsSinceLastSnapshot` reflects only post-bootstrap activity.
+   *
+   * Schedules a snapshot if the milestone threshold is reached;
+   * snapshot generation is queue-routed so it serializes against
+   * any in-flight actions.
+   */
+  private appendEventAndCount(event: BufferedDraftEvent): void {
+    this.events.append(event);
+    this.eventsSinceLastSnapshot++;
+    if (
+      this.snapshotEventMilestone > 0 &&
+      this.eventsSinceLastSnapshot >= this.snapshotEventMilestone
+    ) {
+      this.scheduleSnapshot();
+    }
+  }
+
+  /**
+   * Schedule a snapshot generation through the single-writer queue.
+   * Public for tests; production triggers are the periodic timer
+   * (`startSnapshotTimer`), the milestone threshold (via
+   * `appendEventAndCount`), and lifecycle hooks (draft completion /
+   * cancellation).
+   *
+   * Routed through the queue (not a `DraftAction` variant — direct
+   * promise chain like `pauseAuction`) so snapshot generation
+   * serializes against in-flight actions. Snapshot generation
+   * latency (~100ms DB write) contributes to action processing
+   * latency for actions queued during snapshot. At 30s cadence,
+   * this is ~0.3% of wall-clock time (acceptable per Decision Log
+   * 2026-05-07).
+   */
+  scheduleSnapshot(): Promise<void> {
+    const next = this.queue
+      .then(() => this.processSnapshot())
+      .catch((err: unknown) => {
+        structuredLogger.error(
+          'snapshot.persistence.queue_error',
+          { lobbyId: this.lobbyId, leagueId: this.leagueId },
+          err,
+        );
+      });
+    this.queue = next;
+    return next;
+  }
+
+  /**
+   * Snapshot generation logic (queue-routed). Reads the current
+   * max event seq, builds the wire `DraftSnapshot` via 7b's
+   * `buildSnapshot()` helper, captures engine-internal orchestration
+   * fields, validates basic shape, and writes the row + retention
+   * pruning. Skipped during pause (nothing new to capture; previous
+   * snapshot remains current).
+   */
+  private async processSnapshot(): Promise<void> {
+    if (this.shutDown) {
+      return;
+    }
+    if (this.draftStatus === 'not_started') {
+      structuredLogger.debug('snapshot.persistence.skipped_not_started', {
+        lobbyId: this.lobbyId,
+        leagueId: this.leagueId,
+      });
+      return;
+    }
+    if (this.pauseState !== null) {
+      structuredLogger.debug('snapshot.persistence.skipped_paused', {
+        lobbyId: this.lobbyId,
+        leagueId: this.leagueId,
+      });
+      return;
+    }
+
+    structuredLogger.debug('snapshot.persistence.scheduled', {
+      lobbyId: this.lobbyId,
+      leagueId: this.leagueId,
+      eventsSinceLastSnapshot: this.eventsSinceLastSnapshot,
+    });
+
+    let lastAppliedSeq: number;
+    try {
+      lastAppliedSeq = await findMaxEventSeq(this.supabase, this.leagueId);
+    } catch (err) {
+      structuredLogger.error(
+        'snapshot.persistence.max_seq_lookup_failed',
+        { lobbyId: this.lobbyId, leagueId: this.leagueId },
+        err,
+      );
+      return;
+    }
+
+    let snapshot;
+    try {
+      snapshot = await buildSnapshot(this.leagueId, this.supabase);
+    } catch (err) {
+      structuredLogger.error(
+        'snapshot.persistence.build_failed',
+        { lobbyId: this.lobbyId, leagueId: this.leagueId },
+        err,
+      );
+      return;
+    }
+    if (snapshot === null) {
+      structuredLogger.warn('snapshot.persistence.skipped_no_snapshot', {
+        lobbyId: this.lobbyId,
+        leagueId: this.leagueId,
+      });
+      return;
+    }
+
+    const engineState = serializeEngineState({
+      currentTimerKind: this.currentTimerKind,
+      pauseState: this.pauseState,
+      eventsSinceLastSnapshot: this.eventsSinceLastSnapshot,
+    });
+
+    try {
+      await writeSnapshot(this.supabase, {
+        leagueId: this.leagueId,
+        lastAppliedSeq,
+        snapshot,
+        engineState,
+        draftStatus: this.draftStatus,
+      });
+    } catch (err) {
+      // Already logged in writeSnapshot; just swallow + return.
+      void err;
+      return;
+    }
+
+    // Reset the milestone counter on successful write.
+    this.eventsSinceLastSnapshot = 0;
+  }
+
+  /**
+   * Start the periodic snapshot timer. Called by `init()` after
+   * bootstrap completes. Tests pass `SNAPSHOT_INTERVAL_MS=0` to
+   * disable the periodic timer and trigger snapshots manually via
+   * `lobby.scheduleSnapshot()`.
+   */
+  private startSnapshotTimer(): void {
+    if (this.snapshotIntervalMs <= 0) {
+      return;
+    }
+    if (this.snapshotIntervalHandle !== null) {
+      return; // already started
+    }
+    this.snapshotIntervalHandle = setInterval(() => {
+      void this.scheduleSnapshot();
+    }, this.snapshotIntervalMs);
+    // Don't keep the process alive for snapshot timer alone.
+    if (typeof this.snapshotIntervalHandle.unref === 'function') {
+      this.snapshotIntervalHandle.unref();
+    }
+  }
+
+  /**
+   * Stop the periodic snapshot timer. Called from `shutdown()`.
+   */
+  private stopSnapshotTimer(): void {
+    if (this.snapshotIntervalHandle !== null) {
+      clearInterval(this.snapshotIntervalHandle);
+      this.snapshotIntervalHandle = null;
+    }
+  }
+
+  // ── Step 6b + 7c: bootstrap from snapshot + event log ─────────────
+
+  /**
+   * Bootstrap entry point. Chunk 11g.7 sub-step 7c adds a snapshot+
+   * delta optimization in front of the existing full event-log
+   * replay (chunk 11g.4 step 6b):
+   *
+   *   1. Try `readMostRecentSnapshot` for this league.
+   *   2. If a snapshot exists AND validates against
+   *      `validateSnapshotForBootstrap` (engine version match, seq
+   *      sanity, payload + engine_state shape):
+   *      - `applySnapshot` to restore the base state.
+   *      - `listDraftEvents(sinceSeq=snapshot.lastAppliedSeq)` to
+   *        read the delta.
+   *      - Apply each delta event via existing apply-during-replay
+   *        handlers (canonical-replay principle preserved).
+   *   3. If no snapshot OR validation fails → WARN log with
+   *      structured `reason` discriminator + fall back to full
+   *      event-log replay.
+   *
+   * **Belt-and-suspenders preserved**: the full event-replay path
+   * (chunk 11g.4 step 6b's original behavior) remains the canonical
+   * fallback. Snapshot+delta is purely an optimization on top.
+   */
+  private async bootstrap(): Promise<void> {
+    let snapshotRecord: SnapshotRecord | null = null;
+    try {
+      snapshotRecord = await readMostRecentSnapshot(
+        this.supabase,
+        this.leagueId,
+      );
+    } catch (err) {
+      structuredLogger.warn('snapshot.bootstrap.read_failed', {
+        lobbyId: this.lobbyId,
+        leagueId: this.leagueId,
+      });
+      void err; // already logged inside readMostRecentSnapshot
+    }
+
+    if (snapshotRecord) {
+      let maxSeq: number;
+      let minSeq: number;
+      try {
+        maxSeq = await findMaxEventSeq(this.supabase, this.leagueId);
+        minSeq = await findMinEventSeq(this.supabase, this.leagueId);
+      } catch (err) {
+        structuredLogger.warn('snapshot.bootstrap.fallback_full_replay', {
+          lobbyId: this.lobbyId,
+          leagueId: this.leagueId,
+          reason: 'payload_deserialization_failed',
+          details: 'failed to read seq bounds from draft_events',
+        });
+        void err;
+        return this.bootstrapFullEventReplay();
+      }
+
+      const validation = validateSnapshotForBootstrap(
+        snapshotRecord,
+        maxSeq,
+        minSeq,
+      );
+      // Narrow via property-existence (`'reason' in validation`)
+      // rather than via the `ok` discriminator — narrowing on
+      // `validation.ok` is unreliable under server/tsconfig.json's
+      // `strict: false` setting; `in`-based narrowing works in
+      // either mode (same pattern as uws-server.ts verifyDraftToken
+      // handling).
+      if ('reason' in validation) {
+        structuredLogger.warn('snapshot.bootstrap.fallback_full_replay', {
+          lobbyId: this.lobbyId,
+          leagueId: this.leagueId,
+          reason: validation.reason,
+          ...(validation.details !== undefined
+            ? { details: validation.details }
+            : {}),
+        });
+        return this.bootstrapFullEventReplay();
+      }
+
+      // Apply the snapshot's base state.
+      this.applySnapshot(snapshotRecord);
+
+      // Read + replay delta events via existing apply-during-replay
+      // handlers. Canonical-replay principle preserved.
+      let deltaEvents: DraftEventRow[];
+      try {
+        deltaEvents = await this.draftService.listDraftEvents(
+          this.leagueId,
+          snapshotRecord.lastAppliedSeq,
+        );
+      } catch (err) {
+        structuredLogger.error(
+          'snapshot.bootstrap.delta_read_failed',
+          { lobbyId: this.lobbyId, leagueId: this.leagueId },
+          err,
+        );
+        throw err;
+      }
+
+      for (const event of deltaEvents) {
+        this.applyEventDuringBootstrap(event);
+      }
+
+      structuredLogger.info('snapshot.bootstrap.applied', {
+        lobbyId: this.lobbyId,
+        leagueId: this.leagueId,
+        snapshotSeq: snapshotRecord.lastAppliedSeq,
+        deltaEvents: deltaEvents.length,
+      });
+      return;
+    }
+
+    // No snapshot exists — first-deploy scenario. Fall through to
+    // full event-replay (existing chunk 11g.4 step 6b behavior).
+    return this.bootstrapFullEventReplay();
+  }
+
+  /**
+   * Apply a `SnapshotRecord` to engine in-memory state. Restores
+   * format-specific projection fields from the wire snapshot +
+   * orchestration fields from `engineState`. Called by `bootstrap`
+   * before delta-event replay.
+   *
+   * The wire `DraftSnapshot.recentEvents` ring buffer is hydrated
+   * directly into the engine's ring buffer (these are already in
+   * the wire-shape `BufferedDraftEvent` form).
+   */
+  private applySnapshot(record: SnapshotRecord): void {
+    const { snapshot, engineState } = record;
+    const state = snapshot.stateSnapshot;
+
+    // Status — common to both formats.
+    this.draftStatus = state.draftStatus as DraftStatus;
+
+    if (snapshot.format === 'auction') {
+      // Auction projection state.
+      this.nominationsCompleted = state.picksMade;
+      const aux = snapshot.auctionState;
+      if (aux) {
+        // currentNomination — wire shape carries clockDeadline as
+        // ISO string; engine wants a Date.
+        if (aux.currentNomination) {
+          this.currentNomination = {
+            nominationId: aux.currentNomination.nominationId,
+            playerId: aux.currentNomination.playerId,
+            // playerName isn't in AuctionStateSnapshot; recover
+            // empty string (the engine derives display only via
+            // the broadcast event payloads, not this field).
+            playerName: '',
+            nominatorTeamId: aux.currentNomination.nominatorTeamId,
+            leadingBidderId: aux.currentNomination.leadingBidderId,
+            leadingBid: aux.currentNomination.leadingBid,
+            expiresAt: new Date(aux.currentNomination.clockDeadline),
+            timerHandle: null,
+          };
+        }
+        // teamBudgets / teamPlayersWon (note: aux carries
+        // teamRosterSlotsRemaining, which is `draftRounds -
+        // players_won` — invert to recover playersWon).
+        for (const [teamId, budget] of Object.entries(aux.teamBudgets)) {
+          this.teamBudgets.set(teamId, budget);
+        }
+        for (const [teamId, slotsRemaining] of Object.entries(
+          aux.teamRosterSlotsRemaining,
+        )) {
+          this.teamPlayersWon.set(teamId, this.draftRounds - slotsRemaining);
+        }
+      }
+    } else {
+      // Snake/linear projection state.
+      this.picksMade = state.picksMade;
+    }
+
+    // Engine-internal orchestration fields.
+    this.currentTimerKind = engineState.currentTimerKind;
+    this.pauseState = engineState.pauseState;
+    this.eventsSinceLastSnapshot = engineState.eventsSinceLastSnapshot;
+
+    // Hydrate the ring buffer from the snapshot's recentEvents.
+    // These are already in the engine's wire-shape; append directly
+    // (NOT appendEventAndCount — replay shouldn't increment the
+    // milestone counter).
+    for (const event of snapshot.recentEvents) {
+      this.events.append(event);
+    }
+  }
+
+  /**
+   * Dispatch a single durable `DraftEventRow` to the appropriate
+   * apply-during-replay handler. Used by both the snapshot+delta
+   * path (delta events post-snapshot) and the full event-replay
+   * fallback. Mirrors the dispatch switch in
+   * `bootstrapFullEventReplay` but doesn't track aggregate counters
+   * (those are full-replay's diagnostic concern).
+   */
+  private applyEventDuringBootstrap(event: DraftEventRow): void {
+    switch (event.event_type) {
+      case 'pick':
+        this.applyPickEvent(event);
+        break;
+      case 'pick_undone':
+        this.applyPickUndoneEvent(event);
+        break;
+      case 'commissioner_override':
+        this.applyCommissionerOverrideEvent(event);
+        break;
+      case 'draft_completed':
+        this.draftStatus = 'completed';
+        break;
+      case 'draft_cancelled':
+        this.draftStatus = 'cancelled';
+        break;
+      case 'draft_paused':
+        this.pauseState = {
+          pausedAt: new Date(
+            ((event.payload as Record<string, unknown>).paused_at as string) ??
+              event.created_at,
+          ),
+          remainingMs:
+            ((((event.payload as Record<string, unknown>).remaining_seconds as number) ??
+              0) *
+              1000),
+          pausedTimerKind: 'bid_window',
+        };
+        break;
+      case 'draft_resumed':
+        this.pauseState = null;
+        break;
+      case 'auction_nomination_started':
+        this.applyAuctionNominationStartedEvent(event);
+        break;
+      case 'auction_bid_placed':
+        this.applyAuctionBidPlacedEvent(event);
+        break;
+      case 'auction_bid_extends_timer':
+        this.applyAuctionBidExtendsTimerEvent(event);
+        break;
+      case 'auction_nomination_closed':
+        this.applyAuctionNominationClosedEvent(event);
+        break;
+      case 'auction_nomination_expired':
+        this.applyAuctionNominationExpiredEvent(event);
+        break;
+      case 'auction_paused':
+        this.applyAuctionPausedEvent(event);
+        break;
+      case 'auction_resumed':
+        this.applyAuctionResumedEvent(event);
+        break;
+      case 'auction_auto_nominated':
+        this.applyAuctionAutoNominatedEvent(event);
+        break;
+      case 'auction_nomination_skipped':
+        this.applyAuctionNominationSkippedEvent(event);
+        break;
+      case 'auction_commissioner_override':
+        this.applyAuctionCommissionerOverrideEvent(event);
+        break;
+      default:
+        // Forward-compat skip; existing bootstrapFullEventReplay
+        // covers the diagnostic-vs-unknown distinction.
+        break;
+    }
+  }
 
   /**
    * Read the durable event log for this lobby's `leagueId` and
@@ -1985,12 +2481,16 @@ export class LobbyManager {
    * seq contiguity, payload-vs-draftOrder consistency for pick
    * events, and emits typed errors on any inconsistency.
    *
+   * **This is the canonical bootstrap fallback (chunk 11g.4 step 6b).**
+   * Snapshot+delta replay (chunk 11g.7 sub-step 7c) is an optimization
+   * that defers to this path on any snapshot issue.
+   *
    * Performance: typical 12-team × 21-round draft (252 events) is a
    * single index scan on `(league_id, seq)` plus an in-memory walk;
    * end-to-end latency is dominated by the round-trip to Postgres
    * (~10-50ms in production, <1ms in unit tests with mocked service).
    */
-  private async bootstrap(): Promise<void> {
+  private async bootstrapFullEventReplay(): Promise<void> {
     const startTime = Date.now();
 
     let events: DraftEventRow[];
@@ -3180,7 +3680,7 @@ export class LobbyManager {
         totalBids: 1,
         playerId: nomination.playerId,
       };
-      this.events.append(event);
+      this.appendEventAndCount(event);
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'event',
@@ -3200,7 +3700,7 @@ export class LobbyManager {
         nominationId: nomination.nominationId,
         reason: 'no_bids',
       };
-      this.events.append(event);
+      this.appendEventAndCount(event);
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'event',
@@ -3429,7 +3929,7 @@ export class LobbyManager {
         fallbackSource: strategyResult.source,
         correlationId: idemKey,
       };
-      this.events.append(event);
+      this.appendEventAndCount(event);
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'event',
@@ -3488,7 +3988,7 @@ export class LobbyManager {
         skippedTeamId,
         reason,
       };
-      this.events.append(event);
+      this.appendEventAndCount(event);
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'event',
@@ -3761,7 +4261,7 @@ export class LobbyManager {
           : {}),
         pausedTimerKind,
       };
-      this.events.append(event);
+      this.appendEventAndCount(event);
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'event',
@@ -3859,7 +4359,7 @@ export class LobbyManager {
           ? { newClockDeadline: result.new_expires_at }
           : {}),
       };
-      this.events.append(event);
+      this.appendEventAndCount(event);
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'event',
@@ -4042,7 +4542,7 @@ export class LobbyManager {
         newState: result.new_state,
         ...(params.rationale !== undefined ? { rationale: params.rationale } : {}),
       };
-      this.events.append(event);
+      this.appendEventAndCount(event);
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'event',
@@ -4342,6 +4842,7 @@ export class LobbyManager {
     }
     this.shutDown = true;
     this.cancelPickTimer();
+    this.stopSnapshotTimer();
     this.currentTimerDeadline = null;
     structuredLogger.info(`[lobby] shutdown lobbyId=${this.lobbyId}`);
   }
