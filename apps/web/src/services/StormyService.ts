@@ -567,6 +567,27 @@ class StormyServiceImpl {
       }
 
       // Build a human-readable bracket summary
+      // Tightness annotation per series — Stormy uses this to flag risk in
+      // bracket/confidence picks and to weight team longevity in roster pools.
+      const seriesTightness = (s: SeriesRow): { label: string; alive: boolean; needed: number } => {
+        const hi = s.high_seed_wins ?? 0;
+        const lo = s.low_seed_wins ?? 0;
+        const total = hi + lo;
+        if (s.series_status === 'completed') {
+          return { label: 'final', alive: false, needed: 0 };
+        }
+        const gap = Math.abs(hi - lo);
+        const leader = hi > lo ? 'high' : lo > hi ? 'low' : 'tied';
+        const needed = 4 - Math.max(hi, lo); // wins still needed by leader to clinch
+        if (total === 0) return { label: 'not started', alive: true, needed };
+        if (gap >= 3) return { label: `dominant ${hi}-${lo}`, alive: true, needed };
+        if (gap === 2) return { label: `${leader === 'tied' ? '' : leader + ' '}leading ${hi}-${lo}`.trim(), alive: true, needed };
+        // gap is 0 or 1 — tight
+        return { label: `TIGHT ${hi}-${lo}`, alive: true, needed };
+      };
+      const tightnessBySlot = new Map<number, ReturnType<typeof seriesTightness>>();
+      for (const s of series) tightnessBySlot.set(s.bracket_slot, seriesTightness(s));
+
       if (series.length > 0) {
         const seriesLines: string[] = [];
         const byRound = new Map<number, SeriesRow[]>();
@@ -638,13 +659,28 @@ class StormyServiceImpl {
           }
 
           const rosterLines: string[] = [];
+          // Track per-position counts + cumulative scoring inputs for the
+          // roster summary. Stormy uses these to flag underweight positions
+          // and frame "are you on track?" type questions with real numbers.
+          const slotCounts: Record<string, number> = {};
+          let totalGP = 0;
+          let totalGoals = 0;
+          let totalAssists = 0;
+          let totalPoints = 0;
+          let aliveCount = 0;
+          let eliminatedCount = 0;
+
           for (const pick of picks) {
             const p = playerById.get(pick.player_id);
             if (!p) continue;
             const s = statsById.get(pick.player_id);
             const teamAbbrev = p.team_abbrev ?? '?';
             const status = p.status && p.status !== 'ACT' ? ` [${p.status}]` : '';
-            const teamState = eliminated.has(teamAbbrev) ? ' ⚠️ELIMINATED' : '';
+            const isElim = eliminated.has(teamAbbrev);
+            const teamState = isElim ? ' ⚠️ELIMINATED' : (teamAbbrevAlive.has(teamAbbrev) ? ' ✓ALIVE' : '');
+            if (isElim) eliminatedCount++;
+            else if (teamAbbrevAlive.has(teamAbbrev)) aliveCount++;
+            slotCounts[pick.position_slot] = (slotCounts[pick.position_slot] ?? 0) + 1;
 
             let line = `${pick.position_slot} ${p.full_name} (${teamAbbrev})${status}${teamState}`;
             if (s) {
@@ -655,6 +691,10 @@ class StormyServiceImpl {
                 const ppg = ((s.points ?? 0) / s.games_played).toFixed(2);
                 line += ` (${ppg}PPG) ${s.shots ?? 0}SOG ${s.hits ?? 0}HIT ${s.blocks ?? 0}BLK`;
                 if ((s.ppp ?? 0) > 0) line += ` ${s.ppp}PPP`;
+                totalGP += s.games_played ?? 0;
+                totalGoals += s.goals ?? 0;
+                totalAssists += s.assists ?? 0;
+                totalPoints += s.points ?? 0;
               } else {
                 line += ` — 0GP (has not played yet)`;
               }
@@ -663,7 +703,68 @@ class StormyServiceImpl {
             }
             rosterLines.push(line);
           }
-          ctx.rosterSummary = `YOUR PLAYOFF ROSTER (${picks.length} players) — playoff-only stats:\n` + rosterLines.join('\n');
+
+          // Per-position balance + roster totals header
+          const balanceParts = Object.entries(slotCounts)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([slot, n]) => `${n}${slot}`);
+          const balance = balanceParts.join('/');
+          const headerStats = `${picks.length} players (${balance}) · ${aliveCount} alive · ${eliminatedCount} eliminated · totals so far: ${totalPoints}PTS (${totalGoals}G ${totalAssists}A across ${totalGP} skater GP)`;
+
+          ctx.rosterSummary = `YOUR PLAYOFF ROSTER — ${headerStats}\n` + rosterLines.join('\n');
+
+          // ── Top unrostered playoff scorers on still-alive teams ─────────
+          // Stormy's #1 advice in roster pools is "swap a cold/eliminated
+          // player for an under-the-radar hot scorer." Provide that list
+          // pre-computed so Stormy can name actual players, not vague advice.
+          try {
+            const { data: topData } = await sb
+              .from('player_playoff_stats')
+              .select('player_id, games_played, goals, assists, points, ppp, shots, hits, blocks, is_goalie, team_abbrev')
+              .gt('games_played', 1)
+              .order('points', { ascending: false })
+              .limit(80);
+            const topRows = (topData ?? []) as Array<PlayoffStatRow & { team_abbrev: string | null }>;
+
+            // Filter: not already rostered, alive team only.
+            const ownedIds = new Set(picks.map(pk => pk.player_id));
+            const candidates = topRows.filter(r => {
+              if (ownedIds.has(r.player_id)) return false;
+              const ta = r.team_abbrev ?? '';
+              return teamAbbrevAlive.has(ta);
+            });
+            // Re-rank by PPG (a 4-game player at 1.5 PPG is more interesting
+            // than an 8-game player at 0.8 PPG, even if total points look similar).
+            const ranked = candidates
+              .map(r => ({ row: r, ppg: (r.points ?? 0) / Math.max(1, r.games_played ?? 1) }))
+              .sort((a, b) => b.ppg - a.ppg)
+              .slice(0, 10);
+
+            if (ranked.length > 0) {
+              const namesRes = await sb
+                .from('player_directory')
+                .select('player_id, full_name, position')
+                .in('player_id', ranked.map(x => x.row.player_id));
+              const dir = (namesRes.data ?? []) as Array<{ player_id: number; full_name: string; position: string | null }>;
+              const dirById = new Map<number, { full_name: string; position: string | null }>();
+              for (const d of dir) dirById.set(d.player_id, { full_name: d.full_name, position: d.position });
+
+              const hotLines = ranked.map(({ row, ppg }) => {
+                const meta = dirById.get(row.player_id);
+                const nm = meta?.full_name ?? `Player ${row.player_id}`;
+                const pos = meta?.position ?? '?';
+                const ta = row.team_abbrev ?? '?';
+                if (row.is_goalie) {
+                  return `  ${nm} (${ta}, G) — ${row.games_played}GP ${row.wins ?? 0}W ${row.saves ?? 0}SV ${row.shutouts ?? 0}SO`;
+                }
+                return `  ${nm} (${ta}, ${pos}) — ${row.games_played}GP ${row.points ?? 0}PTS (${ppg.toFixed(2)}PPG) ${row.shots ?? 0}SOG ${row.hits ?? 0}HIT ${row.blocks ?? 0}BLK`;
+              });
+              ctx.extra = (ctx.extra ? ctx.extra + '\n\n' : '') +
+                `TOP UNROSTERED PLAYOFF SCORERS (alive teams, sorted by PPG, min 2 GP):\n${hotLines.join('\n')}`;
+            }
+          } catch {
+            // Hot-scorers list is best-effort — failure here doesn't block the rest.
+          }
         } else {
           ctx.rosterSummary = `User has NOT picked their playoff roster yet. Encourage them to build one.`;
         }
@@ -692,6 +793,21 @@ class StormyServiceImpl {
             if (s && s.series_status === 'completed') {
               const correct = p.is_correct ? '✓' : '✗';
               line += ` [${correct} — ${p.points_earned ?? 0} pts]`;
+            } else if (s) {
+              // Active or pending — annotate live tightness so Stormy can flag at-risk picks.
+              const t = tightnessBySlot.get(p.series_slot);
+              if (t) {
+                // If user's pick is currently TRAILING, flag it explicitly.
+                const userPickIsHigh = p.picked_team_id === s.high_seed_team_id;
+                const hi = s.high_seed_wins ?? 0;
+                const lo = s.low_seed_wins ?? 0;
+                let riskTag = `[${t.label}]`;
+                if (t.label !== 'final' && t.label !== 'not started') {
+                  const userTrailing = userPickIsHigh ? hi < lo : lo < hi;
+                  if (userTrailing) riskTag = `[⚠️ AT RISK — ${t.label}]`;
+                }
+                line += ` ${riskTag}`;
+              }
             }
             pickLines.push(line);
           }
@@ -716,15 +832,39 @@ class StormyServiceImpl {
         }>;
 
         if (picks.length > 0) {
+          // Confidence values are 1..N — N is the count of picks (typically 15).
+          // Anything in the top third of the range is "high confidence" and
+          // therefore expensive if it busts.
+          const highConfThreshold = Math.ceil(picks.length * 0.66);
           const pickLines: string[] = [];
           for (const p of picks) {
+            const s = series.find(x => x.bracket_slot === p.series_slot);
             const pickedAbbrev = p.picked_team_id ? teamById.get(p.picked_team_id)?.abbreviation ?? `#${p.picked_team_id}` : 'TBD';
             let line = `  Series ${p.series_slot}: ${pickedAbbrev} @ confidence ${p.confidence_value}`;
-            if (p.is_correct === true) line += ` ✓ (${p.points_earned ?? 0} pts)`;
-            else if (p.is_correct === false) line += ` ✗`;
+            if (p.is_correct === true) {
+              line += ` ✓ (${p.points_earned ?? 0} pts)`;
+            } else if (p.is_correct === false) {
+              line += ` ✗`;
+            } else if (s) {
+              const t = tightnessBySlot.get(p.series_slot);
+              if (t) {
+                const userPickIsHigh = p.picked_team_id === s.high_seed_team_id;
+                const hi = s.high_seed_wins ?? 0;
+                const lo = s.low_seed_wins ?? 0;
+                const userTrailing = userPickIsHigh ? hi < lo : lo < hi;
+                const isHighConf = p.confidence_value >= highConfThreshold;
+                if (t.label !== 'final' && t.label !== 'not started' && userTrailing && isHighConf) {
+                  line += ` [🚨 HIGH-CONF AT RISK — ${t.label}]`;
+                } else if (t.label.startsWith('TIGHT') && isHighConf) {
+                  line += ` [⚠️ HIGH-CONF in tight series — ${t.label}]`;
+                } else if (t.label !== 'final' && t.label !== 'not started') {
+                  line += ` [${t.label}]`;
+                }
+              }
+            }
             pickLines.push(line);
           }
-          ctx.rosterSummary = `YOUR CONFIDENCE PICKS (1-${picks.length}):\n${pickLines.join('\n')}`;
+          ctx.rosterSummary = `YOUR CONFIDENCE PICKS (sorted high→low, total ${picks.length}):\n${pickLines.join('\n')}`;
         } else {
           ctx.rosterSummary = `User has NOT submitted confidence picks yet.`;
         }
