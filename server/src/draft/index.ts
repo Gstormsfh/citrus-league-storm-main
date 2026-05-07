@@ -169,7 +169,15 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
     throw new Error(`league ${leagueId} not found`);
   }
   const settings = leagueRow.settings as
-    | { draftType?: string; pickTimeLimit?: number }
+    | {
+        draftType?: string;
+        pickTimeLimit?: number;
+        auctionNominationTime?: number;
+        auctionBudget?: number;
+        auctionMinBid?: number;
+        rosterSize?: number;
+        draftRounds?: number;
+      }
     | null;
   const draftType = settings?.draftType;
   if (draftType !== 'snake' && draftType !== 'linear' && draftType !== 'auction') {
@@ -180,9 +188,20 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
   }
   const format: DraftFormat = draftType;
 
-  // pickClockSeconds = pickTimeLimit + 1 (RPC pad). Default 90 + 1 = 91.
+  // For snake/linear: pickClockSeconds = pickTimeLimit + 1 (RPC pad).
+  // For auction (chunk 11g.6 sub-step 6a): the bid window uses
+  // `auctionNominationTime + 1`. Default 30s bid window matches the
+  // existing v1 LeagueFormatSettings default. The ADR-002 §3.4
+  // nomination-window/bid-window split is 6c work; until then a
+  // single value covers both paths.
   const pickTimeLimit =
-    typeof settings?.pickTimeLimit === 'number' ? settings.pickTimeLimit : 90;
+    format === 'auction'
+      ? typeof settings?.auctionNominationTime === 'number'
+        ? settings.auctionNominationTime
+        : 30
+      : typeof settings?.pickTimeLimit === 'number'
+        ? settings.pickTimeLimit
+        : 90;
   const pickClockSeconds = pickTimeLimit + 1;
 
   const initialPickDeadline = leagueRow.pick_deadline
@@ -193,14 +212,19 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
   // Auction lobbies have no slot-based order — chunk 11g.6 / ADR-002
   // owns auction state. Return empty draftOrder so the LobbyManager's
   // `processSubmitPick` short-circuits at the format gate before
-  // consulting the (intentionally empty) order.
+  // consulting the (intentionally empty) order. Round-1 `team_order`
+  // from `draft_order` provides the round-robin nomination rotation
+  // (per ADR-002 §3.2 + v1 AuctionService); auction_budgets feeds the
+  // initial budget/playersWon maps.
   if (format === 'auction') {
+    const auctionConfig = await loadAuctionConfig(leagueId, settings);
     return {
       format,
       draftOrder: [],
       pickClockSeconds,
       initialPickDeadline,
       initialDraftState,
+      ...auctionConfig,
     };
   }
 
@@ -253,6 +277,140 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
     pickClockSeconds,
     initialPickDeadline,
     initialDraftState,
+    // Snake/linear lobbies do not use auction state. Empty/zero
+    // values keep `LobbyConfig` discriminator-free at the type level
+    // while letting `LobbyManager` short-circuit on `format`.
+    nominationOrder: [],
+    auctionBudget: 0,
+    auctionMinBid: 0,
+    draftRounds: 0,
+    initialTeamBudgets: new Map(),
+    initialPlayersWon: new Map(),
+    initialActiveNomination: null,
+  };
+}
+
+/**
+ * Auction-only `lobbyConfigLookup` extension (chunk 11g.6 sub-step
+ * 6a). Returns the auction subset of `LobbyConfig`:
+ *
+ *   - `nominationOrder`: round-1 `team_order` from `draft_order`.
+ *     This is the round-robin rotation per ADR-002 §3.2; it matches
+ *     v1 `AuctionService`'s `nomination_order` semantics so a
+ *     mid-draft handover from v1 to the engine is order-preserving.
+ *   - `auctionBudget` / `auctionMinBid` / `draftRounds`: from
+ *     `leagues.settings` (with ADR-002 §4.3 defaults).
+ *   - `initialTeamBudgets` / `initialPlayersWon`: hydrated from the
+ *     existing `auction_budgets` table (canonical per recon — this
+ *     replaces the brief's proposal to add a `teams.budget_remaining`
+ *     column).
+ *   - `initialActiveNomination`: most-recent open row from
+ *     `auction_nominations`, used for diagnostic logging during
+ *     bootstrap. The authoritative replay path rebuilds
+ *     `currentNomination` from `draft_events`, so this field is
+ *     informational; init log emits a warning if it disagrees with
+ *     the replayed state.
+ */
+async function loadAuctionConfig(
+  leagueId: string,
+  settings:
+    | {
+        auctionBudget?: number;
+        auctionMinBid?: number;
+        rosterSize?: number;
+        draftRounds?: number;
+      }
+    | null,
+): Promise<{
+  nominationOrder: string[];
+  auctionBudget: number;
+  auctionMinBid: number;
+  draftRounds: number;
+  initialTeamBudgets: Map<string, number>;
+  initialPlayersWon: Map<string, number>;
+  initialActiveNomination: LobbyConfig['initialActiveNomination'];
+}> {
+  const auctionBudget =
+    typeof settings?.auctionBudget === 'number' ? settings.auctionBudget : 200;
+  const auctionMinBid =
+    typeof settings?.auctionMinBid === 'number' ? settings.auctionMinBid : 1;
+  const draftRounds =
+    typeof settings?.draftRounds === 'number'
+      ? settings.draftRounds
+      : typeof settings?.rosterSize === 'number'
+        ? settings.rosterSize
+        : 0;
+
+  const { data: round1, error: round1Err } = await supabaseAdmin
+    .from('draft_order')
+    .select('team_order')
+    .eq('league_id', leagueId)
+    .eq('round_number', 1)
+    .single();
+  if (round1Err) {
+    throw new Error(
+      `auction draftOrderLookup failed for ${leagueId}: ${round1Err.message}`,
+    );
+  }
+  if (!round1 || !Array.isArray(round1.team_order)) {
+    throw new Error(
+      `league ${leagueId} round-1 team_order missing or not an array`,
+    );
+  }
+  const nominationOrder: string[] = [];
+  for (const teamId of round1.team_order as unknown[]) {
+    if (typeof teamId !== 'string') {
+      throw new Error(
+        `league ${leagueId} round-1 team_order contains non-string entry`,
+      );
+    }
+    nominationOrder.push(teamId);
+  }
+
+  const { data: budgetRows, error: budgetErr } = await supabaseAdmin
+    .from('auction_budgets')
+    .select('team_id, remaining_budget, players_won')
+    .eq('league_id', leagueId);
+  if (budgetErr) {
+    throw new Error(
+      `auction_budgets lookup failed for ${leagueId}: ${budgetErr.message}`,
+    );
+  }
+  const initialTeamBudgets = new Map<string, number>();
+  const initialPlayersWon = new Map<string, number>();
+  for (const row of budgetRows ?? []) {
+    initialTeamBudgets.set(row.team_id as string, Number(row.remaining_budget));
+    initialPlayersWon.set(row.team_id as string, Number(row.players_won));
+  }
+
+  // Active nomination (informational; replay is authoritative).
+  const { data: activeNom } = await supabaseAdmin
+    .from('auction_nominations')
+    .select('id, player_id, nominator_team_id, leading_bidder_id, leading_bid, expires_at')
+    .eq('league_id', leagueId)
+    .eq('status', 'active')
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const initialActiveNomination = activeNom
+    ? {
+        nominationId: String(activeNom.id),
+        playerId: String(activeNom.player_id),
+        nominatorTeamId: String(activeNom.nominator_team_id),
+        leadingBidderId: String(activeNom.leading_bidder_id),
+        leadingBid: Number(activeNom.leading_bid),
+        expiresAt: new Date(activeNom.expires_at as string),
+      }
+    : null;
+
+  return {
+    nominationOrder,
+    auctionBudget,
+    auctionMinBid,
+    draftRounds,
+    initialTeamBudgets,
+    initialPlayersWon,
+    initialActiveNomination,
   };
 }
 

@@ -60,12 +60,24 @@ function makeStubSupabase(): SupabaseClient {
  * Default LobbyConfig for tests that don't care about
  * pickClockSeconds / initialPickDeadline / initialDraftState.
  */
+/** Default auction-specific fields, spread onto inline mocks below. */
+const AUCTION_FIELDS_EMPTY = {
+  nominationOrder: [] as ReadonlyArray<string>,
+  auctionBudget: 0,
+  auctionMinBid: 0,
+  draftRounds: 0,
+  initialTeamBudgets: new Map<string, number>(),
+  initialPlayersWon: new Map<string, number>(),
+  initialActiveNomination: null,
+};
+
 const DEFAULT_LOBBY_CONFIG: LobbyConfig = {
   format: 'snake',
   draftOrder: DEFAULT_DRAFT_ORDER,
   pickClockSeconds: 91,
   initialPickDeadline: null,
   initialDraftState: null,
+  ...AUCTION_FIELDS_EMPTY,
 };
 
 function makeRegistry(opts: MakeRegistryOpts = {}) {
@@ -158,6 +170,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
         pickClockSeconds: 91,
         initialPickDeadline: null,
         initialDraftState: null,
+        ...AUCTION_FIELDS_EMPTY,
       };
     });
     const { registry } = makeRegistry({ lobbyConfigLookup });
@@ -188,6 +201,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
               pickClockSeconds: 91,
               initialPickDeadline: null,
               initialDraftState: null,
+              ...AUCTION_FIELDS_EMPTY,
             }),
             5,
           ),
@@ -224,6 +238,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
               pickClockSeconds: 91,
               initialPickDeadline: null,
               initialDraftState: null,
+              ...AUCTION_FIELDS_EMPTY,
             }),
             20,
           ),
@@ -269,6 +284,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
       pickClockSeconds: 91,
       initialPickDeadline: null,
       initialDraftState: null,
+      ...AUCTION_FIELDS_EMPTY,
     }));
     const registry = new LobbyRegistry({
       draftService,
@@ -314,6 +330,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
       pickClockSeconds: 91,
       initialPickDeadline: null,
       initialDraftState: null,
+      ...AUCTION_FIELDS_EMPTY,
     }));
     const registry = new LobbyRegistry({
       draftService,
@@ -349,6 +366,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
       pickClockSeconds: 91,
       initialPickDeadline: null,
       initialDraftState: null,
+      ...AUCTION_FIELDS_EMPTY,
     }));
     const { registry } = makeRegistry({ lobbyConfigLookup });
 
@@ -381,6 +399,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
       pickClockSeconds: 91,
       initialPickDeadline: null,
       initialDraftState: null,
+      ...AUCTION_FIELDS_EMPTY,
     }));
     const registry = new LobbyRegistry({
       draftService,
@@ -431,6 +450,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
       pickClockSeconds: 91,
       initialPickDeadline: null,
       initialDraftState: null,
+      ...AUCTION_FIELDS_EMPTY,
     }));
     const registry = new LobbyRegistry({
       draftService,
@@ -468,6 +488,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
       pickClockSeconds: 121, // custom value (120s + 1s pad)
       initialPickDeadline: initialDeadline,
       initialDraftState: 'active',
+      ...AUCTION_FIELDS_EMPTY,
     }));
     const { registry } = makeRegistry({ lobbyConfigLookup });
 

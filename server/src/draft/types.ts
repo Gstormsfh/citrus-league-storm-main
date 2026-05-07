@@ -119,18 +119,45 @@ export type DraftAction =
       actorKind?: 'user' | 'autopick';
     }
   | {
+      /**
+       * Auction nomination — chunk 11g.6 sub-step 6a. The nominator
+       * proposes a player at an opening bid; the engine starts the
+       * bid window on success.
+       *
+       * `playerId` is wire-format string (matches auction's TEXT
+       * `auction_nominations.player_id` column, distinct from
+       * snake/linear's int `draft_picks_v2.player_id`).
+       *
+       * `playerName` is captured at the action layer so the engine
+       * can write the canonical player name to
+       * `auction_nominations.player_name` without an extra DB
+       * lookup. Client provides this from its player-pool view.
+       */
+      kind: 'nominate';
+      teamId: string;
+      playerId: string;
+      playerName: string;
+      openingBid: number;
+      userId: string;
+      sessionId: string;
+      idempotencyKey: string;
+      actorKind?: 'user' | 'autopick';
+    }
+  | {
+      /**
+       * Auction bid placement — chunk 11g.6 sub-step 6a. Bid must
+       * be strictly greater than the current leading bid and meet
+       * the minimum-increment rule (flat $1 in 6a; tiered increments
+       * 6c). Engine validates budget reserve before calling RPC.
+       */
       kind: 'place_bid';
       teamId: string;
       nominationId: string;
       bidAmount: number;
+      userId: string;
+      sessionId: string;
       idempotencyKey: string;
-    }
-  | {
-      kind: 'nominate';
-      teamId: string;
-      playerId: string;
-      openingBid: number;
-      idempotencyKey: string;
+      actorKind?: 'user' | 'autopick';
     };
 
 /**
@@ -169,7 +196,13 @@ export type DraftActionResult =
         | 'idempotency_conflict'
         | 'unauthorized'
         | 'invalid_state'
-        | 'invalid_payload';
+        | 'invalid_payload'
+        // Auction-specific rejection reasons (chunk 11g.6 sub-step 6a).
+        | 'nomination_already_active'
+        | 'no_active_nomination'
+        | 'bid_too_low'
+        | 'bid_increment_violation'
+        | 'insufficient_budget';
     };
 
 /**
@@ -261,11 +294,13 @@ export type TeamAuthorizationResult =
     };
 
 /**
- * `DraftSnapshot` lives in `@citrus/shared` (chunk 11g.5a moved
- * cross-boundary types). Re-exported here so existing server
- * imports keep working without churn.
+ * `DraftSnapshot` and `AuctionStateSnapshot` live in
+ * `@citrus/shared` (chunk 11g.5a moved cross-boundary types;
+ * chunk 11g.6 sub-step 6a added `AuctionStateSnapshot`).
+ * Re-exported here so existing server imports keep working
+ * without churn.
  */
-export type { DraftSnapshot } from '@citrus/shared';
+export type { DraftSnapshot, AuctionStateSnapshot } from '@citrus/shared';
 
 // ── Wire protocol (chunk 11g.5a moved to @citrus/shared) ───────────
 //

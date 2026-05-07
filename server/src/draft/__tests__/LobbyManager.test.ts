@@ -53,6 +53,10 @@ interface MakeLobbyOpts
    * pass their own mock returning an array of `DraftEventRow`s.
    */
   listDraftEvents?: (leagueId: string, sinceSeq?: number) => Promise<DraftEventRow[]>;
+  /** Chunk 11g.6 6a: auction RPC stubs. */
+  nominatePlayer?: (params: unknown) => Promise<unknown>;
+  placeBid?: (params: unknown) => Promise<unknown>;
+  closeNomination?: (params: unknown) => Promise<unknown>;
   publish?: (topic: string, message: string) => void;
   verifyTeamAuthorization?: (
     userId: string,
@@ -119,7 +123,40 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
   } satisfies SubmitPickResult);
   const listDraftEvents = opts.listDraftEvents ?? vi.fn(async () => [] as DraftEventRow[]);
 
-  const draftService = { submitPick, listDraftEvents } as unknown as DraftServiceV2;
+  const nominatePlayer =
+    opts.nominatePlayer ??
+    vi.fn(async () => ({
+      event_id: 1,
+      seq: 1,
+      nomination_id: 'nom-1',
+      clock_deadline: new Date(Date.now() + 91_000).toISOString(),
+      was_duplicate: false,
+    }));
+  const placeBid =
+    opts.placeBid ??
+    vi.fn(async () => ({
+      event_id: 2,
+      seq: 2,
+      clock_deadline: new Date(Date.now() + 91_000).toISOString(),
+      was_duplicate: false,
+    }));
+  const closeNomination =
+    opts.closeNomination ??
+    vi.fn(async () => ({
+      event_id: 3,
+      seq: 3,
+      event_type: 'auction_nomination_closed' as const,
+      no_sale: false,
+      was_duplicate: false,
+    }));
+
+  const draftService = {
+    submitPick,
+    listDraftEvents,
+    nominatePlayer,
+    placeBid,
+    closeNomination,
+  } as unknown as DraftServiceV2;
   const publish = opts.publish ?? vi.fn();
   const verifyTeamAuthorization = opts.verifyTeamAuthorization ?? ALLOW_ALL_AUTH;
   // Default draftOrder matches the existing default teamIds — pre-step-6a
@@ -142,6 +179,16 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
     initialPickDeadline: opts.initialPickDeadline ?? null,
     initialDraftState: opts.initialDraftState ?? null,
     autopickStrategies: opts.autopickStrategies,
+    // Auction-specific (chunk 11g.6 sub-step 6a). Tests that exercise
+    // auction handlers pass these via opts; snake/linear tests get
+    // the empty defaults below (LobbyManager short-circuits on format).
+    nominationOrder: opts.nominationOrder ?? [],
+    auctionBudget: opts.auctionBudget ?? 0,
+    auctionMinBid: opts.auctionMinBid ?? 0,
+    draftRounds: opts.draftRounds ?? 0,
+    initialTeamBudgets: opts.initialTeamBudgets ?? new Map(),
+    initialPlayersWon: opts.initialPlayersWon ?? new Map(),
+    initialActiveNomination: opts.initialActiveNomination ?? null,
   });
 }
 
@@ -481,29 +528,10 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     expect(submitPick).not.toHaveBeenCalled();
   });
 
-  it('place_bid returns not_yet_implemented_chunk_11g6 (auction stub)', async () => {
-    const lobby = await makeLobby({ format: 'auction' });
-    const result = await lobby.enqueueAction({
-      kind: 'place_bid',
-      teamId: 'team-1',
-      nominationId: 'nom-1',
-      bidAmount: 25,
-      idempotencyKey: 'idem-bid-1',
-    });
-    expect(result).toEqual({ ok: false, reason: 'not_yet_implemented_chunk_11g6' });
-  });
-
-  it('nominate returns not_yet_implemented_chunk_11g6 (auction stub)', async () => {
-    const lobby = await makeLobby({ format: 'auction' });
-    const result = await lobby.enqueueAction({
-      kind: 'nominate',
-      teamId: 'team-1',
-      playerId: '8478402',
-      openingBid: 1,
-      idempotencyKey: 'idem-nom-1',
-    });
-    expect(result).toEqual({ ok: false, reason: 'not_yet_implemented_chunk_11g6' });
-  });
+  // Step-2's `place_bid` / `nominate` `not_yet_implemented_chunk_11g6`
+  // stub tests were deleted in chunk 11g.6 sub-step 6a — those
+  // handlers are real now. The new auction test suite at the bottom
+  // of this file covers the production behavior.
 
   it('maps RPC AppError messages to typed rejection reasons', async () => {
     const submitPick = vi.fn().mockRejectedValue(
@@ -819,26 +847,10 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     expect(publish).not.toHaveBeenCalled();
   });
 
-  it('auction action stubs (place_bid, nominate) do NOT broadcast', async () => {
-    const publish = vi.fn();
-    const lobby = await makeLobby({ format: 'auction', publish });
-
-    await lobby.enqueueAction({
-      kind: 'place_bid',
-      teamId: 'team-1',
-      nominationId: 'nom-1',
-      bidAmount: 25,
-      idempotencyKey: 'idem-bid-stub-1',
-    });
-    await lobby.enqueueAction({
-      kind: 'nominate',
-      teamId: 'team-1',
-      playerId: '8478402',
-      openingBid: 1,
-      idempotencyKey: 'idem-nom-stub-1',
-    });
-    expect(publish).not.toHaveBeenCalled();
-  });
+  // The pre-6a "auction action stubs do NOT broadcast" test was
+  // deleted in chunk 11g.6 sub-step 6a — auction handlers are real
+  // and broadcast successfully on success path. The auction test
+  // suite at the bottom of this file covers the new behavior.
 
   it('addConnection sends a snapshot message to the new ws via ws.send', async () => {
     const publish = vi.fn();
@@ -1594,30 +1606,11 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     ).rejects.toThrow(/enqueueAction called before init\(\)/);
   });
 
-  it('bootstrap skips auction events with a log entry (forward-compat for chunk 11g.6)', async () => {
-    // Auction events aren't in the shipping CHECK enum yet — they hit
-    // the bootstrap's `default:` branch and emit a warn. Mix one
-    // pick event with auction events to verify the pick is processed
-    // and the auction events are skipped.
-    const listDraftEvents = vi.fn(async () => [
-      makePickRow({ seq: 1, teamId: 'team-1', pickNumber: 1, round: 1 }),
-      makeEventRow({
-        seq: 2,
-        event_type: 'auction_bid_placed',
-        payload: { bid_amount: 25 },
-      }),
-      makeEventRow({
-        seq: 3,
-        event_type: 'auction_nomination_started',
-        payload: { player_id: 8478001 },
-      }),
-    ]);
-
-    const lobby = await makeLobby({ listDraftEvents });
-
-    // picksMade is 1 (only the real pick advanced state).
-    expect(lobby.getCurrentState().picksMade).toBe(1);
-  });
+  // The pre-6a "bootstrap skips auction events" forward-compat test
+  // was deleted in chunk 11g.6 sub-step 6a — auction event types
+  // are now first-class bootstrap handlers (not warn-and-skip).
+  // The new auction test suite at the bottom of this file covers
+  // the dedicated replay paths.
 
   it('bootstrap skips unknown event_type with warn', async () => {
     const listDraftEvents = vi.fn(async () => [
@@ -2446,5 +2439,376 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     const lobby = await makeLobby({ format: 'snake' });
     await lobby.shutdown();
     await expect(lobby.shutdown()).resolves.toBeUndefined();
+  });
+
+  // ── Chunk 11g.6 sub-step 6a — auction handlers ─────────────────────
+  //
+  // Auction format brings two new actions (`nominate`, `place_bid`),
+  // a new timer-fired path (`handleNominationTimeout` →
+  // `closeNomination`), and four new bootstrap event handlers
+  // (`auction_nomination_started`, `auction_bid_placed`,
+  // `auction_nomination_closed`, `auction_nomination_expired`).
+  //
+  // Anti-snipe extension semantics (ADR-002 §3.3) are deferred to
+  // sub-step 6b — these tests assert that bids do NOT extend the
+  // bid window in 6a.
+
+  /** Auction-lobby helper: 3 teams × 2 rounds = 6 nominations, $200 budget. */
+  function auctionLobbyOpts(extra: Partial<MakeLobbyOpts> = {}): MakeLobbyOpts {
+    const teams = ['team-1', 'team-2', 'team-3'];
+    return {
+      format: 'auction',
+      draftOrder: [],
+      nominationOrder: teams,
+      auctionBudget: 200,
+      auctionMinBid: 1,
+      draftRounds: 2,
+      pickClockSeconds: 31, // 30s bid window + 1s pad
+      initialTeamBudgets: new Map(teams.map((t) => [t, 200])),
+      initialPlayersWon: new Map(teams.map((t) => [t, 0])),
+      ...extra,
+    };
+  }
+
+  function nominateAction(extra: Partial<Extract<DraftAction, { kind: 'nominate' }>> = {}): Extract<DraftAction, { kind: 'nominate' }> {
+    return {
+      kind: 'nominate',
+      teamId: 'team-1',
+      playerId: '8478402',
+      playerName: 'Connor McDavid',
+      openingBid: 1,
+      userId: 'user-1',
+      sessionId: 'sess-1',
+      idempotencyKey: 'idem-nom-1',
+      ...extra,
+    };
+  }
+
+  function bidAction(extra: Partial<Extract<DraftAction, { kind: 'place_bid' }>> = {}): Extract<DraftAction, { kind: 'place_bid' }> {
+    return {
+      kind: 'place_bid',
+      teamId: 'team-2',
+      nominationId: 'nom-1',
+      bidAmount: 5,
+      userId: 'user-2',
+      sessionId: 'sess-2',
+      idempotencyKey: 'idem-bid-1',
+      ...extra,
+    };
+  }
+
+  // ── nominate happy path ──────────────────────────────────────────────
+
+  it('auction nominate: happy path — RPC called, state updates, ring buffer + broadcast fire', async () => {
+    const publish = vi.fn();
+    const nominatePlayer = vi.fn(async (_params: unknown) => ({
+      event_id: 1,
+      seq: 1,
+      nomination_id: 'nom-abc',
+      clock_deadline: new Date('2026-05-06T12:30:00Z').toISOString(),
+      was_duplicate: false,
+    }));
+
+    const lobby = await makeLobby(auctionLobbyOpts({ publish, nominatePlayer }));
+    const result = await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+
+    expect(result).toEqual({ ok: true, eventSeq: 1 });
+    expect(nominatePlayer).toHaveBeenCalledTimes(1);
+    expect(nominatePlayer.mock.calls[0]?.[0]).toMatchObject({
+      teamId: 'team-1',
+      playerId: '8478402',
+      openingBid: 5,
+    });
+    // State updates: currentNomination set, draftStatus advanced.
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.currentNomination).toMatchObject({
+      nominationId: 'nom-abc',
+      playerId: '8478402',
+      nominatorTeamId: 'team-1',
+      leadingBidderId: 'team-1',
+      leadingBid: 5,
+    });
+    expect(lobby.getCurrentState().draftStatus).toBe('in_progress');
+    // Ring buffer has the event; broadcast fired.
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish.mock.calls[0][0]).toBe('draft:lobby-1');
+    const broadcastJson = JSON.parse(publish.mock.calls[0][1]);
+    expect(broadcastJson.type).toBe('event');
+    expect(broadcastJson.payload.kind).toBe('auction_nomination_started');
+  });
+
+  it('auction nominate: rejects when not on the clock (different team_id)', async () => {
+    const nominatePlayer = vi.fn();
+    const lobby = await makeLobby(auctionLobbyOpts({ nominatePlayer }));
+    // team-1 is on the clock at nominationsCompleted=0; team-2 trying.
+    const result = await lobby.enqueueAction(nominateAction({ teamId: 'team-2' }));
+    expect(result).toEqual({ ok: false, reason: 'not_on_clock' });
+    expect(nominatePlayer).not.toHaveBeenCalled();
+  });
+
+  it('auction nominate: rejects with nomination_already_active when one is open', async () => {
+    const lobby = await makeLobby(auctionLobbyOpts());
+    // First nominate: succeeds.
+    await lobby.enqueueAction(nominateAction({ idempotencyKey: 'idem-nom-A' }));
+    // Second nominate while first is open: rejected, even from same team.
+    const result = await lobby.enqueueAction(
+      nominateAction({ idempotencyKey: 'idem-nom-B', playerId: '8478403' }),
+    );
+    expect(result).toEqual({ ok: false, reason: 'nomination_already_active' });
+  });
+
+  it('auction nominate: rejects bid_too_low when openingBid < auctionMinBid', async () => {
+    const nominatePlayer = vi.fn();
+    const lobby = await makeLobby(
+      auctionLobbyOpts({ auctionMinBid: 5, nominatePlayer }),
+    );
+    const result = await lobby.enqueueAction(nominateAction({ openingBid: 3 }));
+    expect(result).toEqual({ ok: false, reason: 'bid_too_low' });
+    expect(nominatePlayer).not.toHaveBeenCalled();
+  });
+
+  it('auction nominate: rejects insufficient_budget when bid exceeds budget reserve', async () => {
+    const nominatePlayer = vi.fn();
+    // 2 rounds, 0 won → 2 slots remaining → reserve = (2 - 1) * 1 = $1.
+    // Budget $200 → maxAffordable = 199. Bid 200 should fail.
+    const lobby = await makeLobby(auctionLobbyOpts({ nominatePlayer }));
+    const result = await lobby.enqueueAction(nominateAction({ openingBid: 200 }));
+    expect(result).toEqual({ ok: false, reason: 'insufficient_budget' });
+    expect(nominatePlayer).not.toHaveBeenCalled();
+  });
+
+  it('auction nominate: snake-format lobby returns wrong_format_for_action', async () => {
+    const lobby = await makeLobby({ format: 'snake' });
+    const result = await lobby.enqueueAction(nominateAction());
+    expect(result).toEqual({ ok: false, reason: 'wrong_format_for_action' });
+  });
+
+  it('auction nominate: unauthorized user gets coarse-grained unauthorized', async () => {
+    const verifyTeamAuthorization = vi.fn(async () => ({
+      authorized: false as const,
+      reason: 'not_owner' as const,
+    }));
+    const nominatePlayer = vi.fn();
+    const lobby = await makeLobby(
+      auctionLobbyOpts({ verifyTeamAuthorization, nominatePlayer }),
+    );
+    const result = await lobby.enqueueAction(nominateAction());
+    expect(result).toEqual({ ok: false, reason: 'unauthorized' });
+    expect(nominatePlayer).not.toHaveBeenCalled();
+  });
+
+  // ── place_bid happy path ─────────────────────────────────────────────
+
+  it('auction place_bid: happy path — RPC called, leading bid mutated, broadcast fires', async () => {
+    const publish = vi.fn();
+    const placeBid = vi.fn(async () => ({
+      event_id: 2,
+      seq: 2,
+      clock_deadline: new Date('2026-05-06T12:30:00Z').toISOString(),
+      was_duplicate: false,
+    }));
+    const lobby = await makeLobby(auctionLobbyOpts({ publish, placeBid }));
+    // Establish a nomination first.
+    const nomResult = await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+    expect(nomResult.ok).toBe(true);
+    publish.mockClear();
+
+    // team-2 outbids.
+    const result = await lobby.enqueueAction(
+      bidAction({ bidAmount: 10, nominationId: 'nom-1' }),
+    );
+    expect(result).toEqual({ ok: true, eventSeq: 2 });
+    expect(placeBid).toHaveBeenCalledTimes(1);
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.currentNomination?.leadingBid).toBe(10);
+    expect(auctionState?.currentNomination?.leadingBidderId).toBe('team-2');
+    expect(publish).toHaveBeenCalledTimes(1);
+    const broadcastJson = JSON.parse(publish.mock.calls[0][1]);
+    expect(broadcastJson.payload.kind).toBe('auction_bid_placed');
+    expect(broadcastJson.payload.bidAmount).toBe(10);
+  });
+
+  it('auction place_bid: rejects bid_too_low when bid <= leading bid', async () => {
+    const placeBid = vi.fn();
+    const lobby = await makeLobby(auctionLobbyOpts({ placeBid }));
+    await lobby.enqueueAction(nominateAction({ openingBid: 10 }));
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 10 }));
+    expect(result).toEqual({ ok: false, reason: 'bid_too_low' });
+    expect(placeBid).not.toHaveBeenCalled();
+  });
+
+  it('auction place_bid: rejects no_active_nomination when none open', async () => {
+    const placeBid = vi.fn();
+    const lobby = await makeLobby(auctionLobbyOpts({ placeBid }));
+    const result = await lobby.enqueueAction(bidAction());
+    expect(result).toEqual({ ok: false, reason: 'no_active_nomination' });
+    expect(placeBid).not.toHaveBeenCalled();
+  });
+
+  it('auction place_bid: rejects insufficient_budget when bid exceeds reserve', async () => {
+    const placeBid = vi.fn();
+    const lobby = await makeLobby(auctionLobbyOpts({ placeBid }));
+    await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+    // team-2 budget $200, 0 won, 2 rounds → maxAffordable = 199.
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 200 }));
+    expect(result).toEqual({ ok: false, reason: 'insufficient_budget' });
+    expect(placeBid).not.toHaveBeenCalled();
+  });
+
+  // ── handleNominationTimeout ──────────────────────────────────────────
+
+  it('auction nomination timeout: closes nomination via closeNomination RPC, deducts budget, advances rotation', async () => {
+    vi.useFakeTimers();
+    try {
+      const publish = vi.fn();
+      // Mock RPCs whose returned `clock_deadline` aligns with the
+      // test's `pickClockSeconds=31` so the engine schedules a 31s
+      // timer (default mock returns +91s, which would outlast our
+      // advanceTimersByTimeAsync(32_000) call below).
+      const nominatePlayer = vi.fn(async (_params: unknown) => ({
+        event_id: 1,
+        seq: 1,
+        nomination_id: 'nom-1',
+        clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+        was_duplicate: false,
+      }));
+      const placeBid = vi.fn(async (_params: unknown) => ({
+        event_id: 2,
+        seq: 2,
+        clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+        was_duplicate: false,
+      }));
+      const closeNomination = vi.fn(async () => ({
+        event_id: 3,
+        seq: 3,
+        event_type: 'auction_nomination_closed' as const,
+        no_sale: false,
+        was_duplicate: false,
+      }));
+      const lobby = await makeLobby(
+        auctionLobbyOpts({ publish, nominatePlayer, placeBid, closeNomination }),
+      );
+      // Open a nomination at $5.
+      await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+      // Place a bid at $20 by team-2.
+      await lobby.enqueueAction(bidAction({ bidAmount: 20 }));
+      publish.mockClear();
+
+      // Advance past the bid window (31s).
+      await vi.advanceTimersByTimeAsync(32_000);
+
+      expect(closeNomination).toHaveBeenCalledTimes(1);
+      // Winner = leadingBidderId (team-2), final = $20. Budget
+      // deducted, players_won incremented.
+      const auctionState = lobby.getAuctionState();
+      expect(auctionState?.teamBudgets['team-2']).toBe(200 - 20);
+      expect(auctionState?.teamRosterSlotsRemaining['team-2']).toBe(2 - 1);
+      expect(auctionState?.nominationsCompleted).toBe(1);
+      expect(auctionState?.currentNomination).toBeNull();
+      // Broadcast fired with auction_nomination_closed.
+      const closedBroadcasts = publish.mock.calls.filter((c) =>
+        c[1].includes('auction_nomination_closed'),
+      );
+      expect(closedBroadcasts.length).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('auction nomination timeout: no_sale branch (only opening bid) skips budget deduction', async () => {
+    vi.useFakeTimers();
+    try {
+      const nominatePlayer = vi.fn(async (_params: unknown) => ({
+        event_id: 1,
+        seq: 1,
+        nomination_id: 'nom-1',
+        clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+        was_duplicate: false,
+      }));
+      const closeNomination = vi.fn(async () => ({
+        event_id: 3,
+        seq: 3,
+        event_type: 'auction_nomination_expired' as const,
+        no_sale: true,
+        was_duplicate: false,
+      }));
+      const lobby = await makeLobby(
+        auctionLobbyOpts({ nominatePlayer, closeNomination }),
+      );
+      await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+
+      await vi.advanceTimersByTimeAsync(32_000);
+
+      expect(closeNomination).toHaveBeenCalledTimes(1);
+      const auctionState = lobby.getAuctionState();
+      // No budget deduction on no_sale.
+      expect(auctionState?.teamBudgets['team-1']).toBe(200);
+      expect(auctionState?.teamRosterSlotsRemaining['team-1']).toBe(2);
+      // But rotation advances.
+      expect(auctionState?.nominationsCompleted).toBe(1);
+      expect(auctionState?.currentNomination).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // ── Bootstrap auction event replay ───────────────────────────────────
+
+  it('auction bootstrap: replays nomination_started → bid_placed → nomination_closed correctly', async () => {
+    const events: DraftEventRow[] = [
+      makeEventRow({
+        seq: 1,
+        event_type: 'auction_nomination_started',
+        payload: {
+          nomination_id: 'nom-1',
+          player_id: '8478402',
+          player_name: 'Connor McDavid',
+          opening_bid: 5,
+          nominator_team_id: 'team-1',
+          expires_at: new Date(Date.now() + 31_000).toISOString(),
+        },
+      }),
+      makeEventRow({
+        seq: 2,
+        event_type: 'auction_bid_placed',
+        payload: {
+          nomination_id: 'nom-1',
+          team_id: 'team-2',
+          bid_amount: 20,
+        },
+      }),
+      makeEventRow({
+        seq: 3,
+        event_type: 'auction_nomination_closed',
+        payload: {
+          nomination_id: 'nom-1',
+          winning_team_id: 'team-2',
+          final_amount: 20,
+          total_bids: 2,
+          player_id: '8478402',
+        },
+      }),
+    ];
+    const lobby = await makeLobby(
+      auctionLobbyOpts({ listDraftEvents: vi.fn(async () => events) }),
+    );
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.nominationsCompleted).toBe(1);
+    expect(auctionState?.currentNomination).toBeNull();
+    expect(auctionState?.teamBudgets['team-2']).toBe(180);
+    expect(auctionState?.teamRosterSlotsRemaining['team-2']).toBe(1);
+  });
+
+  // ── Snapshot exposure ───────────────────────────────────────────────
+
+  it('auction getSnapshot includes auctionState; snake getSnapshot omits it', async () => {
+    const auctionLobby = await makeLobby(auctionLobbyOpts());
+    const auctionSnapshot = auctionLobby.getSnapshot();
+    expect(auctionSnapshot.auctionState).toBeDefined();
+    expect(auctionSnapshot.auctionState?.currentNomination).toBeNull();
+
+    const snakeLobby = await makeLobby({ format: 'snake' });
+    const snakeSnapshot = snakeLobby.getSnapshot();
+    expect(snakeSnapshot.auctionState).toBeUndefined();
   });
 });

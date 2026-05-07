@@ -67,6 +67,67 @@ export interface DraftEventRow {
   created_at: string;
 }
 
+// ── Auction RPC params + results (chunk 11g.6 sub-step 6a) ────────
+
+export interface NominatePlayerParams {
+  leagueId: string;
+  teamId: string;
+  /** Wire-format string; auction's `auction_nominations.player_id` is TEXT. */
+  playerId: string;
+  playerName: string;
+  openingBid: number;
+  sessionId: string;
+  idempotencyKey: string;
+  actor: DraftV2Actor;
+  correlationId?: string | null;
+  /** Bid window duration in seconds; RPC adds +1s pad and computes deadline. */
+  clockSeconds: number;
+}
+
+export interface NominatePlayerResult {
+  event_id: number;
+  seq: number;
+  nomination_id: string;
+  clock_deadline: string;
+  was_duplicate: boolean;
+}
+
+export interface PlaceBidParams {
+  leagueId: string;
+  teamId: string;
+  nominationId: string;
+  bidAmount: number;
+  sessionId: string;
+  idempotencyKey: string;
+  actor: DraftV2Actor;
+  correlationId?: string | null;
+}
+
+export interface PlaceBidResult {
+  event_id: number;
+  seq: number;
+  /** Returned unchanged from `auction_nominations.expires_at`; in 6a the deadline doesn't change on bid. */
+  clock_deadline: string;
+  was_duplicate: boolean;
+}
+
+export interface CloseNominationParams {
+  leagueId: string;
+  nominationId: string;
+  idempotencyKey: string;
+  actor: DraftV2Actor;
+  correlationId?: string | null;
+}
+
+export interface CloseNominationResult {
+  event_id: number;
+  seq: number;
+  /** `auction_nomination_closed` (winning bid) or `auction_nomination_expired` (no_sale). */
+  event_type: 'auction_nomination_closed' | 'auction_nomination_expired';
+  no_sale: boolean;
+  was_duplicate: boolean;
+}
+
 // ── Internal helpers ────────────────────────────────────────────────
 // Hash computation lives in @citrus/shared (canonicalJson, sha256Hex,
 // computePickPayloadHash) so the Phase 4 autopick worker can use the
@@ -95,6 +156,8 @@ function mapRpcError(err: { message?: string; code?: string }): AppError {
     ['pick_out_of_order',    'CONFLICT', 409],
     ['not_on_clock',         'CONFLICT', 409],
     ['player_taken',         'CONFLICT', 409],
+    // Auction-specific prefixes (chunk 11g.6 sub-step 6a).
+    ['bid_too_low',          'CONFLICT', 409],
     ['unauthorized',         'FORBIDDEN', 403],
     ['shadow_guard_violated', 'INTERNAL_ERROR', 500],
     ['illegal_state_transition', 'INTERNAL_ERROR', 500],
@@ -216,6 +279,110 @@ export class DraftServiceV2 {
     }
 
     return data as SubmitPickResult;
+  }
+
+  // ── Auction RPCs (chunk 11g.6 sub-step 6a) ──────────────────────
+
+  /**
+   * Submit an auction nomination via `nominate_player_v2`. Mirrors
+   * `submitPick`'s structural pattern: typed params/result,
+   * `mapRpcError` for error translation, idempotency via the RPC's
+   * advisory lock + `draft_events_idempotency_key_uniq` index.
+   *
+   * Engine validates nominator-on-clock + budget reserve BEFORE
+   * calling (per ADR-002 §3 + ADR-004 §5 trusted-executor). RPC
+   * does its own preflight as defense-in-depth (player-not-taken,
+   * no active nomination, opening_bid >= league min).
+   */
+  async nominatePlayer(params: NominatePlayerParams): Promise<NominatePlayerResult> {
+    const payloadHash = await computePickPayloadHash({
+      pick_number: 0, // unused for nominations; payload-hash uses
+      round:       0, // a different shape but the same canonical
+      team_id:     params.teamId, // hash function for idempotency-key
+      player_id:   0, // collision detection.
+    } as never);
+
+    const { data, error } = await this.supabase.rpc('nominate_player_v2', {
+      p_league_id:       params.leagueId,
+      p_team_id:         params.teamId,
+      p_player_id:       params.playerId,
+      p_player_name:     params.playerName,
+      p_opening_bid:     params.openingBid,
+      p_session_id:      params.sessionId,
+      p_idempotency_key: params.idempotencyKey,
+      p_payload_hash:    payloadHash,
+      p_actor:           params.actor,
+      p_correlation_id:  params.correlationId ?? null,
+      p_clock_seconds:   params.clockSeconds,
+    });
+
+    if (error) throw mapRpcError(error);
+    return data as NominatePlayerResult;
+  }
+
+  /**
+   * Submit an auction bid via `place_bid_v2`. Mirrors `submitPick`'s
+   * pattern. Engine validates budget reserve + bid-too-low BEFORE
+   * calling; RPC enforces strict-greater-than-current-bid as
+   * defense-in-depth.
+   */
+  async placeBid(params: PlaceBidParams): Promise<PlaceBidResult> {
+    const payloadHash = await computePickPayloadHash({
+      pick_number: 0,
+      round:       0,
+      team_id:     params.teamId,
+      player_id:   0,
+    } as never);
+
+    const { data, error } = await this.supabase.rpc('place_bid_v2', {
+      p_league_id:       params.leagueId,
+      p_team_id:         params.teamId,
+      p_nomination_id:   params.nominationId,
+      p_bid_amount:      params.bidAmount,
+      p_session_id:      params.sessionId,
+      p_idempotency_key: params.idempotencyKey,
+      p_payload_hash:    payloadHash,
+      p_actor:           params.actor,
+      p_correlation_id:  params.correlationId ?? null,
+    });
+
+    if (error) throw mapRpcError(error);
+    return data as PlaceBidResult;
+  }
+
+  /**
+   * Close the active auction nomination via `close_nomination_v2`.
+   * Engine-only (timer fire); actor.kind must be 'autopick' (engine)
+   * or 'commissioner' (override). The RPC awards the player to the
+   * leading bidder, decrements their budget, INSERTs the
+   * `draft_picks` row, and writes the `auction_nomination_closed`
+   * event — all atomically.
+   *
+   * "No sale" branch: when only one bid exists (the nominator's
+   * opening bid) and no follow-up bids landed, the RPC marks status
+   * 'no_sale', skips the budget decrement + draft_picks insert, and
+   * emits `auction_nomination_expired` instead. Caller advances
+   * state via the returned `event_type`.
+   */
+  async closeNomination(params: CloseNominationParams): Promise<CloseNominationResult> {
+    const payloadHash = await computePickPayloadHash({
+      pick_number: 0,
+      round:       0,
+      team_id:     params.nominationId,
+      player_id:   0,
+    } as never);
+
+    const { data, error } = await this.supabase.rpc('close_nomination_v2', {
+      p_league_id:       params.leagueId,
+      p_nomination_id:   params.nominationId,
+      p_idempotency_key: params.idempotencyKey,
+      p_payload_hash:    payloadHash,
+      p_actor:           params.actor,
+      p_correlation_id:  params.correlationId ?? null,
+    });
+
+    if (error) throw mapRpcError(error);
+    return data as CloseNominationResult;
   }
 
   /**

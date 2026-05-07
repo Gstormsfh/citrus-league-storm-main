@@ -135,21 +135,75 @@ export type BufferedDraftEvent =
       reason?: string;
     }
   | {
-      kind: 'auction_bid_placed';
-      seq: number;
-      timestamp: string;
-      nominationId: string;
-      teamId: string;
-      bidAmount: number;
-    }
-  | {
+      /**
+       * Auction nomination begins. Chunk 11g.6 sub-step 6a writes
+       * this when a nominator submits via `nominate_player_v2`.
+       * `clockDeadline` is the wall-clock ISO timestamp when the
+       * bid window expires; engine clears the timer on
+       * `auction_nomination_closed`.
+       *
+       * `playerId` is wire-format string (auction uses TEXT
+       * `auction_nominations.player_id`, distinct from snake/linear's
+       * int `draft_picks_v2.player_id`).
+       */
       kind: 'auction_nomination_started';
       seq: number;
       timestamp: string;
+      correlationId: string;
       nominationId: string;
       playerId: string;
-      openingBid: number;
+      playerName: string;
       nominatorTeamId: string;
+      openingBid: number;
+      clockDeadline: string;
+    }
+  | {
+      /**
+       * Bid placed on the active nomination. `bidAmount` strictly
+       * greater than the prior leading bid (RPC + engine both
+       * enforce). `clockDeadline` is forward-compat for chunk
+       * 11g.6 sub-step 6b's anti-snipe extension; in 6a the
+       * deadline doesn't change on bids, so this carries the
+       * nomination's original deadline.
+       */
+      kind: 'auction_bid_placed';
+      seq: number;
+      timestamp: string;
+      correlationId: string;
+      nominationId: string;
+      bidderTeamId: string;
+      bidAmount: number;
+      clockDeadline: string;
+    }
+  | {
+      /**
+       * Bid window expired with NO bids. Engine emits this when a
+       * nomination opens, the engine's clock fires, and the
+       * leading bid equals the opening bid (no follow-up bids).
+       * Chunk 11g.6 sub-step 6a treats this as a no-sale: nominator
+       * forfeits their nomination turn but loses no budget.
+       */
+      kind: 'auction_nomination_expired';
+      seq: number;
+      timestamp: string;
+      nominationId: string;
+      reason: 'no_bids';
+    }
+  | {
+      /**
+       * Bid window expired WITH a winning bid. RPC awards the
+       * player to `winnerTeamId`, decrements their budget by
+       * `finalAmount`, increments their `players_won`, INSERTs the
+       * `draft_picks` row.
+       */
+      kind: 'auction_nomination_closed';
+      seq: number;
+      timestamp: string;
+      nominationId: string;
+      winnerTeamId: string;
+      finalAmount: number;
+      totalBids: number;
+      playerId: string;
     };
 
 // ── Snapshot payloads ──────────────────────────────────────────────
@@ -181,16 +235,47 @@ export interface DraftStateSnapshot {
 }
 
 /**
+ * Auction-specific state carried in the wire snapshot for auction-
+ * format lobbies. `undefined` for snake/linear (chunk 11g.5b's v2
+ * UI ignores). Populated by `LobbyManager.getCurrentState()` for
+ * `format === 'auction'` per chunk 11g.6 sub-step 6a.
+ *
+ * `currentNomination` is `null` between nominations and after the
+ * auction completes; non-null while a nomination is active.
+ *
+ * `teamBudgets` and `teamRosterSlotsRemaining` are keyed by team
+ * UUID. Match `auction_budgets.remaining_budget` (cents-as-int /
+ * NUMERIC) and `(rosterSize - players_won)` respectively.
+ */
+export interface AuctionStateSnapshot {
+  currentNomination: {
+    nominationId: string;
+    playerId: string;
+    nominatorTeamId: string;
+    leadingBidderId: string;
+    leadingBid: number;
+    clockDeadline: string;
+  } | null;
+  teamBudgets: Record<string, number>;
+  teamRosterSlotsRemaining: Record<string, number>;
+  nominationsCompleted: number;
+}
+
+/**
  * Minimal client-facing snapshot of a lobby's current state.
  * Carried in the `snapshot` server message (sent on first connect)
  * and the chunk-11g.5 fallback HTTP snapshot endpoint (when the
  * resync ring buffer is too_old).
+ *
+ * Chunk 11g.6 sub-step 6a adds `auctionState` for auction-format
+ * lobbies; snake/linear leave it `undefined`.
  */
 export interface DraftSnapshot {
   lobbyId: string;
   format: DraftFormat;
   recentEvents: ReadonlyArray<BufferedDraftEvent>;
   stateSnapshot: DraftStateSnapshot;
+  auctionState?: AuctionStateSnapshot;
 }
 
 // ── Wire envelope ──────────────────────────────────────────────────

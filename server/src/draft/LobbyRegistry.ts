@@ -75,6 +75,11 @@ export interface LobbyConfig {
    * `leagues.settings.pickTimeLimit` + 1 (the +1 mirrors
    * `submit_pick_v2`'s deadline computation at migration line
    * 896-898). Default fallback if missing: 91 (= 90 + 1).
+   *
+   * For auction lobbies, this is the **bid-window** duration
+   * (chunk 11g.6 sub-step 6a uses `auctionNominationTime + 1` as
+   * the bid window; the nomination-window/bid-window split per
+   * ADR-002 §3.4 lands in 6c alongside auto-nominate).
    */
   pickClockSeconds: number;
   /**
@@ -94,6 +99,67 @@ export interface LobbyConfig {
    * `'pre_draft'` for fresh-start).
    */
   initialDraftState: string | null;
+
+  // ── Auction-specific (chunk 11g.6 sub-step 6a) ──────────────────
+  // Populated only for `format === 'auction'`; ignored otherwise.
+
+  /**
+   * Round-robin team rotation per ADR-002 §3.2. Sourced from the
+   * existing `draft_order` table's round-1 `team_order` JSONB
+   * array (same data feeds snake/linear's `draftOrder` per chunk
+   * 11g.4 step 6a Path B — DB is canonical, engine consumes).
+   *
+   * Current nominator = `nominationOrder[nominationsCompleted % nominationOrder.length]`.
+   * Auction completes when `nominationsCompleted >= nominationOrder.length × draftRounds`.
+   *
+   * Empty for snake/linear lobbies.
+   */
+  nominationOrder: ReadonlyArray<string>;
+  /**
+   * Per-team starting budget (`leagues.settings.auctionBudget`).
+   * Default 200 per ADR-002 §4.3. Used to seed `auction_budgets`
+   * at draft setup; `LobbyManager.teamBudgets` mirrors the
+   * `auction_budgets.remaining_budget` column.
+   */
+  auctionBudget: number;
+  /**
+   * Minimum opening bid + minimum bid increment (flat $1 in 6a;
+   * tiered increments per ADR-002 §4.3 are 6c work).
+   * Default 1 per ADR-002 §4.3.
+   */
+  auctionMinBid: number;
+  /**
+   * Total roster slots per team — drives the auction completion
+   * check (`nominationsCompleted >= teamCount × draftRounds`) and
+   * the budget-reserve calculation (per ADR-002 §3 + v1
+   * AuctionService.placeBid: `slotsRemaining = rosterSize -
+   * players_won - 1`).
+   */
+  draftRounds: number;
+  /**
+   * Initial `auction_budgets` rows hydrated from the DB at
+   * construction. Map keyed by team UUID.
+   */
+  initialTeamBudgets: ReadonlyMap<string, number>;
+  /**
+   * Initial `auction_budgets.players_won` per team — used to
+   * compute `teamRosterSlotsRemaining = draftRounds - players_won`.
+   */
+  initialPlayersWon: ReadonlyMap<string, number>;
+  /**
+   * Active nomination row from `auction_nominations` if one exists
+   * at construction time (mid-draft restart). Bootstrap will
+   * derive the in-memory `currentNomination` from the event log
+   * replay; this field is informational for diagnostic logging.
+   */
+  initialActiveNomination: {
+    nominationId: string;
+    playerId: string;
+    nominatorTeamId: string;
+    leadingBidderId: string;
+    leadingBid: number;
+    expiresAt: Date;
+  } | null;
 }
 
 export interface LobbyRegistryOptions {
@@ -298,6 +364,13 @@ export class LobbyRegistry {
       pickClockSeconds: config.pickClockSeconds,
       initialPickDeadline: config.initialPickDeadline,
       initialDraftState: config.initialDraftState,
+      nominationOrder: config.nominationOrder,
+      auctionBudget: config.auctionBudget,
+      auctionMinBid: config.auctionMinBid,
+      draftRounds: config.draftRounds,
+      initialTeamBudgets: config.initialTeamBudgets,
+      initialPlayersWon: config.initialPlayersWon,
+      initialActiveNomination: config.initialActiveNomination,
     });
     // Step 6b: bootstrap from the durable event log BEFORE returning.
     // A failed init() throws; the existing try/catch in getOrCreate

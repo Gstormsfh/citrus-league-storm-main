@@ -111,6 +111,7 @@ import {
 import {
   serializeServerMessage,
   WIRE_PROTOCOL_VERSION,
+  type AuctionStateSnapshot,
   type BufferedDraftEvent,
   type DraftAction,
   type DraftActionResult,
@@ -241,6 +242,32 @@ export interface LobbyManagerOptions {
    * pass a different chain too.
    */
   autopickStrategies?: ReadonlyArray<AutopickStrategy>;
+
+  // ── Auction-specific (chunk 11g.6 sub-step 6a) ──────────────────
+  // Required for `format === 'auction'`; ignored for snake/linear.
+  // See `LobbyConfig` JSDoc in LobbyRegistry.ts for full semantics.
+
+  /** Round-robin nomination rotation. Empty for snake/linear. */
+  nominationOrder: ReadonlyArray<string>;
+  /** Per-team starting budget (seeds `auction_budgets`). */
+  auctionBudget: number;
+  /** Min opening bid + min bid increment (flat $1 in 6a). */
+  auctionMinBid: number;
+  /** Total roster slots per team — drives auction completion + budget reserve. */
+  draftRounds: number;
+  /** Initial budget per team, hydrated from `auction_budgets`. */
+  initialTeamBudgets: ReadonlyMap<string, number>;
+  /** Initial `players_won` per team, from `auction_budgets`. */
+  initialPlayersWon: ReadonlyMap<string, number>;
+  /** Active nomination row at construction (informational). */
+  initialActiveNomination: {
+    nominationId: string;
+    playerId: string;
+    nominatorTeamId: string;
+    leadingBidderId: string;
+    leadingBid: number;
+    expiresAt: Date;
+  } | null;
 }
 
 /**
@@ -455,6 +482,58 @@ export class LobbyManager {
    */
   private readonly events = new RingBuffer<BufferedDraftEvent>(EVENT_BUFFER_CAPACITY);
 
+  // ── Auction state (chunk 11g.6 sub-step 6a) ───────────────────────
+
+  /**
+   * Round-robin nomination rotation. Empty for snake/linear.
+   * `currentNominator = nominationOrder[nominationsCompleted %
+   * nominationOrder.length]`. Auction completes when
+   * `nominationsCompleted >= nominationOrder.length × draftRounds`.
+   */
+  private readonly nominationOrder: ReadonlyArray<string>;
+  private readonly draftRounds: number;
+  private readonly auctionMinBid: number;
+  /**
+   * Bid-window duration in ms. 6a uses `pickClockMs` (mirrors
+   * `auctionNominationTime + 1`); ADR-002 §3.4 nomination-window/
+   * bid-window split lands in 6c alongside auto-nominate.
+   */
+  private readonly bidWindowMs: number;
+
+  /**
+   * Number of nominations that have closed (bid won + roster
+   * filled, OR no_sale + nomination expired). Drives the rotation
+   * pointer and the auction-complete check.
+   */
+  private nominationsCompleted = 0;
+
+  /**
+   * Active nomination row, or null when no nomination is open.
+   * Updated by:
+   *   - `processNominate` success (creates)
+   *   - `processPlaceBid` success (mutates leadingBid + leadingBidderId)
+   *   - `handleNominationTimeout` (clears on close + advances rotation)
+   *   - bootstrap auction event handlers (event log replay)
+   *
+   * The timer handle is held here (parallel to snake/linear's
+   * `currentPickTimerHandle`); `cancelPickTimer` clears both.
+   */
+  private currentNomination: {
+    nominationId: string;
+    playerId: string;
+    playerName: string;
+    nominatorTeamId: string;
+    leadingBidderId: string;
+    leadingBid: number;
+    expiresAt: Date;
+    timerHandle: NodeJS.Timeout | null;
+  } | null = null;
+
+  /** Per-team remaining budget (mirrors `auction_budgets.remaining_budget`). */
+  private readonly teamBudgets: Map<string, number>;
+  /** Per-team players-won count (mirrors `auction_budgets.players_won`). */
+  private readonly teamPlayersWon: Map<string, number>;
+
   constructor(opts: LobbyManagerOptions) {
     this.lobbyId = opts.lobbyId;
     this.format = opts.format;
@@ -469,12 +548,24 @@ export class LobbyManager {
     this.initialDraftState = opts.initialDraftState;
     this.draftOrder = opts.draftOrder;
     this.topicName = `draft:${opts.lobbyId}`;
+
+    // Auction state (chunk 11g.6 sub-step 6a). `bidWindowMs` reuses
+    // `pickClockMs` (the auction format-aware `pickClockSeconds`
+    // already pulled `auctionNominationTime + 1` from settings in
+    // `lookupLobbyConfig`).
+    this.nominationOrder = opts.nominationOrder;
+    this.draftRounds = opts.draftRounds;
+    this.auctionMinBid = opts.auctionMinBid;
+    this.bidWindowMs = this.pickClockMs;
+    this.teamBudgets = new Map(opts.initialTeamBudgets);
+    this.teamPlayersWon = new Map(opts.initialPlayersWon);
+
     // `picksMade`, `draftStatus`, `initialized`, timer state are
     // zero-initialized at the field declaration above. `init()`
     // mutates them during event-log replay + sets the deadline
     // timer from `initialPickDeadline` per chunk 11g.4 step 6c.
     logger.info(
-      `[lobby] LobbyManager constructed (pre-init) lobbyId=${opts.lobbyId} format=${opts.format} leagueId=${opts.leagueId} topic=${this.topicName} totalPicks=${this.draftOrder.length} pickClockSeconds=${opts.pickClockSeconds}`,
+      `[lobby] LobbyManager constructed (pre-init) lobbyId=${opts.lobbyId} format=${opts.format} leagueId=${opts.leagueId} topic=${this.topicName} totalPicks=${this.draftOrder.length} pickClockSeconds=${opts.pickClockSeconds} auctionTeams=${opts.nominationOrder.length} auctionRounds=${opts.draftRounds}`,
     );
   }
 
@@ -520,7 +611,21 @@ export class LobbyManager {
     //   the on-clock team's clock expired): fire autopick
     //   immediately. This is the "process restarted mid-deadline"
     //   recovery path.
-    if (
+    if (this.format === 'auction') {
+      // Auction timer post-replay (chunk 11g.6 sub-step 6a): if a
+      // nomination is open after event replay AND the draft is
+      // active, schedule the bid-window timer from
+      // `currentNomination.expiresAt`. Process-restart-mid-bid
+      // recovery; mirrors the snake/linear `initialPickDeadline`
+      // path conceptually.
+      if (
+        this.draftStatus === 'in_progress' &&
+        this.pauseState === null &&
+        this.currentNomination !== null
+      ) {
+        this.setPickDeadline(this.currentNomination.expiresAt);
+      }
+    } else if (
       this.draftStatus === 'in_progress' &&
       this.pauseState === null &&
       this.initialPickDeadline !== null
@@ -529,7 +634,7 @@ export class LobbyManager {
     }
 
     logger.info(
-      `[lobby] init complete lobbyId=${this.lobbyId} picksMade=${this.picksMade} status=${this.draftStatus} bufferSize=${this.events.size()} timerScheduled=${this.currentPickTimerHandle !== null}`,
+      `[lobby] init complete lobbyId=${this.lobbyId} format=${this.format} picksMade=${this.picksMade} status=${this.draftStatus} bufferSize=${this.events.size()} timerScheduled=${this.currentPickTimerHandle !== null} activeNomination=${this.currentNomination !== null}`,
     );
   }
 
@@ -746,11 +851,13 @@ export class LobbyManager {
    * snapshot and identity shaping.
    */
   getSnapshot(): DraftSnapshot {
+    const auctionState = this.getAuctionState();
     return {
       lobbyId: this.lobbyId,
       format: this.format,
       recentEvents: this.events.snapshot(),
       stateSnapshot: this.getCurrentState(),
+      ...(auctionState !== undefined ? { auctionState } : {}),
     };
   }
 
@@ -768,6 +875,40 @@ export class LobbyManager {
    * `null`-when-not-active convention.
    */
   getCurrentState(): DraftStateSnapshot {
+    if (this.format === 'auction') {
+      // Auction lobbies derive `onClockTeamId` from the round-robin
+      // rotation rather than `draftOrder`; `currentPickNumber` and
+      // `currentRoundNumber` map to the rotation pointer +
+      // round-within-rotation. `totalPicks` is `nominationOrder.length
+      // × draftRounds` (one nomination per roster slot per team).
+      const teamCount = this.nominationOrder.length;
+      const totalPicks = teamCount * this.draftRounds;
+      const onClockTeamId =
+        this.draftStatus === 'in_progress' && teamCount > 0
+          ? this.nominationOrder[this.nominationsCompleted % teamCount] ?? null
+          : null;
+      const currentRoundNumber =
+        this.draftStatus === 'in_progress' && teamCount > 0
+          ? Math.floor(this.nominationsCompleted / teamCount) + 1
+          : null;
+      const currentPickNumber =
+        this.draftStatus === 'in_progress'
+          ? this.nominationsCompleted + 1
+          : null;
+      return {
+        currentPickNumber,
+        currentRoundNumber,
+        onClockTeamId,
+        totalPicks,
+        picksMade: this.nominationsCompleted,
+        draftStatus: this.draftStatus,
+        currentPickDeadline:
+          this.currentNomination !== null
+            ? this.currentNomination.expiresAt.toISOString()
+            : null,
+      };
+    }
+
     const slot =
       this.draftStatus === 'in_progress' ? this.draftOrder[this.picksMade] : null;
     return {
@@ -781,6 +922,44 @@ export class LobbyManager {
         this.currentPickDeadline !== null
           ? this.currentPickDeadline.toISOString()
           : null,
+    };
+  }
+
+  /**
+   * Auction-only state for the wire snapshot. Returns `undefined`
+   * for snake/linear lobbies (callers spread conditionally on
+   * `DraftSnapshot.auctionState`). Per chunk 11g.6 sub-step 6a +
+   * the `AuctionStateSnapshot` shape in `packages/shared/src/types/
+   * draftWire.ts`.
+   *
+   * `teamRosterSlotsRemaining` = `draftRounds - players_won` per
+   * team (the auction-side equivalent of how many roster slots a
+   * team still needs to fill).
+   */
+  getAuctionState(): AuctionStateSnapshot | undefined {
+    if (this.format !== 'auction') {
+      return undefined;
+    }
+    const teamRosterSlotsRemaining: Record<string, number> = {};
+    for (const teamId of this.nominationOrder) {
+      const playersWon = this.teamPlayersWon.get(teamId) ?? 0;
+      teamRosterSlotsRemaining[teamId] = this.draftRounds - playersWon;
+    }
+    return {
+      currentNomination:
+        this.currentNomination !== null
+          ? {
+              nominationId: this.currentNomination.nominationId,
+              playerId: this.currentNomination.playerId,
+              nominatorTeamId: this.currentNomination.nominatorTeamId,
+              leadingBidderId: this.currentNomination.leadingBidderId,
+              leadingBid: this.currentNomination.leadingBid,
+              clockDeadline: this.currentNomination.expiresAt.toISOString(),
+            }
+          : null,
+      teamBudgets: Object.fromEntries(this.teamBudgets),
+      teamRosterSlotsRemaining,
+      nominationsCompleted: this.nominationsCompleted,
     };
   }
 
@@ -846,16 +1025,17 @@ export class LobbyManager {
 
   /**
    * Per-action dispatch. Snake/linear `submit_pick` flows through
-   * `processSubmitPick`; auction action variants are stubbed until
-   * chunk 11g.6.
+   * `processSubmitPick`; auction `nominate` / `place_bid` flow
+   * through `processNominate` / `processPlaceBid` (chunk 11g.6 6a).
    */
   private async processAction(action: DraftAction): Promise<DraftActionResult> {
     switch (action.kind) {
       case 'submit_pick':
         return this.processSubmitPick(action);
-      case 'place_bid':
       case 'nominate':
-        return { ok: false, reason: 'not_yet_implemented_chunk_11g6' };
+        return this.processNominate(action);
+      case 'place_bid':
+        return this.processPlaceBid(action);
     }
   }
 
@@ -1050,6 +1230,344 @@ export class LobbyManager {
         this.cancelPickTimer();
         this.currentPickDeadline = null;
       }
+    }
+
+    return { ok: true, eventSeq: result.seq };
+  }
+
+  /**
+   * Auction `nominate` handler (chunk 11g.6 sub-step 6a per
+   * ADR-002 §3.2 + §3.3).
+   *
+   * Sequence:
+   *   1. Format gate — snake/linear → `wrong_format_for_action`.
+   *   2. ADR-004 §5.3 engine-side authorization (skipped for engine-
+   *      authored autopick / auto-nominate; auto-nominate proper
+   *      lands in 6c).
+   *   3. Status check — completed/cancelled → `invalid_state`.
+   *   4. **Active nomination check** — engine-side fail-fast: if
+   *      `currentNomination !== null`, return
+   *      `nomination_already_active`. Mirrors the RPC's
+   *      `auction_nominations` constraint at migration line 119
+   *      (UNIQUE (`league_id`) WHERE `status = 'active'`); engine
+   *      check eliminates the round-trip on the contended path.
+   *   5. **Nominator-on-clock check** —
+   *      `nominationOrder[nominationsCompleted % nominationOrder.length]`
+   *      must equal `action.teamId`, else `not_on_clock`. Auth
+   *      runs FIRST so a non-manager probing the WS doesn't see
+   *      on-clock leak through differentiated error reasons.
+   *   6. **Bid validation** — opening bid must be ≥ `auctionMinBid`
+   *      (`bid_too_low`) AND must satisfy the budget reserve check
+   *      (`insufficient_budget`). Reserve = `(slotsRemaining - 1) ×
+   *      auctionMinBid` mirrors v1 `AuctionService.placeBid`.
+   *   7. **Call `nominate_player_v2` RPC** — atomic 5-write block
+   *      (INSERT auction_nominations + INSERT auction_bids +
+   *      INSERT draft_events; the engine consumes the resulting
+   *      nomination_id from the RPC response).
+   *   8. **Advance state** on `was_duplicate=false`: set
+   *      `currentNomination`, append to ring buffer, broadcast
+   *      `auction_nomination_started`, schedule the bid-window
+   *      timer.
+   */
+  private async processNominate(
+    action: Extract<DraftAction, { kind: 'nominate' }>,
+  ): Promise<DraftActionResult> {
+    // Step 1: format gate.
+    if (this.format !== 'auction') {
+      return { ok: false, reason: 'wrong_format_for_action' };
+    }
+
+    const isAutopick = action.actorKind === 'autopick';
+
+    // Step 2: ADR-004 §5.3 engine-side authorization (skip for
+    // engine-authored actions). Auto-nominate proper lands in 6c
+    // alongside the nomination-window timer; today the only
+    // engine-authored auction action is the `closeNomination` call
+    // from `handleNominationTimeout`, which goes through the RPC
+    // directly rather than through `enqueueAction`.
+    if (!isAutopick) {
+      let authResult: TeamAuthorizationResult;
+      try {
+        authResult = await this.verifyTeamAuthorization(action.userId, action.teamId);
+      } catch (err) {
+        logger.error(
+          `[lobby] processNominate verifyTeamAuthorization threw lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId}`,
+          err,
+        );
+        return { ok: false, reason: 'internal_error' };
+      }
+      if ('reason' in authResult) {
+        logger.info(
+          `[lobby] unauthorized nominate attempt lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId} reason=${authResult.reason}`,
+        );
+        return { ok: false, reason: 'unauthorized' };
+      }
+    }
+
+    // Step 3: status check.
+    if (this.draftStatus === 'completed' || this.draftStatus === 'cancelled') {
+      return { ok: false, reason: 'invalid_state' };
+    }
+
+    // Step 4: active nomination check.
+    if (this.currentNomination !== null) {
+      return { ok: false, reason: 'nomination_already_active' };
+    }
+
+    // Step 5: nominator-on-clock check.
+    if (this.nominationOrder.length === 0) {
+      return { ok: false, reason: 'invalid_state' };
+    }
+    const expectedNominator =
+      this.nominationOrder[this.nominationsCompleted % this.nominationOrder.length];
+    if (action.teamId !== expectedNominator) {
+      return { ok: false, reason: 'not_on_clock' };
+    }
+
+    // Step 6: bid validation.
+    if (action.openingBid < this.auctionMinBid) {
+      return { ok: false, reason: 'bid_too_low' };
+    }
+    const budget = this.teamBudgets.get(action.teamId) ?? 0;
+    const playersWon = this.teamPlayersWon.get(action.teamId) ?? 0;
+    const slotsRemaining = this.draftRounds - playersWon;
+    if (slotsRemaining <= 0) {
+      // Roster full. Should be unreachable when the on-clock check
+      // passes (a team with no slots can't be in rotation), but
+      // guard anyway.
+      return { ok: false, reason: 'invalid_state' };
+    }
+    // Reserve $auctionMinBid for each remaining slot AFTER this one
+    // (matches v1 AuctionService.placeBid semantics; ADR-002 §3.3).
+    const reserve = (slotsRemaining - 1) * this.auctionMinBid;
+    const maxAffordable = budget - reserve;
+    if (action.openingBid > maxAffordable) {
+      return { ok: false, reason: 'insufficient_budget' };
+    }
+
+    const actor: DraftV2Actor = {
+      kind: isAutopick ? 'autopick' : 'user',
+      id: action.userId,
+      session_id: action.sessionId,
+    };
+
+    // Step 7: call the RPC. Atomic 5-write block per the migration
+    // at supabase/migrations/20260506000000_auction_engine_foundation.sql.
+    let result: Awaited<ReturnType<DraftServiceV2['nominatePlayer']>>;
+    try {
+      result = await this.draftService.nominatePlayer({
+        leagueId: this.leagueId,
+        teamId: action.teamId,
+        playerId: action.playerId,
+        playerName: action.playerName,
+        openingBid: action.openingBid,
+        sessionId: action.sessionId,
+        idempotencyKey: action.idempotencyKey,
+        actor,
+        clockSeconds: Math.floor(this.bidWindowMs / 1000),
+      });
+    } catch (err: unknown) {
+      if (err instanceof AppError) {
+        return { ok: false, reason: this.mapAppErrorToReason(err) };
+      }
+      logger.error(
+        `[lobby] processNominate: unexpected throw lobbyId=${this.lobbyId}`,
+        err,
+      );
+      return { ok: false, reason: 'internal_error' };
+    }
+
+    // Step 8: advance state on the non-duplicate success path.
+    if (!result.was_duplicate) {
+      const expiresAt = new Date(result.clock_deadline);
+      this.currentNomination = {
+        nominationId: result.nomination_id,
+        playerId: action.playerId,
+        playerName: action.playerName,
+        nominatorTeamId: action.teamId,
+        leadingBidderId: action.teamId,
+        leadingBid: action.openingBid,
+        expiresAt,
+        timerHandle: null,
+      };
+      if (this.draftStatus === 'not_started') {
+        this.draftStatus = 'in_progress';
+      }
+
+      const timestamp = new Date().toISOString();
+      const event: BufferedDraftEvent = {
+        kind: 'auction_nomination_started',
+        seq: result.seq,
+        timestamp,
+        nominationId: result.nomination_id,
+        playerId: action.playerId,
+        playerName: action.playerName,
+        nominatorTeamId: action.teamId,
+        openingBid: action.openingBid,
+        clockDeadline: expiresAt.toISOString(),
+        correlationId: action.idempotencyKey,
+      };
+      this.events.append(event);
+      this.broadcast({
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'event',
+        seq: result.seq,
+        timestamp,
+        correlationId: action.idempotencyKey,
+        payload: event,
+      });
+
+      this.setPickDeadline(expiresAt);
+    }
+
+    return { ok: true, eventSeq: result.seq };
+  }
+
+  /**
+   * Auction `place_bid` handler (chunk 11g.6 sub-step 6a per
+   * ADR-002 §3.3).
+   *
+   * Sequence:
+   *   1. Format gate.
+   *   2. ADR-004 §5.3 engine-side authorization.
+   *   3. **Active nomination check** — `currentNomination` must be
+   *      non-null AND its `nominationId` must match
+   *      `action.nominationId`; else `no_active_nomination`.
+   *      Mismatched nomination IDs happen on a stale client whose
+   *      bid arrives after the nomination it targeted has closed.
+   *   4. **Bid validation** — strictly greater than current
+   *      leading bid (`bid_too_low`); meets minimum increment
+   *      (`bid_increment_violation`; flat $1 in 6a, tiered in 6c);
+   *      satisfies budget reserve (`insufficient_budget`).
+   *   5. **Call `place_bid_v2` RPC** — atomic 4-write block.
+   *   6. **Advance state** on `was_duplicate=false`: mutate
+   *      `currentNomination.leadingBid` + `leadingBidderId`,
+   *      append to ring buffer, broadcast `auction_bid_placed`.
+   *      Anti-snipe extension semantics (ADR-002 §3.3) are
+   *      deferred to 6b.
+   */
+  private async processPlaceBid(
+    action: Extract<DraftAction, { kind: 'place_bid' }>,
+  ): Promise<DraftActionResult> {
+    // Step 1: format gate.
+    if (this.format !== 'auction') {
+      return { ok: false, reason: 'wrong_format_for_action' };
+    }
+
+    const isAutopick = action.actorKind === 'autopick';
+
+    // Step 2: auth.
+    if (!isAutopick) {
+      let authResult: TeamAuthorizationResult;
+      try {
+        authResult = await this.verifyTeamAuthorization(action.userId, action.teamId);
+      } catch (err) {
+        logger.error(
+          `[lobby] processPlaceBid verifyTeamAuthorization threw lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId}`,
+          err,
+        );
+        return { ok: false, reason: 'internal_error' };
+      }
+      if ('reason' in authResult) {
+        logger.info(
+          `[lobby] unauthorized place_bid attempt lobbyId=${this.lobbyId} userId=${action.userId} teamId=${action.teamId} reason=${authResult.reason}`,
+        );
+        return { ok: false, reason: 'unauthorized' };
+      }
+    }
+
+    // Step 3: active-nomination check.
+    if (this.draftStatus === 'completed' || this.draftStatus === 'cancelled') {
+      return { ok: false, reason: 'invalid_state' };
+    }
+    if (
+      this.currentNomination === null ||
+      this.currentNomination.nominationId !== action.nominationId
+    ) {
+      return { ok: false, reason: 'no_active_nomination' };
+    }
+
+    // Step 4: bid validation.
+    if (action.bidAmount <= this.currentNomination.leadingBid) {
+      return { ok: false, reason: 'bid_too_low' };
+    }
+    // Min increment in 6a is flat `auctionMinBid` ($1 default).
+    // ADR-002 §4.3 tiered increments land in 6c.
+    if (action.bidAmount - this.currentNomination.leadingBid < this.auctionMinBid) {
+      return { ok: false, reason: 'bid_increment_violation' };
+    }
+    const budget = this.teamBudgets.get(action.teamId) ?? 0;
+    const playersWon = this.teamPlayersWon.get(action.teamId) ?? 0;
+    const slotsRemaining = this.draftRounds - playersWon;
+    if (slotsRemaining <= 0) {
+      return { ok: false, reason: 'invalid_state' };
+    }
+    const reserve = (slotsRemaining - 1) * this.auctionMinBid;
+    const maxAffordable = budget - reserve;
+    if (action.bidAmount > maxAffordable) {
+      return { ok: false, reason: 'insufficient_budget' };
+    }
+
+    const actor: DraftV2Actor = {
+      kind: isAutopick ? 'autopick' : 'user',
+      id: action.userId,
+      session_id: action.sessionId,
+    };
+
+    // Step 5: call the RPC.
+    let result: Awaited<ReturnType<DraftServiceV2['placeBid']>>;
+    try {
+      result = await this.draftService.placeBid({
+        leagueId: this.leagueId,
+        teamId: action.teamId,
+        nominationId: action.nominationId,
+        bidAmount: action.bidAmount,
+        sessionId: action.sessionId,
+        idempotencyKey: action.idempotencyKey,
+        actor,
+      });
+    } catch (err: unknown) {
+      if (err instanceof AppError) {
+        return { ok: false, reason: this.mapAppErrorToReason(err) };
+      }
+      logger.error(
+        `[lobby] processPlaceBid: unexpected throw lobbyId=${this.lobbyId}`,
+        err,
+      );
+      return { ok: false, reason: 'internal_error' };
+    }
+
+    // Step 6: advance state.
+    if (!result.was_duplicate) {
+      this.currentNomination.leadingBid = action.bidAmount;
+      this.currentNomination.leadingBidderId = action.teamId;
+
+      const timestamp = new Date().toISOString();
+      const event: BufferedDraftEvent = {
+        kind: 'auction_bid_placed',
+        seq: result.seq,
+        timestamp,
+        nominationId: action.nominationId,
+        bidderTeamId: action.teamId,
+        bidAmount: action.bidAmount,
+        // 6a anti-snipe deferred — `clockDeadline` carries the
+        // nomination's original deadline. Forward-compat with 6b.
+        clockDeadline: this.currentNomination.expiresAt.toISOString(),
+        correlationId: action.idempotencyKey,
+      };
+      this.events.append(event);
+      this.broadcast({
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'event',
+        seq: result.seq,
+        timestamp,
+        correlationId: action.idempotencyKey,
+        payload: event,
+      });
+
+      // Anti-snipe deadline extension (ADR-002 §3.3): deferred to
+      // chunk 11g.6 sub-step 6b. Today the bid does NOT extend the
+      // bid-window timer.
     }
 
     return { ok: true, eventSeq: result.seq };
@@ -1302,16 +1820,42 @@ export class LobbyManager {
           );
           skippedCount++;
           break;
+        // ── Auction events (chunk 11g.6 sub-step 6a) ──────────────────
+        case 'auction_nomination_started':
+          this.applyAuctionNominationStartedEvent(event);
+          break;
+        case 'auction_bid_placed':
+          this.applyAuctionBidPlacedEvent(event);
+          break;
+        case 'auction_nomination_closed':
+          this.applyAuctionNominationClosedEvent(event);
+          break;
+        case 'auction_nomination_expired':
+          this.applyAuctionNominationExpiredEvent(event);
+          break;
+        case 'auction_paused':
+        case 'auction_resumed':
+          // Auction pause/resume mirror the snake/linear flow. Engine-
+          // side pause state lives in `pauseState`; the chunks that
+          // drive these (commissioner override + cross-process
+          // notification) land in 6c. Replay them as state-only events
+          // for now — no in-memory mutation beyond the existing
+          // `pauseState` field.
+          logger.debug(
+            `[lobby] bootstrap auction pause/resume placeholder event_type=${event.event_type} ` +
+              `seq=${event.seq} lobbyId=${this.lobbyId} (chunk 11g.6 6c handles fully)`,
+          );
+          skippedCount++;
+          break;
         default:
-          // Forward-compat for chunk 11g.6 auction events
-          // (`auction_*` per ADR-002 §4.1) and any future additions.
-          // Today the migration's CHECK enum doesn't admit these, so
-          // encountering one means the CHECK was ALTERed by a newer
-          // chunk that this engine doesn't understand yet.
+          // Forward-compat for any future additions. Today the
+          // migration's CHECK enum admits the 9 event types listed
+          // in the cases above; encountering an unknown type means
+          // a newer chunk added one that this engine doesn't handle.
           logger.warn(
             `[lobby] bootstrap unknown event_type=${event.event_type} ` +
               `seq=${event.seq} lobbyId=${this.lobbyId} ` +
-              `(forward-compat skip — chunk 11g.6 / ADR-002 §4.1 may handle)`,
+              `(forward-compat skip)`,
           );
           skippedCount++;
           break;
@@ -1506,6 +2050,163 @@ export class LobbyManager {
     }
   }
 
+  // ── Auction event-replay handlers (chunk 11g.6 sub-step 6a) ────────
+
+  /**
+   * Bootstrap handler for `event_type === 'auction_nomination_started'`.
+   * Sets `currentNomination` from the payload, appends a translated
+   * application-layer event to the ring buffer. Does NOT schedule a
+   * timer (init() handles that post-replay so paused / completed
+   * states correctly suppress).
+   */
+  private applyAuctionNominationStartedEvent(event: DraftEventRow): void {
+    const payload = event.payload as Record<string, unknown>;
+    const nominationId = String(payload.nomination_id);
+    const playerId = String(payload.player_id);
+    const playerName = String(payload.player_name ?? '');
+    const nominatorTeamId = String(payload.nominator_team_id);
+    const openingBid = Number(payload.opening_bid);
+    const expiresAt = new Date(String(payload.expires_at));
+
+    this.currentNomination = {
+      nominationId,
+      playerId,
+      playerName,
+      nominatorTeamId,
+      leadingBidderId: nominatorTeamId,
+      leadingBid: openingBid,
+      expiresAt,
+      timerHandle: null,
+    };
+    if (this.draftStatus === 'not_started') {
+      this.draftStatus = 'in_progress';
+    }
+
+    this.events.append({
+      kind: 'auction_nomination_started',
+      seq: event.seq,
+      timestamp: event.created_at,
+      nominationId,
+      playerId,
+      playerName,
+      nominatorTeamId,
+      openingBid,
+      clockDeadline: expiresAt.toISOString(),
+      correlationId: event.idempotency_key ?? '',
+    });
+  }
+
+  /**
+   * Bootstrap handler for `event_type === 'auction_bid_placed'`.
+   * Mutates `currentNomination.leadingBid` + `leadingBidderId`.
+   * Throws if no active nomination — events arriving in this state
+   * indicate an event-log corruption.
+   */
+  private applyAuctionBidPlacedEvent(event: DraftEventRow): void {
+    if (this.currentNomination === null) {
+      throw new Error(
+        `[lobby] bootstrap auction_bid_placed with no active nomination ` +
+          `lobbyId=${this.lobbyId} seq=${event.seq}`,
+      );
+    }
+    const payload = event.payload as Record<string, unknown>;
+    const nominationId = String(payload.nomination_id);
+    if (nominationId !== this.currentNomination.nominationId) {
+      throw new Error(
+        `[lobby] bootstrap auction_bid_placed nomination mismatch ` +
+          `lobbyId=${this.lobbyId} seq=${event.seq} ` +
+          `expected=${this.currentNomination.nominationId} got=${nominationId}`,
+      );
+    }
+    const bidderTeamId = String(payload.team_id);
+    const bidAmount = Number(payload.bid_amount);
+    this.currentNomination.leadingBid = bidAmount;
+    this.currentNomination.leadingBidderId = bidderTeamId;
+
+    this.events.append({
+      kind: 'auction_bid_placed',
+      seq: event.seq,
+      timestamp: event.created_at,
+      nominationId,
+      bidderTeamId,
+      bidAmount,
+      clockDeadline: this.currentNomination.expiresAt.toISOString(),
+      correlationId: event.idempotency_key ?? '',
+    });
+  }
+
+  /**
+   * Bootstrap handler for `event_type === 'auction_nomination_closed'`.
+   * Deducts winner's budget, increments `players_won`, increments
+   * `nominationsCompleted`, clears `currentNomination`, advances to
+   * `completed` if the auction is full.
+   */
+  private applyAuctionNominationClosedEvent(event: DraftEventRow): void {
+    const payload = event.payload as Record<string, unknown>;
+    const nominationId = String(payload.nomination_id);
+    const winnerTeamId = String(payload.winning_team_id);
+    const finalAmount = Number(payload.final_amount);
+    const totalBids = Number(payload.total_bids ?? 1);
+    const playerId = String(payload.player_id);
+
+    const prevBudget = this.teamBudgets.get(winnerTeamId) ?? 0;
+    const prevWon = this.teamPlayersWon.get(winnerTeamId) ?? 0;
+    this.teamBudgets.set(winnerTeamId, prevBudget - finalAmount);
+    this.teamPlayersWon.set(winnerTeamId, prevWon + 1);
+
+    this.currentNomination = null;
+    this.nominationsCompleted++;
+
+    this.events.append({
+      kind: 'auction_nomination_closed',
+      seq: event.seq,
+      timestamp: event.created_at,
+      nominationId,
+      winnerTeamId,
+      finalAmount,
+      totalBids,
+      playerId,
+    });
+
+    const totalNominations = this.nominationOrder.length * this.draftRounds;
+    if (
+      this.nominationOrder.length > 0 &&
+      this.nominationsCompleted >= totalNominations
+    ) {
+      this.draftStatus = 'completed';
+    }
+  }
+
+  /**
+   * Bootstrap handler for `event_type === 'auction_nomination_expired'`.
+   * No-sale: nominator forfeited the turn. No budget / players_won
+   * change. Increments `nominationsCompleted` and clears
+   * `currentNomination`.
+   */
+  private applyAuctionNominationExpiredEvent(event: DraftEventRow): void {
+    const payload = event.payload as Record<string, unknown>;
+    const nominationId = String(payload.nomination_id);
+
+    this.currentNomination = null;
+    this.nominationsCompleted++;
+
+    this.events.append({
+      kind: 'auction_nomination_expired',
+      seq: event.seq,
+      timestamp: event.created_at,
+      nominationId,
+      reason: 'no_bids',
+    });
+
+    const totalNominations = this.nominationOrder.length * this.draftRounds;
+    if (
+      this.nominationOrder.length > 0 &&
+      this.nominationsCompleted >= totalNominations
+    ) {
+      this.draftStatus = 'completed';
+    }
+  }
+
   // ── Step 6c: pick deadline timer + autopick on timeout ─────────────
 
   /**
@@ -1531,11 +2232,41 @@ export class LobbyManager {
     const delayMs = Math.max(0, deadline.getTime() - Date.now());
     this.currentPickTimerHandle = setTimeout(() => {
       this.currentPickTimerHandle = null;
-      void this.handleAutopickTimeout();
+      void this.handleClockExpired();
     }, delayMs);
     logger.debug(
       `[lobby] pick deadline scheduled lobbyId=${this.lobbyId} deadline=${deadline.toISOString()} delayMs=${delayMs}`,
     );
+  }
+
+  /**
+   * Format-aware clock-expiry dispatch (chunk 11g.6 sub-step 6a).
+   * Snake/linear → autopick; auction → close-nomination. Common
+   * defensive guards (shut down / not in_progress / paused) live
+   * here so each branch's body is single-purpose.
+   */
+  private async handleClockExpired(): Promise<void> {
+    if (this.shutDown) {
+      logger.debug(`[lobby] clock fired post-shutdown — ignored lobbyId=${this.lobbyId}`);
+      return;
+    }
+    if (this.draftStatus !== 'in_progress') {
+      logger.warn(
+        `[lobby] clock fired but draftStatus=${this.draftStatus} — ignored (timer should have been cancelled) lobbyId=${this.lobbyId}`,
+      );
+      return;
+    }
+    if (this.pauseState !== null) {
+      logger.warn(
+        `[lobby] clock fired while paused — ignored (pauseDraft should have cancelled) lobbyId=${this.lobbyId}`,
+      );
+      return;
+    }
+    if (this.format === 'auction') {
+      await this.handleNominationTimeout();
+    } else {
+      await this.handleAutopickTimeout();
+    }
   }
 
   /**
@@ -1564,22 +2295,10 @@ export class LobbyManager {
    * transition; if it fires anyway, treat as stale and ignore).
    */
   private async handleAutopickTimeout(): Promise<void> {
-    if (this.shutDown) {
-      logger.debug(`[lobby] autopick fired post-shutdown — ignored lobbyId=${this.lobbyId}`);
-      return;
-    }
-    if (this.draftStatus !== 'in_progress') {
-      logger.warn(
-        `[lobby] autopick fired but draftStatus=${this.draftStatus} — ignored (timer should have been cancelled) lobbyId=${this.lobbyId}`,
-      );
-      return;
-    }
-    if (this.pauseState !== null) {
-      logger.warn(
-        `[lobby] autopick fired while paused — ignored (pauseDraft should have cancelled) lobbyId=${this.lobbyId}`,
-      );
-      return;
-    }
+    // Guards (shut down / not in_progress / paused) live in
+    // handleClockExpired — this method is only called from that
+    // dispatcher AND from legacy direct callers (none today, but
+    // keep the method signature stable for forward-compat).
 
     const slot = this.draftOrder[this.picksMade];
     if (!slot) {
@@ -1648,6 +2367,143 @@ export class LobbyManager {
       logger.error(
         `[lobby] autopick enqueueAction threw lobbyId=${this.lobbyId}`,
         err,
+      );
+    }
+  }
+
+  /**
+   * Auction nomination-timer entry point (chunk 11g.6 sub-step 6a).
+   * Called from `handleClockExpired` when the bid window closes.
+   * Common defensive guards already ran in the dispatcher.
+   *
+   * Sequence:
+   *   1. **Active-nomination guard** — if `currentNomination` is
+   *      already null, the timer fired against a closed nomination
+   *      (race with a manual close path; shouldn't happen in 6a).
+   *      Log warn and return.
+   *   2. **Call `close_nomination_v2` RPC** — atomic 5-write block
+   *      (UPDATE auction_nominations + UPDATE auction_budgets +
+   *      INSERT draft_picks + INSERT draft_events; no_sale branch
+   *      omits the budget/picks writes when the nominator's
+   *      opening bid is the only bid).
+   *   3. **Advance state** — deduct budget, increment players_won,
+   *      append closed/expired event to ring buffer, broadcast,
+   *      increment `nominationsCompleted`, clear
+   *      `currentNomination`. Auction-completion check fires when
+   *      `nominationsCompleted >= teams × draftRounds`.
+   *
+   * Unlike snake/linear's `handleAutopickTimeout` (which routes a
+   * synthetic `submit_pick` action through the queue),
+   * `handleNominationTimeout` calls `closeNomination` directly. The
+   * close is engine-authored and engine-only; there's no
+   * client-facing `close_nomination` action that needs to be
+   * idempotency-cached or auth-checked.
+   */
+  private async handleNominationTimeout(): Promise<void> {
+    if (this.currentNomination === null) {
+      logger.warn(
+        `[lobby] nomination timeout fired with no active nomination — ignored lobbyId=${this.lobbyId}`,
+      );
+      return;
+    }
+    const nomination = this.currentNomination;
+
+    let result: Awaited<ReturnType<DraftServiceV2['closeNomination']>>;
+    try {
+      result = await this.draftService.closeNomination({
+        leagueId: this.leagueId,
+        nominationId: nomination.nominationId,
+        idempotencyKey: `close-${nomination.nominationId}`,
+        actor: {
+          kind: 'autopick',
+          id: 'auction-engine',
+          session_id: randomUUID(),
+        },
+      });
+    } catch (err) {
+      logger.error(
+        `[lobby] closeNomination RPC threw lobbyId=${this.lobbyId} nominationId=${nomination.nominationId}`,
+        err,
+      );
+      // Stuck-auction condition. Surface for ops; clear timer and
+      // currentNomination so the lobby doesn't deadlock. Chunk 11g.7
+      // alerting fires on this log line.
+      this.currentNomination = null;
+      this.currentPickDeadline = null;
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const correlationId = `close-${nomination.nominationId}`;
+
+    if (!result.no_sale) {
+      // Winning bid: deduct budget, increment players_won. Mirror
+      // the RPC's atomic UPDATE auction_budgets writes so engine
+      // state matches the DB without a re-read. Winner / final
+      // amount come from the in-memory `currentNomination` (which
+      // tracked the leading bid live); RPC doesn't redundantly
+      // return them.
+      const winnerId = nomination.leadingBidderId;
+      const finalAmount = nomination.leadingBid;
+      const prevBudget = this.teamBudgets.get(winnerId) ?? 0;
+      const prevWon = this.teamPlayersWon.get(winnerId) ?? 0;
+      this.teamBudgets.set(winnerId, prevBudget - finalAmount);
+      this.teamPlayersWon.set(winnerId, prevWon + 1);
+
+      const event: BufferedDraftEvent = {
+        kind: 'auction_nomination_closed',
+        seq: result.seq,
+        timestamp,
+        nominationId: nomination.nominationId,
+        winnerTeamId: winnerId,
+        finalAmount,
+        // Engine doesn't track per-nomination bid counts in 6a;
+        // placeholder of 1 (= the opening bid) is the floor.
+        // Chunk 11g.6 6b/6c may add a counter on `currentNomination`.
+        totalBids: 1,
+        playerId: nomination.playerId,
+      };
+      this.events.append(event);
+      this.broadcast({
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'event',
+        seq: result.seq,
+        timestamp,
+        correlationId,
+        payload: event,
+      });
+    } else {
+      // No-sale: nomination expired with only the opening bid (no
+      // follow-up bids). Nominator forfeits the turn, no budget
+      // change. ADR-002 §3.3.
+      const event: BufferedDraftEvent = {
+        kind: 'auction_nomination_expired',
+        seq: result.seq,
+        timestamp,
+        nominationId: nomination.nominationId,
+        reason: 'no_bids',
+      };
+      this.events.append(event);
+      this.broadcast({
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'event',
+        seq: result.seq,
+        timestamp,
+        correlationId,
+        payload: event,
+      });
+    }
+
+    this.currentNomination = null;
+    this.currentPickDeadline = null;
+    this.nominationsCompleted++;
+
+    // Auction completion check.
+    const totalNominations = this.nominationOrder.length * this.draftRounds;
+    if (this.nominationsCompleted >= totalNominations) {
+      this.draftStatus = 'completed';
+      logger.info(
+        `[lobby] auction completed lobbyId=${this.lobbyId} totalNominations=${totalNominations}`,
       );
     }
   }
