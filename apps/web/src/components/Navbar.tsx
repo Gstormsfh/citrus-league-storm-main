@@ -139,7 +139,10 @@ const Navbar = () => {
       ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-pastel-surface/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-white/10">
+    <header
+      className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:border-b max-lg:border-white/10"
+      style={{ backgroundColor: '#0F1F15' }}
+    >
       {/* ===== ROW 1: Brand bar ===== */}
       <div className="hidden lg:block bg-pastel-surface border-b border-white/5">
         <div className="w-full px-6 h-12 flex items-center justify-between">
@@ -382,7 +385,10 @@ const Navbar = () => {
 
       {/* ===== MOBILE: Slide-in menu ===== */}
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-pastel-surface animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
+        <div
+          className="lg:hidden fixed inset-0 top-[56px] z-50 animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10"
+          style={{ backgroundColor: '#0F1F15' }}
+        >
           <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3">
             {/* League context + switcher */}
             {user && !leagueLoading && userLeagues.length === 0 && (
