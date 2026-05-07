@@ -241,9 +241,18 @@ export const StormyChatBubble = () => {
 
   // ── Open State (Chat Card) ─────────────────────────────────────
 
+  // Mobile: cap height to viewport minus the 9rem bottom offset plus a small
+  // headroom so the header (close/minimize buttons) is always reachable on
+  // short phones — the previous 80vh cap pushed the top off-screen.
+  const heightClass = isMinimized
+    ? 'h-[70px]'
+    : isMobile
+      ? 'h-[min(640px,calc(100dvh-10rem-env(safe-area-inset-top)-env(safe-area-inset-bottom)))]'
+      : 'h-[min(640px,80vh)]';
+
   return (
     <Card
-      className={`fixed w-[calc(100vw-3rem)] md:w-[440px] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10 border-0 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 bg-pastel-surface-tile ${isMinimized ? 'h-[70px]' : 'h-[min(640px,80vh)]'}`}
+      className={`fixed w-[calc(100vw-3rem)] md:w-[440px] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10 border-0 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 bg-pastel-surface-tile ${heightClass}`}
       style={{
         position: 'fixed',
         bottom: isMobile ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem)' : '1.5rem',
