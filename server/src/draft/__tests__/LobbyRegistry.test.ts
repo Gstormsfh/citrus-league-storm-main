@@ -13,7 +13,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { LobbyRegistry, type LobbyConfig } from '../LobbyRegistry';
 import { LobbyManager } from '../LobbyManager';
 import type { DraftServiceV2 } from '../../services/DraftServiceV2';
-import type { DraftFormat, TeamAuthorizationResult } from '../types';
+import type {
+  CommissionerAuthorizationResult,
+  DraftFormat,
+  TeamAuthorizationResult,
+} from '../types';
 import { generateDraftOrder } from '../draftOrderGenerator';
 
 // ── Test helpers ─────────────────────────────────────────────────────
@@ -29,6 +33,11 @@ const ALLOW_ALL_AUTH: (
   teamId: string,
 ) => Promise<TeamAuthorizationResult> = async () => ({ authorized: true });
 
+const ALLOW_ALL_COMMISH_AUTH: (
+  userId: string,
+  leagueId: string,
+) => Promise<CommissionerAuthorizationResult> = async () => ({ authorized: true });
+
 interface MakeRegistryOpts {
   lobbyConfigLookup?: (leagueId: string) => Promise<LobbyConfig>;
   publish?: (topic: string, message: string) => void;
@@ -36,6 +45,10 @@ interface MakeRegistryOpts {
     userId: string,
     teamId: string,
   ) => Promise<TeamAuthorizationResult>;
+  verifyCommissionerAuthorization?: (
+    userId: string,
+    leagueId: string,
+  ) => Promise<CommissionerAuthorizationResult>;
   /** Step 6c: stub Supabase client; default is no-op chainable. */
   supabase?: SupabaseClient;
 }
@@ -99,12 +112,15 @@ function makeRegistry(opts: MakeRegistryOpts = {}) {
     vi.fn(async (_leagueId: string) => DEFAULT_LOBBY_CONFIG);
   const publish = opts.publish ?? vi.fn();
   const verifyTeamAuthorization = opts.verifyTeamAuthorization ?? ALLOW_ALL_AUTH;
+  const verifyCommissionerAuthorization =
+    opts.verifyCommissionerAuthorization ?? ALLOW_ALL_COMMISH_AUTH;
   const supabase = opts.supabase ?? makeStubSupabase();
   const registry = new LobbyRegistry({
     draftService,
     lobbyConfigLookup,
     publish,
     verifyTeamAuthorization,
+    verifyCommissionerAuthorization,
     supabase,
   });
   return { registry, lobbyConfigLookup, draftService, publish, verifyTeamAuthorization, supabase };
@@ -299,6 +315,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
       lobbyConfigLookup,
       publish,
       verifyTeamAuthorization: ALLOW_ALL_AUTH,
+      verifyCommissionerAuthorization: ALLOW_ALL_COMMISH_AUTH,
       supabase: makeStubSupabase(),
     });
 
@@ -345,6 +362,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
       lobbyConfigLookup,
       publish: vi.fn(),
       verifyTeamAuthorization,
+      verifyCommissionerAuthorization: ALLOW_ALL_COMMISH_AUTH,
       supabase: makeStubSupabase(),
     });
 
@@ -414,6 +432,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
       lobbyConfigLookup,
       publish: vi.fn(),
       verifyTeamAuthorization: ALLOW_ALL_AUTH,
+      verifyCommissionerAuthorization: ALLOW_ALL_COMMISH_AUTH,
       supabase: makeStubSupabase(),
     });
 
@@ -465,6 +484,7 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
       lobbyConfigLookup,
       publish: vi.fn(),
       verifyTeamAuthorization: ALLOW_ALL_AUTH,
+      verifyCommissionerAuthorization: ALLOW_ALL_COMMISH_AUTH,
       supabase: makeStubSupabase(),
     });
 

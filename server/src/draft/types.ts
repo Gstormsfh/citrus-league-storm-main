@@ -208,7 +208,17 @@ export type DraftActionResult =
         // bids reopen on resume" toast instead of generic
         // 'invalid_state'. Engine fail-fast in processPlaceBid /
         // processNominate during pauseState !== null.
-        | 'auction_paused';
+        | 'auction_paused'
+        // Chunk 11g.6 sub-step 6c4 (auction commissioner override):
+        // typed rejection reasons for the seven override actions.
+        // Each reason maps to a specific failure mode of one or
+        // more override actions; clients can render actionable
+        // errors per the action attempted.
+        | 'no_bids_to_revert'
+        | 'insufficient_budget_for_award'
+        | 'opening_bid_below_current_leading'
+        | 'extension_below_current_deadline'
+        | 'insufficient_budget_for_floor_increase';
       /**
        * Chunk 11g.6 sub-step 6c2: when `reason ===
        * 'bid_increment_violation'`, engine populates the computed
@@ -307,6 +317,26 @@ export type TeamAuthorizationResult =
   | {
       authorized: false;
       reason: 'not_owner' | 'team_not_found' | 'team_archived' | 'co_manager_disabled';
+    };
+
+/**
+ * Discriminated union returned by the engine-side
+ * `verifyCommissionerAuthorization` callback (chunk 11g.6 sub-step
+ * 6c4 per ADR-002 §4.4 + ADR-004 §5). Engine MUST verify
+ * commissioner authority before calling
+ * `auction_commissioner_override_v2` with `actor.kind='commissioner'`.
+ *
+ * Today's `index.ts` implementation queries `leagues.commissioner_id`
+ * directly; same `service_role` bypass pattern as
+ * `verifyTeamAuthorization`. Engine logs the granular `reason` at
+ * info level for observability but returns coarse-grained
+ * `'unauthorized'` to the client (no information disclosure).
+ */
+export type CommissionerAuthorizationResult =
+  | { authorized: true }
+  | {
+      authorized: false;
+      reason: 'not_commissioner' | 'league_not_found';
     };
 
 /**

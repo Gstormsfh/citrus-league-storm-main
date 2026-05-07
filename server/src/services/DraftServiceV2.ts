@@ -237,6 +237,45 @@ export interface SkipNominationResult {
   was_duplicate: boolean;
 }
 
+// ── Chunk 11g.6 sub-step 6c4 — auction commissioner override ─────────
+
+/**
+ * Discriminated union of the seven commissioner override actions.
+ * Per ADR-002 §4.4 + extensions documented in
+ * PHASE_4_5_PROJECT_PLAN.md Decision Log (2026-05-07).
+ */
+export type CommissionerOverrideAction =
+  | { kind: 'revert_bid' }
+  | { kind: 'force_close_nomination' }
+  | { kind: 'award_to_team'; teamId: string; amount: number }
+  | { kind: 'adjust_opening_bid'; newOpeningBid: number }
+  | { kind: 'adjust_budget'; teamId: string; delta: number }
+  | { kind: 'cancel_nomination' }
+  | { kind: 'extend_bid_window'; extensionSeconds: number };
+
+export interface CommissionerOverrideParams {
+  leagueId: string;
+  action: CommissionerOverrideAction;
+  rationale?: string;
+  idempotencyKey: string;
+  /**
+   * Per ADR-004 §5: actor.kind must be 'commissioner'. RPC
+   * additionally enforces caller is service_role; engine-side
+   * `verifyCommissionerAuthorization` callback fail-fasts before
+   * the RPC call.
+   */
+  actor: DraftV2Actor;
+}
+
+export interface CommissionerOverrideResult {
+  event_id: number;
+  seq: number;
+  override_action: CommissionerOverrideAction['kind'];
+  prior_state: Record<string, unknown>;
+  new_state: Record<string, unknown>;
+  was_duplicate: boolean;
+}
+
 export interface CloseNominationResult {
   event_id: number;
   seq: number;
@@ -582,6 +621,56 @@ export class DraftServiceV2 {
 
     if (error) throw mapRpcError(error);
     return data as SkipNominationResult;
+  }
+
+  /**
+   * Execute a commissioner override via `auction_commissioner_override_v2`
+   * (chunk 11g.6 sub-step 6c4 per ADR-002 §4.4 + extensions).
+   *
+   * **Polymorphic single-RPC architecture.** All seven override
+   * actions go through this one method; the `action` discriminated-
+   * union value's `kind` becomes the RPC's `p_override_action`
+   * parameter; action-specific fields become `p_action_payload`
+   * JSONB.
+   *
+   * Auth (per ADR-004 §5): requires `actor.kind='commissioner'` AND
+   * service_role. Engine-side `verifyCommissionerAuthorization`
+   * fail-fasts before this method is called; RPC enforces the
+   * commissioner authority check durably (defense-in-depth).
+   *
+   * Each action's atomicity contract is documented inline in the
+   * SQL migration. Per-branch atomic multi-table writes match what
+   * natural events would have produced (e.g., `force_close_nomination`
+   * mutates `auction_budgets` + INSERTs `draft_picks` like
+   * `auction_nomination_closed` would), but the canonical durable
+   * event is a single `auction_commissioner_override` row with the
+   * `overrideAction` discriminator.
+   */
+  async commissionerOverride(
+    params: CommissionerOverrideParams,
+  ): Promise<CommissionerOverrideResult> {
+    // Strip the `kind` discriminator out of the action payload — the
+    // RPC takes it as a separate `p_override_action` parameter. The
+    // remaining fields (if any) become `p_action_payload`.
+    const { kind, ...payload } = params.action as { kind: string } & Record<
+      string,
+      unknown
+    >;
+
+    const { data, error } = await this.supabase.rpc(
+      'auction_commissioner_override_v2',
+      {
+        p_league_id:       params.leagueId,
+        p_actor:           params.actor,
+        p_override_action: kind,
+        p_action_payload:  payload,
+        p_idempotency_key: params.idempotencyKey,
+        p_rationale:       params.rationale ?? null,
+      },
+    );
+
+    if (error) throw mapRpcError(error);
+    return data as CommissionerOverrideResult;
   }
 
   /**

@@ -352,6 +352,54 @@ export type BufferedDraftEvent =
       correlationId: string;
       skippedTeamId: string;
       reason: 'insufficient_budget' | 'no_eligible_players';
+    }
+  | {
+      /**
+       * Commissioner override (chunk 11g.6 sub-step 6c4 per ADR-002
+       * §4.4 + extensions). **Polymorphic discriminator-based event**
+       * — a single event variant covers all seven supported override
+       * actions; the `overrideAction` field discriminates. Engine
+       * bootstrap dispatches on `overrideAction` to per-action APPLY
+       * handlers; runtime dispatch in `LobbyManager.processCommissionerOverride`
+       * mirrors the apply-handler pattern.
+       *
+       * **No additional side-effect events are emitted.** A
+       * `force_close_nomination` does NOT also emit
+       * `auction_nomination_closed`; a `cancel_nomination` does NOT
+       * emit a separate cancel event. Engine state mutations match
+       * what natural events would have produced (e.g.,
+       * `force_close_nomination` mutates `teamBudgets` /
+       * `teamPlayersWon` like `auction_nomination_closed` would),
+       * but the canonical event in the durable log is this single
+       * polymorphic row. Avoids redundant event pairs.
+       *
+       * **Seven actions ship in 6c4 — extending ADR-002 §4.1's
+       * three illustrative actions** (forced nomination, forced
+       * close, undo) with a full operational toolbox commissioners
+       * need on day 1. Decision Log 2026-05-07 captures the
+       * extension rationale.
+       *
+       * `priorState` and `newState` are action-specific JSONB
+       * snapshots for audit reconstruction. Their shapes vary by
+       * `overrideAction`; the engine reads them with action-aware
+       * field extraction during bootstrap APPLY.
+       */
+      kind: 'auction_commissioner_override';
+      seq: number;
+      timestamp: string;
+      correlationId: string;
+      commissionerUserId: string;
+      overrideAction:
+        | 'revert_bid'
+        | 'force_close_nomination'
+        | 'award_to_team'
+        | 'adjust_opening_bid'
+        | 'adjust_budget'
+        | 'cancel_nomination'
+        | 'extend_bid_window';
+      priorState: Record<string, unknown>;
+      newState: Record<string, unknown>;
+      rationale?: string;
     };
 
 // ── Snapshot payloads ──────────────────────────────────────────────

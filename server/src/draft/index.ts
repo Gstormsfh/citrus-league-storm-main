@@ -69,7 +69,12 @@ import { startUwsServer, type UwsServerHandle } from './uws-server';
 import { LobbyRegistry, type LobbyConfig } from './LobbyRegistry';
 import { DraftServiceV2 } from '../services/DraftServiceV2';
 import { supabaseAdmin } from '../lib/supabase';
-import type { DraftFormat, DraftOrderSlot, TeamAuthorizationResult } from './types';
+import type {
+  CommissionerAuthorizationResult,
+  DraftFormat,
+  DraftOrderSlot,
+  TeamAuthorizationResult,
+} from './types';
 import {
   DEFAULT_BID_INCREMENT_TIERS,
   validateBidIncrementTiers,
@@ -497,10 +502,36 @@ async function verifyTeamAuthorization(
   return { authorized: true };
 }
 
+/**
+ * Engine-side commissioner-authorization callback (chunk 11g.6
+ * sub-step 6c4 per ADR-002 §4.4 + ADR-004 §5). Parallel structure
+ * to `verifyTeamAuthorization`. Queries `leagues.commissioner_id`
+ * directly; returns granular reasons for observability while the
+ * engine returns coarse-grained `'unauthorized'` to the client.
+ */
+async function verifyCommissionerAuthorization(
+  userId: string,
+  leagueId: string,
+): Promise<CommissionerAuthorizationResult> {
+  const { data, error } = await supabaseAdmin
+    .from('leagues')
+    .select('commissioner_id')
+    .eq('id', leagueId)
+    .single();
+  if (error || !data) {
+    return { authorized: false, reason: 'league_not_found' };
+  }
+  if (data.commissioner_id !== userId) {
+    return { authorized: false, reason: 'not_commissioner' };
+  }
+  return { authorized: true };
+}
+
 const lobbyRegistry = new LobbyRegistry({
   draftService: new DraftServiceV2(supabaseAdmin),
   lobbyConfigLookup: lookupLobbyConfig,
   verifyTeamAuthorization,
+  verifyCommissionerAuthorization,
   publish: publishToLobbyTopic,
   // Step 6c: same admin client backs autopick read queries
   // (player projections, already-drafted lookup). Forwarded

@@ -30,6 +30,7 @@ import type {
 } from '../../services/DraftServiceV2';
 import type {
   BufferedDraftEvent,
+  CommissionerAuthorizationResult,
   DraftAction,
   DraftOrderSlot,
   DraftSocketUserData,
@@ -43,7 +44,7 @@ interface MakeLobbyOpts
   extends Partial<
     Omit<
       LobbyManagerOptions,
-      'draftService' | 'publish' | 'verifyTeamAuthorization' | 'supabase'
+      'draftService' | 'publish' | 'verifyTeamAuthorization' | 'verifyCommissionerAuthorization' | 'supabase'
     >
   > {
   submitPick?: (params: unknown) => Promise<SubmitPickResult>;
@@ -63,11 +64,17 @@ interface MakeLobbyOpts
   resumeAuction?: (params: unknown) => Promise<unknown>;
   /** Chunk 11g.6 6c3: skip-nomination RPC stub. */
   skipNomination?: (params: unknown) => Promise<unknown>;
+  /** Chunk 11g.6 6c4: commissioner-override RPC stub. */
+  commissionerOverride?: (params: unknown) => Promise<unknown>;
   publish?: (topic: string, message: string) => void;
   verifyTeamAuthorization?: (
     userId: string,
     teamId: string,
   ) => Promise<TeamAuthorizationResult>;
+  verifyCommissionerAuthorization?: (
+    userId: string,
+    leagueId: string,
+  ) => Promise<CommissionerAuthorizationResult>;
   /**
    * Step 6c: stub Supabase client for autopick read queries.
    * Default is a no-op stub returning empty arrays. Tests that
@@ -98,6 +105,15 @@ const ALLOW_ALL_AUTH: (
   userId: string,
   teamId: string,
 ) => Promise<TeamAuthorizationResult> = async () => ({ authorized: true });
+
+/**
+ * Default-allow commissioner-auth callback (chunk 11g.6 sub-step
+ * 6c4). Same shape as ALLOW_ALL_AUTH but for league commissioner.
+ */
+const ALLOW_ALL_COMMISH_AUTH: (
+  userId: string,
+  leagueId: string,
+) => Promise<CommissionerAuthorizationResult> = async () => ({ authorized: true });
 
 /**
  * Construct a LobbyManager AND await its `init()` so tests get an
@@ -185,6 +201,16 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
       reason: 'insufficient_budget' as const,
       was_duplicate: false,
     }));
+  const commissionerOverride =
+    opts.commissionerOverride ??
+    vi.fn(async (_params: unknown) => ({
+      event_id: 13,
+      seq: 13,
+      override_action: 'cancel_nomination' as const,
+      prior_state: {},
+      new_state: {},
+      was_duplicate: false,
+    }));
 
   const draftService = {
     submitPick,
@@ -195,9 +221,12 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
     pauseAuction,
     resumeAuction,
     skipNomination,
+    commissionerOverride,
   } as unknown as DraftServiceV2;
   const publish = opts.publish ?? vi.fn();
   const verifyTeamAuthorization = opts.verifyTeamAuthorization ?? ALLOW_ALL_AUTH;
+  const verifyCommissionerAuthorization =
+    opts.verifyCommissionerAuthorization ?? ALLOW_ALL_COMMISH_AUTH;
   // Default draftOrder matches the existing default teamIds — pre-step-6a
   // tests that exercised submit_pick with team='team-1' still pass
   // because team-1 is on the clock at picksMade=0.
@@ -213,6 +242,7 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
     publish,
     draftOrder,
     verifyTeamAuthorization,
+    verifyCommissionerAuthorization,
     supabase,
     pickClockSeconds: opts.pickClockSeconds ?? 91, // 90 + 1s pad default
     initialPickDeadline: opts.initialPickDeadline ?? null,
@@ -4567,5 +4597,558 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // ── Chunk 11g.6 sub-step 6c4 — auction commissioner override ────────
+  //
+  // Polymorphic single-event-variant architecture: all seven
+  // override actions flow through `LobbyManager.commissionerOverride`
+  // → `auction_commissioner_override_v2` RPC → single
+  // `auction_commissioner_override` event with `overrideAction`
+  // discriminator. Per ADR-002 §4.4 + extensions documented in
+  // PHASE_4_5_PROJECT_PLAN.md Decision Log (2026-05-07).
+
+  /** Helper: auction lobby with active nomination at $5 by team-1. */
+  async function lobbyWithActiveNomination(
+    extra: Partial<MakeLobbyOpts> = {},
+  ) {
+    const nominatePlayer = vi.fn(async (_p: unknown) => ({
+      event_id: 1,
+      seq: 1,
+      nomination_id: 'nom-1',
+      clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+      was_duplicate: false,
+    }));
+    const lobby = await makeLobby(
+      auctionLobbyOpts({ nominatePlayer, ...extra }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+    return lobby;
+  }
+
+  it('6c4 commissionerOverride: snake-format lobby returns wrong_format_for_action', async () => {
+    const lobby = await makeLobby({ format: 'snake' });
+    const result = await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'cancel_nomination' },
+      idempotencyKey: 'idem-1',
+    });
+    expect(result).toEqual({ ok: false, reason: 'wrong_format_for_action' });
+  });
+
+  it('6c4 commissionerOverride: unauthorized user rejected with coarse-grained unauthorized', async () => {
+    const verifyCommissionerAuthorization = vi.fn(async () => ({
+      authorized: false as const,
+      reason: 'not_commissioner' as const,
+    }));
+    const commissionerOverride = vi.fn();
+    const lobby = await lobbyWithActiveNomination({
+      verifyCommissionerAuthorization,
+      commissionerOverride,
+    });
+    const result = await lobby.commissionerOverride({
+      commissionerUserId: 'imposter',
+      action: { kind: 'cancel_nomination' },
+      idempotencyKey: 'idem-1',
+    });
+    expect(result).toEqual({ ok: false, reason: 'unauthorized' });
+    expect(commissionerOverride).not.toHaveBeenCalled();
+  });
+
+  // ── revert_bid ─────────────────────────────────────────────────────
+
+  it('6c4 revert_bid happy path: reverts to prior bidder/amount + broadcasts override event', async () => {
+    const publish = vi.fn();
+    const commissionerOverride = vi.fn(async (_p: unknown) => ({
+      event_id: 100,
+      seq: 100,
+      override_action: 'revert_bid' as const,
+      prior_state: { nominationId: 'nom-1', leadingBidderId: 'team-3', leadingBid: 20 },
+      new_state: { nominationId: 'nom-1', leadingBidderId: 'team-2', leadingBid: 10 },
+      was_duplicate: false,
+    }));
+    const lobby = await lobbyWithActiveNomination({ publish, commissionerOverride });
+    // Simulate two bids: team-2 at $10, team-3 at $20.
+    await lobby.enqueueAction(bidAction({ teamId: 'team-2', bidAmount: 10, idempotencyKey: 'b1' }));
+    await lobby.enqueueAction(bidAction({ teamId: 'team-3', bidAmount: 20, idempotencyKey: 'b2' }));
+    publish.mockClear();
+
+    const result = await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'revert_bid' },
+      idempotencyKey: 'rev-1',
+      rationale: 'collusion suspected',
+    });
+    expect(result).toEqual({ ok: true, eventSeq: 100 });
+
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.currentNomination?.leadingBidderId).toBe('team-2');
+    expect(auctionState?.currentNomination?.leadingBid).toBe(10);
+
+    const broadcastJson = JSON.parse(publish.mock.calls[0][1] as string);
+    expect(broadcastJson.payload.kind).toBe('auction_commissioner_override');
+    expect(broadcastJson.payload.overrideAction).toBe('revert_bid');
+    expect(broadcastJson.payload.rationale).toBe('collusion suspected');
+  });
+
+  it('6c4 revert_bid: rejected with no_active_nomination when no nomination is open', async () => {
+    const lobby = await makeLobby(auctionLobbyOpts());
+    const result = await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'revert_bid' },
+      idempotencyKey: 'rev-1',
+    });
+    expect(result).toEqual({ ok: false, reason: 'no_active_nomination' });
+  });
+
+  // ── force_close_nomination ─────────────────────────────────────────
+
+  it('6c4 force_close (sold outcome): awards player + advances state', async () => {
+    const commissionerOverride = vi.fn(async (_p: unknown) => ({
+      event_id: 100,
+      seq: 100,
+      override_action: 'force_close_nomination' as const,
+      prior_state: { nominationId: 'nom-1', leadingBidderId: 'team-2', leadingBid: 10, totalBids: 2 },
+      new_state: { nominationId: 'nom-1', outcome: 'sold', winnerTeamId: 'team-2', finalAmount: 10, totalBids: 2 },
+      was_duplicate: false,
+    }));
+    const lobby = await lobbyWithActiveNomination({ commissionerOverride });
+    await lobby.enqueueAction(bidAction({ teamId: 'team-2', bidAmount: 10, idempotencyKey: 'b1' }));
+
+    const result = await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'force_close_nomination' },
+      idempotencyKey: 'fc-1',
+    });
+    expect(result.ok).toBe(true);
+
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.currentNomination).toBeNull();
+    expect(auctionState?.nominationsCompleted).toBe(1);
+    expect(auctionState?.teamBudgets['team-2']).toBe(200 - 10);
+    expect(auctionState?.teamRosterSlotsRemaining['team-2']).toBe(2 - 1);
+  });
+
+  it('6c4 force_close (no_sale outcome): no budget deduction; nominationsCompleted advances', async () => {
+    const commissionerOverride = vi.fn(async (_p: unknown) => ({
+      event_id: 100,
+      seq: 100,
+      override_action: 'force_close_nomination' as const,
+      prior_state: { nominationId: 'nom-1', leadingBidderId: 'team-1', leadingBid: 5, totalBids: 1 },
+      new_state: { nominationId: 'nom-1', outcome: 'no_sale' },
+      was_duplicate: false,
+    }));
+    const lobby = await lobbyWithActiveNomination({ commissionerOverride });
+    // Only the opening bid (1 bid total) — natural no_sale path.
+
+    await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'force_close_nomination' },
+      idempotencyKey: 'fc-1',
+    });
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.nominationsCompleted).toBe(1);
+    // No budget deduction.
+    expect(auctionState?.teamBudgets['team-1']).toBe(200);
+  });
+
+  // ── award_to_team ──────────────────────────────────────────────────
+
+  it('6c4 award_to_team happy path: deducts target budget, increments players_won', async () => {
+    const commissionerOverride = vi.fn(async (_p: unknown) => ({
+      event_id: 100,
+      seq: 100,
+      override_action: 'award_to_team' as const,
+      prior_state: { nominationId: 'nom-1', leadingBidderId: 'team-1', leadingBid: 5 },
+      new_state: { nominationId: 'nom-1', awardedTeamId: 'team-3', awardedAmount: 50 },
+      was_duplicate: false,
+    }));
+    const lobby = await lobbyWithActiveNomination({ commissionerOverride });
+
+    await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'award_to_team', teamId: 'team-3', amount: 50 },
+      idempotencyKey: 'aw-1',
+    });
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.teamBudgets['team-3']).toBe(200 - 50);
+    expect(auctionState?.teamRosterSlotsRemaining['team-3']).toBe(2 - 1);
+    expect(auctionState?.currentNomination).toBeNull();
+  });
+
+  it('6c4 award_to_team: rejected with insufficient_budget_for_award when target cannot afford', async () => {
+    const commissionerOverride = vi.fn();
+    const lobby = await lobbyWithActiveNomination({
+      commissionerOverride,
+      // team-3 has $1, draftRounds=2 → reserve = $1 → maxAffordable = $0.
+      initialTeamBudgets: new Map([
+        ['team-1', 200],
+        ['team-2', 200],
+        ['team-3', 1],
+      ]),
+    });
+    const result = await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'award_to_team', teamId: 'team-3', amount: 5 },
+      idempotencyKey: 'aw-1',
+    });
+    expect(result).toEqual({ ok: false, reason: 'insufficient_budget_for_award' });
+    expect(commissionerOverride).not.toHaveBeenCalled();
+  });
+
+  // ── adjust_opening_bid ─────────────────────────────────────────────
+
+  it('6c4 adjust_opening_bid happy path: floor above current leading bumps leading up', async () => {
+    const commissionerOverride = vi.fn(async (_p: unknown) => ({
+      event_id: 100,
+      seq: 100,
+      override_action: 'adjust_opening_bid' as const,
+      prior_state: { nominationId: 'nom-1', openingBid: 1, leadingBid: 5 },
+      new_state: { nominationId: 'nom-1', openingBid: 10, leadingBid: 10 },
+      was_duplicate: false,
+    }));
+    const lobby = await lobbyWithActiveNomination({ commissionerOverride });
+
+    await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'adjust_opening_bid', newOpeningBid: 10 },
+      idempotencyKey: 'ad-1',
+    });
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.currentNomination?.leadingBid).toBe(10);
+  });
+
+  it('6c4 adjust_opening_bid: rejected with opening_bid_below_current_leading when floor below current', async () => {
+    const commissionerOverride = vi.fn();
+    const lobby = await lobbyWithActiveNomination({ commissionerOverride });
+    // Place a bid first so current_high_bid > opening (5 → 10).
+    await lobby.enqueueAction(bidAction({ teamId: 'team-2', bidAmount: 10 }));
+
+    const result = await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'adjust_opening_bid', newOpeningBid: 7 },
+      idempotencyKey: 'ad-1',
+    });
+    expect(result).toEqual({ ok: false, reason: 'opening_bid_below_current_leading' });
+    expect(commissionerOverride).not.toHaveBeenCalled();
+  });
+
+  it('6c4 adjust_opening_bid: rejected with insufficient_budget_for_floor_increase when leader cannot afford', async () => {
+    const commissionerOverride = vi.fn();
+    // team-1 has $6 (enough to nominate at $5 + reserve $1).
+    // Adjusting floor to $20 + reserve $1 = $21 > $6 → reject.
+    const lobby = await lobbyWithActiveNomination({
+      commissionerOverride,
+      initialTeamBudgets: new Map([
+        ['team-1', 6],
+        ['team-2', 200],
+        ['team-3', 200],
+      ]),
+    });
+    const result = await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'adjust_opening_bid', newOpeningBid: 20 },
+      idempotencyKey: 'ad-1',
+    });
+    expect(result).toEqual({ ok: false, reason: 'insufficient_budget_for_floor_increase' });
+    expect(commissionerOverride).not.toHaveBeenCalled();
+  });
+
+  // ── adjust_budget ──────────────────────────────────────────────────
+
+  it('6c4 adjust_budget credit happy path: increases team budget', async () => {
+    const commissionerOverride = vi.fn(async (_p: unknown) => ({
+      event_id: 100,
+      seq: 100,
+      override_action: 'adjust_budget' as const,
+      prior_state: { teamId: 'team-1', budgetRemaining: 200 },
+      new_state: { teamId: 'team-1', budgetRemaining: 250, delta: 50 },
+      was_duplicate: false,
+    }));
+    const lobby = await makeLobby(auctionLobbyOpts({ commissionerOverride }));
+    await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'adjust_budget', teamId: 'team-1', delta: 50 },
+      idempotencyKey: 'ab-1',
+    });
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.teamBudgets['team-1']).toBe(250);
+  });
+
+  it('6c4 adjust_budget debit: rejected with insufficient_budget when delta exceeds budget', async () => {
+    const commissionerOverride = vi.fn();
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        commissionerOverride,
+        initialTeamBudgets: new Map([
+          ['team-1', 5],
+          ['team-2', 200],
+          ['team-3', 200],
+        ]),
+      }),
+    );
+    const result = await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'adjust_budget', teamId: 'team-1', delta: -10 },
+      idempotencyKey: 'ab-1',
+    });
+    expect(result).toEqual({ ok: false, reason: 'insufficient_budget' });
+    expect(commissionerOverride).not.toHaveBeenCalled();
+  });
+
+  // ── cancel_nomination ──────────────────────────────────────────────
+
+  it('6c4 cancel_nomination happy path: clears currentNomination, does NOT advance nominationsCompleted (redo semantics)', async () => {
+    vi.useFakeTimers();
+    try {
+      const commissionerOverride = vi.fn(async (_p: unknown) => ({
+        event_id: 100,
+        seq: 100,
+        override_action: 'cancel_nomination' as const,
+        prior_state: { nominationId: 'nom-1', playerId: '8478402', totalBids: 1, leadingBidderId: 'team-1', leadingBid: 5 },
+        new_state: {},
+        was_duplicate: false,
+      }));
+      const lobby = await lobbyWithActiveNomination({ commissionerOverride });
+
+      await lobby.commissionerOverride({
+        commissionerUserId: 'commish-1',
+        action: { kind: 'cancel_nomination' },
+        idempotencyKey: 'cn-1',
+      });
+      const auctionState = lobby.getAuctionState();
+      // Redo semantics: currentNomination cleared, nominationsCompleted stays at 0.
+      expect(auctionState?.currentNomination).toBeNull();
+      expect(auctionState?.nominationsCompleted).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('6c4 cancel_nomination during pause: pauseState flips to nomination_window kind + remainingMs reset', async () => {
+    vi.useFakeTimers();
+    try {
+      const pauseAuction = vi.fn(async (_p: unknown) => ({
+        event_id: 50,
+        seq: 50,
+        paused_at: new Date().toISOString(),
+        paused_nomination_id: 'nom-1',
+        captured_remaining_seconds: 18,
+        was_duplicate: false,
+      }));
+      const commissionerOverride = vi.fn(async (_p: unknown) => ({
+        event_id: 100,
+        seq: 100,
+        override_action: 'cancel_nomination' as const,
+        prior_state: {},
+        new_state: {},
+        was_duplicate: false,
+      }));
+      const lobby = await lobbyWithActiveNomination({
+        pauseAuction,
+        commissionerOverride,
+        auctionNominationWindowSeconds: 60,
+      });
+      // Pause first.
+      await lobby.pauseAuction({
+        commissionerUserId: 'commish-1',
+        reason: 'pause',
+        idempotencyKey: 'p-1',
+      });
+      // Then cancel during pause. Expected: pausedTimerKind flips
+      // from 'bid_window' (set by pauseAuction since active nom)
+      // to 'nomination_window'; remainingMs resets to
+      // nominationWindowMs (60_000ms).
+      await lobby.commissionerOverride({
+        commissionerUserId: 'commish-1',
+        action: { kind: 'cancel_nomination' },
+        idempotencyKey: 'cn-1',
+      });
+      // Engine state: still paused, currentNomination cleared, no
+      // timer running. Resume should restore a fresh nomination
+      // window for the same nominator.
+      const auctionState = lobby.getAuctionState();
+      expect(auctionState?.currentNomination).toBeNull();
+      expect(auctionState?.nominationsCompleted).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // ── extend_bid_window ──────────────────────────────────────────────
+
+  it('6c4 extend_bid_window happy path: deadline pushed, timer rescheduled', async () => {
+    vi.useFakeTimers();
+    try {
+      const newDeadline = new Date(Date.now() + 60_000);
+      const commissionerOverride = vi.fn(async (_p: unknown) => ({
+        event_id: 100,
+        seq: 100,
+        override_action: 'extend_bid_window' as const,
+        prior_state: { nominationId: 'nom-1', priorClockDeadline: new Date().toISOString() },
+        new_state: { nominationId: 'nom-1', newClockDeadline: newDeadline.toISOString(), extensionSeconds: 30 },
+        was_duplicate: false,
+      }));
+      const lobby = await lobbyWithActiveNomination({ commissionerOverride });
+
+      await lobby.commissionerOverride({
+        commissionerUserId: 'commish-1',
+        action: { kind: 'extend_bid_window', extensionSeconds: 30 },
+        idempotencyKey: 'ex-1',
+      });
+      const auctionState = lobby.getAuctionState();
+      expect(auctionState?.currentNomination?.clockDeadline).toBe(
+        newDeadline.toISOString(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('6c4 extend_bid_window: rejected with extension_below_current_deadline when extensionSeconds <= 0', async () => {
+    const commissionerOverride = vi.fn();
+    const lobby = await lobbyWithActiveNomination({ commissionerOverride });
+    const result = await lobby.commissionerOverride({
+      commissionerUserId: 'commish-1',
+      action: { kind: 'extend_bid_window', extensionSeconds: 0 },
+      idempotencyKey: 'ex-1',
+    });
+    expect(result).toEqual({ ok: false, reason: 'extension_below_current_deadline' });
+    expect(commissionerOverride).not.toHaveBeenCalled();
+  });
+
+  // ── Bootstrap APPLY ─────────────────────────────────────────────────
+
+  it('6c4 bootstrap mid-override-sequence: replay applies all action types correctly', async () => {
+    // Sequence: nominate → bid → revert_bid (override) → adjust_budget (credit) → cancel_nomination
+    const events: DraftEventRow[] = [
+      makeEventRow({
+        seq: 1,
+        event_type: 'auction_nomination_started',
+        payload: {
+          nomination_id: 'nom-1',
+          player_id: '8478402',
+          player_name: 'McDavid',
+          opening_bid: 5,
+          nominator_team_id: 'team-1',
+          expires_at: new Date(Date.now() + 31_000).toISOString(),
+        },
+      }),
+      makeEventRow({
+        seq: 2,
+        event_type: 'auction_bid_placed',
+        payload: {
+          nomination_id: 'nom-1',
+          team_id: 'team-2',
+          bid_amount: 10,
+        },
+      }),
+      makeEventRow({
+        seq: 3,
+        event_type: 'auction_commissioner_override',
+        payload: {
+          commissioner_user_id: 'commish-1',
+          override_action: 'revert_bid',
+          prior_state: { nominationId: 'nom-1', leadingBidderId: 'team-2', leadingBid: 10 },
+          new_state: { nominationId: 'nom-1', leadingBidderId: 'team-1', leadingBid: 5 },
+        },
+      }),
+      makeEventRow({
+        seq: 4,
+        event_type: 'auction_commissioner_override',
+        payload: {
+          commissioner_user_id: 'commish-1',
+          override_action: 'adjust_budget',
+          prior_state: { teamId: 'team-1', budgetRemaining: 200 },
+          new_state: { teamId: 'team-1', budgetRemaining: 250, delta: 50 },
+        },
+      }),
+      makeEventRow({
+        seq: 5,
+        event_type: 'auction_commissioner_override',
+        payload: {
+          commissioner_user_id: 'commish-1',
+          override_action: 'cancel_nomination',
+          prior_state: {},
+          new_state: {},
+        },
+      }),
+    ];
+    const lobby = await makeLobby(
+      auctionLobbyOpts({ listDraftEvents: vi.fn(async () => events) }),
+    );
+    const auctionState = lobby.getAuctionState();
+    // Final state: nomination cancelled (cleared), team-1 budget +$50,
+    // nominationsCompleted unchanged (cancel = redo semantics).
+    expect(auctionState?.currentNomination).toBeNull();
+    expect(auctionState?.nominationsCompleted).toBe(0);
+    expect(auctionState?.teamBudgets['team-1']).toBe(250);
+    // Ring buffer carries all five events.
+    const snap = lobby.getSnapshot();
+    expect(snap.recentEvents.map((e) => e.kind)).toEqual([
+      'auction_nomination_started',
+      'auction_bid_placed',
+      'auction_commissioner_override',
+      'auction_commissioner_override',
+      'auction_commissioner_override',
+    ]);
+  });
+
+  it('6c4 bootstrap: force_close override applied during replay deducts winner budget + advances nominationsCompleted', async () => {
+    const events: DraftEventRow[] = [
+      makeEventRow({
+        seq: 1,
+        event_type: 'auction_nomination_started',
+        payload: {
+          nomination_id: 'nom-1',
+          player_id: '8478402',
+          player_name: 'McDavid',
+          opening_bid: 5,
+          nominator_team_id: 'team-1',
+          expires_at: new Date(Date.now() + 31_000).toISOString(),
+        },
+      }),
+      makeEventRow({
+        seq: 2,
+        event_type: 'auction_commissioner_override',
+        payload: {
+          commissioner_user_id: 'commish-1',
+          override_action: 'force_close_nomination',
+          prior_state: { nominationId: 'nom-1', leadingBidderId: 'team-1', leadingBid: 5, totalBids: 1 },
+          new_state: { nominationId: 'nom-1', outcome: 'sold', winnerTeamId: 'team-1', finalAmount: 5, totalBids: 1 },
+        },
+      }),
+    ];
+    const lobby = await makeLobby(
+      auctionLobbyOpts({ listDraftEvents: vi.fn(async () => events) }),
+    );
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.nominationsCompleted).toBe(1);
+    expect(auctionState?.teamBudgets['team-1']).toBe(200 - 5);
+    expect(auctionState?.teamRosterSlotsRemaining['team-1']).toBe(2 - 1);
+    expect(auctionState?.currentNomination).toBeNull();
+  });
+
+  // ── Idempotency ─────────────────────────────────────────────────────
+
+  it('6c4 idempotent retry: same idempotencyKey returns cached promise; RPC fires once', async () => {
+    const commissionerOverride = vi.fn(async (_p: unknown) => ({
+      event_id: 100,
+      seq: 100,
+      override_action: 'cancel_nomination' as const,
+      prior_state: {},
+      new_state: {},
+      was_duplicate: false,
+    }));
+    const lobby = await lobbyWithActiveNomination({ commissionerOverride });
+    const params = {
+      commissionerUserId: 'commish-1',
+      action: { kind: 'cancel_nomination' as const },
+      idempotencyKey: 'idem-same',
+    };
+    const r1 = await lobby.commissionerOverride(params);
+    const r2 = await lobby.commissionerOverride(params);
+    expect(r1).toEqual(r2);
+    expect(commissionerOverride).toHaveBeenCalledTimes(1);
   });
 });

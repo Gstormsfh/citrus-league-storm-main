@@ -143,6 +143,7 @@ import {
   WIRE_PROTOCOL_VERSION,
   type AuctionStateSnapshot,
   type BufferedDraftEvent,
+  type CommissionerAuthorizationResult,
   type DraftAction,
   type DraftActionResult,
   type DraftFormat,
@@ -155,6 +156,7 @@ import {
   type GetEventsSinceSeqResult,
   type TeamAuthorizationResult,
 } from './types';
+import type { CommissionerOverrideAction } from '../services/DraftServiceV2';
 
 export interface LobbyManagerOptions {
   lobbyId: string;
@@ -251,6 +253,26 @@ export interface LobbyManagerOptions {
     userId: string,
     teamId: string,
   ) => Promise<TeamAuthorizationResult>;
+
+  /**
+   * Engine-side commissioner-authorization callback per ADR-004 §5
+   * + ADR-002 §4.4 (chunk 11g.6 sub-step 6c4). Verifies that
+   * `userId` is the league's commissioner BEFORE the engine calls
+   * `auction_commissioner_override_v2` with `actor.kind='commissioner'`.
+   * Required for the trusted-executor contract — RPC's relaxed
+   * permission check (service_role + actor.kind='commissioner')
+   * trusts the engine to have done this verification.
+   *
+   * Today's `index.ts` implementation queries `leagues.commissioner_id`
+   * directly; parallel structure to `verifyTeamAuthorization`. The
+   * callback returns a discriminated union; engine logs granular
+   * reason at info level but returns coarse-grained
+   * `'unauthorized'` to the client.
+   */
+  verifyCommissionerAuthorization: (
+    userId: string,
+    leagueId: string,
+  ) => Promise<CommissionerAuthorizationResult>;
 
   /**
    * Supabase client for autopick read queries (player projections,
@@ -394,6 +416,10 @@ export class LobbyManager {
     userId: string,
     teamId: string,
   ) => Promise<TeamAuthorizationResult>;
+  private readonly verifyCommissionerAuthorization: (
+    userId: string,
+    leagueId: string,
+  ) => Promise<CommissionerAuthorizationResult>;
   private readonly supabase: SupabaseClient;
   private readonly autopickStrategies: ReadonlyArray<AutopickStrategy> | undefined;
   private readonly pickClockMs: number;
@@ -675,6 +701,7 @@ export class LobbyManager {
     this.draftService = opts.draftService;
     this.publish = opts.publish;
     this.verifyTeamAuthorization = opts.verifyTeamAuthorization;
+    this.verifyCommissionerAuthorization = opts.verifyCommissionerAuthorization;
     this.supabase = opts.supabase;
     this.autopickStrategies = opts.autopickStrategies;
     this.pickClockMs = opts.pickClockSeconds * 1000;
@@ -2115,6 +2142,10 @@ export class LobbyManager {
         case 'auction_nomination_skipped':
           this.applyAuctionNominationSkippedEvent(event);
           break;
+        // ── Auction events (chunk 11g.6 sub-step 6c4) ─────────────────
+        case 'auction_commissioner_override':
+          this.applyAuctionCommissionerOverrideEvent(event);
+          break;
         default:
           // Forward-compat for any future additions. Today the
           // migration's CHECK enum admits the 9 event types listed
@@ -2630,6 +2661,128 @@ export class LobbyManager {
     ) {
       this.draftStatus = 'completed';
     }
+  }
+
+  /**
+   * Bootstrap handler for `event_type === 'auction_commissioner_override'`
+   * (chunk 11g.6 sub-step 6c4 per ADR-002 §4.4 + extensions).
+   *
+   * Polymorphic dispatch on `payload.override_action`. Each branch
+   * mutates engine state to mirror what the corresponding runtime
+   * handler did at the moment the event fired. Per the canonical-
+   * replay principle from 6b: APPLY during replay, not log-and-skip.
+   *
+   * Append the polymorphic event to the ring buffer with the
+   * full discriminator preserved so client UI can render
+   * action-specific audit messages.
+   */
+  private applyAuctionCommissionerOverrideEvent(event: DraftEventRow): void {
+    const payload = event.payload as Record<string, unknown>;
+    const overrideActionRaw = String(payload.override_action);
+    const commissionerUserId =
+      payload.commissioner_user_id == null
+        ? ''
+        : String(payload.commissioner_user_id);
+    const priorState = (payload.prior_state ?? {}) as Record<string, unknown>;
+    const newState = (payload.new_state ?? {}) as Record<string, unknown>;
+    const rationale =
+      payload.rationale == null ? undefined : String(payload.rationale);
+
+    // Apply state mutation per action.
+    const overrideAction = overrideActionRaw as
+      | 'revert_bid'
+      | 'force_close_nomination'
+      | 'award_to_team'
+      | 'adjust_opening_bid'
+      | 'adjust_budget'
+      | 'cancel_nomination'
+      | 'extend_bid_window';
+
+    switch (overrideAction) {
+      case 'revert_bid': {
+        if (this.currentNomination !== null) {
+          this.currentNomination.leadingBidderId = String(newState.leadingBidderId);
+          this.currentNomination.leadingBid = Number(newState.leadingBid);
+        }
+        break;
+      }
+      case 'force_close_nomination': {
+        const outcome = String(newState.outcome);
+        if (outcome === 'sold') {
+          const winnerId = String(newState.winnerTeamId);
+          const finalAmount = Number(newState.finalAmount);
+          const prevBudget = this.teamBudgets.get(winnerId) ?? 0;
+          const prevWon = this.teamPlayersWon.get(winnerId) ?? 0;
+          this.teamBudgets.set(winnerId, prevBudget - finalAmount);
+          this.teamPlayersWon.set(winnerId, prevWon + 1);
+        }
+        this.currentNomination = null;
+        this.nominationsCompleted++;
+        const totalNominations = this.nominationOrder.length * this.draftRounds;
+        if (
+          this.nominationOrder.length > 0 &&
+          this.nominationsCompleted >= totalNominations
+        ) {
+          this.draftStatus = 'completed';
+        }
+        break;
+      }
+      case 'award_to_team': {
+        const winnerId = String(newState.awardedTeamId);
+        const finalAmount = Number(newState.awardedAmount);
+        const prevBudget = this.teamBudgets.get(winnerId) ?? 0;
+        const prevWon = this.teamPlayersWon.get(winnerId) ?? 0;
+        this.teamBudgets.set(winnerId, prevBudget - finalAmount);
+        this.teamPlayersWon.set(winnerId, prevWon + 1);
+        this.currentNomination = null;
+        this.nominationsCompleted++;
+        const totalNominations = this.nominationOrder.length * this.draftRounds;
+        if (
+          this.nominationOrder.length > 0 &&
+          this.nominationsCompleted >= totalNominations
+        ) {
+          this.draftStatus = 'completed';
+        }
+        break;
+      }
+      case 'adjust_opening_bid': {
+        if (this.currentNomination !== null) {
+          this.currentNomination.leadingBid = Number(newState.leadingBid);
+        }
+        break;
+      }
+      case 'adjust_budget': {
+        const teamId = String(newState.teamId);
+        const newBudget = Number(newState.budgetRemaining);
+        this.teamBudgets.set(teamId, newBudget);
+        break;
+      }
+      case 'cancel_nomination': {
+        // Redo semantics: nominationsCompleted does NOT advance.
+        this.currentNomination = null;
+        break;
+      }
+      case 'extend_bid_window': {
+        if (this.currentNomination !== null) {
+          this.currentNomination.expiresAt = new Date(
+            String(newState.newClockDeadline),
+          );
+        }
+        break;
+      }
+    }
+
+    this.events.append({
+      kind: 'auction_commissioner_override',
+      seq: event.seq,
+      timestamp: event.created_at,
+      correlationId: event.idempotency_key ?? '',
+      commissionerUserId,
+      overrideAction,
+      priorState,
+      newState,
+      ...(rationale !== undefined ? { rationale } : {}),
+    });
   }
 
   /**
@@ -3727,6 +3880,452 @@ export class LobbyManager {
     }
 
     return { ok: true, eventSeq: result.seq };
+  }
+
+  // ── Chunk 11g.6 sub-step 6c4 — auction commissioner override ────────
+
+  /**
+   * Execute a commissioner override on the auction. **All seven
+   * actions** (`revert_bid`, `force_close_nomination`,
+   * `award_to_team`, `adjust_opening_bid`, `adjust_budget`,
+   * `cancel_nomination`, `extend_bid_window`) flow through this
+   * single public entry point. Per ADR-002 §4.4 + extensions
+   * documented in PHASE_4_5_PROJECT_PLAN.md Decision Log
+   * (2026-05-07).
+   *
+   * Routed through the single-writer queue (consistent with
+   * 6c1's `pauseAuction`/`resumeAuction` queue routing) so
+   * commissioner overrides serialize against in-flight bids /
+   * nominations deterministically. The audit trail in event-seq
+   * order matches wall-clock action order; the in-flight-action
+   * race that would otherwise let a bid land between the engine's
+   * pre-check and the RPC call is eliminated.
+   *
+   * Auth (per ADR-004 §5): engine-side
+   * `verifyCommissionerAuthorization` fail-fasts BEFORE the RPC
+   * call; RPC additionally enforces `actor.kind='commissioner'` +
+   * service_role. Two layers, defense-in-depth.
+   *
+   * Idempotency: caller-provided `idempotencyKey`. Same-key
+   * retries return the cached resolved promise without re-firing
+   * the RPC.
+   */
+  async commissionerOverride(params: {
+    commissionerUserId: string;
+    action: CommissionerOverrideAction;
+    rationale?: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    if (!this.initialized) {
+      const msg = `[lobby] commissionerOverride called before init() lobbyId=${this.lobbyId}`;
+      logger.error(msg);
+      throw new Error(msg);
+    }
+    if (this.format !== 'auction') {
+      return { ok: false, reason: 'wrong_format_for_action' };
+    }
+    const cached = this.seenIdempotencyKeys.get(params.idempotencyKey);
+    if (cached) {
+      return cached;
+    }
+
+    const next: Promise<DraftActionResult> = this.queue
+      .then(() => this.processCommissionerOverride(params))
+      .catch((err: unknown) => {
+        logger.error(
+          `[lobby] commissionerOverride queue error lobbyId=${this.lobbyId}`,
+          err,
+        );
+        return { ok: false, reason: 'internal_error' as const };
+      });
+
+    this.queue = next;
+    this.cacheIdempotencyResult(params.idempotencyKey, next);
+    return next;
+  }
+
+  private async processCommissionerOverride(params: {
+    commissionerUserId: string;
+    action: CommissionerOverrideAction;
+    rationale?: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    // Engine-side commissioner-auth fail-fast (ADR-004 §5.3 mirror
+    // for commissioner actions). RPC also enforces.
+    let authResult: CommissionerAuthorizationResult;
+    try {
+      authResult = await this.verifyCommissionerAuthorization(
+        params.commissionerUserId,
+        this.leagueId,
+      );
+    } catch (err) {
+      logger.error(
+        `[lobby] verifyCommissionerAuthorization threw lobbyId=${this.lobbyId} userId=${params.commissionerUserId}`,
+        err,
+      );
+      return { ok: false, reason: 'internal_error' };
+    }
+    if ('reason' in authResult) {
+      logger.info(
+        `[lobby] unauthorized commissioner override attempt lobbyId=${this.lobbyId} userId=${params.commissionerUserId} reason=${authResult.reason}`,
+      );
+      return { ok: false, reason: 'unauthorized' };
+    }
+
+    // Engine-side preconditions per action. Each handler returns
+    // either a typed rejection (no RPC call) or proceeds to RPC.
+    switch (params.action.kind) {
+      case 'revert_bid':
+        return this.processOverrideRevertBid(params);
+      case 'force_close_nomination':
+        return this.processOverrideForceClose(params);
+      case 'award_to_team':
+        return this.processOverrideAwardToTeam(params);
+      case 'adjust_opening_bid':
+        return this.processOverrideAdjustOpeningBid(params);
+      case 'adjust_budget':
+        return this.processOverrideAdjustBudget(params);
+      case 'cancel_nomination':
+        return this.processOverrideCancelNomination(params);
+      case 'extend_bid_window':
+        return this.processOverrideExtendBidWindow(params);
+    }
+  }
+
+  /**
+   * Helper: call the commissioner-override RPC, broadcast the
+   * resulting `auction_commissioner_override` event, append to the
+   * ring buffer. Common-suffix code factored from each per-action
+   * handler.
+   */
+  private async fireCommissionerOverrideRpc(params: {
+    commissionerUserId: string;
+    action: CommissionerOverrideAction;
+    rationale?: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<
+    | { ok: true; eventSeq: number; result: Awaited<ReturnType<DraftServiceV2['commissionerOverride']>> }
+    | { ok: false; reason: Extract<DraftActionResult, { ok: false }>['reason']; minimumNextBid?: number }
+  > {
+    let result: Awaited<ReturnType<DraftServiceV2['commissionerOverride']>>;
+    try {
+      result = await this.draftService.commissionerOverride({
+        leagueId: this.leagueId,
+        action: params.action,
+        rationale: params.rationale,
+        idempotencyKey: params.idempotencyKey,
+        actor: {
+          kind: 'commissioner',
+          id: params.commissionerUserId,
+          session_id: params.sessionId ?? randomUUID(),
+        },
+      });
+    } catch (err: unknown) {
+      if (err instanceof AppError) {
+        return { ok: false, reason: this.mapAppErrorToReason(err) };
+      }
+      logger.error(
+        `[lobby] commissionerOverride RPC threw lobbyId=${this.lobbyId} action=${params.action.kind}`,
+        err,
+      );
+      return { ok: false, reason: 'internal_error' };
+    }
+
+    if (!result.was_duplicate) {
+      const timestamp = new Date().toISOString();
+      const event: BufferedDraftEvent = {
+        kind: 'auction_commissioner_override',
+        seq: result.seq,
+        timestamp,
+        correlationId: params.idempotencyKey,
+        commissionerUserId: params.commissionerUserId,
+        overrideAction: params.action.kind,
+        priorState: result.prior_state,
+        newState: result.new_state,
+        ...(params.rationale !== undefined ? { rationale: params.rationale } : {}),
+      };
+      this.events.append(event);
+      this.broadcast({
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'event',
+        seq: result.seq,
+        timestamp,
+        correlationId: params.idempotencyKey,
+        payload: event,
+      });
+    }
+
+    return { ok: true, eventSeq: result.seq, result };
+  }
+
+  // ── Per-action override handlers ─────────────────────────────────────
+
+  private async processOverrideRevertBid(params: {
+    commissionerUserId: string;
+    action: CommissionerOverrideAction;
+    rationale?: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    if (this.currentNomination === null) {
+      return { ok: false, reason: 'no_active_nomination' };
+    }
+    // The engine doesn't track per-nomination bid count in memory
+    // (the auction_bids table is canonical); RPC enforces
+    // bid_count > 1. Engine pre-check would require a DB read; skip
+    // and let the RPC layer handle the rejection.
+
+    const r = await this.fireCommissionerOverrideRpc(params);
+    if (!r.ok) return r;
+
+    // Apply state mutation to mirror the RPC's projection-table
+    // writes. Reads new leader from result.new_state.
+    const newState = r.result.new_state as Record<string, unknown>;
+    const newLeaderId = String(newState.leadingBidderId);
+    const newLeadingBid = Number(newState.leadingBid);
+    if (this.currentNomination !== null) {
+      this.currentNomination.leadingBidderId = newLeaderId;
+      this.currentNomination.leadingBid = newLeadingBid;
+    }
+    return { ok: true, eventSeq: r.eventSeq };
+  }
+
+  private async processOverrideForceClose(params: {
+    commissionerUserId: string;
+    action: CommissionerOverrideAction;
+    rationale?: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    if (this.currentNomination === null) {
+      return { ok: false, reason: 'no_active_nomination' };
+    }
+
+    const nomination = this.currentNomination;
+    const r = await this.fireCommissionerOverrideRpc(params);
+    if (!r.ok) return r;
+
+    // Apply state mutation per the close outcome.
+    const newState = r.result.new_state as Record<string, unknown>;
+    const outcome = String(newState.outcome);
+    if (outcome === 'sold') {
+      const winnerId = String(newState.winnerTeamId);
+      const finalAmount = Number(newState.finalAmount);
+      const prevBudget = this.teamBudgets.get(winnerId) ?? 0;
+      const prevWon = this.teamPlayersWon.get(winnerId) ?? 0;
+      this.teamBudgets.set(winnerId, prevBudget - finalAmount);
+      this.teamPlayersWon.set(winnerId, prevWon + 1);
+    }
+    // Both outcomes (sold + no_sale) advance state the same way:
+    // currentNomination cleared, nominationsCompleted++, cascade
+    // or complete. Cancel any active bid-window timer first.
+    this.cancelPickTimer();
+    this.currentNomination = null;
+    this.currentTimerDeadline = null;
+    this.nominationsCompleted++;
+
+    const totalNominations = this.nominationOrder.length * this.draftRounds;
+    if (this.nominationsCompleted >= totalNominations) {
+      this.draftStatus = 'completed';
+    } else if (this.pauseState === null) {
+      // Schedule next nominator's nomination-window timer.
+      const newDeadline = new Date(Date.now() + this.nominationWindowMs);
+      this.setPickDeadline(newDeadline, 'nomination_window');
+    }
+    // Suppress unused variable warning — `nomination` captured for
+    // scope but unused after currentNomination clear.
+    void nomination;
+    return { ok: true, eventSeq: r.eventSeq };
+  }
+
+  private async processOverrideAwardToTeam(params: {
+    commissionerUserId: string;
+    action: CommissionerOverrideAction;
+    rationale?: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    if (this.currentNomination === null) {
+      return { ok: false, reason: 'no_active_nomination' };
+    }
+    if (params.action.kind !== 'award_to_team') {
+      return { ok: false, reason: 'invalid_payload' };
+    }
+    const target = params.action;
+
+    // Engine-side fail-fast budget check (RPC also enforces).
+    const targetBudget = this.teamBudgets.get(target.teamId) ?? 0;
+    const targetWon = this.teamPlayersWon.get(target.teamId) ?? 0;
+    const slotsRemaining = this.draftRounds - targetWon;
+    if (slotsRemaining <= 0) {
+      return { ok: false, reason: 'insufficient_budget_for_award' };
+    }
+    const reserve = (slotsRemaining - 1) * this.auctionMinBid;
+    if (target.amount + reserve > targetBudget) {
+      return { ok: false, reason: 'insufficient_budget_for_award' };
+    }
+
+    const r = await this.fireCommissionerOverrideRpc(params);
+    if (!r.ok) return r;
+
+    // Apply: deduct budget, increment players_won, advance state.
+    this.teamBudgets.set(target.teamId, targetBudget - target.amount);
+    this.teamPlayersWon.set(target.teamId, targetWon + 1);
+    this.cancelPickTimer();
+    this.currentNomination = null;
+    this.currentTimerDeadline = null;
+    this.nominationsCompleted++;
+
+    const totalNominations = this.nominationOrder.length * this.draftRounds;
+    if (this.nominationsCompleted >= totalNominations) {
+      this.draftStatus = 'completed';
+    } else if (this.pauseState === null) {
+      const newDeadline = new Date(Date.now() + this.nominationWindowMs);
+      this.setPickDeadline(newDeadline, 'nomination_window');
+    }
+    return { ok: true, eventSeq: r.eventSeq };
+  }
+
+  private async processOverrideAdjustOpeningBid(params: {
+    commissionerUserId: string;
+    action: CommissionerOverrideAction;
+    rationale?: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    if (this.currentNomination === null) {
+      return { ok: false, reason: 'no_active_nomination' };
+    }
+    if (params.action.kind !== 'adjust_opening_bid') {
+      return { ok: false, reason: 'invalid_payload' };
+    }
+    const newFloor = params.action.newOpeningBid;
+
+    // Reject floor below current leading bid (nonsensical).
+    if (newFloor < this.currentNomination.leadingBid) {
+      return { ok: false, reason: 'opening_bid_below_current_leading' };
+    }
+
+    // If floor > current leading bid, validate leader's budget.
+    if (newFloor > this.currentNomination.leadingBid) {
+      const leaderId = this.currentNomination.leadingBidderId;
+      const leaderBudget = this.teamBudgets.get(leaderId) ?? 0;
+      const leaderWon = this.teamPlayersWon.get(leaderId) ?? 0;
+      const leaderSlotsRemaining = this.draftRounds - leaderWon;
+      if (leaderSlotsRemaining <= 0) {
+        return { ok: false, reason: 'insufficient_budget_for_floor_increase' };
+      }
+      const leaderReserve = (leaderSlotsRemaining - 1) * this.auctionMinBid;
+      if (newFloor + leaderReserve > leaderBudget) {
+        return { ok: false, reason: 'insufficient_budget_for_floor_increase' };
+      }
+    }
+
+    const r = await this.fireCommissionerOverrideRpc(params);
+    if (!r.ok) return r;
+
+    // Apply: bump leading bid up if it was below new floor.
+    if (newFloor > this.currentNomination.leadingBid) {
+      this.currentNomination.leadingBid = newFloor;
+    }
+    return { ok: true, eventSeq: r.eventSeq };
+  }
+
+  private async processOverrideAdjustBudget(params: {
+    commissionerUserId: string;
+    action: CommissionerOverrideAction;
+    rationale?: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    if (params.action.kind !== 'adjust_budget') {
+      return { ok: false, reason: 'invalid_payload' };
+    }
+    const target = params.action;
+    const currentBudget = this.teamBudgets.get(target.teamId) ?? 0;
+    const newBudget = currentBudget + target.delta;
+    if (newBudget < 0) {
+      return { ok: false, reason: 'insufficient_budget' };
+    }
+
+    const r = await this.fireCommissionerOverrideRpc(params);
+    if (!r.ok) return r;
+
+    this.teamBudgets.set(target.teamId, newBudget);
+    return { ok: true, eventSeq: r.eventSeq };
+  }
+
+  private async processOverrideCancelNomination(params: {
+    commissionerUserId: string;
+    action: CommissionerOverrideAction;
+    rationale?: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    if (this.currentNomination === null) {
+      return { ok: false, reason: 'no_active_nomination' };
+    }
+
+    const r = await this.fireCommissionerOverrideRpc(params);
+    if (!r.ok) return r;
+
+    // Cancel-nomination = REDO (NOT skip). nominationsCompleted does
+    // NOT advance; the same nominator gets another chance.
+    this.cancelPickTimer();
+    this.currentNomination = null;
+    this.currentTimerDeadline = null;
+
+    if (this.pauseState !== null) {
+      // During-pause cancel: flip pausedTimerKind from 'bid_window'
+      // to 'nomination_window' AND reset the captured remainingMs
+      // to the full nomination window — the prior captured time
+      // was for the now-nonexistent bid_window timer.
+      this.pauseState = {
+        pausedAt: this.pauseState.pausedAt,
+        remainingMs: this.nominationWindowMs,
+        pausedTimerKind: 'nomination_window',
+      };
+    } else {
+      // Schedule fresh nomination-window timer for the same nominator
+      // (redo semantics).
+      const newDeadline = new Date(Date.now() + this.nominationWindowMs);
+      this.setPickDeadline(newDeadline, 'nomination_window');
+    }
+    return { ok: true, eventSeq: r.eventSeq };
+  }
+
+  private async processOverrideExtendBidWindow(params: {
+    commissionerUserId: string;
+    action: CommissionerOverrideAction;
+    rationale?: string;
+    idempotencyKey: string;
+    sessionId?: string;
+  }): Promise<DraftActionResult> {
+    if (this.currentNomination === null) {
+      return { ok: false, reason: 'no_active_nomination' };
+    }
+    if (params.action.kind !== 'extend_bid_window') {
+      return { ok: false, reason: 'invalid_payload' };
+    }
+    if (params.action.extensionSeconds <= 0) {
+      return { ok: false, reason: 'extension_below_current_deadline' };
+    }
+
+    const r = await this.fireCommissionerOverrideRpc(params);
+    if (!r.ok) return r;
+
+    // Apply: read newClockDeadline from result.new_state, update
+    // currentNomination.expiresAt, reschedule timer.
+    const newState = r.result.new_state as Record<string, unknown>;
+    const newDeadline = new Date(String(newState.newClockDeadline));
+    this.currentNomination.expiresAt = newDeadline;
+    if (this.pauseState === null) {
+      this.setPickDeadline(newDeadline, 'bid_window');
+    }
+    return { ok: true, eventSeq: r.eventSeq };
   }
 
   /**

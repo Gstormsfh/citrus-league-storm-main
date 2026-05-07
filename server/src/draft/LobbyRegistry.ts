@@ -44,7 +44,12 @@ import { logger } from '@citrus/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DraftServiceV2 } from '../services/DraftServiceV2';
 import { LobbyManager } from './LobbyManager';
-import type { DraftFormat, DraftOrderSlot, TeamAuthorizationResult } from './types';
+import type {
+  CommissionerAuthorizationResult,
+  DraftFormat,
+  DraftOrderSlot,
+  TeamAuthorizationResult,
+} from './types';
 
 /**
  * Configuration the registry needs from the application layer to
@@ -240,6 +245,17 @@ export interface LobbyRegistryOptions {
   ) => Promise<TeamAuthorizationResult>;
 
   /**
+   * Engine-side commissioner-authorization callback (chunk 11g.6
+   * sub-step 6c4 per ADR-002 §4.4 + ADR-004 §5). Parallel structure
+   * to `verifyTeamAuthorization`. Forwarded to every constructed
+   * `LobbyManager`.
+   */
+  verifyCommissionerAuthorization: (
+    userId: string,
+    leagueId: string,
+  ) => Promise<CommissionerAuthorizationResult>;
+
+  /**
    * uWS app-level publish callback — forwarded into every
    * `LobbyManager` constructed by this registry so they can
    * broadcast events to all subscribers of their `draft:${lobbyId}`
@@ -269,6 +285,10 @@ export class LobbyRegistry {
     userId: string,
     teamId: string,
   ) => Promise<TeamAuthorizationResult>;
+  private readonly verifyCommissionerAuthorization: (
+    userId: string,
+    leagueId: string,
+  ) => Promise<CommissionerAuthorizationResult>;
   private readonly publish: (topic: string, message: string) => void;
   private readonly supabase: SupabaseClient;
 
@@ -288,6 +308,7 @@ export class LobbyRegistry {
     this.draftService = opts.draftService;
     this.lobbyConfigLookup = opts.lobbyConfigLookup;
     this.verifyTeamAuthorization = opts.verifyTeamAuthorization;
+    this.verifyCommissionerAuthorization = opts.verifyCommissionerAuthorization;
     this.publish = opts.publish;
     this.supabase = opts.supabase;
   }
@@ -394,6 +415,7 @@ export class LobbyRegistry {
       publish: this.publish,
       draftOrder: config.draftOrder,
       verifyTeamAuthorization: this.verifyTeamAuthorization,
+      verifyCommissionerAuthorization: this.verifyCommissionerAuthorization,
       supabase: this.supabase,
       pickClockSeconds: config.pickClockSeconds,
       initialPickDeadline: config.initialPickDeadline,
