@@ -74,6 +74,9 @@ const AUCTION_FIELDS_EMPTY = {
   auctionMinBidIncrementTiers: [
     { below: Number.MAX_SAFE_INTEGER, increment: 1 },
   ] as ReadonlyArray<{ below: number; increment: number }>,
+  // Chunk 11g.6 sub-step 6c3: snake/linear lobbies don't use these.
+  auctionBidWindowSeconds: 0,
+  auctionNominationWindowSeconds: 0,
 };
 
 const DEFAULT_LOBBY_CONFIG: LobbyConfig = {

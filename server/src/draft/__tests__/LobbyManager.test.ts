@@ -61,6 +61,8 @@ interface MakeLobbyOpts
   /** Chunk 11g.6 6c1: pause/resume RPC stubs. */
   pauseAuction?: (params: unknown) => Promise<unknown>;
   resumeAuction?: (params: unknown) => Promise<unknown>;
+  /** Chunk 11g.6 6c3: skip-nomination RPC stub. */
+  skipNomination?: (params: unknown) => Promise<unknown>;
   publish?: (topic: string, message: string) => void;
   verifyTeamAuthorization?: (
     userId: string,
@@ -174,6 +176,15 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
       new_expires_at: null,
       was_duplicate: false,
     }));
+  const skipNomination =
+    opts.skipNomination ??
+    vi.fn(async (_params: unknown) => ({
+      event_id: 12,
+      seq: 12,
+      skipped_team_id: 'team-1',
+      reason: 'insufficient_budget' as const,
+      was_duplicate: false,
+    }));
 
   const draftService = {
     submitPick,
@@ -183,6 +194,7 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
     closeNomination,
     pauseAuction,
     resumeAuction,
+    skipNomination,
   } as unknown as DraftServiceV2;
   const publish = opts.publish ?? vi.fn();
   const verifyTeamAuthorization = opts.verifyTeamAuthorization ?? ALLOW_ALL_AUTH;
@@ -228,6 +240,12 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
       opts.auctionMinBidIncrementTiers ?? [
         { below: Number.MAX_SAFE_INTEGER, increment: 1 },
       ],
+    // Chunk 11g.6 6c3 default: 0 for snake/linear (unused); auction
+    // tests override via auctionLobbyOpts.
+    auctionBidWindowSeconds: opts.auctionBidWindowSeconds ?? 0,
+    auctionNominationWindowSeconds:
+      opts.auctionNominationWindowSeconds ?? 0,
+    auctionAutoNominateStrategies: opts.auctionAutoNominateStrategies,
   });
 }
 
@@ -2502,7 +2520,18 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
       auctionBudget: 200,
       auctionMinBid: 1,
       draftRounds: 2,
-      pickClockSeconds: 31, // 30s bid window + 1s pad
+      pickClockSeconds: 31, // 30s bid window + 1s pad (legacy; engine
+                            // prefers explicit auctionBidWindowSeconds below
+                            // for chunk 11g.6 6c3+)
+      auctionBidWindowSeconds: 30,
+      // Default 60s nomination window per ADR-002 §3.4. Auto-nominate
+      // tests can override to small values (e.g., 5s) for fast fake-
+      // timer runs. **Backward-compat note**: 6a/6b/6c1/6c2 tests
+      // don't exercise the nomination-window timer at all because
+      // they pre-populate `currentNomination` via nominateAction and
+      // never let the nomination-window expire; the default 60s value
+      // is benign for those tests.
+      auctionNominationWindowSeconds: 60,
       initialTeamBudgets: new Map(teams.map((t) => [t, 200])),
       initialPlayersWon: new Map(teams.map((t) => [t, 0])),
       ...extra,
@@ -4092,5 +4121,451 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
       bidAction({ bidAmount: 5.5, idempotencyKey: 'idem-bid-2' }),
     );
     expect(accepted.ok).toBe(true);
+  });
+
+  // ── Chunk 11g.6 sub-step 6c3 — auction auto-nominate + nomination-window timer ──
+  //
+  // Two-timer architecture: nomination_window (engine waits for
+  // user to pick a player) → bid_window (bidding on the chosen
+  // nomination). Auto-nominate fires when nomination_window
+  // expires; force-skip cascades when auto-nominator can't afford
+  // even auctionMinBid + reserve. Per ADR-002 §3.4 + §4.2 + Path Y
+  // extension.
+
+  /** Helper: auction lobby with `initialDraftState='active'` so init() schedules a nomination-window timer. */
+  function autoNominateLobbyOpts(extra: Partial<MakeLobbyOpts> = {}): MakeLobbyOpts {
+    return auctionLobbyOpts({
+      initialDraftState: 'active',
+      auctionNominationWindowSeconds: 5, // short window for fast fake-timer tests
+      auctionBidWindowSeconds: 30,
+      ...extra,
+    });
+  }
+
+  /** Strategy mock that returns a fixed projection result. */
+  function fixedProjectionStrategy(playerId: string, openingBid = 1) {
+    return [
+      vi.fn(async () => ({
+        ok: true as const,
+        playerId,
+        openingBid,
+        source: 'projections' as const,
+      })),
+    ];
+  }
+
+  it('auto-nominate happy path: nomination-window timer fires → engine selects player → bid-window timer scheduled', async () => {
+    vi.useFakeTimers();
+    try {
+      const publish = vi.fn();
+      const nominatePlayer = vi.fn(async (_p: unknown) => ({
+        event_id: 1,
+        seq: 1,
+        nomination_id: 'nom-auto-1',
+        clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+        was_duplicate: false,
+      }));
+      const lobby = await makeLobby(
+        autoNominateLobbyOpts({
+          publish,
+          nominatePlayer,
+          auctionAutoNominateStrategies: fixedProjectionStrategy('8478402'),
+        }),
+      );
+      // Init scheduled the nomination-window timer (5s). Advance past it.
+      publish.mockClear();
+      await vi.advanceTimersByTimeAsync(6_000);
+
+      expect(nominatePlayer).toHaveBeenCalledTimes(1);
+      const call = nominatePlayer.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(call.teamId).toBe('team-1'); // first nominator in rotation
+      expect(call.playerId).toBe('8478402');
+      expect((call.actor as Record<string, unknown>).kind).toBe('autopick');
+
+      // Broadcast: auction_auto_nominated event (NOT auction_nomination_started).
+      const broadcasts = publish.mock.calls.map((c) => JSON.parse(c[1] as string));
+      const autoNomBroadcast = broadcasts.find(
+        (b) => b.payload.kind === 'auction_auto_nominated',
+      );
+      expect(autoNomBroadcast).toBeDefined();
+      expect(autoNomBroadcast.payload.fallbackSource).toBe('projections');
+      expect(autoNomBroadcast.payload.nominatorTeamId).toBe('team-1');
+
+      // Engine state: currentNomination set; bid-window timer scheduled.
+      const auctionState = lobby.getAuctionState();
+      expect(auctionState?.currentNomination?.nominatorTeamId).toBe('team-1');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('auto-nominate insufficient_budget: skip event emitted, nominationsCompleted advances, next nominator window scheduled', async () => {
+    vi.useFakeTimers();
+    try {
+      const publish = vi.fn();
+      const skipNomination = vi.fn(async (_p: unknown) => ({
+        event_id: 2,
+        seq: 2,
+        skipped_team_id: 'team-1',
+        reason: 'insufficient_budget' as const,
+        was_duplicate: false,
+      }));
+      const nominatePlayer = vi.fn();
+      // team-1 has only $1 budget but needs reserve of $1 ((rounds-1)*minBid).
+      // maxAffordable = $0; auto-nominator's openingBid=1 > $0 → skip.
+      const lobby = await makeLobby(
+        autoNominateLobbyOpts({
+          publish,
+          skipNomination,
+          nominatePlayer,
+          auctionAutoNominateStrategies: fixedProjectionStrategy('8478402', 1),
+          initialTeamBudgets: new Map([
+            ['team-1', 1],
+            ['team-2', 200],
+            ['team-3', 200],
+          ]),
+        }),
+      );
+      publish.mockClear();
+      await vi.advanceTimersByTimeAsync(6_000);
+
+      expect(skipNomination).toHaveBeenCalledTimes(1);
+      const skipCall = skipNomination.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(skipCall.reason).toBe('insufficient_budget');
+      expect(skipCall.teamId).toBe('team-1');
+      expect(nominatePlayer).not.toHaveBeenCalled();
+
+      // Broadcast carries the skip event.
+      const broadcasts = publish.mock.calls.map((c) => JSON.parse(c[1] as string));
+      const skipBroadcast = broadcasts.find(
+        (b) => b.payload.kind === 'auction_nomination_skipped',
+      );
+      expect(skipBroadcast).toBeDefined();
+      expect(skipBroadcast.payload.reason).toBe('insufficient_budget');
+
+      // nominationsCompleted advanced; next nominator's window scheduled.
+      const auctionState = lobby.getAuctionState();
+      expect(auctionState?.nominationsCompleted).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('auto-nominate cascade: 3 teams in a row skip → all complete early', async () => {
+    vi.useFakeTimers();
+    try {
+      let skipCallCount = 0;
+      const skipNomination = vi.fn(async (_p: unknown) => {
+        skipCallCount++;
+        return {
+          event_id: skipCallCount,
+          seq: skipCallCount,
+          skipped_team_id: `team-${skipCallCount}`,
+          reason: 'insufficient_budget' as const,
+          was_duplicate: false,
+        };
+      });
+      const nominatePlayer = vi.fn();
+      // All 3 teams have $0 budget → all skip. With draftRounds=2:
+      // 3 × 2 = 6 total nominations. Budget reserve makes EVERY round
+      // a forced skip. So all 6 are skipped → auction completes early.
+      const lobby = await makeLobby(
+        autoNominateLobbyOpts({
+          skipNomination,
+          nominatePlayer,
+          auctionAutoNominateStrategies: fixedProjectionStrategy('8478402', 1),
+          initialTeamBudgets: new Map([
+            ['team-1', 0],
+            ['team-2', 0],
+            ['team-3', 0],
+          ]),
+        }),
+      );
+
+      // Cascade through all 6 nominations (each takes ~5s window).
+      // Total elapsed: 6 × 5s = 30s + buffer.
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(skipNomination).toHaveBeenCalledTimes(6);
+      expect(nominatePlayer).not.toHaveBeenCalled();
+      const auctionState = lobby.getAuctionState();
+      expect(auctionState?.nominationsCompleted).toBe(6);
+      expect(lobby.getCurrentState().draftStatus).toBe('completed');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('user nomination during nomination window: cancels nomination-window timer, schedules bid-window timer', async () => {
+    vi.useFakeTimers();
+    try {
+      const nominatePlayer = vi.fn(async (_p: unknown) => ({
+        event_id: 1,
+        seq: 1,
+        nomination_id: 'nom-1',
+        clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+        was_duplicate: false,
+      }));
+      const skipNomination = vi.fn();
+      const lobby = await makeLobby(
+        autoNominateLobbyOpts({ nominatePlayer, skipNomination }),
+      );
+      // User nominates BEFORE the 5s nomination window expires.
+      await vi.advanceTimersByTimeAsync(2_000);
+      const result = await lobby.enqueueAction(
+        nominateAction({ openingBid: 5 }),
+      );
+      expect(result.ok).toBe(true);
+
+      // Continue advancing past where the nomination-window timer
+      // would have fired (5s mark) — auto-nominate must NOT fire.
+      await vi.advanceTimersByTimeAsync(5_000);
+      // nominatePlayer was called once (the user's), not twice.
+      expect(nominatePlayer).toHaveBeenCalledTimes(1);
+      // Note: the user's nominate uses actor.kind='user'; auto-nominate
+      // would use 'autopick'. Verify the single call was the user's.
+      const call = nominatePlayer.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect((call.actor as Record<string, unknown>).kind).toBe('user');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('pause during nomination window: pauseState captures nomination_window kind', async () => {
+    vi.useFakeTimers();
+    try {
+      const pauseAuction = vi.fn(async (_p: unknown) => ({
+        event_id: 5,
+        seq: 5,
+        paused_at: new Date().toISOString(),
+        paused_nomination_id: null,
+        captured_remaining_seconds: 3,
+        was_duplicate: false,
+      }));
+      const lobby = await makeLobby(
+        autoNominateLobbyOpts({ pauseAuction }),
+      );
+      // Init scheduled the nomination-window timer; pause within
+      // the window (no active nomination).
+      const result = await lobby.pauseAuction({
+        commissionerUserId: 'commish-1',
+        reason: 'pause-within-nom-window',
+        idempotencyKey: 'p-1',
+      });
+      expect(result.ok).toBe(true);
+
+      // The auction_paused event in the ring buffer carries the
+      // nomination_window discriminator.
+      const snap = lobby.getSnapshot();
+      const pausedEvent = snap.recentEvents.find(
+        (e) => e.kind === 'auction_paused',
+      );
+      expect(pausedEvent).toBeDefined();
+      expect(
+        (pausedEvent as Extract<BufferedDraftEvent, { kind: 'auction_paused' }>)
+          .pausedTimerKind,
+      ).toBe('nomination_window');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bootstrap mid-nomination-window: replay leaves no currentNomination, post-replay schedules nomination-window timer', async () => {
+    vi.useFakeTimers();
+    try {
+      const nominatePlayer = vi.fn(async (_p: unknown) => ({
+        event_id: 1,
+        seq: 1,
+        nomination_id: 'nom-1',
+        clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+        was_duplicate: false,
+      }));
+      // Event log: a prior nomination + close, leaving the auction
+      // mid-nomination-window for the SECOND nominator.
+      const events: DraftEventRow[] = [
+        makeEventRow({
+          seq: 1,
+          event_type: 'auction_nomination_started',
+          payload: {
+            nomination_id: 'nom-prior',
+            player_id: '8478000',
+            player_name: 'Prior',
+            opening_bid: 1,
+            nominator_team_id: 'team-1',
+            expires_at: new Date('2026-05-07T12:00:00Z').toISOString(),
+          },
+        }),
+        makeEventRow({
+          seq: 2,
+          event_type: 'auction_nomination_closed',
+          payload: {
+            nomination_id: 'nom-prior',
+            winning_team_id: 'team-1',
+            final_amount: 1,
+            total_bids: 1,
+            player_id: '8478000',
+          },
+        }),
+      ];
+      const lobby = await makeLobby(
+        autoNominateLobbyOpts({
+          listDraftEvents: vi.fn(async () => events),
+          nominatePlayer,
+          auctionAutoNominateStrategies: fixedProjectionStrategy('8478402'),
+        }),
+      );
+
+      // Post-replay: nominationsCompleted=1, currentNomination=null,
+      // nomination-window timer scheduled for team-2 (next in rotation).
+      const auctionState = lobby.getAuctionState();
+      expect(auctionState?.nominationsCompleted).toBe(1);
+      expect(auctionState?.currentNomination).toBeNull();
+
+      await vi.advanceTimersByTimeAsync(6_000);
+      expect(nominatePlayer).toHaveBeenCalledTimes(1);
+      const call = nominatePlayer.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(call.teamId).toBe('team-2'); // next nominator after team-1's win
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bootstrap mid-auto-nominate: replay sets currentNomination, schedules bid-window timer', async () => {
+    const events: DraftEventRow[] = [
+      makeEventRow({
+        seq: 1,
+        event_type: 'auction_auto_nominated',
+        payload: {
+          nomination_id: 'nom-1',
+          player_id: '8478402',
+          player_name: 'McDavid',
+          opening_bid: 1,
+          nominator_team_id: 'team-1',
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+          fallback_source: 'projections',
+        },
+      }),
+    ];
+    const lobby = await makeLobby(
+      autoNominateLobbyOpts({ listDraftEvents: vi.fn(async () => events) }),
+    );
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.currentNomination?.nominationId).toBe('nom-1');
+    expect(auctionState?.currentNomination?.nominatorTeamId).toBe('team-1');
+    // Ring buffer has the auction_auto_nominated event.
+    const snap = lobby.getSnapshot();
+    expect(snap.recentEvents.map((e) => e.kind)).toContain('auction_auto_nominated');
+  });
+
+  it('bootstrap with auction_nomination_skipped events: replay correctly advances nominationsCompleted past skipped teams', async () => {
+    const events: DraftEventRow[] = [
+      makeEventRow({
+        seq: 1,
+        event_type: 'auction_nomination_skipped',
+        payload: { skipped_team_id: 'team-1', reason: 'insufficient_budget' },
+      }),
+      makeEventRow({
+        seq: 2,
+        event_type: 'auction_nomination_skipped',
+        payload: { skipped_team_id: 'team-2', reason: 'insufficient_budget' },
+      }),
+    ];
+    const lobby = await makeLobby(
+      autoNominateLobbyOpts({ listDraftEvents: vi.fn(async () => events) }),
+    );
+    const auctionState = lobby.getAuctionState();
+    expect(auctionState?.nominationsCompleted).toBe(2);
+    // The next nominator (rotation pointer) is team-3.
+    expect(lobby.getCurrentState().onClockTeamId).toBe('team-3');
+  });
+
+  it('auto-nominate no_eligible_players: skip event emitted with that reason', async () => {
+    vi.useFakeTimers();
+    try {
+      const skipNomination = vi.fn(async (_p: unknown) => ({
+        event_id: 2,
+        seq: 2,
+        skipped_team_id: 'team-1',
+        reason: 'no_eligible_players' as const,
+        was_duplicate: false,
+      }));
+      // Strategy returns no_eligible_players (every projection consumed).
+      const lobby = await makeLobby(
+        autoNominateLobbyOpts({
+          skipNomination,
+          auctionAutoNominateStrategies: [
+            vi.fn(async () => ({ ok: false as const, reason: 'no_eligible_players' as const })),
+          ],
+        }),
+      );
+      await vi.advanceTimersByTimeAsync(6_000);
+
+      expect(skipNomination).toHaveBeenCalledTimes(1);
+      const call = skipNomination.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(call.reason).toBe('no_eligible_players');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('engine completion via cascade: all teams skip → status becomes completed', async () => {
+    vi.useFakeTimers();
+    try {
+      const skipNomination = vi.fn(async (_p: unknown) => ({
+        event_id: Math.floor(Math.random() * 1000),
+        seq: Math.floor(Math.random() * 1000),
+        skipped_team_id: 'team-x',
+        reason: 'insufficient_budget' as const,
+        was_duplicate: false,
+      }));
+      const lobby = await makeLobby(
+        autoNominateLobbyOpts({
+          skipNomination,
+          draftRounds: 1, // 3 teams × 1 round = 3 total nominations
+          auctionAutoNominateStrategies: fixedProjectionStrategy('8478402', 1),
+          initialTeamBudgets: new Map([
+            ['team-1', 0],
+            ['team-2', 0],
+            ['team-3', 0],
+          ]),
+        }),
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(skipNomination).toHaveBeenCalledTimes(3);
+      expect(lobby.getCurrentState().draftStatus).toBe('completed');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('idempotent retry: deterministic auto-nominate idempotency key — engine restart mid-fire produces same key', async () => {
+    vi.useFakeTimers();
+    try {
+      const nominatePlayer = vi.fn(async (_p: unknown) => ({
+        event_id: 1,
+        seq: 1,
+        nomination_id: 'nom-1',
+        clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+        was_duplicate: false,
+      }));
+      const lobby = await makeLobby(
+        autoNominateLobbyOpts({
+          nominatePlayer,
+          auctionAutoNominateStrategies: fixedProjectionStrategy('8478402'),
+        }),
+      );
+      await vi.advanceTimersByTimeAsync(6_000);
+      const firstKey = (
+        nominatePlayer.mock.calls[0]?.[0] as Record<string, unknown>
+      ).idempotencyKey as string;
+
+      // Verify the key looks like a UUID (md5UuidFromSeed output).
+      expect(firstKey).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

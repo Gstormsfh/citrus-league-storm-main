@@ -195,7 +195,8 @@ export interface LeagueFormatSettings {
   pickTimeLimit: number;         // Seconds per pick (snake/linear)
   auctionBudget?: number;        // $ budget per team (auction only)
   auctionMinBid?: number;        // Minimum opening bid (NOT minimum increment — see auctionMinBidIncrementTiers per ADR-002 §4.3 chunk 11g.6 6c2 decoupling).
-  auctionNominationTime?: number;// Seconds to nominate (auction only)
+  auctionBidWindowSeconds?: number;        // Seconds bidding stays open per nomination. ADR-002 §3.4 / §4.3 default 30. Pre-launch rename of legacy `auctionNominationTime` per chunk 11g.6 6c3.
+  auctionNominationWindowSeconds?: number; // Seconds the on-clock nominator has to choose a player before auto-nominate fires. ADR-002 §3.4 / §4.3 default 60.
   auctionAntiSnipeThresholdSeconds?: number; // Bid in last N s extends clock (0 disables). ADR-002 §3.3 / §4.3.
   auctionAntiSnipeExtensionSeconds?: number; // Extension duration when threshold fires. ADR-002 §3.3 / §4.3.
   /**
@@ -468,7 +469,16 @@ export function extractFormatSettings(settings: Record<string, unknown>): Partia
     // Auction
     auctionBudget: (settings.auctionBudget as number) || 200,
     auctionMinBid: (settings.auctionMinBid as number) || 1,
-    auctionNominationTime: (settings.auctionNominationTime as number) || 30,
+    // ADR-002 §3.4 default 30s bid window. Pre-launch rename of legacy
+    // `auctionNominationTime` (which was misnamed — being used as the
+    // bid window despite the name implying nominator's clock). Chunk
+    // 11g.6 sub-step 6c3.
+    auctionBidWindowSeconds: (settings.auctionBidWindowSeconds as number) || 30,
+    // ADR-002 §3.4 default 60s nomination window — net-new in 6c3.
+    // Drives the auto-nominate timer for on-clock nominators who
+    // don't choose a player.
+    auctionNominationWindowSeconds:
+      (settings.auctionNominationWindowSeconds as number) || 60,
     auctionAntiSnipeThresholdSeconds:
       (settings.auctionAntiSnipeThresholdSeconds as number) ?? 30,
     auctionAntiSnipeExtensionSeconds:

@@ -179,6 +179,21 @@ export interface LobbyConfig {
    * default flat-$1 table (unused — no `place_bid_v2` calls).
    */
   auctionMinBidIncrementTiers: ReadonlyArray<{ below: number; increment: number }>;
+  /**
+   * Auction bid-window duration in seconds (chunk 11g.6 sub-step
+   * 6c3 per ADR-002 §3.4 / §4.3 default 30). Pre-launch rename of
+   * the legacy `auctionNominationTime` setting which was misnamed
+   * — being used as bid-window despite the name implying nominator
+   * clock. Snake/linear lobbies set to 0 (unused).
+   */
+  auctionBidWindowSeconds: number;
+  /**
+   * Auction nomination-window duration in seconds (chunk 11g.6
+   * sub-step 6c3 per ADR-002 §3.4 default 60). Net-new in 6c3.
+   * Drives the auto-nominate timer for on-clock nominators who
+   * don't choose a player. Snake/linear lobbies set to 0 (unused).
+   */
+  auctionNominationWindowSeconds: number;
 }
 
 export interface LobbyRegistryOptions {
@@ -393,6 +408,8 @@ export class LobbyRegistry {
       auctionAntiSnipeThresholdSeconds: config.auctionAntiSnipeThresholdSeconds,
       auctionAntiSnipeExtensionSeconds: config.auctionAntiSnipeExtensionSeconds,
       auctionMinBidIncrementTiers: config.auctionMinBidIncrementTiers,
+      auctionBidWindowSeconds: config.auctionBidWindowSeconds,
+      auctionNominationWindowSeconds: config.auctionNominationWindowSeconds,
     });
     // Step 6b: bootstrap from the durable event log BEFORE returning.
     // A failed init() throws; the existing try/catch in getOrCreate

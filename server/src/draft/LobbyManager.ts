@@ -102,13 +102,42 @@ import {
   type DraftV2Actor,
   type SubmitPickResult,
 } from '../services/DraftServiceV2';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+
+/**
+ * Derive a deterministic UUID-formatted string from a seed via MD5
+ * hashing. Used by chunk 11g.6 sub-step 6c3 for engine-fired
+ * auto-nominate / skip idempotency keys. Same pattern as the SQL
+ * migration's `md5('extends:'||...)::uuid` derivation in 6b.
+ *
+ * Output format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (32 hex
+ * chars + 4 hyphens; the column type is uuid so the format must
+ * match Postgres' uuid parser).
+ */
+function md5UuidFromSeed(seed: string): string {
+  const hex = createHash('md5').update(seed).digest('hex');
+  return (
+    hex.slice(0, 8) +
+    '-' +
+    hex.slice(8, 12) +
+    '-' +
+    hex.slice(12, 16) +
+    '-' +
+    hex.slice(16, 20) +
+    '-' +
+    hex.slice(20, 32)
+  );
+}
 import { RingBuffer } from './RingBuffer';
 import {
   selectAutopickPlayer,
   type AutopickStrategy,
 } from './autopickStrategy';
 import { computeMinimumNextBid } from './auctionBidIncrement';
+import {
+  selectAuctionAutoNominate,
+  type AuctionAutoNominateStrategy,
+} from './auctionAutoNominateStrategy';
 import {
   serializeServerMessage,
   WIRE_PROTOCOL_VERSION,
@@ -286,6 +315,26 @@ export interface LobbyManagerOptions {
    * Snake/linear lobbies pass the default (unused).
    */
   auctionMinBidIncrementTiers: ReadonlyArray<{ below: number; increment: number }>;
+  /**
+   * Auction bid-window duration in seconds (chunk 11g.6 sub-step
+   * 6c3 per ADR-002 §3.4 default 30). Pre-launch rename of legacy
+   * `auctionNominationTime` setting. Snake/linear lobbies pass 0
+   * (unused).
+   */
+  auctionBidWindowSeconds: number;
+  /**
+   * Auction nomination-window duration in seconds (chunk 11g.6
+   * sub-step 6c3 per ADR-002 §3.4 default 60). Net-new in 6c3.
+   * Drives the auto-nominate timer for on-clock nominators who
+   * don't choose a player. Snake/linear lobbies pass 0 (unused).
+   */
+  auctionNominationWindowSeconds: number;
+  /**
+   * Optional auction auto-nominate strategy chain override.
+   * Defaults to `[projectionsAuctionStrategy]` per
+   * `auctionAutoNominateStrategy.ts`. Tests pass custom strategies.
+   */
+  auctionAutoNominateStrategies?: ReadonlyArray<AuctionAutoNominateStrategy>;
 }
 
 /**
@@ -401,13 +450,13 @@ export class LobbyManager {
   /**
    * Step-6c timer state.
    *
-   * `currentPickDeadline`: wall-clock timestamp when the on-clock
+   * `currentTimerDeadline`: wall-clock timestamp when the on-clock
    * pick's deadline expires. Wall-clock (not relative) so it
    * survives bootstrap correctly — at bootstrap the engine reads
    * the deadline from `leagues.pick_deadline` and computes
    * `setTimeout(handleAutopickTimeout, deadline - now())`.
    *
-   * `currentPickTimerHandle`: the live `setTimeout` handle. Cleared
+   * `currentTimerHandle`: the live `setTimeout` handle. Cleared
    * by `cancelPickTimer` on pick advance, pause, completion,
    * cancellation, and shutdown. `null` when no timer is scheduled.
    *
@@ -423,9 +472,36 @@ export class LobbyManager {
    * `setPickDeadline` becomes a no-op. Set by `shutdown()` (called
    * by chunk 11g.7's graceful-shutdown path; today only by tests).
    */
-  private currentPickDeadline: Date | null = null;
-  private currentPickTimerHandle: NodeJS.Timeout | null = null;
-  private pauseState: { pausedAt: Date; remainingMs: number } | null = null;
+  private currentTimerDeadline: Date | null = null;
+  private currentTimerHandle: NodeJS.Timeout | null = null;
+  /**
+   * Single-timer-handle architecture (chunk 11g.6 sub-step 6c3).
+   * At most one timer is active at runtime; this discriminates
+   * the format-and-state-specific behavior on
+   * `handleClockExpired`. Snake/linear uses `'pick'`; auction uses
+   * `'bid_window'` (active nomination open for bidding) or
+   * `'nomination_window'` (between nominations — current nominator
+   * has the clock to pick a player). Mutually exclusive by
+   * construction; tests verify never-both.
+   */
+  private currentTimerKind:
+    | 'pick'
+    | 'bid_window'
+    | 'nomination_window'
+    | null = null;
+  /**
+   * Pause state. `pausedTimerKind` (chunk 11g.6 sub-step 6c3)
+   * discriminates which timer was running so resume restores
+   * correctly. Backward-compat: 6c1-emitted events without this
+   * field default to `'bid_window'`. Snake/linear paused state
+   * also carries `'bid_window'` as a harmless placeholder
+   * (engine consults `format` to decide the restore path).
+   */
+  private pauseState: {
+    pausedAt: Date;
+    remainingMs: number;
+    pausedTimerKind: 'bid_window' | 'nomination_window';
+  } | null = null;
   private shutDown = false;
 
   /**
@@ -534,7 +610,7 @@ export class LobbyManager {
    *   - bootstrap auction event handlers (event log replay)
    *
    * The timer handle is held here (parallel to snake/linear's
-   * `currentPickTimerHandle`); `cancelPickTimer` clears both.
+   * `currentTimerHandle`); `cancelPickTimer` clears both.
    */
   private currentNomination: {
     nominationId: string;
@@ -574,6 +650,24 @@ export class LobbyManager {
     increment: number;
   }>;
 
+  /**
+   * Auction nomination-window duration in ms (chunk 11g.6 sub-step
+   * 6c3 per ADR-002 §3.4 default 60s). Engine schedules the
+   * nomination-window timer with this duration when no nomination
+   * is open. On expiry → auto-nominate via the strategy chain.
+   */
+  private readonly nominationWindowMs: number;
+
+  /**
+   * Strategy chain for engine-fired auto-nominate (chunk 11g.6
+   * sub-step 6c3). Today: `[projectionsAuctionStrategy]`. Future
+   * chains can prepend queue-priority / append commissioner-preset
+   * without engine refactor (chain-of-strategies pattern).
+   */
+  private readonly auctionAutoNominateStrategies:
+    | ReadonlyArray<AuctionAutoNominateStrategy>
+    | undefined;
+
   constructor(opts: LobbyManagerOptions) {
     this.lobbyId = opts.lobbyId;
     this.format = opts.format;
@@ -602,6 +696,15 @@ export class LobbyManager {
     this.antiSnipeThresholdSeconds = opts.auctionAntiSnipeThresholdSeconds;
     this.antiSnipeExtensionSeconds = opts.auctionAntiSnipeExtensionSeconds;
     this.auctionMinBidIncrementTiers = opts.auctionMinBidIncrementTiers;
+    // Chunk 11g.6 sub-step 6c3: nomination window timer +
+    // auto-nominate strategy chain. `bidWindowMs` (set above) is
+    // the legacy `pickClockMs` reuse; 6c3 introduces the explicit
+    // pair via `auctionBidWindowSeconds` + `auctionNominationWindowSeconds`.
+    if (opts.format === 'auction') {
+      this.bidWindowMs = opts.auctionBidWindowSeconds * 1000;
+    }
+    this.nominationWindowMs = opts.auctionNominationWindowSeconds * 1000;
+    this.auctionAutoNominateStrategies = opts.auctionAutoNominateStrategies;
 
     // `picksMade`, `draftStatus`, `initialized`, timer state are
     // zero-initialized at the field declaration above. `init()`
@@ -655,29 +758,63 @@ export class LobbyManager {
     //   immediately. This is the "process restarted mid-deadline"
     //   recovery path.
     if (this.format === 'auction') {
-      // Auction timer post-replay (chunk 11g.6 sub-step 6a): if a
-      // nomination is open after event replay AND the draft is
-      // active, schedule the bid-window timer from
-      // `currentNomination.expiresAt`. Process-restart-mid-bid
-      // recovery; mirrors the snake/linear `initialPickDeadline`
-      // path conceptually.
-      if (
-        this.draftStatus === 'in_progress' &&
+      // Auction timer post-replay (chunk 11g.6 sub-step 6a + 6c3):
+      //   - Active nomination → bid-window timer from
+      //     `currentNomination.expiresAt`. Process-restart-mid-bid
+      //     recovery.
+      //   - In-progress, no active nomination, draft not complete →
+      //     nomination-window timer for the current nominator
+      //     (chunk 11g.6 sub-step 6c3 — NEW). Process-restart-
+      //     mid-nomination-window recovery; the deadline is
+      //     reconstructed locally as `now() + nominationWindowMs`
+      //     since there's no DB row tracking nomination-window
+      //     deadlines (they're transient state).
+      //   - Not started → no timer scheduled here. The first
+      //     manual nomination transitions `draftStatus` from
+      //     `'not_started'` to `'in_progress'` AND starts the bid-
+      //     window timer (in `processNominate`). Auction draft
+      //     lifecycle initiation (transitioning the DB to
+      //     `'active'`) is owned by the commissioner-start-draft
+      //     flow which lands separately. Once `initialDraftState`
+      //     is `'active'` AND the durable log is fresh, init()
+      //     starts the very first nomination-window timer.
+      if (this.draftStatus === 'in_progress' && this.pauseState === null) {
+        if (this.currentNomination !== null) {
+          this.setPickDeadline(this.currentNomination.expiresAt, 'bid_window');
+        } else if (
+          this.nominationOrder.length > 0 &&
+          this.nominationsCompleted <
+            this.nominationOrder.length * this.draftRounds
+        ) {
+          // Schedule nomination-window timer for the current nominator.
+          const newDeadline = new Date(Date.now() + this.nominationWindowMs);
+          this.setPickDeadline(newDeadline, 'nomination_window');
+        }
+      } else if (
+        this.draftStatus === 'not_started' &&
+        this.initialDraftState === 'active' &&
         this.pauseState === null &&
-        this.currentNomination !== null
+        this.nominationOrder.length > 0 &&
+        this.draftRounds > 0
       ) {
-        this.setPickDeadline(this.currentNomination.expiresAt);
+        // Fresh-start auction with `leagues.draft_state='active'`:
+        // kick the very first nominator's window. Transition
+        // status to in_progress so the timer's expiry passes
+        // `handleClockExpired`'s status guard.
+        this.draftStatus = 'in_progress';
+        const newDeadline = new Date(Date.now() + this.nominationWindowMs);
+        this.setPickDeadline(newDeadline, 'nomination_window');
       }
     } else if (
       this.draftStatus === 'in_progress' &&
       this.pauseState === null &&
       this.initialPickDeadline !== null
     ) {
-      this.setPickDeadline(this.initialPickDeadline);
+      this.setPickDeadline(this.initialPickDeadline, 'pick');
     }
 
     logger.info(
-      `[lobby] init complete lobbyId=${this.lobbyId} format=${this.format} picksMade=${this.picksMade} status=${this.draftStatus} bufferSize=${this.events.size()} timerScheduled=${this.currentPickTimerHandle !== null} activeNomination=${this.currentNomination !== null}`,
+      `[lobby] init complete lobbyId=${this.lobbyId} format=${this.format} picksMade=${this.picksMade} status=${this.draftStatus} bufferSize=${this.events.size()} timerScheduled=${this.currentTimerHandle !== null} activeNomination=${this.currentNomination !== null}`,
     );
   }
 
@@ -945,10 +1082,17 @@ export class LobbyManager {
         totalPicks,
         picksMade: this.nominationsCompleted,
         draftStatus: this.draftStatus,
+        // Wire field name unchanged (`currentPickDeadline`) for
+        // backward-compat — clients consume this key. Internal
+        // engine field was renamed to `currentTimerDeadline` in
+        // chunk 11g.6 sub-step 6c3 alongside the timer-kind
+        // discriminator addition.
         currentPickDeadline:
           this.currentNomination !== null
             ? this.currentNomination.expiresAt.toISOString()
-            : null,
+            : this.currentTimerDeadline !== null
+              ? this.currentTimerDeadline.toISOString()
+              : null,
       };
     }
 
@@ -962,8 +1106,8 @@ export class LobbyManager {
       picksMade: this.picksMade,
       draftStatus: this.draftStatus,
       currentPickDeadline:
-        this.currentPickDeadline !== null
-          ? this.currentPickDeadline.toISOString()
+        this.currentTimerDeadline !== null
+          ? this.currentTimerDeadline.toISOString()
           : null,
     };
   }
@@ -1269,9 +1413,9 @@ export class LobbyManager {
       } else {
         // Draft completed. Clear timer + deadline; no team is on
         // the clock anymore, so getCurrentState should reflect
-        // that with currentPickDeadline=null.
+        // that with currentTimerDeadline=null.
         this.cancelPickTimer();
-        this.currentPickDeadline = null;
+        this.currentTimerDeadline = null;
       }
     }
 
@@ -1467,7 +1611,10 @@ export class LobbyManager {
         payload: event,
       });
 
-      this.setPickDeadline(expiresAt);
+      // Chunk 11g.6 sub-step 6c3: explicit bid-window kind for the
+      // post-nomination timer (previously implicit since auction
+      // had only one timer kind).
+      this.setPickDeadline(expiresAt, 'bid_window');
     }
 
     return { ok: true, eventSeq: result.seq };
@@ -1651,7 +1798,9 @@ export class LobbyManager {
       // semantics work (the ring buffer entry's seq matches the
       // durable `draft_events.seq` from the same transaction).
       if (result.was_extended && result.extends_event_seq !== undefined) {
-        this.setPickDeadline(newExpiresAt);
+        // Chunk 11g.6 sub-step 6c3: explicit bid-window kind on
+        // anti-snipe extension reschedule.
+        this.setPickDeadline(newExpiresAt, 'bid_window');
 
         const extendsEvent: BufferedDraftEvent = {
           kind: 'auction_bid_extends_timer',
@@ -1899,6 +2048,12 @@ export class LobbyManager {
             ),
             remainingMs:
               ((((event.payload as Record<string, unknown>).remaining_seconds as number) ?? 0) * 1000),
+            // Snake/linear `draft_paused` doesn't have a meaningful
+            // `pausedTimerKind` — populate as 'bid_window' as a
+            // harmless backward-compat default. The engine consults
+            // `format` to decide the restore path; this field is
+            // load-bearing only for auction.
+            pausedTimerKind: 'bid_window',
           };
           skippedCount++;
           break;
@@ -1952,6 +2107,13 @@ export class LobbyManager {
           break;
         case 'auction_resumed':
           this.applyAuctionResumedEvent(event);
+          break;
+        // ── Auction events (chunk 11g.6 sub-step 6c3) ─────────────────
+        case 'auction_auto_nominated':
+          this.applyAuctionAutoNominatedEvent(event);
+          break;
+        case 'auction_nomination_skipped':
+          this.applyAuctionNominationSkippedEvent(event);
           break;
         default:
           // Forward-compat for any future additions. Today the
@@ -2376,6 +2538,101 @@ export class LobbyManager {
   }
 
   /**
+   * Bootstrap handler for `event_type === 'auction_auto_nominated'`
+   * (chunk 11g.6 sub-step 6c3 per ADR-002 §3.4 + §4.2).
+   *
+   * Treated symmetrically with `auction_nomination_started` for
+   * state-machine purposes — both set `currentNomination`. The
+   * `fallbackSource` discriminator is preserved in the ring buffer
+   * for client UI to render an "🤖 Auto-nominated" badge.
+   *
+   * Per the canonical-replay principle from 6b: APPLY during
+   * replay, not log-and-skip.
+   */
+  private applyAuctionAutoNominatedEvent(event: DraftEventRow): void {
+    const payload = event.payload as Record<string, unknown>;
+    const nominationId = String(payload.nomination_id);
+    const playerId = String(payload.player_id);
+    const playerName = String(payload.player_name ?? '');
+    const nominatorTeamId = String(payload.nominator_team_id);
+    const openingBid = Number(payload.opening_bid);
+    const expiresAt = new Date(String(payload.expires_at));
+    const fallbackSourceRaw = String(payload.fallback_source ?? 'projections');
+    const fallbackSource: 'queue' | 'projections' | 'commissioner_preset' =
+      fallbackSourceRaw === 'queue'
+        ? 'queue'
+        : fallbackSourceRaw === 'commissioner_preset'
+          ? 'commissioner_preset'
+          : 'projections';
+
+    this.currentNomination = {
+      nominationId,
+      playerId,
+      playerName,
+      nominatorTeamId,
+      leadingBidderId: nominatorTeamId,
+      leadingBid: openingBid,
+      expiresAt,
+      timerHandle: null,
+    };
+    if (this.draftStatus === 'not_started') {
+      this.draftStatus = 'in_progress';
+    }
+
+    this.events.append({
+      kind: 'auction_auto_nominated',
+      seq: event.seq,
+      timestamp: event.created_at,
+      nominationId,
+      playerId,
+      playerName,
+      nominatorTeamId,
+      openingBid,
+      clockDeadline: expiresAt.toISOString(),
+      fallbackSource,
+      correlationId: event.idempotency_key ?? '',
+    });
+  }
+
+  /**
+   * Bootstrap handler for `event_type === 'auction_nomination_skipped'`
+   * (chunk 11g.6 sub-step 6c3 — Path Y extension of ADR-002).
+   *
+   * No `currentNomination` mutation (skip means no nomination
+   * happened). Just advances `nominationsCompleted` so the rotation
+   * pointer moves forward; cascade-completion check fires if the
+   * skip was the final pending action.
+   */
+  private applyAuctionNominationSkippedEvent(event: DraftEventRow): void {
+    const payload = event.payload as Record<string, unknown>;
+    const skippedTeamId = String(payload.skipped_team_id);
+    const reasonRaw = String(payload.reason ?? 'insufficient_budget');
+    const reason: 'insufficient_budget' | 'no_eligible_players' =
+      reasonRaw === 'no_eligible_players'
+        ? 'no_eligible_players'
+        : 'insufficient_budget';
+
+    this.nominationsCompleted++;
+
+    this.events.append({
+      kind: 'auction_nomination_skipped',
+      seq: event.seq,
+      timestamp: event.created_at,
+      correlationId: event.idempotency_key ?? '',
+      skippedTeamId,
+      reason,
+    });
+
+    const totalNominations = this.nominationOrder.length * this.draftRounds;
+    if (
+      this.nominationOrder.length > 0 &&
+      this.nominationsCompleted >= totalNominations
+    ) {
+      this.draftStatus = 'completed';
+    }
+  }
+
+  /**
    * Bootstrap handler for `event_type === 'auction_paused'` (chunk
    * 11g.6 sub-step 6c1 per ADR-002 §4.4).
    *
@@ -2407,6 +2664,14 @@ export class LobbyManager {
       payload.commissioner_user_id == null
         ? null
         : String(payload.commissioner_user_id);
+    // Chunk 11g.6 sub-step 6c3: read `pausedTimerKind` from payload;
+    // default to 'bid_window' for backward-compat with 6c1 events
+    // that don't have this field.
+    const pausedTimerKindRaw = payload.paused_timer_kind;
+    const pausedTimerKind: 'bid_window' | 'nomination_window' =
+      pausedTimerKindRaw === 'nomination_window'
+        ? 'nomination_window'
+        : 'bid_window';
 
     this.pauseState = {
       pausedAt,
@@ -2414,6 +2679,7 @@ export class LobbyManager {
         capturedRemainingSeconds === null
           ? 0
           : capturedRemainingSeconds * 1000,
+      pausedTimerKind,
     };
 
     this.events.append({
@@ -2430,6 +2696,7 @@ export class LobbyManager {
       ...(capturedRemainingSeconds !== null
         ? { capturedRemainingSeconds }
         : {}),
+      pausedTimerKind,
     });
   }
 
@@ -2490,40 +2757,51 @@ export class LobbyManager {
   // ── Step 6c: pick deadline timer + autopick on timeout ─────────────
 
   /**
-   * Schedule (or reschedule) the autopick timer for the on-clock
-   * pick. Cancels any existing timer first so concurrent calls
-   * don't double-schedule.
+   * Schedule (or reschedule) the active timer. Cancels any existing
+   * timer first so concurrent calls don't double-schedule.
+   *
+   * Chunk 11g.6 sub-step 6c3: `kind` parameter discriminates the
+   * timer's semantics for `handleClockExpired` dispatch:
+   *   - `'pick'`: snake/linear pick deadline → fires
+   *     `handleAutopickTimeout` (chunk 11g.4 step 6c).
+   *   - `'bid_window'`: auction nomination is open for bidding;
+   *     fires `handleNominationTimeout` → close nomination.
+   *   - `'nomination_window'`: auction is between nominations;
+   *     fires `handleNominationWindowTimeout` → auto-nominate.
    *
    * If `deadline <= now()`, the timer fires on the next event-loop
-   * tick (via `setTimeout(..., 0)`). This handles the bootstrap-
-   * recovery path where the engine starts after the on-clock team's
-   * deadline already passed — autopick fires immediately rather
-   * than leaving the draft stuck.
+   * tick. This handles the bootstrap-recovery path where the
+   * engine starts after a deadline already passed.
    *
    * No-op if `shutDown` is true (graceful-shutdown protection
    * against late-firing timers post-shutdown).
    */
-  private setPickDeadline(deadline: Date): void {
+  private setPickDeadline(
+    deadline: Date,
+    kind: 'pick' | 'bid_window' | 'nomination_window' = 'pick',
+  ): void {
     this.cancelPickTimer();
     if (this.shutDown) {
       return;
     }
-    this.currentPickDeadline = deadline;
+    this.currentTimerDeadline = deadline;
+    this.currentTimerKind = kind;
     const delayMs = Math.max(0, deadline.getTime() - Date.now());
-    this.currentPickTimerHandle = setTimeout(() => {
-      this.currentPickTimerHandle = null;
+    this.currentTimerHandle = setTimeout(() => {
+      this.currentTimerHandle = null;
       void this.handleClockExpired();
     }, delayMs);
     logger.debug(
-      `[lobby] pick deadline scheduled lobbyId=${this.lobbyId} deadline=${deadline.toISOString()} delayMs=${delayMs}`,
+      `[lobby] timer scheduled lobbyId=${this.lobbyId} kind=${kind} deadline=${deadline.toISOString()} delayMs=${delayMs}`,
     );
   }
 
   /**
-   * Format-aware clock-expiry dispatch (chunk 11g.6 sub-step 6a).
-   * Snake/linear → autopick; auction → close-nomination. Common
+   * Format-aware AND timer-kind-aware clock-expiry dispatch. Common
    * defensive guards (shut down / not in_progress / paused) live
-   * here so each branch's body is single-purpose.
+   * here so each branch's body is single-purpose. Chunk 11g.6
+   * sub-step 6c3 extends with `currentTimerKind` dispatch for
+   * auction lobbies (bid_window vs nomination_window).
    */
   private async handleClockExpired(): Promise<void> {
     if (this.shutDown) {
@@ -2543,7 +2821,14 @@ export class LobbyManager {
       return;
     }
     if (this.format === 'auction') {
-      await this.handleNominationTimeout();
+      // Chunk 11g.6 sub-step 6c3: dispatch by timer kind.
+      if (this.currentTimerKind === 'nomination_window') {
+        await this.handleNominationWindowTimeout();
+      } else {
+        // 'bid_window' (or null — defensive default to bid_window
+        // since 6a/6b/6c1/6c2 didn't track the discriminator).
+        await this.handleNominationTimeout();
+      }
     } else {
       await this.handleAutopickTimeout();
     }
@@ -2552,15 +2837,19 @@ export class LobbyManager {
   /**
    * Cancel the pending autopick timer (if any). Idempotent — safe
    * to call when no timer is set. Does NOT clear
-   * `currentPickDeadline` because callers may want to inspect it
+   * `currentTimerDeadline` because callers may want to inspect it
    * (e.g., for observability after shutdown). Set to null
    * explicitly when the deadline truly no longer applies.
    */
   private cancelPickTimer(): void {
-    if (this.currentPickTimerHandle !== null) {
-      clearTimeout(this.currentPickTimerHandle);
-      this.currentPickTimerHandle = null;
+    if (this.currentTimerHandle !== null) {
+      clearTimeout(this.currentTimerHandle);
+      this.currentTimerHandle = null;
     }
+    // Chunk 11g.6 sub-step 6c3: clear the discriminator so a
+    // subsequent `handleClockExpired` (e.g., a stale timer racing
+    // a manual cancel) sees a null kind and bails defensively.
+    this.currentTimerKind = null;
   }
 
   /**
@@ -2604,7 +2893,7 @@ export class LobbyManager {
         err,
       );
       // Treat as stuck-draft — clear deadline, surface for ops.
-      this.currentPickDeadline = null;
+      this.currentTimerDeadline = null;
       return;
     }
 
@@ -2615,7 +2904,7 @@ export class LobbyManager {
       logger.error(
         `[lobby] autopick STUCK — no eligible players lobbyId=${this.lobbyId} teamId=${slot.teamId} picksMade=${this.picksMade}`,
       );
-      this.currentPickDeadline = null;
+      this.currentTimerDeadline = null;
       return;
     }
 
@@ -2709,7 +2998,7 @@ export class LobbyManager {
       // currentNomination so the lobby doesn't deadlock. Chunk 11g.7
       // alerting fires on this log line.
       this.currentNomination = null;
-      this.currentPickDeadline = null;
+      this.currentTimerDeadline = null;
       return;
     }
 
@@ -2775,7 +3064,7 @@ export class LobbyManager {
     }
 
     this.currentNomination = null;
-    this.currentPickDeadline = null;
+    this.currentTimerDeadline = null;
     this.nominationsCompleted++;
 
     // Auction completion check.
@@ -2785,7 +3074,316 @@ export class LobbyManager {
       logger.info(
         `[lobby] auction completed lobbyId=${this.lobbyId} totalNominations=${totalNominations}`,
       );
+    } else {
+      // Chunk 11g.6 sub-step 6c3: schedule the next nominator's
+      // nomination-window timer. Engine drives the auction forward
+      // even without user action — auto-nominate fires if the next
+      // nominator doesn't manually pick a player within the window.
+      const newDeadline = new Date(Date.now() + this.nominationWindowMs);
+      this.setPickDeadline(newDeadline, 'nomination_window');
     }
+  }
+
+  /**
+   * Auction nomination-window timer entry point (chunk 11g.6
+   * sub-step 6c3 per ADR-002 §3.4 + §4.2). Called from
+   * `handleClockExpired` when a nomination window closes without
+   * the on-clock nominator submitting a player.
+   *
+   * Sequence:
+   *   1. **Cascade-completion guard**: if the auction is already
+   *      complete (`nominationsCompleted >= teams × draftRounds`),
+   *      transition status and exit. Defensive — should be unreachable
+   *      because `handleNominationTimeout`'s post-close logic would
+   *      have transitioned status already.
+   *   2. **Active-nomination guard**: if `currentNomination !== null`,
+   *      a user nomination raced ahead of the timer fire. No-op
+   *      defensively — the user won the race. Single-writer queue
+   *      ensures we observe the user's nomination before the timer's
+   *      callback because the timer chains through `enqueueAction`'s
+   *      queue as well (via the `setPickDeadline` indirection).
+   *   3. **Determine current nominator** from the rotation pointer.
+   *   4. **Run strategy chain** to pick a player.
+   *      - Strategy returns no_eligible_players → emit
+   *        `auction_nomination_skipped` with `reason='no_eligible_players'`,
+   *        advance `nominationsCompleted`, schedule next nominator's
+   *        timer (cascade); the spec's pause-and-alert path (ADR-002
+   *        §4.4) is wired in chunk 11g.7 alongside ops alerting.
+   *      - Strategy returns ok → check budget reserve.
+   *   5. **Budget check**: if `auctionMinBid > maxAffordable`, emit
+   *      `auction_nomination_skipped` with
+   *      `reason='insufficient_budget'`, advance `nominationsCompleted`,
+   *      schedule next nominator's timer (cascade — Path Y extension
+   *      of ADR-002).
+   *   6. **Call `nominate_player_v2` RPC** with `actor.kind='autopick'`
+   *      and the strategy-chosen player + `openingBid=auctionMinBid`.
+   *      Same atomic 5-write block as the user-initiated path.
+   *   7. **Advance state** on success: set `currentNomination`,
+   *      append `auction_auto_nominated` event (instead of the
+   *      user-path's `auction_nomination_started`), broadcast,
+   *      schedule bid-window timer.
+   *
+   * Engine-fired idempotency keys are derived deterministically:
+   *   - `md5('auto-nominate:' || leagueId || ':' || nominationsCompleted)::uuid`
+   *     for the nominate path.
+   *   - `md5('skip:' || leagueId || ':' || nominationsCompleted)::uuid`
+   *     for the skip path.
+   * Same retry-safety pattern as 6b's `extends-` derivation.
+   */
+  private async handleNominationWindowTimeout(): Promise<void> {
+    // Step 1: cascade-completion guard.
+    const totalNominations = this.nominationOrder.length * this.draftRounds;
+    if (this.nominationsCompleted >= totalNominations) {
+      this.draftStatus = 'completed';
+      this.currentTimerDeadline = null;
+      logger.info(
+        `[lobby] auction completed via cascade exhaustion lobbyId=${this.lobbyId}`,
+      );
+      return;
+    }
+
+    // Step 2: active-nomination guard (race resolution).
+    if (this.currentNomination !== null) {
+      logger.debug(
+        `[lobby] nomination-window timer fired with active nomination — race lost, no-op lobbyId=${this.lobbyId}`,
+      );
+      return;
+    }
+
+    // Step 3: determine current nominator.
+    const teamCount = this.nominationOrder.length;
+    if (teamCount === 0) {
+      logger.error(
+        `[lobby] handleNominationWindowTimeout: empty nominationOrder lobbyId=${this.lobbyId}`,
+      );
+      this.currentTimerDeadline = null;
+      return;
+    }
+    const nominatorTeamId =
+      this.nominationOrder[this.nominationsCompleted % teamCount];
+
+    // Step 4: run strategy chain.
+    let strategyResult: Awaited<ReturnType<typeof selectAuctionAutoNominate>>;
+    try {
+      strategyResult = await selectAuctionAutoNominate(
+        {
+          leagueId: this.leagueId,
+          teamId: nominatorTeamId,
+          auctionMinBid: this.auctionMinBid,
+          supabase: this.supabase,
+        },
+        this.auctionAutoNominateStrategies,
+      );
+    } catch (err) {
+      logger.error(
+        `[lobby] auto-nominate strategy threw lobbyId=${this.lobbyId} teamId=${nominatorTeamId}`,
+        err,
+      );
+      // Treat as stuck — clear timer + surface for ops. Chunk 11g.7
+      // alerting consumes this log line.
+      this.currentTimerDeadline = null;
+      return;
+    }
+
+    if (!strategyResult.ok) {
+      // No eligible players — per ADR-002 §4.4 this should pause
+      // the draft + alert commissioner. For 6c3 we emit the
+      // `auction_nomination_skipped` event with `reason='no_eligible_players'`
+      // for audit, advance state, AND cascade to the next nominator.
+      // The pause-and-alert wiring is chunk 11g.7 ops territory.
+      await this.fireAutoSkipEvent(nominatorTeamId, 'no_eligible_players');
+      return;
+    }
+
+    // Step 5: budget check. Reserve = (slotsRemaining - 1) * auctionMinBid;
+    // maxAffordable = budget - reserve.
+    const budget = this.teamBudgets.get(nominatorTeamId) ?? 0;
+    const playersWon = this.teamPlayersWon.get(nominatorTeamId) ?? 0;
+    const slotsRemaining = this.draftRounds - playersWon;
+    if (slotsRemaining <= 0) {
+      // Roster full. Should be unreachable when the rotation
+      // pointer correctly skips full teams; defensive emit.
+      await this.fireAutoSkipEvent(nominatorTeamId, 'insufficient_budget');
+      return;
+    }
+    const reserve = (slotsRemaining - 1) * this.auctionMinBid;
+    const maxAffordable = budget - reserve;
+    if (strategyResult.openingBid > maxAffordable) {
+      // Path Y extension of ADR-002 — engine cascades to next
+      // nominator rather than pausing. Better UX than disrupting
+      // 11 other teams for one nominator's budget exhaustion.
+      await this.fireAutoSkipEvent(nominatorTeamId, 'insufficient_budget');
+      return;
+    }
+
+    // Step 6: call nominate_player_v2 RPC with actor.kind='autopick'.
+    const idemKey = this.deriveAutoNominateIdempotencyKey();
+    let result: Awaited<ReturnType<DraftServiceV2['nominatePlayer']>>;
+    try {
+      result = await this.draftService.nominatePlayer({
+        leagueId: this.leagueId,
+        teamId: nominatorTeamId,
+        playerId: strategyResult.playerId,
+        // Player name not known here — strategy returns playerId only.
+        // Pass empty string; the audit trail's player name comes from
+        // a downstream join (`auction_nominations.player_name` is
+        // written by the RPC; UIs render from that).
+        playerName: '',
+        openingBid: strategyResult.openingBid,
+        sessionId: randomUUID(),
+        idempotencyKey: idemKey,
+        actor: {
+          kind: 'autopick',
+          id: 'auction-engine',
+          session_id: randomUUID(),
+        },
+        clockSeconds: Math.floor(this.bidWindowMs / 1000),
+      });
+    } catch (err: unknown) {
+      logger.error(
+        `[lobby] auto-nominate RPC threw lobbyId=${this.lobbyId} teamId=${nominatorTeamId}`,
+        err,
+      );
+      this.currentTimerDeadline = null;
+      return;
+    }
+
+    if (!result.was_duplicate) {
+      // Step 7: advance state. Mirror of `processNominate`'s success
+      // path but emit `auction_auto_nominated` instead of
+      // `auction_nomination_started`.
+      const expiresAt = new Date(result.clock_deadline);
+      this.currentNomination = {
+        nominationId: result.nomination_id,
+        playerId: strategyResult.playerId,
+        playerName: '',
+        nominatorTeamId,
+        leadingBidderId: nominatorTeamId,
+        leadingBid: strategyResult.openingBid,
+        expiresAt,
+        timerHandle: null,
+      };
+      if (this.draftStatus === 'not_started') {
+        this.draftStatus = 'in_progress';
+      }
+
+      const timestamp = new Date().toISOString();
+      const event: BufferedDraftEvent = {
+        kind: 'auction_auto_nominated',
+        seq: result.seq,
+        timestamp,
+        nominationId: result.nomination_id,
+        playerId: strategyResult.playerId,
+        playerName: '',
+        nominatorTeamId,
+        openingBid: strategyResult.openingBid,
+        clockDeadline: expiresAt.toISOString(),
+        fallbackSource: strategyResult.source,
+        correlationId: idemKey,
+      };
+      this.events.append(event);
+      this.broadcast({
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'event',
+        seq: result.seq,
+        timestamp,
+        correlationId: idemKey,
+        payload: event,
+      });
+
+      this.setPickDeadline(expiresAt, 'bid_window');
+    }
+  }
+
+  /**
+   * Helper: emit an `auction_nomination_skipped` event for the
+   * given nominator + reason, advance `nominationsCompleted`, AND
+   * either cascade to the next nominator (if auction not complete)
+   * or transition to `'completed'` (cascade-exhaustion).
+   */
+  private async fireAutoSkipEvent(
+    skippedTeamId: string,
+    reason: 'insufficient_budget' | 'no_eligible_players',
+  ): Promise<void> {
+    const idemKey = this.deriveSkipIdempotencyKey();
+    let result: Awaited<ReturnType<DraftServiceV2['skipNomination']>>;
+    try {
+      result = await this.draftService.skipNomination({
+        leagueId: this.leagueId,
+        teamId: skippedTeamId,
+        reason,
+        idempotencyKey: idemKey,
+        actor: {
+          kind: 'autopick',
+          id: 'auction-engine',
+          session_id: randomUUID(),
+        },
+      });
+    } catch (err) {
+      logger.error(
+        `[lobby] skipNomination RPC threw lobbyId=${this.lobbyId} teamId=${skippedTeamId} reason=${reason}`,
+        err,
+      );
+      this.currentTimerDeadline = null;
+      return;
+    }
+
+    if (!result.was_duplicate) {
+      this.nominationsCompleted++;
+
+      const timestamp = new Date().toISOString();
+      const event: BufferedDraftEvent = {
+        kind: 'auction_nomination_skipped',
+        seq: result.seq,
+        timestamp,
+        correlationId: idemKey,
+        skippedTeamId,
+        reason,
+      };
+      this.events.append(event);
+      this.broadcast({
+        v: WIRE_PROTOCOL_VERSION,
+        type: 'event',
+        seq: result.seq,
+        timestamp,
+        correlationId: idemKey,
+        payload: event,
+      });
+
+      logger.info(
+        `[lobby] auction nomination skipped lobbyId=${this.lobbyId} teamId=${skippedTeamId} reason=${reason}`,
+      );
+
+      // Cascade or complete.
+      const totalNominations =
+        this.nominationOrder.length * this.draftRounds;
+      if (this.nominationsCompleted >= totalNominations) {
+        this.draftStatus = 'completed';
+        this.currentTimerDeadline = null;
+        logger.info(
+          `[lobby] auction completed via skip-cascade exhaustion lobbyId=${this.lobbyId}`,
+        );
+      } else {
+        const newDeadline = new Date(Date.now() + this.nominationWindowMs);
+        this.setPickDeadline(newDeadline, 'nomination_window');
+      }
+    }
+  }
+
+  /**
+   * Deterministic idempotency key for engine-fired auto-nominate.
+   * Same pattern as 6b's `md5('extends:'||...)::uuid`. Retries of
+   * the same auto-nominate (engine restart mid-fire) produce the
+   * same key; RPC's idempotency check returns the cached result.
+   */
+  private deriveAutoNominateIdempotencyKey(): string {
+    const seed = `auto-nominate:${this.leagueId}:${this.nominationsCompleted}`;
+    return md5UuidFromSeed(seed);
+  }
+
+  private deriveSkipIdempotencyKey(): string {
+    const seed = `skip:${this.leagueId}:${this.nominationsCompleted}`;
+    return md5UuidFromSeed(seed);
   }
 
   /**
@@ -2814,12 +3412,14 @@ export class LobbyManager {
       );
     }
     const now = new Date();
-    const remainingMs = this.currentPickDeadline
-      ? Math.max(0, this.currentPickDeadline.getTime() - now.getTime())
+    const remainingMs = this.currentTimerDeadline
+      ? Math.max(0, this.currentTimerDeadline.getTime() - now.getTime())
       : 0;
-    this.pauseState = { pausedAt: now, remainingMs };
+    // Snake/linear `pausedTimerKind` is a harmless backward-compat
+    // default; engine consults `format` to decide the restore path.
+    this.pauseState = { pausedAt: now, remainingMs, pausedTimerKind: 'bid_window' };
     this.cancelPickTimer();
-    this.currentPickDeadline = null;
+    this.currentTimerDeadline = null;
     logger.info(
       `[lobby] paused lobbyId=${this.lobbyId} remainingMs=${remainingMs}`,
     );
@@ -2983,7 +3583,17 @@ export class LobbyManager {
         result.captured_remaining_seconds === null
           ? 0
           : result.captured_remaining_seconds * 1000;
-      this.pauseState = { pausedAt, remainingMs };
+      // Chunk 11g.6 sub-step 6c3: capture which timer was running
+      // so resume restores the correct one. The timer was cancelled
+      // by `cancelPickTimer()` below; before that, `currentTimerKind`
+      // tells us what was active. Defaults to 'bid_window' for
+      // the snake/linear path (harmless — auction-only code reads
+      // this field).
+      const pausedTimerKind: 'bid_window' | 'nomination_window' =
+        this.currentTimerKind === 'nomination_window'
+          ? 'nomination_window'
+          : 'bid_window';
+      this.pauseState = { pausedAt, remainingMs, pausedTimerKind };
       this.cancelPickTimer();
 
       const timestamp = new Date().toISOString();
@@ -3001,6 +3611,7 @@ export class LobbyManager {
         ...(result.captured_remaining_seconds !== null
           ? { capturedRemainingSeconds: result.captured_remaining_seconds }
           : {}),
+        pausedTimerKind,
       };
       this.events.append(event);
       this.broadcast({
@@ -3053,21 +3664,35 @@ export class LobbyManager {
     }
 
     if (!result.was_duplicate) {
+      // Capture the kind that was paused BEFORE clearing pauseState
+      // so we restore the correct timer (chunk 11g.6 sub-step 6c3).
+      const wasPausedTimerKind = this.pauseState?.pausedTimerKind ?? 'bid_window';
+      const pausedRemainingMs = this.pauseState?.remainingMs ?? 0;
       this.pauseState = null;
       const resumedAt = new Date(result.resumed_at);
 
-      // ADR-002 §4.4: restore captured remaining time. The RPC has
-      // already updated `auction_nominations.expires_at = now() +
-      // captured_remaining_seconds * interval`. Engine mirrors via
-      // `currentNomination.expiresAt` and reschedules the timer.
+      // ADR-002 §4.4: restore captured remaining time. Two paths:
+      //   - bid_window: RPC has already updated
+      //     `auction_nominations.expires_at`; engine reschedules from
+      //     `result.new_expires_at`.
+      //   - nomination_window: no DB row tracks this deadline; engine
+      //     reschedules locally from `now() + pausedRemainingMs`.
       if (
+        wasPausedTimerKind === 'bid_window' &&
         result.new_expires_at !== null &&
         this.currentNomination !== null &&
         result.restored_nomination_id === this.currentNomination.nominationId
       ) {
         const newDeadline = new Date(result.new_expires_at);
         this.currentNomination.expiresAt = newDeadline;
-        this.setPickDeadline(newDeadline);
+        this.setPickDeadline(newDeadline, 'bid_window');
+      } else if (
+        wasPausedTimerKind === 'nomination_window' &&
+        this.currentNomination === null &&
+        this.draftStatus === 'in_progress'
+      ) {
+        const newDeadline = new Date(Date.now() + pausedRemainingMs);
+        this.setPickDeadline(newDeadline, 'nomination_window');
       }
 
       const timestamp = new Date().toISOString();
@@ -3123,7 +3748,7 @@ export class LobbyManager {
     }
     this.shutDown = true;
     this.cancelPickTimer();
-    this.currentPickDeadline = null;
+    this.currentTimerDeadline = null;
     logger.info(`[lobby] shutdown lobbyId=${this.lobbyId}`);
   }
 }

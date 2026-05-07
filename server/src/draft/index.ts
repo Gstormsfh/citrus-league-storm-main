@@ -176,7 +176,8 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
     | {
         draftType?: string;
         pickTimeLimit?: number;
-        auctionNominationTime?: number;
+        auctionBidWindowSeconds?: number;
+        auctionNominationWindowSeconds?: number;
         auctionBudget?: number;
         auctionMinBid?: number;
         auctionAntiSnipeThresholdSeconds?: number;
@@ -195,17 +196,25 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
   }
   const format: DraftFormat = draftType;
 
-  // For snake/linear: pickClockSeconds = pickTimeLimit + 1 (RPC pad).
-  // For auction (chunk 11g.6 sub-step 6a): the bid window uses
-  // `auctionNominationTime + 1`. Default 30s bid window matches the
-  // existing v1 LeagueFormatSettings default. The ADR-002 §3.4
-  // nomination-window/bid-window split is 6c work; until then a
-  // single value covers both paths.
+  // Snake/linear: pickClockSeconds = pickTimeLimit + 1 (RPC pad).
+  // Auction (chunk 11g.6 sub-step 6c3): pickClockSeconds is unused
+  // by the auction state machine (which has its own
+  // `auctionBidWindowSeconds` + `auctionNominationWindowSeconds`
+  // pair per ADR-002 §3.4). For backwards-compat with the
+  // LobbyManager constructor signature, auction lobbies still set
+  // `pickClockSeconds = auctionBidWindowSeconds + 1` (the legacy
+  // shape) but the engine now reads the explicit fields directly.
+  const auctionBidWindowSeconds =
+    typeof settings?.auctionBidWindowSeconds === 'number'
+      ? settings.auctionBidWindowSeconds
+      : 30;
+  const auctionNominationWindowSeconds =
+    typeof settings?.auctionNominationWindowSeconds === 'number'
+      ? settings.auctionNominationWindowSeconds
+      : 60;
   const pickTimeLimit =
     format === 'auction'
-      ? typeof settings?.auctionNominationTime === 'number'
-        ? settings.auctionNominationTime
-        : 30
+      ? auctionBidWindowSeconds
       : typeof settings?.pickTimeLimit === 'number'
         ? settings.pickTimeLimit
         : 90;
@@ -257,6 +266,8 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
       auctionAntiSnipeThresholdSeconds,
       auctionAntiSnipeExtensionSeconds,
       auctionMinBidIncrementTiers,
+      auctionBidWindowSeconds,
+      auctionNominationWindowSeconds,
     };
   }
 
@@ -325,6 +336,9 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
     // unused but `LobbyConfig` requires the field. Default flat-$1
     // is the safe placeholder.
     auctionMinBidIncrementTiers: DEFAULT_BID_INCREMENT_TIERS,
+    // Snake/linear lobbies don't have auction timers; zero-init.
+    auctionBidWindowSeconds: 0,
+    auctionNominationWindowSeconds: 0,
   };
 }
 

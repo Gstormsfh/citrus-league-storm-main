@@ -243,19 +243,24 @@ export type BufferedDraftEvent =
   | {
       /**
        * Commissioner paused the auction (chunk 11g.6 sub-step 6c1
-       * per ADR-002 §4.4). The bid window timer is suspended; new
+       * per ADR-002 §4.4). The active timer is suspended; new
        * bids and nominations are rejected until `auction_resumed`.
        *
        * `pausedNominationId` and `capturedRemainingSeconds` are
-       * present only when there was an active nomination at pause
+       * present only when there was an active timer at pause
        * time. The captured remaining-seconds value is the
        * source-of-truth for resume math — auction `auction_resumed`
-       * restores `auction_nominations.expires_at = now() +
-       * captured_remaining_seconds`. **This diverges from
-       * snake/linear's `draft_resumed` which gives a fresh full
-       * pick clock**; auction's bid window represents all teams'
+       * restores the timer based on this value. **This diverges
+       * from snake/linear's `draft_resumed` which gives a fresh
+       * full pick clock**; auction's timers represent all teams'
        * opportunity to react, so restoring remaining-time is
        * fairness-correct.
+       *
+       * Chunk 11g.6 sub-step 6c3: `pausedTimerKind` discriminates
+       * which timer was running so resume restores the correct
+       * one. Backward-compat: 6c1-emitted events without this
+       * field default to `'bid_window'` (the only timer that
+       * existed pre-6c3).
        */
       kind: 'auction_paused';
       seq: number;
@@ -266,6 +271,7 @@ export type BufferedDraftEvent =
       pausedAt: string;
       pausedNominationId?: string;
       capturedRemainingSeconds?: number;
+      pausedTimerKind?: 'bid_window' | 'nomination_window';
     }
   | {
       /**
@@ -290,6 +296,62 @@ export type BufferedDraftEvent =
       priorPauseEventId: number;
       restoredNominationId?: string;
       newClockDeadline?: string;
+    }
+  | {
+      /**
+       * Engine-fired auto-nominate (chunk 11g.6 sub-step 6c3 per
+       * ADR-002 §3.4 + §4.2). Emitted INSTEAD of
+       * `auction_nomination_started` when the nomination-window
+       * timer expires without the on-clock nominator submitting a
+       * choice. Engine selects the player via the chain-of-
+       * strategies in `auctionAutoNominateStrategy.ts`, then
+       * writes this event with `actor.kind='autopick'`.
+       *
+       * Carries the full `auction_nomination_started` shape (so
+       * bootstrap treats both events symmetrically for state-
+       * machine purposes — both set `currentNomination`) PLUS the
+       * `fallbackSource` discriminator that records which strategy
+       * succeeded for audit trail rendering ("🤖 Auto-nominated
+       * by projections").
+       */
+      kind: 'auction_auto_nominated';
+      seq: number;
+      timestamp: string;
+      correlationId: string;
+      nominationId: string;
+      playerId: string;
+      playerName: string;
+      nominatorTeamId: string;
+      openingBid: number;
+      clockDeadline: string;
+      fallbackSource: 'queue' | 'projections' | 'commissioner_preset';
+    }
+  | {
+      /**
+       * Nomination skipped (chunk 11g.6 sub-step 6c3). **Path Y
+       * extension of ADR-002** — the spec is silent on this case.
+       * Two trigger reasons:
+       *
+       *   - `'insufficient_budget'`: auto-nominator can't afford
+       *     even `auctionMinBid + reserve` — engine cascades to
+       *     the next nominator without writing a nomination.
+       *     Auction continues; nominator forfeits this turn.
+       *
+       *   - `'no_eligible_players'`: strategy chain exhausted (no
+       *     undrafted player available). Per ADR-002 §4.4 this
+       *     should pause the draft + alert the commissioner; the
+       *     skip event is emitted alongside the pause for audit
+       *     clarity.
+       *
+       * `nominationsCompleted` advances by one in either case so
+       * the rotation pointer moves forward.
+       */
+      kind: 'auction_nomination_skipped';
+      seq: number;
+      timestamp: string;
+      correlationId: string;
+      skippedTeamId: string;
+      reason: 'insufficient_budget' | 'no_eligible_players';
     };
 
 // ── Snapshot payloads ──────────────────────────────────────────────

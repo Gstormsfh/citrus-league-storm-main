@@ -214,6 +214,29 @@ export interface ResumeAuctionResult {
   was_duplicate: boolean;
 }
 
+// ── Chunk 11g.6 sub-step 6c3 — auction nomination skip (Path Y) ──────
+
+export interface SkipNominationParams {
+  leagueId: string;
+  teamId: string;
+  reason: 'insufficient_budget' | 'no_eligible_players';
+  idempotencyKey: string;
+  /**
+   * Per ADR-002 §4.2 + ADR-004 §5: actor.kind must be 'autopick'
+   * (engine-fired cascade) or 'commissioner' (override path —
+   * lands in 6c4). RPC enforces.
+   */
+  actor: DraftV2Actor;
+}
+
+export interface SkipNominationResult {
+  event_id: number;
+  seq: number;
+  skipped_team_id: string;
+  reason: 'insufficient_budget' | 'no_eligible_players';
+  was_duplicate: boolean;
+}
+
 export interface CloseNominationResult {
   event_id: number;
   seq: number;
@@ -532,6 +555,33 @@ export class DraftServiceV2 {
 
     if (error) throw mapRpcError(error);
     return data as ResumeAuctionResult;
+  }
+
+  /**
+   * Skip the current nominator's turn via `auction_nomination_skip_v2`
+   * (chunk 11g.6 sub-step 6c3 — Path Y extension of ADR-002).
+   *
+   * Engine-fired cascade when an auto-nominator can't afford even
+   * `auctionMinBid + reserve` (`reason='insufficient_budget'`) or
+   * when the strategy chain exhausted (`reason='no_eligible_players'`,
+   * paired with an `auction_paused` event per ADR-002 §4.4 spec).
+   *
+   * Atomic 2-write block: leagues counter advance + draft_events
+   * INSERT. No projection-table mutations — engine's in-memory
+   * `nominationsCompleted` advances on bootstrap replay or on the
+   * live-event broadcast.
+   */
+  async skipNomination(params: SkipNominationParams): Promise<SkipNominationResult> {
+    const { data, error } = await this.supabase.rpc('auction_nomination_skip_v2', {
+      p_league_id:       params.leagueId,
+      p_team_id:         params.teamId,
+      p_actor:           params.actor,
+      p_reason:          params.reason,
+      p_idempotency_key: params.idempotencyKey,
+    });
+
+    if (error) throw mapRpcError(error);
+    return data as SkipNominationResult;
   }
 
   /**
