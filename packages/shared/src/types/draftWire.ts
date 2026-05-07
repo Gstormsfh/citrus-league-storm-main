@@ -177,6 +177,41 @@ export type BufferedDraftEvent =
     }
   | {
       /**
+       * Anti-snipe extension fired (chunk 11g.6 sub-step 6b per
+       * ADR-002 §3.3 / §4.4). System-derived consequence of a bid
+       * that arrived within the final `anti_snipe_threshold_seconds`
+       * of the bid window — the window is extended by
+       * `anti_snipe_extension_seconds` and a separate event is
+       * appended so reconnecting clients can replay the extension
+       * during resync.
+       *
+       * `correlationId` matches the parent bid's idempotency key
+       * so the audit trail reads "user X placed bid Y; system
+       * extended timer Z" with shared correlation. Same `actor`
+       * as the parent bid (the user); the engine treats the
+       * extension as a consequence of their action, not a separate
+       * engine action — mirrors chunk 11g.4 step 6c's autopick-
+       * actor-flow-to-event pattern.
+       *
+       * `priorClockDeadline` and `newClockDeadline` are wall-clock
+       * ISO timestamps. `triggeringBidId` is the durable
+       * `draft_events.id` of the parent `auction_bid_placed`
+       * event, so clients can correlate extension to bid without
+       * relying on payload field equality.
+       */
+      kind: 'auction_bid_extends_timer';
+      seq: number;
+      timestamp: string;
+      correlationId: string;
+      nominationId: string;
+      priorClockDeadline: string;
+      newClockDeadline: string;
+      triggeringBidId: number;
+      triggeringBidderTeamId: string;
+      triggeringBidAmount: number;
+    }
+  | {
+      /**
        * Bid window expired with NO bids. Engine emits this when a
        * nomination opens, the engine's clock fires, and the
        * leading bid equals the opening bid (no follow-up bids).

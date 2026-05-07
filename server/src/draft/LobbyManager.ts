@@ -268,6 +268,15 @@ export interface LobbyManagerOptions {
     leadingBid: number;
     expiresAt: Date;
   } | null;
+  /**
+   * Anti-snipe configuration (chunk 11g.6 sub-step 6b per ADR-002
+   * §3.3 / §4.4). Threshold = 0 disables anti-snipe entirely.
+   * Engine threads these through to every `place_bid_v2` call.
+   * Snake/linear lobbies set both to 0 (unused — no `place_bid_v2`
+   * calls).
+   */
+  auctionAntiSnipeThresholdSeconds: number;
+  auctionAntiSnipeExtensionSeconds: number;
 }
 
 /**
@@ -534,6 +543,15 @@ export class LobbyManager {
   /** Per-team players-won count (mirrors `auction_budgets.players_won`). */
   private readonly teamPlayersWon: Map<string, number>;
 
+  /**
+   * Anti-snipe configuration (chunk 11g.6 sub-step 6b per ADR-002
+   * §3.3 / §4.4). Threshold = 0 disables anti-snipe entirely.
+   * Threaded through to every `place_bid_v2` call so the RPC can
+   * apply the threshold check atomically with the bid write.
+   */
+  private readonly antiSnipeThresholdSeconds: number;
+  private readonly antiSnipeExtensionSeconds: number;
+
   constructor(opts: LobbyManagerOptions) {
     this.lobbyId = opts.lobbyId;
     this.format = opts.format;
@@ -559,6 +577,8 @@ export class LobbyManager {
     this.bidWindowMs = this.pickClockMs;
     this.teamBudgets = new Map(opts.initialTeamBudgets);
     this.teamPlayersWon = new Map(opts.initialPlayersWon);
+    this.antiSnipeThresholdSeconds = opts.auctionAntiSnipeThresholdSeconds;
+    this.antiSnipeExtensionSeconds = opts.auctionAntiSnipeExtensionSeconds;
 
     // `picksMade`, `draftStatus`, `initialized`, timer state are
     // zero-initialized at the field declaration above. `init()`
@@ -1514,7 +1534,9 @@ export class LobbyManager {
       session_id: action.sessionId,
     };
 
-    // Step 5: call the RPC.
+    // Step 5: call the RPC. Anti-snipe configuration is threaded
+    // through per ADR-002 §3.3 / §4.4 — the RPC applies the
+    // threshold check atomically with the bid write.
     let result: Awaited<ReturnType<DraftServiceV2['placeBid']>>;
     try {
       result = await this.draftService.placeBid({
@@ -1525,6 +1547,8 @@ export class LobbyManager {
         sessionId: action.sessionId,
         idempotencyKey: action.idempotencyKey,
         actor,
+        antiSnipeThresholdSeconds: this.antiSnipeThresholdSeconds,
+        antiSnipeExtensionSeconds: this.antiSnipeExtensionSeconds,
       });
     } catch (err: unknown) {
       if (err instanceof AppError) {
@@ -1537,37 +1561,77 @@ export class LobbyManager {
       return { ok: false, reason: 'internal_error' };
     }
 
-    // Step 6: advance state.
+    // Step 6: advance state. The bid event's `clockDeadline`
+    // carries the POST-extension deadline (or unchanged original
+    // when no extension fired) — RPC has already evaluated the
+    // anti-snipe threshold and updated `auction_nominations.expires_at`
+    // atomically. Engine mirrors the DB state here.
     if (!result.was_duplicate) {
+      const priorExpiresAt = this.currentNomination.expiresAt;
+      const newExpiresAt = new Date(result.clock_deadline);
+
       this.currentNomination.leadingBid = action.bidAmount;
       this.currentNomination.leadingBidderId = action.teamId;
+      this.currentNomination.expiresAt = newExpiresAt;
 
       const timestamp = new Date().toISOString();
-      const event: BufferedDraftEvent = {
+      const bidEvent: BufferedDraftEvent = {
         kind: 'auction_bid_placed',
         seq: result.seq,
         timestamp,
         nominationId: action.nominationId,
         bidderTeamId: action.teamId,
         bidAmount: action.bidAmount,
-        // 6a anti-snipe deferred — `clockDeadline` carries the
-        // nomination's original deadline. Forward-compat with 6b.
-        clockDeadline: this.currentNomination.expiresAt.toISOString(),
+        clockDeadline: newExpiresAt.toISOString(),
         correlationId: action.idempotencyKey,
       };
-      this.events.append(event);
+      this.events.append(bidEvent);
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'event',
         seq: result.seq,
         timestamp,
         correlationId: action.idempotencyKey,
-        payload: event,
+        payload: bidEvent,
       });
 
-      // Anti-snipe deadline extension (ADR-002 §3.3): deferred to
-      // chunk 11g.6 sub-step 6b. Today the bid does NOT extend the
-      // bid-window timer.
+      // Anti-snipe extension (ADR-002 §3.3 / §4.4 — chunk 11g.6
+      // sub-step 6b). When `was_extended === true`, the RPC has
+      // already extended `auction_nominations.expires_at` atomically
+      // with the bid write. Engine: cancel current timer, reschedule
+      // from new deadline, append `auction_bid_extends_timer` event
+      // to ring buffer, broadcast it as a separate event so resync
+      // semantics work (the ring buffer entry's seq matches the
+      // durable `draft_events.seq` from the same transaction).
+      if (result.was_extended && result.extends_event_seq !== undefined) {
+        this.setPickDeadline(newExpiresAt);
+
+        const extendsEvent: BufferedDraftEvent = {
+          kind: 'auction_bid_extends_timer',
+          seq: result.extends_event_seq,
+          timestamp,
+          nominationId: action.nominationId,
+          priorClockDeadline: priorExpiresAt.toISOString(),
+          newClockDeadline: newExpiresAt.toISOString(),
+          // `event_id` is `bigint` in Postgres; PostgREST returns
+          // it as `number` in JSON. Engine surfaces the durable id
+          // so clients can correlate extension to bid without
+          // payload-field equality checks.
+          triggeringBidId: result.event_id,
+          triggeringBidderTeamId: action.teamId,
+          triggeringBidAmount: action.bidAmount,
+          correlationId: action.idempotencyKey,
+        };
+        this.events.append(extendsEvent);
+        this.broadcast({
+          v: WIRE_PROTOCOL_VERSION,
+          type: 'event',
+          seq: result.extends_event_seq,
+          timestamp,
+          correlationId: action.idempotencyKey,
+          payload: extendsEvent,
+        });
+      }
     }
 
     return { ok: true, eventSeq: result.seq };
@@ -1826,6 +1890,9 @@ export class LobbyManager {
           break;
         case 'auction_bid_placed':
           this.applyAuctionBidPlacedEvent(event);
+          break;
+        case 'auction_bid_extends_timer':
+          this.applyAuctionBidExtendsTimerEvent(event);
           break;
         case 'auction_nomination_closed':
           this.applyAuctionNominationClosedEvent(event);
@@ -2131,6 +2198,68 @@ export class LobbyManager {
       bidderTeamId,
       bidAmount,
       clockDeadline: this.currentNomination.expiresAt.toISOString(),
+      correlationId: event.idempotency_key ?? '',
+    });
+  }
+
+  /**
+   * Bootstrap handler for `event_type === 'auction_bid_extends_timer'`
+   * (chunk 11g.6 sub-step 6b per ADR-002 §3.3 / §4.4).
+   *
+   * **Apply during replay (NOT log-and-skip).** The 6b recon surfaced
+   * a load-bearing principle: bootstrap event-replay is canonical for
+   * in-memory state; `lookupLobbyConfig`'s row reads are
+   * informational/diagnostic only. `applyAuctionNominationStartedEvent`
+   * sets `currentNomination.expiresAt` from the START event's payload
+   * (the original pre-extension deadline). If we log-and-skipped
+   * extends_timer events, the in-memory deadline would be stale by
+   * every extension count, and `init()`'s post-replay timer schedule
+   * would fire too early. APPLYing during replay preserves
+   * event-sourcing-as-canonical (Principle 3) and matches every other
+   * 6a auction handler. See PHASE_4_5_PROJECT_PLAN.md Decision Log
+   * (2026-05-07) for the canonical-replay-principle entry.
+   *
+   * Throws if no active nomination or nomination-id mismatch — the
+   * event log integrity is broken in that case.
+   */
+  private applyAuctionBidExtendsTimerEvent(event: DraftEventRow): void {
+    if (this.currentNomination === null) {
+      throw new Error(
+        `[lobby] bootstrap auction_bid_extends_timer with no active nomination ` +
+          `lobbyId=${this.lobbyId} seq=${event.seq}`,
+      );
+    }
+    const payload = event.payload as Record<string, unknown>;
+    const nominationId = String(payload.nomination_id);
+    if (nominationId !== this.currentNomination.nominationId) {
+      throw new Error(
+        `[lobby] bootstrap auction_bid_extends_timer nomination mismatch ` +
+          `lobbyId=${this.lobbyId} seq=${event.seq} ` +
+          `expected=${this.currentNomination.nominationId} got=${nominationId}`,
+      );
+    }
+    const priorExpiresAt = new Date(String(payload.prior_expires_at));
+    const newExpiresAt = new Date(String(payload.new_expires_at));
+    const triggeringBidId = Number(payload.triggering_bid_id);
+    const triggeringTeamId = String(payload.triggering_team_id);
+    const triggeringBidAmount = Number(payload.triggering_bid_amount);
+
+    // Mutate the in-memory deadline to the post-extension value.
+    // This is what makes apply-during-replay correct — without it,
+    // currentNomination.expiresAt would stay at the original START
+    // event's deadline regardless of extensions.
+    this.currentNomination.expiresAt = newExpiresAt;
+
+    this.events.append({
+      kind: 'auction_bid_extends_timer',
+      seq: event.seq,
+      timestamp: event.created_at,
+      nominationId,
+      priorClockDeadline: priorExpiresAt.toISOString(),
+      newClockDeadline: newExpiresAt.toISOString(),
+      triggeringBidId,
+      triggeringBidderTeamId: triggeringTeamId,
+      triggeringBidAmount,
       correlationId: event.idempotency_key ?? '',
     });
   }

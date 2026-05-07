@@ -196,6 +196,8 @@ export interface LeagueFormatSettings {
   auctionBudget?: number;        // $ budget per team (auction only)
   auctionMinBid?: number;        // Minimum bid amount
   auctionNominationTime?: number;// Seconds to nominate (auction only)
+  auctionAntiSnipeThresholdSeconds?: number; // Bid in last N s extends clock (0 disables). ADR-002 §3.3 / §4.3.
+  auctionAntiSnipeExtensionSeconds?: number; // Extension duration when threshold fires. ADR-002 §3.3 / §4.3.
 
   // === Season Settings ===
   playoffTeams?: number;         // 0 = no playoffs, 4, 6, or 8
@@ -459,6 +461,10 @@ export function extractFormatSettings(settings: Record<string, unknown>): Partia
     auctionBudget: (settings.auctionBudget as number) || 200,
     auctionMinBid: (settings.auctionMinBid as number) || 1,
     auctionNominationTime: (settings.auctionNominationTime as number) || 30,
+    auctionAntiSnipeThresholdSeconds:
+      (settings.auctionAntiSnipeThresholdSeconds as number) ?? 30,
+    auctionAntiSnipeExtensionSeconds:
+      (settings.auctionAntiSnipeExtensionSeconds as number) ?? 30,
 
     // Season
     playoffTeams: (settings.playoffTeams as number) ?? 6,

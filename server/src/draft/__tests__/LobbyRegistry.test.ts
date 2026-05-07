@@ -69,6 +69,8 @@ const AUCTION_FIELDS_EMPTY = {
   initialTeamBudgets: new Map<string, number>(),
   initialPlayersWon: new Map<string, number>(),
   initialActiveNomination: null,
+  auctionAntiSnipeThresholdSeconds: 0,
+  auctionAntiSnipeExtensionSeconds: 0,
 };
 
 const DEFAULT_LOBBY_CONFIG: LobbyConfig = {

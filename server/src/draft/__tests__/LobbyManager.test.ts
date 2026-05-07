@@ -29,6 +29,7 @@ import type {
   SubmitPickResult,
 } from '../../services/DraftServiceV2';
 import type {
+  BufferedDraftEvent,
   DraftAction,
   DraftOrderSlot,
   DraftSocketUserData,
@@ -189,6 +190,10 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
     initialTeamBudgets: opts.initialTeamBudgets ?? new Map(),
     initialPlayersWon: opts.initialPlayersWon ?? new Map(),
     initialActiveNomination: opts.initialActiveNomination ?? null,
+    auctionAntiSnipeThresholdSeconds:
+      opts.auctionAntiSnipeThresholdSeconds ?? 0,
+    auctionAntiSnipeExtensionSeconds:
+      opts.auctionAntiSnipeExtensionSeconds ?? 0,
   });
 }
 
@@ -2810,5 +2815,496 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     const snakeLobby = await makeLobby({ format: 'snake' });
     const snakeSnapshot = snakeLobby.getSnapshot();
     expect(snakeSnapshot.auctionState).toBeUndefined();
+  });
+
+  // ── Chunk 11g.6 sub-step 6b — anti-snipe timer extension ────────────
+  //
+  // Anti-snipe extends the bid window when a bid arrives in the final
+  // `auctionAntiSnipeThresholdSeconds` of the current window. The RPC
+  // applies the threshold check atomically with the bid write; engine
+  // mirrors the post-extension state by canceling/rescheduling the
+  // timer + appending an `auction_bid_extends_timer` event to the ring
+  // buffer + broadcasting it.
+  //
+  // Per ADR-002 §3.3 / §4.4 (NOT §3.5).
+
+  /** Auction-lobby helper with anti-snipe enabled (5s threshold + 10s extension). */
+  function antiSnipeLobbyOpts(extra: Partial<MakeLobbyOpts> = {}): MakeLobbyOpts {
+    return auctionLobbyOpts({
+      auctionAntiSnipeThresholdSeconds: 5,
+      auctionAntiSnipeExtensionSeconds: 10,
+      ...extra,
+    });
+  }
+
+  /**
+   * Helper: nomination-RPC mock that returns a `clock_deadline` aligned
+   * with the test's `pickClockSeconds` so timer scheduling lines up
+   * with `vi.advanceTimersByTimeAsync` calls.
+   */
+  function alignedNominateMock(deadlineMs: number) {
+    return vi.fn(async (_params: unknown) => ({
+      event_id: 1,
+      seq: 1,
+      nomination_id: 'nom-1',
+      clock_deadline: new Date(Date.now() + deadlineMs).toISOString(),
+      was_duplicate: false,
+    }));
+  }
+
+  it('anti-snipe: bid in non-final window does not extend timer', async () => {
+    const placeBid = vi.fn(async (_params: unknown) => ({
+      event_id: 2,
+      seq: 2,
+      // RPC returns the SAME deadline (no extension).
+      clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+      was_duplicate: false,
+      was_extended: false,
+    }));
+    const lobby = await makeLobby(
+      antiSnipeLobbyOpts({
+        nominatePlayer: alignedNominateMock(31_000),
+        placeBid,
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+    const result = await lobby.enqueueAction(bidAction({ bidAmount: 10 }));
+
+    expect(result.ok).toBe(true);
+    expect(placeBid).toHaveBeenCalledTimes(1);
+    // Engine threaded the anti-snipe config to the RPC.
+    expect(placeBid.mock.calls[0]?.[0]).toMatchObject({
+      antiSnipeThresholdSeconds: 5,
+      antiSnipeExtensionSeconds: 10,
+    });
+    // No extension event in the ring buffer.
+    const snapshot = lobby.getSnapshot();
+    const extendsEvents = snapshot.recentEvents.filter(
+      (e) => e.kind === 'auction_bid_extends_timer',
+    );
+    expect(extendsEvents).toHaveLength(0);
+  });
+
+  it('anti-snipe: bid in final window extends — timer rescheduled, ring buffer + broadcast fire', async () => {
+    vi.useFakeTimers();
+    try {
+      const publish = vi.fn();
+      // RPC returns was_extended=true and a new deadline 10s out.
+      const placeBid = vi.fn(async (_params: unknown) => ({
+        event_id: 2,
+        seq: 2,
+        clock_deadline: new Date(Date.now() + 10_000).toISOString(),
+        was_duplicate: false,
+        was_extended: true,
+        extends_event_seq: 3,
+      }));
+      const closeNomination = vi.fn(async () => ({
+        event_id: 4,
+        seq: 4,
+        event_type: 'auction_nomination_closed' as const,
+        no_sale: false,
+        was_duplicate: false,
+      }));
+      const lobby = await makeLobby(
+        antiSnipeLobbyOpts({
+          publish,
+          nominatePlayer: alignedNominateMock(31_000),
+          placeBid,
+          closeNomination,
+        }),
+      );
+      await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+      publish.mockClear();
+      // Place bid in the final window (engine doesn't compute this;
+      // RPC mock unconditionally returns was_extended=true).
+      const result = await lobby.enqueueAction(bidAction({ bidAmount: 10 }));
+
+      expect(result.ok).toBe(true);
+      // Ring buffer has both the bid event AND the extends event.
+      const snapshot = lobby.getSnapshot();
+      const bidEvents = snapshot.recentEvents.filter(
+        (e) => e.kind === 'auction_bid_placed',
+      );
+      const extendsEvents = snapshot.recentEvents.filter(
+        (e) => e.kind === 'auction_bid_extends_timer',
+      );
+      expect(bidEvents).toHaveLength(1);
+      expect(extendsEvents).toHaveLength(1);
+      const ext = extendsEvents[0] as Extract<
+        BufferedDraftEvent,
+        { kind: 'auction_bid_extends_timer' }
+      >;
+      expect(ext.seq).toBe(3);
+      expect(ext.triggeringBidAmount).toBe(10);
+      expect(ext.triggeringBidderTeamId).toBe('team-2');
+
+      // Two broadcasts (bid + extends) — both have the same correlationId
+      // (the parent bid's idempotencyKey).
+      expect(publish).toHaveBeenCalledTimes(2);
+      const broadcasts = publish.mock.calls.map((c) => JSON.parse(c[1] as string));
+      expect(broadcasts.map((b) => b.payload.kind)).toEqual([
+        'auction_bid_placed',
+        'auction_bid_extends_timer',
+      ]);
+      expect(broadcasts.every((b) => b.correlationId === 'idem-bid-1')).toBe(true);
+
+      // Engine's currentNomination.expiresAt is the new (extended)
+      // deadline. closeNomination would NOT fire under the original
+      // 31s window — advance to 11s and confirm the timer hasn't
+      // fired yet (new deadline is 10s out, original was 31s — but
+      // we only advanced 11s after the bid).
+      await vi.advanceTimersByTimeAsync(11_000);
+      expect(closeNomination).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('anti-snipe: cascade — three bids in rapid succession each extend the timer', async () => {
+    vi.useFakeTimers();
+    try {
+      // RPC returns was_extended=true on every call. Each call's
+      // returned clock_deadline is +10s from when the call was made.
+      const placeBid = vi.fn(async (_params: unknown) => ({
+        event_id: 100,
+        seq: 100, // overridden via mock results below
+        clock_deadline: new Date(Date.now() + 10_000).toISOString(),
+        was_duplicate: false,
+        was_extended: true,
+        extends_event_seq: 101,
+      }));
+      // Override the response on each call to give monotonic seq.
+      let bidCallCount = 0;
+      placeBid.mockImplementation(async (_params: unknown) => {
+        bidCallCount++;
+        const baseSeq = 1 + bidCallCount * 2; // 3, 5, 7
+        return {
+          event_id: baseSeq,
+          seq: baseSeq,
+          clock_deadline: new Date(Date.now() + 10_000).toISOString(),
+          was_duplicate: false,
+          was_extended: true,
+          extends_event_seq: baseSeq + 1,
+        };
+      });
+      const closeNomination = vi.fn(async () => ({
+        event_id: 999,
+        seq: 999,
+        event_type: 'auction_nomination_closed' as const,
+        no_sale: false,
+        was_duplicate: false,
+      }));
+      const lobby = await makeLobby(
+        antiSnipeLobbyOpts({
+          nominatePlayer: alignedNominateMock(31_000),
+          placeBid,
+          closeNomination,
+        }),
+      );
+      await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+
+      // Three rapid bids (single-writer queue serializes). Each
+      // extends. Cascade depth 3.
+      await lobby.enqueueAction(bidAction({ bidAmount: 10, idempotencyKey: 'b1' }));
+      await lobby.enqueueAction(
+        bidAction({ teamId: 'team-3', bidAmount: 15, idempotencyKey: 'b2' }),
+      );
+      await lobby.enqueueAction(
+        bidAction({ teamId: 'team-2', bidAmount: 20, idempotencyKey: 'b3' }),
+      );
+
+      const snapshot = lobby.getSnapshot();
+      const extendsEvents = snapshot.recentEvents.filter(
+        (e) => e.kind === 'auction_bid_extends_timer',
+      );
+      expect(extendsEvents).toHaveLength(3);
+      // Each extension's triggering bid amount in monotonic order.
+      const amounts = extendsEvents.map(
+        (e) =>
+          (e as Extract<BufferedDraftEvent, { kind: 'auction_bid_extends_timer' }>)
+            .triggeringBidAmount,
+      );
+      expect(amounts).toEqual([10, 15, 20]);
+
+      // Timer didn't fire mid-cascade (each extension reset it to
+      // 10s out from the most recent bid).
+      expect(closeNomination).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('anti-snipe: bid arrives after window closed — rejected as no_active_nomination, no extension', async () => {
+    vi.useFakeTimers();
+    try {
+      const placeBid = vi.fn();
+      const closeNomination = vi.fn(async () => ({
+        event_id: 3,
+        seq: 3,
+        event_type: 'auction_nomination_closed' as const,
+        no_sale: false,
+        was_duplicate: false,
+      }));
+      const lobby = await makeLobby(
+        antiSnipeLobbyOpts({
+          nominatePlayer: alignedNominateMock(31_000),
+          placeBid,
+          closeNomination,
+        }),
+      );
+      await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+      // Advance past the bid window — handleNominationTimeout fires +
+      // closeNomination clears currentNomination.
+      await vi.advanceTimersByTimeAsync(32_000);
+      expect(closeNomination).toHaveBeenCalledTimes(1);
+
+      // Late bid arrives.
+      const result = await lobby.enqueueAction(bidAction({ bidAmount: 10 }));
+      expect(result).toEqual({ ok: false, reason: 'no_active_nomination' });
+      expect(placeBid).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('anti-snipe disabled (threshold=0): RPC mock ignored, no extension fires', async () => {
+    const placeBid = vi.fn(async (_params: unknown) => ({
+      event_id: 2,
+      seq: 2,
+      clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+      was_duplicate: false,
+      was_extended: false,
+    }));
+    // antiSnipe DISABLED (threshold = 0).
+    const lobby = await makeLobby(
+      auctionLobbyOpts({
+        auctionAntiSnipeThresholdSeconds: 0,
+        auctionAntiSnipeExtensionSeconds: 30,
+        placeBid,
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+    await lobby.enqueueAction(bidAction({ bidAmount: 10 }));
+    // Engine still threads the (zero) threshold to the RPC; the RPC
+    // is what skips extension when threshold=0.
+    expect(placeBid.mock.calls[0]?.[0]).toMatchObject({
+      antiSnipeThresholdSeconds: 0,
+    });
+  });
+
+  it('anti-snipe bootstrap: replay applies extends_timer events to currentNomination.expiresAt', async () => {
+    // Simulate a draft with one nomination + two bids, the second
+    // of which extended the timer. Bootstrap must mutate
+    // currentNomination.expiresAt to the post-extension value
+    // (NOT log-and-skip — see Decision Log 2026-05-07).
+    const originalDeadline = new Date('2026-05-07T12:30:00Z');
+    const extendedDeadline = new Date('2026-05-07T12:30:30Z');
+    const events: DraftEventRow[] = [
+      makeEventRow({
+        seq: 1,
+        event_type: 'auction_nomination_started',
+        payload: {
+          nomination_id: 'nom-1',
+          player_id: '8478402',
+          player_name: 'Connor McDavid',
+          opening_bid: 5,
+          nominator_team_id: 'team-1',
+          expires_at: originalDeadline.toISOString(),
+        },
+      }),
+      makeEventRow({
+        seq: 2,
+        event_type: 'auction_bid_placed',
+        payload: { nomination_id: 'nom-1', team_id: 'team-2', bid_amount: 10 },
+      }),
+      makeEventRow({
+        seq: 3,
+        event_type: 'auction_bid_extends_timer',
+        payload: {
+          nomination_id: 'nom-1',
+          prior_expires_at: originalDeadline.toISOString(),
+          new_expires_at: extendedDeadline.toISOString(),
+          triggering_bid_id: 2,
+          triggering_team_id: 'team-2',
+          triggering_bid_amount: 10,
+        },
+      }),
+    ];
+    const lobby = await makeLobby(
+      antiSnipeLobbyOpts({ listDraftEvents: vi.fn(async () => events) }),
+    );
+    const auctionState = lobby.getAuctionState();
+    // Post-extension deadline (NOT the original).
+    expect(auctionState?.currentNomination?.clockDeadline).toBe(
+      extendedDeadline.toISOString(),
+    );
+    // Ring buffer has all three events including the extension.
+    const snap = lobby.getSnapshot();
+    expect(snap.recentEvents.map((e) => e.kind)).toEqual([
+      'auction_nomination_started',
+      'auction_bid_placed',
+      'auction_bid_extends_timer',
+    ]);
+  });
+
+  it('anti-snipe bootstrap: extends_timer with no active nomination throws (event log integrity)', async () => {
+    const events: DraftEventRow[] = [
+      makeEventRow({
+        seq: 1,
+        event_type: 'auction_bid_extends_timer',
+        payload: {
+          nomination_id: 'nom-1',
+          prior_expires_at: new Date().toISOString(),
+          new_expires_at: new Date().toISOString(),
+          triggering_bid_id: 1,
+          triggering_team_id: 'team-2',
+          triggering_bid_amount: 10,
+        },
+      }),
+    ];
+    await expect(
+      makeLobby(
+        antiSnipeLobbyOpts({ listDraftEvents: vi.fn(async () => events) }),
+      ),
+    ).rejects.toThrow(/no active nomination/);
+  });
+
+  it('anti-snipe bootstrap: extends_timer with mismatched nomination id throws', async () => {
+    const events: DraftEventRow[] = [
+      makeEventRow({
+        seq: 1,
+        event_type: 'auction_nomination_started',
+        payload: {
+          nomination_id: 'nom-1',
+          player_id: '8478402',
+          player_name: 'McDavid',
+          opening_bid: 5,
+          nominator_team_id: 'team-1',
+          expires_at: new Date().toISOString(),
+        },
+      }),
+      makeEventRow({
+        seq: 2,
+        event_type: 'auction_bid_extends_timer',
+        payload: {
+          nomination_id: 'WRONG-ID',
+          prior_expires_at: new Date().toISOString(),
+          new_expires_at: new Date().toISOString(),
+          triggering_bid_id: 1,
+          triggering_team_id: 'team-2',
+          triggering_bid_amount: 10,
+        },
+      }),
+    ];
+    await expect(
+      makeLobby(
+        antiSnipeLobbyOpts({ listDraftEvents: vi.fn(async () => events) }),
+      ),
+    ).rejects.toThrow(/nomination mismatch/);
+  });
+
+  it('anti-snipe wire: published auction_bid_extends_timer payload round-trips correctly', async () => {
+    const publish = vi.fn();
+    const placeBid = vi.fn(async (_params: unknown) => ({
+      event_id: 2,
+      seq: 2,
+      clock_deadline: new Date(Date.now() + 10_000).toISOString(),
+      was_duplicate: false,
+      was_extended: true,
+      extends_event_seq: 3,
+    }));
+    const lobby = await makeLobby(
+      antiSnipeLobbyOpts({
+        publish,
+        nominatePlayer: alignedNominateMock(31_000),
+        placeBid,
+      }),
+    );
+    await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+    publish.mockClear();
+    await lobby.enqueueAction(bidAction({ bidAmount: 10 }));
+
+    // Find the extends broadcast.
+    const extendsCall = publish.mock.calls.find((c) =>
+      String(c[1]).includes('auction_bid_extends_timer'),
+    );
+    expect(extendsCall).toBeDefined();
+    const parsed = JSON.parse(extendsCall![1] as string);
+    expect(parsed.type).toBe('event');
+    expect(parsed.seq).toBe(3);
+    expect(parsed.payload.kind).toBe('auction_bid_extends_timer');
+    expect(parsed.payload.nominationId).toBe('nom-1');
+    expect(parsed.payload.triggeringBidAmount).toBe(10);
+    expect(parsed.payload.triggeringBidderTeamId).toBe('team-2');
+    expect(typeof parsed.payload.priorClockDeadline).toBe('string');
+    expect(typeof parsed.payload.newClockDeadline).toBe('string');
+  });
+
+  it('anti-snipe end-to-end: nominate → bid (no ext) → bid (extends) → bid (extends again) → expiry → close', async () => {
+    vi.useFakeTimers();
+    try {
+      let bidCallCount = 0;
+      const placeBid = vi.fn().mockImplementation(async (_params: unknown) => {
+        bidCallCount++;
+        if (bidCallCount === 1) {
+          // No extension on first bid.
+          return {
+            event_id: 2,
+            seq: 2,
+            clock_deadline: new Date(Date.now() + 31_000).toISOString(),
+            was_duplicate: false,
+            was_extended: false,
+          };
+        }
+        // Subsequent bids extend by 10s each.
+        const baseSeq = 1 + bidCallCount * 2;
+        return {
+          event_id: baseSeq,
+          seq: baseSeq,
+          clock_deadline: new Date(Date.now() + 10_000).toISOString(),
+          was_duplicate: false,
+          was_extended: true,
+          extends_event_seq: baseSeq + 1,
+        };
+      });
+      const closeNomination = vi.fn(async () => ({
+        event_id: 999,
+        seq: 999,
+        event_type: 'auction_nomination_closed' as const,
+        no_sale: false,
+        was_duplicate: false,
+      }));
+      const lobby = await makeLobby(
+        antiSnipeLobbyOpts({
+          nominatePlayer: alignedNominateMock(31_000),
+          placeBid,
+          closeNomination,
+        }),
+      );
+      await lobby.enqueueAction(nominateAction({ openingBid: 5 }));
+      await lobby.enqueueAction(bidAction({ bidAmount: 10, idempotencyKey: 'b1' }));
+      await lobby.enqueueAction(
+        bidAction({ teamId: 'team-3', bidAmount: 15, idempotencyKey: 'b2' }),
+      );
+      await lobby.enqueueAction(
+        bidAction({ teamId: 'team-2', bidAmount: 20, idempotencyKey: 'b3' }),
+      );
+
+      // After 3 bids: 1 placed (no ext), 2 placed (ext), 3 placed (ext).
+      // Two extension events in the buffer.
+      const snap = lobby.getSnapshot();
+      expect(
+        snap.recentEvents.filter((e) => e.kind === 'auction_bid_placed'),
+      ).toHaveLength(3);
+      expect(
+        snap.recentEvents.filter((e) => e.kind === 'auction_bid_extends_timer'),
+      ).toHaveLength(2);
+
+      // Expiry path still fires after the final extension's window.
+      await vi.advanceTimersByTimeAsync(11_000);
+      expect(closeNomination).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

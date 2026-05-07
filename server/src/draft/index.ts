@@ -175,6 +175,8 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
         auctionNominationTime?: number;
         auctionBudget?: number;
         auctionMinBid?: number;
+        auctionAntiSnipeThresholdSeconds?: number;
+        auctionAntiSnipeExtensionSeconds?: number;
         rosterSize?: number;
         draftRounds?: number;
       }
@@ -218,6 +220,17 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
   // initial budget/playersWon maps.
   if (format === 'auction') {
     const auctionConfig = await loadAuctionConfig(leagueId, settings);
+    // Anti-snipe configuration (chunk 11g.6 sub-step 6b per ADR-002
+    // §3.3 / §4.4). Read from `leagues.settings`; defaults match
+    // ADR-002 §4.3 (30s threshold + 30s extension).
+    const auctionAntiSnipeThresholdSeconds =
+      typeof settings?.auctionAntiSnipeThresholdSeconds === 'number'
+        ? settings.auctionAntiSnipeThresholdSeconds
+        : 30;
+    const auctionAntiSnipeExtensionSeconds =
+      typeof settings?.auctionAntiSnipeExtensionSeconds === 'number'
+        ? settings.auctionAntiSnipeExtensionSeconds
+        : 30;
     return {
       format,
       draftOrder: [],
@@ -225,6 +238,8 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
       initialPickDeadline,
       initialDraftState,
       ...auctionConfig,
+      auctionAntiSnipeThresholdSeconds,
+      auctionAntiSnipeExtensionSeconds,
     };
   }
 
@@ -287,6 +302,8 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
     initialTeamBudgets: new Map(),
     initialPlayersWon: new Map(),
     initialActiveNomination: null,
+    auctionAntiSnipeThresholdSeconds: 0,
+    auctionAntiSnipeExtensionSeconds: 0,
   };
 }
 

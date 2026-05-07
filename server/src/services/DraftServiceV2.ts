@@ -101,14 +101,45 @@ export interface PlaceBidParams {
   idempotencyKey: string;
   actor: DraftV2Actor;
   correlationId?: string | null;
+  /**
+   * Chunk 11g.6 sub-step 6b — anti-snipe configuration passed per-RPC
+   * (rather than read from `leagues.settings` inside the function).
+   * Mirrors the chunk 11g.6 6a pattern of `nominate_player_v2.p_clock_seconds`
+   * — engine reads the per-league config once and threads it through.
+   * Threshold = 0 disables anti-snipe.
+   */
+  antiSnipeThresholdSeconds: number;
+  antiSnipeExtensionSeconds: number;
 }
 
 export interface PlaceBidResult {
   event_id: number;
   seq: number;
-  /** Returned unchanged from `auction_nominations.expires_at`; in 6a the deadline doesn't change on bid. */
+  /**
+   * Post-extension `auction_nominations.expires_at` if anti-snipe
+   * fired (`was_extended === true`); otherwise the original
+   * unchanged deadline. Either way: this is the wall-clock
+   * deadline the engine should use to (re)schedule its bid-window
+   * timer. Chunk 11g.6 sub-step 6b.
+   */
   clock_deadline: string;
   was_duplicate: boolean;
+  /**
+   * `true` when the bid arrived in the final
+   * `anti_snipe_threshold_seconds` of the bid window and the RPC
+   * extended `expires_at` atomically with the bid write. Engine
+   * cancels the existing timer + reschedules from the new
+   * deadline + broadcasts the `auction_bid_extends_timer` event.
+   */
+  was_extended: boolean;
+  /**
+   * `draft_events.seq` of the `auction_bid_extends_timer` event
+   * row written in the same transaction (only when
+   * `was_extended === true`). Engine uses this seq when appending
+   * the extension event to the ring buffer + broadcasting; saves
+   * a downstream lookup on the durable log.
+   */
+  extends_event_seq?: number;
 }
 
 export interface CloseNominationParams {
@@ -335,15 +366,17 @@ export class DraftServiceV2 {
     } as never);
 
     const { data, error } = await this.supabase.rpc('place_bid_v2', {
-      p_league_id:       params.leagueId,
-      p_team_id:         params.teamId,
-      p_nomination_id:   params.nominationId,
-      p_bid_amount:      params.bidAmount,
-      p_session_id:      params.sessionId,
-      p_idempotency_key: params.idempotencyKey,
-      p_payload_hash:    payloadHash,
-      p_actor:           params.actor,
-      p_correlation_id:  params.correlationId ?? null,
+      p_league_id:                    params.leagueId,
+      p_team_id:                      params.teamId,
+      p_nomination_id:                params.nominationId,
+      p_bid_amount:                   params.bidAmount,
+      p_session_id:                   params.sessionId,
+      p_idempotency_key:              params.idempotencyKey,
+      p_payload_hash:                 payloadHash,
+      p_actor:                        params.actor,
+      p_correlation_id:               params.correlationId ?? null,
+      p_anti_snipe_threshold_seconds: params.antiSnipeThresholdSeconds,
+      p_anti_snipe_extension_seconds: params.antiSnipeExtensionSeconds,
     });
 
     if (error) throw mapRpcError(error);

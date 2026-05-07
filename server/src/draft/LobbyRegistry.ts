@@ -160,6 +160,18 @@ export interface LobbyConfig {
     leadingBid: number;
     expiresAt: Date;
   } | null;
+  /**
+   * Anti-snipe configuration (chunk 11g.6 sub-step 6b per ADR-002
+   * §3.3 / §4.4). Engine reads from `leagues.settings` once at
+   * config lookup and threads through to the LobbyManager + every
+   * `place_bid_v2` RPC call. Threshold = 0 disables anti-snipe
+   * entirely (per ADR-002 §4.3 range "0-120 (0 disables)").
+   *
+   * Snake/linear lobbies set both to 0 — they don't make
+   * `place_bid_v2` calls so the values are never used.
+   */
+  auctionAntiSnipeThresholdSeconds: number;
+  auctionAntiSnipeExtensionSeconds: number;
 }
 
 export interface LobbyRegistryOptions {
@@ -371,6 +383,8 @@ export class LobbyRegistry {
       initialTeamBudgets: config.initialTeamBudgets,
       initialPlayersWon: config.initialPlayersWon,
       initialActiveNomination: config.initialActiveNomination,
+      auctionAntiSnipeThresholdSeconds: config.auctionAntiSnipeThresholdSeconds,
+      auctionAntiSnipeExtensionSeconds: config.auctionAntiSnipeExtensionSeconds,
     });
     // Step 6b: bootstrap from the durable event log BEFORE returning.
     // A failed init() throws; the existing try/catch in getOrCreate
