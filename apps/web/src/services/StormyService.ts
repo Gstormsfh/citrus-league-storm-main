@@ -278,16 +278,53 @@ class StormyServiceImpl {
         const { PlayerService } = await import('@/services/PlayerService');
         const { playerApi } = await import('@/api/players');
 
-        const [playersData, lineupResult, rosProjectionsResult] = await Promise.allSettled([
+        // ── Advanced metrics: xG/60 + xG rating (skaters), GSAx (goalies) ─
+        // These exist in the DB but were never flowing to Stormy. Querying
+        // them in parallel with the main player fetch keeps the latency cost
+        // close to zero. Best-effort — failures here don't block context.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sb = supabase as unknown as any;
+        const talentPromise = (async () => {
+          try {
+            const { data } = await sb
+              .from('player_talent_metrics')
+              .select('player_id, xg_per_60, xg_rating')
+              .in('player_id', allNeededPlayerIds);
+            return (data ?? []) as Array<{ player_id: number; xg_per_60: number | null; xg_rating: string | null }>;
+          } catch { return []; }
+        })();
+        const gsaxPromise = (async () => {
+          try {
+            const { data } = await sb
+              .from('goalie_gsax_primary')
+              .select('goalie_id, regressed_gsax')
+              .in('goalie_id', allNeededPlayerIds);
+            return (data ?? []) as Array<{ goalie_id: number; regressed_gsax: number | null }>;
+          } catch { return []; }
+        })();
+
+        const [playersData, lineupResult, rosProjectionsResult, talentRows, gsaxRows] = await Promise.allSettled([
           PlayerService.getPlayersByIds(allNeededPlayerIds.map(String)),
           rosterApi.getLineup(leagueId, team.id),
           playerApi.getRosProjections(200),
+          talentPromise,
+          gsaxPromise,
         ]);
 
         // Build player lookup maps
         const playerMap = new Map(
           (playersData.status === 'fulfilled' ? playersData.value : []).map(p => [Number(p.id), p])
         );
+        const talentByPid = new Map<number, { xg_per_60: number | null; xg_rating: string | null }>();
+        if (talentRows.status === 'fulfilled') {
+          for (const r of talentRows.value) talentByPid.set(r.player_id, { xg_per_60: r.xg_per_60, xg_rating: r.xg_rating });
+        }
+        const gsaxByPid = new Map<number, number>();
+        if (gsaxRows.status === 'fulfilled') {
+          for (const r of gsaxRows.value) {
+            if (r.regressed_gsax != null) gsaxByPid.set(r.goalie_id, r.regressed_gsax);
+          }
+        }
 
         const lineupData = lineupResult.status === 'fulfilled'
           ? lineupResult.value.data as { starters?: string[]; bench?: string[]; ir?: string[] } | null
@@ -340,6 +377,10 @@ class StormyServiceImpl {
             if (isGoalie && (p.goalie_gp || 0) > 0) {
               line += ` ${p.goalie_gp}GP ${p.wins}W ${p.saves}SV ${p.goals_against}GA ${p.shutouts}SO`;
               if (p.save_percentage != null) line += ` ${Number(p.save_percentage).toFixed(3)}SV%`;
+              // GSAx (regressed goals saved above expected) — Bayesian-shrunk
+              // measure of true goaltending value vs an average NHL goalie.
+              const gsax = gsaxByPid.get(Number(p.id));
+              if (gsax != null) line += ` GSAx:${gsax >= 0 ? '+' : ''}${gsax.toFixed(1)}`;
             } else if (p.games_played > 0) {
               line += ` ${p.games_played}GP ${p.goals}G ${p.assists}A ${p.points}PTS`;
               const ppg = (p.points / p.games_played).toFixed(1);
@@ -347,6 +388,14 @@ class StormyServiceImpl {
               if ((p.ppp || 0) > 0) line += ` ${p.ppp}PPP`;
               if ((p.shp || 0) > 0) line += ` ${p.shp}SHP`;
               line += ` ${p.shots}SOG ${p.hits}HIT ${p.blocks}BLK ${p.pim}PIM`;
+              // xG/60 + tier rating — shot-quality signal. A 0.95 PPG player
+              // with xG/60 of 1.4 (Elite) is hot but sustainable; a 1.1 PPG
+              // player with xG/60 of 0.5 (Below Avg) is regression-prone.
+              const t = talentByPid.get(Number(p.id));
+              if (t?.xg_per_60 != null) {
+                line += ` xG/60:${Number(t.xg_per_60).toFixed(2)}`;
+                if (t.xg_rating) line += `[${t.xg_rating}]`;
+              }
             }
 
             // Injury status
@@ -396,8 +445,15 @@ class StormyServiceImpl {
                 if (isGoalie && (p.goalie_gp || 0) > 0) {
                   line += ` ${p.goalie_gp}GP ${p.wins}W`;
                   if (p.save_percentage != null) line += ` ${Number(p.save_percentage).toFixed(3)}SV%`;
+                  const gsax = gsaxByPid.get(Number(p.id));
+                  if (gsax != null) line += ` GSAx:${gsax >= 0 ? '+' : ''}${gsax.toFixed(1)}`;
                 } else if (p.games_played > 0) {
                   line += ` ${p.games_played}GP ${p.points}PTS ${(p.points / p.games_played).toFixed(1)}PPG`;
+                  const t = talentByPid.get(Number(p.id));
+                  if (t?.xg_per_60 != null) {
+                    line += ` xG/60:${Number(t.xg_per_60).toFixed(2)}`;
+                    if (t.xg_rating) line += `[${t.xg_rating}]`;
+                  }
                 }
                 matchupLines.push(line);
               });
