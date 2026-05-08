@@ -185,10 +185,22 @@ class StormyServiceImpl {
       });
 
       // Error response: 429 (rate-limited), 500 (server), etc come back as JSON.
+      // Edge function MAY also still be running in non-streaming mode (until
+      // the SSE-streaming edge function deploys), in which case it returns
+      // a 200 with `{ response: "..." }` and Content-Type: application/json.
+      // We treat that as a successful one-shot reply: call onDelta with the
+      // whole string and return — same shape as if it had streamed.
       const contentType = res.headers.get("content-type") || "";
       if (!res.ok || contentType.includes("application/json")) {
         try {
           const body = await res.json();
+          if (res.ok && typeof body?.response === "string") {
+            // Non-streaming fallback path. Surface the full text via onDelta
+            // in one call so the UI still shows it correctly.
+            const text = body.response as string;
+            if (text) onDelta(text);
+            return { response: text, usage: body?.usage };
+          }
           return { response: "", error: body?.error || `Stormy error (${res.status})` };
         } catch {
           return { response: "", error: `Stormy error (${res.status})` };
