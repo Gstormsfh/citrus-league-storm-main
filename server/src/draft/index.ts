@@ -568,6 +568,12 @@ function shutdown(signal: string) {
   structuredLogger.info('shutdown.initiated', { signal });
 
   if (uwsHandle) {
+    // Chunk 11g.7 sub-step 7d: cancel the heartbeat soft-check timer
+    // BEFORE closing the listen socket. Mirrors the
+    // `LobbyManager.stopSnapshotTimer()` pattern from sub-step 7c —
+    // late-firing timers post-shutdown add noise to the SIGTERM
+    // window and can race against teardown.
+    uwsHandle.stopHeartbeat();
     uwsHandle.close();
     uwsHandle = null;
   }

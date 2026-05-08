@@ -1045,6 +1045,31 @@ export class LobbyManager {
   }
 
   /**
+   * Iterate this lobby's active WebSocket connections (chunk 11g.7
+   * sub-step 7d). Snapshots the `connections` map at call-start, then
+   * walks the snapshot — safe against mid-iteration mutation (a
+   * connection closing inside the callback removes itself from the
+   * live map but does not affect the snapshot we're walking).
+   *
+   * Used by `LobbyRegistry.forEachConnection` to drive the
+   * heartbeat soft-check scan across every lobby in a single pass.
+   * Callbacks that throw propagate up; callers should `try/catch`
+   * around the per-connection work so one bad connection doesn't
+   * abort the rest of the scan.
+   */
+  forEachConnection(
+    fn: (ws: WebSocket<DraftSocketUserData>, userData: DraftSocketUserData) => void,
+  ): void {
+    const snapshot: Array<[WebSocket<DraftSocketUserData>, DraftSocketUserData]> = [];
+    for (const entry of this.connections) {
+      snapshot.push(entry);
+    }
+    for (const [ws, userData] of snapshot) {
+      fn(ws, userData);
+    }
+  }
+
+  /**
    * Enqueue a state-mutating action through the single-writer queue.
    * All bid/pick/nominate flows route through here so concurrent
    * actions serialize cleanly (per ADR-002 §3.5 race-condition fix

@@ -5,6 +5,14 @@
 // constructed in `index.ts` (not here) so its `publish` callback
 // can also feed the LobbyRegistry — see uws-helpers.ts and
 // LobbyManager.ts step-5 broadcast wiring.
+// Phase 4.5 chunk 11g.7 sub-step 7d — WebSocket heartbeat for zombie
+// connection cleanup. Hybrid uWS-native pings + application-level
+// pong tracking + custom close code 4002. uWS handles ping emission
+// (sendPingsAutomatically + idleTimeout=60 as defense-in-depth
+// backstop); a server-wide soft-check timer scans
+// `lobbyRegistry.forEachConnection` and force-closes anything whose
+// last pong is older than HEARTBEAT_PONG_TIMEOUT_MS. See
+// `heartbeat.ts` for the pure helpers and the architecture rationale.
 //
 // Authenticates incoming WebSocket clients before allowing the upgrade.
 // Tokens are issued by the discovery endpoint (chunk 11g.1) and carried
@@ -35,10 +43,23 @@ import { verifyDraftToken } from '../lib/draftToken';
 import type { LobbyRegistry } from './LobbyRegistry';
 import { handleClientMessage } from './uws-helpers';
 import type { DraftSocketUserData } from './types';
+import {
+  HEARTBEAT_PONG_TIMEOUT_CLOSE_CODE,
+  findTimedOutConnections,
+  initializeHeartbeat,
+  recordPong,
+} from './heartbeat';
 
 export interface UwsServerHandle {
   port: number;
   close: () => void;
+  /**
+   * Cancel the heartbeat soft-check timer (chunk 11g.7 sub-step 7d).
+   * Called from the graceful-shutdown path in `index.ts` so the
+   * scanner doesn't fire mid-shutdown and add noise to the SIGTERM
+   * window. Idempotent — second call is a no-op.
+   */
+  stopHeartbeat: () => void;
 }
 
 export interface StartUwsServerOptions {
@@ -59,12 +80,53 @@ export interface StartUwsServerOptions {
   lobbyRegistry: LobbyRegistry;
 }
 
+// ── Heartbeat configuration (chunk 11g.7 sub-step 7d) ────────────────
+//
+// Defaults: 30s ping interval (uWS-managed via sendPingsAutomatically
+// + idleTimeout=60s backstop), 30s pong timeout (application-managed
+// via the soft-check timer below). Both are env-overridable;
+// vitest setup sets them to 0 to disable the timer entirely under
+// tests. uWS rounds idleTimeout to 4s granularity (per uWS
+// documentation), so 60 is the wall-clock backstop value.
+const HEARTBEAT_PING_INTERVAL_MS = parseInt(
+  process.env.HEARTBEAT_PING_INTERVAL_MS ?? '30000',
+  10,
+);
+const HEARTBEAT_PONG_TIMEOUT_MS = parseInt(
+  process.env.HEARTBEAT_PONG_TIMEOUT_MS ?? '30000',
+  10,
+);
+// uWS idleTimeout in SECONDS (not ms) — twice the application-level
+// ping interval so uWS only kills a connection if our soft-check
+// timer has somehow failed to fire. Floor 4s (uWS minimum).
+const UWS_IDLE_TIMEOUT_SECONDS = Math.max(
+  4,
+  Math.ceil((HEARTBEAT_PING_INTERVAL_MS * 2) / 1000),
+);
+// Soft-check cadence: every min(pongTimeoutMs/3, 10s). At default
+// 30s pong timeout this fires every 10s — a zombie surfaces within
+// ~10s of breaching, while CPU overhead stays negligible.
+const HEARTBEAT_SCAN_INTERVAL_MS = Math.min(
+  Math.max(1, Math.floor(HEARTBEAT_PONG_TIMEOUT_MS / 3)),
+  10_000,
+);
+
 export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHandle> {
   const { port, app, lobbyRegistry } = opts;
   return new Promise((resolve, reject) => {
     let listenSocket: unknown = null;
+    let heartbeatTimer: NodeJS.Timeout | null = null;
 
     app.ws<DraftSocketUserData>('/ws/draft/:lobbyId', {
+      // Chunk 11g.7 sub-step 7d: uWS handles ping emission internally
+      // when sendPingsAutomatically=true; idleTimeout=60s is the
+      // defense-in-depth backstop in case the application-level soft-
+      // check timer somehow fails to fire. Browsers automatically pong
+      // any incoming ping per the WebSocket spec, so the `pong` handler
+      // below fires on whatever cadence uWS's internal scheduler emits.
+      idleTimeout: UWS_IDLE_TIMEOUT_SECONDS,
+      sendPingsAutomatically: true,
+
       upgrade: (res, req, context) => {
         // ── Sync: capture all req values BEFORE any await ──
         // uWS invalidates `req` after the upgrade handler returns; any
@@ -119,6 +181,12 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
                     leagueId: claims.leagueId,
                     draftId: claims.draftId,
                     expiresAt: claims.exp,
+                    // Chunk 11g.7 sub-step 7d: lastPongAt is stamped
+                    // properly in the open handler (`Date.now()` is
+                    // not safely callable from inside a uWS upgrade
+                    // cork). Initialized to 0 here as a placeholder;
+                    // overwritten before any soft-check scan can see it.
+                    lastPongAt: 0,
                   },
                   secKey,
                   secProto,
@@ -156,6 +224,13 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
       open: (ws) => {
         const userData = ws.getUserData();
         const { lobbyId, userId, leagueId } = userData;
+        // Chunk 11g.7 sub-step 7d: stamp lastPongAt before any
+        // soft-check scan can observe this connection. Initialization
+        // happens here (post-upgrade) rather than in the upgrade
+        // handler because Date.now() inside the upgrade cork can race
+        // against scan cadence — initialization in `open` runs on the
+        // uWS event loop thread that also drives the scan timer.
+        initializeHeartbeat(ws, Date.now());
         structuredLogger.info('uws.connection.opened', {
           lobbyId,
           userId,
@@ -229,6 +304,17 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
         }
       },
 
+      // Chunk 11g.7 sub-step 7d: pong handler updates lastPongAt so
+      // the soft-check scanner can recognize this connection as alive.
+      // DEBUG-level logging only (production noise floor is INFO+);
+      // healthy connections pong on uWS's internal cadence and we
+      // don't need an info-level entry per pong.
+      pong: (ws) => {
+        recordPong(ws, Date.now());
+        const { lobbyId, userId } = ws.getUserData();
+        structuredLogger.debug('heartbeat.pong_received', { lobbyId, userId });
+      },
+
       close: (ws, code) => {
         const { lobbyId, userId } = ws.getUserData();
         const lobby = lobbyRegistry.get(lobbyId);
@@ -244,6 +330,86 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
       },
     });
 
+    // ── Heartbeat soft-check timer (chunk 11g.7 sub-step 7d) ──
+    //
+    // Runs every HEARTBEAT_SCAN_INTERVAL_MS, snapshots all connections
+    // across all lobbies, and force-closes anything whose lastPongAt
+    // is older than HEARTBEAT_PONG_TIMEOUT_MS. Setting either env to 0
+    // disables the timer entirely (vitest setup default — tests don't
+    // want a setInterval running under fake timers).
+    //
+    // Logging volume: pong_timeout is the only INFO+ event (warn
+    // level — alert-worthy if frequency spikes). Scan start/complete
+    // are debug-only and suppressed at production INFO+.
+    if (HEARTBEAT_PONG_TIMEOUT_MS > 0 && HEARTBEAT_SCAN_INTERVAL_MS > 0) {
+      heartbeatTimer = setInterval(() => {
+        const now = Date.now();
+        // Snapshot all WSes from the registry. forEachConnection
+        // snapshots each lobby's connection map at iteration-start,
+        // so force-closing a connection mid-scan (which triggers a
+        // synchronous removeConnection on the close handler) is safe.
+        const candidates: Array<uWS.WebSocket<DraftSocketUserData>> = [];
+        lobbyRegistry.forEachConnection((ws) => {
+          candidates.push(ws);
+        });
+        const timedOut = findTimedOutConnections(candidates, now, {
+          pongTimeoutMs: HEARTBEAT_PONG_TIMEOUT_MS,
+        });
+        if (timedOut.length === 0) {
+          structuredLogger.debug('heartbeat.scan_completed', {
+            connectionsScanned: candidates.length,
+            timedOut: 0,
+          });
+          return;
+        }
+        for (const entry of timedOut) {
+          structuredLogger.warn('heartbeat.pong_timeout', {
+            lobbyId: entry.lobbyId,
+            userId: entry.userId,
+            lastPongAgeMs: entry.lastPongAgeMs,
+            pongTimeoutMs: HEARTBEAT_PONG_TIMEOUT_MS,
+          });
+          try {
+            entry.ws.end(HEARTBEAT_PONG_TIMEOUT_CLOSE_CODE, 'pong_timeout');
+          } catch (err) {
+            // ws may already be closed if the close happened
+            // concurrently with the scan; swallow + log.
+            structuredLogger.debug('heartbeat.ws_end_threw', {
+              lobbyId: entry.lobbyId,
+              userId: entry.userId,
+            });
+            void err;
+          }
+        }
+        structuredLogger.debug('heartbeat.scan_completed', {
+          connectionsScanned: candidates.length,
+          timedOut: timedOut.length,
+        });
+      }, HEARTBEAT_SCAN_INTERVAL_MS);
+      // unref() so the timer doesn't keep the Node event loop alive
+      // on its own (e.g., during graceful shutdown after listenSocket
+      // is closed but before stopHeartbeat fires).
+      heartbeatTimer.unref();
+      structuredLogger.info('heartbeat.timer_started', {
+        scanIntervalMs: HEARTBEAT_SCAN_INTERVAL_MS,
+        pongTimeoutMs: HEARTBEAT_PONG_TIMEOUT_MS,
+        uwsIdleTimeoutSeconds: UWS_IDLE_TIMEOUT_SECONDS,
+      });
+    } else {
+      structuredLogger.info('heartbeat.timer_disabled', {
+        pongTimeoutMs: HEARTBEAT_PONG_TIMEOUT_MS,
+        scanIntervalMs: HEARTBEAT_SCAN_INTERVAL_MS,
+      });
+    }
+
+    const stopHeartbeat = () => {
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+        structuredLogger.info('heartbeat.timer_stopped', {});
+      }
+    };
+
     app.listen(port, (token) => {
       if (token) {
         listenSocket = token;
@@ -257,10 +423,14 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
               structuredLogger.info('uws.listen_socket_closed', { port });
             }
           },
+          stopHeartbeat,
         });
       } else {
         const err = new Error(`[uws] FAILED to listen on port ${port}`);
         structuredLogger.error('uws.listen_failed', { port }, err);
+        // Failed to bind — cancel the heartbeat we just started so
+        // it doesn't keep firing for a never-listening server.
+        stopHeartbeat();
         reject(err);
       }
     });

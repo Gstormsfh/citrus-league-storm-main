@@ -400,6 +400,7 @@ function makeUserData(overrides: Partial<DraftSocketUserData> = {}): DraftSocket
     leagueId: 'league-1',
     draftId: 'lobby-1',
     expiresAt: Math.floor(Date.now() / 1000) + 300,
+    lastPongAt: 0,
     ...overrides,
   };
 }
@@ -458,6 +459,7 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
       leagueId: 'league-1',
       draftId: 'lobby-1',
       expiresAt: Math.floor(Date.now() / 1000) + 300,
+      lastPongAt: 0,
     };
     expect(() => lobby.addConnection(fakeWs, userData)).not.toThrow();
     expect(() => lobby.removeConnection(fakeWs)).not.toThrow();
@@ -811,6 +813,7 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
       leagueId: 'league-1',
       draftId: 'lobby-1',
       expiresAt: Math.floor(Date.now() / 1000) + 300,
+      lastPongAt: 0,
     };
     lobby.addConnection(ws, userData);
     expect(lobby.connectionCount()).toBe(1);
@@ -825,6 +828,7 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
       leagueId: 'league-1',
       draftId: 'lobby-1',
       expiresAt: Math.floor(Date.now() / 1000) + 300,
+      lastPongAt: 0,
     };
 
     lobby.addConnection(ws, userData);
@@ -850,6 +854,7 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
       leagueId: 'league-1',
       draftId: 'lobby-1',
       expiresAt: Math.floor(Date.now() / 1000) + 300,
+      lastPongAt: 0,
     };
 
     lobby.addConnection(ws, userData);

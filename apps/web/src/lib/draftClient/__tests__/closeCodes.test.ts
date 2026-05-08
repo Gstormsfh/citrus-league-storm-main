@@ -1,8 +1,11 @@
 // Phase 4.5 chunk 11g.5a — close-code disposition tests.
+// Phase 4.5 chunk 11g.7 sub-step 7d — added 4002 carve-out regression
+// lock: heartbeat pong-timeout MUST classify as `transient`, not
+// `permanent_auth`, despite living in the 4001-4099 auth range.
 //
-// 5 tests covering each major code class: standard normal, standard
+// 6 tests covering each major code class: standard normal, standard
 // transient, custom auth (4001-4099), custom lobby (4100-4199),
-// custom server (4200+).
+// custom server (4200+), and the 4002 carve-out.
 
 import { describe, it, expect } from 'vitest';
 import { classifyCloseCode } from '../closeCodes';
@@ -19,10 +22,27 @@ describe('classifyCloseCode (chunk 11g.5a)', () => {
     expect(classifyCloseCode(1013, 'backpressure')).toBe('transient');
   });
 
-  it('4001-4099 are permanent_auth', () => {
+  it('4001-4099 are permanent_auth (with 4002 carved out — see next test)', () => {
     expect(classifyCloseCode(4001, 'token_expired')).toBe('permanent_auth');
+    expect(classifyCloseCode(4003, '')).toBe('permanent_auth');
     expect(classifyCloseCode(4050, '')).toBe('permanent_auth');
     expect(classifyCloseCode(4099, '')).toBe('permanent_auth');
+  });
+
+  it('4002 is transient — heartbeat pong-timeout carve-out (chunk 11g.7 sub-step 7d)', () => {
+    // Regression lock: the engine's heartbeat soft-check timer
+    // emits close code 4002 when a connection misses its pong
+    // window (`server/src/draft/heartbeat.ts`
+    // `HEARTBEAT_PONG_TIMEOUT_CLOSE_CODE`). Despite living inside
+    // the 4001-4099 auth range, 4002 represents a network /
+    // keepalive failure, NOT a token problem — clients reconnect
+    // with backoff. The carve-out in classifyCloseCode runs BEFORE
+    // the 4001-4099 range check; if a future refactor reorders
+    // those checks, this test is the canary.
+    expect(classifyCloseCode(4002, 'pong_timeout')).toBe('transient');
+    // Empty reason string also classifies as transient — the
+    // disposition doesn't depend on the reason today.
+    expect(classifyCloseCode(4002, '')).toBe('transient');
   });
 
   it('4100-4199 are permanent_lobby', () => {

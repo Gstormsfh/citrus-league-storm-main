@@ -42,12 +42,14 @@
 
 import { structuredLogger } from '@citrus/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { WebSocket } from 'uWebSockets.js';
 import type { DraftServiceV2 } from '../services/DraftServiceV2';
 import { LobbyManager } from './LobbyManager';
 import type {
   CommissionerAuthorizationResult,
   DraftFormat,
   DraftOrderSlot,
+  DraftSocketUserData,
   TeamAuthorizationResult,
 } from './types';
 
@@ -402,6 +404,37 @@ export class LobbyRegistry {
   /** Diagnostic: number of registry entries (constructed + in-flight). */
   size(): number {
     return this.lobbies.size;
+  }
+
+  /**
+   * Iterate every active WebSocket connection across every constructed
+   * lobby in the registry (chunk 11g.7 sub-step 7d). Used by the
+   * heartbeat soft-check timer in `uws-server.ts` to scan for zombie
+   * connections in a single pass.
+   *
+   * **Iteration safety contract.** Iterator is safe against connection
+   * mutation during the walk. If a connection closes mid-scan (e.g.,
+   * the soft-check force-disconnect itself triggers a uWS `close`
+   * handler that calls back into `removeConnection`), iteration MUST
+   * NOT throw or skip remaining entries. The lobby-level
+   * `forEachConnection` snapshots its own `connections` map at
+   * call-start; this method calls each lobby's iterator in turn.
+   *
+   * Lobbies that are still in-flight (`Promise<LobbyManager>` placeholders
+   * during construction) are skipped — they have no connections yet.
+   *
+   * Errors thrown by `fn` propagate. Callers (typically the soft-check
+   * scanner) should `try/catch` around the per-connection action so a
+   * single misbehaving connection doesn't abort the entire scan.
+   */
+  forEachConnection(
+    fn: (ws: WebSocket<DraftSocketUserData>, userData: DraftSocketUserData) => void,
+  ): void {
+    for (const entry of this.lobbies.values()) {
+      if (entry instanceof LobbyManager) {
+        entry.forEachConnection(fn);
+      }
+    }
   }
 
   // ── Private ────────────────────────────────────────────────────

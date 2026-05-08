@@ -28,6 +28,7 @@ function makeUserData(overrides: Partial<DraftSocketUserData> = {}): DraftSocket
     leagueId: 'league-1',
     draftId: 'lobby-1',
     expiresAt: Math.floor(Date.now() / 1000) + 300,
+    lastPongAt: 0,
     ...overrides,
   };
 }

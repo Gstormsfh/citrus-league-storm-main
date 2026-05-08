@@ -29,3 +29,20 @@ if (!process.env.SNAPSHOT_INTERVAL_MS) {
 if (!process.env.SNAPSHOT_EVENT_MILESTONE) {
   process.env.SNAPSHOT_EVENT_MILESTONE = '0';
 }
+
+// Chunk 11g.7 sub-step 7d — disable the WebSocket heartbeat soft-
+// check timer in tests by default. Setting `HEARTBEAT_PONG_TIMEOUT_MS`
+// or `HEARTBEAT_PING_INTERVAL_MS` to `0` short-circuits the timer
+// startup in `uws-server.ts`. Same rationale as the snapshot timer:
+// fake-timer-using tests don't want a 10s setInterval ticking in the
+// background. Heartbeat-specific tests in `heartbeat.test.ts` are
+// pure-function tests that bypass the timer entirely; tests that
+// exercise the soft-check end-to-end (none today — chunk 11g.7
+// declined uWS integration tests in scope) would override these
+// per-test in `beforeEach`.
+if (!process.env.HEARTBEAT_PING_INTERVAL_MS) {
+  process.env.HEARTBEAT_PING_INTERVAL_MS = '0';
+}
+if (!process.env.HEARTBEAT_PONG_TIMEOUT_MS) {
+  process.env.HEARTBEAT_PONG_TIMEOUT_MS = '0';
+}

@@ -42,6 +42,18 @@ export interface DraftSocketUserData {
   leagueId: string;
   draftId: string;
   expiresAt: number;
+  /**
+   * Heartbeat last-pong timestamp in epoch milliseconds (chunk 11g.7
+   * sub-step 7d). Stamped on connection open by
+   * `heartbeat.initializeHeartbeat`, then refreshed on every received
+   * pong control frame by `heartbeat.recordPong`. The application-
+   * level soft-check timer compares against `Date.now()` and force-
+   * closes connections whose `lastPongAt` is older than
+   * `HEARTBEAT_PONG_TIMEOUT_MS` (default 30000ms) with custom close
+   * code 4002. `number` (not `Date`) so the hot-path subtraction is
+   * a single integer op per connection per scan.
+   */
+  lastPongAt: number;
 }
 
 /**
