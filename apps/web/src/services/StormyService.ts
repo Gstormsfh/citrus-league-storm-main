@@ -770,9 +770,12 @@ class StormyServiceImpl {
           ctx.rosterSummary = `YOUR PLAYOFF ROSTER — ${headerStats}\n` + rosterLines.join('\n');
 
           // ── Top unrostered playoff scorers on still-alive teams ─────────
-          // Stormy's #1 advice in roster pools is "swap a cold/eliminated
-          // player for an under-the-radar hot scorer." Provide that list
-          // pre-computed so Stormy can name actual players, not vague advice.
+          // Roster pools LOCK the roster at draft time — no add/drops, no
+          // waivers. So this list isn't for "swap X for Y" advice (the
+          // user can't); it's for context: "here are the top hot scorers
+          // you didn't draft, this is the production currently beating you."
+          // Useful for "how am I doing" analysis and for next-year draft
+          // prep. The system prompt enforces this framing.
           try {
             const { data: topData } = await sb
               .from('player_playoff_stats')
@@ -928,7 +931,7 @@ class StormyServiceImpl {
 
       // Pool-mode hint in extra so Stormy responds appropriately
       const mode = leagueType === 'playoff-roster-pool'
-        ? 'PLAYOFF ROSTER POOL — user builds a single playoff roster (players only). Winner = most fantasy points across the playoffs. Ask about MY roster, player swaps, hot playoff performers.'
+        ? 'PLAYOFF ROSTER POOL — user drafted a single locked playoff roster at the start. NO add/drops, NO waivers, NO trades — they keep their drafted roster the entire playoffs. Eliminated players stay on roster but score zero from here. Ask about MY roster, hot playoff performers (as missed-draft context, NOT as pickups), and matchup analysis.'
         : leagueType === 'playoff-bracket-pickem'
         ? 'PLAYOFF BRACKET PICKEM — user picks series winners across all 4 rounds. Winner = most correct picks (with round multipliers).'
         : 'PLAYOFF CONFIDENCE POOL — user assigns confidence values (1-15) to series picks. Winner = highest total from correct picks weighted by confidence.';
