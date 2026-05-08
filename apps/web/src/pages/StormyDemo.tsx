@@ -93,7 +93,7 @@ export default function StormyDemo() {
     {
       id: 'greet',
       text:
-        "Demo mode loaded — I'm running on the public demo league's data so you can record clean examples of free-agent advice, lineup moves, and trade analysis. Click a preset prompt below or type your own.",
+        "Hey! I'm Stormy — your AI Assistant GM. I'm plugged into your roster, matchup, scoring, and the latest xG model. Ask me anything about start/sit, free agents, trades, or your matchup outlook.",
       sender: 'stormy',
       timestamp: new Date(),
     },
@@ -140,7 +140,8 @@ export default function StormyDemo() {
     setMessages([
       {
         id: 'reset-' + Date.now(),
-        text: 'Conversation cleared. Ready for a fresh demo take.',
+        text:
+          "Hey! I'm Stormy — your AI Assistant GM. I'm plugged into your roster, matchup, scoring, and the latest xG model. Ask me anything about start/sit, free agents, trades, or your matchup outlook.",
         sender: 'stormy',
         timestamp: new Date(),
       },
@@ -171,7 +172,7 @@ export default function StormyDemo() {
       ]);
 
       const ctx: StormyContext = {
-        page: 'StormyDemo',
+        page: 'GM Office',
         leagueName: ctxRef.current?.leagueName,
         teamName: ctxRef.current?.teamName,
         scoringSettings: ctxRef.current?.scoringSettings,
@@ -242,15 +243,15 @@ export default function StormyDemo() {
             <div>
               <h1 className="font-calistoga text-2xl text-pastel-cream flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-pastel-orange" />
-                Stormy Demo
+                Stormy — Assistant GM
               </h1>
               <p className="text-sm text-white/60 mt-1">
-                Forces fantasy-pool context (demo league {leagueId.slice(0, 8)}…) regardless of your active league. Use to record demo videos.
+                Live access to your roster, matchup, projections, and xG model.
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={reset} disabled={isLoading}>
               <RotateCcw className="h-4 w-4 mr-1" />
-              Reset chat
+              New chat
             </Button>
           </div>
 
@@ -262,14 +263,14 @@ export default function StormyDemo() {
             </Card>
           )}
 
-          {/* Preset prompt grid */}
+          {/* Quick prompt grid — visible until the first message is sent */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft">
-                Preset prompts
+                Try asking
               </CardTitle>
               <CardDescription className="text-xs">
-                Click any prompt to send it. Each one exercises a different Stormy feature.
+                Tap any question to start, or type your own.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
@@ -335,7 +336,7 @@ export default function StormyDemo() {
                   }
                 }}
                 placeholder={
-                  contextLoaded ? 'Ask Stormy anything…' : 'Loading demo league context…'
+                  contextLoaded ? 'Ask Stormy anything…' : 'Loading your league…'
                 }
                 disabled={!contextLoaded || isLoading}
                 className="flex-1"
