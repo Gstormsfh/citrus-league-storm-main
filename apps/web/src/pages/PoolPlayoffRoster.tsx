@@ -255,27 +255,81 @@ export default function PoolPlayoffRosterEntry() {
       try {
         const session = (await supabase.auth.getSession()).data.session;
         const headers: Record<string, string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
-        const [leagueRes, playersRes, picksRes] = await Promise.all([
+        // Step 1 — fetch league + picks first. The picks list tells us
+        // whether THIS league has already drafted (any user has saved picks).
+        // We use that signal to decide whether to apply the alive-teams
+        // filter to the player pool. Already-drafted leagues keep the full
+        // pool so users still see all their roster players (including ones
+        // on now-eliminated teams).
+        const [leagueRes, picksRes] = await Promise.all([
           fetch(`/api/leagues/${leagueId}`, { headers }).then(r => r.json()),
-          fetch('/api/players?limit=1000', { headers }).then(r => r.json()),
           fetch(`/api/playoff-pools/${leagueId}/picks?type=roster`, { headers }).then(r => r.json()).catch(() => null),
         ]);
         const leagueData = leagueRes.data || leagueRes;
         setLeague(leagueData);
+
+        // Has anyone in this league drafted yet? If yes → existing league,
+        // don't shrink the pool. If no → fresh pool, apply alive-teams filter
+        // so new pools mid-playoffs only show teams still in contention.
+        const allPicks = (picksRes?.data?.picks || picksRes?.picks || []) as Array<{ player_id: number; user_id: string }>;
+        const leagueHasDrafted = allPicks.length > 0;
+
+        // Step 2 — fetch players with the appropriate filter.
+        const playersUrl = leagueHasDrafted
+          ? '/api/players?limit=1000'
+          : '/api/players?limit=1000&aliveTeamsOnly=true';
+        const playersRes = await fetch(playersUrl, { headers }).then(r => r.json());
+
         // API returns { data: [...players] } — extract array safely
         const playerArr = Array.isArray(playersRes.data) ? playersRes.data
           : Array.isArray(playersRes) ? playersRes : [];
-        // Filter to ONLY playoff teams so users see a focused pool.
-        // Matches the 16 teams in nhl_playoff_seeds for 2025-26.
-        const PLAYOFF_TEAMS = new Set(['BUF','BOS','TBL','MTL','CAR','OTT','PIT','PHI','COL','LAK','DAL','MIN','VGK','UTA','EDM','ANA']);
-        const playoffOnly = (playerArr as PoolPlayer[]).filter(p => PLAYOFF_TEAMS.has(p.team));
-        setPlayers(playoffOnly);
-        // Restore roster picks — either the current user's or the viewed user's
-        if (picksRes && targetUserId) {
-          const rawPicks = picksRes.data?.picks || picksRes.picks || [];
-          const targetPicks = (rawPicks as Array<{ player_id: number; user_id: string }>).filter(p => p.user_id === targetUserId);
+        const draftablePlayers = playerArr as PoolPlayer[];
+        setPlayers(draftablePlayers);
+        // Restore roster picks — either the current user's or the viewed user's.
+        // We look up the saved picks against ALL players (not just currently
+        // draftable) by falling back to the player ID on the server response —
+        // a previously-drafted player on a now-eliminated team must still
+        // appear on the user's roster (they keep what they drafted).
+        if (allPicks.length > 0 && targetUserId) {
+          const targetPicks = allPicks.filter(p => p.user_id === targetUserId);
+
+          // First pass: find picks already in the alive-team draftable list.
+          const draftableById = new Map(draftablePlayers.map(p => [parseInt(p.id), p]));
+          const aliveTeamPicks = targetPicks
+            .map(pk => draftableById.get(pk.player_id))
+            .filter((p): p is PoolPlayer => !!p);
+
+          // Second pass: any picks NOT in the draftable list are on
+          // eliminated teams — fetch those players directly so they still
+          // appear on the user's roster (rule: you keep what you drafted,
+          // even if the team got knocked out).
+          const missingIds = targetPicks
+            .map(pk => pk.player_id)
+            .filter(id => !draftableById.has(id));
+          let eliminatedTeamPicks: PoolPlayer[] = [];
+          if (missingIds.length > 0) {
+            try {
+              const eliminatedRes = await fetch(
+                `/api/players/by-ids?ids=${missingIds.join(',')}`,
+                { headers }
+              ).then(r => r.json());
+              const arr = Array.isArray(eliminatedRes.data) ? eliminatedRes.data
+                : Array.isArray(eliminatedRes) ? eliminatedRes : [];
+              eliminatedTeamPicks = arr as PoolPlayer[];
+            } catch {
+              // Best-effort — if this lookup fails, those picks just won't
+              // show. Rare path, not worth blocking the UI.
+            }
+          }
+
+          // Preserve original draft order using the targetPicks index so the
+          // roster table renders the way the user built it.
+          const allPickedById = new Map<number, PoolPlayer>();
+          for (const p of [...aliveTeamPicks, ...eliminatedTeamPicks]) {
+            allPickedById.set(parseInt(p.id), p);
+          }
           const savedPlayers = targetPicks
-            .map(pick => playoffOnly.find(p => parseInt(p.id) === pick.player_id))
+            .map(pk => allPickedById.get(pk.player_id))
             .filter((p): p is PoolPlayer => !!p);
           setRoster(savedPlayers);
         }
