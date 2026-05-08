@@ -29,9 +29,14 @@ import sys
 import argparse
 from dotenv import load_dotenv
 
-# Add project root to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-from supabase_rest import SupabaseRest
+# Bootstrap data_pipeline package — file moved under scripts/utilities/ post-monorepo;
+# bare 'from supabase_rest' worked pre-monorepo but the file's now at
+# data-pipeline/utils/supabase_rest.py.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "data-pipeline"))
+import _bootstrap  # noqa: F401
+
+from data_pipeline.utils.supabase_rest import SupabaseRest
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")

@@ -249,8 +249,13 @@ def process_single_game_json(raw_json, game_id):
             if 'last_event_category' in df_shots.columns and 'last_event_category_encoded' not in df_shots.columns:
                 from sklearn.preprocessing import LabelEncoder
                 if LAST_EVENT_CATEGORY_ENCODER is not None:
+                    # 'OTHER' is the encoder's known catch-all label (assigned at line 1330 +
+                    # 2816 of data_acquisition.py for typeCodes not in the legacy mapping
+                    # table). 'unknown' is NOT in the encoder's training vocabulary —
+                    # passing it raises sklearn ValueError("y contains previously unseen
+                    # labels: 'unkno'"). Caught by 6a pilot 2026-05-07.
                     df_shots['last_event_category_encoded'] = LAST_EVENT_CATEGORY_ENCODER.transform(
-                        df_shots['last_event_category'].fillna('unknown').astype(str)
+                        df_shots['last_event_category'].fillna('OTHER').astype(str)
                     )
                 else:
                     le = LabelEncoder()

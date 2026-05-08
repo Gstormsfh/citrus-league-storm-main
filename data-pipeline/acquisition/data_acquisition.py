@@ -208,39 +208,49 @@ def parse_time_to_seconds(time_str):
     except (ValueError, IndexError):
         return 0
 
-def calculate_time_difference(prev_play, current_play, max_period=3):
+def calculate_time_difference(prev_play, current_play, max_period=3, max_seconds=60):
     """
     Calculate time difference between two plays in seconds.
     Returns: time difference in seconds, or None if plays are in different periods
-    or time cannot be calculated.
-    
+    or time cannot be calculated or exceeds the max_seconds cap.
+
     Note: timeInPeriod counts UP from 00:00, so later plays have higher values.
     If prev_play is at 16:07 and current_play is at 16:16, that's 9 seconds later.
+
+    The max_seconds parameter caps the lookup window. Default 60s is for
+    rebound detection (rebounds happen within ~60s of the original shot). For
+    other lookups (faceoff context, last-event context), pass a larger
+    max_seconds appropriate to the semantic — e.g. max_seconds=180 for the
+    faceoff lookup since possessions routinely last 30-180s after a faceoff.
+
+    Callers as of 2026-05-07 (Phase 0 / 0d-pre Bug E):
+      - Rebound detection (line ~1130): uses default 60s
+      - Faceoff lookup (line ~1408 + line ~2991): passes max_seconds=180
     """
     prev_period = prev_play.get('periodDescriptor', {}).get('number', 0)
     curr_period = current_play.get('periodDescriptor', {}).get('number', 0)
-    
+
     # If different periods, not a rebound (too much time passed)
     if prev_period != curr_period:
         return None
-    
+
     prev_time = prev_play.get('timeInPeriod', '')
     curr_time = current_play.get('timeInPeriod', '')
-    
+
     prev_seconds = parse_time_to_seconds(prev_time)
     curr_seconds = parse_time_to_seconds(curr_time)
-    
+
     if prev_seconds is None or curr_seconds is None or prev_seconds == 0 or curr_seconds == 0:
         return None
-    
+
     # Time difference: current play happens AFTER previous play
     # So current time should be greater than previous time
     # Example: 16:07 -> 16:16 = 9 seconds
     time_diff = curr_seconds - prev_seconds
-    
+
     # If negative, previous play happened after current (shouldn't happen in sorted order)
-    # If too large (> 60 seconds), probably not a rebound
-    if time_diff < 0 or time_diff > 60:
+    # If too large (> max_seconds), the gap is outside what the caller cares about
+    if time_diff < 0 or time_diff > max_seconds:
         return None
     
     return time_diff
@@ -1012,7 +1022,21 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
     try:
         # Initialize tracking variables (same as scrape_pbp_and_process)
         previous_play = None
-        previous_plays = []
+        # ─── TWO BUFFERS WITH DISTINCT PURPOSES — DO NOT MERGE ────────────────
+        # previous_plays: SHOT-ONLY buffer (typeCodes 505/506/507).
+        #   Used by find_pass_before_shot() and pass-context derivation logic.
+        #   The shot-only filter is intentional — pass detection looks back over
+        #   recent shots to find rebound/secondary-shot opportunities. Adding
+        #   non-shot events to this buffer breaks pass detection.
+        # previous_all_plays: ALL EVENT TYPES (faceoffs, hits, giveaways, etc.).
+        #   Used by faceoff lookup, last-event-category derivation, hit-context
+        #   lookups. New 2026-05-07 (Phase 0 / 0d-pre Bug C) — without it, the
+        #   faceoff lookup at line ~1406 was iterating a buffer that could
+        #   never satisfy `typeCode == 502` because previous_plays only ever
+        #   contained shot events.
+        # ──────────────────────────────────────────────────────────────────────
+        previous_plays = []          # shot-only — DO NOT add non-shot events
+        previous_all_plays = []      # all event types — used by faceoff/last-event lookups
         powerplay_start_times = {}
         last_event_state = {
             'time_in_seconds': None,
@@ -1021,21 +1045,28 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
             'type_code': None,
             'period': None
         }
-        
+
         # Process all plays in the game (extract logic from lines 1031-2219)
         for play in raw_data.get('plays', []):
             type_code = play.get('typeCode')
             details = play.get('details', {})
-            
+
+            # All-events buffer: track every play regardless of type so the
+            # faceoff/last-event lookups downstream can find non-shot events.
+            # Cap at 30 entries (~5 plays/faceoff × 6 plays of safety).
+            previous_all_plays.append(play)
+            if len(previous_all_plays) > 30:
+                previous_all_plays.pop(0)
+
             # Get current event coordinates and time
             current_x = details.get('xCoord') if details else None
             current_y = details.get('yCoord') if details else None
             current_time_in_period = play.get('timeInPeriod', '')
             current_period = play.get('periodDescriptor', {}).get('number')
             current_time_seconds = parse_time_to_seconds(current_time_in_period)
-            
+
             is_shot_event = type_code in [505, 506, 507]
-            
+
             if not is_shot_event:
                 # Update state for non-shot events
                 if current_x is not None and current_y is not None and current_time_seconds is not None:
@@ -1403,9 +1434,13 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                     pass
             
             time_since_faceoff = None
-            for prev_play in reversed(previous_plays[-20:]):
+            # Faceoff lookup uses previous_all_plays (the all-events buffer) because
+            # previous_plays is shot-only and can never contain a faceoff event.
+            # max_seconds=180 because possessions routinely last 30-180s after a
+            # faceoff; the default 60s cap from rebound-detection is too tight here.
+            for prev_play in reversed(previous_all_plays):
                 if prev_play.get('typeCode') == 502:  # 502 = faceoff in modern api-web.nhle.com
-                    time_since_faceoff = calculate_time_difference(prev_play, play)
+                    time_since_faceoff = calculate_time_difference(prev_play, play, max_seconds=180)
                     break
             
             # Team context
@@ -1696,6 +1731,23 @@ def _save_shots_to_database(df_shots, db_client, game_id):
         # Prepare raw_shots records (same structure as scrape_pbp_and_process)
         raw_shots_records = []
         for idx, row in df_shots.iterrows():
+            # ─── IMPORTANT: explicit column enumeration — silent-loss risk ───
+            # This dict explicitly lists every column to write. Adding a new
+            # column upstream (in _extract_shots_from_game) WITHOUT also adding
+            # it here results in silent data loss — the value is computed but
+            # never written to the database.
+            #
+            # The 36 TOI columns + time_difference_since_change +
+            # average_rest_difference were silently dropped this way until
+            # 2026-05-07 (Phase 0 / 0d-pre Bug D). Added inline below.
+            #
+            # Architectural cleanup deferred to v1.5: replace this manual
+            # enumeration with df_shots.to_dict('records') or programmatic
+            # column copy with type coercion. See
+            # apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md § 12.
+            # Until that lands, every column added upstream MUST also be
+            # added here AND added to the nullable_fields list below.
+            # ────────────────────────────────────────────────────────────────
             record = {
                 'game_id': int(row['game_id']),
                 'player_id': int(row['playerId']),
@@ -1756,6 +1808,55 @@ def _save_shots_to_database(df_shots, db_client, game_id):
                 'time_in_period': str(row['time_in_period']) if pd.notna(row.get('time_in_period')) else None,
                 'time_remaining_seconds': int(row['time_remaining_seconds']) if pd.notna(row.get('time_remaining_seconds')) else None,
                 'time_since_faceoff': float(row['time_since_faceoff']) if pd.notna(row.get('time_since_faceoff')) else None,
+                # ─── 36 TOI proxy columns (added 2026-05-07, Phase 0 / 0d-pre Bug D) ───
+                # All 36 derive from the same time_since_faceoff value via
+                # calculate_toi_features_proxy. v1.5 will replace with real
+                # shift-derived per-player TOI. See GAPS § 9.
+                'shooter_time_on_ice': float(row['shooter_time_on_ice']) if pd.notna(row.get('shooter_time_on_ice')) else None,
+                'shooter_time_on_ice_since_faceoff': float(row['shooter_time_on_ice_since_faceoff']) if pd.notna(row.get('shooter_time_on_ice_since_faceoff')) else None,
+                'shooting_team_average_time_on_ice': float(row['shooting_team_average_time_on_ice']) if pd.notna(row.get('shooting_team_average_time_on_ice')) else None,
+                'shooting_team_max_time_on_ice': float(row['shooting_team_max_time_on_ice']) if pd.notna(row.get('shooting_team_max_time_on_ice')) else None,
+                'shooting_team_min_time_on_ice': float(row['shooting_team_min_time_on_ice']) if pd.notna(row.get('shooting_team_min_time_on_ice')) else None,
+                'shooting_team_average_time_on_ice_of_forwards': float(row['shooting_team_average_time_on_ice_of_forwards']) if pd.notna(row.get('shooting_team_average_time_on_ice_of_forwards')) else None,
+                'shooting_team_max_time_on_ice_of_forwards': float(row['shooting_team_max_time_on_ice_of_forwards']) if pd.notna(row.get('shooting_team_max_time_on_ice_of_forwards')) else None,
+                'shooting_team_min_time_on_ice_of_forwards': float(row['shooting_team_min_time_on_ice_of_forwards']) if pd.notna(row.get('shooting_team_min_time_on_ice_of_forwards')) else None,
+                'shooting_team_average_time_on_ice_of_defencemen': float(row['shooting_team_average_time_on_ice_of_defencemen']) if pd.notna(row.get('shooting_team_average_time_on_ice_of_defencemen')) else None,
+                'shooting_team_max_time_on_ice_of_defencemen': float(row['shooting_team_max_time_on_ice_of_defencemen']) if pd.notna(row.get('shooting_team_max_time_on_ice_of_defencemen')) else None,
+                'shooting_team_min_time_on_ice_of_defencemen': float(row['shooting_team_min_time_on_ice_of_defencemen']) if pd.notna(row.get('shooting_team_min_time_on_ice_of_defencemen')) else None,
+                'shooting_team_average_time_on_ice_since_faceoff': float(row['shooting_team_average_time_on_ice_since_faceoff']) if pd.notna(row.get('shooting_team_average_time_on_ice_since_faceoff')) else None,
+                'shooting_team_max_time_on_ice_since_faceoff': float(row['shooting_team_max_time_on_ice_since_faceoff']) if pd.notna(row.get('shooting_team_max_time_on_ice_since_faceoff')) else None,
+                'shooting_team_min_time_on_ice_since_faceoff': float(row['shooting_team_min_time_on_ice_since_faceoff']) if pd.notna(row.get('shooting_team_min_time_on_ice_since_faceoff')) else None,
+                'shooting_team_average_time_on_ice_of_forwards_since_faceoff': float(row['shooting_team_average_time_on_ice_of_forwards_since_faceoff']) if pd.notna(row.get('shooting_team_average_time_on_ice_of_forwards_since_faceoff')) else None,
+                'shooting_team_max_time_on_ice_of_forwards_since_faceoff': float(row['shooting_team_max_time_on_ice_of_forwards_since_faceoff']) if pd.notna(row.get('shooting_team_max_time_on_ice_of_forwards_since_faceoff')) else None,
+                'shooting_team_min_time_on_ice_of_forwards_since_faceoff': float(row['shooting_team_min_time_on_ice_of_forwards_since_faceoff']) if pd.notna(row.get('shooting_team_min_time_on_ice_of_forwards_since_faceoff')) else None,
+                'shooting_team_average_time_on_ice_of_defencemen_since_faceoff': float(row['shooting_team_average_time_on_ice_of_defencemen_since_faceoff']) if pd.notna(row.get('shooting_team_average_time_on_ice_of_defencemen_since_faceoff')) else None,
+                'shooting_team_max_time_on_ice_of_defencemen_since_faceoff': float(row['shooting_team_max_time_on_ice_of_defencemen_since_faceoff']) if pd.notna(row.get('shooting_team_max_time_on_ice_of_defencemen_since_faceoff')) else None,
+                'shooting_team_min_time_on_ice_of_defencemen_since_faceoff': float(row['shooting_team_min_time_on_ice_of_defencemen_since_faceoff']) if pd.notna(row.get('shooting_team_min_time_on_ice_of_defencemen_since_faceoff')) else None,
+                'defending_team_average_time_on_ice': float(row['defending_team_average_time_on_ice']) if pd.notna(row.get('defending_team_average_time_on_ice')) else None,
+                'defending_team_max_time_on_ice': float(row['defending_team_max_time_on_ice']) if pd.notna(row.get('defending_team_max_time_on_ice')) else None,
+                'defending_team_min_time_on_ice': float(row['defending_team_min_time_on_ice']) if pd.notna(row.get('defending_team_min_time_on_ice')) else None,
+                'defending_team_average_time_on_ice_of_forwards': float(row['defending_team_average_time_on_ice_of_forwards']) if pd.notna(row.get('defending_team_average_time_on_ice_of_forwards')) else None,
+                'defending_team_max_time_on_ice_of_forwards': float(row['defending_team_max_time_on_ice_of_forwards']) if pd.notna(row.get('defending_team_max_time_on_ice_of_forwards')) else None,
+                'defending_team_min_time_on_ice_of_forwards': float(row['defending_team_min_time_on_ice_of_forwards']) if pd.notna(row.get('defending_team_min_time_on_ice_of_forwards')) else None,
+                'defending_team_average_time_on_ice_of_defencemen': float(row['defending_team_average_time_on_ice_of_defencemen']) if pd.notna(row.get('defending_team_average_time_on_ice_of_defencemen')) else None,
+                'defending_team_max_time_on_ice_of_defencemen': float(row['defending_team_max_time_on_ice_of_defencemen']) if pd.notna(row.get('defending_team_max_time_on_ice_of_defencemen')) else None,
+                'defending_team_min_time_on_ice_of_defencemen': float(row['defending_team_min_time_on_ice_of_defencemen']) if pd.notna(row.get('defending_team_min_time_on_ice_of_defencemen')) else None,
+                'defending_team_average_time_on_ice_since_faceoff': float(row['defending_team_average_time_on_ice_since_faceoff']) if pd.notna(row.get('defending_team_average_time_on_ice_since_faceoff')) else None,
+                'defending_team_max_time_on_ice_since_faceoff': float(row['defending_team_max_time_on_ice_since_faceoff']) if pd.notna(row.get('defending_team_max_time_on_ice_since_faceoff')) else None,
+                'defending_team_min_time_on_ice_since_faceoff': float(row['defending_team_min_time_on_ice_since_faceoff']) if pd.notna(row.get('defending_team_min_time_on_ice_since_faceoff')) else None,
+                'defending_team_average_time_on_ice_of_forwards_since_faceoff': float(row['defending_team_average_time_on_ice_of_forwards_since_faceoff']) if pd.notna(row.get('defending_team_average_time_on_ice_of_forwards_since_faceoff')) else None,
+                'defending_team_max_time_on_ice_of_forwards_since_faceoff': float(row['defending_team_max_time_on_ice_of_forwards_since_faceoff']) if pd.notna(row.get('defending_team_max_time_on_ice_of_forwards_since_faceoff')) else None,
+                'defending_team_min_time_on_ice_of_forwards_since_faceoff': float(row['defending_team_min_time_on_ice_of_forwards_since_faceoff']) if pd.notna(row.get('defending_team_min_time_on_ice_of_forwards_since_faceoff')) else None,
+                # Rest difference features (also part of TOI cascade)
+                'time_difference_since_change': float(row['time_difference_since_change']) if pd.notna(row.get('time_difference_since_change')) else None,
+                'average_rest_difference': float(row['average_rest_difference']) if pd.notna(row.get('average_rest_difference')) else None,
+                # Other columns also caught by Bug D diff (extracted but never saved).
+                # Note: is_slot_shot and shot_result are extracted upstream but
+                # NOT in the raw_shots schema — intentionally omitted here.
+                'shot_angle_adjusted': float(row['shot_angle_adjusted']) if pd.notna(row.get('shot_angle_adjusted')) else None,
+                'home_empty_net': bool(row.get('home_empty_net', 0)) if pd.notna(row.get('home_empty_net')) else False,
+                'away_empty_net': bool(row.get('away_empty_net', 0)) if pd.notna(row.get('away_empty_net')) else False,
+                # ─── end Bug D additions ───
                 'team_code': str(row['team_code']) if pd.notna(row.get('team_code')) else None,
                 'shooting_team_code': str(row['shooting_team_code']) if pd.notna(row.get('shooting_team_code')) else None,
                 'defending_team_code': str(row['defending_team_code']) if pd.notna(row.get('defending_team_code')) else None,
@@ -1804,9 +1905,9 @@ def _save_shots_to_database(df_shots, db_client, game_id):
                 'shot_angle_plus_rebound_speed': float(row['shot_angle_plus_rebound_speed']) if pd.notna(row.get('shot_angle_plus_rebound_speed')) else None,
             }
             # Remove None values except for nullable fields
-            nullable_fields = ['passer_id', 'pass_x', 'pass_y', 'pass_lateral_distance', 'pass_to_net_distance', 
-                             'pass_zone', 'pass_immediacy_score', 'goalie_movement_score', 'pass_quality_score', 
-                             'time_before_shot', 'pass_angle', 'xa_value', 'pass_zone_encoded', 
+            nullable_fields = ['passer_id', 'pass_x', 'pass_y', 'pass_lateral_distance', 'pass_to_net_distance',
+                             'pass_zone', 'pass_immediacy_score', 'goalie_movement_score', 'pass_quality_score',
+                             'time_before_shot', 'pass_angle', 'xa_value', 'pass_zone_encoded',
                              'normalized_lateral_distance', 'zone_relative_distance', 'score_differential',
                              'expected_rebound_probability', 'expected_goals_of_expected_rebounds',
                              'shooting_talent_adjusted_xg', 'shooting_talent_multiplier', 'created_expected_goals',
@@ -1822,7 +1923,22 @@ def _save_shots_to_database(df_shots, db_client, game_id):
                              'away_team_abbrev', 'away_sog', 'home_sog', 'shot_type_raw', 'miss_reason',
                              'last_event_shot_angle', 'last_event_shot_distance', 'player_num_that_did_last_event',
                              'arena_adjusted_x', 'arena_adjusted_y', 'arena_adjusted_x_abs', 'arena_adjusted_y_abs',
-                             'arena_adjusted_shot_distance', 'shot_angle_plus_rebound', 'shot_angle_plus_rebound_speed']
+                             'arena_adjusted_shot_distance', 'shot_angle_plus_rebound', 'shot_angle_plus_rebound_speed',
+                             # ─── Bug D additions 2026-05-07 (TOI cascade + miscellaneous) ───
+                             'shooter_time_on_ice', 'shooter_time_on_ice_since_faceoff',
+                             'shooting_team_average_time_on_ice', 'shooting_team_max_time_on_ice', 'shooting_team_min_time_on_ice',
+                             'shooting_team_average_time_on_ice_of_forwards', 'shooting_team_max_time_on_ice_of_forwards', 'shooting_team_min_time_on_ice_of_forwards',
+                             'shooting_team_average_time_on_ice_of_defencemen', 'shooting_team_max_time_on_ice_of_defencemen', 'shooting_team_min_time_on_ice_of_defencemen',
+                             'shooting_team_average_time_on_ice_since_faceoff', 'shooting_team_max_time_on_ice_since_faceoff', 'shooting_team_min_time_on_ice_since_faceoff',
+                             'shooting_team_average_time_on_ice_of_forwards_since_faceoff', 'shooting_team_max_time_on_ice_of_forwards_since_faceoff', 'shooting_team_min_time_on_ice_of_forwards_since_faceoff',
+                             'shooting_team_average_time_on_ice_of_defencemen_since_faceoff', 'shooting_team_max_time_on_ice_of_defencemen_since_faceoff', 'shooting_team_min_time_on_ice_of_defencemen_since_faceoff',
+                             'defending_team_average_time_on_ice', 'defending_team_max_time_on_ice', 'defending_team_min_time_on_ice',
+                             'defending_team_average_time_on_ice_of_forwards', 'defending_team_max_time_on_ice_of_forwards', 'defending_team_min_time_on_ice_of_forwards',
+                             'defending_team_average_time_on_ice_of_defencemen', 'defending_team_max_time_on_ice_of_defencemen', 'defending_team_min_time_on_ice_of_defencemen',
+                             'defending_team_average_time_on_ice_since_faceoff', 'defending_team_max_time_on_ice_since_faceoff', 'defending_team_min_time_on_ice_since_faceoff',
+                             'defending_team_average_time_on_ice_of_forwards_since_faceoff', 'defending_team_max_time_on_ice_of_forwards_since_faceoff', 'defending_team_min_time_on_ice_of_forwards_since_faceoff',
+                             'time_difference_since_change', 'average_rest_difference',
+                             'shot_angle_adjusted']
             record = {k: v for k, v in record.items() if v is not None or k in nullable_fields}
             raw_shots_records.append(record)
         
@@ -2984,10 +3100,12 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                         pass
                 
                 # Time since faceoff (find last faceoff)
+                # max_seconds=180 because possessions routinely last 30-180s after
+                # a faceoff; default 60s from rebound-detection is too tight (Bug E).
                 time_since_faceoff = None
                 for prev_play in reversed(previous_plays[-20:]):  # Look back 20 plays
                     if prev_play.get('typeCode') == 502:  # 502 = faceoff in modern api-web.nhle.com (was 503 pre-EDGE rewrite)
-                        time_since_faceoff = calculate_time_difference(prev_play, play)
+                        time_since_faceoff = calculate_time_difference(prev_play, play, max_seconds=180)
                         break
                 
                 # TEAM CONTEXT

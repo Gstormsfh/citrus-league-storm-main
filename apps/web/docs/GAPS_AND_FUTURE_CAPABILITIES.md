@@ -176,7 +176,14 @@ After Phase 0 closes. This one is closer to the active roadmap than to "deferred
 
 **Capability:** replace the `time_since_faceoff` proxy used in `data_acquisition.py:calculate_toi_features_proxy` with actual shift-derived per-player TOI computed by joining `player_shifts_official` against shot timestamps. Yields true `shooter_time_on_ice`, `shooting_team_average_time_on_ice`, distinct values per player on the ice (not the same proxy value collapsed across all 36 TOI columns).
 
-**Why deferred (2026-05-07):** the v1 fix in 0d-pre #2 unlocks the proxy values from "always NULL" to "populated proxy" via the typeCode 502 fix. That gets us *something* honest in the columns. But it's still a proxy — every player on ice is reported with the same `time_since_faceoff` value, and the column names imply per-player accuracy that the data doesn't have.
+**Why deferred (2026-05-07):** the v1 fix sequence in 0d-pre #2 + Bug B/C/D/E unlocks the proxy values from "always NULL" to "populated proxy" — typeCode 502 lookup correctly resolved against an all-events buffer, save function preserves the cascade, 180-second window covers extended possessions. That gets us *something* honest in the columns. But it's still a proxy — every player on ice is reported with the same `time_since_faceoff` value, and the column names imply per-player accuracy that the data doesn't have.
+
+**Residual ~5% NULL after Bug E fix:** even with `max_seconds=180`, ~5% of shots will remain NULL for legitimate reasons:
+  - Period-start shots before the period's opening faceoff is in the buffer
+  - Extended power-play possessions exceeding 180s (rare but happens)
+  - Period-spanning sequences where the faceoff is in a prior period (`calculate_time_difference` returns None for cross-period lookups by design — different game state)
+
+The v1.5 shift-derived approach would close that gap (a player's TOI in the current shift is well-defined regardless of how long the possession has lasted or whether a faceoff is recent), but requires the `player_shifts_official` join work below.
 
 The real version requires:
 
@@ -255,7 +262,35 @@ The encoder is a categorical-one-hot transformer. Adding new categories (e.g., c
 
 ---
 
-## §11. CV-extracted on-ice formations + tactics
+## §11. Save function fragility — `_save_shots_to_database` manual column enumeration
+
+**Capability:** robust, drift-resistant write path from extraction to `raw_shots`.
+
+**Current state (audited 2026-05-07 during 6a pilot debug):** `_save_shots_to_database` in `data-pipeline/acquisition/data_acquisition.py` manually enumerates every column to write — currently ~114 explicit `'col': ...` entries in the record dict. Adding a new column upstream (in `_extract_shots_from_game`) without also adding it here causes **silent data loss** — the value is computed but never written to the database.
+
+**How it broke:** between extraction and save, 38 columns were silently dropped (the entire 36-column TOI cascade + `time_difference_since_change` + `average_rest_difference` + 5 misc). Caught only because Phase 0 / 0d-pre #2's typeCode fix surfaced the cascade and the 6a pilot validated end-to-end.
+
+**Why deferred:** the immediate Bug D fix (commit `[fixed in 6a-v3]`) added the missing columns inline. The architectural fix would replace the manual enumeration with one of:
+
+1. **`df_shots.to_dict('records')`** — write all DataFrame columns directly. Simplest. Drawback: less explicit type coercion; need a separate type-coercion pass.
+2. **Programmatic column copy** — iterate `df_shots.columns` and apply per-column type coercion via a registry (`int_cols`, `float_cols`, `bool_cols`, `str_cols`). More expressive than option 1; preserves the type-safety the current code provides.
+3. **Schema-introspecting writer** — query `information_schema.columns` for `raw_shots` once at startup, build the type map automatically, write only columns that exist in the schema. Most robust; catches the missing-column case at write time instead of silently dropping.
+
+### Unlock path
+
+**One path: build internally.** No external dependency. Cost: 1-2 days for option 2 (recommended) or option 3.
+
+### Strategic trigger to revisit
+
+**Post-Phase-0 cleanup, before any feature work that adds new shot-level columns.** The current state — explicit enumeration with a strong "MUST update" comment — is acceptable for the duration of Phase 0 since no new columns are being added. The first feature that adds a new `raw_shots` column triggers this cleanup.
+
+### Why it survived this long
+
+The xG v3 model only uses ~31 of the ~114 raw_shots columns. As long as those 31 are in the save dict (they are), model output is correct. The missing TOI columns weren't surfaced until R7-2 baseline checks looked at NULL rates across all columns 2026-05-07. This is the system working as designed: monitoring caught the silent drift.
+
+---
+
+## §12. CV-extracted on-ice formations + tactics
 
 **Capability:** classify shifts by tactical pattern (1-3-1 PP, 2-2-1 forecheck, etc.) using CV on broadcast video. Powers coach-tier tactical intelligence.
 
@@ -271,7 +306,7 @@ When the user base is professional / coach-tier. Pre-launch fantasy doesn't need
 
 ---
 
-## §12. Bookkeeping summary
+## §13. Bookkeeping summary
 
 | § | Capability | Status | Cheapest unlock | Trigger to revisit |
 |---|---|---|---|---|
@@ -285,11 +320,12 @@ When the user base is professional / coach-tier. Pre-launch fantasy doesn't need
 | 8 | Per-shot goalie probability | engineering gap, post-Phase-0 | build internally | After Phase 0 closes |
 | 9 | Real per-player TOI from shifts | engineering gap, post-Phase-0 | build internally (~1-2 weeks) | After 0c, bundled with xG v4 retrain |
 | 10 | Legacy `last_event_category` labels | engineering gap; retrain-coupled | full retrain pipeline (~1-2 days) | Post-0c, bundled with xG v4 retrain |
-| 11 | CV-extracted tactics | deferred | internal CV pipeline | Coach-tier user base |
+| 11 | Save function fragility (`_save_shots_to_database` manual enum) | engineering gap | programmatic column copy + type registry (~1-2 days) | Before any feature work that adds new shot-level columns |
+| 12 | CV-extracted tactics | deferred | internal CV pipeline | Coach-tier user base |
 
 ---
 
-## §13. Document maintenance
+## §14. Document maintenance
 
 Add a row here when:
 - A capability moves from active roadmap to deferred
