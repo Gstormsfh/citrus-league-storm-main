@@ -21,6 +21,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Loader2, Send, RotateCcw, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { MascotAvatar } from '@/components/citrus2';
@@ -31,6 +38,7 @@ import {
   type StormyMessage,
 } from '@/services/StormyService';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
+import { leagueApi } from '@/api/leagues';
 
 interface ChatMessage {
   id: string;
@@ -90,7 +98,16 @@ export default function StormyDemo() {
   const userId = auth?.user?.id;
   const [searchParams] = useSearchParams();
 
-  const leagueId = searchParams.get('leagueId') || DEMO_LEAGUE_ID_FOR_GUESTS;
+  // The user can override via ?leagueId=... in the URL. Otherwise we
+  // auto-pick one of their own leagues (so the roster context actually
+  // loads), falling back to the public demo league if they don't own
+  // any. The selected league is reactive so the in-page dropdown can
+  // switch between leagues without a navigation.
+  const overrideLeagueId = searchParams.get('leagueId');
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string>(
+    overrideLeagueId || DEMO_LEAGUE_ID_FOR_GUESTS,
+  );
+  const [userLeagues, setUserLeagues] = useState<Array<{ id: string; name: string }>>([]);
 
   const initialGreeting =
     "Hey! I'm Stormy — your AI Assistant GM. I'm plugged into your roster, matchup, scoring, and the latest xG model. Ask me anything about start/sit, free agents, trades, or your matchup outlook.";
@@ -110,25 +127,68 @@ export default function StormyDemo() {
   const ctxRef = useRef<Partial<StormyContext> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Load the user's actual leagues once. If they have any, default the
+  // selection to the first one (so context loads correctly) instead of
+  // sticking with the public demo league which they don't own.
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
     (async () => {
       try {
-        const ctx = await fetchLeagueContext(leagueId, userId);
+        const res = await leagueApi.getUserLeagues();
+        if (cancelled) return;
+        const list = ((res?.data ?? []) as Array<{ id: string; name?: string }>)
+          .filter((l) => l?.id)
+          .map((l) => ({ id: l.id, name: l.name ?? 'League' }));
+        setUserLeagues(list);
+        // If no ?leagueId override and the user owns at least one league,
+        // auto-switch to their first league so we don't get the empty-
+        // context experience on the public demo.
+        if (!overrideLeagueId && list.length > 0) {
+          setSelectedLeagueId(list[0].id);
+        }
+      } catch {
+        // If listing fails we just stay on the demo default.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, overrideLeagueId]);
+
+  // Re-fetch context whenever the selected league changes.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    setContextLoaded(false);
+    setContextError(null);
+    ctxRef.current = null;
+    (async () => {
+      try {
+        const ctx = await fetchLeagueContext(selectedLeagueId, userId);
         if (cancelled) return;
         ctxRef.current = ctx;
+        // If the lookup didn't find a team for this user (no ownership),
+        // surface that explicitly — otherwise Stormy answers based on
+        // empty context which is what produced "without seeing your full
+        // roster status…" replies.
+        if (!ctx.teamName && !ctx.rosterSummary) {
+          setContextError(
+            "Couldn't find your team in this league — pick one of your own leagues from the dropdown above for full roster context.",
+          );
+        }
         setContextLoaded(true);
       } catch (err) {
         if (!cancelled) {
           setContextError(err instanceof Error ? err.message : 'Failed to load league');
+          setContextLoaded(true);
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [leagueId, userId]);
+  }, [selectedLeagueId, userId]);
 
   // Auto-scroll on new messages.
   useEffect(() => {
@@ -262,6 +322,43 @@ export default function StormyDemo() {
               New chat
             </Button>
           </div>
+
+          {/* League picker — visible only when the user owns at least one
+              league, so they can swap between leagues for different demos
+              without leaving the page. The public demo league is appended
+              as a fallback option. */}
+          {userLeagues.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] sm:text-xs font-jbmono uppercase tracking-[0.22em] text-white/45 shrink-0">
+                League
+              </span>
+              <Select
+                value={selectedLeagueId}
+                onValueChange={(v) => {
+                  apiHistoryRef.current = [];
+                  setSelectedLeagueId(v);
+                  setMessages([
+                    { id: 'switch-' + Date.now(), text: initialGreeting, sender: 'stormy', timestamp: new Date() },
+                  ]);
+                  setPresetsExpanded(true);
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {userLeagues.map((l) => (
+                    <SelectItem key={l.id} value={l.id} className="text-xs">
+                      {l.name}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={DEMO_LEAGUE_ID_FOR_GUESTS} className="text-xs">
+                    Public demo league
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {contextError && (
             <Card className="border-red-400/40">
