@@ -70,6 +70,7 @@ const PlayoffBracket = lazyWithErrorHandling(() => import("./pages/PlayoffBracke
 const FreeAgents = lazyWithErrorHandling(() => import("./pages/FreeAgents"));
 const GMOffice = lazyWithErrorHandling(() => import("./pages/GMOffice"));
 const StormyAssistant = lazyWithErrorHandling(() => import("./pages/StormyAssistant"));
+const StormyDemo = lazyWithErrorHandling(() => import("./pages/StormyDemo"));
 const News = lazyWithErrorHandling(() => import("./pages/News"));
 const DraftRoom = lazyWithErrorHandling(() => import("./pages/DraftRoom"));
 const Profile = lazyWithErrorHandling(() => import("./pages/Profile"));
@@ -187,6 +188,7 @@ const App = () => {
                 <Route path="/free-agents" element={<ErrorBoundary><FreeAgents /></ErrorBoundary>} />
                 <Route path="/gm-office" element={<ProtectedRoute><ErrorBoundary><GMOffice /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office/stormy" element={<ProtectedRoute><ErrorBoundary><StormyAssistant /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/gm-office/stormy-demo" element={<ProtectedRoute><ErrorBoundary><StormyDemo /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/news" element={<News />} />
                 <Route path="/draft-room" element={<ProtectedRoute><ErrorBoundary><DraftRoom /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/draft" element={<ProtectedRoute><ErrorBoundary><DraftRoom /></ErrorBoundary></ProtectedRoute>} /> {/* Fallback route */}
