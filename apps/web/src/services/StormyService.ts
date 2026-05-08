@@ -124,6 +124,130 @@ class StormyServiceImpl {
     }
   }
 
+  /**
+   * Streaming variant of sendMessage. Token-by-token rendering instead of
+   * a 5–8 second silent wait followed by a wall of text. Calls onDelta
+   * for each `text_delta` chunk Anthropic sends. Returns the final
+   * accumulated response when the stream closes.
+   *
+   * Uses raw fetch instead of supabase.functions.invoke() because the
+   * supabase JS client buffers the entire response before resolving,
+   * which defeats the point of streaming.
+   */
+  async sendMessageStream(
+    message: string,
+    history: StormyMessage[],
+    context: StormyContext | undefined,
+    onDelta: (textChunk: string) => void,
+  ): Promise<StormyResponse> {
+    try {
+      // Auth + guest throttle (mirrors sendMessage)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        this.guestMessageCount++;
+        if (this.guestMessageCount > StormyServiceImpl.GUEST_LIMIT) {
+          return {
+            response: "",
+            error:
+              "Want more from Stormy? Sign up for a free account to get 3 questions per matchup week!",
+          };
+        }
+      }
+
+      const contextString = context
+        ? StormyServiceImpl.buildContextString(context)
+        : "";
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+      if (!supabaseUrl || !supabaseAnon) {
+        return { response: "", error: "Stormy is not configured." };
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token ?? supabaseAnon;
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/stormy-chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          apikey: supabaseAnon,
+        },
+        body: JSON.stringify({
+          message,
+          conversationHistory: history.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          context: contextString,
+        }),
+      });
+
+      // Error response: 429 (rate-limited), 500 (server), etc come back as JSON.
+      const contentType = res.headers.get("content-type") || "";
+      if (!res.ok || contentType.includes("application/json")) {
+        try {
+          const body = await res.json();
+          return { response: "", error: body?.error || `Stormy error (${res.status})` };
+        } catch {
+          return { response: "", error: `Stormy error (${res.status})` };
+        }
+      }
+
+      if (!res.body) {
+        return { response: "", error: "Stormy returned empty stream." };
+      }
+
+      // Parse Anthropic's SSE stream and surface each text_delta to the caller.
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullText = "";
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          // SSE events are separated by blank lines. Within an event, the
+          // payload line starts with "data: ". Anthropic emits one JSON
+          // object per data line. Process complete lines; keep the partial
+          // last line for the next chunk.
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const raw of lines) {
+            const line = raw.trim();
+            if (!line.startsWith("data:")) continue;
+            const payload = line.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+            try {
+              const evt = JSON.parse(payload);
+              if (evt?.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+                const t = String(evt.delta.text ?? "");
+                if (t) {
+                  fullText += t;
+                  onDelta(t);
+                }
+              }
+            } catch {
+              // Skip malformed events; keep streaming.
+            }
+          }
+        }
+      } finally {
+        try { reader.releaseLock(); } catch { /* ignore */ }
+      }
+
+      return { response: fullText };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong.";
+      return { response: "", error: msg };
+    }
+  }
+
   static buildContextString(ctx: StormyContext): string {
     const lines: string[] = [];
 
