@@ -339,8 +339,8 @@ serve(async (req) => {
     }
     messages.push({ role: "user", content: message.substring(0, 1000) });
 
-    // ── Call Claude API ────────────────────────────────────────
-    console.log(`Stormy: ${CLAUDE_MODEL} | ${messages.length} msgs | ctx ${context ? Math.min(context.length, 8000) : 0} chars`);
+    // ── Call Claude API (streaming) ────────────────────────────
+    console.log(`Stormy: ${CLAUDE_MODEL} | ${messages.length} msgs | ctx ${context ? Math.min(context.length, 8000) : 0} chars | streaming`);
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -354,6 +354,7 @@ serve(async (req) => {
         max_tokens: MAX_RESPONSE_TOKENS,
         system: systemPrompt,
         messages,
+        stream: true,
       }),
     });
 
@@ -363,21 +364,58 @@ serve(async (req) => {
       throw new Error(`AI service error (${response.status}). Try again in a moment.`);
     }
 
-    const data = await response.json();
-    const aiResponse = data.content?.[0]?.text ?? "Sorry, I couldn't generate a response.";
-    const inputTokens = data.usage?.input_tokens ?? 0;
-    const outputTokens = data.usage?.output_tokens ?? 0;
-    const tokensUsed = inputTokens + outputTokens;
-
-    // ── Log usage ──────────────────────────────────────────────
-    if (user && supabaseServiceKey) {
-      const svc = createClient(supabaseUrl, supabaseServiceKey);
-      logUsage(svc, user.id, tokensUsed, message);
+    if (!response.body) {
+      throw new Error("Claude returned empty stream body");
     }
 
-    return makeJsonResponse({
-      response: aiResponse,
-      usage: { weeklyLimit: WEEKLY_MESSAGE_LIMIT, inputTokens, outputTokens },
+    // Forward Anthropic's SSE stream to the client AS chunks arrive — that's
+    // the whole point of streaming. We also peek at chunks to extract token
+    // counts (carried in message_start input_tokens + message_delta usage)
+    // so we can log usage after the stream ends, without buffering the
+    // entire response.
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let leftover = ""; // bytes that arrive split mid-line
+    const decoder = new TextDecoder();
+    const userId = user?.id ?? null;
+
+    const transform = new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        controller.enqueue(chunk); // forward unchanged
+        // Best-effort token extraction. Failures here just skip logging.
+        try {
+          const text = leftover + decoder.decode(chunk, { stream: true });
+          const lines = text.split("\n");
+          leftover = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6);
+            if (!data || data === "[DONE]") continue;
+            const evt = JSON.parse(data);
+            if (evt?.message?.usage?.input_tokens != null) {
+              inputTokens = evt.message.usage.input_tokens;
+            }
+            if (evt?.usage?.output_tokens != null) {
+              outputTokens = evt.usage.output_tokens;
+            }
+          }
+        } catch { /* malformed chunk — keep streaming, just skip parsing */ }
+      },
+      flush() {
+        if (userId && supabaseServiceKey) {
+          const svc = createClient(supabaseUrl, supabaseServiceKey);
+          // Fire and forget — logUsage already swallows its own errors.
+          logUsage(svc, userId, inputTokens + outputTokens, message);
+        }
+      },
+    });
+
+    return new Response(response.body.pipeThrough(transform), {
+      headers: {
+        ...requestCorsHeaders,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+      },
     });
   } catch (error) {
     console.error("Error in stormy-chat:", error);
