@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { NHL_TEAMS } from '@/types/captracker';
 import { ScoringCalculator, type ScoringSettings } from '@/utils/scoringUtils';
+import { getTodayMST } from '@/utils/timezoneUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 
@@ -203,7 +204,7 @@ export default function PoolPlayoffHub() {
         }
 
         // 2. Today's playoff games (always fetch)
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getTodayMST();
         const gamesRes = await sb
           .from('nhl_games')
           .select('game_id, game_date, game_time, home_team, away_team, home_score, away_score, status, period, period_time, series_game_number')

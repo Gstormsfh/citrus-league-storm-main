@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { getTodayMST } from '@/utils/timezoneUtils';
 
 interface Seed {
   team_id: number;
@@ -80,7 +81,7 @@ export default function PoolPlayoffConfidence() {
   useEffect(() => {
     const fetchLive = async () => {
       try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getTodayMST();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data } = await (supabase as any)
           .from('nhl_games')
