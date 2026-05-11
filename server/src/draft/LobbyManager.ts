@@ -729,6 +729,32 @@ export class LobbyManager {
   private eventsSinceLastSnapshot = 0;
 
   /**
+   * Highest `draft_events.seq` value the engine has applied to its
+   * in-memory state (chunk 11g.7 sub-step 7e). Initialized to 0 at
+   * construction; updated by:
+   *   - `applySnapshot` to `snapshotRecord.lastAppliedSeq`
+   *   - `applyEventDuringBootstrap` to `event.seq` (each event,
+   *     monotonically increasing)
+   *   - `bootstrapFullEventReplay` to the seq of each replayed event
+   *   - Runtime emission paths (`processSubmitPick`, `processNominate`,
+   *     `processPlaceBid`, `processPauseAuction`, `processResumeAuction`,
+   *     `processCommissionerOverride`, `fireAutoSkipEvent`,
+   *     `handleNominationTimeout`'s close, `fireAutoNominateAction`,
+   *     and the snake/linear `pauseDraft`/`resumeDraft`/`extendDraft`)
+   *     update this cursor to the seq returned by their RPC.
+   *   - `processExternalEvent` (the cross-process NOTIFY apply path)
+   *     updates this cursor to the seq of the event it just applied.
+   *
+   * **Used by `processExternalEvent` for dedup**: NOTIFY notifications
+   * for seq `<= lastAppliedSeq` short-circuit without re-applying.
+   * This dedups the engine's own emitted events (which fire NOTIFY
+   * via the `draft_events_notify_after_insert` trigger from migration
+   * `20260511000000_draft_events_notify.sql`) that bounce back to its
+   * own LISTEN subscription.
+   */
+  private lastAppliedSeq = 0;
+
+  /**
    * Cadence configuration (env-overridable for tests + tuning).
    * Tests typically pass `0` for `intervalMs` to disable the
    * periodic timer and trigger snapshots manually via
@@ -2078,6 +2104,20 @@ export class LobbyManager {
   private appendEventAndCount(event: BufferedDraftEvent): void {
     this.events.append(event);
     this.eventsSinceLastSnapshot++;
+    // Chunk 11g.7 sub-step 7e: every runtime emission path that
+    // appends to the ring buffer is one that just successfully wrote
+    // a `draft_events` row. Advance the dedup cursor here so external
+    // NOTIFY bounces for the same seq short-circuit in
+    // `processExternalEvent`. Single source of truth — runtime paths
+    // (`processSubmitPick`, `processNominate`, `processPlaceBid` with
+    // its possible double-event extend-timer case, `processPauseAuction`,
+    // `processResumeAuction`, `processCommissionerOverride`,
+    // `fireAutoSkipEvent`, `handleNominationTimeout` close,
+    // `fireAutoNominateAction`) all funnel through here without
+    // needing per-callsite updates.
+    if (event.seq > this.lastAppliedSeq) {
+      this.lastAppliedSeq = event.seq;
+    }
     if (
       this.snapshotEventMilestone > 0 &&
       this.eventsSinceLastSnapshot >= this.snapshotEventMilestone
@@ -2413,6 +2453,11 @@ export class LobbyManager {
     this.pauseState = engineState.pauseState;
     this.eventsSinceLastSnapshot = engineState.eventsSinceLastSnapshot;
 
+    // Chunk 11g.7 sub-step 7e: seed the dedup cursor from the
+    // snapshot. Subsequent delta-event apply via
+    // `applyEventDuringBootstrap` will advance it further.
+    this.lastAppliedSeq = record.lastAppliedSeq;
+
     // Hydrate the ring buffer from the snapshot's recentEvents.
     // These are already in the engine's wire-shape; append directly
     // (NOT appendEventAndCount — replay shouldn't increment the
@@ -2431,6 +2476,16 @@ export class LobbyManager {
    * (those are full-replay's diagnostic concern).
    */
   private applyEventDuringBootstrap(event: DraftEventRow): void {
+    // Chunk 11g.7 sub-step 7e: advance the dedup cursor monotonically
+    // so the LISTEN/NOTIFY path can dedup against bootstrap-applied
+    // events. Events arrive in seq order from the durable log; this
+    // assignment effectively becomes `this.lastAppliedSeq = event.seq`
+    // but using max() defends against any future caller that replays
+    // out-of-order (e.g., a chunk-7e cross-process apply path
+    // re-entering this method through the queue).
+    if (event.seq > this.lastAppliedSeq) {
+      this.lastAppliedSeq = event.seq;
+    }
     switch (event.event_type) {
       case 'pick':
         this.applyPickEvent(event);
@@ -4463,6 +4518,145 @@ export class LobbyManager {
     this.queue = next;
     this.cacheIdempotencyResult(params.idempotencyKey, next);
     return next;
+  }
+
+  /**
+   * Apply an externally-authored draft event (chunk 11g.7 sub-step 7e).
+   *
+   * Entry point for the LISTEN/NOTIFY subscription dispatch — when a
+   * `draft_events` row is committed by ANOTHER process (e.g.,
+   * commissioner UI → main API server → `draft_pause` RPC), Postgres
+   * fires `pg_notify('draft_events', {league_id, seq})` via the
+   * `draft_events_notify_after_insert` trigger from migration
+   * `20260511000000_draft_events_notify.sql`. The engine's
+   * `eventSubscription.ts` LISTEN client receives the notification,
+   * looks up this lobby via `LobbyRegistry.get(leagueId)`, and calls
+   * this method.
+   *
+   * Routes through the single-writer queue so the apply serializes
+   * with any in-flight engine-authored actions (preserves the chunk
+   * 11g.4 step 2 / ADR-002 §3.5 race-free invariant). Dedup against
+   * own-engine emissions is handled inside `processExternalEvent`
+   * via the `lastAppliedSeq` cursor — when the engine itself fires
+   * an RPC, the resulting NOTIFY bounces back to its own subscription
+   * and `seq <= this.lastAppliedSeq` short-circuits the apply.
+   *
+   * Returns a Promise that resolves when the apply has been processed
+   * (or dedup-skipped). Subscription dispatcher does NOT await beyond
+   * enqueue — `void` is acceptable at the call site.
+   */
+  enqueueExternalEvent(seq: number): Promise<void> {
+    if (!this.initialized) {
+      // External events arriving before init() complete are rare but
+      // possible (engine startup race: subscription connects before
+      // lobbies bootstrap). Skip — bootstrap will read the same event
+      // via snapshot+delta or full-replay paths anyway. Debug-only;
+      // not alert-worthy.
+      structuredLogger.debug(
+        `[lobby] enqueueExternalEvent before init — skipped lobbyId=${this.lobbyId} seq=${seq}`,
+      );
+      return Promise.resolve();
+    }
+
+    const next = this.queue
+      .then(() => this.processExternalEvent(seq))
+      .catch((err: unknown) => {
+        structuredLogger.error(
+          'event_subscription.process_external_event_failed',
+          { lobbyId: this.lobbyId, seq },
+          err,
+        );
+      });
+    this.queue = next;
+    return next;
+  }
+
+  /**
+   * Queue-routed body for external event apply. Dedups against
+   * already-applied events via `lastAppliedSeq`, fetches the event
+   * from `draft_events` by seq, dispatches to the canonical
+   * `applyEventDuringBootstrap` handler (chunk 11g.6 sub-step 6b
+   * canonical-replay principle).
+   *
+   * Fetches via `listDraftEvents(leagueId, sinceSeq=this.lastAppliedSeq)`
+   * which returns ALL events with seq > lastAppliedSeq, not just the
+   * single seq we received. This handles the rare "engine missed a
+   * notification" case (e.g., LISTEN reconnect window) where the
+   * NOTIFY arrives for seq N but the engine hasn't seen seq N-1 yet —
+   * we apply both in order. Each applied event advances
+   * `lastAppliedSeq` via the per-apply cursor update in
+   * `applyEventDuringBootstrap`.
+   */
+  private async processExternalEvent(seq: number): Promise<void> {
+    // Dedup gate: own-engine NOTIFY bounces or duplicate notifications.
+    if (seq <= this.lastAppliedSeq) {
+      structuredLogger.debug('event_subscription.event_skipped_duplicate', {
+        lobbyId: this.lobbyId,
+        seq,
+        lastAppliedSeq: this.lastAppliedSeq,
+      });
+      return;
+    }
+
+    let events: DraftEventRow[];
+    try {
+      events = await this.draftService.listDraftEvents(
+        this.leagueId,
+        this.lastAppliedSeq,
+      );
+    } catch (err) {
+      structuredLogger.error(
+        'event_subscription.fetch_failed',
+        { lobbyId: this.lobbyId, seq, sinceSeq: this.lastAppliedSeq },
+        err,
+      );
+      return;
+    }
+
+    if (events.length === 0) {
+      // Race: NOTIFY arrived but the event isn't yet visible to our
+      // read. Postgres NOTIFY delivery + read visibility are both
+      // post-commit, but on rare occasions the snapshot read may
+      // pre-date the commit. The next NOTIFY for a higher seq will
+      // re-trigger and fetch this event as part of its delta.
+      structuredLogger.debug('event_subscription.event_not_yet_visible', {
+        lobbyId: this.lobbyId,
+        seq,
+        lastAppliedSeq: this.lastAppliedSeq,
+      });
+      return;
+    }
+
+    for (const event of events) {
+      // Defensive: re-check the dedup gate per-event in case multiple
+      // notifications interleaved and a prior iteration advanced
+      // lastAppliedSeq past this event's seq.
+      if (event.seq <= this.lastAppliedSeq) {
+        continue;
+      }
+      try {
+        this.applyEventDuringBootstrap(event);
+        structuredLogger.debug('event_subscription.event_applied', {
+          lobbyId: this.lobbyId,
+          seq: event.seq,
+          eventType: event.event_type,
+        });
+      } catch (err) {
+        structuredLogger.error(
+          'event_subscription.apply_failed',
+          {
+            lobbyId: this.lobbyId,
+            seq: event.seq,
+            eventType: event.event_type,
+          },
+          err,
+        );
+        // Abort the loop on apply failure — subsequent events depend
+        // on the failed one's state mutations and would propagate
+        // corruption.
+        return;
+      }
+    }
   }
 
   private async processCommissionerOverride(params: {

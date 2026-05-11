@@ -46,3 +46,16 @@ if (!process.env.HEARTBEAT_PING_INTERVAL_MS) {
 if (!process.env.HEARTBEAT_PONG_TIMEOUT_MS) {
   process.env.HEARTBEAT_PONG_TIMEOUT_MS = '0';
 }
+
+// Chunk 11g.7 sub-step 7e — disable the LISTEN/NOTIFY event
+// subscription in tests by default. The engine entry point at
+// `server/src/draft/index.ts` checks this env and skips
+// `startEventSubscription` when set to `'1'`. Tests that exercise
+// the subscription explicitly (e.g., `eventSubscription.test.ts`'s
+// pure-function tests + lifecycle tests with mock pg clients) bypass
+// the engine entry point entirely; tests that need real pg LISTEN
+// (cross-process integration — out of scope for 7e, belongs to
+// chunk 11g.10/11g.11 staging tests) would override this per-test.
+if (!process.env.EVENT_SUBSCRIPTION_DISABLED) {
+  process.env.EVENT_SUBSCRIPTION_DISABLED = '1';
+}

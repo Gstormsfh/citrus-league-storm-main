@@ -5207,4 +5207,120 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     expect(result).toBeInstanceOf(Promise);
     await expect(result).resolves.toBeUndefined();
   });
+
+  // ── Chunk 11g.7 sub-step 7e: external event dispatch + dedup ──
+
+  it('7e enqueueExternalEvent dedups by seq when own-engine emission already advanced the cursor', async () => {
+    // Engine fires a pick; appendEventAndCount advances lastAppliedSeq
+    // to the seq returned by submitPick (the mock returns seq=1).
+    // NOTIFY bounce for seq=1 → dedup gate short-circuits.
+    const listDraftEvents = vi.fn(async () => [] as DraftEventRow[]);
+    const lobby = await makeLobby({ listDraftEvents });
+    await lobby.enqueueAction(makeSubmitPick());
+    // Reset the listDraftEvents call count so we can assert it
+    // does NOT get called for the dedup-skipped external event.
+    listDraftEvents.mockClear();
+    await lobby.enqueueExternalEvent(1);
+    expect(listDraftEvents).not.toHaveBeenCalled();
+  });
+
+  it('7e enqueueExternalEvent fetches via listDraftEvents(sinceSeq=lastAppliedSeq) and applies', async () => {
+    // Construct a draftOrder so the pick event payload validates
+    // against expected team/slot mapping.
+    const teamIds = ['team-1', 'team-2', 'team-3'];
+    const draftOrder: DraftOrderSlot[] = generateDraftOrder(teamIds, 3, 'snake');
+    const firstSlot = draftOrder[0];
+    const externalEvent: DraftEventRow = {
+      id: 5,
+      league_id: 'league-1',
+      seq: 5,
+      event_type: 'pick',
+      payload: {
+        team_id: firstSlot.teamId,
+        pick_number: firstSlot.pickNumber,
+        round: firstSlot.round,
+        player_id: 42,
+      },
+      payload_hash: '',
+      idempotency_key: null,
+      actor: { kind: 'user', id: 'u-1', session_id: 's-1' },
+      correlation_id: null,
+      created_at: new Date().toISOString(),
+    } as DraftEventRow;
+    const listDraftEvents = vi.fn(async () => [externalEvent]);
+    const lobby = await makeLobby({ listDraftEvents, draftOrder });
+    // Lobby starts with lastAppliedSeq=0; external seq=5 should pass
+    // dedup gate, trigger listDraftEvents(sinceSeq=0), apply the
+    // pick event.
+    await lobby.enqueueExternalEvent(5);
+    expect(listDraftEvents).toHaveBeenCalledWith('league-1', 0);
+    expect(lobby.getCurrentState().picksMade).toBe(1);
+  });
+
+  it('7e enqueueExternalEvent before init() is a debug-log no-op', async () => {
+    // Construct a lobby but skip init(). enqueueExternalEvent should
+    // resolve to undefined without throwing or calling listDraftEvents.
+    const { lobby, listDraftEvents } = await makeUninitializedLobby();
+    await expect(lobby.enqueueExternalEvent(42)).resolves.toBeUndefined();
+    expect(listDraftEvents).not.toHaveBeenCalled();
+  });
+
+  it('7e processExternalEvent tolerates empty event list (race: NOTIFY ahead of read visibility)', async () => {
+    const listDraftEvents = vi.fn(async () => [] as DraftEventRow[]);
+    const lobby = await makeLobby({ listDraftEvents });
+    await expect(lobby.enqueueExternalEvent(42)).resolves.toBeUndefined();
+    expect(listDraftEvents).toHaveBeenCalled();
+    // No state change since no events were applied.
+    expect(lobby.getCurrentState().picksMade).toBe(0);
+  });
 });
+
+// ── Chunk 11g.7 sub-step 7e helper: uninitialized lobby ─────────────
+async function makeUninitializedLobby() {
+  const listDraftEvents = vi.fn(async () => [] as DraftEventRow[]);
+  const draftOrder: DraftOrderSlot[] = generateDraftOrder(
+    ['team-1', 'team-2', 'team-3'],
+    3,
+    'snake',
+  );
+  const draftService = {
+    submitPick: vi.fn(),
+    listDraftEvents,
+    nominatePlayer: vi.fn(),
+    placeBid: vi.fn(),
+    closeNomination: vi.fn(),
+    pauseAuction: vi.fn(),
+    resumeAuction: vi.fn(),
+    skipNomination: vi.fn(),
+    commissionerOverride: vi.fn(),
+  } as unknown as DraftServiceV2;
+  const supabase = {} as unknown as SupabaseClient;
+  const lobby = new LobbyManager({
+    lobbyId: 'lobby-uninit',
+    format: 'snake',
+    leagueId: 'league-uninit',
+    draftService,
+    publish: vi.fn(),
+    draftOrder,
+    verifyTeamAuthorization: async () => ({ authorized: true }),
+    verifyCommissionerAuthorization: async () => ({ authorized: true }),
+    supabase,
+    pickClockSeconds: 91,
+    initialPickDeadline: null,
+    initialDraftState: 'pre_draft',
+    nominationOrder: [],
+    auctionBudget: 0,
+    auctionMinBid: 0,
+    draftRounds: 0,
+    initialTeamBudgets: new Map(),
+    initialPlayersWon: new Map(),
+    initialActiveNomination: null,
+    auctionAntiSnipeThresholdSeconds: 0,
+    auctionAntiSnipeExtensionSeconds: 0,
+    auctionMinBidIncrementTiers: [{ below: Number.MAX_SAFE_INTEGER, increment: 1 }],
+    auctionBidWindowSeconds: 0,
+    auctionNominationWindowSeconds: 0,
+  });
+  // NOTE: lobby.init() deliberately NOT awaited.
+  return { lobby, listDraftEvents };
+}

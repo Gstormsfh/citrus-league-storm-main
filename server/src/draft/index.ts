@@ -74,6 +74,10 @@ import { startUwsServer, type UwsServerHandle } from './uws-server';
 import { LobbyRegistry, type LobbyConfig } from './LobbyRegistry';
 import { DraftServiceV2 } from '../services/DraftServiceV2';
 import { supabaseAdmin } from '../lib/supabase';
+import {
+  startEventSubscription,
+  type EventSubscriptionHandle,
+} from './eventSubscription';
 import type {
   CommissionerAuthorizationResult,
   DraftFormat,
@@ -560,12 +564,74 @@ startUwsServer({ port: wsPort, app: draftApp, lobbyRegistry })
     process.exit(1);
   });
 
+// ── Start cross-process event subscription (chunk 11g.7 sub-step 7e) ──
+//
+// LISTEN/NOTIFY subscription on a dedicated raw `pg.Client` connection.
+// Receives notifications written by ANY process (commissioner UI →
+// main API → RPC, or this engine's own emissions) and dispatches them
+// to in-memory lobbies via the single-writer queue. See
+// `eventSubscription.ts` for full architecture.
+//
+// `SUPABASE_DB_URL` MUST be a direct connection (not pooled —
+// pgbouncer drops LISTEN frames). The startup self-test in
+// `startEventSubscription` is the operational diagnostic that catches
+// pooled-URL misconfiguration within 5s.
+//
+// `EVENT_SUBSCRIPTION_DISABLED=1` short-circuits startup — used in
+// tests (vitest setup sets it by default) and in environments without
+// a direct DB URL configured.
+let subscriptionHandle: EventSubscriptionHandle | null = null;
+const subscriptionDisabled = process.env.EVENT_SUBSCRIPTION_DISABLED === '1';
+const dbUrl = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL;
+if (subscriptionDisabled) {
+  structuredLogger.info('event_subscription.disabled', {
+    reason: 'EVENT_SUBSCRIPTION_DISABLED=1',
+  });
+} else if (!dbUrl) {
+  structuredLogger.warn('event_subscription.skipped_no_db_url', {
+    remediation:
+      'Set SUPABASE_DB_URL (or DATABASE_URL) to a direct Postgres connection ' +
+      'to enable cross-process event delivery. Bootstrap still catches up on ' +
+      'WS reconnect; the engine will not observe runtime cross-process events ' +
+      'without this.',
+  });
+} else {
+  subscriptionHandle = startEventSubscription({
+    connectionString: dbUrl,
+    dispatch: async (notification) => {
+      // Lobby-load forbidden on NOTIFY (resource-exhaustion protection).
+      // Unknown leagueId is silently ignored to prevent the attack
+      // vector of every external event firing a lobby load. Lobbies
+      // load lazily on WS connect; bootstrap catches up via
+      // snapshot+delta from chunk 11g.7 sub-step 7c.
+      const lobby = lobbyRegistry.get(notification.leagueId);
+      if (!lobby) {
+        structuredLogger.debug(
+          'event_subscription.event_skipped_unknown_lobby',
+          { leagueId: notification.leagueId, seq: notification.seq },
+        );
+        return;
+      }
+      await lobby.enqueueExternalEvent(notification.seq);
+    },
+  });
+}
+
 // ── Graceful shutdown — closes both servers within 10s ──
 let shuttingDown = false;
 function shutdown(signal: string) {
   if (shuttingDown) return;
   shuttingDown = true;
   structuredLogger.info('shutdown.initiated', { signal });
+
+  // Chunk 11g.7 sub-step 7e: stop the LISTEN/NOTIFY subscription
+  // FIRST so no new external events fire mid-teardown. The .stop()
+  // promise is awaited inside the IIFE so honoServer.close() doesn't
+  // race against the pg client's graceful end.
+  if (subscriptionHandle) {
+    void subscriptionHandle.stop();
+    subscriptionHandle = null;
+  }
 
   if (uwsHandle) {
     // Chunk 11g.7 sub-step 7d: cancel the heartbeat soft-check timer
