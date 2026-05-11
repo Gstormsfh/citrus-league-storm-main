@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { NHL_TEAMS } from '@/types/captracker';
 import { supabase } from '@/integrations/supabase/client';
+import { getTodayMST } from '@/utils/timezoneUtils';
 
 interface Seed {
   team_id: number;
@@ -99,7 +100,7 @@ export default function PoolPlayoffBracket() {
   useEffect(() => {
     const fetchLive = async () => {
       try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getTodayMST();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data } = await (supabase as any)
           .from('nhl_games')

@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { ScoringCalculator, type ScoringSettings } from '@/utils/scoringUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+import { getTodayMST } from '@/utils/timezoneUtils';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -404,7 +405,7 @@ export default function PoolPlayoffRosterEntry() {
   useEffect(() => {
     const fetchTodayGames = async () => {
       try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getTodayMST();
         const { data, error } = await (supabase as any)
           .from('nhl_games')
           .select('game_id, game_date, game_time, home_team, away_team, home_score, away_score, status, period, period_time, series_game_number')
