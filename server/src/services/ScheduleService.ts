@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS } from '@citrus/shared';
+import { COLUMNS, getTodayMST } from '@citrus/shared';
 
 /**
  * ScheduleService — Server-side NHL schedule queries with DI Supabase client.
@@ -80,7 +80,7 @@ export class ScheduleService {
   /** Get next game for a specific team from today forward */
   async getNextGameForTeam(teamAbbrev: string) {
     const team = teamAbbrev.toUpperCase();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayMST();
 
     const { data, error } = await this.supabase
       .from('nhl_games')
@@ -161,7 +161,7 @@ export class ScheduleService {
   /** Get remaining games in a week for a team */
   async getGamesRemainingInWeek(teamAbbrev: string, weekStart: string, weekEnd: string) {
     const team = teamAbbrev.toUpperCase();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayMST();
 
     const { data } = await this.supabase
       .from('nhl_games')

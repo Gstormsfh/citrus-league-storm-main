@@ -7,7 +7,7 @@ import { createUserClient, supabaseAdmin } from '../lib/supabase';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, okPaginated, fail, handleError } from '../lib/responses';
-import { COLUMNS } from '@citrus/shared';
+import { COLUMNS, getTodayMST } from '@citrus/shared';
 
 const adminRoutes = new Hono<Env>();
 
@@ -148,7 +148,7 @@ adminRoutes.post('/recalculate-scores', validateBody(schemas.adminRecalculateSco
       .update({ is_locked: true, locked_at: new Date().toISOString() })
       .eq('league_id', leagueId)
       .eq('is_locked', false)
-      .lt('roster_date', new Date().toISOString().split('T')[0])
+      .lt('roster_date', getTodayMST())
       .select('player_id');
 
     // Step 2: Recalculate matchup scores via RPC

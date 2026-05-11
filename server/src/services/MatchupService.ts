@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, CURRENT_SEASON, logger } from '@citrus/shared';
+import { COLUMNS, CURRENT_SEASON, logger, getTodayMST } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 
 /**
@@ -541,7 +541,7 @@ export class MatchupService {
       is_locked: boolean;
     }> = [];
     const slotAssignments = finalLineup.slot_assignments || {};
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayMST();
 
     const addRows = (playerIds: number[] | string[], slotType: string, useSlot: boolean) => {
       for (const pid of playerIds || []) {
