@@ -1750,6 +1750,10 @@ def _save_shots_to_database(df_shots, db_client, game_id):
             # ────────────────────────────────────────────────────────────────
             record = {
                 'game_id': int(row['game_id']),
+                # season derived from NHL game_id encoding (first 4 digits = season start year).
+                # Set inline at extraction time so the DELETE+UPSERT retrofit doesn't reintroduce
+                # NULL season after the 0d-pre #3 backfill migration runs (caught during 6c, 2026-05-12).
+                'season': int(int(row['game_id']) / 1000000),
                 'player_id': int(row['playerId']),
                 'passer_id': int(row['passer_id']) if pd.notna(row['passer_id']) and row['passer_id'] is not None else None,
                 'shot_x': float(row['shot_x']),
