@@ -1,4 +1,4 @@
-# Phase 4.5 — Persistent Node Draft Engine in Existing Server (Chunks 11g.0–11g.10)
+# Phase 4.5 — Persistent Node Draft Engine in Existing Server (Chunks 11g.0–11g.11)
 
 > **2026-04-29 update:** deploy target changed from Cloud Run to GCE. See `docs/PHASE_4_5_ARCHITECTURE.md` for the canonical architecture; `CLAUDE.md` for high-level rationale; ADR-001 supersession note for the decision trail. Inline references in this plan have been updated to match. Chunk 11g.2 has been reshaped for the GCE pivot and a new chunk 11g.2.0 (GCE platform spike) added before it; other chunks stand as-written.
 
@@ -8,7 +8,7 @@
 | **Authority** | `docs/adr/ADR-001-persistent-node-draft-engine.md` (the architectural decision: persistent code inside the existing Node.js / Hono server on GCE, with `uWebSockets.js` as the live WebSocket layer; Edge Functions removed entirely); `docs/PHASE_4_5_ARCHITECTURE.md` (canonical architecture reference for the deploy topology); `CLAUDE.md` § Citrus Draft Performance Mandate (binding performance targets). |
 | **Predecessor** | Phase 4 closeout, with autopick latency ~11.7s/pick measured on staging — non-competitive per the Mandate. |
 | **Successor** | Phase 5 (UI client work) is **blocked** until chunk 11g.10 sign-off. |
-| **Estimated solo-founder timeline** | Chunks 11g.0–11g.10 ≈ 3–5 weeks of solo-founder work assisted by Claude Code, including cushion for unknowns. No new language or runtime; the engine ships inside the existing server. |
+| **Estimated solo-founder timeline** | Chunks 11g.0–11g.11 ≈ 4–6 weeks of solo-founder work assisted by Claude Code, including cushion for unknowns. No new language or runtime; the engine ships inside the existing server. |
 
 ## Working discipline (carried forward from Phase 0–4)
 
@@ -366,52 +366,60 @@ Chunk 11g.2 step 5 surfaced that container logs were not reaching Cloud Logging 
 
 ---
 
-### Chunk 11g.8 — Failure mode test suite
+### Chunk 11g.8 — Remove pgmq emissions from writer-side RPCs *(re-scoped 2026-05-11)*
 
-**Deliverable.** Six failure-mode integration tests covering the brief's scenarios. Each test runs against a real staging GCE deploy (or a local server with the same wiring), seeds fixtures, asserts behavior end-to-end. Scenarios:
+> **Re-scope note.** The original chunk 11g.8 ("Failure mode test suite") moved to chunk 11g.11 — it's load-test-adjacent work that exercises the engine under conditions only meaningful once observability + legacy cleanup are done. Doing failure-mode tests pre-cleanup would mean writing tests against an architecture that still has dead pgmq plumbing in it. The natural sequencing is: legacy cleanup (now-11g.8/11g.9) → production rollout (11g.10) → load test + failure mode tests (11g.11). The new 11g.8 + 11g.9 split partitions the legacy autopick infrastructure cleanup into writer-side (this chunk) and consumer-side (11g.9). See `PHASE_4_5_PROJECT_PLAN.md` Decision Log 2026-05-11 for the reorganization rationale.
 
-1. **Process crash mid-draft** — kill the Node process during an active draft (5 picks committed, 2 clients connected). Expected: clients see WS disconnect, server restarts, lobby bootstraps from snapshot + replay (chunk 11g.7), clients reconnect with `last_seen_seq` (chunk 11g.5), draft continues. No picks lost, no duplicates.
-2. **Client reconnect after network drop** — drop a single client's WS connection mid-draft (TCP close). Expected: client reconnects, replays missed events from ring buffer (chunk 11g.5). No effect on other clients. Reconnection p95 ≤ 2000ms.
-3. **Duplicate pick submission with idempotency keys** — client A submits the same pick twice (same idempotency key, e.g. retry after a flaky network). Expected: second submission returns `{ was_duplicate: true }`, no second `draft_events` row, no second broadcast.
-4. **Two users racing on the clock** — clients A and B both submit picks within the same single-writer-queue tick. Expected: one wins (commits + broadcasts), the other receives a typed "not on clock" rejection without committing.
-5. **Slow client** — one client's WS has `getBufferedAmount() > 1MB` (simulated by withholding ACKs). Expected: chunk 11g.4's fanout protection skips the slow socket on subsequent broadcasts; the slow client is flagged for resync; other clients receive picks at normal latency.
-6. **Deploy during active draft (drain mode)** — GCE rolling restart (process receives SIGTERM, drains, exits; new process boots) while a draft is mid-clock. Expected: old process flushes its single-writer queue and commits in-flight mutations before exit; new process bootstraps the lobby from snapshot + replay (chunk 11g.7); clients reconnect via 11g.5. Draft continues without operator intervention. *(See `docs/PHASE_4_5_ARCHITECTURE.md` "Failure Modes Handled on Day 1" and "Day 1 Topology" for the canonical drain semantics on GCE.)*
+**Deliverable.** Remove every `PERFORM pgmq.send(...)` call from every Postgres RPC. The persistent draft engine (chunk 11g.4 step 6c) fires autopicks via in-memory `setTimeout` timers + direct `submit_pick_v2` invocation; the pgmq emission is a side effect nothing in the engine observes. This chunk removes the writer wiring; chunk 11g.9 (next) removes the consumer + tables + extension.
 
-**Dependencies.** 11g.5, 11g.6, 11g.7.
+Single migration `supabase/migrations/20260511010000_remove_pgmq_emissions.sql` `CREATE OR REPLACE`s four RPCs:
+
+- **`submit_pick_v2`** — removed Step 5's `v_send_delay` computation + `PERFORM pgmq.send` block (was 20260425140000:904-923). Engine reads `result.pick_deadline` from the RPC return and runs its own in-memory timer.
+- **`draft_resume`** — removed the trailing pgmq emit block (was 20260511000000:376-396). `generation_bumped` event-write **retained** (Option B: defer protocol removal to 11g.9).
+- **`draft_extend`** — removed the trailing pgmq emit block (was 20260511000000:528-548). `generation_bumped` retained.
+- **`draft_deadline_sweep`** — removed inner `PERFORM pgmq.send` (was 20260426130000:140-150). The function's predicate walk + `safety_net_hit` metric write are preserved; the function itself + its pg_cron job are removed in chunk 11g.9.
+
+Each RPC's other behavior is preserved: idempotency, actor authorization, atomicity contracts, the chunk 11g.7 sub-step 7e `draft_events_notify_after_insert` trigger (which fires on the durable INSERT, NOT on pgmq emission — unaffected by this change).
+
+**Dependencies.** 11g.7 (the live-event subscription path replaces pgmq as the cross-process notification mechanism).
 
 **Acceptance criteria.**
-- All six tests pass on staging. Each test produces a structured log artifact (committed alongside the test) showing the timeline of events for review.
-- Each test asserts both the happy outcome AND the absence of a failure mode (e.g., scenario 3 also asserts that `draft_events` has exactly one row, not zero or two).
-- Mandate targets continue to hold under each scenario where they apply (e.g., scenario 2 asserts reconnection p95 ≤ 2000ms; scenario 4 asserts manual pick latency under contention p95 ≤ 300ms).
+- `git grep -n "pgmq.send" supabase/migrations/20260511010000_remove_pgmq_emissions.sql` returns zero hits in the *new* migration body (sanity check that the removal is complete).
+- `grep "PERFORM pgmq.send" supabase/migrations/*.sql | wc -l` returns the count BEFORE this migration; after applying, the four CREATE OR REPLACE statements supersede the older bodies.
+- All 874 server tests stay green (no test references pgmq behavior, recon-verified).
+- Engine flows continue to function — autopick paths work end-to-end against staging without any pgmq involvement.
 
-**Performance targets.**
-- All Mandate targets continue to hold under each scenario where they apply.
+**Performance targets.** None (subtractive chunk).
 
-**Estimated effort.** 4–5 days. Scenario 6 is the trickiest — needs the GCE rolling-restart / SIGTERM-drain mechanism documented and a drain-mode hook on the engine (chunk should design this).
+**Estimated effort.** ~0.5 days. Migration-only commit; no engine code changes, no test additions.
 
 ---
 
-### Chunk 11g.9 — Edge Function infrastructure removal
+### Chunk 11g.9 — Edge Function infrastructure removal *(expanded 2026-05-11)*
 
-**Deliverable.** Once chunks 11g.1–11g.8 are deployed and verified on staging, this chunk deletes the Phase 0–4 Edge Function infrastructure entirely. Specifically:
+**Deliverable.** Once chunk 11g.8's pgmq emissions are removed and chunk 11g.7 sub-step 7e's LISTEN/NOTIFY path is the canonical cross-process notification mechanism, this chunk deletes the Phase 0–4 Edge Function infrastructure entirely. Specifically:
 
-- Delete `supabase/functions/draft-autopick/` (the Deno autopick worker).
+- Delete `supabase/functions/draft-autopick/` (the Deno autopick worker — pgmq consumer).
 - Drop the pg_cron jobs `draft-deadline-sweep` and `draft-autopick-keepalive` via a new migration in `supabase/migrations/`.
 - Drop the pgmq queue `draft_deadlines` and its archive table via the same migration.
+- Drop the pgmq wrapper RPCs `draft_autopick_read` and `draft_autopick_archive` (from `20260426140000_draft_engine_v2_phase3_pgmq_wrappers.sql`).
+- Drop the `pgmq` extension itself (no remaining consumers after the above).
+- Drop the `draft_deadline_sweep()` function (its writer-side emission was already a no-op after 11g.8; the function + its cron job both go).
+- **(Expanded scope 2026-05-11):** Remove the `generation_bumped` event-write protocol. Drop `'generation_bumped'` from the `draft_events.event_type` CHECK enum. Remove the two `PERFORM append_draft_event(... 'generation_bumped' ...)` calls from `draft_pause` / `draft_resume` / `draft_extend` (per chunk 11g.8 Option B — protocol cleanup deferred to 11g.9 alongside the rest of the pgmq teardown). Remove the bootstrap dispatcher's `default: skip-with-debug-log` arm OR keep it as a defensive forward-compat catch (decision in 11g.9 recon).
 - Delete `supabase/functions/_shared/_vendored/` (no second runtime needs vendored shared code; the in-server engine imports `@citrus/shared` natively).
 - Remove the SQL `_v2_test._uuidv5` cross-runtime parity helper and the corresponding TypeScript test fixture — there is no second runtime to compare against.
 - `git grep` audit confirms zero remaining references to deleted surfaces in shipped code (test fixtures, comments, runbooks). Stale references either get updated or get deleted.
 
 The chunk also closes the runbook entries: **KI-007** (vendored shared code drift) flips to `RESOLVED (chunk 11g.9 commit-sha, date)`. **KI-004** (Phase 3 keep-alive cron's hardcoded staging URL) is annotated `SUPERSEDED by chunk 11g.9 — surface deleted` with the same commit SHA.
 
-**Dependencies.** 11g.6 (the in-server autopick path must be the primary path before the Edge Function is removed), 11g.8 (the failure-mode test suite must pass without the Edge Function as a fallback).
+**Dependencies.** 11g.8 (pgmq emissions removed — necessary precondition; deleting the queue while any RPC still emits to it would break those RPCs).
 
 **Acceptance criteria.**
 - `git ls-files supabase/functions/draft-autopick/` returns 0 files.
 - `git ls-files supabase/functions/_shared/_vendored/` returns 0 files.
-- `git grep -n "_vendored\|draft-deadline-sweep\|draft-autopick-keepalive\|draft_deadlines"` returns no references in shipped code (matches in `docs/RUNBOOKS/draft-engine-v2-known-issues.md` and migration history are expected and acceptable).
+- `git grep -n "_vendored\|draft-deadline-sweep\|draft-autopick-keepalive\|draft_deadlines\|generation_bumped"` returns no references in shipped code (matches in `docs/RUNBOOKS/draft-engine-v2-known-issues.md` and migration history are expected and acceptable).
 - The removal migration applies cleanly on staging and is idempotent (re-running is a no-op).
-- The chunk 11g.8 test suite re-runs after the deletion and all six scenarios still pass — confirming the Edge Function was already not on the critical path.
+- The chunk 11g.11 failure-mode test suite (relocated from former 11g.8) re-runs after the deletion and all six scenarios still pass — confirming the Edge Function was already not on the critical path.
 - KI-007 row in `docs/RUNBOOKS/draft-engine-v2-known-issues.md` carries `RESOLVED (commit-sha, date)`. KI-004 row similarly annotated.
 
 **Performance targets.** None (subtractive chunk).
@@ -450,6 +458,35 @@ A code-comment audit (`git grep "KI-010 Tier 1"`) produces the four expected hit
 **Performance targets.** The full Mandate set, end-to-end, on the deployed GCE server.
 
 **Estimated effort.** 3–5 days. Includes profiling time and any targeted optimization passes that surface during the run.
+
+---
+
+### Chunk 11g.11 — Failure mode test suite + load test *(combined 2026-05-11)*
+
+> **Note.** This chunk combines the original 11g.8 "Failure mode test suite" content (relocated 2026-05-11) with the previously-net-new "load test as hard gate" tracked in `PHASE_4_5_PROJECT_PLAN.md` Decision Log (2026-04-29). Doing both together is the right sequencing — failure-mode scenarios exercise the engine under conditions only meaningful once observability + legacy cleanup + perf-baselined production are in place. Tests written pre-cleanup would have been against an architecture still carrying dead pgmq plumbing.
+
+**Deliverable.** Six failure-mode integration tests + load test against a real production-equivalent GCE deployment. Failure-mode scenarios:
+
+1. **Process crash mid-draft** — kill the Node process during an active draft (5 picks committed, 2 clients connected). Expected: clients see WS disconnect, server restarts, lobby bootstraps from snapshot + replay (chunk 11g.7), clients reconnect with `last_seen_seq` (chunk 11g.5), draft continues. No picks lost, no duplicates.
+2. **Client reconnect after network drop** — drop a single client's WS connection mid-draft (TCP close). Expected: client reconnects, replays missed events from ring buffer (chunk 11g.5). No effect on other clients. Reconnection p95 ≤ 2000ms.
+3. **Duplicate pick submission with idempotency keys** — client A submits the same pick twice (same idempotency key, e.g. retry after a flaky network). Expected: second submission returns `{ was_duplicate: true }`, no second `draft_events` row, no second broadcast.
+4. **Two users racing on the clock** — clients A and B both submit picks within the same single-writer-queue tick. Expected: one wins (commits + broadcasts), the other receives a typed "not on clock" rejection without committing.
+5. **Slow client** — one client's WS has `getBufferedAmount() > 1MB` (simulated by withholding ACKs). Expected: chunk 11g.4's fanout protection skips the slow socket on subsequent broadcasts; the slow client is flagged for resync; other clients receive picks at normal latency.
+6. **Deploy during active draft (drain mode)** — GCE rolling restart (process receives SIGTERM, drains, exits; new process boots) while a draft is mid-clock. Expected: old process flushes its single-writer queue and commits in-flight mutations before exit; new process bootstraps the lobby from snapshot + replay (chunk 11g.7); clients reconnect via 11g.5. Draft continues without operator intervention. *(See `docs/PHASE_4_5_ARCHITECTURE.md` "Failure Modes Handled on Day 1" and "Day 1 Topology" for the canonical drain semantics on GCE.)*
+
+Plus the load test (the Path B from `PHASE_4_5_ARCHITECTURE_ANSWERS.md` Q4.1): simulated peak load against a production-equivalent GCE deployment. 1,000 simulated clients across multiple concurrent leagues; verify Mandate targets continue to hold under sustained pressure; gather scale data on the snake-vs-auction broadcast cost (auction is hotter — anti-snipe cascades produce extension events per bid).
+
+**Dependencies.** 11g.10 (Performance verification — the perf baseline established there is the floor under load).
+
+**Acceptance criteria.**
+- All six failure-mode tests pass on staging. Each test produces a structured log artifact (committed alongside the test) showing the timeline of events for review.
+- Each test asserts both the happy outcome AND the absence of a failure mode (e.g., scenario 3 also asserts that `draft_events` has exactly one row, not zero or two).
+- Mandate targets continue to hold under each scenario where they apply (e.g., scenario 2 asserts reconnection p95 ≤ 2000ms; scenario 4 asserts manual pick latency under contention p95 ≤ 300ms).
+- Load test: Mandate targets hold under 1000-client sustained load for ≥ 30 minutes. Report committed alongside the chunk 11g.10 baseline.
+
+**Performance targets.** Full Mandate set holds under both single-scenario stress and sustained 1000-client load.
+
+**Estimated effort.** 5–7 days. Scenario 6 is the trickiest — needs the GCE rolling-restart / SIGTERM-drain mechanism documented and a drain-mode hook on the engine (chunk should design this). Load harness setup is real work (1–2 days alone).
 
 ---
 
