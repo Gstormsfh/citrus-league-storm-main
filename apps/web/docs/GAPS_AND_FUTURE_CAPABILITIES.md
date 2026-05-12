@@ -306,7 +306,32 @@ When the user base is professional / coach-tier. Pre-launch fantasy doesn't need
 
 ---
 
-## §13. Bookkeeping summary
+## §13. `extractor_job.py` retirement — completed 2026-05-12
+
+**Capability:** redundant `raw_nhl_data → player_game_stats` extraction pipeline.
+
+**Status:** **RETIRED 2026-05-12** during Phase 0 boxscore cleanup. Moved to `scripts/_deprecated/extractor_job.py`. The Windows scheduled task wrapper (`ops/windows/run_extractor_live.ps1`) was renamed to `DISABLED_run_extractor_live.ps1`.
+
+**Why retired:**
+
+1. **Redundant.** Live scrapers (`data-pipeline/acquisition/scrape_live_nhl_stats.py`, `scrape_per_game_nhl_stats.py`, `fetch_nhl_stats_from_landing.py`, `fetch_nhl_stats_from_landing_fast.py`) populate every `player_game_stats` column extractor_job did.
+2. **Partially buggy.** Audit 2026-05-12: extractor_job never populated `nhl_shp` — 0 / 34,800 rows across its entire production lifetime. Live scrapers correctly populate it (116 / 18,918 rows = 0.6%, plausible shorthanded-points rate). Running extractor_job on the 474 boxscore-backlog games would have **overwritten** correct live-scraper values with extractor_job's zeros.
+3. **Broken-cron disposition.** R4 reorg (2026-05-05) moved the script from repo-root to `scripts/utilities/`, but `ops/windows/run_extractor_live.ps1` referenced the old path. The Windows scheduled task has been failing silently since Feb 2026 (matches the stoppage of `stats_extracted_at` flag updates).
+4. **Cosmetic flag only.** extractor_job's only unique side effect was setting `raw_nhl_data.stats_extracted_at`. That flag is now backfilled on the 474 games via a one-time `UPDATE ... SET stats_extracted_at = NOW()` based on live-scraper presence in `player_game_stats`.
+
+**What we'd lose by retiring:** nothing of value. Live scrapers cover every column at higher fidelity.
+
+**What we gained:** simpler pipeline (one writer instead of two), no risk of future schema additions creating drift between the two writers, no risk of correct live-scraper values being overwritten by extractor_job's zeros.
+
+**Operator action item (one-time, low priority):**
+
+If you have access to the Windows machine that ran the scheduled task, remove the Task Scheduler entry that invokes `run_extractor_live.ps1`. The script rename (`DISABLED_*`) means the task will continue to fail silently on every run, which is operationally harmless but generates noise in the Windows event log. Removing the task entry cleans this up.
+
+**Re-instatement criteria:** none. If a future scrape need surfaces, build a fresh script with knowledge of the current schema rather than reviving the legacy one.
+
+---
+
+## §14. Bookkeeping summary
 
 | § | Capability | Status | Cheapest unlock | Trigger to revisit |
 |---|---|---|---|---|
@@ -322,10 +347,11 @@ When the user base is professional / coach-tier. Pre-launch fantasy doesn't need
 | 10 | Legacy `last_event_category` labels | engineering gap; retrain-coupled | full retrain pipeline (~1-2 days) | Post-0c, bundled with xG v4 retrain |
 | 11 | Save function fragility (`_save_shots_to_database` manual enum) | engineering gap | programmatic column copy + type registry (~1-2 days) | Before any feature work that adds new shot-level columns |
 | 12 | CV-extracted tactics | deferred | internal CV pipeline | Coach-tier user base |
+| 13 | `extractor_job.py` retirement | **RETIRED 2026-05-12** | (done — moved to `_deprecated/`) | Operator may want to remove the Windows scheduled task entry |
 
 ---
 
-## §14. Document maintenance
+## §15. Document maintenance
 
 Add a row here when:
 - A capability moves from active roadmap to deferred

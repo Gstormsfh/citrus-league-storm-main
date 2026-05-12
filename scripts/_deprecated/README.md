@@ -31,6 +31,12 @@ superseded it.**
 |---|---|---|
 | `delete-all-draft-data.sql` | `scripts/nuke-all-draft-data.sql` | Functionally near-identical (both DELETE from `draft_picks` + `draft_order`). The canonical `nuke-` version uses a safer `WHERE draft_status IN ('in_progress', 'completed')` clause on the `leagues` UPDATE, avoiding redundant writes to leagues already at `not_started`. Use `nuke-` for any future destructive draft cleanup. |
 
+### Redundant pipeline (retired 2026-05-12)
+
+| Script | Superseded by | Notes |
+|---|---|---|
+| `extractor_job.py` | `data-pipeline/acquisition/scrape_live_nhl_stats.py` + `data-pipeline/acquisition/scrape_per_game_nhl_stats.py` + sibling live scrapers | Phase 0 / 0d-pre Boxscore cleanup (2026-05-12) established this pipeline was redundant + partially buggy. The live scrapers populate every `player_game_stats` column extractor_job did, PLUS `nhl_shp` which extractor_job never set (0% of 34,800 rows, vs 0.6% from live scrapers — the realistic rate for shorthanded points). extractor_job's only unique effect was setting the cosmetic `raw_nhl_data.stats_extracted_at` flag, which we backfilled in a one-time `UPDATE ... SET stats_extracted_at = NOW()` on the 474 games where the live scrapers had already produced `player_game_stats` rows. The Windows scheduled task that invoked it (`ops/windows/run_extractor_live.ps1`) silently fails on every run because R4 reorg moved the script's path; the task script has been renamed `ops/windows/DISABLED_run_extractor_live.ps1` and should be removed from any Windows Task Scheduler entries. See `apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md` § 13 (extractor_job retirement). |
+
 ## When to revisit
 
 Periodic (annual?) audit of this directory:

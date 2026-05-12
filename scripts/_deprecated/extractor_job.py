@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
-# CATEGORY: ACTIVE
-# Purpose:     Stat extraction orchestrator (raw_nhl_data → player_game_stats)
-# Last active: 2026-03-01
-# Invoked:     imported by data_scraping_service.py
-# Reads:       raw_nhl_data
-# Writes:      player_game_stats
+# CATEGORY: DEPRECATED
+# Purpose:     (historical) stat extraction orchestrator (raw_nhl_data → player_game_stats)
+# Last active: 2026-05-12 (retired)
+# Superseded:  data-pipeline/acquisition/scrape_live_nhl_stats.py + scrape_per_game_nhl_stats.py
+#              + fetch_nhl_stats_from_landing.py — live scrapers populate every column this did
+#              PLUS nhl_shp (which this never set). See GAPS § 13 + scripts/_deprecated/README.md.
+# Invoked:     (none — was imported by data_scraping_service.py, no longer in active use)
+# Reads:       (deprecated)
+# Writes:      (deprecated)
 # ────────────────────────────────────────────────────────────
 """
 extractor_job.py
@@ -31,8 +34,14 @@ import time
 import datetime as dt
 from typing import Any, Dict, List, Optional, Tuple
 
+# Bootstrap data_pipeline package — file moved under scripts/utilities/ post-monorepo;
+# bare 'from supabase_rest' worked pre-monorepo when this file lived at the repo root.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "data-pipeline"))
+import _bootstrap  # noqa: F401
+
 from dotenv import load_dotenv
-from supabase_rest import SupabaseRest
+from data_pipeline.utils.supabase_rest import SupabaseRest
 import logging
 
 logger = logging.getLogger(__name__)
