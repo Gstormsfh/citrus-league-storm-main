@@ -331,7 +331,52 @@ If you have access to the Windows machine that ran the scheduled task, remove th
 
 ---
 
-## §14. Bookkeeping summary
+## §14. Defensive GAR pipeline (EVD / PPD / Penalty Component) — deferred to 0d-post
+
+**Capability:** populate `player_gar_components` defensive components — `evd_gar_per_60` (Even-Strength Defense, xGA/60 at 5v5), `ppd_gar_per_60` (Penalty-Kill Defense, xGA/60 on PK), `penalty_gar_per_60` ((penalties drawn − taken) / 60).
+
+**Current state (audited 2026-05-12):**
+
+| Component | Zero rate | Cause |
+|---|---:|---|
+| `evd_gar_per_60` | 97.9% (915 / 935 rows) | `calculate_gar_components.py:349` hardcodes `0.0` with `# TODO` |
+| `ppd_gar_per_60` | 98.3% (919 / 935 rows) | Same — line 350 |
+| `penalty_gar_per_60` | 100% (935 / 935 rows) | Same — line 353 |
+
+The script knows what it needs but ships the defensive components as stubs ("Placeholder for EVD and PPD (will be calculated when on-ice tracking is available)").
+
+**Why deferred to 0d-post:**
+
+GAR computation produces stable rates only when there's enough TOI sample size. Building defensive GAR on the **current single-season corpus** (2025-26, ~935 player-rows) would produce noisy values and force a rebuild after 0a + 0c bring 7 historical seasons online. Same "match work to phase" discipline applied to #1 (defender geometry — wait for data), #2 (typeCode — fix once, retrofit once), #6 (drain — single coordinated pass).
+
+**Unlock conditions (ALL REQUIRED before #7 can land):**
+
+1. **0a complete** — historical CSV load (786K MoneyPuck shots, 2017-18 → 2024-25)
+2. **0c complete** — PbP API replay for 7 moat features across 7 historical seasons (provides full per-shot context)
+3. **player_shifts_official multi-season backfill** — currently 2025-26 forward only; need full per-shot on-ice attribution across historical games
+
+**Implementation scope (~2-4 days post-conditions):**
+
+| Component | Approach | Effort |
+|---|---|---|
+| **EVD** | For each (player, shot) pair where the shot was taken against the player's team at 5v5: check if player was on ice via `player_shifts_official` (shift.start ≤ shot_time ≤ shift.end on same game_id); sum xG of those shots → xGA; divide by 5v5 TOI × 60 | ~2 hrs core code; the shift-overlap join is the new logic |
+| **PPD** | Parallel to EVD with situation filter (defending team on PK at shot time) | ~30 min once EVD pattern lands |
+| **Penalty Component** | Scan `raw_nhl_data.raw_json.plays` typeCode 509 penalty events; attribute to `committedByPlayerId` (taken) and `drawnByPlayerId` (drawn); compute `(drawn − taken) / TOI × 60` | ~1-2 hrs (data already there) |
+| **Pilot on single season + extend to full corpus** | Verify rate distributions are sane (≥80% non-zero, plausible variance) before extending | ~1 hr |
+| **Validation against R7-2 sentinel** | Add `player_gar_defensive_components_populated` check (parallel to existing offensive check) | ~30 min |
+
+**Validation gate (post-implementation):**
+
+- `evd_gar_per_60` ≥80% non-zero across all player-seasons
+- `ppd_gar_per_60` ≥80% non-zero among players with PK TOI > 0
+- `penalty_gar_per_60` ≥80% non-zero (most players draw or take ≥1 penalty per season)
+- Distributions match public benchmarks (HockeyViz / Evolving Hockey RAPM-style)
+
+**Strategic trigger:** post-0c, before any feature work that depends on per-player defensive impact (e.g., Defense-Quality leaderboards, lineup chemistry analytics, fantasy-pool defensive scoring).
+
+---
+
+## §15. Bookkeeping summary
 
 | § | Capability | Status | Cheapest unlock | Trigger to revisit |
 |---|---|---|---|---|
@@ -348,10 +393,11 @@ If you have access to the Windows machine that ran the scheduled task, remove th
 | 11 | Save function fragility (`_save_shots_to_database` manual enum) | engineering gap | programmatic column copy + type registry (~1-2 days) | Before any feature work that adds new shot-level columns |
 | 12 | CV-extracted tactics | deferred | internal CV pipeline | Coach-tier user base |
 | 13 | `extractor_job.py` retirement | **RETIRED 2026-05-12** | (done — moved to `_deprecated/`) | Operator may want to remove the Windows scheduled task entry |
+| 14 | Defensive GAR pipeline (EVD/PPD/Penalty) | engineering gap, deferred to 0d-post | implement on full multi-season corpus (~2-4 days) | After 0a + 0c land |
 
 ---
 
-## §15. Document maintenance
+## §16. Document maintenance
 
 Add a row here when:
 - A capability moves from active roadmap to deferred

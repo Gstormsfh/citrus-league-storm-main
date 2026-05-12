@@ -350,25 +350,32 @@ The decisions interact:
 ### Locked Phase 0 sequence
 
 ```
-0d-pre  (foundation fixes; status as of 2026-05-07)
+0d-pre  (foundation fixes — COMPLETE 2026-05-12; 5 of 5 items resolved)
    ├─ #1 [✅ DROPPED] Defender geometry capability — vestigial columns
-   │      removed; v2 unlock paths documented in GAPS_AND_FUTURE_CAPABILITIES.md § 1.
+   │      removed (commit bf8f83a); v2 unlock paths in GAPS § 1.
    │      NHL public PBP feed has no defender coordinates; deferring is the
-   │      world-class call (see HOCKEY_ANALYTICS_LANDSCAPE_2026.md § 17).
-   ├─ #2 [✅ CODE FIXED — pending #6 retrofit] Shooter shift context extraction fix
-   │      4-line typeCode modernization in data_acquisition.py (lines 1384, 2860,
-   │      2881, 2959). Mapping tables at lines 1326+2812 left intentionally with
-   │      DO-NOT-FIX guard comments — fixing them requires coordinated xG v3
-   │      retrain (see GAPS § 10). TOI columns will populate as proxy values
-   │      after #6 retrofit pass picks up corrected extraction logic.
-   ├─ #3 [✅ DONE] Season column population on raw_shots / player_shifts /
-   │      player_toi_by_situation (commit 422ffb5)
+   │      world-class call (HOCKEY_ANALYTICS_LANDSCAPE_2026.md § 17).
+   ├─ #2 [✅ FIXED via 4-bug cascade B+C+D+E] Shooter shift context
+   │      typeCode 503→502 (commit 85f216f) + Bugs B (encoder vocab), C
+   │      (buffer scope), D (save function omission), E (60s cap)
+   │      (commit 4e714f3). Mapping tables at lines 1326+2812 left
+   │      intentionally with DO-NOT-FIX guard — requires coordinated xG v3
+   │      retrain (GAPS § 10).
+   ├─ #3 [✅ DONE] Season column population (commit 422ffb5) + inline
+   │      patch in extractor save dict (6bbce8c) so future DELETE+UPSERT
+   │      doesn't re-introduce NULL season.
    ├─ #4 [✅ DONE — Item A] populate_player_directory.py one-time backfill
    ├─ #5 [✅ DONE — Item A] populate_player_directory.py daily cron
    │      (.github/workflows/refresh-player-directory.yml)
-   ├─ #6 Extraction backlog drain (~485 reg-season + 45 playoff games stuck
-   │      in raw_nhl_data; combined retrofit pass per Q1+Q2 finding 2026-05-07)
-   └─ #7 Defensive GAR pipeline fix
+   ├─ #6 [✅ DONE] Extraction backlog drain across 3 sub-phases:
+   │      6a pilot (5 games), 6b backlog drain (191 games), 6c full
+   │      retrofit (1,155 games). TSF 12% → 88% populated.
+   │      Plus B (boxscore cleanup): 474 stats_extracted_at flags
+   │      backfilled + extractor_job.py retired (cc55d7b).
+   └─ #7 [⏭️ DEFERRED to 0d-post] Defensive GAR pipeline fix
+          Requires full multi-season corpus (0a + 0c). Building on
+          single-season would mean rebuilding post-0a/0c. Documented
+          in GAPS § 14 with explicit unlock conditions + scope estimate.
        ↓
 0a  (historical CSV load — local)
    ├─ Load shots_2017.csv (119K rows, 2017-18 season) + shots_2018-2024.csv (786K rows, 7 seasons) into raw_shots
@@ -386,7 +393,15 @@ The decisions interact:
        Validate: per-season moat NULL rates flip from 100% to low %
        ↓
 0d-post  (full-corpus recomputes — local)
-   ├─ GAR recomputation against full multi-season data
+   ├─ #7 (DEFERRED FROM 0d-pre) Defensive GAR pipeline implementation:
+   │     EVD (xGA/60 at 5v5), PPD (xGA/60 on PK), Penalty Component
+   │     (drawn − taken/60). Pre-requisites: 0a + 0c complete; multi-
+   │     season player_shifts_official backfill done. See GAPS § 14
+   │     for unlock conditions + ~2-4 day implementation scope.
+   │     Validation gate: evd_gar_per_60, ppd_gar_per_60,
+   │     penalty_gar_per_60 each produce ≥80% non-zero distributions
+   │     matching public benchmarks (HockeyViz / Evolving Hockey RAPM).
+   ├─ GAR recomputation against full multi-season data (uses #7 output)
    ├─ Talent metrics recomputation
    ├─ ROS projections refresh
    └─ Validate: 14 freshness WARN tables flip to OK, model output baselines match expectations
@@ -396,6 +411,73 @@ The decisions interact:
 
 - **Item A approved with cron addition.** `populate_player_directory.py` re-run as the immediate orphan backfill (Garrett-authorized 2026-05-06); `.github/workflows/refresh-player-directory.yml` added for the daily cron going forward.
 - **Item B all 6 questions answered.** Locked above.
+
+### 0d-pre completion summary (2026-05-12)
+
+**Status: COMPLETE.** 5 of 5 0d-pre items resolved; #7 defensive GAR fix deferred to 0d-post per the unlock-condition reasoning (requires multi-season corpus from 0a + 0c).
+
+**Commits (chronological):**
+
+| Commit | What |
+|---|---|
+| `422ffb5` | 0d-pre #3 — season backfill on raw_shots / player_shifts / player_toi_by_situation |
+| `7a960cb` | Item A — player_directory orphan backfill + daily cron + Phase 0 decisions locked |
+| `bf8f83a` | 0d-pre #1 — drop vestigial defender geometry columns; document v2 unlock paths |
+| `85f216f` | 0d-pre #2 (initial) — typeCode 503 → 502 (4 of 6 fixes) |
+| `4e714f3` | 0d-pre #6 pre-fixes — Bug B (encoder vocab) + C (buffer scope) + D (save function) + E (60s cap) |
+| `7a85500` | 0d-pre #6b — backlog drain + 17 FUT-rescrape doc |
+| `6bbce8c` | 0d-pre #6c — full retrofit of 1,155 games; season inline in extractor |
+| `cc55d7b` | 0d-pre B — boxscore cleanup; extractor_job retirement; stats_extracted_at backfill |
+| `(this commit)` | 0d-pre complete — #7 deferred to 0d-post; this summary |
+
+**Bugs discovered + fixed during 0d-pre (5):**
+
+| Bug | Description | Where |
+|---|---|---|
+| A | NHL typeCode mismatch (502 = faceoff in modern api-web.nhle.com, was 503 pre-EDGE rewrite) | `data_acquisition.py` 4 sites |
+| B | sklearn encoder rejected `'unknown'` label (`fillna('unknown')` → unseen-label ValueError) | `process_xg_stats.py:253` |
+| C | `previous_plays` buffer was shot-only; faceoff lookup couldn't find typeCode 502 in it | `data_acquisition.py:_extract_shots_from_game` |
+| D | `_save_shots_to_database` manually enumerated columns; silently dropped 36 TOI columns + sibling fields | `data_acquisition.py:_save_shots_to_database` (38 columns added) |
+| E | `calculate_time_difference()` had 60s cap (correct for rebound detection, wrong for faceoff lookup at 60-180s) | `data_acquisition.py:calculate_time_difference` |
+
+**Bonus findings + addressed:**
+
+- 17 FUT/PRE games flagged in `PHASE_0_FUT_GAMES_AWAITING_RESCRAPE.md` for 0b re-scrape
+- Boxscore pipeline (`extractor_job.py`) retired to `_deprecated/` — redundant with live scrapers, had unfixed `nhl_shp` bug
+- 3 player_directory orphans backfilled (Porter Martone, Josh Samanski, Alex Bump — Item A)
+- Defender geometry vestigial columns dropped (#1)
+- Stale `stats_extracted_at` flag backfilled on 474 games (live-scraper data was already there)
+
+**GAPS_AND_FUTURE_CAPABILITIES.md entries captured during 0d-pre:**
+
+| § | Entry | Status |
+|---|---|---|
+| 1 | Positional defender geometry — v2 unlock paths | deferred |
+| 9 | Real per-player TOI from `player_shifts_official` | post-Phase-0 v1.5 |
+| 10 | Legacy `last_event_category` labels — coordinated retrain | post-0c |
+| 11 | Save function fragility (manual enum) | post-Phase-0 |
+| 13 | `extractor_job.py` retirement | DONE 2026-05-12 |
+| 14 | Defensive GAR (#7 deferred from 0d-pre) | post-0a+0c |
+
+**Validation state throughout 0d-pre:**
+
+- R7-2 baseline: 12 PASS / 0 WARN / 0 FAIL maintained across all commits (one transient FAIL caught + fixed in 6c — see `6bbce8c` body)
+- R7-3 freshness: matches `R7_3_BASELINE.md` expectations
+- No regressions on `pass_quality_score`, `arena_adjusted_*`, or other moat columns
+
+**Quantitative outcomes:**
+
+| Metric | Pre-0d-pre | Post-0d-pre | Δ |
+|---|---:|---:|---|
+| `raw_shots` row count | 99,394 | 115,113 | +15,719 (+15.8%) |
+| `time_since_faceoff` populated | 0 (0%) | 101,646 (88.2%) | +101,646 |
+| `shooter_time_on_ice` populated | 0 (0%) | 101,646 (88.2%) | +101,646 |
+| `pass_quality_score` populated | 100% | 100% | unchanged ✓ |
+| `last_event_category` populated | 99.4% | 99.3% | unchanged ✓ |
+| Games with shots | 1,162 | 1,343 | +181 |
+| Games with `processed=false` backlog | 191 | 0 | -191 |
+| Games with `stats_extracted_at IS NULL` | 491 | 16 (legitimate FUT/PRE) | -475 |
+| `player_gar_components.evd_gar` zero rate | 97.9% | 97.9% | unchanged (deferred to 0d-post) |
 
 ---
 
