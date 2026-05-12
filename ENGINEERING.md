@@ -416,6 +416,10 @@ The frontend is **~95% migrated** to the API-first architecture. All data operat
 
 11. **Legacy `services/` folder size** — 32 files remain in `apps/web/src/services/`. While most now delegate to the API client, several still contain significant business logic that duplicates server-side services. These should be thinned to pure API wrappers or removed.
 
+12. **No functional-correctness gate on migrations** — CI does not run new RPCs against staging-shape data and assert invariants on the output. A migration that compiles cleanly, references real columns, and produces structurally valid rows can still write semantically wrong values to production. The future automated migration validation gate (see §13 P3) **must run each new/altered function against staging data and check declared invariants**, not just validate DDL or syntax.
+
+   **Canonical test case for the validation gate (2026-05-12 incident):** commit 76e5468 introduced an `aggregate_player_playoff_stats[_live]` RPC that summed `primary_assists + secondary_assists` (PBP-extractor columns, populated by a lagging job) instead of `nhl_assists` (live-scraped from NHL.com). All 17 other stats correctly used `COALESCE(nhl_*, unprefixed)`; only assists slipped because `player_game_stats` has no plain `assists` column to fall back to. The RPC compiled, applied, ran without error, and silently produced `assists = 0` for every player across 3+ weeks of playoff data. A compile-check or DDL-only gate would have rubber-stamped it. A functional gate executing the RPC against staging playoff rows and asserting `SUM(goals) + SUM(assists) = SUM(points)` would have caught it before deploy. Fix migration: `20260512120000_fix_playoff_aggregate_assists_use_nhl_col.sql`.
+
 ## 13. Action Items / TODOs
 
 ### P0 — Before next release
