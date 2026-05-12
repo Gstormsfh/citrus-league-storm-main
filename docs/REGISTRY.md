@@ -62,6 +62,8 @@
 
 ### KI-009 — Edge Function infrastructure removed entirely; engine in existing server
 
+**RESOLVED (chunk 11g.9 commit, 2026-05-12).** Migration `supabase/migrations/20260512000000_remove_pgmq_infrastructure.sql` shipped on branch `phase-4-5-implementation`. Removed: `supabase/functions/draft-autopick/index.ts`; pg_cron jobs `draft-deadline-sweep` and `draft-autopick-keepalive`; pgmq wrapper RPCs `draft_autopick_read` / `draft_autopick_archive`; `draft_deadline_sweep()` function; `generation_bumped` event-writes from `draft_pause` / `draft_resume` / `draft_extend`; `'generation_bumped'` from the `draft_events.event_type` CHECK enum (21 → 20 values); `leagues.draft_generation` column; pgmq extension (CASCADE — drops queue + archive tables). The persistent in-server engine + chunk 11g.7 sub-step 7e LISTEN/NOTIFY path carry the production load; recovery is event-log replay on server restart. The deployment shape locked in by ADR-001 is now the only shape — no parallel safety net to maintain. Future need for queue-based coordination should use LISTEN/NOTIFY or a fresh primitive, NOT restoration of pgmq (see migration header irreversibility statement). KI-007 and KI-004 closed in the same commit.
+
 | | |
 |---|---|
 | **Severity** | medium — accepted operational shape; must be tracked so the simplification rationale is preserved across future scale conversations. |

@@ -395,7 +395,9 @@ Each RPC's other behavior is preserved: idempotency, actor authorization, atomic
 
 ---
 
-### Chunk 11g.9 — Edge Function infrastructure removal *(expanded 2026-05-11)*
+### Chunk 11g.9 — Edge Function infrastructure removal *(expanded 2026-05-11, shipped 2026-05-12)*
+
+**Status.** Shipped 2026-05-12 on branch `phase-4-5-implementation`. Migration `supabase/migrations/20260512000000_remove_pgmq_infrastructure.sql` removed all legacy pgmq surface; `supabase/functions/draft-autopick/` deleted in the same commit. KI-007 RESOLVED, KI-009 RESOLVED, KI-004 SUPERSEDED. See migration header (Decision Log D1–D8) for the chunk-specific decisions, including the corrected CHECK-enum recount (21 → 20, not 20 → 19 as the recon report had said), the `submit_pick_v2 v_generation` leak cleanup brought in here under Path A, and the leagues.`draft_generation` DROP COLUMN rationale.
 
 **Deliverable.** Once chunk 11g.8's pgmq emissions are removed and chunk 11g.7 sub-step 7e's LISTEN/NOTIFY path is the canonical cross-process notification mechanism, this chunk deletes the Phase 0–4 Edge Function infrastructure entirely. Specifically:
 
@@ -405,10 +407,12 @@ Each RPC's other behavior is preserved: idempotency, actor authorization, atomic
 - Drop the pgmq wrapper RPCs `draft_autopick_read` and `draft_autopick_archive` (from `20260426140000_draft_engine_v2_phase3_pgmq_wrappers.sql`).
 - Drop the `pgmq` extension itself (no remaining consumers after the above).
 - Drop the `draft_deadline_sweep()` function (its writer-side emission was already a no-op after 11g.8; the function + its cron job both go).
-- **(Expanded scope 2026-05-11):** Remove the `generation_bumped` event-write protocol. Drop `'generation_bumped'` from the `draft_events.event_type` CHECK enum. Remove the two `PERFORM append_draft_event(... 'generation_bumped' ...)` calls from `draft_pause` / `draft_resume` / `draft_extend` (per chunk 11g.8 Option B — protocol cleanup deferred to 11g.9 alongside the rest of the pgmq teardown). Remove the bootstrap dispatcher's `default: skip-with-debug-log` arm OR keep it as a defensive forward-compat catch (decision in 11g.9 recon).
-- Delete `supabase/functions/_shared/_vendored/` (no second runtime needs vendored shared code; the in-server engine imports `@citrus/shared` natively).
-- Remove the SQL `_v2_test._uuidv5` cross-runtime parity helper and the corresponding TypeScript test fixture — there is no second runtime to compare against.
-- `git grep` audit confirms zero remaining references to deleted surfaces in shipped code (test fixtures, comments, runbooks). Stale references either get updated or get deleted.
+- **(Expanded scope 2026-05-11):** Remove the `generation_bumped` event-write protocol. Drop `'generation_bumped'` from the `draft_events.event_type` CHECK enum. Remove the two `PERFORM append_draft_event(... 'generation_bumped' ...)` calls from `draft_pause` / `draft_resume` / `draft_extend` (per chunk 11g.8 Option B — protocol cleanup deferred to 11g.9 alongside the rest of the pgmq teardown). Remove the bootstrap dispatcher's `default: skip-with-debug-log` arm OR keep it as a defensive forward-compat catch (decision in 11g.9 recon — **2026-05-12 recon resolved: RETAIN** the explicit `case 'generation_bumped':` arm in `LobbyManager.applyEventDuringBootstrap` for replay of historical events; the write side goes, the read side stays).
+- **(Recon addition 2026-05-12):** Drop `leagues.draft_generation` column. The column was used exclusively for pgmq message-staleness coordination (workers compared message-attached `generation` against the live column to no-op stale messages). The engine never reads it; with pgmq removed, no consumer remains. All snake/linear RPCs that referenced the column are CoR'd in the same migration; auction RPCs never referenced it.
+- **(Recon addition 2026-05-12):** Clean up the `submit_pick_v2 v_generation` declaration left over from chunk 11g.8 (Path A — natural completion of the cleanup arc; preferred over force-push of 11g.8 for commit-history hygiene).
+- ~~Delete `supabase/functions/_shared/_vendored/`~~ Already absent from this codebase version per 11g.9 recon — directory does not exist. The PLAN line is left here as historical context; no action was needed in 11g.9.
+- ~~Remove the SQL `_v2_test._uuidv5` cross-runtime parity helper and the corresponding TypeScript test fixture~~ Already absent. Same context as the line above.
+- `git grep` audit confirms zero remaining references to deleted surfaces in shipped code (test fixtures, comments, runbooks). Stale references either get updated or get deleted. **2026-05-12 audit:** legacy SQL integration scripts at `supabase/tests/draft_engine_v2_phase{1,2,3}*.sql` and `supabase/seeds/phase1_regression_seed.sql` still reference `draft_generation` / `generation_bumped` / `pgmq`. These are standalone scripts (not in CI/vitest); they test the legacy pgmq architecture and will fail to apply after this migration. Left in place; retirement deferred to 11g.10 / 11g.11.
 
 The chunk also closes the runbook entries: **KI-007** (vendored shared code drift) flips to `RESOLVED (chunk 11g.9 commit-sha, date)`. **KI-004** (Phase 3 keep-alive cron's hardcoded staging URL) is annotated `SUPERSEDED by chunk 11g.9 — surface deleted` with the same commit SHA.
 
@@ -424,7 +428,7 @@ The chunk also closes the runbook entries: **KI-007** (vendored shared code drif
 
 **Performance targets.** None (subtractive chunk).
 
-**Estimated effort.** 1–2 days. Mostly auditing and writing the migration; the deletes themselves are mechanical.
+**Estimated effort.** 1–2 days. Mostly auditing and writing the migration; the deletes themselves are mechanical. **Actual effort:** ~0.5 day (recon + migration + doc updates + commit on 2026-05-12).
 
 ---
 
