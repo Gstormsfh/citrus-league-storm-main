@@ -420,6 +420,14 @@ The frontend is **~95% migrated** to the API-first architecture. All data operat
 
    **Canonical test case for the validation gate (2026-05-12 incident):** commit 76e5468 introduced an `aggregate_player_playoff_stats[_live]` RPC that summed `primary_assists + secondary_assists` (PBP-extractor columns, populated by a lagging job) instead of `nhl_assists` (live-scraped from NHL.com). All 17 other stats correctly used `COALESCE(nhl_*, unprefixed)`; only assists slipped because `player_game_stats` has no plain `assists` column to fall back to. The RPC compiled, applied, ran without error, and silently produced `assists = 0` for every player across 3+ weeks of playoff data. A compile-check or DDL-only gate would have rubber-stamped it. A functional gate executing the RPC against staging playoff rows and asserting `SUM(goals) + SUM(assists) = SUM(points)` would have caught it before deploy. Fix migration: `20260512120000_fix_playoff_aggregate_assists_use_nhl_col.sql`.
 
+13. **[PRE-WEB SUMMIT] Reconciliation alerter for missed game scrapes** — Hourly cron job: `SELECT game_id FROM nhl_games WHERE status='final' AND game_type='playoff' AND season=2025 AND game_id NOT IN (SELECT DISTINCT game_id FROM player_game_stats);` — alert (Slack/email/PagerDuty/whatever channel oncall watches) if it returns anything. Catches the next silent scrape miss within 1 hour instead of 9–17 days.
+
+   **Canonical test case (2026-05-12 incident):** 5 playoff games on series-transition dates (3 R1 G4 closeouts on 2026-04-25, 2 R2 G1 openers on 2026-05-02/03) had `status='final'` in `nhl_games` but ZERO `player_game_stats` rows for weeks. No alert fired. User noticed via stale stats on the playoff pool page. This query, run hourly, would have fired the same evening as the first miss. Scope to `playoff` initially; extend to regular season after demo. Smallest possible intervention; no infra rewrites required.
+
+14. **[PRE-WEB SUMMIT] Widen `data_scraping_service` catch-up window from 24h to 7d** — `data-pipeline/acquisition/data_scraping_service.py:797-821` only looks back one day. If a day gets deferred via the "live games being polled, defer catch-up" branch at line 817-818, it rolls off the window after 24h and is never re-attempted. Change the lookback to iterate the last 7 days. One-line fix; the structural Cloud Run Jobs migration (item 6 of the DevOps backlog) supersedes this post-Web Summit but the one-line widening closes the silent-failure surface for the demo window without waiting for the rewrite.
+
+   **Verification after widening:** the audit query from item 13 above should return empty on subsequent runs — proves the catch-up actually re-attempts deferred days. Use the same idempotent backfill primitive (`fetch_game_boxscore` + `update_player_game_stats_nhl_columns` from `scrape_per_game_nhl_stats.py`) the 2026-05-12 incident used.
+
 ## 13. Action Items / TODOs
 
 ### P0 — Before next release
