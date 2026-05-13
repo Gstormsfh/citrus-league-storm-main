@@ -432,36 +432,52 @@ The chunk also closes the runbook entries: **KI-007** (vendored shared code drif
 
 ---
 
-### Chunk 11g.10 — Performance verification against the Mandate
+### Chunk 11g.10 — Productionization + Mandate verification *(re-scoped 2026-05-12 via sub-step 10a)*
 
-**Deliverable.** End-to-end performance verification on the deployed staging GCE server against every binding target in `CLAUDE.md` § Citrus Draft Performance Mandate. A `server/bench/` benchmark harness drives realistic load (12-user lobbies, multiple concurrent drafts) using the `node --cpu-prof` workflow per VS Code Node profiling docs to capture flame graphs for any regression. The harness emits a structured report: per-Mandate-target p50/p95/p99 latency, throughput, error rate. Output committed to the repo so future regressions have a baseline.
+**Pointer.** Full plan lives at [`docs/PHASE_4_5_PRODUCTIONIZATION_PLAN.md`](./PHASE_4_5_PRODUCTIONIZATION_PLAN.md) (authored 2026-05-12 by chunk 11g.10 sub-step 10a). That document carries the Mandate verbatim quote, architecture-to-Mandate mapping, current-state assessment, binding-patterns audit, non-negotiables operational discipline, full sub-step decomposition, risk register (including solo-founder risk R10C), 10f sign-off criteria, and Decision Log. This section here is the per-chunk pointer + decomposition table — the productionization plan doc is the canonical reference.
 
-The KI-010 Tier 1 optimizations are verified-in-place via grep:
-- Parallel async via `Promise.all`: chunk 11g.3 `LobbyManager` constructor.
-- Candidate pool cached at draft start: chunk 11g.3 `this._candidates`.
-- Byte-limited delta broadcasts: chunk 11g.4 broadcast site.
-- Per-socket fanout protection via `getBufferedAmount()`: chunk 11g.4 broadcast site.
+**Re-scope rationale.** The original chunk 11g.10 was scoped as a single-deliverable perf-verification sprint. Sub-step 10a recon surfaced that the staging GCE VM was torn down 2026-05-04 (chunks 11g.3–11g.9 shipped local-only); engine runbooks are pgmq-era stale post-11g.9; no Cloud Monitoring dashboards exist; no rollback playbook exists for the post-pgmq world; no production cutover plan exists. Productionization is genuinely multi-deliverable work, not single-sprint. The re-scope decomposes chunk 11g.10 into sub-steps 10a–10f.
 
-A code-comment audit (`git grep "KI-010 Tier 1"`) produces the four expected hits. Missing hits indicate the optimization was deferred or removed silently — both fail the chunk.
+**Sub-step decomposition table.**
 
-**Dependencies.** 11g.9.
+| Sub-step | Deliverable | Effort (focused-work) | Dependencies |
+|---|---|---|---|
+| 10a | Plan document + Mandate consolidation + sub-step decomposition + risk register | ~1 day | None |
+| 10b | Staging re-provisioning + smoke verification | ~1–2 days | 10a |
+| 10c | Perf measurement harness (`server/bench/`) + execution + `PHASE_4_5_BASELINE.{json,md}` | ~3–5 days | 10b |
+| 10d | Cloud Monitoring dashboards + alert policies (gcloud / Config Connector, no Terraform) | ~2–3 days | 10b |
+| 10e | Runbook rewriting (3 engine runbooks + new rollback playbook) | ~1–2 days | None hard (parallel-safe with 10a, 10b, 10c, 10d) |
+| 10f | Production cutover plan (canary, league-by-league rollout, sign-off) | ~1 day | 10c + 10d + 10e |
 
-**Acceptance criteria — and the Phase 5 entry gate:**
-- Manual pick submission p95 ≤ 300ms / p99 ≤ 500ms over 1000 trial picks across 5 concurrent lobbies.
-- Autopick latency p95 ≤ 1000ms / p99 ≤ 2000ms over 500 trial autopicks.
-- Pick-to-broadcast fanout p95 ≤ 200ms.
-- Draft state load (cold lobby bootstrap) p95 ≤ 1500ms.
-- Reconnection recovery p95 ≤ 2000ms over 100 reconnect cycles.
-- Timer drift < 100ms across all clients in a 12-user lobby over a full 15-round draft.
-- `git grep "KI-010 Tier 1"` returns ≥ 4 hits in `server/src/draft/`.
-- Benchmark report committed at `server/bench/PHASE_4_5_BASELINE.json` (machine-readable) and `server/bench/PHASE_4_5_BASELINE.md` (human-readable summary). Future Phase 5+ work re-runs against this baseline.
+**Total effort:** ~10–14 focused-work days. Calendar duration is ~3–4 weeks given solo-founder parallel commitments per Phase B–C overlap.
 
-**Pass:** Phase 5 (UI client work) unblocks. KI-010 closes (RESOLVED, with the chunk 11g.10 commit-sha as evidence).
-**Fail (any target missed by > 10%):** stop. Targeted optimization, not a fresh chunk. The Mandate is binding.
+**Mandate targets (verbatim from `CLAUDE.md`).** Per-target verification at 10c against staging:
+- Manual pick submission: p95 ≤ 300ms / p99 ≤ 500ms
+- Autopick latency: p95 ≤ 1000ms / p99 ≤ 2000ms
+- Draft state load: p95 ≤ 1500ms
+- Timer accuracy: drift < 100ms
+- Pick-to-broadcast fanout: p95 ≤ 200ms
+- Reconnection recovery: p95 ≤ 2000ms
 
-**Performance targets.** The full Mandate set, end-to-end, on the deployed GCE server.
+Plus `git grep "KI-010 Tier 1"` ≥ 4 hits in `server/src/draft/` (chunks 11g.3 + 11g.4 baked these in).
 
-**Estimated effort.** 3–5 days. Includes profiling time and any targeted optimization passes that surface during the run.
+**Dependencies.** 11g.9 (the post-pgmq world is the foundation this chunk rests on).
+
+**Acceptance criteria — and the Phase 5 entry gate.** All 6 bullets in PRODUCTIONIZATION_PLAN.md §8 "10f Sign-Off Criteria" must be met. Summary: Mandate compliance + architecture compliance + monitoring live with non-zero data + runbooks rewritten and reviewed + rollback path tested + canary plan ratified.
+
+**Pass:** Phase 5 (UI client work) unblocks. KI-010 closes (RESOLVED) when 10c confirms the Tier 1 optimizations carry the Mandate targets.
+**Fail (any target missed by > 10%):** stop. Targeted optimization absorbs remaining 10c budget. **Not a deferral** — the Mandate is binding per `CLAUDE.md` §1.5 non-negotiables.
+
+**Sub-step status (this section updates as sub-steps ship).**
+
+| Sub-step | Status | Commit / date |
+|---|---|---|
+| 10a | **Complete 2026-05-12.** Plan document at `docs/PHASE_4_5_PRODUCTIONIZATION_PLAN.md`. | (this commit) |
+| 10b | Pending | — |
+| 10c | Pending | — |
+| 10d | Pending | — |
+| 10e | Pending (parallel-safe; can start any time post-10a) | — |
+| 10f | Pending | — |
 
 ---
 
