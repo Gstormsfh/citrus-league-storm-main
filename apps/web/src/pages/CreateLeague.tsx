@@ -341,8 +341,9 @@ const CreateLeague = () => {
     }
 
     const count = parseInt(teamsCount);
-    if (isNaN(count) || count < 2 || count > 100) {
-      setError("Number of teams/participants must be between 2 and 100");
+    const maxCount = isPool ? 200 : 100;
+    if (isNaN(count) || count < 2 || count > maxCount) {
+      setError(`Number of teams/participants must be between 2 and ${maxCount}`);
       return;
     }
 
@@ -837,14 +838,14 @@ const CreateLeague = () => {
                           id="teams-count"
                           type="number"
                           min={isPool ? 2 : 2}
-                          max={isPool ? 100 : 50}
+                          max={isPool ? 200 : 50}
                           value={teamsCount}
                           onChange={(e) => setTeamsCount(e.target.value)}
                           className="h-12"
-                          placeholder={isPool ? '2–100' : '2–50'}
+                          placeholder={isPool ? '2–200' : '2–50'}
                         />
                         <p className="text-xs text-white/55">
-                          {isPool ? 'Any number from 2 to 100' : 'Any number from 2 to 50'}
+                          {isPool ? 'Any number from 2 to 200' : 'Any number from 2 to 50'}
                         </p>
                       </div>
 
