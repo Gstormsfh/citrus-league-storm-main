@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   HockeyFooter,
@@ -236,23 +236,32 @@ const CreateLeague = () => {
     }
   }, [searchParams]);
 
-  // Auto-join if share link has ?code= AND user is logged in.
-  // Previously users clicked an invite link, landed on the join tab with
-  // code pre-filled, and had to hit "Join" manually. Now it fires automatically.
-  const autoJoinFiredRef = useRef(false);
+  // Share-link landing: pre-fill the join code and switch to the Join tab,
+  // but DON'T auto-submit. Earlier versions fired handleJoinLeague within
+  // 50ms of mount, which raced past the team name input — invitees never
+  // had a chance to type a custom name, so every join landed with the
+  // RPC's default fallback ("Team N" or profile.default_team_name). The
+  // WebSummit invite flow surfaced this. Now the user clicks "Join"
+  // themselves after reviewing/editing the team name field.
   useEffect(() => {
     const code = searchParams.get('code');
-    if (code && user && !autoJoinFiredRef.current && !loading) {
-      autoJoinFiredRef.current = true;
+    if (code && user) {
       setJoinCode(code);
       setDefaultTab('join');
-      // Pass the code EXPLICITLY so we don't race with setJoinCode().
-      // Previously handleJoinLeague read joinCode from closure which
-      // could be empty if state hadn't committed yet.
-      setTimeout(() => handleJoinLeague(code), 50);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, searchParams]);
+
+  // Pre-fill the team-name-on-join field from the user's saved default
+  // (Profile → "Default Team Name"). Users who don't care to customize
+  // still get a one-click join with their preferred name; users who want
+  // something league-specific can edit before submitting.
+  useEffect(() => {
+    if (profile?.default_team_name && !teamNameForJoin) {
+      setTeamNameForJoin(profile.default_team_name);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.default_team_name]);
 
   // Reset format settings and smart defaults when league type changes
   useEffect(() => {
