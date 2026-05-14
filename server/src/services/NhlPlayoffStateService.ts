@@ -53,7 +53,14 @@ export class NhlPlayoffStateService {
       return [];
     }
 
+    // Two-pass scan: collect candidate "alive" teams (winners of finals +
+    // both participants of pending/active series) AND the explicit losers
+    // of every final series. A team that won an earlier round but lost a
+    // later one (e.g. PHI: beat PIT in R1, lost to CAR in R2) gets added
+    // by the first scan and must be removed by the second — otherwise the
+    // set monotonically grows and eliminated teams stay "alive" forever.
     const aliveIds = new Set<number>();
+    const eliminatedIds = new Set<number>();
     for (const s of seriesRows) {
       const status = (s.series_status as string) || 'pending';
       const high = s.high_seed_team_id as number | null;
@@ -61,17 +68,22 @@ export class NhlPlayoffStateService {
       const winner = s.winner_team_id as number | null;
 
       if (status === 'final') {
-        // Loser of a finalized series is OUT. Winner advances and is alive
-        // (they'll appear as high/low in their next-round series too, but
-        // adding here covers edge cases where the next series row hasn't
-        // been populated yet).
-        if (winner != null) aliveIds.add(winner);
+        if (winner != null) {
+          aliveIds.add(winner);
+          // Loser = the participant that isn't the winner. Both seeds
+          // must be present for us to know who lost.
+          const loser = winner === high ? low : winner === low ? high : null;
+          if (loser != null) eliminatedIds.add(loser);
+        }
       } else {
-        // pending or in-progress — both teams are still alive.
+        // pending or in-progress — both teams (if known) are still alive.
         if (high != null) aliveIds.add(high);
         if (low != null) aliveIds.add(low);
       }
     }
+    // Apply elimination: a team that lost any final series is OUT,
+    // regardless of how many earlier series they won.
+    for (const id of eliminatedIds) aliveIds.delete(id);
 
     if (aliveIds.size === 0) {
       // No bracket populated yet — return empty (caller treats as "no filter").
