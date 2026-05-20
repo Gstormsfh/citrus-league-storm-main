@@ -438,6 +438,20 @@ The frontend is **~95% migrated** to the API-first architecture. All data operat
 
 18. **[POST-2026-06-02-CHECK] Bump `actions/upload-artifact` + `actions/download-artifact` v4 → v5** — Both are part of the Node 20 deprecation cohort (same publisher and vintage as the actions bumped in §12.15 / PR #273), but v3→v4 of the artifact actions had real breaking API changes (single-artifact-per-upload, name-uniqueness behavior). The v4→v5 changelog needs to be reviewed before bumping — explicitly excluded from the §12.15 sweep to keep that PR low-risk and explicitly verifiable. Affected files at filing time: `staging-deploy.yml` (1× upload at line 67, 1× download at line 180), `production-deploy.yml` (1× upload at line 99, 1× download at line 257). **Action:** read the actions/upload-artifact and actions/download-artifact v4→v5 release notes for breaking changes; if clean, bump in a small PR with a staging-deploy verification run before merging. If breaking, document the migration steps. Tagged `[POST-2026-06-02-CHECK]` because the runner forces Node-24 default on 2026-06-02 but doesn't remove Node 20 until 2026-09-16 — these artifact actions on Node 20 will keep working under the temporary `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true` escape hatch until then if needed. Estimate: 30 min including changelog review + verification run.
 
+19. **[PRE-NEXT-SEASON] `player_season_stats` nightly aggregate failing for 65+ hours** — Observed 2026-05-20 ~17:09 MT: `data_scraping_service.py` emits `CRITICAL [STALE DATA ALERT]` every 30-60s cycle. `player_season_stats.updated_at = 2026-05-18T06:02:04.373899+00:00` — 65h+ stale at observation time, 2-3x over the daemon's 24h freshness threshold. Likely cause: `main.yml` workflow (cron `0 7 * * *`, runs `nightly_projection_batch.py --season 2025`) is either failing silently or the script is succeeding without updating the target table.
+
+    **Investigation steps:**
+    1. `gh run list --workflow=main.yml --limit 14` — check failure pattern over the last two weeks
+    2. If runs are succeeding: read `nightly_projection_batch.py` to find what writes `player_season_stats`, verify the write actually happens (it may be silently no-oping or writing under a different code path)
+    3. If runs are failing: read the failure log, identify root cause
+
+    **Downstream impact (also part of the investigation):**
+    - Stormy season-long context responses — verify which `player_season_stats` fields it reads
+    - xG model retraining cadence — verify source dependencies
+    - Any season-long projection logic in the web app
+
+    Tagged `[PRE-NEXT-SEASON]` because the playoff path doesn't depend on `player_season_stats` (it uses `aggregate_player_playoff_stats_live` against `player_game_stats`), so this isn't playoff-affecting. Should not drift past end-of-playoffs.
+
 ## 13. Action Items / TODOs
 
 ### P0 — Before next release
