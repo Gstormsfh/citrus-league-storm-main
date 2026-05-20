@@ -196,10 +196,16 @@ Each playbook follows the same template:
      force a snapshot persistence to capture current state, then restart
      ONLY the affected lobby via registry eviction:
      ```bash
-     # NOTE: requires admin HTTP endpoint TODO(10b/10c): document the
-     # admin endpoint when it lands. Until then, full engine restart
-     # is the only manual lobby-eviction path. Engine restart triggers
-     # bootstrap for ALL lobbies, which is heavier than needed but safe.
+     # Admin HTTP endpoint scaffolded at chunk 11g.10 sub-step 10b:
+     #   POST /api/admin/engine/lobby/<lobbyId>/evict
+     # Auth: requires is_engine_admin flag on caller's profile.
+     # Status: route is wired + auth-gated, but the cross-process
+     # delegate (main API → engine HTTP/RPC) is scaffolded with a 501
+     # NOT_IMPLEMENTED response. Full wiring lands in 10c/10d. Until
+     # then, the manual equivalent is a full engine restart:
+     #   ssh <vm-name> "sudo systemctl restart citrus-draft-engine"
+     # Heavier than needed (restarts ALL lobbies) but safe — durable
+     # state in draft_events is the source of truth; bootstrap recovers.
      ```
 - **Escalation.** If the lobby reproduces the failure after engine restart,
   the state is durably wedged in Postgres (likely auction nomination state
@@ -245,8 +251,9 @@ Each playbook follows the same template:
      200ms server-side.
 - **Escalation.** Per §4 Mandate breach response: hot-path breach is
   **stop-the-line**. If sustained and not infra-related, pause new drafts
-  via discovery flag (TODO(10b): document discovery-flag mechanics once
-  staging is re-provisioned) and either ship a fix or roll back.
+  via discovery flag (single SQL UPDATE on `system_flags.no_new_drafts`
+  — see rollback playbook §3 for the toggle command) and either ship a
+  fix or roll back.
 - **Verification.** p95 returns below threshold for 10 consecutive minutes
   in a representative-load window.
 
@@ -842,9 +849,26 @@ When `ENGINE_SNAPSHOT_VERSION` is incremented:
 
 ### §6.5 Forcing a snapshot persistence
 
-TODO(10b/10c): document the admin HTTP endpoint for force-snapshot when
-it lands. Until then, the only path is "wait for next scheduled
-snapshot" (periodic + milestone per chunk 11g.7-7c).
+Admin HTTP endpoint scaffolded at chunk 11g.10 sub-step 10b:
+
+```
+POST /api/admin/engine/lobby/<lobbyId>/snapshot
+Authorization: Bearer <jwt-of-is-engine-admin-user>
+```
+
+Auth: requires `is_engine_admin` flag on caller's profile (per
+`profiles.is_engine_admin` column added by migration
+`20260520010000_add_profiles_is_engine_admin.sql`). Garrett gets this
+for free via the migration's `is_admin = true` backfill.
+
+Status: route + auth gating shipped at 10b. The cross-process delegate
+(main API → engine HTTP/RPC for the actual snapshot write) is
+scaffolded with a 501 NOT_IMPLEMENTED response — full wiring lands in
+10c/10d when perf harness + monitoring needs surface. Until then, the
+manual fallback is "wait for next scheduled snapshot" (periodic +
+milestone per chunk 11g.7-7c) OR `sudo systemctl restart
+citrus-draft-engine` (engine writes a clean-shutdown snapshot before
+exit).
 
 ---
 

@@ -18,6 +18,7 @@ import { scheduleRoutes } from './routes/schedule';
 import { notificationRoutes } from './routes/notifications';
 import { stormyRoutes } from './routes/stormy';
 import { adminRoutes } from './routes/admin';
+import { draftAdminRoutes } from './routes/draftAdmin';
 import { auctionRoutes } from './routes/auction';
 import { keeperRoutes } from './routes/keepers';
 import { playoffRoutes } from './routes/playoffs';
@@ -245,6 +246,10 @@ app.route('/api/schedule', scheduleRoutes);
 app.route('/api/notifications', notificationRoutes);
 app.route('/api/stormy', stormyRoutes);
 app.route('/api/admin', adminRoutes);
+// Phase 4.5 chunk 11g.10 sub-step 10b — engine-ops admin endpoints.
+// Distinct namespace from /api/admin/* (user dashboard admin) to make
+// the privilege boundary explicit. Gated by is_engine_admin flag.
+app.route('/api/admin', draftAdminRoutes);
 app.route('/api/auction', auctionRoutes);
 app.route('/api/keepers', keeperRoutes);
 app.route('/api/playoffs', playoffRoutes);

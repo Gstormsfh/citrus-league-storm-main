@@ -106,6 +106,7 @@ const app = new Hono();
 app.get('/health', (c) => c.json({ ok: true, server: 'hono' }));
 
 // ── Start Hono ──
+const processStartTimeMs = Date.now();
 const honoServer = serve(
   {
     fetch: app.fetch,
@@ -113,8 +114,46 @@ const honoServer = serve(
   },
   (info) => {
     structuredLogger.info('hono.listening', { port: info.port });
+    emitDeploymentFingerprint(processStartTimeMs);
   },
 );
+
+/**
+ * Phase 4.5 chunk 11g.10 sub-step 10b — deployment fingerprint.
+ *
+ * Emit a single structured log line capturing forensic context for
+ * any future incident. Fields:
+ *   - imageSha       — Docker image SHA, set by deploy pipeline via env.
+ *   - commitSha      — git SHA baked into image at build time.
+ *   - envFingerprint — presence/absence map for every required env var.
+ *                       VALUES NEVER LOGGED (security boundary).
+ *   - startupTimeMs  — wall-clock from process start to this emit.
+ *
+ * The fingerprint anchors "what was deployed when this broke?" for
+ * post-incident reconstruction. Required env keys reflect chunk
+ * 11g.7-7e + the Phase 4.5 architecture; update when surface changes.
+ */
+function emitDeploymentFingerprint(startTimeMs: number): void {
+  const requiredEnvKeys = [
+    'SUPABASE_URL',
+    'SUPABASE_DB_URL',
+    'SUPABASE_JWT_SECRET',
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'PORT',
+    'DRAFT_WS_PORT',
+  ];
+  const envFingerprint: Record<string, 'present' | 'missing'> = {};
+  for (const key of requiredEnvKeys) {
+    envFingerprint[key] = process.env[key] ? 'present' : 'missing';
+  }
+  structuredLogger.info('deployment.fingerprint', {
+    imageSha: process.env.IMAGE_SHA ?? 'unset',
+    commitSha: process.env.COMMIT_SHA ?? 'unset',
+    nodeEnv: process.env.NODE_ENV ?? 'unset',
+    envFingerprint,
+    startupTimeMs: Date.now() - startTimeMs,
+  });
+}
 
 // ── uWS app + publish callback for the LobbyRegistry ──
 //

@@ -32,6 +32,7 @@ import { issueDraftToken } from '../lib/draftToken';
 import { CONNECTABLE_DRAFT_STATUSES, type DraftStatus } from '@citrus/shared';
 import { logger, structuredLogger } from '@citrus/shared';
 import { buildSnapshot } from '../services/snapshotService';
+import { readSystemFlag } from '../lib/systemFlags';
 
 const draftsRoutes = new Hono<Env>();
 
@@ -91,6 +92,40 @@ draftsRoutes.get('/:draftId/server', async (c) => {
   const memberCheck = await membership.checkMembership(leagueId, userId);
   if (!memberCheck.isMember) {
     return c.json({ error: { code: 'FORBIDDEN', message: 'Not a member of this league' } }, 403);
+  }
+
+  // Phase 4.5 chunk 11g.10 sub-step 10b — discovery-flag check.
+  //
+  // Tier-1 incident bridging action (operations runbook §2.4 + rollback
+  // playbook §3): refuse NEW drafts when `system_flags.no_new_drafts`
+  // is true. In-progress drafts are unaffected — existing players keep
+  // playing. Toggle takes effect within the systemFlags cache TTL (~5s).
+  //
+  // The 5s cache absorbs the discovery endpoint's request rate; an
+  // on-call SQL UPDATE on system_flags propagates within 5 seconds to
+  // every API process reading this flag. Defense-in-depth: the engine
+  // also checks (LobbyRegistry.getOrCreate) — same table, two
+  // enforcement points.
+  const noNewDrafts = await readSystemFlag(supabase, 'no_new_drafts');
+  if (noNewDrafts && draftStatus === 'not_started') {
+    structuredLogger.info('discovery.refused_no_new_drafts', {
+      leagueId,
+      userId,
+      draftStatus,
+    });
+    return c.json(
+      {
+        error: {
+          code: 'NEW_DRAFTS_DISABLED',
+          message:
+            'New drafts are temporarily disabled by an operational flag. ' +
+            'In-progress drafts continue normally. Contact the league commissioner ' +
+            'or admin for status.',
+          status: draftStatus,
+        },
+      },
+      503,
+    );
   }
 
   if (!CONNECTABLE_DRAFT_STATUSES.includes(draftStatus)) {

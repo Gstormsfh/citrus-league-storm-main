@@ -112,17 +112,37 @@ this is the first move: keep existing drafts running (they have
 durable state in `draft_events` and snapshots) but block new draft
 creation while you investigate or roll back.
 
-```bash
-# TODO(10b/10c): document the discovery-flag mechanism for "no new
-# drafts" once 10b lands. Until then, the manual pause path is:
-#   - Set leagues.draft_state = 'paused' for any league where new
-#     drafts should be blocked.
-# Or, via SQL gating on the discovery endpoint:
-psql "$SUPABASE_DB_URL" -c "
-  -- Replace with the actual discovery-flag mechanism once defined.
-  SELECT 'discovery flag TODO(10b)' AS reminder;
-"
+**Toggle command** (shipped at chunk 11g.10 sub-step 10b):
+
+```sql
+-- Block new drafts (Tier-1 bridging action). Takes effect within ~5s
+-- at every enforcement point (main API discovery endpoint + GCE
+-- engine LobbyRegistry).
+UPDATE system_flags
+   SET flag_value = true,
+       updated_at = now(),
+       updated_by = '<your-user-id>'::uuid,
+       reason     = '<incident-id-or-brief-description>'
+ WHERE flag_name = 'no_new_drafts';
+
+-- Unblock (incident resolved):
+UPDATE system_flags
+   SET flag_value = false,
+       updated_at = now()
+ WHERE flag_name = 'no_new_drafts';
 ```
+
+Semantics:
+- New drafts (`draft_status = 'not_started'`): discovery endpoint
+  returns 503 with `code: 'NEW_DRAFTS_DISABLED'`.
+- In-progress drafts (`draft_status = 'in_progress'`): unaffected;
+  existing players continue normally.
+- Engine-side defense in depth: LobbyRegistry.getOrCreate also checks
+  the flag, refusing to construct a new lobby for a `not_started` /
+  `pre_draft` league when the flag is on.
+
+Toggle propagates within the 5s `systemFlags` cache TTL at each
+enforcement point.
 
 This is bridging — buys time, doesn't fix root cause. Move to the
 appropriate scenario once cause is identifiable.
@@ -269,10 +289,15 @@ and the response should change with it.
      ```
      - If migrations exist, see scenario #1 sequencing rule (schema
        rollback first if both are reverting).
-  4. **Build + redeploy the prior SHA.** TODO(10b): document the
-     standard build + GCE deploy pipeline for the engine. Until then,
-     manual rebuild on the VM via `git checkout <sha> && npm ci &&
-     npm run build:server && sudo systemctl restart citrus-draft-engine`.
+  4. **Build + redeploy the prior SHA.** Standard build pipeline
+     documented in `docs/PHASE_4_5_GCE_PLATFORM_NOTES.md` §15 (lands
+     in Commit 2 of chunk 11g.10 sub-step 10b alongside the live
+     re-provisioning). Until §15 lands, use the manual operator
+     procedure: `git checkout <sha> && docker build -f
+     server/Dockerfile.draft-engine -t <image-uri>:<sha> . &&
+     docker push <image-uri>:<sha>`, then on the VM
+     `sudo systemctl restart citrus-draft-engine` after updating the
+     `image-tag` metadata.
   5. **Watch engine startup logs** for the §3 baseline sequence
      (`hono.listening`, `uws.listening`,
      `event_subscription.started`, `event_subscription.self_test_succeeded`).

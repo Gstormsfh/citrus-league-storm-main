@@ -44,6 +44,7 @@ import { structuredLogger } from '@citrus/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { WebSocket } from 'uWebSockets.js';
 import type { DraftServiceV2 } from '../services/DraftServiceV2';
+import { readSystemFlag } from '../lib/systemFlags';
 import { LobbyManager } from './LobbyManager';
 import type {
   CommissionerAuthorizationResult,
@@ -441,6 +442,40 @@ export class LobbyRegistry {
 
   private async constructLobby(lobbyId: string, leagueId: string): Promise<LobbyManager> {
     const config = await this.lobbyConfigLookup(leagueId);
+
+    // Phase 4.5 chunk 11g.10 sub-step 10b — engine-side defense-in-depth
+    // for the no_new_drafts flag.
+    //
+    // The main API discovery endpoint already refuses with 503 when the
+    // flag is on AND the draft is in `not_started` state. This is the
+    // engine's independent check: if a client somehow got past discovery
+    // (cached token, timing window, bypassed routing), the engine
+    // refuses to construct a new lobby for a not-yet-started draft.
+    //
+    // In-progress drafts are NOT blocked here — their LobbyManager
+    // construction is the normal recovery path after engine restart,
+    // and blocking that would prevent in-progress drafts from
+    // continuing (the brief's "in-progress drafts continue" intent).
+    //
+    // 5s cache (per systemFlags.ts) absorbs the read cost; this check
+    // adds at most one Postgres round-trip per cache miss.
+    if (
+      config.initialDraftState === 'not_started' ||
+      config.initialDraftState === 'pre_draft'
+    ) {
+      const noNewDrafts = await readSystemFlag(this.supabase, 'no_new_drafts');
+      if (noNewDrafts) {
+        structuredLogger.warn('registry.refused_no_new_drafts', {
+          lobbyId,
+          leagueId,
+          initialDraftState: config.initialDraftState,
+        });
+        throw new Error(
+          `new_drafts_disabled: system_flags.no_new_drafts is on; refusing to construct lobby ${lobbyId} (draft state ${config.initialDraftState})`,
+        );
+      }
+    }
+
     const lobby = new LobbyManager({
       lobbyId,
       format: config.format,

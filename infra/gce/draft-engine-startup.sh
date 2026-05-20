@@ -103,8 +103,33 @@ IMAGE_TAG="${IMAGE_TAG:-latest}"
 
 IMAGE_URI="${ARTIFACT_REGISTRY_HOST}/${PROJECT_ID}/${IMAGE_REPO}:${IMAGE_TAG}"
 
-SECRET_NAME="$(metadata_get secret-name)"
-SECRET_NAME="${SECRET_NAME:-SUPABASE_JWT_SECRET}"
+# Secret naming follows the GCP Secret Manager convention used by chunk
+# 11g.10 sub-step 10b — separate Secret Manager entries per role:
+#   - supabase-jwt-secret       (chunk 11g.1, existing)
+#   - supabase-db-url           (NEW — required by 11g.7-7e LISTEN/NOTIFY)
+#   - supabase-service-role-key (NEW — required by getSupabaseAdmin())
+# Metadata override on a per-VM basis is supported but the defaults
+# match the standard provisioning shape.
+SECRET_JWT_NAME="$(metadata_get secret-jwt-name)"
+SECRET_JWT_NAME="${SECRET_JWT_NAME:-supabase-jwt-secret}"
+
+SECRET_DB_URL_NAME="$(metadata_get secret-db-url-name)"
+SECRET_DB_URL_NAME="${SECRET_DB_URL_NAME:-supabase-db-url}"
+
+SECRET_SERVICE_ROLE_NAME="$(metadata_get secret-service-role-name)"
+SECRET_SERVICE_ROLE_NAME="${SECRET_SERVICE_ROLE_NAME:-supabase-service-role-key}"
+
+# Public Supabase hostname (not secret — embedded in build, but
+# can be overridden per environment via metadata).
+SUPABASE_URL_VALUE="$(metadata_get supabase-url)"
+SUPABASE_URL_VALUE="${SUPABASE_URL_VALUE:-https://jjgspcpvqaiitloglxbb.supabase.co}"
+
+# IMAGE_SHA + COMMIT_SHA for the deployment-fingerprint log emitted at
+# engine startup (chunk 11g.10 sub-step 10b). Both optional — defaults
+# to "unset" in the fingerprint log if not provided. Production deploys
+# should always set image-sha from the CI pipeline.
+IMAGE_SHA_META="$(metadata_get image-sha)"
+COMMIT_SHA_META="$(metadata_get commit-sha)"
 
 CONTAINER_NAME="$(metadata_get container-name)"
 CONTAINER_NAME="${CONTAINER_NAME:-citrus-draft-engine}"
@@ -119,10 +144,15 @@ echo "Configuration:"
 echo "  PROJECT_ID=${PROJECT_ID}"
 echo "  ENVIRONMENT=${ENVIRONMENT}"
 echo "  IMAGE_URI=${IMAGE_URI}"
-echo "  SECRET_NAME=${SECRET_NAME}"
+echo "  SECRET_JWT_NAME=${SECRET_JWT_NAME}"
+echo "  SECRET_DB_URL_NAME=${SECRET_DB_URL_NAME}"
+echo "  SECRET_SERVICE_ROLE_NAME=${SECRET_SERVICE_ROLE_NAME}"
+echo "  SUPABASE_URL_VALUE=${SUPABASE_URL_VALUE}"
 echo "  CONTAINER_NAME=${CONTAINER_NAME}"
 echo "  HONO_HOST_PORT=${HONO_HOST_PORT} (-> container 3001)"
 echo "  DRAFT_WS_HOST_PORT=${DRAFT_WS_HOST_PORT} (-> container 3002)"
+echo "  IMAGE_SHA_META=${IMAGE_SHA_META:-<unset>}"
+echo "  COMMIT_SHA_META=${COMMIT_SHA_META:-<unset>}"
 
 # ── Step 1: Install Docker ──────────────────────────────────────────
 # Debian's docker.io package + systemd integration. apt-get install is
@@ -139,24 +169,99 @@ systemctl enable --now docker
 echo "Configuring gcloud Docker auth for ${ARTIFACT_REGISTRY_HOST}..."
 gcloud auth configure-docker "${ARTIFACT_REGISTRY_HOST}" --quiet
 
-# ── Step 3: Read SUPABASE_JWT_SECRET from Secret Manager ────────────
-# VM's service account needs roles/secretmanager.secretAccessor on the
-# secret. Failure here is fatal — the application can't issue or
-# verify draft tokens without it.
-echo "Reading ${SECRET_NAME} from Secret Manager (project ${PROJECT_ID})..."
+# ── Step 3: Read secrets from Secret Manager ─────────────────────────
+# VM's service account needs roles/secretmanager.secretAccessor on each
+# secret. Failure on any secret is fatal — the application can't run
+# without all three. The 11g.10-10b expansion added supabase-db-url
+# (for chunk 11g.7-7e LISTEN/NOTIFY) and supabase-service-role-key
+# (for getSupabaseAdmin() in chunk 11g.4+).
+echo "Reading ${SECRET_JWT_NAME} from Secret Manager (project ${PROJECT_ID})..."
 SUPABASE_JWT_SECRET="$(gcloud secrets versions access latest \
-  --secret="${SECRET_NAME}" \
+  --secret="${SECRET_JWT_NAME}" \
   --project="${PROJECT_ID}")"
 if [ -z "${SUPABASE_JWT_SECRET}" ]; then
-  echo "FATAL: ${SECRET_NAME} is empty or not accessible"
+  echo "FATAL: ${SECRET_JWT_NAME} is empty or not accessible"
   exit 1
 fi
-echo "Secret loaded (length ${#SUPABASE_JWT_SECRET})"
+echo "  loaded (length ${#SUPABASE_JWT_SECRET})"
+
+echo "Reading ${SECRET_DB_URL_NAME} from Secret Manager..."
+SUPABASE_DB_URL="$(gcloud secrets versions access latest \
+  --secret="${SECRET_DB_URL_NAME}" \
+  --project="${PROJECT_ID}")"
+if [ -z "${SUPABASE_DB_URL}" ]; then
+  echo "FATAL: ${SECRET_DB_URL_NAME} is empty or not accessible. Chunk 11g.7-7e LISTEN/NOTIFY requires SUPABASE_DB_URL."
+  exit 1
+fi
+echo "  loaded (length ${#SUPABASE_DB_URL})"
+
+echo "Reading ${SECRET_SERVICE_ROLE_NAME} from Secret Manager..."
+SUPABASE_SERVICE_ROLE_KEY="$(gcloud secrets versions access latest \
+  --secret="${SECRET_SERVICE_ROLE_NAME}" \
+  --project="${PROJECT_ID}")"
+if [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]; then
+  echo "FATAL: ${SECRET_SERVICE_ROLE_NAME} is empty or not accessible. getSupabaseAdmin() requires SUPABASE_SERVICE_ROLE_KEY."
+  exit 1
+fi
+echo "  loaded (length ${#SUPABASE_SERVICE_ROLE_KEY})"
+
+# ── Step 3b: Pre-flight assertions ───────────────────────────────────
+# Fail-loud on misconfigurations BEFORE attempting to start the
+# container. Most important: block pooled SUPABASE_DB_URL patterns
+# (KI-E010 — pgbouncer drops LISTEN frames silently).
+#
+# Sourced from the repo via the published image OR via a baked-in copy.
+# For Day 1: the script lives at /opt/citrus/staging-deploy-checks.sh
+# on the VM if pre-copied; otherwise we inline the critical pooled-URL
+# check below as a minimum-viable safety net.
+echo "Running pre-flight assertions..."
+if [ -x "/opt/citrus/staging-deploy-checks.sh" ]; then
+  SUPABASE_DB_URL="${SUPABASE_DB_URL}" \
+  SUPABASE_JWT_SECRET="${SUPABASE_JWT_SECRET}" \
+  SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY}" \
+  SUPABASE_URL="${SUPABASE_URL_VALUE}" \
+  IMAGE_URI="${IMAGE_URI}" \
+  EXPECTED_IMAGE_SHA="${IMAGE_SHA_META}" \
+  /opt/citrus/staging-deploy-checks.sh
+else
+  # Minimum-viable inline check — pooled-URL block (KI-E010).
+  if [[ "${SUPABASE_DB_URL}" == *"pooler.supabase.com"* ]] || \
+     [[ "${SUPABASE_DB_URL}" == *"pgbouncer"* ]] || \
+     [[ "${SUPABASE_DB_URL}" == *":6543"* ]]; then
+    echo "FATAL: SUPABASE_DB_URL matches pooled-connection pattern. KI-E010: pooled URLs drop LISTEN frames silently. Use direct primary URL (db.<project>.supabase.co:5432)." >&2
+    exit 1
+  fi
+  echo "  inline pre-flight pooled-URL check passed (full pre-flight script not installed at /opt/citrus/staging-deploy-checks.sh)"
+fi
 
 # ── Step 4: Pull image from Artifact Registry ───────────────────────
-# Re-pulls if the remote SHA differs from the local cache.
+# Re-pulls only if the remote SHA differs from the local cache (Docker
+# handles this automatically). Idempotency: safe to re-run on every
+# VM startup; cached layers skip download.
 echo "Pulling ${IMAGE_URI}..."
 docker pull "${IMAGE_URI}"
+
+# Capture the local image's digest for the idempotency check below.
+LOCAL_IMAGE_DIGEST="$(docker image inspect --format='{{index .RepoDigests 0}}' "${IMAGE_URI}" 2>/dev/null || echo "")"
+
+# ── Step 4b: Idempotency check — skip restart if container is already
+# running on the current image ───────────────────────────────────────
+# Re-running this script (VM reboot, manual re-trigger) should not
+# disrupt a healthy container unless the image actually changed. If a
+# container with the same name is running on the same image digest,
+# log + skip the restart.
+RUNNING_CONTAINER_ID="$(docker ps -q --filter "name=^/${CONTAINER_NAME}$" --filter "status=running" 2>/dev/null || echo "")"
+if [ -n "${RUNNING_CONTAINER_ID}" ]; then
+  RUNNING_IMAGE_DIGEST="$(docker inspect --format='{{.Image}}' "${RUNNING_CONTAINER_ID}" 2>/dev/null || echo "")"
+  CURRENT_IMAGE_DIGEST="$(docker image inspect --format='{{.Id}}' "${IMAGE_URI}" 2>/dev/null || echo "")"
+  if [ -n "${RUNNING_IMAGE_DIGEST}" ] && [ -n "${CURRENT_IMAGE_DIGEST}" ] && \
+     [ "${RUNNING_IMAGE_DIGEST}" = "${CURRENT_IMAGE_DIGEST}" ]; then
+    echo "Container ${CONTAINER_NAME} already running on current image digest. Skipping restart (idempotency)."
+    echo "=== citrus-draft-engine startup script complete (idempotent skip): $(date -u +%FT%TZ) ==="
+    exit 0
+  fi
+  echo "Container ${CONTAINER_NAME} is running but on a different image. Replacing..."
+fi
 
 # ── Step 5: Stop + remove any existing container with the same name ─
 # Idempotent: succeeds whether the container exists or not.
@@ -194,6 +299,12 @@ docker run -d \
   -p "${HONO_HOST_PORT}:3001" \
   -p "${DRAFT_WS_HOST_PORT}:3002" \
   -e SUPABASE_JWT_SECRET="${SUPABASE_JWT_SECRET}" \
+  -e SUPABASE_DB_URL="${SUPABASE_DB_URL}" \
+  -e SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY}" \
+  -e SUPABASE_URL="${SUPABASE_URL_VALUE}" \
+  -e IMAGE_SHA="${IMAGE_SHA_META}" \
+  -e COMMIT_SHA="${COMMIT_SHA_META}" \
+  -e NODE_ENV=production \
   -e PORT=3001 \
   -e DRAFT_WS_PORT=3002 \
   "${IMAGE_URI}"
