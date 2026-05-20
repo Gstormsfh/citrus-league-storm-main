@@ -327,6 +327,11 @@ def main() -> int:
                         help="Chunked-CSV pandas read size and DB upsert batch size")
     parser.add_argument("--dry-run", action="store_true",
                         help="Parse + map + summarize without writing")
+    parser.add_argument("--game-id", type=int, default=None,
+                        help="Filter to a single NHL game_id (10-digit form, "
+                             "e.g. 2024020001). Applied post-mapping against "
+                             "the derived NHL game_id, not the MoneyPuck 5-digit "
+                             "source value. Default None = no filter.")
     args = parser.parse_args()
 
     if not os.path.exists(args.csv):
@@ -337,6 +342,8 @@ def main() -> int:
     print(f"Load Historical Shots CSV — season={args.season}  csv={args.csv}")
     print(f"Mode: {'DRY-RUN (no writes)' if args.dry_run else 'LIVE (UPSERTs to prod)'}")
     print(f"Batch size: {args.batch_size}")
+    if args.game_id is not None:
+        print(f"Filter: --game-id {args.game_id} (single-game post-mapping filter)")
     print("=" * 80)
 
     # Print the mapping for visual inspection
@@ -353,6 +360,7 @@ def main() -> int:
 
     mapped_rows: List[dict] = []
     unmappable = 0
+    filtered_by_game_id = 0
     total_seen = 0
     season_filtered = 0
     first_5_examples: List[dict] = []
@@ -380,6 +388,9 @@ def main() -> int:
             mapped = map_row(row_dict, args.season)
             if mapped is None:
                 unmappable += 1
+                continue
+            if args.game_id is not None and mapped["game_id"] != args.game_id:
+                filtered_by_game_id += 1
                 continue
             batch.append(mapped)
             distinct_game_ids.add(mapped["game_id"])
@@ -443,6 +454,8 @@ def main() -> int:
     print(f"Total CSV rows scanned:    {total_seen:,}")
     print(f"Rows matching season {args.season}: {season_filtered:,}")
     print(f"Unmappable rows:           {unmappable}")
+    if args.game_id is not None:
+        print(f"Filtered by --game-id {args.game_id}: {filtered_by_game_id:,}")
     print(f"{'Mapped (dry-run)' if args.dry_run else 'Upserted to raw_shots'}: {rows_processed:,}")
     print(f"Distinct game_ids:         {len(distinct_game_ids)}  (range: {min(distinct_game_ids) if distinct_game_ids else 'n/a'} .. {max(distinct_game_ids) if distinct_game_ids else 'n/a'})")
     print(f"Wall-clock:                {_format_elapsed(total_elapsed)}")
