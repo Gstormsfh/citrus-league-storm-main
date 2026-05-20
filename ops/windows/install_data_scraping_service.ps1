@@ -17,7 +17,7 @@ $opsDir = Join-Path $ProjectRoot "ops\windows"
 $logDir = Join-Path $ProjectRoot "logs"
 Ensure-Dir $logDir
 
-$serviceScript = Join-Path $ProjectRoot "data_scraping_service.py"
+$serviceScript = Join-Path $ProjectRoot "data-pipeline\acquisition\data_scraping_service.py"
 
 Write-Host "Installing Data Scraping Service scheduled task from $opsDir"
 Write-Host "Project Root: $ProjectRoot"
@@ -63,7 +63,7 @@ if (-not `$ProjectRoot) {
 if (-not (Test-Path `$logDir)) { New-Item -ItemType Directory -Path `$logDir | Out-Null }
 
 `$logFile = Join-Path `$logDir "data_scraping_service.log"
-`$script = Join-Path `$ProjectRoot "data_scraping_service.py"
+`$script = Join-Path `$ProjectRoot "data-pipeline\acquisition\data_scraping_service.py"
 
 Push-Location `$ProjectRoot
 try {
