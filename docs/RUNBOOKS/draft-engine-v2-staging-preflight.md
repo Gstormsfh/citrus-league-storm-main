@@ -1,631 +1,461 @@
-# Draft Engine v2 — Staging Preflight Runbook
+# Draft Engine — Staging Preflight Runbook
 
-> **Audience.** Anyone validating the staging environment before
-> Phase 1 of Draft Engine v2 begins, or running the staging
-> simulator/chaos harness in any subsequent phase. This document
-> assumes **no prior knowledge of the codebase**. Every command is
-> spelled out; every file path is absolute or relative to the repo
-> root.
-
-> **Companion docs.**
-> - `docs/DRAFT_ENGINE_V2_SPEC.md` — the formal contract. This
->   runbook references it by section number (e.g. §6.1).
-> - `docs/DRAFT_ENGINE_V2_PLAN.md` — the multi-phase plan.
-
-> **Environment under test.** All Phase 0–7 work runs **only** on:
-> - Public URL: `staging.citrusfantasysports.com`
-> - Supabase project ref: `jjgspcpvqaiitloglxbb`
-> - GCP project: `citrus-fantasy-staging` (per
->   `docs/RUNBOOKS/GCP_ORG_SETUP.md`; provisioned in the GCP
->   migration runbook)
-> - Cloud Run service name: `citrus-api-staging` (region
->   `us-central1`)
->
-> **Production is untouched.** If any command in this runbook
-> targets a project ref or hostname other than the four above, stop
-> and re-read the command. Hostname-confusion was a contributor to
-> at least one of the prior live-draft incidents.
+> **Status:** post-11g.9 persistent-engine preflight. Replaces the
+> pre-Phase-4.5 preflight (which was Cloud-Run + Edge-Function + pgmq
+> oriented).
+> **Audience:** anyone validating staging before a deploy, anyone
+> standing staging back up after 10b re-provisioning, or anyone
+> verifying the staging engine matches expected operational shape.
+> **Companion docs:**
+> - [`README.md`](./README.md) — which runbook for which situation.
+> - [`draft-engine-v2-operations.md`](./draft-engine-v2-operations.md) — incident response.
+> - [`draft-engine-v2-rollback-playbook.md`](./draft-engine-v2-rollback-playbook.md) — when to roll back.
+> - [`../PHASE_4_5_PRODUCTIONIZATION_PLAN.md`](../PHASE_4_5_PRODUCTIONIZATION_PLAN.md) §6.1 — 10b staging re-provisioning detail.
 
 ---
 
-## Contents
+## ⚠ Legacy-path warning
 
-1. Prerequisites
-2. Phase 0 infrastructure preflight checks
-3. Seeding a test league
-4. Verifying Realtime is firing
-5. Resetting state between runs
-6. Comparing clocks across N browser tabs
-7. Documented results template
+The pre-Phase-4.5 preflight checked: `pgmq` installable, sub-minute
+pg_cron firing, Edge Function max duration, `draft_generation`
+column collisions. **None of these checks apply to the post-11g.9
+architecture.** pgmq + pg_cron jobs + Edge Function were DROP CASCADE'd
+in chunk 11g.9 (irreversible). If you find yourself running those
+checks against staging, you're working off the wrong runbook.
 
 ---
 
 ## §1 Prerequisites
 
-### §1.1 Tools you need on your laptop
+### §1.1 Tools
 
 ```bash
-# Supabase CLI (for `db push`, `functions deploy`, SQL execution)
+# Supabase CLI (for db push, sql execution)
 npm install -g supabase
 supabase --version              # ≥ 1.200.0
 
-# psql, for direct SQL against the staging DB
+# psql, for direct SQL against staging DB
 which psql                       # any 14+ client is fine
 
 # Node 20.x (matches CI)
 node --version                   # v20.x
 
-# jq (used in many of the SQL-vs-API comparison snippets)
-which jq
-
-# gcloud (for Cloud Run logs / config inspection)
+# gcloud (for GCE VM logs / config)
 gcloud --version
+
+# jq (for JSON-out parsing in some checks below)
+which jq
 ```
 
-### §1.2 Credentials you need
+### §1.2 Credentials and environment
 
-These are stored in 1Password under `citrus-fantasy-staging`. Do
-not paste them into chat or the repo. Export them in your shell
-**only** for the duration of preflight:
+Stored in 1Password under `citrus-fantasy-staging`. Do not paste into
+chat or commit. Export for the duration of preflight only:
 
 ```bash
 export SUPABASE_PROJECT_REF=jjgspcpvqaiitloglxbb
 export SUPABASE_URL=https://${SUPABASE_PROJECT_REF}.supabase.co
+# DIRECT primary URL (port 5432) — NOT the pooler URL (6543).
+# Pooled URLs drop LISTEN frames silently; the LISTEN/NOTIFY self-test
+# below depends on this being correct.
 export SUPABASE_DB_URL='postgresql://postgres:<service-pw>@db.jjgspcpvqaiitloglxbb.supabase.co:5432/postgres'
 export SUPABASE_SERVICE_ROLE_KEY='<from 1Password>'
 export SUPABASE_ANON_KEY='<from 1Password>'
-export STAGING_API_BASE='https://staging.citrusfantasysports.com'
+
+# Staging engine endpoint (set after 10b re-provisioning):
+export STAGING_ENGINE_HOST='<TODO(10b): populate from re-provisioned VM>'
+export STAGING_ENGINE_HTTP_PORT=3001
+export STAGING_ENGINE_WS_PORT=3002
 ```
 
-**Sanity check before proceeding** (this is what every later command
-relies on):
+### §1.3 Sanity check before proceeding
+
+Every later command depends on `psql` connectivity:
 
 ```bash
 psql "$SUPABASE_DB_URL" -c "SELECT current_database(), current_user, version();"
-# Expect: current_database = postgres, current_user = postgres, version
-# string starts with "PostgreSQL".
+# Expect: current_database = postgres, current_user = postgres,
+# version string starts with "PostgreSQL".
 ```
 
-If `psql` fails to connect, fix that before doing anything else; no
-SQL command in this runbook will work otherwise.
+If `psql` fails to connect, fix that first — no later check works
+without it.
 
-### §1.3 Repo state
+### §1.4 Repo state
 
 ```bash
-git fetch origin
-git checkout claude/debug-staging-environment-mv9CY-ZS8os
+cd /c/Users/garre/Documents/citrus-league-storm-phase45 && \
+git fetch origin && \
+git checkout phase-4-5-implementation && \
 git pull --ff-only
 ```
 
-All of Phase 0's work — and only Phase 0's work — lands on this
-branch.
-
 ---
 
-## §2 Phase 0 infrastructure preflight checks
+## §2 Persistent-engine infrastructure checks
 
-Each check below produces a one-line result. Record the result in
-the **Documented results template** (§7). If any check fails or the
-result is uncertain, **stop and surface to the user before Phase 1
-begins**.
+Each check produces a one-line result. Record in §6 results template.
+If any check fails or is uncertain, **stop and investigate** before
+the engine is allowed to serve traffic.
 
-### §2.1 Postgres version (pgmq bug-window check)
-
-The pgmq extension has a known `drop_queue` overload bug in
-Postgres `17.6.1.016+` (a specific window). v2 requires a Postgres
-version outside that window.
+### §2.1 Postgres version + extensions sanity
 
 ```bash
 psql "$SUPABASE_DB_URL" -At -c "SELECT version();"
-```
-
-**Pass criteria.** Major version ≥ 15. Patch revision NOT in the
-documented bug window (consult Supabase changelog if revision is
-17.6.1.x). Record the exact version string in §7.
-
-### §2.2 pgmq is installable
-
-```bash
 psql "$SUPABASE_DB_URL" -At -c "
-  SELECT name, default_version, installed_version
-  FROM pg_available_extensions
-  WHERE name = 'pgmq';
+  SELECT extname, extversion
+  FROM pg_extension
+  WHERE extname IN ('pg_net', 'pgcrypto', 'uuid-ossp', 'pgmq');
 "
 ```
 
-**Pass criteria.** A row is returned. If `installed_version` is
-NULL, that is fine for Phase 0 — Phase 3 installs it. Record both
-columns.
+**Pass criteria:**
+- PostgreSQL ≥ 15 (any recent Supabase managed version qualifies).
+- `pgcrypto` and/or `uuid-ossp` present (for `gen_random_uuid()`).
+- **`pgmq` MUST NOT be present.** It was DROP CASCADE'd in chunk 11g.9
+  (`supabase/migrations/20260512000000_remove_pgmq_infrastructure.sql`).
+  If `pgmq` appears in the output, the migration didn't apply or staging
+  is on an older snapshot — investigate before proceeding.
 
-### §2.3 pg_cron is installed and at ≥ 1.6.4
-
-```bash
-psql "$SUPABASE_DB_URL" -At -c "
-  SELECT extversion FROM pg_extension WHERE extname = 'pg_cron';
-"
-```
-
-**Pass criteria.** Returns a single row with `extversion ≥ 1.6.4`.
-If absent, halt — Supabase Pro is required (see
-`supabase/migrations/20260208400000_supabase_pro_upgrade.sql`).
-
-### §2.4 Sub-minute pg_cron actually fires 6×/min
-
-This is what the safety-net sweep (§7.8 of the spec) depends on.
-
-```bash
-psql "$SUPABASE_DB_URL" <<'SQL'
--- Schedule a 10-second job that just inserts a row.
-DROP TABLE IF EXISTS preflight_cron_test;
-CREATE TABLE preflight_cron_test(t timestamptz default now());
-SELECT cron.schedule(
-  'preflight-10s', '*/10 * * * * *',
-  $$INSERT INTO preflight_cron_test DEFAULT VALUES$$
-);
-SQL
-
-# Wait one full minute.
-sleep 65
-
-psql "$SUPABASE_DB_URL" -At -c "
-  SELECT count(*) FROM preflight_cron_test
-  WHERE t > now() - interval '60 seconds';
-"
-```
-
-**Pass criteria.** Output is `5` or `6`. (Sub-minute cron fires
-roughly every 10s; allow ±1 due to scheduler jitter at the second
-boundary.) Anything ≤ 4 means sub-minute is NOT working — surface
-to the user.
-
-**Cleanup** (do this regardless of pass/fail):
-
-```bash
-psql "$SUPABASE_DB_URL" <<'SQL'
-SELECT cron.unschedule('preflight-10s');
-DROP TABLE IF EXISTS preflight_cron_test;
-SQL
-```
-
-### §2.5 `net.http_post` (pg_net) is available
-
-The keep-alive cron job that re-invokes the worker depends on this.
+### §2.2 `draft_events` + `draft_snapshots` tables exist and are healthy
 
 ```bash
 psql "$SUPABASE_DB_URL" -At -c "
-  SELECT extversion FROM pg_extension WHERE extname = 'pg_net';
+  SELECT relname, reltuples::bigint AS approx_rows
+  FROM pg_class
+  WHERE relname IN ('draft_events', 'draft_snapshots',
+                    'draft_picks_v2', 'auction_bids',
+                    'auction_nominations', 'auction_budgets')
+  ORDER BY relname;
 "
 ```
 
-**Pass criteria.** Returns a non-empty version string. If empty,
-record and surface — the worker keep-alive design needs adjustment
-(plan §3 phase 3 keep-alive bullet).
+**Pass criteria:** all six tables present. Row counts not asserted
+(varies with staging-data state); the existence check is what matters.
 
-### §2.6 Edge Function max duration ceiling
+### §2.3 `draft_events_notify_after_insert` trigger is installed
 
-The long-running worker design (spec §5.3) relies on a 150s
-ceiling. Verify the staging plan supports it.
-
-Open the Supabase dashboard for project `jjgspcpvqaiitloglxbb` →
-Settings → Functions, and read off the **max execution duration**
-field. Record the exact number of seconds in §7. Pass criteria:
-≥ 150s.
-
-### §2.7 Realtime concurrency cap
-
-Target = 500 drafts × ~20 clients = ~10,000 concurrent subscribers.
-Pro standard tier is ~500. **If the staging cap is below the
-target, this is a real blocker that must reach the user before
-Phase 3.**
-
-In the Supabase dashboard → Settings → Realtime, record:
-- **Max concurrent connections** (number).
-- **Channel cap** (if surfaced).
-
-Pass criteria: capture the number and write it down. The decision
-about (a) tier upgrade, (b) channel consolidation, or (c) reduced
-concurrent-draft ceiling is the user's; do not proceed past Phase 2
-until they have decided.
-
-### §2.8 `leagues` column-name collision check
-
-Spec §6.3 adds six columns to `leagues`. If any already exist on
-the staging schema, Phase 1's ALTER TABLE will fail or, worse,
-collide with pre-existing data.
+This is the chunk 11g.7-7e trigger that fires `pg_notify` on every
+`draft_events` INSERT. Without it, cross-process events do not reach
+the engine.
 
 ```bash
 psql "$SUPABASE_DB_URL" -At -c "
-  SELECT column_name
-  FROM information_schema.columns
-  WHERE table_name = 'leagues'
-    AND column_name IN (
-      'feature_flags',
-      'draft_event_counter',
-      'pick_deadline',
-      'draft_state',
-      'draft_generation',
-      'draft_shadow_mode'
-    )
-  ORDER BY column_name;
+  SELECT tgname, tgrelid::regclass, tgenabled
+  FROM pg_trigger
+  WHERE tgname = 'draft_events_notify_after_insert';
 "
 ```
 
-**Pass criteria.** **Zero rows returned.** If any rows return,
-record each collision and surface to the user. The plan documents
-the resolution paths (reuse via namespacing, rename, or
-inspect-and-migrate). Do not proceed to Phase 1 until the user has
-chosen.
+**Pass criteria:** one row returned with `tgrelid = draft_events`
+and `tgenabled = O` (origin / enabled). If zero rows: the chunk
+11g.7-7e migration `20260511000000_draft_events_notify.sql` did not
+apply.
 
-### §2.9 Auth + RLS sanity check (post-fix readiness)
-
-Spec §6.1 RLS requires `service_role` for writes and league
-member SELECT for reads. Confirm the existing RLS infrastructure
-on `leagues` is intact:
+### §2.4 `draft_events_notify_trigger()` function body is current
 
 ```bash
 psql "$SUPABASE_DB_URL" -At -c "
-  SELECT tablename, rowsecurity
-  FROM pg_tables WHERE tablename IN ('leagues','league_members');
+  SELECT pg_get_functiondef(oid)
+  FROM pg_proc
+  WHERE proname = 'draft_events_notify_trigger';
 "
 ```
 
-**Pass criteria.** Both rows show `rowsecurity = t`.
+**Pass criteria:** function body contains
+`pg_notify('draft_events', json_build_object('league_id', NEW.league_id, 'seq', NEW.seq)::text)`.
+If a different shape, the trigger is stale and the engine will fail
+to parse notifications.
+
+### §2.5 No legacy pgmq cron jobs
+
+Sanity check that chunk 11g.9 cleanup landed cleanly:
+
+```bash
+psql "$SUPABASE_DB_URL" -At -c "
+  SELECT jobname, schedule
+  FROM cron.job
+  WHERE jobname LIKE 'draft-%';
+"
+```
+
+**Pass criteria:** zero rows. The legacy `draft-deadline-sweep` and
+`draft-autopick-keepalive` jobs were unscheduled in chunk 11g.9
+(`20260512000000_remove_pgmq_infrastructure.sql`). If any rows
+return, the unschedule did not apply.
+
+### §2.6 `submit_pick_v2` accepts ADR-004 trusted-executor path
+
+ADR-004 modified `submit_pick_v2`'s user-kind branch to accept
+`service_role` callers (the engine) without requiring `auth.uid()`
+to match team owner — the engine has verified at the application
+layer per ADR-004 §5.3.
+
+```bash
+psql "$SUPABASE_DB_URL" -At -c "
+  SELECT pg_get_functiondef(oid)
+  FROM pg_proc
+  WHERE proname = 'submit_pick_v2';
+" | grep -A 2 "v_caller_role NOT IN"
+```
+
+**Pass criteria:** function body contains
+`v_caller_role NOT IN ('service_role', 'postgres')` in the user-kind
+branch. If absent, ADR-004's migration did not apply.
 
 ---
 
-## §3 Seeding a test league
+## §3 Engine deployment + startup verification
 
-The simulator (Phase 7) and any manual draft test need a clean
-league with a deterministic team / member layout. **This procedure
-is staging-only.** Never run it against prod.
-
-### §3.1 Synthetic users
+### §3.1 GCE VM connectivity
 
 ```bash
-psql "$SUPABASE_DB_URL" <<'SQL'
--- 12 synthetic auth users named test_user_01 .. test_user_12.
-DO $$
-DECLARE i int;
-BEGIN
-  FOR i IN 1..12 LOOP
-    INSERT INTO auth.users (id, email, raw_user_meta_data, created_at)
-    VALUES (
-      gen_random_uuid(),
-      format('test_user_%02s@citrusfantasysports.test', i),
-      jsonb_build_object('display_name', format('Test %02s', i)),
-      now()
-    )
-    ON CONFLICT (email) DO NOTHING;
-  END LOOP;
-END$$;
-SQL
+gcloud compute instances list --project=citrus-fantasy-staging \
+  --filter="name~draft-engine" \
+  --format="table(name,zone,status,networkInterfaces[0].accessConfigs[0].natIP)"
 ```
 
-### §3.2 League + teams + members
+**Pass criteria:** one row, status `RUNNING`, external IP populated.
+
+### §3.2 Engine process is running
 
 ```bash
-psql "$SUPABASE_DB_URL" <<'SQL'
-WITH new_league AS (
-  INSERT INTO leagues (id, name, settings, created_at)
-  VALUES (
-    gen_random_uuid(),
-    'Preflight Test League',
-    jsonb_build_object(
-      'team_count',           12,
-      'total_rounds',         15,
-      'pick_time_limit_seconds', 90,
-      'draft_format',         'snake'
-    ),
-    now()
-  )
-  RETURNING id
-),
-seeded_users AS (
-  SELECT u.id, row_number() OVER (ORDER BY u.email) AS slot
-  FROM auth.users u
-  WHERE u.email LIKE 'test_user_%@citrusfantasysports.test'
-  ORDER BY u.email LIMIT 12
-)
-INSERT INTO league_teams (id, league_id, owner_user_id, team_name, slot)
-SELECT gen_random_uuid(), nl.id, su.id, format('Team %02s', su.slot), su.slot
-FROM seeded_users su, new_league nl;
-
--- Capture the league id for subsequent commands.
-SELECT id AS preflight_league_id
-FROM leagues WHERE name = 'Preflight Test League'
-ORDER BY created_at DESC LIMIT 1;
-SQL
+ssh "$STAGING_ENGINE_HOST" "sudo systemctl status citrus-draft-engine --no-pager"
+# OR for Docker:
+ssh "$STAGING_ENGINE_HOST" "docker ps --filter name=citrus-draft-engine"
 ```
 
-Record the returned `preflight_league_id` in §7. All later commands
-use it as `$LEAGUE_ID`. Export it:
+**Pass criteria:** systemd service `active (running)` OR Docker
+container in `Up` state.
+
+### §3.3 Engine startup log sequence
+
+Within 30 seconds of process start, the following must appear in order:
 
 ```bash
-export LEAGUE_ID='<paste from above>'
+ssh "$STAGING_ENGINE_HOST" "sudo journalctl -u citrus-draft-engine -n 100 --no-pager" \
+  | grep -E "hono.listening|uws.listening|event_subscription.started|event_subscription.self_test"
 ```
 
-### §3.3 Verify the seed
+**Pass criteria** (all four present):
+
+```
+hono.listening               { port: 3001 }
+uws.listening                { port: 3002 }
+event_subscription.started   {}
+event_subscription.self_test_succeeded  {}
+```
+
+**Fail mode — `event_subscription.self_test_failed` (error):** the
+engine's `SUPABASE_DB_URL` is wrong (likely pooled URL). See §4.
+
+### §3.4 `SUPABASE_DB_URL` is direct (not pooled)
+
+The single most common operational misconfiguration. Direct =
+host `db.<project>.supabase.co`, port `5432`. Pooled =
+`pooler.supabase.com` or port `6543`.
 
 ```bash
-psql "$SUPABASE_DB_URL" -At -c "
-  SELECT count(*) AS team_count
-  FROM league_teams WHERE league_id = '$LEAGUE_ID';
+# Read the engine's effective env var (do NOT log the password):
+ssh "$STAGING_ENGINE_HOST" "
+  sudo systemctl show citrus-draft-engine -p Environment 2>/dev/null \
+    | grep -oP 'SUPABASE_DB_URL=postgresql://[^@]+@\K[^/?]+' \
+    || docker inspect citrus-draft-engine \
+       | grep -oP 'SUPABASE_DB_URL=postgresql://[^@]+@\K[^/?]+'
 "
 ```
 
-**Pass criteria.** Returns `12`.
+**Pass criteria:**
+- Host matches `db.<project>.supabase.co` pattern.
+- Port `5432` (default; absent in URL is fine).
+- Host does NOT contain `pooler.supabase.com`.
+- Port is NOT `6543`.
 
-> **Schema drift caveat.** If staging's `league_teams` /
-> `league_members` table or column names differ from the snippets
-> above (e.g. you find `members` instead of `league_members`), do
-> NOT silently rename inside this script — first reconcile against
-> the actual schema with
-> `\dt league*` and
-> `\d+ league_teams`, then update §3.2 in this runbook in the same
-> PR that does the seed.
+**Fail mode:** silent-failure of LISTEN/NOTIFY. Fix env var, restart
+service, re-run §3.3 startup verification.
 
 ---
 
-## §4 Verifying Realtime is firing
+## §4 LISTEN/NOTIFY end-to-end verification
 
-Realtime is a load-bearing dependency of the v2 client (spec §9.6).
-Verify it works on staging **before** Phase 5 begins building on it.
+The startup self-test (§3.3) is the cheap version. This is the
+end-to-end version: fire a real `draft_events`-shaped INSERT and
+confirm the engine receives + applies it.
 
-### §4.1 Subscribe to a test channel from one terminal
-
-```bash
-# In terminal A
-node - <<'JS'
-import { createClient } from '@supabase/supabase-js'
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
-const ch = sb
-  .channel('preflight-test-' + Date.now())
-  .on('broadcast', { event: 'event' }, (m) => console.log('GOT:', JSON.stringify(m)))
-  .subscribe(s => console.log('STATE:', s))
-setInterval(() => {}, 60000)
-JS
-```
-
-You should see `STATE: SUBSCRIBED` within ~2 seconds. If you see
-`CHANNEL_ERROR` or no state at all, Realtime is not reachable —
-stop and investigate (firewall, anon key, project ref).
-
-### §4.2 Publish from another terminal
+### §4.1 Trigger a synthetic NOTIFY directly via psql
 
 ```bash
-# In terminal B
-CHANNEL_NAME='<paste exact channel name from terminal A>'
-node - <<JS
-import { createClient } from '@supabase/supabase-js'
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
-const ch = sb.channel('${CHANNEL_NAME}')
-await ch.subscribe()
-await ch.send({ type: 'broadcast', event: 'event', payload: { hello: 'world' } })
-console.log('sent')
-process.exit(0)
-JS
-```
-
-**Pass criteria.** Terminal A logs `GOT: {... "payload":{"hello":"world"} ...}`
-within 1 second.
-
-### §4.3 Confirm broadcast on the v2 channel naming convention
-
-After Phase 1 ships and at least one event lands in `draft_events`,
-repeat §4.1 with the actual v2 channel name:
-
-```
-draft_events_v2:${LEAGUE_ID}
-```
-
-This is the exact convention the client (spec §9.6) subscribes to.
-Until Phase 1 is live, leave a TODO marker in §7 noting that this
-sub-step is gated on Phase 1 schema landing.
-
----
-
-## §5 Resetting state between runs
-
-Each preflight or simulator run leaves rows behind in `draft_events`
-(once Phase 1 lands), `draft_picks_v2`, the pgmq queue, and
-`leagues.draft_event_counter`. Reset is **per-league**, never
-global, and **never run against prod**.
-
-### §5.1 Hard guard — assert you're on staging
-
-The very first command of any reset script must be:
-
-```bash
-psql "$SUPABASE_DB_URL" -At -c "
-  SELECT CASE
-    WHEN current_setting('cluster_name', true) IS NULL
-      AND current_database() = 'postgres'
-      AND inet_server_addr()::text LIKE '%.jjgspcpvqaiitloglxbb%'
-    THEN 'staging'
-    ELSE 'NOT_STAGING'
-  END;
+psql "$SUPABASE_DB_URL" -c "
+  SELECT pg_notify('draft_events',
+                   json_build_object('league_id', 'preflight-test',
+                                     'seq', 999999)::text);
 "
 ```
 
-Bail if the result is not `staging`. Yes, this looks paranoid. The
-April 10 postmortem documented confusion about which environment
-was being acted on; this guard exists to prevent a recurrence.
-
-### §5.2 Reset just the test league
+Then check engine logs within 5 seconds:
 
 ```bash
-psql "$SUPABASE_DB_URL" <<SQL
-BEGIN;
-
--- Delete events FIRST (projection FK references events).
-DELETE FROM draft_picks_v2 WHERE league_id = '$LEAGUE_ID';
-DELETE FROM draft_events    WHERE league_id = '$LEAGUE_ID';
-
--- Reset league counters and state.
-UPDATE leagues SET
-  draft_event_counter = 0,
-  pick_deadline       = NULL,
-  draft_state         = 'not_started',
-  draft_generation    = 0
-WHERE id = '$LEAGUE_ID';
-
--- Drain pgmq messages for this league.
-DELETE FROM pgmq.q_draft_deadlines
-WHERE (message->>'league_id')::uuid = '$LEAGUE_ID';
-
-COMMIT;
-SQL
+ssh "$STAGING_ENGINE_HOST" "sudo journalctl -u citrus-draft-engine -n 50 --no-pager --since '10 seconds ago'" \
+  | grep "event_subscription.notification_received"
 ```
 
-**Pass criteria.** All four DELETEs succeed. Verify with:
+**Pass criteria:** at least one `event_subscription.notification_received`
+log line within 5s of the psql NOTIFY. The engine may then log
+`event_subscription.event_not_yet_visible` (because the synthetic
+seq doesn't correspond to a real `draft_events` row) — that's
+expected for this test.
+
+### §4.2 Trigger via a real RPC (covers the full INSERT → trigger → NOTIFY path)
+
+```bash
+# Call draft_pause via psql — produces real draft_events INSERT.
+# Pick a staging league_id that exists in draft_state = 'in_progress'.
+# TODO(10b): populate a known-good staging league_id for these checks.
+psql "$SUPABASE_DB_URL" -c "
+  SELECT public.draft_pause(
+    '<staging-league-id>'::uuid,
+    jsonb_build_object('kind', 'commissioner',
+                       'id', '<staging-commissioner-user-id>'::uuid)
+  );
+"
+```
+
+Then:
+
+```bash
+ssh "$STAGING_ENGINE_HOST" "sudo journalctl -u citrus-draft-engine -n 50 --no-pager --since '10 seconds ago'" \
+  | grep -E "event_subscription.notification_received|event_subscription.event_applied"
+```
+
+**Pass criteria:** both `notification_received` AND `event_applied`
+log lines fire within 2s. Then resume the league to leave staging
+state clean:
+
+```bash
+psql "$SUPABASE_DB_URL" -c "
+  SELECT public.draft_resume(
+    '<staging-league-id>'::uuid,
+    jsonb_build_object('kind', 'commissioner',
+                       'id', '<staging-commissioner-user-id>'::uuid)
+  );
+"
+```
+
+---
+
+## §5 Snapshot persistence + bootstrap verification
+
+### §5.1 `draft_snapshots` table is writable
 
 ```bash
 psql "$SUPABASE_DB_URL" -At -c "
-  SELECT
-    (SELECT count(*) FROM draft_events    WHERE league_id = '$LEAGUE_ID') AS events,
-    (SELECT count(*) FROM draft_picks_v2 WHERE league_id = '$LEAGUE_ID') AS picks,
-    (SELECT draft_event_counter FROM leagues WHERE id = '$LEAGUE_ID') AS counter,
-    (SELECT draft_state FROM leagues WHERE id = '$LEAGUE_ID') AS state;
+  SELECT count(*) FROM draft_snapshots WHERE created_at > now() - interval '24 hours';
 "
-# Expect: 0 | 0 | 0 | not_started
 ```
 
-### §5.3 Tear down the synthetic users (only at end of preflight)
+**Pass criteria:** non-zero count if any drafts have been active in
+the last 24h, OR zero count if staging has been quiet. Confirms the
+table exists and the engine has write access.
+
+### §5.2 Snapshot persistence emission verification
+
+If staging has an active draft, the engine should periodically emit
+`snapshot.persistence.written` for it. If no active draft,
+skip §5.2 and proceed.
 
 ```bash
-psql "$SUPABASE_DB_URL" <<SQL
-DELETE FROM league_teams WHERE league_id = '$LEAGUE_ID';
-DELETE FROM leagues       WHERE id        = '$LEAGUE_ID';
-DELETE FROM auth.users
-  WHERE email LIKE 'test_user_%@citrusfantasysports.test';
-SQL
+ssh "$STAGING_ENGINE_HOST" "sudo journalctl -u citrus-draft-engine -n 200 --no-pager" \
+  | grep "snapshot.persistence.written" | tail -5
 ```
 
-This is destructive. Only run when you are completely done with the
-preflight session.
+**Pass criteria:** at least one log line in the last few minutes
+if there's an active draft.
+
+### §5.3 Bootstrap fallback path (full event-replay)
+
+Confirm the belt-and-suspenders path works: restart the engine and
+verify it bootstraps from snapshot+delta OR falls back cleanly to
+full event-replay.
+
+```bash
+# Restart the engine:
+ssh "$STAGING_ENGINE_HOST" "sudo systemctl restart citrus-draft-engine"
+
+# Watch logs for bootstrap behavior:
+ssh "$STAGING_ENGINE_HOST" "sudo journalctl -u citrus-draft-engine -n 100 --no-pager --since '30 seconds ago'" \
+  | grep -E "snapshot.bootstrap|registry.lobby_added"
+```
+
+**Pass criteria:** for each previously-active lobby, see either:
+- `snapshot.bootstrap.applied` (info) — snapshot+delta path worked, OR
+- `snapshot.bootstrap.fallback_full_replay` (warn) — fallback worked
+  (acceptable; may indicate version mismatch or missing snapshot).
+
+Both outcomes are correct. **Fail mode** = lobby fails to bootstrap
+at all (no `registry.lobby_added` for an expected lobby).
 
 ---
 
-## §6 Comparing clocks across N browser tabs
+## §6 Documented results template
 
-The v2 client (spec §9.5) uses a multi-sample handshake to compute
-each client's offset from server time. The simulator (Phase 7)
-asserts that **all** subscribed tabs see the same `pick_deadline`
-within ±300ms. This procedure verifies the handshake works in
-practice, on real staging.
-
-### §6.1 Open N tabs
-
-Open `staging.citrusfantasysports.com` in N tabs. (Until Phase 5
-lands, this URL still serves v1; the procedure works against the
-v1 draft room as a baseline.) Sign in to N different test users
-(one per tab). All tabs join the **same** `$LEAGUE_ID`.
-
-### §6.2 Snapshot the perceived deadline from each tab
-
-In every tab's DevTools console, paste:
-
-```js
-(async () => {
-  const t_send = performance.now();
-  const r = await fetch('/api/draft/v2/league/' +
-    new URL(location.href).pathname.split('/').filter(Boolean)[1] +
-    '/sync', { credentials: 'include' });
-  const t_recv = performance.now();
-  const j = await r.json();
-  console.table({
-    rtt_ms:               Math.round(t_recv - t_send),
-    server_time:          j.server_time,
-    pick_deadline:        j.pick_deadline,
-    perceived_remaining_ms: j.pick_deadline
-      ? new Date(j.pick_deadline) - Date.now()
-      : null,
-    ua:                   navigator.userAgent.slice(0, 40)
-  });
-})();
-```
-
-(Until Phase 1 lands `/sync` on staging, substitute the v1 endpoint
-that returns `timerStartedAt + pickTimeLimit`. This procedure exists
-both as a baseline against v1 and as the intended validation step
-post-Phase 1.)
-
-### §6.3 Pass criteria
-
-- Across N tabs, the **maximum** difference in
-  `perceived_remaining_ms` is ≤ 300ms when all tabs were sampled
-  within 1 second of each other.
-- All tabs report identical `pick_deadline` strings (server is the
-  authority — this is the principle being validated).
-- `server_time` differs across tabs only by RTT (≤ 2× the largest
-  observed RTT).
-
-If any of the above fails by >2×, capture the offending tab's full
-console output (including `navigator.userAgent` and the RTT) and
-attach to the §7 results table — this is exactly the kind of clock
-issue v2's design is built to eliminate, and the failure pattern
-informs whether the multi-sample handshake needs more samples or
-shorter inter-sample gaps.
-
-### §6.4 Skew injection (chaos baseline)
-
-To prove the handshake compensates for skewed device clocks, in
-each tab override `Date.now()` with a fixed offset before running
-§6.2:
-
-```js
-const skewMs = 2000; // try -2000, +2000, +5000, -5000
-const _now = Date.now;
-Date.now = () => _now() + skewMs;
-```
-
-Pass criteria identical to §6.3. Skew is allowed; what must hold is
-that **`pick_deadline` agrees across tabs** (it is server-anchored)
-and that the client's reported `perceived_remaining_ms` only differs
-by RTT.
-
----
-
-## §7 Documented results template
-
-Copy this block into the PR description (or a comment on the
-preflight PR) when you finish. Every row is required.
+Copy this block into the preflight PR or operations issue when done.
 
 ```
-## Phase 0 staging preflight — results
+## Staging preflight — results
 
 Environment under test:
-- Hostname:                 staging.citrusfantasysports.com
+- VM:                       <gce-vm-name>
+- IP:                       <external-ip>
 - Supabase project ref:     jjgspcpvqaiitloglxbb
-- Branch:                   claude/debug-staging-environment-mv9CY-ZS8os
+- Engine SHA:               <git rev-parse HEAD>
+- Branch:                   phase-4-5-implementation
 - Run by:                   <name>
 - Run date (Mountain Time): <YYYY-MM-DD HH:MM>
 
-| Check                              | Result | Notes |
-|------------------------------------|--------|-------|
-| §2.1 Postgres version              |        |       |
-| §2.2 pgmq installable              |        |       |
-| §2.3 pg_cron version               |        |       |
-| §2.4 Sub-minute pg_cron count/min  |        |       |
-| §2.5 pg_net version                |        |       |
-| §2.6 Edge Function max duration    |        |       |
-| §2.7 Realtime concurrency cap      |        |       |
-| §2.8 `leagues` column collisions   |        |       |
-| §2.9 RLS rowsecurity flags         |        |       |
-| §3   Seed test league id           |        |       |
-| §4.1 Realtime SUBSCRIBED state     |        |       |
-| §4.2 Cross-tab broadcast received  |        |       |
-| §5   Reset round-trip clean        |        |       |
-| §6.3 Max tab clock divergence (ms) |        |       |
-| §6.4 Skew-injection result         |        |       |
+| Check                                              | Result | Notes |
+|----------------------------------------------------|--------|-------|
+| §2.1 PG version + extensions (pgmq MUST be absent) |        |       |
+| §2.2 draft_events / draft_snapshots tables exist   |        |       |
+| §2.3 draft_events_notify_after_insert trigger      |        |       |
+| §2.4 draft_events_notify_trigger() function body   |        |       |
+| §2.5 No legacy pgmq cron jobs                      |        |       |
+| §2.6 submit_pick_v2 ADR-004 trusted-executor path  |        |       |
+| §3.1 GCE VM is RUNNING                             |        |       |
+| §3.2 Engine process is running                     |        |       |
+| §3.3 Engine startup log sequence (all 4 lines)     |        |       |
+| §3.4 SUPABASE_DB_URL is direct (not pooled)        |        |       |
+| §4.1 Synthetic NOTIFY received within 5s           |        |       |
+| §4.2 Real-RPC NOTIFY + apply within 2s             |        |       |
+| §5.1 draft_snapshots table writable                |        |       |
+| §5.2 snapshot.persistence.written emission         |        |       |
+| §5.3 Bootstrap on restart (snapshot OR fallback)   |        |       |
 
-Open issues raised to user:
-- Realtime concurrency cap decision (§2.7): <decision or pending>
-- `leagues` column collisions (§2.8):       <decision or pending>
-- Other:
+Open issues raised:
+- <any>
 ```
 
-When all rows are filled in and the two open issues from §2.7 and
-§2.8 are either resolved or explicitly deferred-with-mitigation,
-Phase 0 is complete and Phase 1 may begin **after** the 48h
-calendar gate.
+When every check passes, the staging engine is operational and
+matches expected post-11g.9 shape.
+
+---
+
+## §7 Pre-cutover transient-state sidebar
+
+> **This section retires at chunk 11g.10 sub-step 10f (production
+> cutover).** Until then, the preflight applies to the GCE-deployed
+> draft engine alone; the main `citrus-api` (HTTP for non-draft
+> features) still runs on Cloud Run separately and has its own
+> health checks outside this runbook.
+
+During pre-cutover transient:
+
+- The engine is reachable via `STAGING_ENGINE_HOST:3001` (Hono) +
+  `STAGING_ENGINE_HOST:3002` (uWS).
+- The main API is reachable via `staging.citrusfantasysports.com`
+  (Cloud Run).
+- Cross-process events flow Postgres → engine via LISTEN/NOTIFY.
+  Verified by §4 above.
+
+Post-cutover, both services collapse onto the GCE VM (per ADR-001 +
+`../PHASE_4_5_ARCHITECTURE.md`) and `staging.citrusfantasysports.com`
+points at GCE. 10f's deliverable includes the cutover sequencing.

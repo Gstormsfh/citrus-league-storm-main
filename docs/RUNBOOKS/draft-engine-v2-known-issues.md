@@ -225,6 +225,30 @@ wire-up needed for chunk 9d.
 
 ---
 
+---
+
+## Persistent-engine known issues (post-11g.9)
+
+> Section added 2026-05-19 at chunk 11g.10 sub-step 10e. Initial
+> registry for known operational quirks in the post-pgmq persistent-
+> engine world. Populated as 10b/10c/10d surface real operational
+> behavior; the initial KI-010 below documents the most likely
+> deploy-time misconfiguration even without an observed incident
+> (silent-failure mode → worth pre-emptive documentation).
+
+### KI-010 — PgBouncer-pooled `SUPABASE_DB_URL` drops LISTEN frames silently
+
+| | |
+|---|---|
+| **Severity** | high (silent failure → cross-process events invisible to engine until WS reconnect bootstrap) |
+| **Function / file** | `server/src/draft/eventSubscription.ts` (consumes `SUPABASE_DB_URL`); deployment env (the actual value lives in GCE service env / Docker env, not in code). |
+| **Description** | The chunk 11g.7-7e LISTEN/NOTIFY path requires a direct primary Postgres connection. PgBouncer / Supabase pooled connections (port `6543`, host `pooler.supabase.com`) accept LISTEN commands without error but never propagate notifications to the client. Symptom: engine reaches `event_subscription.started` cleanly but never receives notifications; cross-process events (commissioner pause/resume/extend, override) are invisible to the engine until a WS reconnect triggers bootstrap. Bootstrap is the correctness foundation — no events are lost — but runtime behavior degrades: commissioner actions appear to "not work" until users reconnect their browser tabs. |
+| **Why deferred** | Not deferred — this is documented as a known operational gotcha rather than a code defect. The chunk 11g.7-7e startup self-test (synthetic NOTIFY within 5s of LISTEN; failure fires `event_subscription.self_test_failed` with explicit operator hint) is the in-code mitigation. The KI exists because the failure mode is silent at deploy time if the self-test is somehow disabled or its log is missed — operators should know to look for this. |
+| **Target phase for resolution** | Operational, not code. Resolution = (a) deploy-pipeline assertion that `SUPABASE_DB_URL` doesn't match pooled patterns (TODO(10b): add to deploy checks), AND (b) on-call awareness via this KI + `draft-engine-v2-staging-preflight.md` §3.4. |
+| **Verification test** | `draft-engine-v2-staging-preflight.md` §3.4 (env-variable inspection) AND §4.1 (synthetic NOTIFY end-to-end test). Both checks must pass for the engine to be considered operational. |
+
+---
+
 ## How to add a row
 
 When a code review surfaces a deferral, before the commit lands:

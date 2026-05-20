@@ -25,7 +25,7 @@ The performance targets above require specific architectural choices. Designs th
 
 3. **In-memory candidate pool and pre-computed scoring per draft.** Autopick decisions consult cached state, not Postgres queries. A per-pick query of the player pool cannot meet sub-1s autopick latency.
 
-4. **Postgres as durability and disaster recovery, not hot path.** The event log, projection tables, and pgmq scheduler remain as the source of truth and the safety net. They are not on the hot path for manual pick submission, broadcast fanout, or autopick scoring.
+4. **Postgres as durability and disaster recovery, not hot path.** The event log and projection tables are both the source of truth and the durability backstop. LISTEN/NOTIFY (chunk 11g.7-7e) provides cross-process signaling to the engine when other processes append to `draft_events`. None of these is on the hot path for manual pick submission, broadcast fanout, or autopick scoring.
 
 5. **WebSocket reconnection with state snapshot recovery.** Mobile network blips, page refreshes, and brief connection drops are normal user behavior. Clients must reconnect and resync within 2 seconds without losing draft progress.
 
