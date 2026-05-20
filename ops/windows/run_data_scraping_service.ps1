@@ -13,7 +13,7 @@ $logDir = Join-Path $ProjectRoot "logs"
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
 
 $logFile = Join-Path $logDir "data_scraping_service.log"
-$script = Join-Path $ProjectRoot "data_scraping_service.py"
+$script = Join-Path $ProjectRoot "data-pipeline\acquisition\data_scraping_service.py"
 
 Push-Location $ProjectRoot
 try {
