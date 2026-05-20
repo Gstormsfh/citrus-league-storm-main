@@ -787,38 +787,48 @@ def run_unified_loop() -> Tuple[str, int]:
                 _mark_job(db_client, "landing_trueup", date_str, "failed")
                 logger.error(f"{tag} LANDING Error: {e}")
 
-    # --- CATCH-UP: Check yesterday first (if any jobs missed) ---
+    # --- CATCH-UP: Check the last 7 days (any deferred days get re-attempted) ---
+    # Per ENGINEERING.md §12.14 (2026-05-12 incident): the prior 1-day lookback
+    # caused days deferred via the live_now>0 branch to roll off the window
+    # after 24h and never be re-attempted. Widened to 7 days so a deferred day
+    # gets a fresh attempt every off-hours run for a full week.
+    #
     # CRITICAL: skip catch-up when there were no games to process and when
     # there are LIVE games today. The catch-up iterates the NHL landing
     # endpoint for all 938 season players (~30 min), which blocks the
-    # main loop and starves live game polling. If yesterday had zero
-    # games in nhl_games, there's nothing to catch up — auto-mark the
-    # jobs complete and move on.
-    yesterday_str = (now - dt.timedelta(days=1)).strftime("%Y-%m-%d")
-    if not _job_completed(db, "landing_trueup", yesterday_str):
-        # Check if yesterday had any games at all
+    # main loop and starves live game polling. If a day had zero games in
+    # nhl_games, there's nothing to catch up — auto-mark the jobs complete
+    # and move on.
+    live_now = len([g for g in games if str(g.get("status", "")).lower() in ("live", "in_progress")])
+    yesterday_str = (now - dt.timedelta(days=1)).strftime("%Y-%m-%d")  # referenced below to gate today's pipeline
+    for days_back in range(1, 8):
+        catchup_str = (now - dt.timedelta(days=days_back)).strftime("%Y-%m-%d")
+        if _job_completed(db, "landing_trueup", catchup_str):
+            continue
+        # Check if this day had any games at all
         try:
-            y_games = db.select("nhl_games", select="game_id", filters=[("game_date", "eq", yesterday_str)], limit=1)
-            had_games = bool(y_games)
+            d_games = db.select("nhl_games", select="game_id", filters=[("game_date", "eq", catchup_str)], limit=1)
+            had_games = bool(d_games)
         except Exception:
             had_games = True  # if we can't check, be safe and run catch-up
 
-        # Check if any live games are running RIGHT NOW (on today's slate)
-        live_now = len([g for g in games if str(g.get("status", "")).lower() in ("live", "in_progress")])
-
         if not had_games:
-            logger.info(f"[CATCH-UP] Yesterday ({yesterday_str}) had no games — marking complete and skipping.")
+            logger.info(f"[CATCH-UP] {catchup_str} had no games — marking complete and skipping.")
             try:
-                _mark_job(db, "landing_trueup", yesterday_str)
-                _mark_job(db, "pbp_extraction", yesterday_str)
-                _mark_job(db, "ppp_sync", yesterday_str)
+                _mark_job(db, "landing_trueup", catchup_str)
+                _mark_job(db, "pbp_extraction", catchup_str)
+                _mark_job(db, "ppp_sync", catchup_str)
             except Exception as e:
-                logger.warning(f"[CATCH-UP] Failed to auto-mark: {e}")
+                logger.warning(f"[CATCH-UP] Failed to auto-mark {catchup_str}: {e}")
         elif live_now > 0:
-            logger.info(f"[CATCH-UP] Deferring yesterday catch-up — {live_now} live game(s) being polled. Will retry in off-hours.")
+            # live_now is a today-wide condition. If we're deferring this day, we'd defer
+            # any older day too — the catch-up pipeline's heaviness doesn't depend on
+            # which historical day is being processed. Break so we don't log N defer lines.
+            logger.info(f"[CATCH-UP] Deferring catch-up for {catchup_str} (and any older incomplete days) — {live_now} live game(s) being polled. Will retry in off-hours.")
+            break
         else:
-            logger.info(f"[CATCH-UP] Yesterday ({yesterday_str}) pipeline incomplete — running catch-up...")
-            _run_nightly_pipeline(db, yesterday_str, is_catchup=True)
+            logger.info(f"[CATCH-UP] {catchup_str} pipeline incomplete — running catch-up...")
+            _run_nightly_pipeline(db, catchup_str, is_catchup=True)
 
     # --- TODAY: Run nightly pipeline (no time-window restriction) ---
     today_str = now.strftime("%Y-%m-%d")
