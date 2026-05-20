@@ -417,7 +417,59 @@ Until 0c lands, the trap-door comment is the only mitigation needed — the load
 
 ---
 
-## §16. Bookkeeping summary
+## §16. `raw_shots_unique_shot` constraint conflates legitimate repeat-shot pairs
+
+**Capability:** preserve every legitimate shot event in `raw_shots`, including rapid-fire repeat-shot pairs (rebounds, point-blank scrambles, two shots from the same dot within seconds). Today the existing unique constraint `raw_shots_unique_shot (game_id, player_id, shot_x, shot_y, shot_type_code)` conflates such pairs into a single row.
+
+**Current state (audited 2026-05-19 against the season=2024 corpus, 119,870 mapped rows):** the unique constraint does not have enough columns to disambiguate two shots taken by the same player from the same NHL-integer-coordinate dot with the same `shot_type_code` (`SHOT`=506, `GOAL`=505, `MISS`=507). Because NHL stores shot coordinates as integers in [-100, 100] (x) and [-42, 42] (y), legitimate repeat shots can produce two CSV rows with identical conflict-key tuples.
+
+**Quantification (season=2024):**
+
+- 56 pairs (112 rows) share a conflict tuple with at least one other row
+- Unique tuples: 119,814 → 56 rows (0.047% of season) dropped under `keep=first` dedupe
+- All 56 collisions are 2-row pairs (no 3+ collisions)
+- All 10 highest-frequency tuples are SHOT events near the goal line (x ≥ 83 or x ≤ -85) — the rebound-scramble pattern this constraint cannot distinguish
+- Across all 8 historical seasons + 2025-26 partial: expected ~400 dropped rows corpus-wide (~0.044%)
+
+**How the conflation surfaces in writes:** Postgres rejects a single `INSERT ... ON CONFLICT DO UPDATE` batch that contains two rows with the same conflict tuple with error `21000 cardinality_violation` ("ON CONFLICT DO UPDATE command cannot affect row a second time"). The within-batch dedupe in `scripts/utilities/load_historical_shots_csv.py` keeps the first occurrence and drops the rest, mirroring the silent conflation that the existing prod scrape pipeline already produces for any same-batch repeats. Without the dedupe the load fails — with it, the conflation is silent (and matches prod's existing behavior).
+
+**Impact assessment (v1 features):**
+
+| Surface | Sensitivity | Why |
+|---|---|---|
+| xG model (production v3, AUC 0.817) | None observable | Aggregate shot rates and per-shot xG predictions both well below noise floor at 0.047% loss |
+| GAR (offensive + future defensive) | None observable | TOI-normalized rates; dropped rows don't change shifts or scoring meaningfully |
+| Player talent metrics, ROS projections | None observable | Same — rates and percentiles unmoved |
+| Aggregate shot leaderboards | None observable | Per-player totals shift by < 1 shot on average across a full season |
+| **Anomaly engine** (post-Phase-0 differentiator) | **SENSITIVE** | Rapid-fire detection is *exactly* the pattern this constraint masks. Two shots from the same dot in quick succession is precisely the signal the anomaly engine should be surfacing as "scramble in front of the net." Building anomaly detection on top of `raw_shots` without the v2 constraint would mean the engine cannot detect the events it is most intended to detect. |
+| Pre-shot pass-quality moat (0c output) | None | Pass features are measured per-pass, not per-shot-pair |
+
+**Unlock path (Option D from 2026-05-19 analysis — schema v2):**
+
+1. Verify MoneyPuck's `period` and `time_in_period` columns are populated ≥ 99.99% across all 8 historical seasons AND the live 2025-26 scrape. The live scraper writes `period` (integer) and `time_in_period` (varchar `MM:SS`); confirm equivalent coverage on the historical CSV.
+2. Add `period` + `time_in_period` to the unique constraint as `raw_shots_unique_shot_v2`. DDL change coordinated across staging and prod; non-trivial since the existing constraint is referenced by the live scraper's UPSERT logic and any analytics queries that JOIN on the conflict key.
+3. Update the live scraper (`data-pipeline/acquisition/data_acquisition.py:_save_shots_to_database`) and `scripts/utilities/load_historical_shots_csv.py` to write to the new constraint. The within-batch dedupe in the historical loader becomes a no-op once the constraint disambiguates the rebound-pair tuples.
+4. Re-run 0a against staging with the v2 constraint live to confirm zero dedupes; backfill prod via a coordinated migration that adds the columns to the constraint and re-runs the historical load (UPSERT idempotency preserves existing rows; deduped repeats now insert as second occurrences).
+
+**Estimated effort:** 1-2 days for the schema migration, scraper update, and validation gates. Most of the work is verifying no analytics query relies on the v1 constraint's narrower key.
+
+### Mitigation already in place
+
+Within-batch dedupe block above the `db.upsert()` call in `scripts/utilities/load_historical_shots_csv.py` with `keep=first` semantics. Surfaces dropped count in summary output (`Within-batch dedupes: N`) on every run so the operator sees the conflation rate. Cross-references this §16.
+
+### Strategic trigger to revisit
+
+**Apply the schema v2 unlock path when the anomaly engine is on the active roadmap, OR when any v2 feature surfaces the need for shot-level temporal granularity.** Concrete triggers:
+
+- Anomaly engine design phase (one of the six v1.5+ differentiator features per `HOCKEY_ANALYTICS_LANDSCAPE_2026.md`).
+- "Rapid-fire scramble" leaderboards or in-game narrative surfaces (e.g., "McDavid took 3 shots in 11 seconds during the OT period").
+- Any feature that joins `raw_shots` against a per-shot temporal sequence (route reconstruction, shift-narrative replays).
+
+Until those land, the within-batch dedupe + this documented loss rate is the right v1 posture — matches existing prod constraint behavior and keeps the 0a load clean.
+
+---
+
+## §17. Bookkeeping summary
 
 | § | Capability | Status | Cheapest unlock | Trigger to revisit |
 |---|---|---|---|---|
@@ -436,10 +488,11 @@ Until 0c lands, the trap-door comment is the only mitigation needed — the load
 | 13 | `extractor_job.py` retirement | **RETIRED 2026-05-12** | (done — moved to `_deprecated/`) | Operator may want to remove the Windows scheduled task entry |
 | 14 | Defensive GAR pipeline (EVD/PPD/Penalty) | engineering gap, deferred to 0d-post | implement on full multi-season corpus (~2-4 days) | After 0a + 0c land |
 | 15 | UPSERT clobbers moat features on re-run after 0c | documented; code mitigation deferred to post-0c | omit 7 moat columns from upsert payload (~30 min) | Post-0c closeout, before any loader re-run |
+| 16 | `raw_shots_unique_shot` conflates repeat-shot pairs | within-batch dedupe in loader; v2 schema deferred | add `period` + `time_in_period` to unique constraint (~1-2 days) | Anomaly engine design phase, or any v2 feature needing shot-level temporal granularity |
 
 ---
 
-## §17. Document maintenance
+## §18. Document maintenance
 
 Add a row here when:
 - A capability moves from active roadmap to deferred

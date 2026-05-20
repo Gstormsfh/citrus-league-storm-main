@@ -375,6 +375,7 @@ def main() -> int:
     mapped_rows: List[dict] = []
     unmappable = 0
     filtered_by_game_id = 0
+    within_batch_dedupes = 0
     total_seen = 0
     season_filtered = 0
     first_5_examples: List[dict] = []
@@ -416,6 +417,38 @@ def main() -> int:
 
         if not batch:
             continue
+
+        # Within-batch dedupe on the conflict tuple. Required to
+        # avoid Postgres 21000 cardinality_violation: INSERT ...
+        # ON CONFLICT DO UPDATE cannot affect the same row twice
+        # within a single statement. NHL stores coords as integers,
+        # so legitimate repeat-shot pairs (rebounds, point-blank
+        # scrambles) can land at identical (game_id, player_id,
+        # shot_x, shot_y, shot_type_code). This dedupe mirrors the
+        # behavior of the existing raw_shots_unique_shot constraint,
+        # which already conflates these pairs into one row.
+        # keep=first preserves chronologically-first occurrence.
+        # See GAPS_AND_FUTURE_CAPABILITIES.md §16 for the schema-
+        # level analysis and v2 unlock path.
+        seen_keys = set()
+        deduped = []
+        batch_dedupes_this_round = 0
+        for row in batch:
+            key = (row["game_id"], row["player_id"],
+                   row["shot_x"], row["shot_y"], row["shot_type_code"])
+            if key in seen_keys:
+                batch_dedupes_this_round += 1
+                continue
+            seen_keys.add(key)
+            deduped.append(row)
+        within_batch_dedupes += batch_dedupes_this_round
+        batch = deduped
+        # Reconcile moat_check (incremented during batch assembly above)
+        # so the strict NULL invariant check matches post-dedupe row count.
+        # All 7 moat features are written as None for every row by design,
+        # so each dropped row contributed one count to each moat counter.
+        for moat_col in MOAT_FEATURES_NULL_FOR_HISTORICAL:
+            moat_check[moat_col] -= batch_dedupes_this_round
 
         # NOTE: Dry-run does NOT validate Postgres column-type coercion.
         # PostgREST serialization + Postgres type checking only run on
@@ -480,6 +513,7 @@ def main() -> int:
     print(f"Unmappable rows:           {unmappable}")
     if args.game_id is not None:
         print(f"Filtered by --game-id {args.game_id}: {filtered_by_game_id:,}")
+    print(f"Within-batch dedupes:      {within_batch_dedupes:,}")
     print(f"{'Mapped (dry-run)' if args.dry_run else 'Upserted to raw_shots'}: {rows_processed:,}")
     print(f"Distinct game_ids:         {len(distinct_game_ids)}  (range: {min(distinct_game_ids) if distinct_game_ids else 'n/a'} .. {max(distinct_game_ids) if distinct_game_ids else 'n/a'})")
     print(f"Wall-clock:                {_format_elapsed(total_elapsed)}")
