@@ -196,16 +196,25 @@ Each playbook follows the same template:
      force a snapshot persistence to capture current state, then restart
      ONLY the affected lobby via registry eviction:
      ```bash
-     # Admin HTTP endpoint scaffolded at chunk 11g.10 sub-step 10b:
-     #   POST /api/admin/engine/lobby/<lobbyId>/evict
-     # Auth: requires is_engine_admin flag on caller's profile.
-     # Status: route is wired + auth-gated, but the cross-process
-     # delegate (main API → engine HTTP/RPC) is scaffolded with a 501
-     # NOT_IMPLEMENTED response. Full wiring lands in 10c/10d. Until
-     # then, the manual equivalent is a full engine restart:
-     #   ssh <vm-name> "sudo systemctl restart citrus-draft-engine"
-     # Heavier than needed (restarts ALL lobbies) but safe — durable
-     # state in draft_events is the source of truth; bootstrap recovers.
+     # Admin HTTP endpoint (chunk 11g.10 sub-step 10b — functional):
+     #   POST http://<engine-host>:3001/api/admin/engine/lobby/<lobbyId>/evict
+     #     Authorization: Bearer <jwt-of-is-engine-admin-user>
+     #
+     # Hits the engine's Hono port directly (port 3001 on the GCE VM).
+     # Force-closes all WS connections on the lobby with close code
+     # 4002 ("transient" — clients reconnect automatically) and removes
+     # the lobby from the LobbyRegistry. No data loss: draft_events is
+     # the source of truth; next client connect triggers fresh
+     # bootstrap.
+     #
+     # Response shape:
+     #   200 — { lobbyId, connectionsClosed, evictedAt }
+     #   404 — lobby not in registry (was never loaded OR already evicted)
+     #   403 — caller missing is_engine_admin
+     #
+     # Audit-log event emitted on success:
+     #   admin.endpoint.lobby_evicted { userId, lobbyId, outcome: 'success',
+     #                                  connectionsClosed, evictedAt }
      ```
 - **Escalation.** If the lobby reproduces the failure after engine restart,
   the state is durably wedged in Postgres (likely auction nomination state
@@ -849,26 +858,41 @@ When `ENGINE_SNAPSHOT_VERSION` is incremented:
 
 ### §6.5 Forcing a snapshot persistence
 
-Admin HTTP endpoint scaffolded at chunk 11g.10 sub-step 10b:
+Admin HTTP endpoint (chunk 11g.10 sub-step 10b — functional):
 
 ```
-POST /api/admin/engine/lobby/<lobbyId>/snapshot
+POST http://<engine-host>:3001/api/admin/engine/lobby/<lobbyId>/snapshot
 Authorization: Bearer <jwt-of-is-engine-admin-user>
 ```
+
+Hits the engine's Hono port directly (port 3001 on the GCE VM).
+Schedules a synchronous snapshot write through the LobbyManager's
+single-writer queue and awaits completion. Returns metadata about the
+latest snapshot row in `draft_snapshots`.
 
 Auth: requires `is_engine_admin` flag on caller's profile (per
 `profiles.is_engine_admin` column added by migration
 `20260520010000_add_profiles_is_engine_admin.sql`). Garrett gets this
 for free via the migration's `is_admin = true` backfill.
 
-Status: route + auth gating shipped at 10b. The cross-process delegate
-(main API → engine HTTP/RPC for the actual snapshot write) is
-scaffolded with a 501 NOT_IMPLEMENTED response — full wiring lands in
-10c/10d when perf harness + monitoring needs surface. Until then, the
-manual fallback is "wait for next scheduled snapshot" (periodic +
-milestone per chunk 11g.7-7c) OR `sudo systemctl restart
-citrus-draft-engine` (engine writes a clean-shutdown snapshot before
-exit).
+Response shape:
+- `200` — `{ lobbyId, scheduled: true, seq, engineVersion, persistedAt }`
+  (seq/engineVersion/persistedAt may be null if no snapshot row exists
+  yet — e.g., the lobby is in `not_started` or `paused` state where
+  the scheduler skipped the write per chunk 11g.7-7c semantics).
+- `404` — lobby not in registry.
+- `403` — caller missing `is_engine_admin`.
+
+Audit-log event emitted on success:
+```
+admin.endpoint.snapshot_forced { userId, lobbyId, leagueId,
+                                 outcome: 'success', seq }
+```
+
+If the engine process is unavailable (port unreachable), the manual
+fallback is `sudo systemctl restart citrus-draft-engine` — the engine
+writes a clean-shutdown snapshot before exit, and a fresh snapshot is
+written at bootstrap.
 
 ---
 

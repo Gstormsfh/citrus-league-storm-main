@@ -17,6 +17,7 @@
 #   SUPABASE_DB_URL          — direct primary URL, NOT pooled.
 #   SUPABASE_JWT_SECRET      — JWT signing/verification secret.
 #   SUPABASE_SERVICE_ROLE_KEY — admin client key.
+#   SUPABASE_ANON_KEY        — auth-middleware client key (admin endpoints).
 #   SUPABASE_URL             — public Supabase hostname (e.g.
 #                              https://jjgspcpvqaiitloglxbb.supabase.co).
 #
@@ -40,6 +41,7 @@ fail() {
 [ -n "${SUPABASE_DB_URL:-}" ] || fail "SUPABASE_DB_URL is empty or unset"
 [ -n "${SUPABASE_JWT_SECRET:-}" ] || fail "SUPABASE_JWT_SECRET is empty or unset"
 [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ] || fail "SUPABASE_SERVICE_ROLE_KEY is empty or unset"
+[ -n "${SUPABASE_ANON_KEY:-}" ] || fail "SUPABASE_ANON_KEY is empty or unset"
 [ -n "${SUPABASE_URL:-}" ] || fail "SUPABASE_URL is empty or unset"
 
 echo "✓ All required secrets present"

@@ -1071,6 +1071,38 @@ export class LobbyManager {
   }
 
   /**
+   * Phase 4.5 chunk 11g.10 sub-step 10b — engine-admin diagnostic.
+   *
+   * Returns a read-only snapshot of the lobby's identity + replay
+   * cursor + connection count, intended for the engine-admin
+   * `GET /api/admin/engine/registry` endpoint. Cheap (no IO);
+   * called on demand for the operational diagnostic view.
+   *
+   * `format` is the locked snake/linear/auction discriminator. The
+   * registry surfaces this for at-a-glance "what kind of draft is
+   * this lobby."
+   *
+   * `lastAppliedSeq` exposes the engine's replay cursor — useful for
+   * post-incident verification that the engine is caught up with
+   * durable state.
+   */
+  getDiagnosticInfo(): {
+    lobbyId: string;
+    leagueId: string;
+    format: 'snake' | 'linear' | 'auction';
+    connectionCount: number;
+    lastAppliedSeq: number;
+  } {
+    return {
+      lobbyId: this.lobbyId,
+      leagueId: this.leagueId,
+      format: this.format,
+      connectionCount: this.connections.size,
+      lastAppliedSeq: this.lastAppliedSeq,
+    };
+  }
+
+  /**
    * Iterate this lobby's active WebSocket connections (chunk 11g.7
    * sub-step 7d). Snapshots the `connections` map at call-start, then
    * walks the snapshot — safe against mid-iteration mutation (a

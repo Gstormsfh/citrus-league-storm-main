@@ -100,9 +100,19 @@ Object.assign(structuredLogger, createConsoleStructuredLogger());
 const honoPort = parseInt(process.env.PORT || '3001', 10);
 const wsPort = parseInt(process.env.DRAFT_WS_PORT || '3002', 10);
 
-// Minimal Hono app for the chunk 11g.2 scaffold smoke test. The full
-// Citrus Hono app (server/src/app.ts) wires in at chunk 11g.2 step 4-5.
-const app = new Hono();
+// Engine-process Hono app. Carries:
+//   - GET /health (chunk 11g.2 — scaffold smoke endpoint, kept).
+//   - /api/admin/engine/* — engine-ops admin endpoints, mounted
+//     post-registry-construction (chunk 11g.10 sub-step 10b).
+//
+// The Hono app is intentionally separate from the main API server
+// (server/src/app.ts) which runs on Cloud Run. Engine-process routes
+// manipulate engine-local in-memory state (LobbyRegistry, snapshot
+// pipeline) and have no equivalent on the API side.
+import type { Env as AppEnv } from '../app';
+import { createDraftAdminRoutes } from '../routes/draftAdmin';
+
+const app = new Hono<AppEnv>();
 app.get('/health', (c) => c.json({ ok: true, server: 'hono' }));
 
 // ── Start Hono ──
@@ -139,6 +149,7 @@ function emitDeploymentFingerprint(startTimeMs: number): void {
     'SUPABASE_DB_URL',
     'SUPABASE_JWT_SECRET',
     'SUPABASE_SERVICE_ROLE_KEY',
+    'SUPABASE_ANON_KEY',
     'PORT',
     'DRAFT_WS_PORT',
   ];
@@ -591,6 +602,26 @@ const lobbyRegistry = new LobbyRegistry({
   // through the registry to every constructed LobbyManager.
   supabase: supabaseAdmin,
 });
+
+// Phase 4.5 chunk 11g.10 sub-step 10b — mount engine-ops admin routes
+// at /api/admin/engine/* on the engine's Hono server.
+//
+// Auth: existing authMiddleware (JWT validation via Supabase auth API).
+// Requires SUPABASE_URL + SUPABASE_ANON_KEY in the engine's env — the
+// GCE startup script injects both alongside the chunk-11g.10-10b
+// secret additions (SUPABASE_DB_URL, SUPABASE_SERVICE_ROLE_KEY).
+//
+// Per-route is_engine_admin gate is implemented inside the factory.
+// Audit-log events fire on every successful admin action
+// (admin.endpoint.snapshot_forced, admin.endpoint.lobby_evicted,
+// admin.endpoint.registry_read) for durable operational trail.
+app.route(
+  '/api/admin',
+  createDraftAdminRoutes({
+    registry: lobbyRegistry,
+    supabaseAdmin,
+  }),
+);
 
 // ── Start uWS ──
 let uwsHandle: UwsServerHandle | null = null;

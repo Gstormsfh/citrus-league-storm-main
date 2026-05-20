@@ -119,6 +119,14 @@ SECRET_DB_URL_NAME="${SECRET_DB_URL_NAME:-supabase-db-url}"
 SECRET_SERVICE_ROLE_NAME="$(metadata_get secret-service-role-name)"
 SECRET_SERVICE_ROLE_NAME="${SECRET_SERVICE_ROLE_NAME:-supabase-service-role-key}"
 
+# SUPABASE_ANON_KEY — required by authMiddleware in the engine-process
+# Hono server (chunk 11g.10 sub-step 10b admin-endpoint relocation).
+# Cryptographically public (exposed in Vite bundle on the frontend),
+# but tracked in Secret Manager for consistency with the other Supabase
+# env vars.
+SECRET_ANON_KEY_NAME="$(metadata_get secret-anon-key-name)"
+SECRET_ANON_KEY_NAME="${SECRET_ANON_KEY_NAME:-supabase-anon-key}"
+
 # Public Supabase hostname (not secret — embedded in build, but
 # can be overridden per environment via metadata).
 SUPABASE_URL_VALUE="$(metadata_get supabase-url)"
@@ -147,6 +155,7 @@ echo "  IMAGE_URI=${IMAGE_URI}"
 echo "  SECRET_JWT_NAME=${SECRET_JWT_NAME}"
 echo "  SECRET_DB_URL_NAME=${SECRET_DB_URL_NAME}"
 echo "  SECRET_SERVICE_ROLE_NAME=${SECRET_SERVICE_ROLE_NAME}"
+echo "  SECRET_ANON_KEY_NAME=${SECRET_ANON_KEY_NAME}"
 echo "  SUPABASE_URL_VALUE=${SUPABASE_URL_VALUE}"
 echo "  CONTAINER_NAME=${CONTAINER_NAME}"
 echo "  HONO_HOST_PORT=${HONO_HOST_PORT} (-> container 3001)"
@@ -204,6 +213,16 @@ if [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]; then
   exit 1
 fi
 echo "  loaded (length ${#SUPABASE_SERVICE_ROLE_KEY})"
+
+echo "Reading ${SECRET_ANON_KEY_NAME} from Secret Manager..."
+SUPABASE_ANON_KEY="$(gcloud secrets versions access latest \
+  --secret="${SECRET_ANON_KEY_NAME}" \
+  --project="${PROJECT_ID}")"
+if [ -z "${SUPABASE_ANON_KEY}" ]; then
+  echo "FATAL: ${SECRET_ANON_KEY_NAME} is empty or not accessible. authMiddleware (admin endpoints) requires SUPABASE_ANON_KEY."
+  exit 1
+fi
+echo "  loaded (length ${#SUPABASE_ANON_KEY})"
 
 # ── Step 3b: Pre-flight assertions ───────────────────────────────────
 # Fail-loud on misconfigurations BEFORE attempting to start the
@@ -301,6 +320,7 @@ docker run -d \
   -e SUPABASE_JWT_SECRET="${SUPABASE_JWT_SECRET}" \
   -e SUPABASE_DB_URL="${SUPABASE_DB_URL}" \
   -e SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY}" \
+  -e SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY}" \
   -e SUPABASE_URL="${SUPABASE_URL_VALUE}" \
   -e IMAGE_SHA="${IMAGE_SHA_META}" \
   -e COMMIT_SHA="${COMMIT_SHA_META}" \

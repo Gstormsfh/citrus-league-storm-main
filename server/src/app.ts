@@ -18,7 +18,11 @@ import { scheduleRoutes } from './routes/schedule';
 import { notificationRoutes } from './routes/notifications';
 import { stormyRoutes } from './routes/stormy';
 import { adminRoutes } from './routes/admin';
-import { draftAdminRoutes } from './routes/draftAdmin';
+// NOTE: draftAdmin routes (engine-ops admin) live on the engine's Hono
+// server (server/src/draft/index.ts), NOT this API server's app, per
+// chunk 11g.10 sub-step 10b Decision Log 2026-05-19. Admin endpoints
+// manipulate engine-local in-memory state (LobbyRegistry, snapshot
+// pipeline); they have no place in the API server's surface.
 import { auctionRoutes } from './routes/auction';
 import { keeperRoutes } from './routes/keepers';
 import { playoffRoutes } from './routes/playoffs';
@@ -246,10 +250,8 @@ app.route('/api/schedule', scheduleRoutes);
 app.route('/api/notifications', notificationRoutes);
 app.route('/api/stormy', stormyRoutes);
 app.route('/api/admin', adminRoutes);
-// Phase 4.5 chunk 11g.10 sub-step 10b — engine-ops admin endpoints.
-// Distinct namespace from /api/admin/* (user dashboard admin) to make
-// the privilege boundary explicit. Gated by is_engine_admin flag.
-app.route('/api/admin', draftAdminRoutes);
+// Engine-ops admin routes (/api/admin/engine/*) live on the engine's
+// Hono server, not here. See chunk 11g.10 sub-step 10b commit notes.
 app.route('/api/auction', auctionRoutes);
 app.route('/api/keepers', keeperRoutes);
 app.route('/api/playoffs', playoffRoutes);

@@ -402,6 +402,116 @@ export class LobbyRegistry {
     }
   }
 
+  /**
+   * Phase 4.5 chunk 11g.10 sub-step 10b — engine-admin eviction.
+   *
+   * Force-close every WS connection on the lobby (with close code 4002
+   * = "transient" per `apps/web/src/lib/draftClient/closeCodes.ts`,
+   * which tells clients to reconnect) and remove the lobby from the
+   * registry. The next client reconnect triggers fresh bootstrap from
+   * durable state — no data loss because `draft_events` is the source
+   * of truth.
+   *
+   * Returns the count of connections that were closed so the caller
+   * (admin endpoint) can report it. Returns `null` if the lobby is
+   * not in the registry (or is still in flight as a construction
+   * Promise).
+   */
+  evict(lobbyId: string): { connectionsClosed: number } | null {
+    const entry = this.lobbies.get(lobbyId);
+    if (!(entry instanceof LobbyManager)) {
+      return null;
+    }
+    let closed = 0;
+    entry.forEachConnection((ws) => {
+      try {
+        // close code 4002 = transient per closeCodes.ts; clients
+        // reconnect and re-bootstrap from durable state.
+        ws.end(4002, 'engine_admin_eviction');
+        closed += 1;
+      } catch (err) {
+        structuredLogger.debug(
+          'registry.evict_connection_close_threw',
+          { lobbyId },
+          err,
+        );
+      }
+    });
+    this.lobbies.delete(lobbyId);
+    structuredLogger.info('registry.lobby_evicted', {
+      lobbyId,
+      connectionsClosed: closed,
+    });
+    return { connectionsClosed: closed };
+  }
+
+  /**
+   * Phase 4.5 chunk 11g.10 sub-step 10b — diagnostic summary for the
+   * engine-admin `GET /api/admin/engine/registry` endpoint.
+   *
+   * Walks every fully-constructed lobby (skips in-flight Promise
+   * placeholders), collects each LobbyManager's getDiagnosticInfo(),
+   * sums up totals. Read-only; safe to call from a request handler.
+   */
+  getDiagnosticSummary(): {
+    registries: Array<{
+      lobbyId: string;
+      leagueId: string;
+      format: 'snake' | 'linear' | 'auction';
+      connectionCount: number;
+      lastAppliedSeq: number;
+    }>;
+    totalLobbies: number;
+    totalConnections: number;
+  } {
+    const registries: Array<{
+      lobbyId: string;
+      leagueId: string;
+      format: 'snake' | 'linear' | 'auction';
+      connectionCount: number;
+      lastAppliedSeq: number;
+    }> = [];
+    let totalConnections = 0;
+    for (const entry of this.lobbies.values()) {
+      if (entry instanceof LobbyManager) {
+        const info = entry.getDiagnosticInfo();
+        registries.push(info);
+        totalConnections += info.connectionCount;
+      }
+    }
+    return {
+      registries,
+      totalLobbies: registries.length,
+      totalConnections,
+    };
+  }
+
+  /**
+   * Phase 4.5 chunk 11g.10 sub-step 10b — engine-admin force-snapshot.
+   *
+   * Schedules a snapshot write for the named lobby through the
+   * LobbyManager's single-writer queue and waits for it to complete.
+   * Returns `null` if the lobby is not in the registry.
+   *
+   * The underlying `LobbyManager.scheduleSnapshot()` may skip the
+   * write if the lobby is in a non-persistable state (not_started or
+   * paused). Caller distinguishes "scheduled OK" vs "scheduled but
+   * skipped" via subsequent read of `draft_snapshots`. Per the
+   * admin-endpoint contract, we return `{ scheduled: true }` on
+   * registry hit + queue completion regardless of skip — the admin
+   * endpoint queries draft_snapshots for the actual persisted row.
+   */
+  async forceSnapshot(
+    lobbyId: string,
+  ): Promise<{ scheduled: boolean } | null> {
+    const entry = this.lobbies.get(lobbyId);
+    if (!(entry instanceof LobbyManager)) {
+      return null;
+    }
+    await entry.scheduleSnapshot();
+    return { scheduled: true };
+  }
+
   /** Diagnostic: number of registry entries (constructed + in-flight). */
   size(): number {
     return this.lobbies.size;
