@@ -421,25 +421,45 @@ def run_unified_loop() -> Tuple[str, int]:
             # on this same tick.
             if _try_self_heal_schedule(today):
                 try:
+                    # Re-query the SAME window the self-heal ingested ([today, today+7])
+                    # rather than the prior [yesterday, today] narrow window. The narrow
+                    # window produced a false-alarm warning on every NHL off-day: the
+                    # self-heal correctly populated future dates, but the re-query
+                    # couldn't see them and concluded "ingest reported success but query
+                    # empty → FK reject." The TEAM_ID_MAP blame was also misleading —
+                    # it's a single 68→59 Utah HC remap, irrelevant to most slates.
+                    # See ENGINEERING.md §12.16.
+                    window_dates = [
+                        (dt.date.fromisoformat(today) + dt.timedelta(days=d)).isoformat()
+                        for d in range(0, 8)
+                    ]
                     raw_games = db.select(
                         "nhl_games",
-                        filters=[("game_date", "in", [today, yesterday])],
+                        filters=[("game_date", "in", window_dates)],
                     ) or []
-                    games = [
+                    # `games` retains its today-only semantic for downstream cache and
+                    # per-game processing (line ~447 onwards treats this as today's slate).
+                    # Yesterday-stragglers are already handled by the primary path before
+                    # self-heal runs, so they don't need re-checking here.
+                    games = [g for g in raw_games if g.get("game_date") == today]
+                    # Success criterion is broader: any playable game anywhere in the
+                    # forward window. Off-days legitimately return empty for today but
+                    # the schedule is healthy if future dates are populated.
+                    playable_in_window = [
                         g for g in raw_games
-                        if g.get("game_date") == today
-                        or str(g.get("status", "")).lower() not in ("final", "off")
+                        if str(g.get("status", "")).lower() not in ("final", "off")
                     ]
-                    if games:
+                    if playable_in_window:
                         logger.info(
-                            f"[SELF-HEAL] Recovered {len(games)} games for {today} — "
-                            f"resuming normal processing."
+                            f"[SELF-HEAL] Recovered {len(playable_in_window)} playable game(s) "
+                            f"in {window_dates[0]}..{window_dates[-1]} "
+                            f"({len(games)} for {today}) — resuming normal processing."
                         )
                     else:
                         logger.warning(
-                            f"[SELF-HEAL] Ingest reported success but query still empty. "
-                            f"Likely an FK reject on a team_id not in TEAM_ID_MAP — "
-                            f"check the [SELF-HEAL] log lines above for `upsert failed`."
+                            f"[SELF-HEAL] Ingested but no playable games found in the "
+                            f"{window_dates[0]}..{window_dates[-1]} window — verify NHL "
+                            f"schedule API is returning the expected slate."
                         )
                 except Exception as e:
                     logger.error(f"[SELF-HEAL] Re-query after ingest failed: {e}")
