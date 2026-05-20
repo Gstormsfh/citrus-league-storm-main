@@ -376,7 +376,48 @@ GAR computation produces stable rates only when there's enough TOI sample size. 
 
 ---
 
-## §15. Bookkeeping summary
+## §15. UPSERT clobbers moat features on re-run after Phase 0c
+
+**Capability:** safe re-run of `scripts/utilities/load_historical_shots_csv.py` post-Phase-0c without overwriting the 7 pre-shot moat features. As shipped today the loader cannot be re-run after 0c lands without code mitigation.
+
+**Current state (audited 2026-05-19):** the loader explicitly writes `None` to the 7 moat features on every payload row (`load_historical_shots_csv.py` lines 166-174 + 302-304):
+
+- `pass_quality_score`, `pass_immediacy_score`, `goalie_movement_score`
+- `pass_zone_encoded`, `pass_lateral_distance`, `pass_to_net_distance`
+- `has_pass_before_shot`
+
+The write goes through `SupabaseRest.upsert()`, which POSTs to PostgREST with `Prefer: resolution=merge-duplicates`. PostgREST's merge-duplicates semantics translate to `INSERT ... ON CONFLICT (...) DO UPDATE SET <every payload column> = EXCLUDED.<col>` — **including columns set to NULL.** On a conflict the NULLs in the loader payload overwrite whatever values were previously stored.
+
+**Concrete failure mode:** once 0c completes and moat features are populated for historical seasons 2018-19 → 2024-25, any re-run of `load_historical_shots_csv.py` (schema-drift retrofit, accidental re-launch, partial-failure recovery on a future-season batch, etc.) will clobber the 7 moat columns back to NULL on every row it touches. A subsequent xG retrain on the corrupted corpus would silently degrade.
+
+**Why deferred to post-0c:** refactoring the loader before 0c finishes adds untested code paths to a working loader at the worst possible moment (mid-0a/0c sequence). The current behavior is correct for 0a — the 7 moat features are intentionally NULL for historical rows until 0c populates them. Match-work-to-phase: ship 0a with the trap-door documented; address the structural fix once 0c is complete and a re-run path is plausibly on the surface area.
+
+### Unlock paths (apply post-0c)
+
+| # | Approach | Effort | Notes |
+|---|---|---|---|
+| (a) | Omit the 7 moat columns from the upsert payload entirely | 30 min | Cleanest: PostgREST does not touch columns absent from the payload. Existing moat values survive any conflict resolution. One edit at `load_historical_shots_csv.py:303` — replace the "explicit None" loop with "skip entirely." Recommended. |
+| (b) | Add precondition filter `WHERE season < 2025 AND has_pass_before_shot IS NULL` to the upsert | 1-2 hr | More defensive but introduces complexity: the loader has to pre-query each batch or split the upsert into "rows where moat is still NULL → write" vs "rows already populated → skip." Use only if (a) is somehow insufficient. |
+
+Either path preserves 0c's work. Pick (a) unless a future requirement (e.g., partial-row updates that need to touch moat columns conditionally) makes (b) necessary.
+
+### Mitigation already in place
+
+Prominent trap-door comment block above the `db.upsert()` call in `scripts/utilities/load_historical_shots_csv.py` warning operators not to re-run post-0c without applying one of the unlock paths above. Cross-references this §15.
+
+### Strategic trigger to revisit
+
+**Apply unlock path (a) post-0c, before any code path that could re-trigger the loader on already-loaded historical rows.** Concrete triggers:
+
+- Phase 0c closeout: at the moment 0c finishes successfully and moat features are populated for seasons 2018-19 → 2024-25, the loader becomes a clobber hazard.
+- Schema additions to `raw_shots` that would prompt a re-run of historical data through the loader (e.g., a new MoneyPuck column landing).
+- Operator-initiated re-load of any season (idempotent in 0a's design, dangerous post-0c).
+
+Until 0c lands, the trap-door comment is the only mitigation needed — the loader's current behavior is correct.
+
+---
+
+## §16. Bookkeeping summary
 
 | § | Capability | Status | Cheapest unlock | Trigger to revisit |
 |---|---|---|---|---|
@@ -394,10 +435,11 @@ GAR computation produces stable rates only when there's enough TOI sample size. 
 | 12 | CV-extracted tactics | deferred | internal CV pipeline | Coach-tier user base |
 | 13 | `extractor_job.py` retirement | **RETIRED 2026-05-12** | (done — moved to `_deprecated/`) | Operator may want to remove the Windows scheduled task entry |
 | 14 | Defensive GAR pipeline (EVD/PPD/Penalty) | engineering gap, deferred to 0d-post | implement on full multi-season corpus (~2-4 days) | After 0a + 0c land |
+| 15 | UPSERT clobbers moat features on re-run after 0c | documented; code mitigation deferred to post-0c | omit 7 moat columns from upsert payload (~30 min) | Post-0c closeout, before any loader re-run |
 
 ---
 
-## §16. Document maintenance
+## §17. Document maintenance
 
 Add a row here when:
 - A capability moves from active roadmap to deferred

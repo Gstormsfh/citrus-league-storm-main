@@ -396,6 +396,27 @@ def main() -> int:
             mapped_rows.extend(batch)
         else:
             try:
+                # ============================================================
+                # TRAP-DOOR: DO NOT RE-RUN AFTER PHASE 0C COMPLETION
+                # ------------------------------------------------------------
+                # This loader explicitly writes NULL to the 7 moat features:
+                #   pass_quality_score, pass_immediacy_score, goalie_movement_score,
+                #   pass_zone_encoded, pass_lateral_distance, pass_to_net_distance,
+                #   has_pass_before_shot
+                #
+                # Supabase REST UPSERT uses Prefer: resolution=merge-duplicates,
+                # which overwrites ALL payload columns INCLUDING NULLs on conflict.
+                # Re-running this loader after Phase 0c populates moat features for
+                # historical seasons WILL CLOBBER those features back to NULL.
+                #
+                # Safe re-run paths post-0c:
+                #   (a) Modify loader to omit the 7 moat columns from the payload
+                #       entirely (so they are not written at all on conflict), OR
+                #   (b) Add precondition filter: WHERE season < 2025
+                #                                AND has_pass_before_shot IS NULL
+                #
+                # See apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md §15.
+                # ============================================================
                 db.upsert("raw_shots", batch,
                           on_conflict="game_id,player_id,shot_x,shot_y,shot_type_code")
                 upserted += len(batch)
