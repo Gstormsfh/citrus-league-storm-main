@@ -490,26 +490,29 @@ export class LobbyRegistry {
    * Phase 4.5 chunk 11g.10 sub-step 10b — engine-admin force-snapshot.
    *
    * Schedules a snapshot write for the named lobby through the
-   * LobbyManager's single-writer queue and waits for it to complete.
-   * Returns `null` if the lobby is not in the registry.
+   * LobbyManager's single-writer queue, waits for completion, and
+   * returns the persisted outcome (per Q3 follow-up Decision Log
+   * 2026-05-19). Returns `null` if the lobby is not in the registry.
    *
-   * The underlying `LobbyManager.scheduleSnapshot()` may skip the
-   * write if the lobby is in a non-persistable state (not_started or
-   * paused). Caller distinguishes "scheduled OK" vs "scheduled but
-   * skipped" via subsequent read of `draft_snapshots`. Per the
-   * admin-endpoint contract, we return `{ scheduled: true }` on
-   * registry hit + queue completion regardless of skip — the admin
-   * endpoint queries draft_snapshots for the actual persisted row.
+   * The `persisted` boolean distinguishes "new snapshot written" from
+   * "scheduling completed but write was skipped" (state-not-in-progress,
+   * write failure, etc. — see LobbyManager.scheduleSnapshot JSDoc for
+   * the reason discriminator vocabulary).
+   *
+   * The admin endpoint queries `draft_snapshots` for the most-recent
+   * row's metadata (seq, engine_version, persisted_at) regardless of
+   * persisted outcome — operators want to see what's durable right
+   * now even when the call didn't write anything.
    */
   async forceSnapshot(
     lobbyId: string,
-  ): Promise<{ scheduled: boolean } | null> {
+  ): Promise<{ persisted: boolean; reason?: string } | null> {
     const entry = this.lobbies.get(lobbyId);
     if (!(entry instanceof LobbyManager)) {
       return null;
     }
-    await entry.scheduleSnapshot();
-    return { scheduled: true };
+    const result = await entry.scheduleSnapshot();
+    return result;
   }
 
   /** Diagnostic: number of registry entries (constructed + in-flight). */

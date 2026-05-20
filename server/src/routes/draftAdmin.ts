@@ -103,12 +103,24 @@ export function createDraftAdminRoutes(opts: DraftAdminRoutesOptions): Hono<Env>
    *
    * Force a snapshot persistence for the named lobby through its
    * LobbyManager's single-writer queue. Awaits queue completion
-   * before returning. On registry hit, returns 200 with metadata
-   * about the latest snapshot row written; if the queue completed
-   * but no snapshot was written (e.g., draft paused or not_started),
-   * returns 200 with `{ scheduled: true, persisted: false }`.
+   * before returning.
+   *
+   * Response (200):
+   *   - `persisted: true`  — a new snapshot row was written; seq /
+   *     engineVersion / persistedAt reflect the new row.
+   *   - `persisted: false, reason: '<discriminator>'` — scheduling
+   *     completed but the write was skipped (see LobbyManager
+   *     scheduleSnapshot JSDoc for the reason vocabulary). seq /
+   *     engineVersion / persistedAt reflect the most-recent existing
+   *     snapshot row (which is OLDER than this call) — the operator
+   *     gets visibility into what's durable right now even when the
+   *     call didn't write anything.
    *
    * 404 if lobby not in registry.
+   *
+   * Audit log: `admin.endpoint.snapshot_forced` emits on both
+   * persisted: true and persisted: false outcomes so the audit
+   * trail captures the actual result, not just the intent.
    */
   routes.post('/engine/lobby/:lobbyId/snapshot', async (c) => {
     const lobbyId = c.req.param('lobbyId');
@@ -134,9 +146,9 @@ export function createDraftAdminRoutes(opts: DraftAdminRoutesOptions): Hono<Env>
     }
 
     // Read back the most-recently-written snapshot row to extract
-    // metadata for the response body. If the schedule was skipped
-    // (paused / not_started), the latest row is unchanged but still
-    // gives the operator visibility into the lobby's last snapshot.
+    // metadata for the response body. ALWAYS shows the latest durable
+    // row regardless of whether this call wrote a new one — the
+    // operator wants "what's durable right now" visibility.
     const lobby = registry.get(lobbyId);
     const leagueId = lobby?.getDiagnosticInfo().leagueId ?? null;
     let snapshotMeta: {
@@ -166,14 +178,27 @@ export function createDraftAdminRoutes(opts: DraftAdminRoutesOptions): Hono<Env>
       lobbyId,
       leagueId,
       outcome: 'success',
+      persisted: scheduleResult.persisted,
+      reason: scheduleResult.reason,
       seq: snapshotMeta.seq,
     });
 
-    return ok(c, {
+    const body: {
+      lobbyId: string;
+      persisted: boolean;
+      reason?: string;
+      seq: number | null;
+      engineVersion: number | null;
+      persistedAt: string | null;
+    } = {
       lobbyId,
-      scheduled: true,
+      persisted: scheduleResult.persisted,
       ...snapshotMeta,
-    });
+    };
+    if (scheduleResult.reason !== undefined) {
+      body.reason = scheduleResult.reason;
+    }
+    return ok(c, body);
   });
 
   /**

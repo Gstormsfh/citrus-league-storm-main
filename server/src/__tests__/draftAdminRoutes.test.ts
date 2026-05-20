@@ -35,6 +35,8 @@ interface MockRegistry {
   };
 }
 
+type ForceSnapshotResult = { persisted: boolean; reason?: string } | null;
+
 function buildMockRegistry(): {
   registry: unknown;
   capture: {
@@ -43,12 +45,12 @@ function buildMockRegistry(): {
     getCalls: string[];
   };
   setEvictResult: (v: { connectionsClosed: number } | null) => void;
-  setForceSnapshotResult: (v: { scheduled: boolean } | null) => void;
+  setForceSnapshotResult: (v: ForceSnapshotResult) => void;
 } {
   let evictResult: { connectionsClosed: number } | null = {
     connectionsClosed: 3,
   };
-  let forceSnapshotResult: { scheduled: boolean } | null = { scheduled: true };
+  let forceSnapshotResult: ForceSnapshotResult = { persisted: true };
   const capture = {
     evictCalls: [] as string[],
     forceSnapshotCalls: [] as string[],
@@ -257,8 +259,8 @@ describe('draftAdmin routes — functional endpoints', () => {
     expect(body.data.capturedAt).toMatch(/^2026-/);
   });
 
-  it('POST /engine/lobby/:id/snapshot success returns 200 with metadata', async () => {
-    const reg = buildMockRegistry();
+  it('POST /engine/lobby/:id/snapshot success returns 200 with persisted: true', async () => {
+    const reg = buildMockRegistry(); // default forceSnapshotResult = { persisted: true }
     const sb = buildMockSupabaseAdmin(state);
     const { sentReq } = buildApp(reg.registry, sb);
     const res = await sentReq('/api/admin/engine/lobby/lobby-X/snapshot', {
@@ -266,13 +268,63 @@ describe('draftAdmin routes — functional endpoints', () => {
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      data: { lobbyId: string; scheduled: boolean; seq: number | null; engineVersion: number | null; persistedAt: string | null };
+      data: { lobbyId: string; persisted: boolean; reason?: string; seq: number | null; engineVersion: number | null; persistedAt: string | null };
     };
     expect(body.data.lobbyId).toBe('lobby-X');
-    expect(body.data.scheduled).toBe(true);
+    expect(body.data.persisted).toBe(true);
+    expect(body.data.reason).toBeUndefined();
     expect(body.data.seq).toBe(99);
     expect(body.data.engineVersion).toBe(1);
+    // Confirm `scheduled` field is gone (Q3 follow-up removed it).
+    expect((body.data as Record<string, unknown>).scheduled).toBeUndefined();
     expect(reg.capture.forceSnapshotCalls).toEqual(['lobby-X']);
+  });
+
+  it('POST /engine/lobby/:id/snapshot against not_started draft returns 200 with persisted: false + state_not_in_progress reason', async () => {
+    const reg = buildMockRegistry();
+    reg.setForceSnapshotResult({ persisted: false, reason: 'state_not_in_progress' });
+    const sb = buildMockSupabaseAdmin({
+      isEngineAdmin: true,
+      error: null,
+      // Latest existing snapshot row (older than this call). Q3
+      // contract: response shows what's durable now even when call
+      // didn't write anything.
+      draftSnapshotsRow: {
+        last_applied_seq: 87,
+        engine_version: 1,
+        created_at: '2026-05-19T19:45:30Z',
+      },
+    });
+    const { sentReq } = buildApp(reg.registry, sb);
+    const res = await sentReq('/api/admin/engine/lobby/not-started-lobby/snapshot', {
+      method: 'POST',
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { lobbyId: string; persisted: boolean; reason?: string; seq: number | null; engineVersion: number | null; persistedAt: string | null };
+    };
+    expect(body.data.persisted).toBe(false);
+    expect(body.data.reason).toBe('state_not_in_progress');
+    expect(body.data.seq).toBe(87);
+    expect(body.data.persistedAt).toBe('2026-05-19T19:45:30Z');
+  });
+
+  it('POST /engine/lobby/:id/snapshot against paused draft returns 200 with persisted: false + state_not_in_progress reason', async () => {
+    // Paused state is treated identically to not_started by the
+    // LobbyManager (both early-return with state_not_in_progress).
+    const reg = buildMockRegistry();
+    reg.setForceSnapshotResult({ persisted: false, reason: 'state_not_in_progress' });
+    const sb = buildMockSupabaseAdmin(state);
+    const { sentReq } = buildApp(reg.registry, sb);
+    const res = await sentReq('/api/admin/engine/lobby/paused-lobby/snapshot', {
+      method: 'POST',
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { persisted: boolean; reason?: string };
+    };
+    expect(body.data.persisted).toBe(false);
+    expect(body.data.reason).toBe('state_not_in_progress');
   });
 
   it('POST /engine/lobby/:id/snapshot returns 404 when lobby not in registry', async () => {
@@ -346,7 +398,7 @@ describe('draftAdmin routes — audit log emission', () => {
     vi.restoreAllMocks();
   });
 
-  it('emits admin.endpoint.snapshot_forced on successful snapshot', async () => {
+  it('emits admin.endpoint.snapshot_forced with persisted: true on successful write', async () => {
     const reg = buildMockRegistry();
     const sb = buildMockSupabaseAdmin({
       isEngineAdmin: true,
@@ -369,6 +421,35 @@ describe('draftAdmin routes — audit log emission', () => {
       userId: 'test-user-id',
       lobbyId: 'audit-lobby',
       outcome: 'success',
+      persisted: true,
+    });
+  });
+
+  it('emits admin.endpoint.snapshot_forced with persisted: false + reason on skipped write', async () => {
+    // Q3 follow-up: audit trail must capture skipped writes too, so
+    // post-incident review can see WHEN the operator hit the endpoint
+    // and WHY no write happened. persisted + reason both in payload.
+    const reg = buildMockRegistry();
+    reg.setForceSnapshotResult({ persisted: false, reason: 'state_not_in_progress' });
+    const sb = buildMockSupabaseAdmin({
+      isEngineAdmin: true,
+      error: null,
+      draftSnapshotsRow: null,
+    });
+    const { structuredLogger } = await import('@citrus/shared');
+    const spy = vi.spyOn(structuredLogger, 'info');
+    const { sentReq } = buildApp(reg.registry, sb);
+    await sentReq('/api/admin/engine/lobby/audit-skip-lobby/snapshot', { method: 'POST' });
+    const matching = spy.mock.calls.find(
+      (call) => call[0] === 'admin.endpoint.snapshot_forced',
+    );
+    expect(matching).toBeDefined();
+    expect(matching?.[1]).toMatchObject({
+      userId: 'test-user-id',
+      lobbyId: 'audit-skip-lobby',
+      outcome: 'success',
+      persisted: false,
+      reason: 'state_not_in_progress',
     });
   });
 

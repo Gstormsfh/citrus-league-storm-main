@@ -5201,11 +5201,20 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     expect(lobby.getCurrentState().draftStatus).toBe('not_started');
   });
 
-  it('7c scheduleSnapshot returns a Promise that resolves cleanly', async () => {
+  it('7c scheduleSnapshot returns a Promise resolving to {persisted, reason?} envelope (chunk 11g.10 sub-step 10b Q3 follow-up)', async () => {
+    // Pre-Q3: returned Promise<void>. Post-Q3: returns
+    // Promise<{persisted: boolean; reason?: string}> so callers
+    // (notably the admin endpoint) can distinguish "snapshot written"
+    // from "scheduling completed but skipped." For a fresh lobby
+    // (draftStatus='not_started'), the early-return at processSnapshot
+    // surfaces as persisted: false + reason: 'state_not_in_progress'.
     const lobby = await makeLobby();
     const result = lobby.scheduleSnapshot();
     expect(result).toBeInstanceOf(Promise);
-    await expect(result).resolves.toBeUndefined();
+    await expect(result).resolves.toEqual({
+      persisted: false,
+      reason: 'state_not_in_progress',
+    });
   });
 
   // ── Chunk 11g.7 sub-step 7e: external event dispatch + dedup ──

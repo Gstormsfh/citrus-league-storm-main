@@ -2163,7 +2163,9 @@ export class LobbyManager {
    * Public for tests; production triggers are the periodic timer
    * (`startSnapshotTimer`), the milestone threshold (via
    * `appendEventAndCount`), and lifecycle hooks (draft completion /
-   * cancellation).
+   * cancellation). Also called by the engine-admin
+   * `POST /api/admin/engine/lobby/:id/snapshot` endpoint via
+   * `LobbyRegistry.forceSnapshot` (chunk 11g.10 sub-step 10b).
    *
    * Routed through the queue (not a `DraftAction` variant — direct
    * promise chain like `pauseAuction`) so snapshot generation
@@ -2172,9 +2174,25 @@ export class LobbyManager {
    * latency for actions queued during snapshot. At 30s cadence,
    * this is ~0.3% of wall-clock time (acceptable per Decision Log
    * 2026-05-07).
+   *
+   * Returns a `{ persisted, reason? }` envelope per chunk 11g.10
+   * sub-step 10b Q3 follow-up (Decision Log 2026-05-19). Internal
+   * callers (periodic timer + milestone trigger) ignore the return
+   * value via `void`. The admin endpoint consumes it to distinguish
+   * "new snapshot written" from "scheduling succeeded but skipped."
+   *
+   * Reason discriminator values:
+   *   - `state_not_in_progress` — draftStatus is `not_started` OR
+   *     pauseState is non-null. Most common skip cause.
+   *   - `shutting_down` — engine is mid-shutdown.
+   *   - `max_seq_lookup_failed` — findMaxEventSeq threw (DB error).
+   *   - `build_failed` — buildSnapshot threw.
+   *   - `no_snapshot_available` — buildSnapshot returned null.
+   *   - `write_failed` — writeSnapshot threw.
+   *   - `queue_error` — single-writer queue chain rejected.
    */
-  scheduleSnapshot(): Promise<void> {
-    const next = this.queue
+  scheduleSnapshot(): Promise<{ persisted: boolean; reason?: string }> {
+    const next: Promise<{ persisted: boolean; reason?: string }> = this.queue
       .then(() => this.processSnapshot())
       .catch((err: unknown) => {
         structuredLogger.error(
@@ -2182,8 +2200,9 @@ export class LobbyManager {
           { lobbyId: this.lobbyId, leagueId: this.leagueId },
           err,
         );
+        return { persisted: false as const, reason: 'queue_error' };
       });
-    this.queue = next;
+    this.queue = next.then(() => undefined);
     return next;
   }
 
@@ -2193,25 +2212,26 @@ export class LobbyManager {
    * `buildSnapshot()` helper, captures engine-internal orchestration
    * fields, validates basic shape, and writes the row + retention
    * pruning. Skipped during pause (nothing new to capture; previous
-   * snapshot remains current).
+   * snapshot remains current). Returns `{ persisted, reason? }` so
+   * the admin endpoint can distinguish written vs. skipped.
    */
-  private async processSnapshot(): Promise<void> {
+  private async processSnapshot(): Promise<{ persisted: boolean; reason?: string }> {
     if (this.shutDown) {
-      return;
+      return { persisted: false, reason: 'shutting_down' };
     }
     if (this.draftStatus === 'not_started') {
       structuredLogger.debug('snapshot.persistence.skipped_not_started', {
         lobbyId: this.lobbyId,
         leagueId: this.leagueId,
       });
-      return;
+      return { persisted: false, reason: 'state_not_in_progress' };
     }
     if (this.pauseState !== null) {
       structuredLogger.debug('snapshot.persistence.skipped_paused', {
         lobbyId: this.lobbyId,
         leagueId: this.leagueId,
       });
-      return;
+      return { persisted: false, reason: 'state_not_in_progress' };
     }
 
     structuredLogger.debug('snapshot.persistence.scheduled', {
@@ -2229,7 +2249,7 @@ export class LobbyManager {
         { lobbyId: this.lobbyId, leagueId: this.leagueId },
         err,
       );
-      return;
+      return { persisted: false, reason: 'max_seq_lookup_failed' };
     }
 
     let snapshot;
@@ -2241,14 +2261,14 @@ export class LobbyManager {
         { lobbyId: this.lobbyId, leagueId: this.leagueId },
         err,
       );
-      return;
+      return { persisted: false, reason: 'build_failed' };
     }
     if (snapshot === null) {
       structuredLogger.warn('snapshot.persistence.skipped_no_snapshot', {
         lobbyId: this.lobbyId,
         leagueId: this.leagueId,
       });
-      return;
+      return { persisted: false, reason: 'no_snapshot_available' };
     }
 
     const engineState = serializeEngineState({
@@ -2268,11 +2288,12 @@ export class LobbyManager {
     } catch (err) {
       // Already logged in writeSnapshot; just swallow + return.
       void err;
-      return;
+      return { persisted: false, reason: 'write_failed' };
     }
 
     // Reset the milestone counter on successful write.
     this.eventsSinceLastSnapshot = 0;
+    return { persisted: true };
   }
 
   /**

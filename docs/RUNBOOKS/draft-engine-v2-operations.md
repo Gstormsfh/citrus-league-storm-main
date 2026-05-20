@@ -876,17 +876,35 @@ Auth: requires `is_engine_admin` flag on caller's profile (per
 for free via the migration's `is_admin = true` backfill.
 
 Response shape:
-- `200` — `{ lobbyId, scheduled: true, seq, engineVersion, persistedAt }`
-  (seq/engineVersion/persistedAt may be null if no snapshot row exists
-  yet — e.g., the lobby is in `not_started` or `paused` state where
-  the scheduler skipped the write per chunk 11g.7-7c semantics).
+- `200` — `{ lobbyId, persisted, reason?, seq, engineVersion, persistedAt }`:
+  - `persisted: true` → a new snapshot row was written; `seq` /
+    `engineVersion` / `persistedAt` reflect the new row.
+  - `persisted: false, reason: '<discriminator>'` → scheduling
+    completed but the write was skipped. Reason values:
+    `state_not_in_progress` (draft is `not_started` or paused),
+    `shutting_down`, `max_seq_lookup_failed`, `build_failed`,
+    `no_snapshot_available`, `write_failed`, `queue_error`. In all
+    skip cases, `seq` / `engineVersion` / `persistedAt` reflect the
+    **most recent existing** snapshot row — older than this call —
+    so the operator sees what's durable right now.
 - `404` — lobby not in registry.
 - `403` — caller missing `is_engine_admin`.
 
-Audit-log event emitted on success:
+**If `persisted: false`, the response's `seq` / `persistedAt` reflect
+the latest existing snapshot, NOT a newly-written one** — check
+`reason` to understand why the write was skipped. For
+`state_not_in_progress`, the operator's intent (capture current
+state) is unfulfilled; consider whether resuming the draft or
+fixing the underlying state is the right next move.
+
+Audit-log event emitted on every successful call (both persisted
+true AND false):
 ```
 admin.endpoint.snapshot_forced { userId, lobbyId, leagueId,
-                                 outcome: 'success', seq }
+                                 outcome: 'success',
+                                 persisted: <true|false>,
+                                 reason: <discriminator|undefined>,
+                                 seq: <latest-snapshot-seq|null> }
 ```
 
 If the engine process is unavailable (port unreachable), the manual
