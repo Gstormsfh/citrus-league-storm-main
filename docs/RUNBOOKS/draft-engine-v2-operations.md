@@ -122,10 +122,11 @@ Each playbook follows the same template:
      a heap snapshot before killing (`kill -USR1 <pid>` if heap-snapshot
      handler installed; otherwise capture process state via
      `ps -p <pid> -o pid,vsz,rss,pcpu,stat`), then restart.
-- **Escalation.** If restart fails repeatedly or bootstrap surfaces
-  `snapshot.bootstrap.fallback_full_replay` for every lobby AND event
-  count is high (>2000 events per lobby), see rollback playbook
-  scenario #5 (snapshot table corruption) and scenario #1 (bad migration).
+- **Escalation.** If restart fails ≥2 times in 5 minutes OR bootstrap
+  surfaces `snapshot.bootstrap.fallback_full_replay` for every lobby
+  AND event count is high (>2000 events per lobby), see rollback
+  playbook scenario #5 (snapshot table corruption) and scenario #1
+  (bad migration).
 - **Verification.** All previously-active lobbies have `registry.lobby_added`
   + `snapshot.bootstrap.applied` logs. Smoke-test by connecting a WS client
   to one affected lobby; confirm `uws.connection.opened` + a resync event
@@ -223,10 +224,16 @@ Each playbook follows the same template:
   regression in engine code.
 - **Auto-recovery.** None — performance regressions don't self-heal.
 - **Manual intervention.**
-  1. Establish whether this is a sustained regression (every pick slow)
-     or sporadic (tail spikes). Sustained → engine code or infra.
-     Sporadic → look at GC pauses, occasional Postgres slow queries,
-     network blips.
+  1. Establish whether this is a sustained regression or sporadic.
+     - **Sustained:** ≥5 manual picks per minute exceed the p95
+       threshold across a rolling 5-minute window. Almost always
+       engine code or infra regression.
+     - **Sporadic:** isolated spikes (1–2 slow picks per minute).
+       Causes include GC pauses (look at engine memory: `top` or
+       `ps -p <pid> -o rss,vsz`), occasional Postgres slow queries
+       (Supabase Dashboard → Database → Query Performance), or
+       network blips (no specific tool today — TODO(10d) wire latency
+       monitoring).
   2. Sustained: check recent deploys. If new SHA, consider rollback
      playbook scenario #2.
   3. Sustained: check VM resource usage:
@@ -333,8 +340,9 @@ Each playbook follows the same template:
      pathological).
 - **Escalation.** If a single user is affected and they cannot resolve
   via refresh, manually issue them a fresh draft token (TODO(10b/10c):
-  document the admin-issuance path). If many users, suspect engine-side
-  auth bug — see ADR-004 §5.3 verification contract.
+  document the admin-issuance path). If ≥3 concurrent users in a
+  5-minute window are affected, suspect engine-side auth bug — see
+  ADR-004 §5.3 verification contract.
 - **Verification.** Affected user maintains stable WS connection for >
   60s without close.
 
@@ -390,11 +398,23 @@ Each playbook follows the same template:
      If both clients show winners, one is showing optimistic local state.
   3. If durable state shows two `auction_bids` rows with equal amount
      and the second NOT rejected: serialization actually failed — this
-     is a real bug. Capture full logs (`<lobbyId>` + 60s window) and
-     escalate.
-- **Escalation.** Real serialization failure = chunk 11g.4 step 2
-  invariant violation. Pause draft via `auction_pause_v2`; investigate
-  before resuming.
+     is a real bug. Capture full logs (`<lobbyId>` + 60s window). This
+     is a chunk 11g.4 step 2 invariant violation. Actions, in order:
+     1. Pause the draft via `auction_pause_v2`.
+     2. Save the captured logs to `docs/postmortems/raw/` (create the
+        directory if it doesn't exist; this is the canonical location
+        for incident artifacts).
+     3. File an issue in the project tracker with title
+        `INVARIANT VIOLATION: auction bid serialization` and attach
+        the log capture.
+     4. Notify Zach via the standard escalation channel
+        (TODO(garrett): pin the channel name — Slack vs Discord vs
+        Linear comment — once the convention is decided; tracked in
+        `PHASE_4_5_PROJECT_PLAN.md` Decision Log 2026-05-19).
+     5. Tag Zach in the issue so the trail is durable.
+     6. Document in the next PIR per the playbook §G framework.
+- **Escalation.** Per the actions above. Do not resume the draft until
+  the violation root cause is identified and a fix is in flight.
 - **Verification.** Durable state shows one bid winning; affected
   clients refresh and converge.
 
@@ -427,8 +447,7 @@ Each playbook follows the same template:
 ### §2.11 Anti-snipe cascade runaway
 
 - **Detection signal.** A single nomination's bid window has extended
-  many times (e.g., > 10 extensions); operators worried the draft will
-  never advance.
+  ≥10 times; operators worried the draft will never advance.
 - **Architectural truth.** Per ADR-002 §4.4: anti-snipe cascade has
   **no upper bound by design** in v1. Commissioners can configure
   `anti_snipe_threshold_seconds = 0` to disable; `max-cascade-count`
@@ -448,9 +467,9 @@ Each playbook follows the same template:
   2. If commissioner wants to force-close the cascade: use
      `auction_commissioner_override` with `overrideAction =
      'force_close_nomination'` (per ADR-002 §3 6c4 action set).
-- **Escalation.** If a single bid window has extended hundreds of times
-  in a short period, suspect bot/abuse. Pause the draft and investigate
-  bidder identity (audit log per ADR-004 §6).
+- **Escalation.** If a single bid window has extended ≥50 times in 10
+  minutes OR ≥200 times in 1 hour, suspect bot/abuse. Pause the draft
+  and investigate bidder identity (audit log per ADR-004 §6).
 - **Verification.** Cascade ends naturally (no new bids in window) OR
   commissioner override applied + winning bid committed.
 
@@ -515,11 +534,11 @@ Each playbook follows the same template:
   3. **If the URL is correct but self-test still fails:** check
      `event_subscription.client_error` logs for connection-level errors.
      Likely Postgres-side: connection limit, network ACL, IP allowlist.
-  4. **If runtime `event_subscription.connection_lost` is frequent
-     (not just startup):** intermittent connectivity. Acceptable per the
-     reconnect-backoff design; bootstrap restores correctness. If
-     impacting users (e.g., commissioner actions invisible until WS
-     reconnect), see rollback playbook scenario #4.
+  4. **If runtime `event_subscription.connection_lost` fires ≥3 times
+     in 10 minutes (not just startup):** intermittent connectivity.
+     Acceptable per the reconnect-backoff design; bootstrap restores
+     correctness. If impacting users (e.g., commissioner actions
+     invisible until WS reconnect), see rollback playbook scenario #4.
 - **Escalation.** Per rollback playbook scenario #4 if not resolvable
   by env fix.
 - **Verification.** Engine startup logs include

@@ -232,11 +232,23 @@ wire-up needed for chunk 9d.
 > Section added 2026-05-19 at chunk 11g.10 sub-step 10e. Initial
 > registry for known operational quirks in the post-pgmq persistent-
 > engine world. Populated as 10b/10c/10d surface real operational
-> behavior; the initial KI-010 below documents the most likely
+> behavior; the initial KI-E010 below documents the most likely
 > deploy-time misconfiguration even without an observed incident
 > (silent-failure mode → worth pre-emptive documentation).
+>
+> **Numbering convention.** Engine-specific KIs in this file use the
+> `KI-E###` prefix to disambiguate from project-wide KIs in
+> `docs/REGISTRY.md` (which use the plain `KI-###` prefix). Pre-Phase-4.5
+> entries in this file (KI-001..KI-007) predate the convention and are
+> not retroactively renamed — they're effectively grandfathered, and
+> the project-wide registry's numbering does not collide with theirs
+> (REGISTRY.md starts at KI-008). New engine-specific KIs from
+> chunk 11g.10 forward use `KI-E###`. The collision that motivated the
+> convention: engine KI-010 (this file) vs project KI-010 (REGISTRY.md
+> "Tier 1 perf optimizations"). Decision Log entry 2026-05-19 in
+> `docs/PHASE_4_5_PROJECT_PLAN.md` records the convention.
 
-### KI-010 — PgBouncer-pooled `SUPABASE_DB_URL` drops LISTEN frames silently
+### KI-E010 — PgBouncer-pooled `SUPABASE_DB_URL` drops LISTEN frames silently
 
 | | |
 |---|---|

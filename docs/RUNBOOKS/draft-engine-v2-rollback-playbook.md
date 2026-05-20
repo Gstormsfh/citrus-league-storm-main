@@ -129,6 +129,67 @@ appropriate scenario once cause is identifiable.
 
 ---
 
+## §3.5 When rollback execution itself fails
+
+After 10 minutes of executing a scenario's rollback path without
+resolution, the situation has escalated. The on-call must:
+
+1. **STOP the current rollback attempt mid-stream.** Don't compound.
+   A half-applied rollback is often worse than the original incident
+   — at minimum, it produces a state the runbook doesn't anticipate.
+
+2. **Pause new drafts via discovery flag (§3) if not already done.**
+   Stop adding load and adding users to the affected surface.
+
+3. **Pause all in-progress drafts** via `draft_pause` /
+   `auction_pause_v2`. At this point the incident has crossed from
+   "we have a plan" to "we're improvising." Pause buys you the time
+   to think without users feeling the improvisation.
+
+4. **Reassess: is the original scenario classification still correct,
+   or has new information surfaced?** Symptom and cause are not the
+   same thing. A failed rollback often reveals that the cause was
+   misidentified.
+
+5. **Decide one of three paths:**
+   - **Try a different scenario.** If reassessment indicates a
+     different root cause (e.g., scenario 2 engine binary rollback
+     failed because the actual issue is scenario 5 snapshot
+     corruption), abandon the current scenario and execute the
+     correct one from a clean state.
+   - **Roll forward instead.** If the rollback target is also broken
+     or unavailable (e.g., previous SHA had its own bug; prior
+     migration also corrupts state), commit to fix-forward — but
+     pause active drafts and post §F.4 catastrophic-outage comms
+     first. Fix-forward under time pressure with users live is a
+     worse outcome than fix-forward under user-comms cover.
+   - **Full draft-engine downtime.** If neither rollback nor forward
+     path is viable, stop the engine entirely, post §F.4 comms, and
+     work the recovery without the time pressure of live drafts.
+     `draft_events` is durable; the engine can be off for hours and
+     users will lose UX but not state.
+
+6. **Update user comms immediately — silent extended outages destroy
+   trust.** Switch to §F.4 catastrophic outage template if not already
+   on it. The transition from §F.1/§F.2/§F.3 to §F.4 is a signal to
+   users that the response posture has shifted; making the shift
+   explicit is the right move.
+
+7. **Document the rollback-failure path in the PIR (§G).** Add a new
+   question to the PIR: "Why did the first rollback path fail?
+   Was the initial scenario classification wrong, was the rollback
+   procedure incomplete, or was the rollback target itself broken?"
+   This is one of the most diagnostic questions for runbook
+   improvement.
+
+The 10-minute trigger is intentional. Tier 1's 5-minute decision-time
+target is for the initial scenario selection. The 10-minute mark
+gives you a full second 5-minute window to attempt execution. If
+execution hasn't converged by then, the situation has changed shape
+and the response should change with it.
+
+---
+
 ## §4 Scenarios
 
 ### Scenario 1 — Bad migration applied
@@ -150,9 +211,18 @@ appropriate scenario once cause is identifiable.
      may not exist. If absent, the rollback is "write a corrective
      migration" — fix-forward, not revert.
   3. **If down-script exists:** apply it, then restart engine.
-  4. **If no down-script and the bad migration is small + obviously
-     revertable:** write a corrective migration that drops the
-     bad changes; apply it; restart engine.
+  4. **If no down-script exists,** a migration is "obviously revertable"
+     only if ALL of the following are true:
+     - The migration adds/drops a single column, constraint, index, or
+       RPC parameter — not multiple changes, not table renames, not data
+       migrations.
+     - No production data has been migrated as a result of the change
+       (i.e., no UPDATE/INSERT/DELETE in the migration body).
+     - You can write the corrective DDL in under 5 lines without
+       reference material.
+
+     If ALL three: write the corrective migration; apply; restart engine.
+     If ANY fail: skip to step 5 (fix-forward, not roll-back).
   5. **If the bad migration is large, complex, or has produced data
      changes:** pause new drafts (§3); pause active drafts
      (`draft_pause` per affected league); fix forward with care.
@@ -209,8 +279,8 @@ appropriate scenario once cause is identifiable.
 - **Verification.** Engine running prior SHA; bootstrap succeeded for
   all previously-active lobbies; Mandate targets back in healthy
   range; error rates back to baseline.
-- **User communication.** "Rolling back" (§F.2) at start; "Resumed"
-  in a final update once verification clears.
+- **User communication.** "Rolling back" (§F.2) at start; "Resumed /
+  all-clear" (§F.5) in a final update once verification clears.
 - **PIR checklist.**
   1. What test should have caught this regression pre-deploy?
   2. Was the bad SHA detectable by `draft-engine-v2-staging-preflight.md`
@@ -293,6 +363,12 @@ appropriate scenario once cause is identifiable.
      from 5s to 2s?
 
 ### Scenario 5 — Snapshot table corruption
+
+> **Severity escalation:** if investigation reveals that `draft_events`
+> (not just `draft_snapshots`) is the corrupted table, this is no longer
+> Tier 2. Treat as Tier 1 + scenario 6 user-comms posture (§F.4
+> Catastrophic outage). `draft_events` is the source of truth; its
+> corruption is catastrophic.
 
 - **Trigger / detection.** `snapshot.bootstrap.fallback_full_replay`
   (warn) fires for EVERY lobby (not just lobbies with missing
@@ -413,8 +489,9 @@ appropriate scenario once cause is identifiable.
 
 ## §F User-facing communication templates
 
-Starting points only. The on-call adapts wording to the specific
-incident. Goal: remove "what do I say" as a decision under pressure.
+Five templates below — starting points only. The on-call adapts
+wording to the specific incident. Goal: remove "what do I say" as a
+decision under pressure.
 
 ### §F.1 "Investigating" (first 30 seconds)
 
@@ -450,7 +527,7 @@ Drafts are paused due to [BRIEF DESCRIPTION]. We're working on it.
 Specifically:
 - [LEAGUE NAME / NUMBER OF AFFECTED LEAGUES] are paused.
 - No picks have been lost.
-- Estimated resume time: [TIME, e.g., "10:35pm Mountain"].
+- Estimated resume time: [TIME, e.g., "10:35pm Mountain / 12:35am Eastern / 9:35pm Pacific"].
 We'll send a follow-up when drafts are running again.
 ```
 
@@ -458,6 +535,12 @@ We'll send a follow-up when drafts are running again.
 Setting a specific resume time creates accountability; revise the
 time forward if the work takes longer rather than letting the original
 estimate silently expire.
+
+**Timezone note:** Citrus serves North American users across multiple
+timezones. State the time in at least three of the four major North
+American timezones (Eastern / Central / Mountain / Pacific), OR if your
+user-comms surface supports it, use a `[TIMESTAMP]` placeholder that
+renders in each user's local timezone.
 
 ### §F.4 "Catastrophic outage" (full transparency, no ETA, commitment to update cadence)
 
@@ -468,9 +551,10 @@ an ETA for resolution. What we know:
 - [WHAT IS BROKEN]
 - [WHAT IS NOT AFFECTED, e.g., "rosters and league standings are unaffected"]
 - [WHAT USERS SHOULD/SHOULDN'T DO]
-We'll post an update every 15 minutes until resolved, regardless of
-whether there's new information. We'll post a full incident report
-within 48 hours of resolution.
+We'll post an update at least every 30 minutes until resolved,
+regardless of whether there's new information. For incidents lasting
+more than 2 hours, cadence relaxes to hourly. We'll post a full
+incident report within 48 hours of resolution.
 ```
 
 **When to use:**
@@ -482,10 +566,33 @@ Full transparency in catastrophic situations is a long-term reputation
 investment. The instinct to under-promise wears poorly; users tolerate
 honest "we don't know yet" better than vague "working on it."
 
+**Cadence rationale:** solo on-call cannot reliably honor a 15-minute
+update cadence while also fixing the incident — every 15 minutes
+spent drafting an update is 15 minutes not spent on the cause. Commit
+to a cadence you can hit (30 min initial, hourly after 2h). Missing
+a committed update is worse than committing to a longer interval.
+
 For security incidents (scenario #6), adapt:
 - Be explicit that there was an integrity issue.
 - State what users should verify on their own accounts.
 - Commit to individual notifications for impacted users if applicable.
+
+### §F.5 "Resumed / all-clear" (incident closed)
+
+```
+Drafts are resumed. The earlier issue [BRIEF DESCRIPTION] is resolved.
+What happened (short version): [1-2 sentence cause].
+What we did: [1-2 sentence fix].
+What's confirmed working: [specific verifications, e.g., "all picks since
+[time] have committed correctly", "no picks were lost"].
+A full incident report will be posted within 48 hours. Thanks for your
+patience.
+```
+
+**When to use:** every incident ends with one. Sent after verification
+clears in any scenario. This is the most-frequently-needed template;
+don't skip it. The "what we did" sentence is what users remember; keep
+it short, honest, and free of jargon.
 
 ---
 
