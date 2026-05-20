@@ -214,6 +214,9 @@ INT_COLUMNS = {
     "home_skaters_on_ice", "away_skaters_on_ice",
     "goalie_id", "player_num_that_did_last_event",
     "shot_type_code", "season", "game_id",
+    # Binary 0/1 flag — schema stores as integer. _safe_int handles
+    # MoneyPuck's "0.0"/"1.0" CSV form via int(float(v)).
+    "shot_angle_rebound_royal_road",
 }
 FLOAT_COLUMNS = {
     "arena_adjusted_x", "arena_adjusted_y", "arena_adjusted_x_abs", "arena_adjusted_y_abs",
@@ -235,7 +238,6 @@ FLOAT_COLUMNS = {
     "defending_team_average_time_on_ice_of_defencemen", "defending_team_max_time_on_ice_of_defencemen", "defending_team_min_time_on_ice_of_defencemen",
     "defending_team_average_time_on_ice_since_faceoff", "defending_team_max_time_on_ice_since_faceoff", "defending_team_min_time_on_ice_since_faceoff",
     "defending_team_average_time_on_ice_of_forwards_since_faceoff", "defending_team_max_time_on_ice_of_forwards_since_faceoff", "defending_team_min_time_on_ice_of_forwards_since_faceoff",
-    "shot_angle_rebound_royal_road",
 }
 BOOL_COLUMNS = {
     "is_goal", "is_rebound", "is_rush", "is_empty_net",
@@ -338,9 +340,21 @@ def main() -> int:
         print(f"ERROR: CSV not found at {args.csv}")
         return 1
 
+    # Parse the project ref from the configured Supabase URL so every run
+    # — dry or live — surfaces the actual target unambiguously.
+    target_url = SUPABASE_URL or os.getenv("SUPABASE_URL") or ""
+    try:
+        if target_url.startswith("https://") and ".supabase.co" in target_url:
+            target_project = target_url[len("https://"):target_url.index(".supabase.co")]
+        else:
+            target_project = "<unset>"
+    except Exception:
+        target_project = "<unset>"
+
     print("=" * 80)
     print(f"Load Historical Shots CSV — season={args.season}  csv={args.csv}")
-    print(f"Mode: {'DRY-RUN (no writes)' if args.dry_run else 'LIVE (UPSERTs to prod)'}")
+    print(f"Target project: {target_project}")
+    print(f"Mode: {'DRY-RUN (no writes)' if args.dry_run else 'LIVE (UPSERTs)'}")
     print(f"Batch size: {args.batch_size}")
     if args.game_id is not None:
         print(f"Filter: --game-id {args.game_id} (single-game post-mapping filter)")
@@ -403,6 +417,16 @@ def main() -> int:
         if not batch:
             continue
 
+        # NOTE: Dry-run does NOT validate Postgres column-type coercion.
+        # PostgREST serialization + Postgres type checking only run on
+        # live writes. Type mismatches between this loader's *_COLUMNS
+        # sets and destination schema will pass dry-run cleanly and
+        # fail with 22P02 invalid_text_representation on the first
+        # live batch. See 2026-05-19 lessons learned:
+        # shot_angle_rebound_royal_road (float-in-loader vs int-in-
+        # schema) caused sub-pilot batch failure that motivated this
+        # note. Structural fix (schema-introspection startup check)
+        # deferred — see GAPS_AND_FUTURE_CAPABILITIES.md if added.
         if args.dry_run:
             mapped_rows.extend(batch)
         else:
