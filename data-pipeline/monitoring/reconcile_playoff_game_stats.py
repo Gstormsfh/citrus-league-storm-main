@@ -67,12 +67,31 @@ def find_missing_game_stats(db: SupabaseRest, season: int) -> list[dict]:
 
     final_ids = [g["game_id"] for g in final_playoff]
 
-    stats_rows = db.select(
-        "player_game_stats",
-        select="game_id",
-        filters=[("game_id", "in", final_ids)],
-    )
-    ids_with_stats = {r["game_id"] for r in stats_rows}
+    # Paginate the player_game_stats query — PostgREST defaults to ~1000 rows
+    # per response, and per-game roster size (~36 skaters + 4 goalies = ~40 rows)
+    # means the full set exceeds the page size at >25 final playoff games.
+    # Without pagination the truncated response silently drops rows past row
+    # 1000; any game whose rows fall entirely past the cutoff is reported as
+    # false-positive missing. This was the 2026-05-20 → 2026-06-02 false-alarm
+    # pattern that consumed 13 days of hourly failure noise.
+    # See ENGINEERING.md §12.13 for the original alerter spec.
+    ids_with_stats: set = set()
+    PAGE = 1000
+    offset = 0
+    while True:
+        page = db.select(
+            "player_game_stats",
+            select="game_id",
+            filters=[("game_id", "in", final_ids)],
+            limit=PAGE,
+            offset=offset,
+        )
+        if not page:
+            break
+        ids_with_stats.update(r["game_id"] for r in page)
+        if len(page) < PAGE:
+            break
+        offset += PAGE
 
     return [g for g in final_playoff if g["game_id"] not in ids_with_stats]
 
