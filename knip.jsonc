@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  // Files below are unreachable from the npm-workspace import graph but are
+  // NOT dead code — they are external entry points or manually-run tooling.
+  "ignore": [
+    // Deployed Supabase Edge Functions (Deno entry points; draft-autopick
+    // removal is scheduled separately as Phase 4.5 chunk 11g.9 / KI-009).
+    "supabase/functions/**",
+    // k6 load-test suite + provisioning, run per docs/DEPLOY_RUNBOOK.md.
+    "scripts/load-test/**",
+    // Staging environment tooling, run per docs/DRAFT_ENGINE_V2_PLAN.md.
+    "scripts/staging/**",
+    // Manual perf benchmark for draft token issuance (Performance Mandate).
+    "server/scripts/bench-draft-token.ts"
+  ]
+}
