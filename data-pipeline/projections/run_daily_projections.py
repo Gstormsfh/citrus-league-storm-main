@@ -666,7 +666,6 @@ def populate_gp_last_10_metric(db: SupabaseRest, season: int) -> int:
     """
     try:
         # The module lives in scripts/utilities/ — add to path if needed
-        import importlib
         scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "utilities")
         if scripts_dir not in sys.path:
             sys.path.insert(0, scripts_dir)

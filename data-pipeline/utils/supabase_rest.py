@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlencode
 
 import requests

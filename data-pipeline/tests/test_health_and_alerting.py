@@ -6,7 +6,6 @@ test_health_and_alerting.py — Tests for health check server and alerting syste
 import json
 import os
 import sys
-import tempfile
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
