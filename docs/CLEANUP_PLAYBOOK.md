@@ -11,6 +11,16 @@ Status: `[ ]` todo · `[x]` done · `[?]` needs owner decision
 - [x] Codify branching strategy, commit conventions, PR flow, and multi-agent rules in
       `CLAUDE.md` ("Git Workflow & Collaboration Standards" section).
 - [x] Add `.github/PULL_REQUEST_TEMPLATE.md` (What / Why / How).
+- [x] Add `CONTRIBUTING.md` (human quick-reference; `CLAUDE.md` stays canonical).
+- [x] Add `.github/workflows/conventions.yml` — blocks non-conventional PR titles (the title
+      becomes the squash commit subject); branch naming is advisory-only since auto-generated
+      agent branches can't choose their names.
+- [x] Add `.editorconfig` (LF + indent consistency across Mac/Windows editors).
+- [x] Add `.github/CODEOWNERS` (@Gstormsfh auto-requested on every PR; becomes enforceable
+      once branch protection lands).
+- [ ] [?] Optional: GitHub issue templates. Skipped for now — issue tracking currently lives
+      in `docs/REGISTRY.md` + `ENGINEERING.md` § entries; adopt only if the team moves to
+      GitHub Issues.
 - [ ] **Enable branch protection on `master`** — there is currently none (GitHub API returns
       404 for the protection config). Recommended settings, needs repo admin:
   - Require a pull request before merging.
