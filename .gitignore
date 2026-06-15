@@ -39,12 +39,12 @@ dist-ssr
 *.pyc
 __pycache__/
 
-# Large training data files (too big for Git, train locally)
+# Training/analysis data files (regenerable — see data/TRAINING_DATA_MANIFEST.md)
+data/*.csv
+data/*.CSV
 data/*.csv.gz
-data/moneypuck_shots_2018*.csv
-data/moneypuck_shots_historical*.csv
-data/shots_2018-2024.csv
-data/shots_2018-2024.zip
+data/*.zip
+!data/MoneyPuck_Shot_Data_Dictionary.CSV
 
 # Temporary files
 temp_*.json

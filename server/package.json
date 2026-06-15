@@ -14,10 +14,12 @@
     "@hono/node-server": "^1.13.7",
     "@supabase/supabase-js": "^2.56.1",
     "hono": "^4.6.0",
+    "undici": "^7.22.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.5.5",
+    "@vitest/coverage-v8": "^4.1.8",
     "tsx": "^4.19.0",
     "typescript": "^5.5.3",
     "vitest": "^4.0.18"

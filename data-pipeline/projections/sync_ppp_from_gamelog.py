@@ -31,7 +31,7 @@ import sys
 import time
 import argparse
 from datetime import date, timedelta
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 import requests
 from dotenv import load_dotenv
