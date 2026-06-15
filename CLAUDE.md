@@ -267,3 +267,62 @@ npm run dev              # Start with tsx watch
 - Do not create new database tables without RLS policies
 - Do not skip writing tests for new service methods
 - Do not call Supabase directly from new frontend code — use the API client (`@/api/`)
+
+---
+
+# Git Workflow & Collaboration Standards
+
+These standards exist so multiple people and multiple AI agents can work in this repo concurrently without stepping on each other. They codify the flow already implied by the history: short-lived branches, squash-merged into `master` via PR.
+
+## Branching Strategy
+
+- **Trunk-based development.** `master` is the trunk and must always be deployable. All work happens on short-lived branches cut from the tip of `master`.
+- **Never commit or push directly to `master`.** Every change lands via a pull request.
+- **One branch = one logical change.** If you discover an unrelated bug mid-task, file an issue or note it in the PR description — do not fix it inline.
+- **Branch naming:** `prefix/short-slug` — lowercase, hyphens between words, slug under ~6 words. Prefixes mirror commit types: `feat/`, `fix/`, `refactor/`, `perf/`, `test/`, `docs/`, `build/`, `ops/`, `chore/`. Examples: `fix/playoff-alive-set`, `chore/repo-cleanup`. Agents use this scheme too — no auto-generated `claude/...-xYz12` names.
+- **Re-sync before merge.** If `master` moved while your branch was open, rebase onto `master` (preferred) before final review.
+- **Delete branches after merge**, local and remote. A merged branch left behind is noise.
+
+## Commit Messages
+
+Use Conventional Commits for every commit:
+
+```
+<type>(<optional scope>): <description>
+
+<body when the change needs context>
+
+<optional footer>
+```
+
+- Types: `feat`, `fix`, `refactor`, `perf`, `style`, `test`, `docs`, `build`, `ops`, `chore`
+- Scope: short subsystem/module name (e.g. `pipeline`, `draft`, `stormy`, `ci`). Never use issue IDs as scopes.
+- Description: imperative, present tense, lowercase start, no trailing period.
+- Body: only when the change is non-trivial — 1–3 lines stating the *why*, not a per-file changelog.
+- Breaking changes: `!` after type/scope plus a `BREAKING CHANGE:` footer.
+- No `Co-Authored-By` trailers. No "Generated with Claude Code" or other AI attribution in commits or PRs.
+
+## Pull Requests
+
+- Title: conventional-commit style, describes the change, not the ticket.
+- Body: fill in the What/Why/How template (`.github/PULL_REQUEST_TEMPLATE.md`). Keep each section concise and specific.
+- CI must be green before merge.
+- **Squash merge** is the only merge method. The squash commit message follows Conventional Commits (the PR title becomes the commit subject).
+- Keep PRs reviewable — aim for one coherent slice. Chunk large features into independently shippable PRs (vertical slice, backend-only, frontend-only); model/migration work that doesn't change behavior ships ahead of the features that use it; tests ship with the implementation they cover.
+- Run the Security Checklist (above) on every PR.
+
+## Git Safety
+
+- Never force push `master`. On your own PR branch, `git push --force-with-lease` after a rebase is acceptable.
+- Never commit secrets, credentials, or `.env` files.
+- Never merge someone else's PR without their sign-off.
+
+## Multi-Agent Collaboration Rules
+
+Rules for AI agents (Claude Code sessions, web agents, subagents) working in this repo:
+
+- **One agent, one branch, one task.** Never have two agents committing to the same branch concurrently. Parent agents delegating parallel work give each subagent a disjoint file scope.
+- **Stage by explicit file path** (`git add path/to/file1 path/to/file2`) — never `git add -A`, `git add .`, or `git commit -a`. Parallel sessions can collide at the staging area even when their file scopes are disjoint; explicit paths make a commit contain exactly what its author owns.
+- **Commit your own completed work** with a conventional commit — don't leave finished changes sitting in the working tree for someone else to untangle. Exceptions: exploratory spikes, or when explicitly asked to stage only.
+- **Stop and surface instead of guessing.** When you hit an ambiguous requirement, a code path that contradicts the task brief, or a blocker outside your task's scope: write up what you found, file an issue if appropriate, and ask — don't pick a "reasonable" default and press on. A wrong assumption costs more than a clarifying question.
+- **Check `git status` before starting work.** If the working tree has changes you didn't make, stop and ask rather than building on top of (or sweeping up) someone else's in-flight work.
