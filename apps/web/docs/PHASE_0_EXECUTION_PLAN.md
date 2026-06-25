@@ -492,7 +492,15 @@ The decisions interact:
 
 ---
 
-## 9. After Phase 0
+## 9. Operating discipline — lessons learned
+
+Accumulated as Phase 0 progresses. Cross-phase rules that emerged from real incidents; intended to outlast Phase 0.
+
+- **External-source spot-checks: reference values from human memory MUST be verified against the actual source (NHL.com, Hockey-Reference, MoneyPuck UI) BEFORE treating them as ground truth in any data validation.** 2026-05-19 spot-check of the Phase 0a corpus drifted unnecessarily into "systemic issue" territory because reference values were memory-sourced and three out of three were slightly wrong. Net finding (corpus reflects NHL reality) was correct, but the path to it consumed extra cycles. Verification is a 60-second web check; do it first.
+
+---
+
+## 10. After Phase 0
 
 Phase 0 closeout deliverables:
 - `apps/web/docs/PHASE_0_BASELINE_POST.md` — re-runs of both monitoring suites against the post-Phase-0 prod state, captured for diff vs `R7_2_BASELINE.md` + `R7_3_BASELINE.md`
