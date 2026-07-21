@@ -1,8 +1,12 @@
 # Phase 0b Diagnostic — Shot Extraction Regression
 
 ## Status
-Investigation in progress. Regression identified during
-pre-0b scoping. Fix + backfill pending.
+**Backfill complete on prod as of 2026-07-21.** All 1,394
+season=2025 final games now have raw_shots data (0 missing
+across all 9 months). Season-NULL repair complete on the 9
+mid-cascade games. Remaining 0b work: deploy the fix to the
+live scraper machine + live-scraper defect fixes (see
+"Live-machine + scraper-defect scoping" below).
 
 ## Headline finding
 Handoff-stated 0b scope (~360-game Oct-Dec 2025 gap) was
@@ -272,11 +276,136 @@ deferred; the repair is deterministic (game_id / 1_000_000).
   scope proper)**: **9 games**, deterministic UPDATE.
   Authorization required separately.
 
-- Pending: prod backfill authorization. Script ready to run against
-  prod once .env is repointed. Refetch will hit NHL API for the 12
-  no-payload games and store their payloads in prod.raw_nhl_data.
-  Fail-stop by design — first game to error halts the run.
-- Pending: season-repair authorization (9 games, single UPDATE).
+- 2026-07-21: Prod backfill executed under Prompt 14 sequence.
+  - **Step A season repair**: `UPDATE raw_shots SET season = 2025`
+    on the 9 known games / 798 rows. Post-verify:
+    residual_null_in_target=0, all_null_rows=0,
+    games_season_2025=1,352 (baseline 1,343 + 9). Clean.
+  - **Prod payload audit (mid-flight discovery)**: of the 30 games
+    originally classified as replay-set, only **14** had OFF-state
+    payloads with plays; the other **16** were FUT (future) stubs
+    fetched pre-game and never refreshed. Revised split promoted
+    to 14 replay + 28 refetch (total still 42). User re-authorized
+    the revised split.
+  - **Step B pilot** (game 2025030234, earliest OFF-state playable
+    game — the one with `stats_extracted_at` populated despite
+    0 shots): 91 rows saved, xg=91, season_ok=91, season_null=0.
+    All four gate columns pass.
+  - **Step C replay** (13 remaining OFF-state playoff games):
+    13/13 succeeded, 1,131 rows saved, 0 unseen-label warnings.
+    Post-check games_with_shots = 1,366 (1,352 + 14) exact.
+  - **Step D refetch** (12 no-payload + 16 FUT-stub promotions
+    with `--refetch`): 28/28 succeeded, 2,424 rows saved, 0 unseen
+    warnings. Every refetch verified gameState='OFF' before caching.
+    Post-check games_with_shots = **1,394** exact — full season
+    coverage.
+  - **Step E full-season validation**:
+    - total_rows=119,671, games=1,394, bad_season=0, xg_null=0,
+      game_id range 2025020001 → 2025030416.
+    - Per-month table: every month reads 0 missing (see below).
+    - Row arithmetic: baseline 116,025 + pilot 91 + replay 1,131 +
+      refetch 2,424 = 119,671 ✓.
+
+  Per-month coverage after backfill:
+
+  | month    | games | missing |
+  |----------|-------|---------|
+  | 2025-10  | 180   | 0       |
+  | 2025-11  | 225   | 0       |
+  | 2025-12  | 226   | 0       |
+  | 2026-01  | 241   | 0       |
+  | 2026-02  | 74    | 0       |
+  | 2026-03  | 241   | 0       |
+  | 2026-04  | 166   | 0       |
+  | 2026-05  | 35    | 0       |
+  | 2026-06  | 6     | 0       |
+
+## Cause taxonomy (the 42 zero-shot games)
+The 42-game zero-shot set was heterogeneous, not monolithic. Three
+distinct failure modes contributed:
+
+1. **Encoder-death (14 games, May 11+ playoffs)**. Extraction ran,
+   but the xG scoring path raised `ValueError` on the encoder's
+   unseen `'unknown'` fillna (root cause per fix 73382cc).
+   `process_single_game` caught and logged at line 2286, returned
+   None, so raw_shots was never written despite the payload being
+   present and complete. Fixed by the encoder wrap (73382cc);
+   replayed cleanly in Steps B + C.
+
+2. **FUT-stub capture defect (16 games, mostly April 4 + Jan
+   outlier)**. Live scraper captured `raw_nhl_data` payloads pre-game
+   (gameState='FUT', 0 plays, 0 rosters) and never refreshed them
+   after the games happened. Extraction correctly returned 0 shots
+   from the empty stubs; the pipeline treated the exit as
+   "no shots to save," not as a defect. **This is a live-scraper
+   bug independent of the encoder fix** — the "payload exists =
+   payload final" assumption breaks for rescheduled or
+   pre-game-captured payloads. Refetched cleanly in Step D.
+   The January outlier (game 2025020828, `nhl_games.game_date`
+   2026-01-26, payload `gameDate` 2026-03-09) is the reschedule
+   fingerprint that made the defect visible.
+
+3. **No-payload games (12 games, April 5 + April 25 + early May
+   playoffs)**. Live scraper never captured a payload at all —
+   `raw_nhl_data` had no row. Cause not diagnosed this workstream
+   (proximate: scraper wasn't running for those dates, or the
+   day's fetch failed silently and wasn't retried). Refetched
+   cleanly in Step D.
+
+Separately, the **9 season-NULL games** (repaired in Step A) are
+a fourth failure mode disjoint from the 42: shots were saved, but
+`season` landed as NULL because those games saved during the
+2026-05-12 partial-deploy window when the inline season derivation
+at `data_acquisition.py:1756` wasn't yet present. Repair was a
+deterministic UPDATE.
+
+Grand total of 0b incidents on prod (union of the four modes):
+14 + 16 + 12 + 9 = 51 — which is exactly the number the original
+diagnostic reported under its `LEFT JOIN ... AND s.season = 2025`
+semantics that counted the 9 season-NULL games as "missing shots."
+
+## Encoder-death breakdown (Steps C/D warnings)
+**0 unseen-label warnings** across all 42 backfilled games.
+Every game's `last_event_category` values landed within the
+encoder's 12-class known set (`BLOCK, CHL, FAC, GIVE, GOAL, HIT,
+MISS, OTHER, PENL, SHOT, STOP, TAKE`). The DELPEN/PEND/PSTR
+concerns from the staging-corpus audit (2,871+ rows of
+encoder-unseen categories across historical 0a data) did not
+materialize in this specific 42-game set — but the defensive
+wrap remains critical: any future game hitting those categories
+would repeat the regression class without it.
+
+## Live-machine + scraper-defect scoping (0b-deploy work)
+The prod DB is now consistent for season 2025. The **live scraper
+machine still runs the pre-fix code**: file mtime 2026-05-11 22:54
+per prior investigation, which pre-dates fix 73382cc. New games
+will continue to hit encoder-death until deploy.
+
+Deploy scope also needs to address the **FUT-stub capture defect**
+(cause mode #2 above), which is an independent live-scraper bug
+that the 0b encoder fix does NOT touch:
+- The scraper's "if raw_nhl_data row exists, don't refetch"
+  assumption produces silent 0-shot outcomes for
+  pre-game-captured / rescheduled games.
+- Options: (a) always refresh on final-state detection,
+  (b) treat non-OFF/FINAL payloads as needing retry,
+  (c) reconcile `raw_nhl_data.raw_json.gameState` against
+  `nhl_games.status` and refetch on mismatch.
+- Recommend (b) — matches the retired extractor_job's terminal-state
+  set and this backfill script's `_TERMINAL_GAME_STATES` guard.
+
+The **no-payload gap (cause mode #3)** is a third scraper concern:
+some days' games never entered `raw_nhl_data` at all. Diagnosing
+that (cron missed run? day-of retry logic missing? scraper daemon
+was down?) is a separate 0b-deploy or 0b-hygiene item.
+
+## Pending 0b work
+- Deploy 73382cc + 29e2c18 + fb5e817 (backfill script + refactor
+  + zero-rows gate) to the live scraper machine.
+- Fix FUT-stub capture defect (independent scraper bug).
+- Diagnose no-payload gap (independent scraper reliability bug).
+- All three above are scoped for a separate authorization step —
+  not part of this backfill workstream.
 
 ## stats_extracted_at note
 The `raw_nhl_data.stats_extracted_at` column is a **retired-daemon
