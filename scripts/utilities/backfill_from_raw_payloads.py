@@ -61,7 +61,8 @@ import _bootstrap  # noqa: F401
 
 from dotenv import load_dotenv
 
-load_dotenv(os.path.join(_REPO_ROOT, ".env"), override=True)
+# .env is loaded in main() after argparse so --env-file can override.
+# data_acquisition's module import only touches disk (joblib models), not env.
 
 from data_pipeline.utils.supabase_rest import SupabaseRest
 from data_pipeline.acquisition import data_acquisition as da
@@ -238,8 +239,17 @@ def main() -> int:
     src.add_argument("--game-id", type=int, help="single game_id to process")
     src.add_argument("--game-ids-file", type=str, help="path to JSON file with list of game_ids or inventory-style {replay_set, refetch_set}")
     parser.add_argument("--dry-run", action="store_true", help="extract + summarize; no writes")
-    parser.add_argument("--refetch", action="store_true", help="for games without a stored payload, fetch fresh from NHL API and store to raw_nhl_data")
+    parser.add_argument("--refetch", action="store_true", help="for games without a stored payload, fetch fresh from NHL API and store to raw_nhl_data (dry-run: memory only)")
+    parser.add_argument("--env-file", type=str, default=os.path.join(_REPO_ROOT, ".env"),
+                        help="path to .env with Supabase URL + service role key (default: repo-root .env). Use this for prod runs so the default staging .env stays untouched.")
     args = parser.parse_args()
+
+    env_path = args.env_file
+    if not os.path.isabs(env_path):
+        env_path = os.path.abspath(env_path)
+    if not os.path.exists(env_path):
+        raise SystemExit(f"--env-file not found: {env_path}")
+    load_dotenv(env_path, override=True)
 
     SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
     SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -252,6 +262,7 @@ def main() -> int:
     # Startup banner — every run surfaces its target and scope.
     print("=" * 72)
     print("  backfill_from_raw_payloads.py")
+    print(f"  Env file:       {env_path}")
     print(f"  Target project: {project_ref}  ({SUPABASE_URL})")
     print(f"  Mode:           {'DRY-RUN' if args.dry_run else 'LIVE'}"
           f"{'  (--refetch enabled)' if args.refetch else ''}")

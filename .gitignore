@@ -64,8 +64,10 @@ git-diagnostic-output/
 .env.*.local
 .env.staging
 .env.production
+.env.prod
 apps/web/.env.staging
 apps/web/.env.production
+apps/web/.env.prod
 
 # Firebase
 .firebase/
