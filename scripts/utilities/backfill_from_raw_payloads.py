@@ -249,7 +249,10 @@ def main() -> int:
         env_path = os.path.abspath(env_path)
     if not os.path.exists(env_path):
         raise SystemExit(f"--env-file not found: {env_path}")
-    load_dotenv(env_path, override=True)
+    # utf-8-sig strips a UTF-8 BOM if present, no-op otherwise. Windows PowerShell's
+    # `Out-File -Encoding utf8` writes a BOM by default; without this, dotenv parses
+    # the first key as '﻿VITE_SUPABASE_URL' and silently fails to override.
+    load_dotenv(env_path, override=True, encoding="utf-8-sig")
 
     SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
     SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
