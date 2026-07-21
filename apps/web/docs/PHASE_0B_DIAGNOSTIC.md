@@ -98,7 +98,55 @@ entirely.
     silent-swallow retry loop.
 
 ## Fix log
-_(empty — pending 0b-fix)_
+- 2026-07-21: 0b-fix applied to `data-pipeline/acquisition/data_acquisition.py`.
+  Three changes:
+  1. **fillna('unknown') → fillna('OTHER')** at both encoder call sites
+     (line 2171 in `process_single_game`; line ~3575 in
+     `scrape_pbp_and_process`). 'OTHER' is a known encoder class and
+     matches the training script's null handling
+     (`scripts/utilities/train_xg_v3.py:243`).
+  2. **Defensive unseen-label wrap** before both `.transform()` calls.
+     Maps any value not in `encoder.classes_` to 'OTHER' with a
+     warning log. Mirrors the canonical pattern from
+     `train_xg_v3.py:361-366`. Necessary because real prod PBP data
+     contains categories the encoder was never fit on — staging 0a
+     corpus alone shows 6 unseen categories: `DELPEN` (2,871 rows),
+     `PEND` (11), `PSTR` (3), `GEND` (2), `EGT` (2), `ANTHEM` (1),
+     `EISTR` (1). Would have failed on any prod game containing any
+     of these.
+  3. **Silent-swallow replaced** at `_save_shots_to_database`
+     lines 2031-2032 and 2038-2039: `except Exception: pass` →
+     `except Exception as row_err: logger.warning(...)` with game_id,
+     player_id, event_id, and error details. Loop-continue behavior
+     preserved — we're adding visibility, not changing control flow.
+
+  Training-data verification (Step 0):
+  - Staging `raw_shots` (904,859 rows, 0a MoneyPuck corpus): 0 nulls
+    in `last_event_category` — MoneyPuck's own PBP feed doesn't
+    produce them. So training encoded no null cases; fill value is
+    a runtime concern only.
+  - Training script (`train_xg_v3.py:243`) uses
+    `.fillna("OTHER").str.upper()` and the encode step
+    (`train_xg_v3.py:361-366`) has an explicit
+    `if v in known_events else "OTHER"` guard. The runtime scraper
+    diverged from this canonical pattern; the fix restores parity.
+
+  Validation on staging (Step 2):
+  - Test game 2025030416 (Cup Final G6, VGK@CAR): extracts 73 shots,
+    scores cleanly (all 73 rows have xG_Value; sample values
+    [0.042, 0.003, 0.943]), 0 unseen labels in this specific game,
+    1 row landed with NULL `last_event_category` (previously fatal —
+    stored NULL preserved as data-integrity signal, mapped to
+    'OTHER' only for encoding).
+  - Batch upsert succeeded first try; per-row retry loops (now with
+    logging) not exercised.
+  - Staging restored to 904,859 baseline after test.
+
+  Out-of-scope but observed: xA prediction raises non-fatal
+  `TypeError: positive() got an unexpected keyword argument 'upper'`
+  from `np.power(...).clip(upper=)` — sklearn/numpy API drift.
+  Non-blocking (xa_value defaults to 0.0). Log for future fix,
+  separate from 0b.
 
 ## Backfill log
-_(empty — pending 0b-fix)_
+_(empty — pending prod deploy of 0b-fix)_

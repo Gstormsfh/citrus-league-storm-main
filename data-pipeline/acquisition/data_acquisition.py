@@ -2028,15 +2028,25 @@ def _save_shots_to_database(df_shots, db_client, game_id):
                             try:
                                 db_client.upsert('raw_shots', [record], on_conflict='game_id,player_id,shot_x,shot_y,shot_type_code')
                                 total_saved += 1
-                            except Exception:
-                                pass
+                            except Exception as row_err:
+                                logger.warning(
+                                    f"Game {game_id}: raw_shots row save failed "
+                                    f"(constraint-retry path, player_id={record.get('player_id')}, "
+                                    f"event_id={record.get('event_id')}): "
+                                    f"{type(row_err).__name__}: {row_err}"
+                                )
                 else:
                     for record in batch:
                         try:
                             db_client.upsert('raw_shots', [record], on_conflict='game_id,player_id,shot_x,shot_y,shot_type_code')
                             total_saved += 1
-                        except Exception:
-                            pass
+                        except Exception as row_err:
+                            logger.warning(
+                                f"Game {game_id}: raw_shots row save failed "
+                                f"(non-constraint retry path, player_id={record.get('player_id')}, "
+                                f"event_id={record.get('event_id')}): "
+                                f"{type(row_err).__name__}: {row_err}"
+                            )
         
         logger.info(f"Game {game_id}: Saved {total_saved} shot records to database")
         
@@ -2167,13 +2177,24 @@ def process_single_game(game_id, rate_limit_flag=None):
             if 'last_event_category' in df_shots.columns and 'last_event_category_encoded' not in df_shots.columns:
                 from sklearn.preprocessing import LabelEncoder
                 if LAST_EVENT_CATEGORY_ENCODER is not None:
-                    df_shots['last_event_category_encoded'] = LAST_EVENT_CATEGORY_ENCODER.transform(
-                        df_shots['last_event_category'].fillna('unknown').astype(str)
-                    )
+                    # Match training-script null handling (train_xg_v3.py:243) and map
+                    # unseen labels to 'OTHER' — real PBP data contains categories the
+                    # encoder was never fit on (e.g. DELPEN, PEND, PSTR).
+                    known_events = set(LAST_EVENT_CATEGORY_ENCODER.classes_)
+                    series = df_shots['last_event_category'].fillna('OTHER').astype(str)
+                    unseen_mask = ~series.isin(known_events)
+                    if unseen_mask.any():
+                        logger.warning(
+                            f"Game {game_id}: {int(unseen_mask.sum())} rows with "
+                            f"last_event_category unseen by encoder "
+                            f"({sorted(series[unseen_mask].unique().tolist())}) — mapped to 'OTHER'"
+                        )
+                        series = series.where(~unseen_mask, 'OTHER')
+                    df_shots['last_event_category_encoded'] = LAST_EVENT_CATEGORY_ENCODER.transform(series)
                 else:
                     le = LabelEncoder()
                     df_shots['last_event_category_encoded'] = le.fit_transform(
-                        df_shots['last_event_category'].fillna('unknown').astype(str)
+                        df_shots['last_event_category'].fillna('OTHER').astype(str)
                     )
         
         # Calculate derived features
@@ -3570,15 +3591,28 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
         if 'last_event_category' in df_shots.columns and 'last_event_category_encoded' not in df_shots.columns:
             from sklearn.preprocessing import LabelEncoder
             if LAST_EVENT_CATEGORY_ENCODER is not None:
-                # Use saved encoder
-                df_shots['last_event_category_encoded'] = LAST_EVENT_CATEGORY_ENCODER.transform(
-                    df_shots['last_event_category'].fillna('unknown').astype(str)
-                )
+                # Match training-script null handling (train_xg_v3.py:243) and map
+                # unseen labels to 'OTHER' — real PBP data contains categories the
+                # encoder was never fit on (e.g. DELPEN, PEND, PSTR). df_shots here
+                # is batch-scoped (aggregate across all games in the run).
+                known_events = set(LAST_EVENT_CATEGORY_ENCODER.classes_)
+                series = df_shots['last_event_category'].fillna('OTHER').astype(str)
+                unseen_mask = ~series.isin(known_events)
+                if unseen_mask.any():
+                    affected_games = sorted(df_shots.loc[unseen_mask, 'game_id'].unique().tolist()) if 'game_id' in df_shots.columns else []
+                    logger.warning(
+                        f"scrape_pbp_and_process batch: {int(unseen_mask.sum())} rows with "
+                        f"last_event_category unseen by encoder "
+                        f"({sorted(series[unseen_mask].unique().tolist())}) — mapped to 'OTHER' "
+                        f"— affected games: {affected_games}"
+                    )
+                    series = series.where(~unseen_mask, 'OTHER')
+                df_shots['last_event_category_encoded'] = LAST_EVENT_CATEGORY_ENCODER.transform(series)
             else:
                 # Encode on-the-fly (fallback)
                 le = LabelEncoder()
                 df_shots['last_event_category_encoded'] = le.fit_transform(
-                    df_shots['last_event_category'].fillna('unknown').astype(str)
+                    df_shots['last_event_category'].fillna('OTHER').astype(str)
                 )
     
     # Calculate derived features that the model expects (before feature check)
