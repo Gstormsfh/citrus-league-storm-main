@@ -208,7 +208,85 @@ entirely.
   - Cleanup: DELETE raw_shots and raw_nhl_data for 2025030416.
     Post-cleanup: raw_shots=904,859 (exact baseline), raw_nhl_data=0
     (exact baseline).
+- 2026-07-21: Reconciled 51 vs 42 delta — hypothesis CONFIRMED,
+  root cause is `raw_shots.season = NULL` on 9 games.
+  - Q2 reproduced the diagnostic's original 51 by adding
+    `s.season = 2025` to the LEFT JOIN predicate; Q1 (my new
+    inventory) omitted it and counted 42. Difference = **exactly 9**.
+  - Q3 shows 9 games / 798 rows in prod.raw_shots have
+    `season IS NULL`, all others 2025.
+  - The 9 season-NULL games are all complete, fully scored:
+    `shot_rows == xg_rows == flurry_rows` (100% populated),
+    xA populated on the pass-having subset, all rows saved in a
+    single batch each. Save timestamps 2026-05-13 → 2026-06-11
+    (after the 2026-05-11 code cascade but before the fix).
+    Row counts within the normal 70-113 band.
+
+    | game_id     | game_date  | shot_rows | notes |
+    |-------------|------------|-----------|-------|
+    | 2025030245  | 2026-05-12 | 109       |       |
+    | 2025030246  | 2026-05-14 | 93        |       |
+    | 2025030323  | 2026-05-24 | 85        |       |
+    | 2025030313  | 2026-05-25 | 84        |       |
+    | 2025030324  | 2026-05-26 | 73        |       |
+    | 2025030411  | 2026-06-02 | 82        | Cup Final G1 |
+    | 2025030412  | 2026-06-04 | 83        | Cup Final G2 |
+    | 2025030413  | 2026-06-06 | 113       | Cup Final G3 |
+    | 2025030414  | 2026-06-09 | 76        | Cup Final G4 |
+
+  - Verdict: **season UPDATE repair, not a re-backfill**. These
+    games already have complete extraction + scoring; the season
+    column is the only defect. Fix is
+    `UPDATE raw_shots SET season = int(game_id / 1000000)
+     WHERE game_id IN (...) AND season IS NULL`.
+
+## Season-integrity finding (0c blocker if unrepaired)
+The 9 season-NULL games are **invisible to every
+season-filtered query**. This includes the diagnostic queries
+we've been using this whole investigation (`s.season = 2025`
+join predicate would not have found them; `WHERE season = 2025`
+aggregations undercount by 798 rows / 9 games). Downstream
+consumers (per-season aggregates, per-season projection
+training, per-season leaderboards, phase 0c stat rebuilds) will
+silently omit these rows. Repair must land before 0c or 0c
+inputs will be quietly wrong for the Cup Final and
+Round 2/3 games.
+
+Introduction mechanism (inferred, not yet confirmed): the
+extract-time `season` derivation was added inline at line 1756
+during 0d-pre #3 (comment: "Set inline at extraction time so
+the DELETE+UPSERT retrofit doesn't reintroduce NULL season
+after the 0d-pre #3 backfill migration runs (caught during 6c,
+2026-05-12)."). The 9 affected games were saved between
+2026-05-13 and 2026-06-11 — all AFTER that inline derivation
+was added, suggesting the retrofit at line 1756 either wasn't
+present in these earlier saves, or a code path other than
+`_save_shots_to_database` wrote them. Second-order investigation
+deferred; the repair is deterministic (game_id / 1_000_000).
+
+## Pinned backfill scope
+- **Zero-shot backfill (this workstream)**: **42 games**, fully
+  characterized. 30 replay + 12 refetch. Executed via
+  `backfill_from_raw_payloads.py`.
+- **Season-integrity repair (parallel workstream, out of 0b
+  scope proper)**: **9 games**, deterministic UPDATE.
+  Authorization required separately.
+
 - Pending: prod backfill authorization. Script ready to run against
   prod once .env is repointed. Refetch will hit NHL API for the 12
   no-payload games and store their payloads in prod.raw_nhl_data.
   Fail-stop by design — first game to error halts the run.
+- Pending: season-repair authorization (9 games, single UPDATE).
+
+## stats_extracted_at note
+The `raw_nhl_data.stats_extracted_at` column is a **retired-daemon
+flag** from `scripts/_deprecated/extractor_job.py`. The current
+pipeline (live scraper + this backfill) does not set it, and
+should not. Per `GAPS_AND_FUTURE_CAPABILITIES.md § 3`, the flag
+was one-time backfilled on 474 games as part of 0d-pre B and
+otherwise carries no current-pipeline meaning. The single-game
+anomaly noted earlier (`2025030234` with `stats_extracted_at`
+populated despite 0 shots) is explained: the one-time backfill
+set the flag based on then-current live-scraper state; the shot
+data was later lost in the encoder regression. Not a data-model
+inconsistency, just a stale flag.
