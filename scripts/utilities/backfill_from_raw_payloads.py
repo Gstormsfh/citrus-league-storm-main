@@ -130,7 +130,7 @@ def _load_payload(db: SupabaseRest, game_id: int) -> Optional[Dict[str, Any]]:
     return rows[0].get("raw_json")
 
 
-def _refetch_payload(game_id: int, db: SupabaseRest) -> Dict[str, Any]:
+def _refetch_payload(game_id: int, db: SupabaseRest, cache: bool) -> Dict[str, Any]:
     # Plain requests, not data_pipeline.utils.citrus_request: the latter mandates
     # proxy-rotation env vars intended for the high-frequency live scraper.
     # Backfill is at most ~50 one-shot fetches — well under any rate limit.
@@ -141,14 +141,15 @@ def _refetch_payload(game_id: int, db: SupabaseRest) -> Dict[str, Any]:
     response = requests.get(url, timeout=15, headers=headers)
     response.raise_for_status()
     raw_data = response.json()
-    game_date = raw_data.get("gameDate")  # NOT NULL in schema
-    if not game_date:
-        raise RuntimeError(f"Game {game_id}: NHL payload missing gameDate — cannot upsert to raw_nhl_data")
-    db.upsert(
-        "raw_nhl_data",
-        [{"game_id": game_id, "game_date": game_date, "raw_json": raw_data}],
-        on_conflict="game_id",
-    )
+    if cache:
+        game_date = raw_data.get("gameDate")  # NOT NULL in schema
+        if not game_date:
+            raise RuntimeError(f"Game {game_id}: NHL payload missing gameDate — cannot upsert to raw_nhl_data")
+        db.upsert(
+            "raw_nhl_data",
+            [{"game_id": game_id, "game_date": game_date, "raw_json": raw_data}],
+            on_conflict="game_id",
+        )
     return raw_data
 
 
@@ -167,8 +168,16 @@ def _process_one(
             raise RuntimeError(
                 f"Game {game_id}: no payload in raw_nhl_data; rerun with --refetch to fetch from NHL API"
             )
-        raw_data = _refetch_payload(game_id, db)
-        payload_source = "NHL API (stored to raw_nhl_data)"
+        # Dry-run keeps the zero-writes invariant: fetch to memory only,
+        # skip the raw_nhl_data cache write. Live mode caches so subsequent
+        # runs don't refetch.
+        cache_after_fetch = not dry_run
+        raw_data = _refetch_payload(game_id, db, cache=cache_after_fetch)
+        payload_source = (
+            "NHL API (stored to raw_nhl_data)"
+            if cache_after_fetch
+            else "NHL API (dry-run — would cache to raw_nhl_data)"
+        )
 
     warn_capture.drain()  # clear any prior warnings before this game
 
