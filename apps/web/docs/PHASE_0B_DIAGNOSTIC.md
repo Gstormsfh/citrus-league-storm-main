@@ -142,11 +142,73 @@ entirely.
     logging) not exercised.
   - Staging restored to 904,859 baseline after test.
 
-  Out-of-scope but observed: xA prediction raises non-fatal
+- 2026-07-21 (later): Refactor and backfill scaffolding.
+  - Extracted `process_game_from_raw_data(game_id, raw_data, db_client)`
+    from `process_single_game` (data_acquisition.py). The new function
+    holds the extract → score → save block; `process_single_game`
+    now delegates to it after its NHL API fetch. Backfill calls it
+    directly. Rationale: the 0b root cause was runtime/training-code
+    divergence on the encoder; sharing one code path for live scraping
+    and backfill prevents that divergence class going forward.
+  - The DELPEN/PEND/PSTR/... finding is decisive: the encoder's known
+    class set (12) is a strict subset of the categories present in
+    real data (18 in the 0a corpus alone). The defensive wrap is
+    NECESSARY, not defensive-in-the-nice-to-have sense — the fillna
+    change alone would still fail on any game containing DELPEN
+    (2,871 rows across the 0a corpus). Backfill warning logs will
+    reveal the null-vs-DELPEN split across the 42 affected games.
+
+## Tracked separately (out of 0b scope)
+- **xA TypeError**: earlier session harness hit
   `TypeError: positive() got an unexpected keyword argument 'upper'`
-  from `np.power(...).clip(upper=)` — sklearn/numpy API drift.
-  Non-blocking (xa_value defaults to 0.0). Log for future fix,
-  separate from 0b.
+  during xA scoring. Investigation this session: the module's live
+  path is correct — it does `df['xA_Value'] = np.power(raw_xa, k)`
+  first (assigns ndarray → Series), then
+  `df['xA_Value'].clip(upper=)` (pandas Series.clip accepts `upper=`).
+  The harness took a shortcut chaining `.clip(upper=)` directly on
+  the ndarray from `np.power(...)` — numpy's ndarray.clip does not
+  accept `upper=`. **Verdict: harness artifact only.** No prod bug.
+  Removed from active 0b work.
 
 ## Backfill log
-_(empty — pending prod deploy of 0b-fix)_
+- 2026-07-21: Inventory of affected games (prod read-only).
+  - **42 games** currently have season=2025 status=final with zero
+    `raw_shots` rows. Stable across multiple slice definitions
+    (exactly 0 shots, <10 shots — both return 42).
+  - Split: 30 games with `raw_nhl_data` payload present (replay set) /
+    12 games without (refetch set).
+  - January outlier: `2025020828` (2026-01-26); all other affected
+    games cluster April 4 – June 14 2026.
+  - Prior "51-game" figure in the earlier diagnostic was carried
+    forward from the prior investigation session without a preserved
+    query. Reconciled slice counts (< 50 shots = 44; from 2026-04-01
+    with 0 shots = 41; from 2026-05-11 with 0 shots = 14; all
+    season=2025 final = 1,394) do not reproduce 51. **Delta of 9**
+    likely reflects: (a) staleness between prior count and today
+    (though no fix was deployed to prod to change state); (b)
+    different slice semantics that aren't reproducible without the
+    original query. **Prod backfill scope pinned to 42 games** —
+    inventory saved to `C:\tmp\0b_backfill_inventory.json`.
+  - Inventory anomaly: game `2025030234` has `stats_extracted_at`
+    populated (2026-05-12 04:55) despite 0 shots. Matches the
+    failure fingerprint — pipeline advanced the stats flag but
+    the shot-scoring aborted before save.
+- 2026-07-21: Staging pilot via new
+  `scripts/utilities/backfill_from_raw_payloads.py`.
+  - Dry-run + refetch on game 2025030416: fetched from NHL API
+    (plain requests, no proxy — backfill volume doesn't warrant
+    the live-scraper's proxy infra), stored in staging.raw_nhl_data,
+    extracted+scored 73 rows, 0 rows saved (dry-run correctly
+    skipped write via monkey-patched save), 0 unseen-label warnings
+    (this game's null-only case maps to 'OTHER' which IS in the
+    encoder's known set, so the warning-emitting branch never fires).
+  - Live run on the same game: read payload from staging.raw_nhl_data
+    (no NHL API call), extracted+scored+saved 73 rows. Post-save
+    validation: `rows_saved=73, xg_populated=73`. Elapsed 8.4s.
+  - Cleanup: DELETE raw_shots and raw_nhl_data for 2025030416.
+    Post-cleanup: raw_shots=904,859 (exact baseline), raw_nhl_data=0
+    (exact baseline).
+- Pending: prod backfill authorization. Script ready to run against
+  prod once .env is repointed. Refetch will hit NHL API for the 12
+  no-payload games and store their payloads in prod.raw_nhl_data.
+  Fail-stop by design — first game to error halts the run.
