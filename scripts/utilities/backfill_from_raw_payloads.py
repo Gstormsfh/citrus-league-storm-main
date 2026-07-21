@@ -119,6 +119,24 @@ def _load_game_ids(args: argparse.Namespace) -> List[int]:
     return ids
 
 
+# Terminal game states in NHL PBP payloads. Anything else (FUT, PRE, LIVE, CRIT)
+# is a stub or in-progress and must not be treated as a replayable final payload.
+# Matches the set used by the retired scripts/_deprecated/extractor_job.py.
+_TERMINAL_GAME_STATES = {"OFF", "FINAL", "F/SO", "OVER"}
+
+
+def _payload_state(raw_data: Optional[Dict[str, Any]]) -> Tuple[Optional[str], int]:
+    if not isinstance(raw_data, dict):
+        return (None, 0)
+    plays = raw_data.get("plays") or []
+    return (raw_data.get("gameState"), len(plays))
+
+
+def _is_stub_payload(raw_data: Dict[str, Any]) -> bool:
+    state, play_count = _payload_state(raw_data)
+    return state not in _TERMINAL_GAME_STATES or play_count == 0
+
+
 def _load_payload(db: SupabaseRest, game_id: int) -> Optional[Dict[str, Any]]:
     rows = db.select(
         "raw_nhl_data",
@@ -142,6 +160,13 @@ def _refetch_payload(game_id: int, db: SupabaseRest, cache: bool) -> Dict[str, A
     response = requests.get(url, timeout=15, headers=headers)
     response.raise_for_status()
     raw_data = response.json()
+    state, play_count = _payload_state(raw_data)
+    print(f"  refetch: gameState={state!r} plays={play_count}")
+    if state not in _TERMINAL_GAME_STATES:
+        raise RuntimeError(
+            f"Game {game_id}: refetched payload has non-terminal gameState={state!r} "
+            f"(plays={play_count}); refusing to cache a fresh stub over an old one"
+        )
     if cache:
         game_date = raw_data.get("gameDate")  # NOT NULL in schema
         if not game_date:
@@ -164,6 +189,20 @@ def _process_one(
     """Process one game. Raises on failure (backfill fail-stop)."""
     raw_data = _load_payload(db, game_id)
     payload_source = "raw_nhl_data"
+
+    # A stored payload that's a FUT stub is functionally equivalent to no payload —
+    # if --refetch is set, promote to the refetch path and overwrite the stub on cache.
+    if raw_data is not None and _is_stub_payload(raw_data):
+        state, play_count = _payload_state(raw_data)
+        if not refetch:
+            raise RuntimeError(
+                f"Game {game_id}: stored raw_nhl_data payload is a stub "
+                f"(gameState={state!r}, plays={play_count}); rerun with --refetch to "
+                f"replace with fresh NHL API data"
+            )
+        print(f"  stored payload is a stub (gameState={state!r} plays={play_count}) — refetching")
+        raw_data = None  # fall through to refetch
+
     if raw_data is None:
         if not refetch:
             raise RuntimeError(
@@ -198,11 +237,16 @@ def _process_one(
         finally:
             da._save_shots_to_database = original_save
 
+        rows_extracted = int(len(result_df)) if result_df is not None else 0
+        if rows_extracted == 0:
+            # Loud but non-halting in dry-run — this is how we surface stubs.
+            state, play_count = _payload_state(raw_data)
+            print(f"  WARN: dry-run extraction produced 0 rows (gameState={state!r} plays={play_count})")
         return {
             "game_id": game_id,
             "payload_source": payload_source,
             "dry_run": True,
-            "rows_extracted": int(len(result_df)) if result_df is not None else 0,
+            "rows_extracted": rows_extracted,
             "rows_saved": 0,
             "rows_would_save": saved_rows[0] if saved_rows else 0,
             "unseen_warnings": warn_capture.drain(),
@@ -210,6 +254,15 @@ def _process_one(
 
     result_df = da.process_game_from_raw_data(game_id, raw_data, db)
     rows_saved = int(len(result_df)) if result_df is not None else 0
+    if rows_saved == 0:
+        # Live-mode zero-rows gate: every backfill target is a known played game.
+        # A legitimate 0-row extraction does not exist here; a "success" with 0 rows
+        # is how holes survive undetected (proven by the FUT-stub discovery).
+        state, play_count = _payload_state(raw_data)
+        raise RuntimeError(
+            f"Game {game_id}: LIVE extraction produced 0 rows — halting run. "
+            f"source={payload_source}, gameState={state!r}, plays={play_count}"
+        )
     return {
         "game_id": game_id,
         "payload_source": payload_source,
