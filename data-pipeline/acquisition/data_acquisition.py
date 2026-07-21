@@ -2062,10 +2062,161 @@ def _save_shots_to_database(df_shots, db_client, game_id):
         raise
 
 
+def process_game_from_raw_data(game_id, raw_data, db_client):
+    """
+    Extract shots, score xG/xA, and save from a pre-fetched raw PBP payload.
+
+    Backfill entry point — bypasses the NHL API fetch that process_single_game
+    performs, so replay from raw_nhl_data.raw_json shares the exact same
+    extract → score → save code path as live scraping. A fork of scoring
+    logic is precisely what caused the 0b regression; keep them one.
+
+    Raises on any processing error — callers decide whether to swallow.
+    Returns None if no shots extracted; returns the scored DataFrame otherwise.
+    """
+    all_shot_data = _extract_shots_from_game(raw_data, game_id, db_client)
+
+    if not all_shot_data:
+        logger.info(f"Game {game_id}: No shots found")
+        return None
+
+    df_shots = pd.DataFrame(all_shot_data)
+
+    try:
+        from feature_calculations import apply_calculated_features_to_dataframe
+        df_shots = apply_calculated_features_to_dataframe(df_shots)
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.error(f"Game {game_id}: Warning - error applying calculated features: {e}")
+
+    if USE_MONEYPUCK_MODEL and 'last_event_category_encoded' in MODEL_FEATURES:
+        if 'last_event_category' in df_shots.columns and 'last_event_category_encoded' not in df_shots.columns:
+            from sklearn.preprocessing import LabelEncoder
+            if LAST_EVENT_CATEGORY_ENCODER is not None:
+                # Match training-script null handling (train_xg_v3.py:243) and map
+                # unseen labels to 'OTHER' — real PBP data contains categories the
+                # encoder was never fit on (e.g. DELPEN, PEND, PSTR).
+                known_events = set(LAST_EVENT_CATEGORY_ENCODER.classes_)
+                series = df_shots['last_event_category'].fillna('OTHER').astype(str)
+                unseen_mask = ~series.isin(known_events)
+                if unseen_mask.any():
+                    logger.warning(
+                        f"Game {game_id}: {int(unseen_mask.sum())} rows with "
+                        f"last_event_category unseen by encoder "
+                        f"({sorted(series[unseen_mask].unique().tolist())}) — mapped to 'OTHER'"
+                    )
+                    series = series.where(~unseen_mask, 'OTHER')
+                df_shots['last_event_category_encoded'] = LAST_EVENT_CATEGORY_ENCODER.transform(series)
+            else:
+                le = LabelEncoder()
+                df_shots['last_event_category_encoded'] = le.fit_transform(
+                    df_shots['last_event_category'].fillna('OTHER').astype(str)
+                )
+
+    if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
+        df_shots['distance_angle_interaction'] = (df_shots['distance'] * df_shots['angle']) / 100
+
+    if 'speed_from_last_event' in df_shots.columns:
+        speed_series = pd.to_numeric(df_shots['speed_from_last_event'], errors='coerce').fillna(0)
+        df_shots['speed_from_last_event_log'] = np.log1p(speed_series)
+
+    for feature in MODEL_FEATURES:
+        if feature not in df_shots.columns:
+            if feature in ['home_empty_net', 'away_empty_net', 'is_empty_net',
+                           'has_pass_before_shot', 'is_rebound', 'is_slot_shot', 'is_power_play']:
+                df_shots[feature] = 0
+            elif feature == 'shot_angle_adjusted':
+                df_shots[feature] = df_shots['angle'].abs() if 'angle' in df_shots.columns else 0
+            elif feature == 'last_event_category_encoded':
+                df_shots[feature] = 0
+            elif feature == 'distance_angle_interaction':
+                if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
+                    df_shots[feature] = (df_shots['distance'] * df_shots['angle']) / 100
+                else:
+                    df_shots[feature] = 0
+            elif feature == 'speed_from_last_event_log':
+                if 'speed_from_last_event' in df_shots.columns:
+                    df_shots[feature] = np.log1p(df_shots['speed_from_last_event'].fillna(0))
+                else:
+                    df_shots[feature] = 0
+            else:
+                df_shots[feature] = 0
+
+    X_predict = df_shots[MODEL_FEATURES].copy()
+
+    for feature in MODEL_FEATURES:
+        if feature in X_predict.columns and X_predict[feature].isna().any():
+            if feature in ['pass_lateral_distance', 'pass_to_net_distance', 'pass_immediacy_score',
+                          'goalie_movement_score', 'pass_quality_score', 'pass_zone_encoded',
+                          'has_pass_before_shot', 'is_rebound', 'is_slot_shot', 'is_power_play',
+                          'is_empty_net', 'home_empty_net', 'away_empty_net']:
+                X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
+            elif feature in ['time_since_last_event', 'distance_from_last_event', 'speed_from_last_event',
+                            'last_event_shot_angle', 'last_event_shot_distance', 'last_event_category_encoded']:
+                non_zero_values = X_predict[feature][X_predict[feature] > 0]
+                if len(non_zero_values) > 0:
+                    fill_value = non_zero_values.median()
+                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(fill_value)
+                else:
+                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
+            elif feature == 'shot_angle_adjusted':
+                if 'angle' in df_shots.columns:
+                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(df_shots['angle'].abs())
+                else:
+                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
+            else:
+                median_val = pd.to_numeric(X_predict[feature], errors='coerce').median()
+                X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(median_val)
+
+    if USE_MONEYPUCK_MODEL:
+        if hasattr(XG_MODEL, 'predict_proba'):
+            df_shots['xG_Value'] = XG_MODEL.predict_proba(X_predict)[:, 1]
+        else:
+            df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
+        df_shots['xG_Value'] = df_shots['xG_Value'].clip(lower=0.0, upper=0.95)
+    else:
+        raw_xg = XG_MODEL.predict_proba(X_predict)[:, 1]
+        CALIBRATION_FACTOR = 3.5
+        df_shots['xG_Value'] = np.power(raw_xg, CALIBRATION_FACTOR)
+        df_shots['xG_Value'] = df_shots['xG_Value'].clip(upper=0.50)
+        SCALE_FACTOR = 0.19
+        df_shots['xG_Value'] = df_shots['xG_Value'] * SCALE_FACTOR
+
+    df_shots['xA_Value'] = 0.0
+    if XA_MODEL and XA_MODEL_FEATURES:
+        passes_mask = df_shots['has_pass_before_shot'] == 1
+        df_passes = df_shots[passes_mask].copy()
+        if len(df_passes) > 0:
+            X_xa_predict = df_passes[XA_MODEL_FEATURES]
+            raw_xa = XA_MODEL.predict_proba(X_xa_predict)[:, 1]
+            CALIBRATION_FACTOR_XA = 3.5
+            df_passes['xA_Value'] = np.power(raw_xa, CALIBRATION_FACTOR_XA)
+            df_passes['xA_Value'] = df_passes['xA_Value'].clip(upper=0.50)
+            SCALE_FACTOR_XA = 0.15
+            df_passes['xA_Value'] = df_passes['xA_Value'] * SCALE_FACTOR_XA
+            df_shots.loc[passes_mask, 'xA_Value'] = df_passes['xA_Value'].values
+
+    try:
+        from feature_calculations import calculate_flurry_adjusted_xg
+        df_shots = calculate_flurry_adjusted_xg(
+            df_shots, xg_column='xG_Value', game_id_col='game_id',
+            team_code_col='team_code', period_col='period',
+            time_in_period_col='time_in_period', time_since_last_event_col='time_since_last_event'
+        )
+    except Exception:
+        df_shots['flurry_adjusted_xg'] = df_shots['xG_Value']
+
+    _save_shots_to_database(df_shots, db_client, game_id)
+
+    logger.info(f"Game {game_id}: Processed {len(df_shots)} shots")
+    return df_shots
+
+
 def process_single_game(game_id, rate_limit_flag=None):
     """
     Process a single game's play-by-play data, calculates xG, and saves to DB.
-    
+
     This function is designed to be called in parallel by multiprocessing workers.
     It processes one game independently and saves shots directly to the database.
     
@@ -2151,159 +2302,12 @@ def process_single_game(game_id, rate_limit_flag=None):
     if raw_data is None:
         return None
     
-    # 4. Process the game data - extract shots from raw_data
+    # 4. Process the game data via the shared extract → score → save path.
+    # Wraps in try/except None because worker contract is "return None on
+    # failure"; backfill uses process_game_from_raw_data directly and lets
+    # errors propagate.
     try:
-        # Call helper function to extract shot records from raw_data
-        all_shot_data = _extract_shots_from_game(raw_data, game_id, db_client)
-        
-        if not all_shot_data:
-            logger.info(f"Game {game_id}: No shots found")
-            return None
-        
-        # 5. Convert to DataFrame and calculate xG/xA
-        df_shots = pd.DataFrame(all_shot_data)
-        
-        # Apply calculated features
-        try:
-            from feature_calculations import apply_calculated_features_to_dataframe
-            df_shots = apply_calculated_features_to_dataframe(df_shots)
-        except ImportError:
-            pass  # Skip if not available
-        except Exception as e:
-            logger.error(f"Game {game_id}: Warning - error applying calculated features: {e}")
-        
-        # Prepare features for xG prediction (same logic as scrape_pbp_and_process)
-        if USE_MONEYPUCK_MODEL and 'last_event_category_encoded' in MODEL_FEATURES:
-            if 'last_event_category' in df_shots.columns and 'last_event_category_encoded' not in df_shots.columns:
-                from sklearn.preprocessing import LabelEncoder
-                if LAST_EVENT_CATEGORY_ENCODER is not None:
-                    # Match training-script null handling (train_xg_v3.py:243) and map
-                    # unseen labels to 'OTHER' — real PBP data contains categories the
-                    # encoder was never fit on (e.g. DELPEN, PEND, PSTR).
-                    known_events = set(LAST_EVENT_CATEGORY_ENCODER.classes_)
-                    series = df_shots['last_event_category'].fillna('OTHER').astype(str)
-                    unseen_mask = ~series.isin(known_events)
-                    if unseen_mask.any():
-                        logger.warning(
-                            f"Game {game_id}: {int(unseen_mask.sum())} rows with "
-                            f"last_event_category unseen by encoder "
-                            f"({sorted(series[unseen_mask].unique().tolist())}) — mapped to 'OTHER'"
-                        )
-                        series = series.where(~unseen_mask, 'OTHER')
-                    df_shots['last_event_category_encoded'] = LAST_EVENT_CATEGORY_ENCODER.transform(series)
-                else:
-                    le = LabelEncoder()
-                    df_shots['last_event_category_encoded'] = le.fit_transform(
-                        df_shots['last_event_category'].fillna('OTHER').astype(str)
-                    )
-        
-        # Calculate derived features
-        if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
-            df_shots['distance_angle_interaction'] = (df_shots['distance'] * df_shots['angle']) / 100
-        
-        if 'speed_from_last_event' in df_shots.columns:
-            speed_series = pd.to_numeric(df_shots['speed_from_last_event'], errors='coerce').fillna(0)
-            df_shots['speed_from_last_event_log'] = np.log1p(speed_series)
-        
-        # Ensure all required features exist
-        for feature in MODEL_FEATURES:
-            if feature not in df_shots.columns:
-                if feature in ['home_empty_net', 'away_empty_net', 'is_empty_net', 
-                              'has_pass_before_shot', 'is_rebound', 'is_slot_shot', 'is_power_play']:
-                    df_shots[feature] = 0
-                elif feature == 'shot_angle_adjusted':
-                    df_shots[feature] = df_shots['angle'].abs() if 'angle' in df_shots.columns else 0
-                elif feature == 'last_event_category_encoded':
-                    df_shots[feature] = 0
-                elif feature == 'distance_angle_interaction':
-                    if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
-                        df_shots[feature] = (df_shots['distance'] * df_shots['angle']) / 100
-                    else:
-                        df_shots[feature] = 0
-                elif feature == 'speed_from_last_event_log':
-                    if 'speed_from_last_event' in df_shots.columns:
-                        df_shots[feature] = np.log1p(df_shots['speed_from_last_event'].fillna(0))
-                    else:
-                        df_shots[feature] = 0
-                else:
-                    df_shots[feature] = 0
-        
-        # Select features and predict xG
-        X_predict = df_shots[MODEL_FEATURES].copy()
-        
-        # Fill missing values
-        for feature in MODEL_FEATURES:
-            if feature in X_predict.columns and X_predict[feature].isna().any():
-                if feature in ['pass_lateral_distance', 'pass_to_net_distance', 'pass_immediacy_score', 
-                              'goalie_movement_score', 'pass_quality_score', 'pass_zone_encoded',
-                              'has_pass_before_shot', 'is_rebound', 'is_slot_shot', 'is_power_play',
-                              'is_empty_net', 'home_empty_net', 'away_empty_net']:
-                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
-                elif feature in ['time_since_last_event', 'distance_from_last_event', 'speed_from_last_event',
-                                'last_event_shot_angle', 'last_event_shot_distance', 'last_event_category_encoded']:
-                    non_zero_values = X_predict[feature][X_predict[feature] > 0]
-                    if len(non_zero_values) > 0:
-                        fill_value = non_zero_values.median()
-                        X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(fill_value)
-                    else:
-                        X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
-                elif feature == 'shot_angle_adjusted':
-                    if 'angle' in df_shots.columns:
-                        X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(df_shots['angle'].abs())
-                    else:
-                        X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
-                else:
-                    median_val = pd.to_numeric(X_predict[feature], errors='coerce').median()
-                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(median_val)
-        
-        # Predict xG
-        if USE_MONEYPUCK_MODEL:
-            # Use predict_proba for classifiers, predict for regressors
-            if hasattr(XG_MODEL, 'predict_proba'):
-                df_shots['xG_Value'] = XG_MODEL.predict_proba(X_predict)[:, 1]
-            else:
-                df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
-            df_shots['xG_Value'] = df_shots['xG_Value'].clip(lower=0.0, upper=0.95)
-        else:
-            raw_xg = XG_MODEL.predict_proba(X_predict)[:, 1]
-            CALIBRATION_FACTOR = 3.5
-            df_shots['xG_Value'] = np.power(raw_xg, CALIBRATION_FACTOR)
-            df_shots['xG_Value'] = df_shots['xG_Value'].clip(upper=0.50)
-            SCALE_FACTOR = 0.19
-            df_shots['xG_Value'] = df_shots['xG_Value'] * SCALE_FACTOR
-        
-        # Predict xA (if model available)
-        df_shots['xA_Value'] = 0.0
-        if XA_MODEL and XA_MODEL_FEATURES:
-            passes_mask = df_shots['has_pass_before_shot'] == 1
-            df_passes = df_shots[passes_mask].copy()
-            if len(df_passes) > 0:
-                X_xa_predict = df_passes[XA_MODEL_FEATURES]
-                raw_xa = XA_MODEL.predict_proba(X_xa_predict)[:, 1]
-                CALIBRATION_FACTOR_XA = 3.5
-                df_passes['xA_Value'] = np.power(raw_xa, CALIBRATION_FACTOR_XA)
-                df_passes['xA_Value'] = df_passes['xA_Value'].clip(upper=0.50)
-                SCALE_FACTOR_XA = 0.15
-                df_passes['xA_Value'] = df_passes['xA_Value'] * SCALE_FACTOR_XA
-                df_shots.loc[passes_mask, 'xA_Value'] = df_passes['xA_Value'].values
-        
-        # Apply flurry adjustment and other post-processing (simplified)
-        try:
-            from feature_calculations import calculate_flurry_adjusted_xg
-            df_shots = calculate_flurry_adjusted_xg(
-                df_shots, xg_column='xG_Value', game_id_col='game_id',
-                team_code_col='team_code', period_col='period',
-                time_in_period_col='time_in_period', time_since_last_event_col='time_since_last_event'
-            )
-        except Exception:
-            df_shots['flurry_adjusted_xg'] = df_shots['xG_Value']
-        
-        # 6. Save to database using db_client
-        _save_shots_to_database(df_shots, db_client, game_id)
-        
-        logger.info(f"Game {game_id}: Processed {len(df_shots)} shots")
-        return df_shots
-    
+        return process_game_from_raw_data(game_id, raw_data, db_client)
     except Exception as e:
         logger.error(f"Game {game_id}: Error processing game data: {e}")
         import traceback
