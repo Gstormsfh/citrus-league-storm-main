@@ -12,6 +12,9 @@ import WebSocket from 'ws';
 
 const PORT = Number(process.env.PORT || 14002);
 const HOST = process.env.HOST || '127.0.0.1';
+const LOBBY_A = process.env.SMOKE_LOBBY_A || 'lobby-A';
+const LOBBY_B = process.env.SMOKE_LOBBY_B || 'lobby-B';
+const PATH_A = `/ws/draft/${LOBBY_A}`;
 const { TOKEN_VALID_A, TOKEN_VALID_B, TOKEN_WRONG_SECRET } = process.env;
 
 if (!TOKEN_VALID_A || !TOKEN_VALID_B || !TOKEN_WRONG_SECRET) {
@@ -53,7 +56,7 @@ function rawUpgrade({ path, subprotocol, label, expectedStatus }) {
   });
 }
 
-function wsEchoTest({ path, subprotocol, label }) {
+function wsSnapshotTest({ path, subprotocol, label }) {
   return new Promise((resolve) => {
     const ws = new WebSocket(`ws://${HOST}:${PORT}${path}`, [subprotocol]);
     let resolved = false;
@@ -65,10 +68,21 @@ function wsEchoTest({ path, subprotocol, label }) {
       try { ws.close(); } catch {}
       resolve();
     };
-    ws.on('open', () => ws.send('hello-from-smoke-c'));
     ws.on('message', (data) => {
       const text = data.toString('utf8');
-      finish(text === 'echo: hello-from-smoke-c', `received "${text}"`);
+      let parsed;
+      try { parsed = JSON.parse(text); } catch {
+        return finish(false, `non-JSON first message: "${text.slice(0, 80)}"`);
+      }
+      const ok =
+        parsed &&
+        parsed.type === 'snapshot' &&
+        typeof parsed.v === 'number' &&
+        parsed.payload &&
+        typeof parsed.payload.lobbyId === 'string';
+      finish(ok, ok
+        ? `snapshot v=${parsed.v} lobbyId=${parsed.payload.lobbyId} format=${parsed.payload.format}`
+        : `unexpected first message shape: ${text.slice(0, 120)}`);
     });
     ws.on('error', (e) => finish(false, `error: ${e.message}`));
     setTimeout(() => finish(false, 'timeout'), 3000);
@@ -79,37 +93,37 @@ function wsEchoTest({ path, subprotocol, label }) {
   console.log('=== chunk 11g.2 step 2 smoke tests ===\n');
 
   await rawUpgrade({
-    path: '/ws/draft/lobby-A',
+    path: PATH_A,
     subprotocol: null,
     label: '(a) no token',
     expectedStatus: 401,
   });
 
   await rawUpgrade({
-    path: '/ws/draft/lobby-A',
+    path: PATH_A,
     subprotocol: 'not-a-jwt',
     label: '(b1) random non-JWT string',
     expectedStatus: 401,
   });
 
   await rawUpgrade({
-    path: '/ws/draft/lobby-A',
+    path: PATH_A,
     subprotocol: TOKEN_WRONG_SECRET,
     label: '(b2) JWT signed with wrong secret',
     expectedStatus: 401,
   });
 
   await rawUpgrade({
-    path: '/ws/draft/lobby-A',
+    path: PATH_A,
     subprotocol: TOKEN_VALID_B,
-    label: '(d) valid JWT but wrong lobby (token=lobby-B, URL=lobby-A)',
+    label: `(d) valid JWT but wrong lobby (token=${LOBBY_B}, URL=${LOBBY_A})`,
     expectedStatus: 403,
   });
 
-  await wsEchoTest({
-    path: '/ws/draft/lobby-A',
+  await wsSnapshotTest({
+    path: PATH_A,
     subprotocol: TOKEN_VALID_A,
-    label: '(c) valid JWT for matching lobby + echo round-trip',
+    label: '(c) valid JWT for matching lobby + snapshot on connect',
   });
 
   console.log(`\n=== ${pass} passed, ${fail} failed ===`);

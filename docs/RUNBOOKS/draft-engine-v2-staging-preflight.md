@@ -62,8 +62,10 @@ export SUPABASE_DB_URL='postgresql://postgres:<service-pw>@db.jjgspcpvqaiitloglx
 export SUPABASE_SERVICE_ROLE_KEY='<from 1Password>'
 export SUPABASE_ANON_KEY='<from 1Password>'
 
-# Staging engine endpoint (set after 10b re-provisioning):
-export STAGING_ENGINE_HOST='<TODO(10b): populate from re-provisioned VM>'
+# Staging engine endpoint (populated by 10b re-provisioning 2026-07-21;
+# see PHASE_4_5_GCE_PLATFORM_NOTES.md §15). Static IP retained on
+# teardown so this value survives VM lifecycle churn.
+export STAGING_ENGINE_HOST='35.203.89.236'
 export STAGING_ENGINE_HTTP_PORT=3001
 export STAGING_ENGINE_WS_PORT=3002
 ```
@@ -310,7 +312,12 @@ expected for this test.
 ```bash
 # Call draft_pause via psql — produces real draft_events INSERT.
 # Pick a staging league_id that exists in draft_state = 'in_progress'.
-# TODO(10b): populate a known-good staging league_id for these checks.
+# Known-good staging league (10b fixture, "Staging League"):
+#   993c9219-ecbf-4e4e-9fb0-e9837e1bded3 — draftType=snake, seeded
+#   with one team + one draft_order row for lobby-construction proof.
+#   Requires state='in_progress' for draft_pause to accept; toggle
+#   via `UPDATE leagues SET draft_state='active' WHERE id=...` when
+#   running §4.2 (revert to 'not_started' after test).
 psql "$SUPABASE_DB_URL" -c "
   SELECT public.draft_pause(
     '<staging-league-id>'::uuid,

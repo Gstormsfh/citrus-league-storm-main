@@ -207,3 +207,90 @@ Garrett's own reflections from the 2026-04-29 → 2026-04-30 session.
 - **Spike acceptance reviewer (Garrett):** ✅ 2026-04-30.
 - **Spike acceptance reviewer (Zach, when onboard):** Reviewed by Zach 2026-04-30 (async). Three pieces of feedback incorporated: Montreal region locked for Canadian-soil rationale, `e2-medium` confirmed with single-threaded-Node rationale, polymorphic events question raised (response in ADR-002 — separate sharpening pass forthcoming). Spike findings ratified.
 - **Chunk 11g.2 unblocked:** Granted by Zach 2026-04-30 via async Slack ratification of the five-point summary. Chunk 11g.2 cleared to start post-Web-Summit.
+
+---
+
+## §15 Staging re-provisioning 2026-07-21 (chunk 11g.10 sub-step 10b)
+
+Second time standing up staging on GCE. The first stand-up (chunk 11g.2, 2026-05-04) landed a hello-world echo engine at 34.19.223.135 (Montreal) and was torn down post-validation. This section captures the shape and gotchas of the re-provisioning against the real (post-11g.9) engine.
+
+### §15.1 VM shape
+
+- **Instance name:** `citrus-draft-engine-staging`
+- **Zone:** `northamerica-northeast1-a` (Montreal)
+- **Machine type:** `e2-medium` (per §1 spike; unchanged)
+- **Static external IP:** `35.203.89.236` — reserved as a named address so the value survives VM lifecycle churn. **Retention-on-teardown policy:** keep the reserved IP allocated even when the VM is deleted (opposite of the 2026-05-04 teardown). Retention cost is ~$1.50/mo for an unattached static IP; the tradeoff pays for itself the first time we don't have to update runbook / harness / CI env vars on re-provision.
+- **Container image:** `northamerica-northeast1-docker.pkg.dev/citrus-fantasy-staging/citrus-draft-engine/draft-engine:ef52351` — Docker image ID `sha256:a261fb3d6b72edb6624313fe0a05da93cdb7d70f7b62e8418238166472139e70` (short: `af39dff6…` per the deploy manifest handed off from the architect; the container-inspect `sha256:` above is the canonical digest as observed on the VM).
+- **Ports opened:** firewall rule `citrus-draft-engine-allow` — `tcp:3001` (Hono) + `tcp:3002` (uWS).
+- **Service account:** `citrus-draft-engine@citrus-fantasy-staging.iam.gserviceaccount.com` (unchanged from §14 spike).
+
+### §15.2 Secrets inventory (Secret Manager)
+
+Naming convention: UPPERCASE_UNDERSCORE, matching the env-var name the engine reads. This is a change from the chunk 11g.2 spike's `lowercase-hyphen` convention (`supabase-jwt-secret`, etc.); rename adopted here for parity with the env vars themselves. The startup script's `SECRET_*_NAME` metadata overrides (see `infra/gce/draft-engine-startup.sh` §3) supported the migration without a code change.
+
+- `SUPABASE_JWT_SECRET`
+- `SUPABASE_DB_URL` — **direct primary URL** (`db.jjgspcpvqaiitloglxbb.supabase.co:5432`), NOT the pooler. See §15.4 for the IPv4 add-on story.
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_URL`
+
+**IAM-grant-ordering gotcha (real, observed).** The initial provisioning granted `roles/secretmanager.secretAccessor` on the SA in one batch against the then-existing set of secrets, then added a missing secret afterward. Result: the engine boots and hits `PERMISSION_DENIED` on the new secret because the batch grant was against secret resource names, not project-level. **Rule going forward:** either grant `secretAccessor` at the project level, or re-run the per-secret grant every time a new secret is added. Prefer per-secret so the blast radius stays tight; the compensating discipline is a `gcloud secrets add-iam-policy-binding` step folded into any "add-a-new-secret" playbook. Not a KI because there's no code fix — this is provisioning discipline.
+
+### §15.3 Startup log location — file name correction
+
+The startup script writes its own logs to `/var/log/citrus-startup.log`, **not** `/var/log/citrus-draft-engine-startup.log` (as some pre-10b drafts had suggested). The script's `exec >> /var/log/citrus-startup.log 2>&1` at line 76 of `infra/gce/draft-engine-startup.sh` is the authoritative name. When investigating a boot problem via `gcloud compute ssh …`, tail this file:
+
+```
+sudo tail -f /var/log/citrus-startup.log
+```
+
+Separately, the *container* stdout goes to Cloud Logging via the `gcplogs` Docker driver — see §15.6 for filtering.
+
+### §15.4 IPv4 add-on decision (Supabase project)
+
+The Supabase project's Postgres hostname (`db.<ref>.supabase.co`) is **IPv6-only by default**. GCE VMs do not automatically egress on IPv6, so the engine's LISTEN/NOTIFY client and the `supabaseAdmin` `.from('leagues')` calls could not reach the DB at boot. Options considered:
+
+1. Enable IPv6 egress on the VM (requires Cloud NAT reconfig + subnet dual-stack, not one click).
+2. Enable the Supabase "dedicated IPv4 add-on" ($4/mo per project) — hostname resolves to a stable IPv4 (`15.222.174.205` for this project).
+3. Route through Supavisor (pooler on IPv4 but only supports transaction-mode by default, which drops LISTEN frames — KI-E010).
+
+**Chose #2.** Cost is negligible against a single point of ops complexity avoided; #1 has network-config drag; #3 breaks LISTEN.
+
+**10f flag.** Production will need the same IPv4 add-on on its own Supabase project. Not baked into the deploy pipeline — flagged as a 10f pre-cutover checklist item.
+
+### §15.5 Migration-history repair narrative
+
+Supabase migration history had drifted during the local-only chunks 11g.3–11g.9 window. Two classes of repair required:
+
+1. **17 Phase 4.5 migrations marked applied.** `supabase migration repair --status applied <ts>` for each, targeting the staging project's `supabase_migrations.schema_migrations` table. These migrations had been executed via direct psql in local dev but were never registered in staging's history.
+2. **Master hotfix renames reconciled.** Two migrations that shipped on `master` (playoff-winner propagation trigger + playoff aggregate assists NHL-column fix) had been repaired as `reverted` in staging when the branch's earlier state was rolled back. Reconciled to `applied` and copied the two `.sql` files into the branch working tree so the local state matches remote (files remain uncommitted at time of this note; see 10b closure package Commit 2 file list).
+
+Net state after repair: staging `schema_migrations` history is a clean superset of what the `phase-4-5-implementation` branch expects, with the master hotfixes reflected.
+
+### §15.6 Cloud Logging findings (input for 10d)
+
+Container stdout **does** reach Cloud Logging via the `gcplogs` Docker driver configured in the startup script. The suggested filter `labels.app="citrus-draft-engine"` (as it appeared in the startup script comment at line 48) **returns zero results** — the driver does not promote Docker container labels to top-level Cloud Logging entry labels. Working filter:
+
+```
+logName:"gcplogs-docker-driver"
+AND jsonPayload.container.metadata.app="citrus-draft-engine"
+```
+
+Additional caveat for downstream 10d work: the engine's own structured JSON (severity, event, time, and per-event fields) lands inside `jsonPayload.message` as a **stringified JSON blob**, not as top-level fields. Any Cloud Logging alert policy or log-based metric on `jsonPayload.event` would need to reparse `message` (e.g., via a log-based metric filter that extracts the event name from the string). **Flag for 10d design:** either (a) accept the string-reparse pattern and codify it in the alert policy DSL, or (b) switch the Docker log driver to one that preserves structured fields at the top level (e.g., write JSON to a file and ship via the Ops Agent, which parses JSON-per-line into structured payload). Decision belongs to 10d.
+
+### §15.7 LOG_LEVEL=DEBUG operator tip (LISTEN/NOTIFY visibility)
+
+`event_subscription.notification_received` (the log line an operator would grep for to confirm a NOTIFY reached the engine after e.g. a `draft_pause` RPC) is emitted at DEBUG level in `server/src/draft/eventSubscription.ts:248`. Default engine log level is INFO. **Operator tip:** to observe cross-session notifications in logs during a preflight run, set `LOG_LEVEL=DEBUG` on the container (`-e LOG_LEVEL=DEBUG` in the `docker run` line, or the same env var on the deploy invocation). Reset to INFO after.
+
+Note: the engine's built-in `event_subscription.self_test_succeeded` at boot IS a full LISTEN/NOTIFY round-trip through Postgres (engine fires a `_test` sentinel on its own LISTEN client and waits to see it come back). This runs at INFO and is a valid end-to-end proof-of-life without a `LOG_LEVEL=DEBUG` toggle — sufficient for §4 preflight pass criteria. The DEBUG-level `notification_received` tip is for the deeper preflight variant where the operator wants to observe an externally-triggered NOTIFY specifically.
+
+### §15.8 Smoke fixture requirements
+
+The chunk 11g.2 step 2 WebSocket smoke harness (`scripts/smoke-uws-step2.js`) requires more from staging DB state than the original scaffold suggested. Fixture requirements observed during 10b:
+
+- **Real league UUID.** The URL path must be a valid UUID that exists in `leagues.id`. String IDs like `lobby-A` fail with `invalid input syntax for type uuid` at `lookupLobbyConfig` (`server/src/draft/index.ts:239`).
+- **`settings.draftType` in `snake | linear | auction`.** Values like `none` or `offline` fail lobby construction. `pickTimeLimit` recommended alongside (default 90 works, 60 is a fine explicit value for staging).
+- **At least one `draft_order` row.** Zero rows produces `league <id> has no draft_order rows; DraftService.initializeDraftOrder must run before the lobby opens`. Row must have `team_order` as a JSONB array of at least one string team ID; that team ID must reference a row in `teams`.
+- **Snapshot semantics on connect.** The real engine (post-11g.4 step 5) sends a `{v, type:'snapshot', payload:{lobbyId, format, …}}` JSON message immediately on WS open. The pre-11g.4 smoke scaffold expected `echo: <text>` reply; that echo path no longer exists. Harness scenario (c) has been updated to assert the snapshot-message shape instead. See `scripts/smoke-uws-step2.js` scenario (c) `wsSnapshotTest` for the reference assertion.
+
+Staging fixture applied during 10b: league `993c9219-ecbf-4e4e-9fb0-e9837e1bded3` ("Staging League") — `settings.draftType` set to `snake`, `settings.pickTimeLimit` set to `60`, one `draft_order` row inserted with the existing team `4c742dae-6770-43f5-b310-cc24741e8148`. `draft_state` left at `not_started` (the smoke doesn't need in-progress).
