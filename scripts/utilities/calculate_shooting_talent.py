@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Compute Bayesian per-player shooting-talent priors (input to xG v3)
+# Last active: 2026-01-05
+# Invoked:     manual run after season completes; produces models/player_shooting_talent.joblib
+# Reads:       raw_shots
+# Writes:      models/player_shooting_talent.joblib
+# ────────────────────────────────────────────────────────────
 """
 calculate_shooting_talent.py
 Calculate player shooting talent using Bayesian statistics (MoneyPuck methodology).

@@ -1,3 +1,12 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: DEPRECATED
+// Purpose:     Fetch NHL schedule (setup-era TS one-off, kept for reference)
+// Last active: (uncommitted)
+// Invoked:     (none — moved out of scripts/ root by R5)
+// Reads:       NHL API
+// Writes:      (not invoked)
+// Note:        Superseded by data-pipeline/acquisition/ingest_playoff_schedule.py + the schedule discovery in data_scraping_service.py.
+// ────────────────────────────────────────────────────────────
 /**
  * Script to fetch and store NHL schedule data from NHL Stats API
  * Run with: npx tsx scripts/fetch-nhl-schedule.ts

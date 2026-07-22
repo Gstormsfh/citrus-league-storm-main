@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Unified live-game stats scraper (Genesis-Data-Day hardened)
+# Last active: 2026-04-18
+# Invoked:     imported by data_scraping_service.py
+# Reads:       NHL public API
+# Writes:      player_game_stats, nhl_games
+# ────────────────────────────────────────────────────────────
 """
 scrape_live_nhl_stats.py
 UNIFIED PIPELINE EDITION - Hardened for Genesis Data Day.

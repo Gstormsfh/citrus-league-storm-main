@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: DESTRUCTIVE
+# Purpose:     One-off fix: re-process games stuck in raw_nhl_data without stats extraction
+# Last active: 2026-03-03
+# Invoked:     manual fix during a past data integrity incident
+# Reads:       raw_nhl_data
+# Writes:      raw_shots, player_game_stats (UPDATEs)
+# Note:        RECOVERY: prod backups; check raw_nhl_data.processed flag scope before re-run.
+# ────────────────────────────────────────────────────────────
 """
 fix_stuck_pbp_games.py
 

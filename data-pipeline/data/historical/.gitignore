@@ -1,0 +1,9 @@
+# MoneyPuck historical shot CSVs — large training inputs (~500 MB combined),
+# locally regenerated per the manifest, never committed.
+#
+# Source: https://peter-tanner.com/moneypuck/downloads/
+# See ../../../data/TRAINING_DATA_MANIFEST.md and scripts/utilities/train_xg_v3.py
+# for usage.
+*
+!.gitignore
+!README.md

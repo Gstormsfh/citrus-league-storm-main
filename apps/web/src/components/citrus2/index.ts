@@ -16,6 +16,29 @@ export { TeamChip, TeamColorBar } from './TeamChip';
 export { MascotAvatar, MascotPortrait } from './MascotAvatar';
 export { LivePulse, Eyebrow } from './LivePulse';
 
+// Player dashboards primitives (Web Summit launch — May 11)
+export { PlayerMonogram } from './PlayerMonogram';
+export type { PlayerMonogramSize } from './PlayerMonogram';
+export { PercentileBullet } from './PercentileBullet';
+export type { PercentileCategory, PercentileSize } from './PercentileBullet';
+export { StaleDataBadge } from './StaleDataBadge';
+export type { StaleDataBadgeVariant } from './StaleDataBadge';
+// Spatial Hero (locked Concept 3) — see apps/web/docs/PLAYER_DASHBOARD_DESIGN_SPEC.md
+export { RinkHeatmap } from './RinkHeatmap';
+export type { RinkMode, RinkModeOption, ShotEvent } from './RinkHeatmap';
+export { PercentileRingCluster } from './PercentileRingCluster';
+export type { RingCategory, RingMetric } from './PercentileRingCluster';
+export { SparklineMicroChart } from './SparklineMicroChart';
+export type { SparklinePoint, SparklineAccent } from './SparklineMicroChart';
+export { VerdictTile } from './VerdictTile';
+export type { VerdictVariant, VerdictSize, VerdictAccent } from './VerdictTile';
+export { WrappedChapter, KDEDistribution } from './WrappedChapter';
+export type {
+  WrappedChapterVariant,
+  WrappedAccent,
+  KDEDistributionProps,
+} from './WrappedChapter';
+
 // Brand mark
 export { CitrusLogo, CitrusWordmark } from './CitrusLogo';
 

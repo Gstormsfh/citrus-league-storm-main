@@ -179,50 +179,40 @@ export const StormyChatBubble = () => {
     // Add to API history
     apiHistoryRef.current.push({ role: 'user', content: text });
 
-    // Pre-create the assistant message bubble with empty text. We append
-    // tokens to it as they stream in, so the user sees Stormy "typing"
-    // instead of waiting on a blank loading spinner for 5–8 seconds.
-    const stormyMsgId = (Date.now() + 1).toString();
-    setMessages((prev) => [
-      ...prev,
-      { id: stormyMsgId, text: '', sender: 'stormy', timestamp: new Date() },
-    ]);
-
     try {
       const context = await buildContext();
-      const result = await StormyService.sendMessageStream(
+      const result = await StormyService.sendMessage(
         text,
         apiHistoryRef.current.slice(0, -1), // exclude current msg (sent as `message`)
         context,
-        (delta) => {
-          // Append each streamed chunk to the placeholder message in place.
-          setMessages((prev) =>
-            prev.map((m) => (m.id === stormyMsgId ? { ...m, text: m.text + delta } : m)),
-          );
-        },
       );
 
-      // If an error came back (rate limit, network), replace the (likely
-      // empty) placeholder with the error text instead of leaving a blank
-      // bubble.
-      if (result.error) {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === stormyMsgId ? { ...m, text: result.error! } : m)),
-        );
-      } else {
-        // Persist the streamed reply to API history so future turns have it.
+      const responseText = result.error || result.response || "I couldn't process that. Try again?";
+
+      // Add assistant response to UI + API history
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          text: responseText,
+          sender: 'stormy',
+          timestamp: new Date(),
+        },
+      ]);
+
+      if (!result.error) {
         apiHistoryRef.current.push({ role: 'assistant', content: result.response });
       }
     } catch {
-      // Replace the streaming placeholder with the error text rather than
-      // leaving a blank bubble.
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === stormyMsgId
-            ? { ...m, text: 'Something went wrong — give me a sec and try again.' }
-            : m,
-        ),
-      );
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          text: "Something went wrong — give me a sec and try again.",
+          sender: 'stormy',
+          timestamp: new Date(),
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -251,18 +241,9 @@ export const StormyChatBubble = () => {
 
   // ── Open State (Chat Card) ─────────────────────────────────────
 
-  // Mobile: cap height to viewport minus the 9rem bottom offset plus a small
-  // headroom so the header (close/minimize buttons) is always reachable on
-  // short phones — the previous 80vh cap pushed the top off-screen.
-  const heightClass = isMinimized
-    ? 'h-[70px]'
-    : isMobile
-      ? 'h-[min(640px,calc(100dvh-10rem-env(safe-area-inset-top)-env(safe-area-inset-bottom)))]'
-      : 'h-[min(640px,80vh)]';
-
   return (
     <Card
-      className={`fixed w-[calc(100vw-3rem)] md:w-[440px] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10 border-0 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 bg-pastel-surface-tile ${heightClass}`}
+      className={`fixed w-[calc(100vw-3rem)] md:w-[440px] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10 border-0 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 bg-pastel-surface-tile ${isMinimized ? 'h-[70px]' : 'h-[min(640px,80vh)]'}`}
       style={{
         position: 'fixed',
         bottom: isMobile ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem)' : '1.5rem',

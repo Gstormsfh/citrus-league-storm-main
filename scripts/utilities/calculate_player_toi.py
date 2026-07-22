@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Compute per-player TOI splits by game situation (5v5, PP, PK)
+# Last active: 2026-01-08
+# Invoked:     imported by run_daily_pbp_processing.py
+# Reads:       player_shifts
+# Writes:      player_toi_by_situation
+# ────────────────────────────────────────────────────────────
 """
 calculate_player_toi.py
 Calculate Time On Ice (TOI) for each player by game situation (5v5, PP, PK).

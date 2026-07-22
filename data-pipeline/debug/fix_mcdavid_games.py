@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: DESTRUCTIVE
+# Purpose:     One-off fix: re-derive McDavid's specific games (writes to player_game_stats)
+# Last active: 2026-03-03
+# Invoked:     manual fix during a past data integrity incident — DO NOT re-run blindly
+# Reads:       raw_shots, raw_nhl_data
+# Writes:      player_game_stats (UPDATEs McDavid rows)
+# Note:        RECOVERY: prod backups; 7-day PITR available via Supabase. Verify scope before re-run.
+# ────────────────────────────────────────────────────────────
 """
 Fix McDavid's two games with incorrect stats
 """

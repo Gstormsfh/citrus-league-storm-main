@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     HTTP /health endpoint for Cloud Run / Docker liveness checks
+# Last active: 2026-03-02
+# Invoked:     containerized service
+# Reads:       (in-memory state)
+# Writes:      (HTTP 200/500)
+# ────────────────────────────────────────────────────────────
 """
 health_check_server.py — Lightweight HTTP health check for the data pipeline.
 

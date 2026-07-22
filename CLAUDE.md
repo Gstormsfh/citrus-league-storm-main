@@ -111,6 +111,12 @@ Citrus Fantasy Sports is a world-class NHL fantasy hockey platform powered by th
 - **AI Assistant:** Stormy (Claude Sonnet via API server → Supabase Edge Function)
 - **Hosting:** Firebase Hosting with CDN, PWA support, security headers
 
+## Data Architecture
+
+Single source of truth for "where does data live?" — see [`DATA_INVENTORY.md`](./DATA_INVENTORY.md) at the repo root. Covers Supabase projects (prod + staging), historical training-data archives (the MoneyPuck 2018-2024 corpus), pipeline scripts inventory, model artifacts, and the database schema reference.
+
+**Update protocol:** When adding any new data artifact (table, file, model, script), update `DATA_INVENTORY.md` in the same PR. Full audit + categorization + reorganization plan lives at [`apps/web/docs/DATA_ORGANIZATION_AUDIT.md`](./apps/web/docs/DATA_ORGANIZATION_AUDIT.md).
+
 ## Monorepo Structure
 
 ```

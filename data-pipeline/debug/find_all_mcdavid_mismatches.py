@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: DEBUG-ONLY
+# Purpose:     Forensics: cross-reference McDavid stats sources, find mismatches
+# Last active: 2026-03-03
+# Invoked:     ad-hoc
+# Reads:       player_game_stats, raw_shots, NHL official stats
+# Writes:      stdout
+# ────────────────────────────────────────────────────────────
 """
 Check ALL McDavid games for stat mismatches
 Find every game where our stats don't match NHL API

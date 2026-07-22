@@ -1,0 +1,9 @@
+# Database export bundles — produced by `pg_dump --inserts` against prod for
+# staging-load workflows. Each subdir is date-stamped (e.g. 2026-04-26-staging-load,
+# 2026-04-26-prod-snapshot). Files are large and prod-snapshot, never committed.
+#
+# This file itself is committed so the directory survives in the tree even
+# when no exports are present locally.
+*
+!.gitignore
+!README.md

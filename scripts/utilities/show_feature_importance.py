@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose:     Visualize XGBoost feature importance for the current xG model
+# Last active: 2026-01-05
+# Invoked:     manual analytical tool
+# Reads:       models/xg_model_moneypuck.joblib
+# Writes:      stdout / chart
+# ────────────────────────────────────────────────────────────
 """Show actual feature importance from trained model."""
 import joblib
 import pandas as pd

@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: DEBUG-ONLY
+# Purpose:     Manual proxy-rotation smoke test
+# Last active: 2026-03-03
+# Invoked:     ad-hoc when debugging proxy issues
+# Reads:       (proxy pool)
+# Writes:      stdout
+# ────────────────────────────────────────────────────────────
 """
 test_proxy_system.py - Comprehensive Test Suite for Enterprise Proxy System
 

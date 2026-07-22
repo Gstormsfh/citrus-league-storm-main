@@ -5,9 +5,15 @@
 //
 // Reads staging credentials from .env.staging at the repo root.
 //
+// Chunk files live at data/exports/2026-04-26-staging-load/ (per R2 reorg).
+// Bare filenames passed via CLI are auto-resolved against that directory,
+// so existing operator commands work unchanged. Pass a path with a
+// separator to load an ad-hoc file outside the canonical bundle.
+//
 // Usage:
 //   node scripts/staging/04-load-stats-data.mjs
-//   node scripts/staging/04-load-stats-data.mjs <specific_chunk_file.sql>
+//   node scripts/staging/04-load-stats-data.mjs chunk_player_directory.sql
+//   node scripts/staging/04-load-stats-data.mjs ./some/other/chunk.sql
 //
 // Idempotent via ON CONFLICT — re-running skips duplicates.
 
@@ -17,6 +23,10 @@ import readline from 'node:readline';
 
 const REPO_ROOT = path.resolve(process.cwd());
 const ENV_FILE = path.join(REPO_ROOT, '.env.staging');
+// Chunks moved from repo root → data/exports/<date>/ during R2 reorg
+// (2026-05-05). Bare chunk filenames passed via CLI are auto-resolved
+// against this directory, so existing operator commands remain valid.
+const CHUNKS_DIR = path.join(REPO_ROOT, 'data', 'exports', '2026-04-26-staging-load');
 
 // ── Parse .env.staging ─────────────────────────────────────────────
 if (!fs.existsSync(ENV_FILE)) {
@@ -42,6 +52,10 @@ if (!SERVICE_ROLE) {
 }
 
 // ── Default chunk files (ALL six tables, including the big one) ──
+// Bare filenames here; resolveChunk() prefixes CHUNKS_DIR. CLI args
+// follow the same resolution rules so operator commands like
+// `node scripts/staging/04-load-stats-data.mjs chunk_player_directory.sql`
+// keep working unchanged after the R2 reorg.
 const DEFAULT_CHUNKS = [
   'chunk_player_directory.sql',
   'chunk_player_projected_stats.sql',
@@ -51,9 +65,18 @@ const DEFAULT_CHUNKS = [
   'chunk_goalie_gsax_primary.sql',
 ];
 
-const filesToLoad = process.argv.slice(2).length > 0
+// If the operator passed a bare filename (no path separator), look for
+// it inside CHUNKS_DIR. If they passed a full or relative path, honor
+// it as-is — supports ad-hoc dumps outside the canonical bundle.
+function resolveChunk(name) {
+  if (name.includes(path.sep) || name.includes('/')) return name;
+  return path.join(CHUNKS_DIR, name);
+}
+
+const filesToLoad = (process.argv.slice(2).length > 0
   ? process.argv.slice(2)
-  : DEFAULT_CHUNKS;
+  : DEFAULT_CHUNKS
+).map(resolveChunk);
 
 // ── Parse one INSERT statement into { table, columns, row } ───────
 // Expected: INSERT INTO public.foo (a, b, c) VALUES (1, 'x', true);

@@ -1,3 +1,11 @@
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose:     Shared chart helpers used by analytical scripts
+# Last active: 2026-01-05
+# Invoked:     imported by create_xg_heatmap + zone_heatmap + show_feature_importance
+# Reads:       (varies)
+# Writes:      (image files)
+# ────────────────────────────────────────────────────────────
 # visualization_utils.py
 # Shared utilities for shot and pass visualization
 

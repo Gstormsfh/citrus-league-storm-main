@@ -133,10 +133,7 @@ const MobileMenuButton = () => {
 
       {/* Full-screen slide-in menu — dark Citrus 2.0 panel */}
       {menuOpen && (
-        <div
-          className="fixed inset-0 top-0 z-[60] animate-in fade-in slide-in-from-top duration-200 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]"
-          style={{ backgroundColor: '#0F1F15' }}
-        >
+        <div className="fixed inset-0 top-0 z-[60] bg-pastel-surface/98 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
           <div className="flex flex-col h-[calc(100dvh-env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+0.75rem)] px-4 pb-3 bg-pastel-surface text-pastel-cream relative overflow-hidden">
             {/* Decorative orange + sage halos */}
             <div aria-hidden="true" className="absolute -top-32 -right-20 w-[420px] h-[420px] bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />

@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Apply flurry-adjusted xG (discount consecutive shots in scoring sequences)
+# Last active: 2026-01-05
+# Invoked:     imported by feature_calculations.py
+# Reads:       raw_shots.xg_value
+# Writes:      raw_shots.flurry_adjusted_xg
+# ────────────────────────────────────────────────────────────
 """
 enhanced_flurry_adjustment.py
 Enhanced flurry adjustment that BOOSTS flurry shots (user's insight).

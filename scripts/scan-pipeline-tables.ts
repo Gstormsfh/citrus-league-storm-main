@@ -1,3 +1,11 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: UTILITY
+// Purpose:     Inventory tables touched by data-pipeline scripts (analysis tool)
+// Last active: 2026-02-27
+// Invoked:     manual run; useful for onboarding
+// Reads:       (static analysis of data-pipeline/)
+// Writes:      stdout
+// ────────────────────────────────────────────────────────────
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./env";
 

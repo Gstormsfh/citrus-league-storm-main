@@ -1,3 +1,11 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: UTILITY
+// Purpose:     Verify roster integrity invariants across team_lineups and roster_assignments
+// Last active: 2026-02-27
+// Invoked:     manual sanity check
+// Reads:       team_lineups, roster_assignments
+// Writes:      stdout
+// ────────────────────────────────────────────────────────────
 /**
  * Roster Integrity Verification Script
  * 

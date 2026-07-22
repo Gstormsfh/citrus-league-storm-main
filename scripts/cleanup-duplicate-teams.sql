@@ -1,3 +1,12 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: DESTRUCTIVE
+-- Purpose:     Remove duplicate teams discovered via dedupe query
+-- Last active: 2025-12-17
+-- Invoked:     manual via Supabase SQL Editor; review before run
+-- Reads:       teams (SELECT for dedupe)
+-- Writes:      teams (DELETE duplicates)
+-- Note:        RECOVERY: PITR.
+-- ────────────────────────────────────────────────────────────
 -- Script to clean up duplicate AI teams
 -- Run this in Supabase SQL Editor
 -- Replace 'YOUR_LEAGUE_ID' with your actual league UUID

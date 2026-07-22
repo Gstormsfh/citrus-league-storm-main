@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose:     Manual shiftchart ingest with progress bar
+# Last active: 2026-01-05
+# Invoked:     manual operator tool
+# Reads:       NHL shiftcharts endpoint
+# Writes:      player_shifts_official
+# ────────────────────────────────────────────────────────────
 """
 Run shiftcharts ingestion with progress tracking and better error handling.
 This version will continue even if individual games fail.

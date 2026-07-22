@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose:     Validate xG model accuracy on held-out shots (reports AUC, Brier, log loss)
+# Last active: 2026-02-18
+# Invoked:     manual run after retrain
+# Reads:       raw_shots, models/*.joblib
+# Writes:      (reports)
+# ────────────────────────────────────────────────────────────
 """
 validate_xg_accuracy.py
 Comprehensive validation of xG model accuracy with calibration improvements.
