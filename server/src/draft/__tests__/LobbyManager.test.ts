@@ -5282,6 +5282,328 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     // No state change since no events were applied.
     expect(lobby.getCurrentState().picksMade).toBe(0);
   });
+
+  // ── Chunk 11g.10 sub-step 10c-1a: live external-apply broadcast ──
+  //
+  // Defect closure. Pre-10c-1a, `processExternalEvent` applied state
+  // for cross-process picks (client → main API → RPC → NOTIFY → LISTEN
+  // → this method) but did NOT broadcast to connected WS clients.
+  // Only engine-authored actions broadcast, silently violating the
+  // Performance Mandate wire contract. See PROJECT_PLAN Decision Log
+  // 2026-07-21 for the ruling + rationale.
+
+  it('10c-1a live external pick apply broadcasts to connected clients', async () => {
+    const teamIds = ['team-1', 'team-2', 'team-3'];
+    const draftOrder: DraftOrderSlot[] = generateDraftOrder(teamIds, 3, 'snake');
+    const firstSlot = draftOrder[0];
+    const externalPick: DraftEventRow = {
+      id: 5,
+      league_id: 'league-1',
+      seq: 5,
+      event_type: 'pick',
+      payload: {
+        team_id: firstSlot.teamId,
+        pick_number: firstSlot.pickNumber,
+        round: firstSlot.round,
+        player_id: 8478402,
+      },
+      payload_hash: '',
+      idempotency_key: 'idem-external-pick-1',
+      actor: { kind: 'user', id: 'u-external', session_id: 's-external' },
+      correlation_id: null,
+      created_at: '2026-07-21T20:00:00.000Z',
+    } as DraftEventRow;
+    // First call = bootstrap (fresh lobby, no historical events);
+    // subsequent calls = live external apply fetching the new event.
+    const listDraftEvents = vi
+      .fn<[string, number?], Promise<DraftEventRow[]>>()
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([externalPick]);
+    const publish = vi.fn();
+    const lobby = await makeLobby({
+      lobbyId: 'lobby-live-apply-1',
+      listDraftEvents: listDraftEvents as unknown as MakeLobbyOpts['listDraftEvents'],
+      publish,
+      draftOrder,
+    });
+    // Clear any startup/init publish activity (there shouldn't be any
+    // for a fresh lobby, but be explicit).
+    publish.mockClear();
+
+    await lobby.enqueueExternalEvent(5);
+
+    // Assert state was applied.
+    expect(lobby.getCurrentState().picksMade).toBe(1);
+    // Assert broadcast fired exactly once with the correct wire shape.
+    expect(publish).toHaveBeenCalledTimes(1);
+    const [topic, message] = publish.mock.calls[0];
+    expect(topic).toBe('draft:lobby-live-apply-1');
+    const parsed = JSON.parse(message);
+    expect(parsed).toMatchObject({
+      v: 1,
+      type: 'event',
+      seq: 5,
+      timestamp: '2026-07-21T20:00:00.000Z',
+      correlationId: 'idem-external-pick-1',
+      payload: {
+        kind: 'pick_submitted',
+        seq: 5,
+        teamId: firstSlot.teamId,
+        playerId: 8478402,
+        correlationId: 'idem-external-pick-1',
+      },
+    });
+  });
+
+  it('10c-1a bootstrap replay does NOT broadcast (canonical-replay principle)', async () => {
+    // Historical events already committed to draft_events; the lobby
+    // bootstraps from them via full-event-replay. The apply path is
+    // the same dispatcher used by live external apply, but broadcast
+    // must NOT fire during replay — the events are old, connected
+    // clients (there are none here anyway) get them via snapshot +
+    // ring-buffer replay on connect.
+    const teamIds = ['team-1', 'team-2', 'team-3'];
+    const draftOrder: DraftOrderSlot[] = generateDraftOrder(teamIds, 3, 'snake');
+    const firstSlot = draftOrder[0];
+    const historicalPick: DraftEventRow = {
+      id: 1,
+      league_id: 'league-1',
+      seq: 1,
+      event_type: 'pick',
+      payload: {
+        team_id: firstSlot.teamId,
+        pick_number: firstSlot.pickNumber,
+        round: firstSlot.round,
+        player_id: 42,
+      },
+      payload_hash: '',
+      idempotency_key: 'idem-historical-1',
+      actor: { kind: 'user', id: 'u-historical', session_id: 's-h' },
+      correlation_id: null,
+      created_at: '2026-07-20T18:00:00.000Z',
+    } as DraftEventRow;
+    const listDraftEvents = vi.fn(async () => [historicalPick]);
+    const publish = vi.fn();
+    // makeLobby awaits init() which triggers bootstrap replay.
+    const lobby = await makeLobby({
+      lobbyId: 'lobby-replay-1',
+      listDraftEvents,
+      publish,
+      draftOrder,
+    });
+
+    // Bootstrap applied the historical pick.
+    expect(lobby.getCurrentState().picksMade).toBe(1);
+    // But no broadcast fired — canonical-replay side-effect-free.
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('10c-1a engine-authored autopick echo does NOT double-broadcast (dedup via lastAppliedSeq)', async () => {
+    // Engine's own processSubmitPick advances lastAppliedSeq at the
+    // moment of its local broadcast. The trigger-fired NOTIFY bounces
+    // back with the same seq; the dedup gate at the top of
+    // processExternalEvent short-circuits before any apply/broadcast.
+    // End result: exactly one broadcast (the engine-authored one),
+    // never two.
+    const submitPick = vi.fn().mockResolvedValue({
+      event_id: 7,
+      seq: 7,
+      pick_deadline: null,
+      was_duplicate: false,
+    } satisfies SubmitPickResult);
+    const listDraftEvents = vi.fn(async () => [] as DraftEventRow[]);
+    const publish = vi.fn();
+    const lobby = await makeLobby({
+      lobbyId: 'lobby-echo-1',
+      format: 'snake',
+      submitPick,
+      listDraftEvents,
+      publish,
+      draftOrder: [{ round: 1, pickNumber: 1, teamId: 'team-echo-1' }],
+    });
+
+    // Engine-authored pick → exactly one broadcast fires.
+    await lobby.enqueueAction(
+      makeSubmitPick({ idempotencyKey: 'idem-echo-1', teamId: 'team-echo-1' }),
+    );
+    expect(publish).toHaveBeenCalledTimes(1);
+
+    // Simulate the NOTIFY echo arriving with the same seq. The dedup
+    // gate should skip; listDraftEvents should not even be called.
+    publish.mockClear();
+    listDraftEvents.mockClear();
+    await lobby.enqueueExternalEvent(7);
+    expect(listDraftEvents).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('10c-1a live external commissioner_override apply broadcasts', async () => {
+    const teamIds = ['team-1', 'team-2', 'team-3'];
+    const draftOrder: DraftOrderSlot[] = generateDraftOrder(teamIds, 3, 'snake');
+    const firstSlot = draftOrder[0];
+    const overrideEvent: DraftEventRow = {
+      id: 5,
+      league_id: 'league-1',
+      seq: 5,
+      event_type: 'commissioner_override',
+      payload: {
+        team_id: firstSlot.teamId,
+        pick_number: firstSlot.pickNumber,
+        round: firstSlot.round,
+        player_id: 8479318,
+        reason: 'manual injury workaround',
+      },
+      payload_hash: '',
+      idempotency_key: 'idem-override-1',
+      actor: { kind: 'commissioner', id: 'commish-1', session_id: null },
+      correlation_id: null,
+      created_at: '2026-07-21T20:05:00.000Z',
+    } as DraftEventRow;
+    const listDraftEvents = vi
+      .fn<[string, number?], Promise<DraftEventRow[]>>()
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([overrideEvent]);
+    const publish = vi.fn();
+    const lobby = await makeLobby({
+      lobbyId: 'lobby-override-1',
+      listDraftEvents: listDraftEvents as unknown as MakeLobbyOpts['listDraftEvents'],
+      publish,
+      draftOrder,
+    });
+    publish.mockClear();
+
+    await lobby.enqueueExternalEvent(5);
+
+    expect(publish).toHaveBeenCalledTimes(1);
+    const [, message] = publish.mock.calls[0];
+    const parsed = JSON.parse(message);
+    expect(parsed).toMatchObject({
+      v: 1,
+      type: 'event',
+      seq: 5,
+      payload: {
+        kind: 'commissioner_override',
+        seq: 5,
+        playerId: 8479318,
+        reason: 'manual injury workaround',
+      },
+    });
+  });
+
+  it('10c-1a live external draft_paused apply does NOT broadcast (no wire representation today)', async () => {
+    // Snake/linear `draft_paused` is a pauseState-only event with no
+    // BufferedDraftEvent variant. The dispatcher inline-mutates
+    // pauseState without appending to the ring buffer, so tail-check
+    // evaluates false and no broadcast fires. Adding a wire variant
+    // for these internal-only events is tracked separately (Decision
+    // Log 2026-07-21).
+    const teamIds = ['team-1', 'team-2', 'team-3'];
+    const draftOrder: DraftOrderSlot[] = generateDraftOrder(teamIds, 3, 'snake');
+    const pauseEvent: DraftEventRow = {
+      id: 5,
+      league_id: 'league-1',
+      seq: 5,
+      event_type: 'draft_paused',
+      payload: {
+        paused_at: '2026-07-21T20:10:00.000Z',
+        remaining_seconds: 45,
+      },
+      payload_hash: '',
+      idempotency_key: null,
+      actor: { kind: 'commissioner', id: 'commish-1', session_id: null },
+      correlation_id: null,
+      created_at: '2026-07-21T20:10:00.000Z',
+    } as DraftEventRow;
+    const listDraftEvents = vi
+      .fn<[string, number?], Promise<DraftEventRow[]>>()
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([pauseEvent]);
+    const publish = vi.fn();
+    const lobby = await makeLobby({
+      lobbyId: 'lobby-pause-1',
+      listDraftEvents: listDraftEvents as unknown as MakeLobbyOpts['listDraftEvents'],
+      publish,
+      draftOrder,
+    });
+    publish.mockClear();
+
+    await lobby.enqueueExternalEvent(5);
+
+    // State did apply (bootstrap dispatcher's `case 'draft_paused'`
+    // set pauseState); no broadcast fired.
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('10c-1a state apply is byte-identical between live and replay modes', async () => {
+    // Two lobbies driven by the same event sequence — one via
+    // bootstrap replay (init() reads all events from listDraftEvents),
+    // one via live external apply (init() starts empty, then each
+    // event arrives one at a time through enqueueExternalEvent).
+    // The resulting picksMade / draftStatus / on-clock team must be
+    // identical, proving broadcast is a strictly additive side effect
+    // on the live path.
+    const teamIds = ['team-1', 'team-2', 'team-3'];
+    const draftOrder: DraftOrderSlot[] = generateDraftOrder(teamIds, 2, 'snake');
+    const eventSequence: DraftEventRow[] = draftOrder.slice(0, 4).map((slot, idx) => ({
+      id: idx + 1,
+      league_id: 'league-parity',
+      seq: idx + 1,
+      event_type: 'pick',
+      payload: {
+        team_id: slot.teamId,
+        pick_number: slot.pickNumber,
+        round: slot.round,
+        player_id: 1000 + idx,
+      },
+      payload_hash: '',
+      idempotency_key: `idem-parity-${idx + 1}`,
+      actor: { kind: 'user', id: 'u-parity', session_id: 's-parity' },
+      correlation_id: null,
+      created_at: '2026-07-21T20:20:00.000Z',
+    } as DraftEventRow));
+
+    // Replay lobby — init() sees all events at once.
+    const replayList = vi.fn(async () => eventSequence);
+    const replayPublish = vi.fn();
+    const replayLobby = await makeLobby({
+      lobbyId: 'lobby-replay-parity',
+      listDraftEvents: replayList,
+      publish: replayPublish,
+      draftOrder,
+    });
+
+    // Live lobby — init() sees nothing; each event applies via NOTIFY.
+    // Mock mirrors the real `listDraftEvents(leagueId, sinceSeq)`
+    // contract: returns events with seq > sinceSeq.
+    const livePool: DraftEventRow[] = [];
+    const liveList = vi.fn(
+      async (_leagueId: string, sinceSeq?: number) =>
+        livePool.filter((e) => e.seq > (sinceSeq ?? 0)),
+    );
+    const livePublish = vi.fn();
+    const liveLobby = await makeLobby({
+      lobbyId: 'lobby-live-parity',
+      listDraftEvents: liveList as unknown as MakeLobbyOpts['listDraftEvents'],
+      publish: livePublish,
+      draftOrder,
+    });
+    for (const evt of eventSequence) {
+      livePool.push(evt);
+      await liveLobby.enqueueExternalEvent(evt.seq);
+    }
+
+    // State parity.
+    const replayState = replayLobby.getCurrentState();
+    const liveState = liveLobby.getCurrentState();
+    expect(liveState.picksMade).toBe(replayState.picksMade);
+    expect(liveState.draftStatus).toBe(replayState.draftStatus);
+    expect(liveState.onClockTeamId).toBe(replayState.onClockTeamId);
+    expect(liveState.totalPicks).toBe(replayState.totalPicks);
+
+    // Broadcast parity: replay = 0 (canonical-replay), live = 4.
+    expect(replayPublish).not.toHaveBeenCalled();
+    expect(livePublish).toHaveBeenCalledTimes(4);
+  });
 });
 
 // ── Chunk 11g.7 sub-step 7e helper: uninitialized lobby ─────────────

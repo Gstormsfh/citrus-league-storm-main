@@ -103,4 +103,35 @@ describe('RingBuffer (chunk 11g.4 step 3)', () => {
       expect(fresh.events.map((e) => e.seq)).toEqual([12]);
     }
   });
+
+  // ── Chunk 11g.10 sub-step 10c-1a: peekLast() ──
+  //
+  // LobbyManager's live external-apply broadcast path inspects the
+  // buffer tail after `applyEventDuringBootstrap(event)` to decide
+  // whether the apply produced a client-visible buffered event.
+
+  it('peekLast returns undefined on an empty buffer', () => {
+    const buf = new RingBuffer<{ seq: number }>(5);
+    expect(buf.peekLast()).toBeUndefined();
+  });
+
+  it('peekLast returns the most recently appended item', () => {
+    const buf = new RingBuffer<{ seq: number; label: string }>(5);
+    buf.append({ seq: 1, label: 'first' });
+    expect(buf.peekLast()).toEqual({ seq: 1, label: 'first' });
+    buf.append({ seq: 2, label: 'second' });
+    expect(buf.peekLast()).toEqual({ seq: 2, label: 'second' });
+  });
+
+  it('peekLast tracks the tail correctly through eviction', () => {
+    const buf = new RingBuffer<{ seq: number }>(3);
+    buf.append({ seq: 1 });
+    buf.append({ seq: 2 });
+    buf.append({ seq: 3 });
+    expect(buf.peekLast()).toEqual({ seq: 3 });
+    // Append seq=4 → evicts seq=1; tail advances to seq=4.
+    buf.append({ seq: 4 });
+    expect(buf.peekLast()).toEqual({ seq: 4 });
+    expect(buf.oldestSeq()).toBe(2);
+  });
 });

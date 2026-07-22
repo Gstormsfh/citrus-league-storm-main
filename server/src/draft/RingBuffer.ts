@@ -117,4 +117,17 @@ export class RingBuffer<T extends { seq: number }> {
   oldestSeq(): number | undefined {
     return this.items[0]?.seq;
   }
+
+  /**
+   * The most recently appended item, or `undefined` if the buffer is
+   * empty. Chunk 11g.10 sub-step 10c-1a uses this from the live
+   * external-event apply path to determine whether an applier
+   * appended a client-visible event — if `peekLast().seq === event.seq`
+   * after `applyEventDuringBootstrap(event)`, the apply produced a
+   * buffered event and the LobbyManager broadcasts it. Read-only
+   * tail access; does not mutate buffer contents.
+   */
+  peekLast(): T | undefined {
+    return this.items[this.items.length - 1];
+  }
 }

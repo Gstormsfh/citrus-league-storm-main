@@ -4694,6 +4694,70 @@ export class LobbyManager {
           seq: event.seq,
           eventType: event.event_type,
         });
+        // ── Chunk 11g.10 sub-step 10c-1a: live external-apply broadcast ──
+        //
+        // The defect this closes (see PROJECT_PLAN Decision Log 2026-07-21):
+        // pre-10c-1a, this method applied state changes for cross-process
+        // events (a pick submitted via the main API server, a pause fired
+        // by a commissioner-side RPC, etc.) but did NOT broadcast them to
+        // connected WS clients. Only engine-authored actions
+        // (`processSubmitPick`, `processNominate`, `processPlaceBid`,
+        // auction close/timeout handlers, `processCommissionerOverride`)
+        // broadcast, because those handlers had their own inline
+        // `this.broadcast(...)` calls after the RPC returned. External
+        // events skipped that step entirely, silently violating the
+        // Performance Mandate's "manual pick submission → all participants
+        // see the pick" wire contract.
+        //
+        // **Live-mode-only.** Bootstrap event replay (called via
+        // `bootstrap()` + `bootstrapFullEventReplay()`) uses the same
+        // `applyEventDuringBootstrap` dispatcher and MUST NOT broadcast —
+        // replay reconstructs in-memory state from durable history; the
+        // events are already old and any connected client already saw them
+        // (or gets them from `snapshot` on reconnect + `recentEvents`
+        // ring-buffer replay). Broadcasting on replay would flood the wire
+        // with duplicate events on every engine restart.
+        //
+        // **State apply is byte-identical between live and replay modes.**
+        // `applyEventDuringBootstrap` mutates the state machine + appends
+        // to the ring buffer. Broadcast is a strictly-additive side
+        // effect appended AFTER successful state apply — no mutation of
+        // the applier's semantics, no mode branching inside the per-type
+        // apply functions. Canonical-replay principle (ADR-002 §3.5,
+        // chunk 11g.6 sub-step 6b Decision Log) intact.
+        //
+        // **Detection**: if the applier appended a `BufferedDraftEvent`
+        // for this event, the ring buffer's tail's `seq` will equal
+        // `event.seq`. Applier variants without a wire representation
+        // (`draft_paused`, `draft_resumed`, `draft_completed`,
+        // `draft_cancelled`, `draft_extended`, `autopick_failed`,
+        // `generation_bumped`) mutate state without appending to the ring
+        // buffer; tail check evaluates false and no broadcast fires. Wire
+        // representations for those internal-only variants are tracked as
+        // a separate design question (see Decision Log 2026-07-21).
+        //
+        // **Echo protection**: engine-authored actions (autopicks via
+        // `processSubmitPick`, all `processNominate`/`processPlaceBid`/
+        // etc. paths) advance `this.lastAppliedSeq` inside
+        // `appendEventAndCount` at the moment of their local
+        // `this.broadcast(...)`. The trigger-fired NOTIFY bounces back to
+        // this method with the same seq; the `seq <= lastAppliedSeq`
+        // gate at the top of `processExternalEvent` short-circuits before
+        // the loop, so echo cannot double-broadcast. Serialization is
+        // via the single-writer queue: an engine-authored action's
+        // `appendEventAndCount` completes before any external-event
+        // apply for the same seq is dequeued.
+        const buffered = this.events.peekLast();
+        if (buffered !== undefined && buffered.seq === event.seq) {
+          this.broadcast({
+            v: WIRE_PROTOCOL_VERSION,
+            type: 'event',
+            seq: event.seq,
+            timestamp: event.created_at,
+            correlationId: event.idempotency_key ?? '',
+            payload: buffered,
+          });
+        }
       } catch (err) {
         structuredLogger.error(
           'event_subscription.apply_failed',
