@@ -1,12 +1,25 @@
 # Phase 0b Diagnostic — Shot Extraction Regression
 
 ## Status
-**Backfill complete on prod as of 2026-07-21.** All 1,394
-season=2025 final games now have raw_shots data (0 missing
-across all 9 months). Season-NULL repair complete on the 9
-mid-cascade games. Remaining 0b work: deploy the fix to the
-live scraper machine + live-scraper defect fixes (see
-"Live-machine + scraper-defect scoping" below).
+**COMPLETE as of 2026-07-21.**
+
+Final summary: 42 zero-shot games backfilled + 9 season-NULL rows
+repaired → 1,394/1,394 season=2025 final games have complete
+`raw_shots` coverage. Encoder-death fix deployed to master via
+merge commit `ac4b96f`. Reconciler
+(`data-pipeline/monitoring/reconcile_shot_coverage.py`) live as
+the permanent guard, running daily at 11:00 UTC via
+`.github/workflows/shot-coverage-reconciler.yml`. First
+reconciler run found + healed 7 additional stale-payload games
+(95 previously-missing shots recovered). Ghost writer (May 13 -
+June 11, 06:00 UTC cadence) logged as issue #284 — inactive
+since June 11, cause not identified.
+
+**Operational successor: `docs/OPERATIONS_RUNBOOK.md`.** That's
+where the ongoing failure playbook, daily health check, and
+deploy procedure live. This diagnostic is retained as the causal
+record for the 0b arc — read it when a similar extraction-path
+failure recurs, not for day-to-day operations.
 
 ## Headline finding
 Handoff-stated 0b scope (~360-game Oct-Dec 2025 gap) was
@@ -406,6 +419,44 @@ was down?) is a separate 0b-deploy or 0b-hygiene item.
 - Diagnose no-payload gap (independent scraper reliability bug).
 - All three above are scoped for a separate authorization step —
   not part of this backfill workstream.
+
+## Reconciler first run — 7 stale-payload gaps beyond 0b scope
+- 2026-07-21: The new `data-pipeline/monitoring/reconcile_shot_coverage.py`
+  reconciler's first run against prod surfaced **7 stale-payload games**
+  outside the 0b investigation window (Dec 18 — Apr 2). All 7 were
+  invisible to the zero-shots inventory (they had 60-84 shot rows each,
+  xG populated on every row) — extraction succeeded on the mid-game
+  snapshot the payload was captured from, but the payload's `gameState`
+  was still CRIT or LIVE when captured and never refreshed to OFF.
+- Healed via `--heal --max-heal 15` (refetch → overwrite payload with
+  OFF-state → re-extract shots). All 7 payloads now read
+  `gameState=OFF`. Elapsed: 67s.
+- **Row deltas recovered actual missing shots — not just metadata.**
+
+  | game_id     | date       | state (before → after) | rows (before → after) | delta |
+  |-------------|------------|------------------------|-----------------------|-------|
+  | 2025020534  | 2025-12-18 | CRIT → OFF             | 68 → 72               | +4    |
+  | 2025020546  | 2025-12-19 | CRIT → OFF             | 76 → 77               | +1    |
+  | 2025020547  | 2025-12-19 | CRIT → OFF             | 76 → 78               | +2    |
+  | 2025020582  | 2025-12-23 | CRIT → OFF             | 80 → 81               | +1    |
+  | 2025020656  | 2026-01-03 | **LIVE → OFF**         | 60 → 96               | **+36** |
+  | 2025021201  | 2026-04-02 | **LIVE → OFF**         | 65 → 78               | **+13** |
+  | 2025021204  | 2026-04-02 | **LIVE → OFF**         | 84 → 122              | **+38** |
+
+  Total: **95 previously-missing shots** recovered. The three games
+  captured in LIVE state (mid-game) were missing 13-38 shots each —
+  significant late-period data.
+
+- **Fourth confirmed instance of the same operational pattern:
+  capture-time success is not completeness — only `gameState=OFF` is.**
+  Prior three: encoder-death (extraction ran but scoring aborted),
+  FUT-stub (payload captured pre-game and never refreshed), no-payload
+  (scraper outage). This one: payload captured mid-game and never
+  refreshed. Same failure class, different symptom, invisible to any
+  detector that only counts rows.
+- Post-heal acceptance rerun: 0 gaps, exit 0. Reconciler is safe to
+  promote to a daily cron (see
+  `.github/workflows/shot-coverage-reconciler.yml`).
 
 ## stats_extracted_at note
 The `raw_nhl_data.stats_extracted_at` column is a **retired-daemon
