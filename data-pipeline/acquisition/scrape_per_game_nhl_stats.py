@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Per-game stats scraper for batch backfill
+# Last active: 2026-03-03
+# Invoked:     manual catch-up + scripts/utilities/backfill_missing_shots.py
+# Reads:       NHL public API
+# Writes:      player_game_stats
+# ────────────────────────────────────────────────────────────
 """
 scrape_per_game_nhl_stats.py
 

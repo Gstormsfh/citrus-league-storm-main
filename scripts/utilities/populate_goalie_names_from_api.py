@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose:     Backfill goalie names into goalie_gsax / goalie_gar from NHL API
+# Last active: 2026-01-08
+# Invoked:     one-off; ran during initial goalie data load
+# Reads:       NHL public API
+# Writes:      goalie_gsax.goalie_name, goalie_gar.goalie_name
+# ────────────────────────────────────────────────────────────
 """
 Populate goalie names in raw_shots table by fetching from NHL API.
 This replaces dependency on staging data with our own data pull.

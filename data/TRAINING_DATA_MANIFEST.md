@@ -3,12 +3,17 @@
 Files required for xG v3 model training. Large files are `.gitignore`d and stored locally.
 Only the trained model binary (~2.5 MB) gets committed to Git.
 
+Per the R3 reorg (2026-05-05) the MoneyPuck historical data lives at
+`data-pipeline/data/historical/` (gitignored). Current-season Citrus PbP
+exports continue to live at `data/` (the smaller files there are tracked).
+
 ## Required Files
 
 | File | Size | Rows | Source | How to Obtain |
 |------|------|------|--------|---------------|
-| `shots_2018-2024.csv` | ~447 MB | 786,244 | MoneyPuck 2018-2024 | `curl -L -o data/shots_2018-2024.zip https://peter-tanner.com/moneypuck/downloads/shots_2018-2024.zip && cd data && unzip shots_2018-2024.zip` |
-| `shots_full_features_2025.csv` | ~25 MB | 76,877+ | Our PBP pipeline | `python scripts/utilities/export_raw_shots_csv.py --training` |
+| `data-pipeline/data/historical/shots_2018-2024.csv` | ~447 MB | 786,244 | MoneyPuck 2018-2024 | `curl -L -o /tmp/shots_2018-2024.zip https://peter-tanner.com/moneypuck/downloads/shots_2018-2024.zip && unzip -p /tmp/shots_2018-2024.zip > data-pipeline/data/historical/shots_2018-2024.csv` |
+| `data-pipeline/data/historical/shots_2017.csv` (optional, 8th season for extended training) | ~64 MB | 119,715 | MoneyPuck 2017 | `curl -L -o /tmp/shots_2017.zip https://peter-tanner.com/moneypuck/downloads/shots_2017.zip && unzip -p /tmp/shots_2017.zip > data-pipeline/data/historical/shots_2017.csv` |
+| `data/shots_full_features_2025.csv` | ~25 MB | 76,877+ | Our PBP pipeline | `python scripts/utilities/export_raw_shots_csv.py --training` |
 
 ## Complete Retrain Workflow
 
@@ -39,7 +44,9 @@ export_raw_shots_csv.py --training
         v
 data/shots_full_features_2025.csv (our PBP shots)
     +
-data/shots_2018-2024.csv (MoneyPuck historical)
+data-pipeline/data/historical/shots_2018-2024.csv (MoneyPuck historical)
+    +
+data-pipeline/data/historical/shots_2017.csv (optional 8th-season extension)
         |
         v
 train_xg_v3.py (combines 863K+ shots, trains XGBoost)

@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Sync power-play points (ppp) from per-game gamelog to player_season_stats
+# Last active: 2026-03-03
+# Invoked:     imported by nightly_projection_batch.py
+# Reads:       player_game_stats
+# Writes:      player_season_stats.ppp
+# ────────────────────────────────────────────────────────────
 """
 sync_ppp_from_gamelog.py
 

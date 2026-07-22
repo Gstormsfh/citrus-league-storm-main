@@ -1,3 +1,12 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: DEPRECATED
+// Purpose:     Fetch NHL player metadata (setup-era TS one-off, kept for reference)
+// Last active: (uncommitted)
+// Invoked:     (none — moved out of scripts/ root by R5)
+// Reads:       NHL API
+// Writes:      (early-era table; not invoked)
+// Note:        Superseded by data-pipeline/acquisition/data_acquisition.py + scripts/utilities/populate_player_directory.py. See scripts/_deprecated/README.md.
+// ────────────────────────────────────────────────────────────
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../src/integrations/supabase/types';

@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose:     Simulate fantasy matchups under hypothetical lineups for backtest / what-if
+# Last active: 2026-03-03
+# Invoked:     manual analytical run
+# Reads:       player_projected_stats, leagues
+# Writes:      (reports)
+# ────────────────────────────────────────────────────────────
 """
 simulate_matchups.py
 

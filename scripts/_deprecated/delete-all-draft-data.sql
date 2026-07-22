@@ -1,3 +1,12 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: DEPRECATED
+-- Purpose:     Wipe all draft data (functional near-duplicate of nuke-all-draft-data.sql)
+-- Last active: (uncommitted)
+-- Invoked:     (none — moved out of scripts/ root by R5)
+-- Reads:       (none)
+-- Writes:      (not invoked)
+-- Note:        Superseded by scripts/nuke-all-draft-data.sql which uses a safer WHERE clause on the leagues UPDATE. See scripts/_deprecated/README.md.
+-- ────────────────────────────────────────────────────────────
 -- Delete ALL draft data and reset all leagues
 -- WARNING: This is a destructive operation - it will permanently delete all draft data!
 -- Run this in Supabase SQL Editor

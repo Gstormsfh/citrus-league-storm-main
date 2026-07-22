@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Train per-shot-type isotonic calibration on top of xG v3 (commit 6e18851)
+# Last active: 2026-02-18
+# Invoked:     manual operator run after train_xg_v3.py
+# Reads:       models/xg_model_moneypuck.joblib + held-out validation shots
+# Writes:      models/xg_shot_type_calibration.joblib
+# ────────────────────────────────────────────────────────────
 """
 train_xg_calibration.py
 Trains per-shot-type isotonic regression calibration models for xG.

@@ -1,3 +1,11 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: ACTIVE
+// Purpose:     Shared env loading + validation for TS scripts
+// Last active: 2026-02-27
+// Invoked:     imported by every TS script in scripts/
+// Reads:       (.env files)
+// Writes:      (returns validated config)
+// ────────────────────────────────────────────────────────────
 /**
  * Shared Supabase environment configuration for scripts.
  *

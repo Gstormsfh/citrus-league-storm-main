@@ -1,3 +1,11 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: UTILITY
+// Purpose:     Integration smoke test for lineup state machine
+// Last active: 2026-02-27
+// Invoked:     manual run when changing lineup logic
+// Reads:       team_lineups, leagues
+// Writes:      stdout
+// ────────────────────────────────────────────────────────────
 /**
  * Test script to verify the lineup integration with Supabase
  * Run with: npx tsx scripts/test-lineup-integration.ts

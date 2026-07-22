@@ -202,6 +202,109 @@ prod-data dumps. A future operator could `git add .` and accidentally
 commit them. Add the pattern to `.gitignore` to make that footgun
 impossible.
 
+### Pipeline scripts in scripts/utilities/ have no automation — silent staleness pattern
+
+Discovered 2026-05-04 during Phase 0 data audit for the player
+dashboards project: the scripts that populate the analytical layer
+(goalie_gar, goalie_gsax, goalie_rebound_control, player_directory,
+player_gar_components, player_talent_metrics, league_averages,
+player_weekly_stats) live in `scripts/utilities/` — completely
+outside the documented `data-pipeline/` directory and with **zero
+automation pointing at them**. No GitHub workflow, no cron, no
+orchestrator script, no Makefile.
+
+Staleness as of audit:
+- `goalie_gar`: 5 months stale (last update 2025-12-18)
+- `goalie_gsax`: 4 months stale (last update 2026-01-04)
+- `player_directory`: 17 days stale (last update 2026-04-17)
+- `player_ros_projections`: 15 days stale (last update 2026-04-19)
+- `player_projected_stats`: 7 days stale (last update 2026-04-27)
+
+The schema exists, the data is real, the scripts work — but no one
+runs them, and there's no alerting when they go stale. This is the
+**5th silent-failure pattern** found in the last 60 days, joining:
+1. Cron `continue-on-error: true` masking 14-day failures (Path C/D)
+2. `sync_playoff_results.py` cascade docstring lie (Path B)
+3. Migration application asymmetry (May 1 propagation trigger)
+4. stormy-chat edge function legacy bundle BOOT_ERROR (May 2)
+5. **This one** — scripts/utilities orphan automation gap
+
+Common shape across all 5: *a system that supposedly does X has
+stopped doing X, with no alert, for an unknown duration.*
+
+**Followup work** (deferred to post-Web-Summit):
+- Add a nightly GitHub workflow that runs each script in dependency
+  order with explicit env override for prod project ref. Wire to
+  the existing `nightly_job_runs` ledger so failures surface.
+- Diagnose `nightly_job_runs.completed_at < started_at` timestamp
+  inversion — recorder bug, ~5-line fix.
+- Diagnose `pipeline-deadman` alert path (returned `alerted: false`
+  on May 2 despite reporting staleness).
+- Higher-level audit: identify ANY system in the codebase whose
+  output could be silently stale, document its expected freshness,
+  and add monitoring. Treat as "what else might be silently
+  broken?" sweep ticket. Web Summit-quality reliability requires it.
+
+**Web Summit workaround**: For the May 11 player-dashboards launch,
+re-run scripts manually one-time via a fresh `.venv-pipeline` with
+pinned requirements + per-invocation env override pointing at prod
+project ref `iezwazccqqrhrjupxzvf`. This is what's happening on
+2026-05-04 → 2026-05-05.
+
+### Stormy edge function on legacy CDN-fetch deployment format — boot-error vulnerability
+
+Discovered 2026-05-02 ~04:07 MT during prod verification of the v2
+ship: `stormy-chat` edge function returned BOOT_ERROR (HTTP 503) on
+every invocation. Garrett reported "fails to send a request to edge
+function" when trying the chat bubble on prod.
+
+Root cause: legacy deployment format that fetched dependencies
+(`https://deno.land/std@0.168.0/http/server.ts`,
+`https://esm.sh/@supabase/supabase-js@2`) on every cold start. When
+those CDNs respond slowly, return bad JS, or have any availability
+hiccup from the Supabase edge region (us-west-2), the function's Deno
+isolate fails to boot before reaching even the OPTIONS handler.
+
+Sibling edge functions (`demo-matchup-cache`, `pipeline-deadman`)
+were unaffected — both ship with `ezbr_sha256` self-contained
+eszip bundles and don't touch external CDNs at cold-start. Only
+`stormy-chat` (last deployed 2026-04-16, before Supabase CLI
+defaulted to eszip bundling) was on the legacy format.
+
+The bug was **latent** — Stormy was already broken before tonight's
+v2 deploy. We caught it during prod verification only because Garrett
+specifically tested the chat bubble. Without the verification walk,
+this would have stayed silent for users until reported.
+
+Fix: re-deployed `stormy-chat` from unchanged source via
+`supabase functions deploy stormy-chat --project-ref iezwazccqqrhrjupxzvf`.
+Newer Supabase CLI bundled all dependencies into self-contained
+eszip (version 29, `ezbr_sha256: e4ac7946...`). OPTIONS preflight
+went from `503 BOOT_ERROR` → `200 OK` immediately after.
+
+**Followup work**:
+- Audit ALL remaining edge functions for legacy CDN-fetch deployment
+  format. Any function without `ezbr_sha256` set is at risk. Re-deploy
+  each from current source to migrate.
+- Add `stormy-chat` OPTIONS preflight to `production-deploy.yml`
+  post-deploy health checks. Currently the workflow only checks
+  `https://citrusfantasysports.com/` returning 200 — doesn't catch
+  edge function failures. A simple `curl -X OPTIONS` against
+  stormy-chat with origin header should be added.
+- Consider general edge function uptime monitoring — Supabase status
+  alerts, Sentry edge integration, or a periodic synthetic check.
+- Monthly synthetic Stormy chat as a canary (real POST with auth
+  token, expecting valid response). Catches the NEXT class of failure
+  beyond bootability (rate limits, Anthropic outages, schema drift on
+  `stormy_chat_log` table).
+- Pattern recognition: this is the third silent-failure pattern
+  surfaced in the Citrus stack in the last 60 days (cron continue-on-
+  error, sync_playoff_results docstring lie, edge-function legacy
+  bundle). All share the same shape: a system that supposedly does X
+  has been failing to do X for an unknown duration without alerting.
+  Worth a higher-level audit pass for "what other things might be
+  silently broken?" — Web Summit-quality reliability requires it.
+
 ### Migration application asymmetry — verify ALL targeted environments after apply
 
 On 2026-05-01 the playoff winner propagation trigger migration

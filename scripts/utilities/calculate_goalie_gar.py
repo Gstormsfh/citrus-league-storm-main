@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Compute combined goalie G-GAR (rebound control + primary GSAx components)
+# Last active: 2026-01-05
+# Invoked:     manual run after goalie_gsax_primary + goalie_rebound_control populated
+# Reads:       goalie_gsax_primary, goalie_rebound_control
+# Writes:      goalie_gar
+# ────────────────────────────────────────────────────────────
 """
 Calculate Combined Goalie G-GAR (Goals Above Replacement) Metric.
 

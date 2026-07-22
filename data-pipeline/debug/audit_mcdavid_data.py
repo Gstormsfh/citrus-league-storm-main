@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: DEBUG-ONLY
+# Purpose:     Forensics: audit McDavid's data across raw_shots / player_game_stats / season totals
+# Last active: 2026-03-03
+# Invoked:     ad-hoc when investigating data integrity
+# Reads:       raw_shots, player_game_stats, player_season_stats
+# Writes:      stdout
+# ────────────────────────────────────────────────────────────
 """
 Audit McDavid Stats - Check actual database values
 Player ID: 8478402

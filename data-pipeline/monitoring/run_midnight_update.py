@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Midnight update orchestrator: refresh roster_assignments, fantasy_daily_rosters
+# Last active: 2026-03-02
+# Invoked:     scheduled (likely cron)
+# Reads:       team_lineups, leagues
+# Writes:      fantasy_daily_rosters, roster_assignments
+# ────────────────────────────────────────────────────────────
 """
 Manual Midnight Run - Landing Stats Update
 Run this script to manually trigger the nightly landing stats update

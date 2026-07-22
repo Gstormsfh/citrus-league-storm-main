@@ -1,3 +1,11 @@
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose:     Manual weekly projection run for a specific week range
+# Last active: 2026-01-05
+# Invoked:     manual operator tool
+# Reads:       (same as nightly_projection_batch)
+# Writes:      (same as nightly_projection_batch)
+# ────────────────────────────────────────────────────────────
 """
 Run projections for an entire week (all days with games).
 Usage: python run_week_projections.py [start_date] [end_date]

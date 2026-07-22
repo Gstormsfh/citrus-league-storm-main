@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Re-derive raw_shots from raw_nhl_data (drains the extraction backlog)
+# Last active: 2026-01-05
+# Invoked:     manual operator run; imports data_acquisition.py
+# Reads:       raw_nhl_data
+# Writes:      raw_shots
+# ────────────────────────────────────────────────────────────
 """
 populate_raw_shots.py
 Convenience script to populate the raw_shots table with shot data.

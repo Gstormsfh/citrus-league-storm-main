@@ -1,3 +1,11 @@
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Master scraper module — fetches PBP from NHL API and derives raw_shots feature columns (xG, pre-shot context, shooting talent)
+# Last active: 2026-04-07
+# Invoked:     imported by data_scraping_service.py + scripts/utilities/populate_raw_shots.py
+# Reads:       NHL public API (api-web.nhle.com), models/*.joblib, raw_nhl_data
+# Writes:      raw_shots, raw_nhl_data
+# ────────────────────────────────────────────────────────────
 # data_acquisition.py
 
 import pandas as pd
@@ -200,39 +208,49 @@ def parse_time_to_seconds(time_str):
     except (ValueError, IndexError):
         return 0
 
-def calculate_time_difference(prev_play, current_play, max_period=3):
+def calculate_time_difference(prev_play, current_play, max_period=3, max_seconds=60):
     """
     Calculate time difference between two plays in seconds.
     Returns: time difference in seconds, or None if plays are in different periods
-    or time cannot be calculated.
-    
+    or time cannot be calculated or exceeds the max_seconds cap.
+
     Note: timeInPeriod counts UP from 00:00, so later plays have higher values.
     If prev_play is at 16:07 and current_play is at 16:16, that's 9 seconds later.
+
+    The max_seconds parameter caps the lookup window. Default 60s is for
+    rebound detection (rebounds happen within ~60s of the original shot). For
+    other lookups (faceoff context, last-event context), pass a larger
+    max_seconds appropriate to the semantic — e.g. max_seconds=180 for the
+    faceoff lookup since possessions routinely last 30-180s after a faceoff.
+
+    Callers as of 2026-05-07 (Phase 0 / 0d-pre Bug E):
+      - Rebound detection (line ~1130): uses default 60s
+      - Faceoff lookup (line ~1408 + line ~2991): passes max_seconds=180
     """
     prev_period = prev_play.get('periodDescriptor', {}).get('number', 0)
     curr_period = current_play.get('periodDescriptor', {}).get('number', 0)
-    
+
     # If different periods, not a rebound (too much time passed)
     if prev_period != curr_period:
         return None
-    
+
     prev_time = prev_play.get('timeInPeriod', '')
     curr_time = current_play.get('timeInPeriod', '')
-    
+
     prev_seconds = parse_time_to_seconds(prev_time)
     curr_seconds = parse_time_to_seconds(curr_time)
-    
+
     if prev_seconds is None or curr_seconds is None or prev_seconds == 0 or curr_seconds == 0:
         return None
-    
+
     # Time difference: current play happens AFTER previous play
     # So current time should be greater than previous time
     # Example: 16:07 -> 16:16 = 9 seconds
     time_diff = curr_seconds - prev_seconds
-    
+
     # If negative, previous play happened after current (shouldn't happen in sorted order)
-    # If too large (> 60 seconds), probably not a rebound
-    if time_diff < 0 or time_diff > 60:
+    # If too large (> max_seconds), the gap is outside what the caller cares about
+    if time_diff < 0 or time_diff > max_seconds:
         return None
     
     return time_diff
@@ -1004,7 +1022,21 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
     try:
         # Initialize tracking variables (same as scrape_pbp_and_process)
         previous_play = None
-        previous_plays = []
+        # ─── TWO BUFFERS WITH DISTINCT PURPOSES — DO NOT MERGE ────────────────
+        # previous_plays: SHOT-ONLY buffer (typeCodes 505/506/507).
+        #   Used by find_pass_before_shot() and pass-context derivation logic.
+        #   The shot-only filter is intentional — pass detection looks back over
+        #   recent shots to find rebound/secondary-shot opportunities. Adding
+        #   non-shot events to this buffer breaks pass detection.
+        # previous_all_plays: ALL EVENT TYPES (faceoffs, hits, giveaways, etc.).
+        #   Used by faceoff lookup, last-event-category derivation, hit-context
+        #   lookups. New 2026-05-07 (Phase 0 / 0d-pre Bug C) — without it, the
+        #   faceoff lookup at line ~1406 was iterating a buffer that could
+        #   never satisfy `typeCode == 502` because previous_plays only ever
+        #   contained shot events.
+        # ──────────────────────────────────────────────────────────────────────
+        previous_plays = []          # shot-only — DO NOT add non-shot events
+        previous_all_plays = []      # all event types — used by faceoff/last-event lookups
         powerplay_start_times = {}
         last_event_state = {
             'time_in_seconds': None,
@@ -1013,21 +1045,28 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
             'type_code': None,
             'period': None
         }
-        
+
         # Process all plays in the game (extract logic from lines 1031-2219)
         for play in raw_data.get('plays', []):
             type_code = play.get('typeCode')
             details = play.get('details', {})
-            
+
+            # All-events buffer: track every play regardless of type so the
+            # faceoff/last-event lookups downstream can find non-shot events.
+            # Cap at 30 entries (~5 plays/faceoff × 6 plays of safety).
+            previous_all_plays.append(play)
+            if len(previous_all_plays) > 30:
+                previous_all_plays.pop(0)
+
             # Get current event coordinates and time
             current_x = details.get('xCoord') if details else None
             current_y = details.get('yCoord') if details else None
             current_time_in_period = play.get('timeInPeriod', '')
             current_period = play.get('periodDescriptor', {}).get('number')
             current_time_seconds = parse_time_to_seconds(current_time_in_period)
-            
+
             is_shot_event = type_code in [505, 506, 507]
-            
+
             if not is_shot_event:
                 # Update state for non-shot events
                 if current_x is not None and current_y is not None and current_time_seconds is not None:
@@ -1314,13 +1353,36 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                 last_event_type_code = last_event_state['type_code']
                 last_event_period = last_event_state['period']
                 
+                # ============================================================
+                # ⚠️ DO NOT "FIX" THIS MAPPING WITHOUT A COORDINATED MODEL RETRAIN
+                # ============================================================
+                # The labels below are stale from the older NHL Stats API era —
+                # in the modern api-web.nhle.com endpoints typeCode 502 = faceoff
+                # (not 'TAKE'), 503 = hit (not 'FAC'), 504 = giveaway (not 'HIT'),
+                # etc. The labels are nonetheless internally consistent with
+                # `models/last_event_category_encoder.joblib` and the trained
+                # xG v3 model — every faceoff event has been encoded as the
+                # same `'TAKE'`-derived int since training, so model predictions
+                # remain numerically correct despite wrong labels.
+                #
+                # Fixing these labels without a coordinated retrain would silently
+                # degrade xG v3 accuracy: the encoder would either reject the
+                # newly-relabelled rows or fall back to a default int the model
+                # doesn't expect. The result would be ~24% of all shots
+                # (faceoff-prior shots) getting wrong xG predictions.
+                #
+                # Full unlock path: see apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md
+                # § 11 "Legacy NHL API last_event_category labels" — schedule for
+                # post-0c v1.5 retrain when the 7-historical-season corpus is
+                # available.
+                # ============================================================
                 type_code_to_category = {
                     505: 'GOAL', 506: 'SHOT', 507: 'MISS', 503: 'FAC', 504: 'HIT',
                     509: 'BLOCK', 516: 'PENL', 517: 'STOP', 520: 'GIVE', 521: 'TAKE',
                     502: 'TAKE', 518: 'CHL', 519: 'GIVE'
                 }
                 last_event_category = type_code_to_category.get(last_event_type_code, 'OTHER')
-                
+
                 distance_from_last_event = math.sqrt(
                     (shot_coord_x - last_event_x)**2 + 
                     (shot_coord_y - last_event_y)**2
@@ -1372,9 +1434,13 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                     pass
             
             time_since_faceoff = None
-            for prev_play in reversed(previous_plays[-20:]):
-                if prev_play.get('typeCode') == 503:
-                    time_since_faceoff = calculate_time_difference(prev_play, play)
+            # Faceoff lookup uses previous_all_plays (the all-events buffer) because
+            # previous_plays is shot-only and can never contain a faceoff event.
+            # max_seconds=180 because possessions routinely last 30-180s after a
+            # faceoff; the default 60s cap from rebound-detection is too tight here.
+            for prev_play in reversed(previous_all_plays):
+                if prev_play.get('typeCode') == 502:  # 502 = faceoff in modern api-web.nhle.com
+                    time_since_faceoff = calculate_time_difference(prev_play, play, max_seconds=180)
                     break
             
             # Team context
@@ -1608,9 +1674,10 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                 'shooting_team_defencemen_on_ice': None,
                 'defending_team_forwards_on_ice': None,
                 'defending_team_defencemen_on_ice': None,
-                'distance_to_nearest_defender': None,
-                'skaters_in_screening_box': None,
-                'nearest_defender_to_net_distance': None,
+                # Defender geometry columns dropped 2026-05-07 (Phase 0 / 0d-pre #1).
+                # NHL public PBP carries no defender coordinates; v2 unlock requires
+                # NHL EDGE licensing / SPORTLOGiQ feed / internal CV pipeline. See
+                # apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md.
                 'angle_change_from_last_event': angle_change_from_last_event,
                 'angle_change_squared': angle_change_squared,
                 'distance_change_from_last_event': distance_change_from_last_event,
@@ -1664,8 +1731,29 @@ def _save_shots_to_database(df_shots, db_client, game_id):
         # Prepare raw_shots records (same structure as scrape_pbp_and_process)
         raw_shots_records = []
         for idx, row in df_shots.iterrows():
+            # ─── IMPORTANT: explicit column enumeration — silent-loss risk ───
+            # This dict explicitly lists every column to write. Adding a new
+            # column upstream (in _extract_shots_from_game) WITHOUT also adding
+            # it here results in silent data loss — the value is computed but
+            # never written to the database.
+            #
+            # The 36 TOI columns + time_difference_since_change +
+            # average_rest_difference were silently dropped this way until
+            # 2026-05-07 (Phase 0 / 0d-pre Bug D). Added inline below.
+            #
+            # Architectural cleanup deferred to v1.5: replace this manual
+            # enumeration with df_shots.to_dict('records') or programmatic
+            # column copy with type coercion. See
+            # apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md § 12.
+            # Until that lands, every column added upstream MUST also be
+            # added here AND added to the nullable_fields list below.
+            # ────────────────────────────────────────────────────────────────
             record = {
                 'game_id': int(row['game_id']),
+                # season derived from NHL game_id encoding (first 4 digits = season start year).
+                # Set inline at extraction time so the DELETE+UPSERT retrofit doesn't reintroduce
+                # NULL season after the 0d-pre #3 backfill migration runs (caught during 6c, 2026-05-12).
+                'season': int(int(row['game_id']) / 1000000),
                 'player_id': int(row['playerId']),
                 'passer_id': int(row['passer_id']) if pd.notna(row['passer_id']) and row['passer_id'] is not None else None,
                 'shot_x': float(row['shot_x']),
@@ -1724,6 +1812,55 @@ def _save_shots_to_database(df_shots, db_client, game_id):
                 'time_in_period': str(row['time_in_period']) if pd.notna(row.get('time_in_period')) else None,
                 'time_remaining_seconds': int(row['time_remaining_seconds']) if pd.notna(row.get('time_remaining_seconds')) else None,
                 'time_since_faceoff': float(row['time_since_faceoff']) if pd.notna(row.get('time_since_faceoff')) else None,
+                # ─── 36 TOI proxy columns (added 2026-05-07, Phase 0 / 0d-pre Bug D) ───
+                # All 36 derive from the same time_since_faceoff value via
+                # calculate_toi_features_proxy. v1.5 will replace with real
+                # shift-derived per-player TOI. See GAPS § 9.
+                'shooter_time_on_ice': float(row['shooter_time_on_ice']) if pd.notna(row.get('shooter_time_on_ice')) else None,
+                'shooter_time_on_ice_since_faceoff': float(row['shooter_time_on_ice_since_faceoff']) if pd.notna(row.get('shooter_time_on_ice_since_faceoff')) else None,
+                'shooting_team_average_time_on_ice': float(row['shooting_team_average_time_on_ice']) if pd.notna(row.get('shooting_team_average_time_on_ice')) else None,
+                'shooting_team_max_time_on_ice': float(row['shooting_team_max_time_on_ice']) if pd.notna(row.get('shooting_team_max_time_on_ice')) else None,
+                'shooting_team_min_time_on_ice': float(row['shooting_team_min_time_on_ice']) if pd.notna(row.get('shooting_team_min_time_on_ice')) else None,
+                'shooting_team_average_time_on_ice_of_forwards': float(row['shooting_team_average_time_on_ice_of_forwards']) if pd.notna(row.get('shooting_team_average_time_on_ice_of_forwards')) else None,
+                'shooting_team_max_time_on_ice_of_forwards': float(row['shooting_team_max_time_on_ice_of_forwards']) if pd.notna(row.get('shooting_team_max_time_on_ice_of_forwards')) else None,
+                'shooting_team_min_time_on_ice_of_forwards': float(row['shooting_team_min_time_on_ice_of_forwards']) if pd.notna(row.get('shooting_team_min_time_on_ice_of_forwards')) else None,
+                'shooting_team_average_time_on_ice_of_defencemen': float(row['shooting_team_average_time_on_ice_of_defencemen']) if pd.notna(row.get('shooting_team_average_time_on_ice_of_defencemen')) else None,
+                'shooting_team_max_time_on_ice_of_defencemen': float(row['shooting_team_max_time_on_ice_of_defencemen']) if pd.notna(row.get('shooting_team_max_time_on_ice_of_defencemen')) else None,
+                'shooting_team_min_time_on_ice_of_defencemen': float(row['shooting_team_min_time_on_ice_of_defencemen']) if pd.notna(row.get('shooting_team_min_time_on_ice_of_defencemen')) else None,
+                'shooting_team_average_time_on_ice_since_faceoff': float(row['shooting_team_average_time_on_ice_since_faceoff']) if pd.notna(row.get('shooting_team_average_time_on_ice_since_faceoff')) else None,
+                'shooting_team_max_time_on_ice_since_faceoff': float(row['shooting_team_max_time_on_ice_since_faceoff']) if pd.notna(row.get('shooting_team_max_time_on_ice_since_faceoff')) else None,
+                'shooting_team_min_time_on_ice_since_faceoff': float(row['shooting_team_min_time_on_ice_since_faceoff']) if pd.notna(row.get('shooting_team_min_time_on_ice_since_faceoff')) else None,
+                'shooting_team_average_time_on_ice_of_forwards_since_faceoff': float(row['shooting_team_average_time_on_ice_of_forwards_since_faceoff']) if pd.notna(row.get('shooting_team_average_time_on_ice_of_forwards_since_faceoff')) else None,
+                'shooting_team_max_time_on_ice_of_forwards_since_faceoff': float(row['shooting_team_max_time_on_ice_of_forwards_since_faceoff']) if pd.notna(row.get('shooting_team_max_time_on_ice_of_forwards_since_faceoff')) else None,
+                'shooting_team_min_time_on_ice_of_forwards_since_faceoff': float(row['shooting_team_min_time_on_ice_of_forwards_since_faceoff']) if pd.notna(row.get('shooting_team_min_time_on_ice_of_forwards_since_faceoff')) else None,
+                'shooting_team_average_time_on_ice_of_defencemen_since_faceoff': float(row['shooting_team_average_time_on_ice_of_defencemen_since_faceoff']) if pd.notna(row.get('shooting_team_average_time_on_ice_of_defencemen_since_faceoff')) else None,
+                'shooting_team_max_time_on_ice_of_defencemen_since_faceoff': float(row['shooting_team_max_time_on_ice_of_defencemen_since_faceoff']) if pd.notna(row.get('shooting_team_max_time_on_ice_of_defencemen_since_faceoff')) else None,
+                'shooting_team_min_time_on_ice_of_defencemen_since_faceoff': float(row['shooting_team_min_time_on_ice_of_defencemen_since_faceoff']) if pd.notna(row.get('shooting_team_min_time_on_ice_of_defencemen_since_faceoff')) else None,
+                'defending_team_average_time_on_ice': float(row['defending_team_average_time_on_ice']) if pd.notna(row.get('defending_team_average_time_on_ice')) else None,
+                'defending_team_max_time_on_ice': float(row['defending_team_max_time_on_ice']) if pd.notna(row.get('defending_team_max_time_on_ice')) else None,
+                'defending_team_min_time_on_ice': float(row['defending_team_min_time_on_ice']) if pd.notna(row.get('defending_team_min_time_on_ice')) else None,
+                'defending_team_average_time_on_ice_of_forwards': float(row['defending_team_average_time_on_ice_of_forwards']) if pd.notna(row.get('defending_team_average_time_on_ice_of_forwards')) else None,
+                'defending_team_max_time_on_ice_of_forwards': float(row['defending_team_max_time_on_ice_of_forwards']) if pd.notna(row.get('defending_team_max_time_on_ice_of_forwards')) else None,
+                'defending_team_min_time_on_ice_of_forwards': float(row['defending_team_min_time_on_ice_of_forwards']) if pd.notna(row.get('defending_team_min_time_on_ice_of_forwards')) else None,
+                'defending_team_average_time_on_ice_of_defencemen': float(row['defending_team_average_time_on_ice_of_defencemen']) if pd.notna(row.get('defending_team_average_time_on_ice_of_defencemen')) else None,
+                'defending_team_max_time_on_ice_of_defencemen': float(row['defending_team_max_time_on_ice_of_defencemen']) if pd.notna(row.get('defending_team_max_time_on_ice_of_defencemen')) else None,
+                'defending_team_min_time_on_ice_of_defencemen': float(row['defending_team_min_time_on_ice_of_defencemen']) if pd.notna(row.get('defending_team_min_time_on_ice_of_defencemen')) else None,
+                'defending_team_average_time_on_ice_since_faceoff': float(row['defending_team_average_time_on_ice_since_faceoff']) if pd.notna(row.get('defending_team_average_time_on_ice_since_faceoff')) else None,
+                'defending_team_max_time_on_ice_since_faceoff': float(row['defending_team_max_time_on_ice_since_faceoff']) if pd.notna(row.get('defending_team_max_time_on_ice_since_faceoff')) else None,
+                'defending_team_min_time_on_ice_since_faceoff': float(row['defending_team_min_time_on_ice_since_faceoff']) if pd.notna(row.get('defending_team_min_time_on_ice_since_faceoff')) else None,
+                'defending_team_average_time_on_ice_of_forwards_since_faceoff': float(row['defending_team_average_time_on_ice_of_forwards_since_faceoff']) if pd.notna(row.get('defending_team_average_time_on_ice_of_forwards_since_faceoff')) else None,
+                'defending_team_max_time_on_ice_of_forwards_since_faceoff': float(row['defending_team_max_time_on_ice_of_forwards_since_faceoff']) if pd.notna(row.get('defending_team_max_time_on_ice_of_forwards_since_faceoff')) else None,
+                'defending_team_min_time_on_ice_of_forwards_since_faceoff': float(row['defending_team_min_time_on_ice_of_forwards_since_faceoff']) if pd.notna(row.get('defending_team_min_time_on_ice_of_forwards_since_faceoff')) else None,
+                # Rest difference features (also part of TOI cascade)
+                'time_difference_since_change': float(row['time_difference_since_change']) if pd.notna(row.get('time_difference_since_change')) else None,
+                'average_rest_difference': float(row['average_rest_difference']) if pd.notna(row.get('average_rest_difference')) else None,
+                # Other columns also caught by Bug D diff (extracted but never saved).
+                # Note: is_slot_shot and shot_result are extracted upstream but
+                # NOT in the raw_shots schema — intentionally omitted here.
+                'shot_angle_adjusted': float(row['shot_angle_adjusted']) if pd.notna(row.get('shot_angle_adjusted')) else None,
+                'home_empty_net': bool(row.get('home_empty_net', 0)) if pd.notna(row.get('home_empty_net')) else False,
+                'away_empty_net': bool(row.get('away_empty_net', 0)) if pd.notna(row.get('away_empty_net')) else False,
+                # ─── end Bug D additions ───
                 'team_code': str(row['team_code']) if pd.notna(row.get('team_code')) else None,
                 'shooting_team_code': str(row['shooting_team_code']) if pd.notna(row.get('shooting_team_code')) else None,
                 'defending_team_code': str(row['defending_team_code']) if pd.notna(row.get('defending_team_code')) else None,
@@ -1772,9 +1909,9 @@ def _save_shots_to_database(df_shots, db_client, game_id):
                 'shot_angle_plus_rebound_speed': float(row['shot_angle_plus_rebound_speed']) if pd.notna(row.get('shot_angle_plus_rebound_speed')) else None,
             }
             # Remove None values except for nullable fields
-            nullable_fields = ['passer_id', 'pass_x', 'pass_y', 'pass_lateral_distance', 'pass_to_net_distance', 
-                             'pass_zone', 'pass_immediacy_score', 'goalie_movement_score', 'pass_quality_score', 
-                             'time_before_shot', 'pass_angle', 'xa_value', 'pass_zone_encoded', 
+            nullable_fields = ['passer_id', 'pass_x', 'pass_y', 'pass_lateral_distance', 'pass_to_net_distance',
+                             'pass_zone', 'pass_immediacy_score', 'goalie_movement_score', 'pass_quality_score',
+                             'time_before_shot', 'pass_angle', 'xa_value', 'pass_zone_encoded',
                              'normalized_lateral_distance', 'zone_relative_distance', 'score_differential',
                              'expected_rebound_probability', 'expected_goals_of_expected_rebounds',
                              'shooting_talent_adjusted_xg', 'shooting_talent_multiplier', 'created_expected_goals',
@@ -1790,7 +1927,22 @@ def _save_shots_to_database(df_shots, db_client, game_id):
                              'away_team_abbrev', 'away_sog', 'home_sog', 'shot_type_raw', 'miss_reason',
                              'last_event_shot_angle', 'last_event_shot_distance', 'player_num_that_did_last_event',
                              'arena_adjusted_x', 'arena_adjusted_y', 'arena_adjusted_x_abs', 'arena_adjusted_y_abs',
-                             'arena_adjusted_shot_distance', 'shot_angle_plus_rebound', 'shot_angle_plus_rebound_speed']
+                             'arena_adjusted_shot_distance', 'shot_angle_plus_rebound', 'shot_angle_plus_rebound_speed',
+                             # ─── Bug D additions 2026-05-07 (TOI cascade + miscellaneous) ───
+                             'shooter_time_on_ice', 'shooter_time_on_ice_since_faceoff',
+                             'shooting_team_average_time_on_ice', 'shooting_team_max_time_on_ice', 'shooting_team_min_time_on_ice',
+                             'shooting_team_average_time_on_ice_of_forwards', 'shooting_team_max_time_on_ice_of_forwards', 'shooting_team_min_time_on_ice_of_forwards',
+                             'shooting_team_average_time_on_ice_of_defencemen', 'shooting_team_max_time_on_ice_of_defencemen', 'shooting_team_min_time_on_ice_of_defencemen',
+                             'shooting_team_average_time_on_ice_since_faceoff', 'shooting_team_max_time_on_ice_since_faceoff', 'shooting_team_min_time_on_ice_since_faceoff',
+                             'shooting_team_average_time_on_ice_of_forwards_since_faceoff', 'shooting_team_max_time_on_ice_of_forwards_since_faceoff', 'shooting_team_min_time_on_ice_of_forwards_since_faceoff',
+                             'shooting_team_average_time_on_ice_of_defencemen_since_faceoff', 'shooting_team_max_time_on_ice_of_defencemen_since_faceoff', 'shooting_team_min_time_on_ice_of_defencemen_since_faceoff',
+                             'defending_team_average_time_on_ice', 'defending_team_max_time_on_ice', 'defending_team_min_time_on_ice',
+                             'defending_team_average_time_on_ice_of_forwards', 'defending_team_max_time_on_ice_of_forwards', 'defending_team_min_time_on_ice_of_forwards',
+                             'defending_team_average_time_on_ice_of_defencemen', 'defending_team_max_time_on_ice_of_defencemen', 'defending_team_min_time_on_ice_of_defencemen',
+                             'defending_team_average_time_on_ice_since_faceoff', 'defending_team_max_time_on_ice_since_faceoff', 'defending_team_min_time_on_ice_since_faceoff',
+                             'defending_team_average_time_on_ice_of_forwards_since_faceoff', 'defending_team_max_time_on_ice_of_forwards_since_faceoff', 'defending_team_min_time_on_ice_of_forwards_since_faceoff',
+                             'time_difference_since_change', 'average_rest_difference',
+                             'shot_angle_adjusted']
             record = {k: v for k, v in record.items() if v is not None or k in nullable_fields}
             raw_shots_records.append(record)
         
@@ -1876,15 +2028,25 @@ def _save_shots_to_database(df_shots, db_client, game_id):
                             try:
                                 db_client.upsert('raw_shots', [record], on_conflict='game_id,player_id,shot_x,shot_y,shot_type_code')
                                 total_saved += 1
-                            except Exception:
-                                pass
+                            except Exception as row_err:
+                                logger.warning(
+                                    f"Game {game_id}: raw_shots row save failed "
+                                    f"(constraint-retry path, player_id={record.get('player_id')}, "
+                                    f"event_id={record.get('event_id')}): "
+                                    f"{type(row_err).__name__}: {row_err}"
+                                )
                 else:
                     for record in batch:
                         try:
                             db_client.upsert('raw_shots', [record], on_conflict='game_id,player_id,shot_x,shot_y,shot_type_code')
                             total_saved += 1
-                        except Exception:
-                            pass
+                        except Exception as row_err:
+                            logger.warning(
+                                f"Game {game_id}: raw_shots row save failed "
+                                f"(non-constraint retry path, player_id={record.get('player_id')}, "
+                                f"event_id={record.get('event_id')}): "
+                                f"{type(row_err).__name__}: {row_err}"
+                            )
         
         logger.info(f"Game {game_id}: Saved {total_saved} shot records to database")
         
@@ -1900,10 +2062,161 @@ def _save_shots_to_database(df_shots, db_client, game_id):
         raise
 
 
+def process_game_from_raw_data(game_id, raw_data, db_client):
+    """
+    Extract shots, score xG/xA, and save from a pre-fetched raw PBP payload.
+
+    Backfill entry point — bypasses the NHL API fetch that process_single_game
+    performs, so replay from raw_nhl_data.raw_json shares the exact same
+    extract → score → save code path as live scraping. A fork of scoring
+    logic is precisely what caused the 0b regression; keep them one.
+
+    Raises on any processing error — callers decide whether to swallow.
+    Returns None if no shots extracted; returns the scored DataFrame otherwise.
+    """
+    all_shot_data = _extract_shots_from_game(raw_data, game_id, db_client)
+
+    if not all_shot_data:
+        logger.info(f"Game {game_id}: No shots found")
+        return None
+
+    df_shots = pd.DataFrame(all_shot_data)
+
+    try:
+        from feature_calculations import apply_calculated_features_to_dataframe
+        df_shots = apply_calculated_features_to_dataframe(df_shots)
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.error(f"Game {game_id}: Warning - error applying calculated features: {e}")
+
+    if USE_MONEYPUCK_MODEL and 'last_event_category_encoded' in MODEL_FEATURES:
+        if 'last_event_category' in df_shots.columns and 'last_event_category_encoded' not in df_shots.columns:
+            from sklearn.preprocessing import LabelEncoder
+            if LAST_EVENT_CATEGORY_ENCODER is not None:
+                # Match training-script null handling (train_xg_v3.py:243) and map
+                # unseen labels to 'OTHER' — real PBP data contains categories the
+                # encoder was never fit on (e.g. DELPEN, PEND, PSTR).
+                known_events = set(LAST_EVENT_CATEGORY_ENCODER.classes_)
+                series = df_shots['last_event_category'].fillna('OTHER').astype(str)
+                unseen_mask = ~series.isin(known_events)
+                if unseen_mask.any():
+                    logger.warning(
+                        f"Game {game_id}: {int(unseen_mask.sum())} rows with "
+                        f"last_event_category unseen by encoder "
+                        f"({sorted(series[unseen_mask].unique().tolist())}) — mapped to 'OTHER'"
+                    )
+                    series = series.where(~unseen_mask, 'OTHER')
+                df_shots['last_event_category_encoded'] = LAST_EVENT_CATEGORY_ENCODER.transform(series)
+            else:
+                le = LabelEncoder()
+                df_shots['last_event_category_encoded'] = le.fit_transform(
+                    df_shots['last_event_category'].fillna('OTHER').astype(str)
+                )
+
+    if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
+        df_shots['distance_angle_interaction'] = (df_shots['distance'] * df_shots['angle']) / 100
+
+    if 'speed_from_last_event' in df_shots.columns:
+        speed_series = pd.to_numeric(df_shots['speed_from_last_event'], errors='coerce').fillna(0)
+        df_shots['speed_from_last_event_log'] = np.log1p(speed_series)
+
+    for feature in MODEL_FEATURES:
+        if feature not in df_shots.columns:
+            if feature in ['home_empty_net', 'away_empty_net', 'is_empty_net',
+                           'has_pass_before_shot', 'is_rebound', 'is_slot_shot', 'is_power_play']:
+                df_shots[feature] = 0
+            elif feature == 'shot_angle_adjusted':
+                df_shots[feature] = df_shots['angle'].abs() if 'angle' in df_shots.columns else 0
+            elif feature == 'last_event_category_encoded':
+                df_shots[feature] = 0
+            elif feature == 'distance_angle_interaction':
+                if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
+                    df_shots[feature] = (df_shots['distance'] * df_shots['angle']) / 100
+                else:
+                    df_shots[feature] = 0
+            elif feature == 'speed_from_last_event_log':
+                if 'speed_from_last_event' in df_shots.columns:
+                    df_shots[feature] = np.log1p(df_shots['speed_from_last_event'].fillna(0))
+                else:
+                    df_shots[feature] = 0
+            else:
+                df_shots[feature] = 0
+
+    X_predict = df_shots[MODEL_FEATURES].copy()
+
+    for feature in MODEL_FEATURES:
+        if feature in X_predict.columns and X_predict[feature].isna().any():
+            if feature in ['pass_lateral_distance', 'pass_to_net_distance', 'pass_immediacy_score',
+                          'goalie_movement_score', 'pass_quality_score', 'pass_zone_encoded',
+                          'has_pass_before_shot', 'is_rebound', 'is_slot_shot', 'is_power_play',
+                          'is_empty_net', 'home_empty_net', 'away_empty_net']:
+                X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
+            elif feature in ['time_since_last_event', 'distance_from_last_event', 'speed_from_last_event',
+                            'last_event_shot_angle', 'last_event_shot_distance', 'last_event_category_encoded']:
+                non_zero_values = X_predict[feature][X_predict[feature] > 0]
+                if len(non_zero_values) > 0:
+                    fill_value = non_zero_values.median()
+                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(fill_value)
+                else:
+                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
+            elif feature == 'shot_angle_adjusted':
+                if 'angle' in df_shots.columns:
+                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(df_shots['angle'].abs())
+                else:
+                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
+            else:
+                median_val = pd.to_numeric(X_predict[feature], errors='coerce').median()
+                X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(median_val)
+
+    if USE_MONEYPUCK_MODEL:
+        if hasattr(XG_MODEL, 'predict_proba'):
+            df_shots['xG_Value'] = XG_MODEL.predict_proba(X_predict)[:, 1]
+        else:
+            df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
+        df_shots['xG_Value'] = df_shots['xG_Value'].clip(lower=0.0, upper=0.95)
+    else:
+        raw_xg = XG_MODEL.predict_proba(X_predict)[:, 1]
+        CALIBRATION_FACTOR = 3.5
+        df_shots['xG_Value'] = np.power(raw_xg, CALIBRATION_FACTOR)
+        df_shots['xG_Value'] = df_shots['xG_Value'].clip(upper=0.50)
+        SCALE_FACTOR = 0.19
+        df_shots['xG_Value'] = df_shots['xG_Value'] * SCALE_FACTOR
+
+    df_shots['xA_Value'] = 0.0
+    if XA_MODEL and XA_MODEL_FEATURES:
+        passes_mask = df_shots['has_pass_before_shot'] == 1
+        df_passes = df_shots[passes_mask].copy()
+        if len(df_passes) > 0:
+            X_xa_predict = df_passes[XA_MODEL_FEATURES]
+            raw_xa = XA_MODEL.predict_proba(X_xa_predict)[:, 1]
+            CALIBRATION_FACTOR_XA = 3.5
+            df_passes['xA_Value'] = np.power(raw_xa, CALIBRATION_FACTOR_XA)
+            df_passes['xA_Value'] = df_passes['xA_Value'].clip(upper=0.50)
+            SCALE_FACTOR_XA = 0.15
+            df_passes['xA_Value'] = df_passes['xA_Value'] * SCALE_FACTOR_XA
+            df_shots.loc[passes_mask, 'xA_Value'] = df_passes['xA_Value'].values
+
+    try:
+        from feature_calculations import calculate_flurry_adjusted_xg
+        df_shots = calculate_flurry_adjusted_xg(
+            df_shots, xg_column='xG_Value', game_id_col='game_id',
+            team_code_col='team_code', period_col='period',
+            time_in_period_col='time_in_period', time_since_last_event_col='time_since_last_event'
+        )
+    except Exception:
+        df_shots['flurry_adjusted_xg'] = df_shots['xG_Value']
+
+    _save_shots_to_database(df_shots, db_client, game_id)
+
+    logger.info(f"Game {game_id}: Processed {len(df_shots)} shots")
+    return df_shots
+
+
 def process_single_game(game_id, rate_limit_flag=None):
     """
     Process a single game's play-by-play data, calculates xG, and saves to DB.
-    
+
     This function is designed to be called in parallel by multiprocessing workers.
     It processes one game independently and saves shots directly to the database.
     
@@ -1989,148 +2302,12 @@ def process_single_game(game_id, rate_limit_flag=None):
     if raw_data is None:
         return None
     
-    # 4. Process the game data - extract shots from raw_data
+    # 4. Process the game data via the shared extract → score → save path.
+    # Wraps in try/except None because worker contract is "return None on
+    # failure"; backfill uses process_game_from_raw_data directly and lets
+    # errors propagate.
     try:
-        # Call helper function to extract shot records from raw_data
-        all_shot_data = _extract_shots_from_game(raw_data, game_id, db_client)
-        
-        if not all_shot_data:
-            logger.info(f"Game {game_id}: No shots found")
-            return None
-        
-        # 5. Convert to DataFrame and calculate xG/xA
-        df_shots = pd.DataFrame(all_shot_data)
-        
-        # Apply calculated features
-        try:
-            from feature_calculations import apply_calculated_features_to_dataframe
-            df_shots = apply_calculated_features_to_dataframe(df_shots)
-        except ImportError:
-            pass  # Skip if not available
-        except Exception as e:
-            logger.error(f"Game {game_id}: Warning - error applying calculated features: {e}")
-        
-        # Prepare features for xG prediction (same logic as scrape_pbp_and_process)
-        if USE_MONEYPUCK_MODEL and 'last_event_category_encoded' in MODEL_FEATURES:
-            if 'last_event_category' in df_shots.columns and 'last_event_category_encoded' not in df_shots.columns:
-                from sklearn.preprocessing import LabelEncoder
-                if LAST_EVENT_CATEGORY_ENCODER is not None:
-                    df_shots['last_event_category_encoded'] = LAST_EVENT_CATEGORY_ENCODER.transform(
-                        df_shots['last_event_category'].fillna('unknown').astype(str)
-                    )
-                else:
-                    le = LabelEncoder()
-                    df_shots['last_event_category_encoded'] = le.fit_transform(
-                        df_shots['last_event_category'].fillna('unknown').astype(str)
-                    )
-        
-        # Calculate derived features
-        if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
-            df_shots['distance_angle_interaction'] = (df_shots['distance'] * df_shots['angle']) / 100
-        
-        if 'speed_from_last_event' in df_shots.columns:
-            speed_series = pd.to_numeric(df_shots['speed_from_last_event'], errors='coerce').fillna(0)
-            df_shots['speed_from_last_event_log'] = np.log1p(speed_series)
-        
-        # Ensure all required features exist
-        for feature in MODEL_FEATURES:
-            if feature not in df_shots.columns:
-                if feature in ['home_empty_net', 'away_empty_net', 'is_empty_net', 
-                              'has_pass_before_shot', 'is_rebound', 'is_slot_shot', 'is_power_play']:
-                    df_shots[feature] = 0
-                elif feature == 'shot_angle_adjusted':
-                    df_shots[feature] = df_shots['angle'].abs() if 'angle' in df_shots.columns else 0
-                elif feature == 'last_event_category_encoded':
-                    df_shots[feature] = 0
-                elif feature == 'distance_angle_interaction':
-                    if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
-                        df_shots[feature] = (df_shots['distance'] * df_shots['angle']) / 100
-                    else:
-                        df_shots[feature] = 0
-                elif feature == 'speed_from_last_event_log':
-                    if 'speed_from_last_event' in df_shots.columns:
-                        df_shots[feature] = np.log1p(df_shots['speed_from_last_event'].fillna(0))
-                    else:
-                        df_shots[feature] = 0
-                else:
-                    df_shots[feature] = 0
-        
-        # Select features and predict xG
-        X_predict = df_shots[MODEL_FEATURES].copy()
-        
-        # Fill missing values
-        for feature in MODEL_FEATURES:
-            if feature in X_predict.columns and X_predict[feature].isna().any():
-                if feature in ['pass_lateral_distance', 'pass_to_net_distance', 'pass_immediacy_score', 
-                              'goalie_movement_score', 'pass_quality_score', 'pass_zone_encoded',
-                              'has_pass_before_shot', 'is_rebound', 'is_slot_shot', 'is_power_play',
-                              'is_empty_net', 'home_empty_net', 'away_empty_net']:
-                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
-                elif feature in ['time_since_last_event', 'distance_from_last_event', 'speed_from_last_event',
-                                'last_event_shot_angle', 'last_event_shot_distance', 'last_event_category_encoded']:
-                    non_zero_values = X_predict[feature][X_predict[feature] > 0]
-                    if len(non_zero_values) > 0:
-                        fill_value = non_zero_values.median()
-                        X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(fill_value)
-                    else:
-                        X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
-                elif feature == 'shot_angle_adjusted':
-                    if 'angle' in df_shots.columns:
-                        X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(df_shots['angle'].abs())
-                    else:
-                        X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(0)
-                else:
-                    median_val = pd.to_numeric(X_predict[feature], errors='coerce').median()
-                    X_predict[feature] = pd.to_numeric(X_predict[feature], errors='coerce').fillna(median_val)
-        
-        # Predict xG
-        if USE_MONEYPUCK_MODEL:
-            # Use predict_proba for classifiers, predict for regressors
-            if hasattr(XG_MODEL, 'predict_proba'):
-                df_shots['xG_Value'] = XG_MODEL.predict_proba(X_predict)[:, 1]
-            else:
-                df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
-            df_shots['xG_Value'] = df_shots['xG_Value'].clip(lower=0.0, upper=0.95)
-        else:
-            raw_xg = XG_MODEL.predict_proba(X_predict)[:, 1]
-            CALIBRATION_FACTOR = 3.5
-            df_shots['xG_Value'] = np.power(raw_xg, CALIBRATION_FACTOR)
-            df_shots['xG_Value'] = df_shots['xG_Value'].clip(upper=0.50)
-            SCALE_FACTOR = 0.19
-            df_shots['xG_Value'] = df_shots['xG_Value'] * SCALE_FACTOR
-        
-        # Predict xA (if model available)
-        df_shots['xA_Value'] = 0.0
-        if XA_MODEL and XA_MODEL_FEATURES:
-            passes_mask = df_shots['has_pass_before_shot'] == 1
-            df_passes = df_shots[passes_mask].copy()
-            if len(df_passes) > 0:
-                X_xa_predict = df_passes[XA_MODEL_FEATURES]
-                raw_xa = XA_MODEL.predict_proba(X_xa_predict)[:, 1]
-                CALIBRATION_FACTOR_XA = 3.5
-                df_passes['xA_Value'] = np.power(raw_xa, CALIBRATION_FACTOR_XA)
-                df_passes['xA_Value'] = df_passes['xA_Value'].clip(upper=0.50)
-                SCALE_FACTOR_XA = 0.15
-                df_passes['xA_Value'] = df_passes['xA_Value'] * SCALE_FACTOR_XA
-                df_shots.loc[passes_mask, 'xA_Value'] = df_passes['xA_Value'].values
-        
-        # Apply flurry adjustment and other post-processing (simplified)
-        try:
-            from feature_calculations import calculate_flurry_adjusted_xg
-            df_shots = calculate_flurry_adjusted_xg(
-                df_shots, xg_column='xG_Value', game_id_col='game_id',
-                team_code_col='team_code', period_col='period',
-                time_in_period_col='time_in_period', time_since_last_event_col='time_since_last_event'
-            )
-        except Exception:
-            df_shots['flurry_adjusted_xg'] = df_shots['xG_Value']
-        
-        # 6. Save to database using db_client
-        _save_shots_to_database(df_shots, db_client, game_id)
-        
-        logger.info(f"Game {game_id}: Processed {len(df_shots)} shots")
-        return df_shots
-    
+        return process_game_from_raw_data(game_id, raw_data, db_client)
     except Exception as e:
         logger.error(f"Game {game_id}: Error processing game data: {e}")
         import traceback
@@ -2798,7 +2975,14 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     last_event_type_code = last_event_state['type_code']
                     last_event_period = last_event_state['period']
                     
-                    # Map type codes to event categories
+                    # ============================================================
+                    # ⚠️ DO NOT "FIX" THIS MAPPING WITHOUT A COORDINATED MODEL RETRAIN
+                    # See the matching guard above the duplicate mapping in this file
+                    # (introduced 2026-05-07 with 0d-pre #2). Labels are stale but
+                    # internally consistent with last_event_category_encoder.joblib +
+                    # xG v3. Full unlock path:
+                    # apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md § 10.
+                    # ============================================================
                     type_code_to_category = {
                         505: 'GOAL', 506: 'SHOT', 507: 'MISS', 503: 'FAC', 504: 'HIT',
                         509: 'BLOCK', 516: 'PENL', 517: 'STOP', 520: 'GIVE', 521: 'TAKE',
@@ -2848,7 +3032,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     # (fallback for player info, but coordinates come from state)
                     previous_play_for_context = None
                     for prev_play in reversed(previous_plays):
-                        if prev_play.get('typeCode') not in [517]:  # Skip stoppages
+                        if prev_play.get('typeCode') not in [516]:  # Skip stoppages (516 in modern api-web.nhle.com)
                             previous_play_for_context = prev_play
                             break
                     
@@ -2869,7 +3053,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                             player_num_that_did_last_event = prev_details.get('scoringPlayerId')
                         elif prev_type_code in [506, 507]:  # Shot
                             player_num_that_did_last_event = prev_details.get('shootingPlayerId')
-                        elif prev_type_code == 503:  # Faceoff
+                        elif prev_type_code == 502:  # Faceoff (502 in modern api-web.nhle.com; was 503 pre-EDGE rewrite)
                             player_num_that_did_last_event = prev_details.get('winningPlayerId')
                         else:
                             player_num_that_did_last_event = prev_details.get('eventOwnerTeamId')  # Fallback
@@ -2945,10 +3129,12 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                         pass
                 
                 # Time since faceoff (find last faceoff)
+                # max_seconds=180 because possessions routinely last 30-180s after
+                # a faceoff; default 60s from rebound-detection is too tight (Bug E).
                 time_since_faceoff = None
                 for prev_play in reversed(previous_plays[-20:]):  # Look back 20 plays
-                    if prev_play.get('typeCode') == 503:  # Faceoff
-                        time_since_faceoff = calculate_time_difference(prev_play, play)
+                    if prev_play.get('typeCode') == 502:  # 502 = faceoff in modern api-web.nhle.com (was 503 pre-EDGE rewrite)
+                        time_since_faceoff = calculate_time_difference(prev_play, play, max_seconds=180)
                         break
                 
                 # TEAM CONTEXT
@@ -3046,13 +3232,22 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 defending_team_defencemen_on_ice = None
                 
                 # ============================================================
-                # PHASE 3: DEFENDER PROXIMITY FEATURES (3 features)
+                # PHASE 3: DEFENDER PROXIMITY FEATURES — REMOVED 2026-05-07
                 # ============================================================
-                # Note: Requires tracking last known positions of defenders
-                distance_to_nearest_defender = None  # Would need defender position tracking
-                skaters_in_screening_box = None  # Would need position tracking
-                nearest_defender_to_net_distance = None
-                
+                # Three columns previously declared here (distance_to_nearest_defender,
+                # skaters_in_screening_box, nearest_defender_to_net_distance) were dropped
+                # in migration 20260507223000_phase0_pre_drop_vestigial_defender_geometry.sql
+                # after the 2026-05-07 investigation established that:
+                #
+                #   - NHL public PBP feed carries no per-event on-ice player IDs and no
+                #     defender coordinates (only shooter/goalie + situationCode strength).
+                #   - NHL EDGE granular tracking is not exposed for per-event consumption.
+                #   - MoneyPuck themselves don't publish positional defender geometry.
+                #
+                # Defender geometric features remain a v2 capability — see
+                # apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md for unlock paths
+                # (NHL EDGE licensing / SPORTLOGiQ feed / internal CV pipeline).
+
                 # ============================================================
                 # PHASE 4: ADVANCED SHOT QUALITY FEATURES (7 features)
                 # ============================================================
@@ -3276,12 +3471,8 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     'shooting_team_defencemen_on_ice': shooting_team_defencemen_on_ice,
                     'defending_team_forwards_on_ice': defending_team_forwards_on_ice,
                     'defending_team_defencemen_on_ice': defending_team_defencemen_on_ice,
-                    # ============================================================
-                    # PHASE 3: DEFENDER PROXIMITY FEATURES (3 features)
-                    # ============================================================
-                    'distance_to_nearest_defender': distance_to_nearest_defender,
-                    'skaters_in_screening_box': skaters_in_screening_box,
-                    'nearest_defender_to_net_distance': nearest_defender_to_net_distance,
+                    # PHASE 3 (defender proximity, 3 columns) removed 2026-05-07 —
+                    # see GAPS_AND_FUTURE_CAPABILITIES.md for v2 unlock paths.
                     # ============================================================
                     # PHASE 4: ADVANCED SHOT QUALITY FEATURES (7 features)
                     # ============================================================
@@ -3404,15 +3595,28 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
         if 'last_event_category' in df_shots.columns and 'last_event_category_encoded' not in df_shots.columns:
             from sklearn.preprocessing import LabelEncoder
             if LAST_EVENT_CATEGORY_ENCODER is not None:
-                # Use saved encoder
-                df_shots['last_event_category_encoded'] = LAST_EVENT_CATEGORY_ENCODER.transform(
-                    df_shots['last_event_category'].fillna('unknown').astype(str)
-                )
+                # Match training-script null handling (train_xg_v3.py:243) and map
+                # unseen labels to 'OTHER' — real PBP data contains categories the
+                # encoder was never fit on (e.g. DELPEN, PEND, PSTR). df_shots here
+                # is batch-scoped (aggregate across all games in the run).
+                known_events = set(LAST_EVENT_CATEGORY_ENCODER.classes_)
+                series = df_shots['last_event_category'].fillna('OTHER').astype(str)
+                unseen_mask = ~series.isin(known_events)
+                if unseen_mask.any():
+                    affected_games = sorted(df_shots.loc[unseen_mask, 'game_id'].unique().tolist()) if 'game_id' in df_shots.columns else []
+                    logger.warning(
+                        f"scrape_pbp_and_process batch: {int(unseen_mask.sum())} rows with "
+                        f"last_event_category unseen by encoder "
+                        f"({sorted(series[unseen_mask].unique().tolist())}) — mapped to 'OTHER' "
+                        f"— affected games: {affected_games}"
+                    )
+                    series = series.where(~unseen_mask, 'OTHER')
+                df_shots['last_event_category_encoded'] = LAST_EVENT_CATEGORY_ENCODER.transform(series)
             else:
                 # Encode on-the-fly (fallback)
                 le = LabelEncoder()
                 df_shots['last_event_category_encoded'] = le.fit_transform(
-                    df_shots['last_event_category'].fillna('unknown').astype(str)
+                    df_shots['last_event_category'].fillna('OTHER').astype(str)
                 )
     
     # Calculate derived features that the model expects (before feature check)

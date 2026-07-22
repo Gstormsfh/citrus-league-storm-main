@@ -1,3 +1,12 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: DESTRUCTIVE
+-- Purpose:     Reset a single user by email (wipe their leagues/teams/picks)
+-- Last active: 2025-12-17
+-- Invoked:     manual; one-off support tool
+-- Reads:       auth.users
+-- Writes:      Multiple tables — DELETEs scoped to one user_id
+-- Note:        RECOVERY: PITR. Verify email scope before run.
+-- ────────────────────────────────────────────────────────────
 -- Quick reset script - Replace 'your-email@example.com' with your actual email
 -- This will delete all your profile and related data
 

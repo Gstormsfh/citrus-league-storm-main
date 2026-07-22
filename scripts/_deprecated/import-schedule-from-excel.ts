@@ -1,3 +1,12 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: DEPRECATED
+// Purpose:     Import schedule from Excel (one-off setup tool, kept for reference)
+// Last active: (uncommitted)
+// Invoked:     (none — moved out of scripts/ root by R5)
+// Reads:       user-supplied .xlsx
+// Writes:      (not invoked)
+// Note:        No current canonical replacement — was a one-time offline-import path during initial setup.
+// ────────────────────────────────────────────────────────────
 /**
  * Script to import NHL schedule from Excel file
  * Run with: npx tsx scripts/import-schedule-from-excel.ts
