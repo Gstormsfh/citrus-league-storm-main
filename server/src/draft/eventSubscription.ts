@@ -144,6 +144,7 @@ export function computeReconnectDelayMs(attemptNumber: number): number {
  */
 export type DispatchExternalEvent = (
   notification: DraftEventNotification,
+  notificationReceivedAtMs?: number,
 ) => Promise<void>;
 
 export interface StartEventSubscriptionOptions {
@@ -223,6 +224,11 @@ export function startEventSubscription(
   let selfTestReceived = false;
 
   const handleNotification = (msg: { channel: string; payload?: string }): void => {
+    // Chunk 11g.10 sub-step 10c-1b: stamp receipt time at the earliest
+    // observable moment (pg client's notification event → this handler).
+    // Passed into `dispatch` so downstream (LobbyManager) can compute
+    // notify→broadcast latency for the Mandate fanout metric.
+    const notificationReceivedAtMs = Date.now();
     if (msg.channel !== 'draft_events') return;
     const raw = msg.payload ?? '';
     // Self-test sentinel: any payload containing `"_test":true` (with
@@ -249,13 +255,29 @@ export function startEventSubscription(
       leagueId: parsed.leagueId,
       seq: parsed.seq,
     });
-    void dispatch(parsed).catch((err: unknown) => {
-      structuredLogger.error(
-        'event_subscription.dispatch_failed',
-        { leagueId: parsed.leagueId, seq: parsed.seq },
-        err,
-      );
-    });
+    // Chunk 11g.10 sub-step 10c-1b: event_subscription.dispatched
+    // DEBUG-level (fires per external event; INFO would be too hot
+    // on a busy draft). `dispatchMs` bounds the callback overhead
+    // between notification receipt and the LobbyManager enqueue —
+    // combined with `external_event.applied.notifyToBroadcastMs` on
+    // the LobbyManager side, this gives the full NOTIFY→broadcast
+    // decomposition for the Mandate fanout metric.
+    const dispatchStart = Date.now();
+    void dispatch(parsed, notificationReceivedAtMs)
+      .then(() => {
+        structuredLogger.debug('event_subscription.dispatched', {
+          leagueId: parsed.leagueId,
+          seq: parsed.seq,
+          dispatchMs: Date.now() - dispatchStart,
+        });
+      })
+      .catch((err: unknown) => {
+        structuredLogger.error(
+          'event_subscription.dispatch_failed',
+          { leagueId: parsed.leagueId, seq: parsed.seq },
+          err,
+        );
+      });
   };
 
   const scheduleReconnect = (): void => {

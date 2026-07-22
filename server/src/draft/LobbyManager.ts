@@ -966,19 +966,39 @@ export class LobbyManager {
     }
 
     // Snapshot send — point-to-point, not via the broadcast topic.
+    //
+    // Chunk 11g.10 sub-step 10c-1b: lobby.snapshot_sent_on_connect
+    // instrumentation. INFO-level, once per connection (low rate —
+    // one per WS open, ~12 per active draft in the baseline scenario).
+    // `buildMs` isolates `getSnapshot()` cost from `ws.send()` I/O.
+    // Both contribute to the Mandate's "draft state load p95 ≤ 1500ms"
+    // metric — this is the server-side portion.
+    let snapshotBuildMs = 0;
+    let snapshotSendMs = 0;
     try {
+      const buildStart = Date.now();
       const snapshot: DraftServerMessage = {
         v: WIRE_PROTOCOL_VERSION,
         type: 'snapshot',
         timestamp: new Date().toISOString(),
         payload: this.getSnapshot(),
       };
-      ws.send(serializeServerMessage(snapshot));
+      const serialized = serializeServerMessage(snapshot);
+      snapshotBuildMs = Date.now() - buildStart;
+      const sendStart = Date.now();
+      ws.send(serialized);
+      snapshotSendMs = Date.now() - sendStart;
     } catch (err) {
       structuredLogger.debug(
         `[lobby] snapshot ws.send threw during addConnection lobbyId=${this.lobbyId} userId=${userData.userId}`,
       );
     }
+    structuredLogger.info('lobby.snapshot_sent_on_connect', {
+      lobbyId: this.lobbyId,
+      userId: userData.userId,
+      buildMs: snapshotBuildMs,
+      sendMs: snapshotSendMs,
+    });
 
     structuredLogger.info(
       `[lobby] connection added lobbyId=${this.lobbyId} userId=${userData.userId} size=${this.connections.size}`,
@@ -1348,6 +1368,12 @@ export class LobbyManager {
     userData: DraftSocketUserData,
     sinceSeq: number,
   ): DraftServerMessage {
+    // Chunk 11g.10 sub-step 10c-1b: resync.responded instrumentation.
+    // `buildMs` bounds the ring-buffer filter cost (typically <1ms
+    // for a 200-event buffer). `deltaCount` is the number of events
+    // returned to the client; useful for reconnect-storm capacity
+    // planning in 10c-2 (larger deltas mean longer resync recovery).
+    const buildStart = Date.now();
     const result = this.events.getEventsSinceSeq(sinceSeq);
     structuredLogger.debug(
       `[lobby] resync request lobbyId=${this.lobbyId} userId=${userData.userId} sinceSeq=${sinceSeq} ok=${result.ok}`,
@@ -1367,12 +1393,22 @@ export class LobbyManager {
             oldestAvailableSeq: result.oldestAvailableSeq,
           };
 
-    return {
+    const message: DraftServerMessage = {
       v: WIRE_PROTOCOL_VERSION,
       type: 'resync_response',
       timestamp: new Date().toISOString(),
       payload,
     };
+
+    structuredLogger.info('resync.responded', {
+      lobbyId: this.lobbyId,
+      sinceSeq,
+      deltaCount: 'events' in result ? result.events.length : 0,
+      tooOld: !('events' in result),
+      buildMs: Date.now() - buildStart,
+    });
+
+    return message;
   }
 
   // ── Private: queue + dispatch ─────────────────────────────────────
@@ -1428,6 +1464,12 @@ export class LobbyManager {
   private async processSubmitPick(
     action: Extract<DraftAction, { kind: 'submit_pick' }>,
   ): Promise<DraftActionResult> {
+    // Chunk 11g.10 sub-step 10c-1b: instrumentation entry timestamp.
+    // `totalMs` bounds the full engine-side pick processing latency
+    // (authorization + on-clock check + RPC + broadcast). `rpcMs` and
+    // `broadcastMs` decompose it for the Mandate manual-pick metric.
+    const processStart = Date.now();
+
     // Step 1: format gate.
     if (this.format === 'auction') {
       return { ok: false, reason: 'wrong_format_for_action' };
@@ -1501,6 +1543,7 @@ export class LobbyManager {
     // validation (idempotency, on-clock, player-taken, etc.) so the
     // engine's fail-fast checks above are an optimization, not a
     // replacement for RPC-side guards.
+    const rpcStart = Date.now();
     let result: SubmitPickResult;
     try {
       result = await this.draftService.submitPick({
@@ -1531,6 +1574,8 @@ export class LobbyManager {
     // Skip on `was_duplicate=true` — the original event is already
     // in the buffer + durable log; the state machine already
     // advanced when the original first landed.
+    const rpcMs = Date.now() - rpcStart;
+    let broadcastMs = 0;
     if (!result.was_duplicate) {
       this.picksMade++;
       // Status transition: not_started → in_progress on first pick;
@@ -1558,6 +1603,7 @@ export class LobbyManager {
         ...(isAutopick ? { isAutopick: true } : {}),
       };
       this.appendEventAndCount(event);
+      const broadcastStart = Date.now();
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'event',
@@ -1566,6 +1612,7 @@ export class LobbyManager {
         correlationId: action.idempotencyKey,
         payload: event,
       });
+      broadcastMs = Date.now() - broadcastStart;
 
       // Step 6c: set / cancel the deadline timer based on new state.
       if (this.draftStatus === 'in_progress') {
@@ -1585,6 +1632,24 @@ export class LobbyManager {
         this.currentTimerDeadline = null;
       }
     }
+
+    // Chunk 11g.10 sub-step 10c-1b: pick.processed emission.
+    // INFO-level, one per submit (autopick + manual through engine
+    // paths — currently just autopick until 10c-2's WS-direct-submit
+    // optional optimization, if triggered by measurement data).
+    // `totalMs` includes authorization + on-clock check + RPC round
+    // trip + broadcast. `wasDuplicate=true` skips broadcast so
+    // `broadcastMs=0` there is expected, not a bug.
+    structuredLogger.info('pick.processed', {
+      lobbyId: this.lobbyId,
+      seq: result.seq,
+      teamId: action.teamId,
+      rpcMs,
+      broadcastMs,
+      totalMs: Date.now() - processStart,
+      wasAutopick: isAutopick,
+      wasDuplicate: result.was_duplicate,
+    });
 
     return { ok: true, eventSeq: result.seq };
   }
@@ -2007,6 +2072,12 @@ export class LobbyManager {
    * a slow consumer cannot block the rest of the lobby.
    */
   private broadcast(message: DraftServerMessage): void {
+    // KI-010 Tier 1: byte-limited delta (not full state) — each
+    // broadcast carries a single event payload (`BufferedDraftEvent`),
+    // never a full lobby snapshot. Snapshots are point-to-point on
+    // connect + explicit resync only. Keeps per-broadcast wire size
+    // bounded to O(1 event) regardless of draft depth. Verified
+    // structural per chunk 11g.10 sub-step 10c-1b audit.
     const serialized = serializeServerMessage(message);
     this.publish(this.topicName, serialized);
     this.sweepBackpressure();
@@ -2025,6 +2096,12 @@ export class LobbyManager {
    * (2026-05-05).
    */
   private sweepBackpressure(): void {
+    // KI-010 Tier 1: per-socket fanout protection via getBufferedAmount()
+    // — a single slow consumer's per-connection outbound queue cannot
+    // block the rest of the lobby. Any WS whose buffered outbound
+    // exceeds BACKPRESSURE_THRESHOLD_BYTES is forcibly disconnected
+    // with WS close code 1013 (Try Again Later). Verified structural
+    // per chunk 11g.10 sub-step 10c-1b audit.
     for (const [ws, userData] of this.connections) {
       let buffered: number;
       try {
@@ -3650,6 +3727,18 @@ export class LobbyManager {
     // dispatcher AND from legacy direct callers (none today, but
     // keep the method signature stable for forward-compat).
 
+    // Chunk 11g.10 sub-step 10c-1b: autopick.fired instrumentation.
+    // Captured on entry (before slot lookup) so drift is measured
+    // against the scheduled deadline regardless of what the timer
+    // dispatch did with the fire. If `currentTimerDeadline` is null
+    // (e.g., timer fired for a lobby whose deadline was already
+    // cleared), drift is emitted as null to make the anomaly
+    // visible without discarding the log.
+    const autopickStart = Date.now();
+    const scheduledDeadlineMs = this.currentTimerDeadline?.getTime() ?? null;
+    const driftFromDeadlineMs =
+      scheduledDeadlineMs !== null ? autopickStart - scheduledDeadlineMs : null;
+
     const slot = this.draftOrder[this.picksMade];
     if (!slot) {
       structuredLogger.error(
@@ -3719,6 +3808,24 @@ export class LobbyManager {
         {}, err,
       );
     }
+
+    // Chunk 11g.10 sub-step 10c-1b: autopick.fired emission.
+    // Emitted AFTER enqueueAction returns so `submitElapsedMs`
+    // captures the full pick-submission cost (RPC + broadcast via
+    // processSubmitPick, which also emits its own `pick.processed`).
+    // `deadlineMs` and `scheduledFireMs` are the same value today
+    // (setTimeout is scheduled directly against the deadline);
+    // separating them keeps the wire schema forward-compatible with
+    // any future "fire early by N ms" logic.
+    structuredLogger.info('autopick.fired', {
+      lobbyId: this.lobbyId,
+      teamId: slot.teamId,
+      deadlineMs: scheduledDeadlineMs,
+      scheduledFireMs: scheduledDeadlineMs,
+      actualFireMs: autopickStart,
+      driftFromDeadlineMs,
+      submitElapsedMs: Date.now() - autopickStart,
+    });
   }
 
   /**
@@ -4598,7 +4705,7 @@ export class LobbyManager {
    * (or dedup-skipped). Subscription dispatcher does NOT await beyond
    * enqueue — `void` is acceptable at the call site.
    */
-  enqueueExternalEvent(seq: number): Promise<void> {
+  enqueueExternalEvent(seq: number, notificationReceivedAtMs?: number): Promise<void> {
     if (!this.initialized) {
       // External events arriving before init() complete are rare but
       // possible (engine startup race: subscription connects before
@@ -4611,8 +4718,16 @@ export class LobbyManager {
       return Promise.resolve();
     }
 
+    // Chunk 11g.10 sub-step 10c-1b: capture the notification-received
+    // timestamp at enqueue time so `external_event.applied` can report
+    // `notifyToBroadcastMs` (NOTIFY receipt → broadcast dispatched).
+    // Caller may pass an explicit value from `eventSubscription.ts`'s
+    // notification handler; if omitted, we use enqueue-time as a
+    // near-equivalent (adds one microtask hop of overhead).
+    const notifyTs = notificationReceivedAtMs ?? Date.now();
+
     const next = this.queue
-      .then(() => this.processExternalEvent(seq))
+      .then(() => this.processExternalEvent(seq, notifyTs))
       .catch((err: unknown) => {
         structuredLogger.error(
           'event_subscription.process_external_event_failed',
@@ -4640,7 +4755,10 @@ export class LobbyManager {
    * `lastAppliedSeq` via the per-apply cursor update in
    * `applyEventDuringBootstrap`.
    */
-  private async processExternalEvent(seq: number): Promise<void> {
+  private async processExternalEvent(
+    seq: number,
+    notificationReceivedAtMs?: number,
+  ): Promise<void> {
     // Dedup gate: own-engine NOTIFY bounces or duplicate notifications.
     if (seq <= this.lastAppliedSeq) {
       structuredLogger.debug('event_subscription.event_skipped_duplicate', {
@@ -4688,7 +4806,17 @@ export class LobbyManager {
         continue;
       }
       try {
+        // Chunk 11g.10 sub-step 10c-1b: per-event timing capture.
+        // applyMs = state-machine mutation cost (usually <1ms).
+        // broadcastMs = uWS publish call cost (0 if no broadcast).
+        // notifyToBroadcastMs = server-side commit→broadcast decomposition
+        //   for the Mandate fanout metric (measured from NOTIFY receipt
+        //   to broadcast dispatched). Combined with `draft_events.created_at`
+        //   this gives the full server-side commit→broadcast latency
+        //   without any client-side network noise.
+        const applyStart = Date.now();
         this.applyEventDuringBootstrap(event);
+        const applyMs = Date.now() - applyStart;
         structuredLogger.debug('event_subscription.event_applied', {
           lobbyId: this.lobbyId,
           seq: event.seq,
@@ -4748,7 +4876,9 @@ export class LobbyManager {
         // `appendEventAndCount` completes before any external-event
         // apply for the same seq is dequeued.
         const buffered = this.events.peekLast();
+        let broadcastMs = 0;
         if (buffered !== undefined && buffered.seq === event.seq) {
+          const broadcastStart = Date.now();
           this.broadcast({
             v: WIRE_PROTOCOL_VERSION,
             type: 'event',
@@ -4757,7 +4887,27 @@ export class LobbyManager {
             correlationId: event.idempotency_key ?? '',
             payload: buffered,
           });
+          broadcastMs = Date.now() - broadcastStart;
         }
+        // external_event.applied — INFO, live-mode only. Bootstrap
+        // replay does not reach this log site (it uses the switch in
+        // `bootstrapFullEventReplay` / the `applyEventDuringBootstrap`
+        // dispatcher via `bootstrap()`; neither goes through
+        // `processExternalEvent`). Fanout-metric decomposition input
+        // for 10c-2: pairs with `draft_events.created_at` to compute
+        // server-side commit→broadcast latency.
+        structuredLogger.info('external_event.applied', {
+          lobbyId: this.lobbyId,
+          seq: event.seq,
+          eventType: event.event_type,
+          applyMs,
+          broadcastMs,
+          notifyToBroadcastMs:
+            notificationReceivedAtMs !== undefined
+              ? Date.now() - notificationReceivedAtMs
+              : undefined,
+          broadcasted: buffered !== undefined && buffered.seq === event.seq,
+        });
       } catch (err) {
         structuredLogger.error(
           'event_subscription.apply_failed',

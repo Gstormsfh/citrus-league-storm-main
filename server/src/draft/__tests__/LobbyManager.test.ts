@@ -5316,7 +5316,7 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     // First call = bootstrap (fresh lobby, no historical events);
     // subsequent calls = live external apply fetching the new event.
     const listDraftEvents = vi
-      .fn<[string, number?], Promise<DraftEventRow[]>>()
+      .fn<(leagueId: string, sinceSeq?: number) => Promise<DraftEventRow[]>>()
       .mockResolvedValueOnce([])
       .mockResolvedValue([externalPick]);
     const publish = vi.fn();
@@ -5460,7 +5460,7 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
       created_at: '2026-07-21T20:05:00.000Z',
     } as DraftEventRow;
     const listDraftEvents = vi
-      .fn<[string, number?], Promise<DraftEventRow[]>>()
+      .fn<(leagueId: string, sinceSeq?: number) => Promise<DraftEventRow[]>>()
       .mockResolvedValueOnce([])
       .mockResolvedValue([overrideEvent]);
     const publish = vi.fn();
@@ -5515,7 +5515,7 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
       created_at: '2026-07-21T20:10:00.000Z',
     } as DraftEventRow;
     const listDraftEvents = vi
-      .fn<[string, number?], Promise<DraftEventRow[]>>()
+      .fn<(leagueId: string, sinceSeq?: number) => Promise<DraftEventRow[]>>()
       .mockResolvedValueOnce([])
       .mockResolvedValue([pauseEvent]);
     const publish = vi.fn();
@@ -5532,6 +5532,133 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     // State did apply (bootstrap dispatcher's `case 'draft_paused'`
     // set pauseState); no broadcast fired.
     expect(publish).not.toHaveBeenCalled();
+  });
+
+  // ── Chunk 11g.10 sub-step 10c-1b: instrumentation ──
+  //
+  // Duration-field presence + sane band assertions on the four INFO-
+  // level metric logs. Spy pattern mirrors draftAdminRoutes.test.ts's
+  // admin.endpoint.* audit assertions.
+
+  it('10c-1b pick.processed emits with duration fields on engine-authored pick', async () => {
+    const { structuredLogger } = await import('@citrus/shared');
+    const spy = vi.spyOn(structuredLogger, 'info');
+    const submitPick = vi.fn().mockResolvedValue({
+      event_id: 3,
+      seq: 3,
+      pick_deadline: null,
+      was_duplicate: false,
+    } satisfies SubmitPickResult);
+    const lobby = await makeLobby({
+      lobbyId: 'lobby-instr-pick',
+      format: 'snake',
+      submitPick,
+      draftOrder: [{ round: 1, pickNumber: 1, teamId: 'team-instr-1' }],
+    });
+    spy.mockClear();
+
+    await lobby.enqueueAction(
+      makeSubmitPick({ idempotencyKey: 'idem-instr-pick-1', teamId: 'team-instr-1' }),
+    );
+
+    const emission = spy.mock.calls.find((c) => c[0] === 'pick.processed');
+    expect(emission).toBeDefined();
+    const payload = emission![1] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      lobbyId: 'lobby-instr-pick',
+      seq: 3,
+      teamId: 'team-instr-1',
+      wasAutopick: false,
+      wasDuplicate: false,
+    });
+    expect(typeof payload.rpcMs).toBe('number');
+    expect(typeof payload.broadcastMs).toBe('number');
+    expect(typeof payload.totalMs).toBe('number');
+    expect(payload.totalMs).toBeGreaterThanOrEqual(0);
+    expect(payload.totalMs).toBeLessThan(10_000);
+    expect(payload.broadcastMs).toBeGreaterThanOrEqual(0);
+    spy.mockRestore();
+  });
+
+  it('10c-1b external_event.applied emits with duration + notifyToBroadcastMs fields', async () => {
+    const { structuredLogger } = await import('@citrus/shared');
+    const spy = vi.spyOn(structuredLogger, 'info');
+    const teamIds = ['team-1', 'team-2', 'team-3'];
+    const draftOrder: DraftOrderSlot[] = generateDraftOrder(teamIds, 3, 'snake');
+    const firstSlot = draftOrder[0];
+    const externalPick: DraftEventRow = {
+      id: 9,
+      league_id: 'league-1',
+      seq: 9,
+      event_type: 'pick',
+      payload: {
+        team_id: firstSlot.teamId,
+        pick_number: firstSlot.pickNumber,
+        round: firstSlot.round,
+        player_id: 8478402,
+      },
+      payload_hash: '',
+      idempotency_key: 'idem-instr-ext-1',
+      actor: { kind: 'user', id: 'u-ext', session_id: 's-ext' },
+      correlation_id: null,
+      created_at: '2026-07-21T22:00:00.000Z',
+    } as DraftEventRow;
+    const listDraftEvents = vi
+      .fn<(leagueId: string, sinceSeq?: number) => Promise<DraftEventRow[]>>()
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([externalPick]);
+    const lobby = await makeLobby({
+      lobbyId: 'lobby-instr-ext',
+      listDraftEvents: listDraftEvents as unknown as MakeLobbyOpts['listDraftEvents'],
+      draftOrder,
+    });
+    spy.mockClear();
+
+    // Pass an explicit notification-received timestamp so the log
+    // payload's `notifyToBroadcastMs` is deterministic in a sane band.
+    const notifyTs = Date.now();
+    await lobby.enqueueExternalEvent(9, notifyTs);
+
+    const emission = spy.mock.calls.find((c) => c[0] === 'external_event.applied');
+    expect(emission).toBeDefined();
+    const payload = emission![1] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      lobbyId: 'lobby-instr-ext',
+      seq: 9,
+      eventType: 'pick',
+      broadcasted: true,
+    });
+    expect(typeof payload.applyMs).toBe('number');
+    expect(typeof payload.broadcastMs).toBe('number');
+    expect(typeof payload.notifyToBroadcastMs).toBe('number');
+    expect(payload.notifyToBroadcastMs).toBeGreaterThanOrEqual(0);
+    expect(payload.notifyToBroadcastMs).toBeLessThan(10_000);
+    spy.mockRestore();
+  });
+
+  it('10c-1b resync.responded emits with buildMs + deltaCount', async () => {
+    const { structuredLogger } = await import('@citrus/shared');
+    const spy = vi.spyOn(structuredLogger, 'info');
+    const lobby = await makeLobby({ lobbyId: 'lobby-instr-resync' });
+    spy.mockClear();
+
+    lobby.handleResyncRequest(
+      { userId: 'u-1', lobbyId: 'lobby-instr-resync' } as DraftSocketUserData,
+      0,
+    );
+
+    const emission = spy.mock.calls.find((c) => c[0] === 'resync.responded');
+    expect(emission).toBeDefined();
+    const payload = emission![1] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      lobbyId: 'lobby-instr-resync',
+      sinceSeq: 0,
+      deltaCount: 0,
+      tooOld: false,
+    });
+    expect(typeof payload.buildMs).toBe('number');
+    expect(payload.buildMs).toBeGreaterThanOrEqual(0);
+    spy.mockRestore();
   });
 
   it('10c-1a state apply is byte-identical between live and replay modes', async () => {

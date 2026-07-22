@@ -668,7 +668,7 @@ if (subscriptionDisabled) {
 } else {
   subscriptionHandle = startEventSubscription({
     connectionString: dbUrl,
-    dispatch: async (notification) => {
+    dispatch: async (notification, notificationReceivedAtMs) => {
       // Lobby-load forbidden on NOTIFY (resource-exhaustion protection).
       // Unknown leagueId is silently ignored to prevent the attack
       // vector of every external event firing a lobby load. Lobbies
@@ -682,7 +682,13 @@ if (subscriptionDisabled) {
         );
         return;
       }
-      await lobby.enqueueExternalEvent(notification.seq);
+      // Chunk 11g.10 sub-step 10c-1b: thread the NOTIFY receipt
+      // timestamp into the LobbyManager so `external_event.applied`
+      // can emit `notifyToBroadcastMs` (server-side fanout metric).
+      await lobby.enqueueExternalEvent(
+        notification.seq,
+        notificationReceivedAtMs,
+      );
     },
   });
 }

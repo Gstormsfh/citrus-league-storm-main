@@ -143,7 +143,13 @@ describe('startEventSubscription (chunk 11g.7 sub-step 7e)', () => {
     });
     await vi.runAllTimersAsync();
 
-    expect(dispatch).toHaveBeenCalledWith({ leagueId: 'lobby-1', seq: 7 });
+    // Chunk 11g.10 sub-step 10c-1b: dispatch signature grew a second
+    // arg `notificationReceivedAtMs` (timestamp captured in the
+    // notification handler for downstream fanout-metric decomposition).
+    expect(dispatch).toHaveBeenCalledWith(
+      { leagueId: 'lobby-1', seq: 7 },
+      expect.any(Number),
+    );
 
     await handle.stop();
     expect(client.end).toHaveBeenCalledTimes(1);
