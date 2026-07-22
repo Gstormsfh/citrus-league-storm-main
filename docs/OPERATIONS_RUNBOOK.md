@@ -158,6 +158,10 @@ reconciler heals these automatically** unless the count exceeds
 means a structural failure in the ingest workflow itself is the more
 important story.
 
+Fire-drilled 2026-07-21: injected `gameState=LIVE` on 2025020534;
+detected within one run, healed, state restored to OFF with rows/xg
+byte-identical to pre-drill (72/72, payload_len 140213).
+
 **Unseen-label warning** (`Game N: X rows with last_event_category
 unseen by encoder (['DELPEN', ...]) — mapped to 'OTHER'`). New or rare
 NHL event category that the fitted encoder wasn't trained on. Mapped to
