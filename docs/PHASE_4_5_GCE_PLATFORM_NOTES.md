@@ -294,3 +294,54 @@ The chunk 11g.2 step 2 WebSocket smoke harness (`scripts/smoke-uws-step2.js`) re
 - **Snapshot semantics on connect.** The real engine (post-11g.4 step 5) sends a `{v, type:'snapshot', payload:{lobbyId, format, …}}` JSON message immediately on WS open. The pre-11g.4 smoke scaffold expected `echo: <text>` reply; that echo path no longer exists. Harness scenario (c) has been updated to assert the snapshot-message shape instead. See `scripts/smoke-uws-step2.js` scenario (c) `wsSnapshotTest` for the reference assertion.
 
 Staging fixture applied during 10b: league `993c9219-ecbf-4e4e-9fb0-e9837e1bded3` ("Staging League") — `settings.draftType` set to `snake`, `settings.pickTimeLimit` set to `60`, one `draft_order` row inserted with the existing team `4c742dae-6770-43f5-b310-cc24741e8148`. `draft_state` left at `not_started` (the smoke doesn't need in-progress).
+
+> **UUID correction, 2026-07-24:** the "4e4e" UUID above is stale. The correct Staging League UUID, verified by direct query against staging on 2026-07-24, is `993c9219-ecbf-4c4e-9fb0-c9837c1bdcd3` (the "4c4e" form). See `PHASE_4_5_PROJECT_PLAN.md` Decision Log 2026-07-24 "Staging League UUID correction" entry. This paragraph is preserved verbatim as historical record of the incorrect string that circulated during 10b closure; the 4c4e form is the one queries should use.
+
+## §16 Staging schema recovery — July 2026 (chunk 11g.10 sub-step 10c-1c)
+
+Second-order finding from the 10c-1a defect closure + 10c-1b instrumentation window: staging's DB objects had drifted from the intent of migrations `20260222000000` through `20260512000000`. Eight migrations that the branch's `supabase/migrations/` tree carried had never been executed against the staging Postgres instance. The migration-history table (§15.5) had been repaired to `applied` for those rows during 10b, but the underlying objects those migrations were supposed to create did not exist. This section captures what was missing, what the recovery migration restored, the drain-then-drop scoping of pgmq, and the verification evidence.
+
+### §16.1 What the object audit found missing
+
+Direct object-presence queries against staging (Garrett-executed via `supabase db push` dry-run + direct psql `\d` and `information_schema` reads) surfaced the following gaps as of 2026-07-22 (day the recovery migration was authored). Each item corresponds to a migration whose `schema_migrations` row was marked `applied` but whose objects did not exist:
+
+- **AFTER-INSERT `pg_notify` trigger on `draft_events`** (missing — from `20260511000000_draft_events_notify.sql`, chunk 11g.7 sub-step 7e). Without the trigger, no cross-process notification fires when writer RPCs INSERT into `draft_events`. The engine's LISTEN client was still receiving its own boot-time `_test` sentinel round-trip (§15.7), but real RPC-driven notifications were silently absent. Consistent with the 10c-1a defect's discovery pattern — server-side effects that appeared to work in isolation while cross-process flows failed silently.
+- **`draft_snapshots` table** (missing — from `20260507050000_draft_snapshots.sql`, chunk 11g.7 sub-step 7c). Without the table, the engine's snapshot-persistence writer path threw on every attempted snapshot (`relation "draft_snapshots" does not exist`); bootstrap fell back to full event-replay on every engine restart. The engine did not crash — snapshot writes are non-fatal by design — but every restart paid the full replay cost silently.
+- **Auction RPC family** (missing — from `20260222000000_create_pool_auction_faab_tables.sql` and the auction-lifecycle migrations `20260507000000` / `20260507010000` / `20260507020000` / `20260507030000` / `20260507040000`, chunks 11g.6 sub-steps 6a–6c4). Missing functions included `nominate_player_v2`, `place_bid_v2`, `close_nomination_v2`, `auction_pause_v2`, `auction_resume_v2`, `auction_commissioner_override_v2`, `auction_nomination_skip_v2`, plus supporting projection tables (`auction_nominations`, `auction_bids`, `auction_budgets`) and the extended `draft_events.event_type` CHECK enum values for the auction event variants. Any auction draft attempted against staging would have failed at first RPC call.
+- **Clean RPC bodies (pgmq drained) for the four writer-side RPCs `submit_pick_v2` / `draft_pause` / `draft_resume` / `draft_extend`** (bodies stale — from `20260511010000_remove_pgmq_emissions.sql`, chunk 11g.8). The RPCs existed but carried their pre-11g.8 bodies with `PERFORM pgmq.send(...)` still inline. Given the pgmq extension was itself missing from staging (see §16.3), any invocation of those RPCs would have raised `schema "pgmq" does not exist` at runtime.
+
+Net: eight unexecuted migrations, four classes of missing objects, each with a distinct silent-failure mode.
+
+### §16.2 What migration 20260722000000 restored
+
+Recovery migration `supabase/migrations/20260722000000_staging_schema_recovery.sql` restores the missing objects in the order the original migrations would have applied them, folded into a single migration file to compress the restoration into one durable audit entry. Restoration scope:
+
+- **`draft_events` notify trigger** — creates the `draft_events_notify_trigger()` function and the AFTER-INSERT trigger, byte-identical to the intent of `20260511000000` chunk 11g.7 sub-step 7e.
+- **`draft_snapshots` table** — creates the table with `snapshot_payload jsonb`, `engine_state jsonb`, `engine_version int`, `last_applied_seq bigint`, RLS enabled with no policies (matches the intent of chunk 11g.7 sub-step 7c and its Decision Log entry on the deliberate RLS-no-policies posture).
+- **Auction schema + RPC family** — creates `auction_nominations`, `auction_bids`, `auction_budgets` tables with CHECK constraints matching post-6c4 state (including the `'cancelled'` value on `auction_nominations.status`); extends the `draft_events.event_type` CHECK enum with the 10 auction-family event types; creates the 7 auction RPCs (`nominate_player_v2`, `place_bid_v2` with the 6b anti-snipe + 6c1 pause-gate + 6c2 tier-check + 6c4 rejection-set, `close_nomination_v2`, `auction_pause_v2`, `auction_resume_v2`, `auction_commissioner_override_v2`, `auction_nomination_skip_v2`) as SECURITY DEFINER; adds the `compute_min_next_bid(numeric, jsonb)` STABLE helper from chunk 11g.6 sub-step 6c2.
+- **Clean RPC bodies for the four writer-side RPCs** — `CREATE OR REPLACE`s `submit_pick_v2`, `draft_pause`, `draft_resume`, `draft_extend` with post-11g.8 bodies (no `pgmq.send`, no `v_send_delay` computation, `seq` returned in the jsonb result per chunk 11g.7 sub-step 7e). Also removes `generation_bumped` event-writes per chunk 11g.9's intent, matching the state the branch code expected.
+
+Migration structure: DDL statements wrapped in the standard `BEGIN`/`COMMIT` block; each restoration group commented with the originating migration filename so future auditors can trace an object back to its authoring intent.
+
+### §16.3 Drain-then-drop scoping for the pgmq extension
+
+The recovery migration DRAINS pgmq usage — no restored RPC body carries `PERFORM pgmq.send(...)` — but does NOT `DROP EXTENSION pgmq`. Two rationales:
+
+1. **Rollback isolation.** If any downstream verification of the recovery had failed and the migration had needed to roll back, having the extension drop bundled in would have forced a mid-incident extension reinstall as part of the rollback. Keeping the drop as a separately-scoped follow-up migration means the recovery migration itself is idempotently re-runnable and the drop is independently reversible.
+2. **Consistency with the branch history.** Chunk 11g.9 (`20260512000000_remove_pgmq_infrastructure.sql`, commit `9f72fd8`) shipped `DROP EXTENSION pgmq CASCADE` as its own migration on `master` and had already succeeded there historically. In staging's post-recovery state, the extension is present but inert: no function body references it; no pg_cron job invokes anything that touches it (chunk 11g.9's cron unschedule was also folded into the recovery migration). The drop as a follow-up matches the branch's pattern of "one destructive migration per concern."
+
+Named as a pre-10f ledger item (`PHASE_4_5_PROJECT_PLAN.md` Decision Log 2026-07-24 "Pre-10f ledger" entry, item #1). Not shipping the drop in the same migration is a deliberate scoping decision, not an oversight.
+
+### §16.4 Verification evidence summary
+
+Post-execution verification against staging (2026-07-24, before Garrett committed `958cf807`):
+
+- **Object-presence grid.** Direct queries against `information_schema` and `pg_proc` confirmed all restored objects present: the notify trigger on `draft_events`, the `draft_snapshots` table with expected columns and RLS enabled, each auction RPC in `pg_proc` with SECURITY DEFINER + `search_path = public`, the four writer-side RPCs with post-11g.8 clean bodies (verified by dumping their `prosrc` and grepping for absence of `pgmq.send`), the extended `draft_events.event_type` CHECK enum values for the auction-family events, and the `compute_min_next_bid` helper.
+- **Migration history row.** `supabase_migrations.schema_migrations` carries a row for `20260722000000` marked `applied` with the execution timestamp matching the `supabase db push` invocation. History reconciles with objects.
+- **Self-check tripwire.** The recovery migration's final DO block (an assertion suite that queries `pg_proc` / `information_schema` for each restored object and RAISEs on any missing) executed cleanly during `supabase db push` — had any restoration group failed to land, the tripwire would have raised inside the transaction and rolled the migration back before it committed. The tripwire's success is durable evidence at execution time.
+
+No performance measurement was taken against the recovered schema — the Mandate remains entirely unmeasured (`PHASE_4_5_PROJECT_PLAN.md` Decision Log 2026-07-24 "Measurement status reset" entry). The verification captured here is object-level correctness, not latency.
+
+### §16.5 Operational note — post-recovery staging schema state
+
+Staging schema now matches the intent of the `phase-4-5-implementation` branch through `master`'s `20260512000000` migration, **except** for the inert pgmq extension (see §16.3). Any operational tool, runbook step, or 10c-2 fixture builder can treat staging as post-11g.9 for correctness purposes; the extension-drop follow-up is a housekeeping migration, not a functional gate. If a future object-presence query reveals a divergence not captured here, treat that as a signal of further undocumented drift and repeat the recovery-migration pattern before ratifying downstream work.
