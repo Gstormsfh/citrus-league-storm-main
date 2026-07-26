@@ -185,6 +185,28 @@ See §1.2 for the full table-by-table inventory in prod. **Critical schema quirk
 - `raw_shots.shot_type` is **NULL on ~0.92% of rows** — source-data reality, not a loader defect. NHL PBP feed records `typeCode` (506/507) without a sub-type for some shots; MoneyPuck propagates the NULL. Audited 2026-05-19 on the Phase 0a season=2024 load (1,105 NaN of 119,870 CSV rows). The loader passes these through as NULL rather than imputing to `'unknown'` to avoid conflating "feed didn't classify" with a future intentional `'unknown'` category. Same pattern expected on the remaining 7 historical seasons and on live 2025-26 scraper output. Any analytics filtering on `shot_type` should account for this fraction (not raised to a GAPS entry — no platform-side unlock path, this is the upstream source as-is).
 - `raw_shots` goals and shots-on-goal counts run **~6-11% higher than NHL.com headline totals** for the same player-season. MoneyPuck includes empty-net goals and shootout shots that NHL.com's main scoring tables typically exclude. Verified 2026-05-19 against three player-seasons: McDavid 2022-23 (staging 71G vs NHL.com 64G), Ovechkin 2018-19 (55G vs 51G), MacKinnon 2023-24 (55G vs 51G; 451 SOG vs 405). Pattern is consistent in direction (always higher), small in magnitude, and matches the documented MoneyPuck convention. Any analytics that reports goal or SOG totals against an NHL.com-style baseline should disclose the convention difference. Not a load defect.
 
+### Phase 0c quirks (moat feature population)
+
+- **MoneyPuck intra-bucket insertion order ≠ NHL sortOrder, era-dependent.** For same-game same-player same-shot-type shot buckets, MoneyPuck's file order does not track NHL's `sortOrder` within the bucket. The era probe (40 games, 5/season × 8 seasons, 2026-07-26) showed coord-mismatch counts of 2 in 2024 vs 113 in 2021 as evidence of the divergence. **Order-based NHL→DB matching is forbidden.** Phase 0c uses time-bridge matching (NHL→CSV by MoneyPuck game-seconds, CSV→DB via unique constraint by provenance). See `scripts/utilities/replay_pbp_for_moat.py`.
+- **MoneyPuck `xCord`/`yCord` use a "shooter attacks positive x" convention** that flips sign relative to NHL's raw physical coordinates depending on attacking side. The `raw_shots` unique constraint `(game_id, player_id, shot_x, shot_y, shot_type_code)` is **valid CSV→DB** (0a loaded these exact CSVs — provenance) and **invalid NHL→DB** (a POC in 2026-07-26 got 17/90 matches on game 2024020001 attempting to match NHL raw coords to DB rows via the unique constraint). `arena_adjusted_x_abs`/`y_abs` DO match `|NHL_shot_x|`/`|NHL_shot_y|` within ±10 units in ~99.8% of pairs — used as the coord-verification backstop in `replay_pbp_for_moat.py` to guard against wrong-net-side mispairings (deltas of 60-140 units).
+- **MoneyPuck game-seconds convention** (verified 2026-07-26 across reg-season/playoff/multi-OT): `time = (period-1)*1200 + seconds_into_period` for ALL periods including reg-OT (5-min → time in [3600, 3900]) and playoff-OT (20-min → time in [3600, 4800]). NHL's `timeInPeriod` (`"MM:SS"`) + `periodDescriptor.number` inverts trivially. `1200` is arbitrary MoneyPuck bookkeeping (20-minutes'-worth of slot regardless of actual period length) — do not assume it equals the physical period duration.
+- **MoneyPuck excludes shootout shots from `shots_*.csv` by design.** Reg-season shootout events (period=5, `time_in_period="00:00"`, `periodDescriptor.periodType="SO"`) are present in NHL PBP but not MoneyPuck. `replay_pbp_for_moat.py` filters these out before match/count so they do not consume the unmatched-cap.
+- **Per-season `has_pass_before_shot` capture density** (era probe, 40 games, 5/season × 8 seasons):
+
+  | season | has_pass rate |
+  |---|---|
+  | 2017 | 3.2% |
+  | 2018 | 6.3% |
+  | 2019 | 7.6% |
+  | 2020 | 6.5% |
+  | 2021 | 3.9% |
+  | 2022 | 5.5% |
+  | 2023 | 7.2% |
+  | 2024 | 9.0% |
+
+  Monotonic improvement in NHL PBP capture over time; **2021 is an unexplained dip** (open question pending full-season 0c data). Cross-era comparisons of moat-derived metrics (pass_quality_score, goalie_movement_score, etc.) MUST account for capture-density differences — the same player's average moat scores in 2017 are structurally lower not because they made fewer setup passes but because fewer of them were captured.
+- **`passer_id` fallback to `eventOwnerTeamId` when previous event lacks `playerId`.** Pre-existing behavior from live scraper (`data_acquisition.py` lines 322-327). For events like hits, blocks, penalties whose `details` carries `hittingPlayerId`/`blockingPlayerId` instead of `playerId`, the pass-detection code falls back to the team_id. Downstream consumers joining `passer_id` against `player_directory` will get orphan joins on these fallback rows (team_id ≈ 1..32, distinguishable from player_ids ≈ 84xxxxx). Documented so consumers can filter.
+
 ---
 
 ## 5. Other related repos / directories (NOT canonical)
