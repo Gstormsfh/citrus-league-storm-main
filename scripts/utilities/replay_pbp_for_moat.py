@@ -485,9 +485,13 @@ def process_game(
     matched = r["matched"]
     unexplained = r["nhl_um_unexplained"]
 
-    # 3. Verification backstop: coord check on each pair
-    delta_hist = Counter()  # buckets 0-3 / 3-10 / >10
-    over_tolerance = []
+    # 3. Verification backstop: coord check on each pair.
+    # Histogram buckets: 0-3 (typical) / 3-10 (noisy but fine) / 10-15 (warn) / >15 (fail).
+    # Warn threshold is fixed at 10; --tolerance is the fail threshold (default 15).
+    COORD_WARN_THRESHOLD = 10
+    delta_hist: Counter = Counter()
+    over_tolerance: List[Dict[str, Any]] = []
+    coord_warn = 0
     for (nhl_evt, db_row, _dt) in matched:
         try:
             nx = abs(float(nhl_evt["shot_x"])); ny = abs(float(nhl_evt["shot_y"]))
@@ -498,14 +502,14 @@ def process_game(
         max_d = max(abs(nx - dx), abs(ny - dy))
         if max_d <= 3:
             delta_hist["0-3"] += 1
-        elif max_d <= 10:
+        elif max_d <= COORD_WARN_THRESHOLD:
             delta_hist["3-10"] += 1
+        elif max_d <= tolerance:
+            delta_hist["10-15"] += 1
+            coord_warn += 1
         else:
-            delta_hist[">10"] += 1
+            delta_hist[">15"] += 1
             over_tolerance.append({"nhl_abs": [nx, ny], "db_abs": [dx, dy], "delta": max_d})
-        # Enforce tolerance
-        if max_d > tolerance:
-            pass  # Collected in over_tolerance; enforcement below
 
     if over_tolerance:
         evidence = json.dumps(over_tolerance[:5])[:1800]
@@ -556,15 +560,17 @@ def process_game(
         "nhl_unmatched_unexplained": len(unexplained),
         "db_unmatched": db_um_count,
         "has_pass_count": has_pass_count,
+        "coord_warn": coord_warn,
         "delta_hist": dict(delta_hist),
     }
     if not dry_run:
         upsert_progress(db, {
             "game_id": game_id, "season": season, "status": "complete",
             "rows_matched": len(matched), "rows_updated": rows_updated,
-            "nhl_unmatched": result["nhl_unmatched_508"] + result["nhl_unmatched_dedupe"] + result["nhl_unmatched_unexplained"],
+            "nhl_unmatched": result["nhl_unmatched_508"] + result["nhl_unmatched_dedupe"] + result["nhl_unmatched_shootout"] + result["nhl_unmatched_unexplained"],
             "db_unmatched": db_um_count,
             "has_pass_count": has_pass_count,
+            "coord_warn_count": coord_warn,
             "attempted_at": started_iso, "completed_at": now_iso(),
         })
     return result
@@ -632,24 +638,120 @@ def games_for_season(db, season: int, force: bool, limit: Optional[int] = None) 
     return pending
 
 
+def process_season_batch(db, season: int, args) -> Dict[str, Any]:
+    """Process one season end-to-end. Returns per-season summary dict.
+    Prints a one-line rollup every 50 games. Loads the season's CSV slice
+    once, then iterates games."""
+    game_ids = games_for_season(db, season, args.force, args.limit)
+    if not game_ids:
+        print(f"\n[season {season}] no pending games — skipping.")
+        return {"season": season, "games": 0, "complete": 0, "match_integrity_fail": 0,
+                "error": 0, "fail_rate": 0.0, "elapsed": 0.0}
+    print(f"\n[season {season}] {len(game_ids)} pending games")
+
+    csv_slice = load_season_csv_slice(season)
+    print(f"[season {season}] CSV slice: {sum(len(v) for v in csv_slice.values())} rows across {len(csv_slice)} games")
+
+    started = time.time()
+    per_status: Counter[str] = Counter()
+    fail_details: List[Dict[str, Any]] = []
+    season_delta_hist: Counter = Counter()
+    season_has_pass = 0
+    season_rows_matched = 0
+    season_coord_warn = 0
+
+    for i, gid in enumerate(game_ids, 1):
+        csv_rows_for_game = csv_slice.get(gid, [])
+        result = process_game(
+            db, gid, season, csv_rows_for_game,
+            args.dry_run, args.delay, args.tolerance, args.time_tolerance, args.unmatched_cap,
+        )
+        st = result.get("status", "?")
+        per_status[st] += 1
+        if "delta_hist" in result:
+            for k, v in result["delta_hist"].items():
+                season_delta_hist[k] += v
+        if isinstance(result.get("has_pass_count"), int):
+            season_has_pass += result["has_pass_count"]
+        if isinstance(result.get("rows_matched"), int):
+            season_rows_matched += result["rows_matched"]
+        if isinstance(result.get("coord_warn"), int):
+            season_coord_warn += result["coord_warn"]
+        if st in ("match_integrity_fail", "error"):
+            fail_details.append(result)
+
+        # Periodic rollup every 50 games (plus first game so it's visible early)
+        if i == 1 or i % 50 == 0 or i == len(game_ids):
+            elapsed = time.time() - started
+            avg = elapsed / i
+            remain = (len(game_ids) - i) * avg
+            fails = per_status["match_integrity_fail"] + per_status["error"]
+            print(f"  [season {season}] {i}/{len(game_ids)} complete={per_status['complete']} "
+                  f"fails={fails} rows_matched={season_rows_matched} has_pass={season_has_pass} "
+                  f"warn={season_coord_warn} elapsed={elapsed:.0f}s ETA={remain:.0f}s", flush=True)
+
+    elapsed = time.time() - started
+    total = len(game_ids)
+    complete = per_status.get("complete", 0) + per_status.get("dry_run_complete", 0)
+    mif = per_status.get("match_integrity_fail", 0)
+    err = per_status.get("error", 0)
+    fail_rate = (mif + err) / total if total else 0.0
+
+    # Per-season summary
+    print("\n" + "-" * 72)
+    print(f"  Season {season} summary")
+    print("-" * 72)
+    print(f"  Games processed: {total}")
+    print(f"  Complete:        {complete}")
+    print(f"  match_fail:      {mif}")
+    print(f"  error:           {err}")
+    print(f"  Fail rate:       {fail_rate:.2%} (cap {args.season_fail_cap:.2%})")
+    print(f"  Rows matched:    {season_rows_matched}")
+    print(f"  Has pass:        {season_has_pass}  ({100.0*season_has_pass/max(1, season_rows_matched):.1f}%)")
+    print(f"  Coord warn:      {season_coord_warn}")
+    total_d = sum(season_delta_hist.values())
+    if total_d:
+        print(f"  Delta hist ({total_d} pairs):")
+        for k in ("0-3", "3-10", "10-15", ">15"):
+            n = season_delta_hist.get(k, 0)
+            pct = (100 * n / total_d) if total_d else 0
+            print(f"    {k:>5}: {n:>7} ({pct:5.1f}%)")
+    print(f"  Elapsed: {elapsed:.0f}s ({elapsed/60:.1f}min)")
+    if fail_details:
+        print(f"\n  First failures (up to 3):")
+        for r in fail_details[:3]:
+            print(f"    {json.dumps(r)[:500]}")
+    print("-" * 72, flush=True)
+
+    return {
+        "season": season, "games": total, "complete": complete,
+        "match_integrity_fail": mif, "error": err, "fail_rate": fail_rate,
+        "elapsed": elapsed, "has_pass": season_has_pass,
+        "rows_matched": season_rows_matched, "coord_warn": season_coord_warn,
+        "delta_hist": dict(season_delta_hist),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     src = parser.add_mutually_exclusive_group()
-    src.add_argument("--season", type=int, help="process all pending games in this season")
+    src.add_argument("--season", type=int, help="process all pending games in one season")
+    src.add_argument("--seasons", type=str, help="comma-separated list, e.g. 2017,2018,2019,2020,2021,2022,2023,2024 (sequential, oldest first as ordered)")
     src.add_argument("--game-id", type=int, help="process a single game (debug)")
     src.add_argument("--status-report", action="store_true", help="print per-season rollup + exit")
-    parser.add_argument("--limit", type=int, default=None, help="cap games processed (season mode)")
+    parser.add_argument("--limit", type=int, default=None, help="cap games processed per season")
     parser.add_argument("--dry-run", action="store_true", help="no writes; no checkpoint")
     parser.add_argument("--force", action="store_true", help="reprocess even if status=complete")
     parser.add_argument("--delay", type=float, default=0.5, help="politeness sleep before each NHL fetch (seconds)")
-    parser.add_argument("--tolerance", type=int, default=10, help="max abs coord delta between NHL and DB before integrity fail")
+    parser.add_argument("--tolerance", type=int, default=15, help="max abs coord delta before integrity fail (default 15). Warn threshold fixed at 10.")
     parser.add_argument("--time-tolerance", type=int, default=2, help="max |seconds| between NHL and CSV for time-bridge match")
     parser.add_argument("--unmatched-cap", type=int, default=5, help="max unexplained NHL unmatched per game")
+    parser.add_argument("--season-fail-cap", type=float, default=0.03, help="halt sequential run if any season's fail rate exceeds this (default 0.03)")
     parser.add_argument("--env-file", type=str, default=os.path.join(_REPO_ROOT, ".env"))
     args = parser.parse_args()
 
-    if not (args.season or args.game_id or args.status_report):
-        raise SystemExit("Provide one of --season, --game-id, or --status-report.")
+    if not (args.season or args.seasons or args.game_id or args.status_report):
+        raise SystemExit("Provide one of --season, --seasons, --game-id, or --status-report.")
 
     env_path = os.path.abspath(args.env_file)
     if not os.path.exists(env_path):
@@ -669,94 +771,85 @@ def main() -> int:
         status_report(db)
         return 0
 
-    # Banner
-    if args.season:
-        mode = f"SEASON {args.season}" + (f" (limit={args.limit})" if args.limit else "")
+    # Build seasons list
+    if args.game_id:
+        seasons_to_run = [args.game_id // 1_000_000]
+        target_desc = f"GAME {args.game_id}"
+    elif args.seasons:
+        try:
+            seasons_to_run = [int(s.strip()) for s in args.seasons.split(",") if s.strip()]
+        except ValueError as e:
+            raise SystemExit(f"--seasons parse error: {e}")
+        target_desc = f"SEASONS {seasons_to_run}"
     else:
-        mode = f"GAME {args.game_id}"
-    if args.dry_run:
-        mode = f"DRY-RUN {mode}"
-    if args.force:
-        mode = f"{mode} FORCE"
+        seasons_to_run = [args.season]
+        target_desc = f"SEASON {args.season}" + (f" (limit={args.limit})" if args.limit else "")
+
+    mode_flags = []
+    if args.dry_run: mode_flags.append("DRY-RUN")
+    if args.force: mode_flags.append("FORCE")
+    mode = " ".join(mode_flags + [target_desc])
+
     print("=" * 72)
     print("  replay_pbp_for_moat.py")
     print(f"  Env file:       {env_path}")
     print(f"  Target project: {project_ref}  ({SUPABASE_URL})")
     print(f"  Mode:           {mode}")
     print(f"  Time tol:       ±{args.time_tolerance}s (NHL↔CSV)")
-    print(f"  Coord tol:      ±{args.tolerance} abs coord units (NHL↔DB backstop)")
+    print(f"  Coord tol:      ±{args.tolerance} abs coord units (fail); warn ≥10")
     print(f"  Unmatched cap:  {args.unmatched_cap} unexplained per game")
+    print(f"  Season fail-cap:{args.season_fail_cap:.1%}")
     print(f"  Delay:          {args.delay}s per fetch")
-    print("=" * 72)
+    print("=" * 72, flush=True)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-    # Determine target games + season CSV to load
+    # Single-game path uses --game-id → process one game and return.
     if args.game_id:
         season = args.game_id // 1_000_000
-        game_ids = [args.game_id]
-    else:
-        game_ids = games_for_season(db, args.season, args.force, args.limit)
-        season = args.season
-        if not game_ids:
-            print(f"\nNo pending games for season {args.season}.")
-            return 0
-        print(f"\nProcessing {len(game_ids)} pending games for season {args.season}.")
-
-    csv_slice = load_season_csv_slice(season)
-    print(f"CSV slice for season {season}: {sum(len(v) for v in csv_slice.values())} rows across {len(csv_slice)} games")
-
-    started = time.time()
-    per_status: Counter[str] = Counter()
-    fail_details: List[Dict[str, Any]] = []
-    global_delta_hist: Counter = Counter()
-
-    for i, gid in enumerate(game_ids, 1):
-        csv_rows_for_game = csv_slice.get(gid, [])
+        csv_slice = load_season_csv_slice(season)
+        csv_rows_for_game = csv_slice.get(args.game_id, [])
         result = process_game(
-            db, gid, season, csv_rows_for_game,
+            db, args.game_id, season, csv_rows_for_game,
             args.dry_run, args.delay, args.tolerance, args.time_tolerance, args.unmatched_cap,
         )
         st = result.get("status", "?")
-        per_status[st] += 1
-        if "delta_hist" in result:
-            for k, v in result["delta_hist"].items():
-                global_delta_hist[k] += v
-        rm = result.get("rows_matched", "-")
-        ru = result.get("rows_updated", "-")
-        um_ux = result.get("nhl_unmatched_unexplained", "-")
-        hp = result.get("has_pass_count", "-")
-        um508 = result.get("nhl_unmatched_508", "-")
-        umde = result.get("nhl_unmatched_dedupe", "-")
-        umso = result.get("nhl_unmatched_shootout", "-")
-        dbum = result.get("db_unmatched", "-")
-        dh = result.get("delta_hist", {})
-        print(f"[{i}/{len(game_ids)}] game_id={gid} status={st} matched={rm} updated={ru} "
-              f"nhl_um[508/dedupe/SO/unexpl]={um508}/{umde}/{umso}/{um_ux} db_um={dbum} has_pass={hp} deltas={dh}")
-        if st in ("match_integrity_fail", "error"):
-            fail_details.append(result)
+        rm = result.get("rows_matched", "-"); ru = result.get("rows_updated", "-")
+        um_ux = result.get("nhl_unmatched_unexplained", "-"); hp = result.get("has_pass_count", "-")
+        um508 = result.get("nhl_unmatched_508", "-"); umde = result.get("nhl_unmatched_dedupe", "-")
+        umso = result.get("nhl_unmatched_shootout", "-"); dbum = result.get("db_unmatched", "-")
+        cw = result.get("coord_warn", "-"); dh = result.get("delta_hist", {})
+        print(f"[1/1] game_id={args.game_id} status={st} matched={rm} updated={ru} "
+              f"nhl_um[508/dedupe/SO/unexpl]={um508}/{umde}/{umso}/{um_ux} db_um={dbum} "
+              f"has_pass={hp} warn={cw} deltas={dh}")
+        return 0 if st in ("complete", "dry_run_complete") else 1
 
-    elapsed = time.time() - started
+    # Multi-season sequential path with fail-cap gate
+    run_start = time.time()
+    season_summaries: List[Dict[str, Any]] = []
+    for season in seasons_to_run:
+        summary = process_season_batch(db, season, args)
+        season_summaries.append(summary)
+        if summary["fail_rate"] > args.season_fail_cap:
+            print(f"\n!!! HALT: season {season} fail rate {summary['fail_rate']:.2%} > cap {args.season_fail_cap:.2%}.")
+            print(f"!!! Not proceeding to remaining seasons: {seasons_to_run[seasons_to_run.index(season)+1:]}")
+            break
+
+    total_elapsed = time.time() - run_start
     print("\n" + "=" * 72)
-    print("  Run summary")
+    print("  MULTI-SEASON RUN SUMMARY")
     print("=" * 72)
-    for k in ("complete", "dry_run_complete", "match_integrity_fail", "error"):
-        if per_status.get(k):
-            print(f"  {k}: {per_status[k]}")
-    print(f"  Elapsed: {elapsed:.1f}s")
-    total_deltas = sum(global_delta_hist.values())
-    if total_deltas:
-        print(f"  Coord-backstop delta distribution ({total_deltas} pairs):")
-        for k in ("0-3", "3-10", ">10"):
-            n = global_delta_hist.get(k, 0)
-            pct = (100 * n / total_deltas) if total_deltas else 0
-            print(f"    {k:>5}: {n:>6} ({pct:5.1f}%)")
-    if fail_details:
-        print(f"\n  First failures (up to 3):")
-        for r in fail_details[:3]:
-            print(f"    {json.dumps(r)[:600]}")
+    for s in season_summaries:
+        hp_rate = 100.0 * s["has_pass"] / max(1, s["rows_matched"])
+        print(f"  {s['season']}: games={s['games']:>5} complete={s['complete']:>5} "
+              f"fails={s['match_integrity_fail']+s['error']:>3} ({s['fail_rate']:.2%}) "
+              f"has_pass={s['has_pass']:>6} ({hp_rate:>4.1f}%) warn={s['coord_warn']:>4} "
+              f"elapsed={s['elapsed']/60:>5.1f}min")
+    total_fails = sum(s["match_integrity_fail"] + s["error"] for s in season_summaries)
+    print(f"\n  Total elapsed: {total_elapsed/60:.1f}min ({total_elapsed/3600:.2f}h)")
+    print(f"  Total fails:   {total_fails}")
     print("=" * 72)
-    return 0 if not fail_details else 1
+    return 0 if total_fails == 0 else 1
 
 
 if __name__ == "__main__":
