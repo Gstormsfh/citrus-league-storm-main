@@ -161,9 +161,15 @@ COLUMN_MAP: Dict[str, str] = {
     "period":                   "period",
 }
 
-# The 7 moat features — STRICT NULL for historical rows.
-# Setting these to 0 would silently corrupt the xG v3 training corpus.
-MOAT_FEATURES_NULL_FOR_HISTORICAL = [
+# The 7 moat features — populated by Phase 0c (replay_pbp_for_moat.py),
+# NOT by this loader. MoneyPuck CSV has no pass-context columns. Per GAPS §15
+# unlock path (a) (applied 2026-07-26), we OMIT these keys from the upsert
+# payload entirely — PostgREST leaves absent columns untouched on conflict,
+# so a re-run of this loader after 0c preserves the moat data.
+#
+# Kept as a named list only for documentation / future validation checks.
+# The map_row() function must NOT assign these keys.
+MOAT_FEATURES_NOT_LOADED_BY_THIS_SCRIPT = [
     "pass_quality_score",
     "pass_immediacy_score",
     "goalie_movement_score",
@@ -301,9 +307,13 @@ def map_row(row: dict, season: int) -> Optional[dict]:
     # Derived: shot_type (lowercase form)
     out["shot_type"] = SHOT_TYPE_NORMALIZE(row.get("shotType"))
 
-    # STRICT NULL on the 7 moat features (NEVER 0 — would corrupt xG v3 training)
-    for moat_col in MOAT_FEATURES_NULL_FOR_HISTORICAL:
-        out[moat_col] = None
+    # 7 moat features + 10 companions (passer_id, pass_x, pass_y, pass_angle,
+    # time_before_shot, normalized_lateral_distance, zone_relative_distance,
+    # pass_zone, event_id, sort_order): INTENTIONALLY OMITTED from the payload.
+    # MoneyPuck CSV has no pass-context or NHL event-id fields, and PostgREST's
+    # merge-duplicates upsert leaves absent columns untouched on conflict —
+    # meaning Phase 0c's moat writes survive any re-run of this loader.
+    # Per GAPS §15 unlock path (a). See MOAT_FEATURES_NOT_LOADED_BY_THIS_SCRIPT.
 
     # Require core identity + geometry to be present
     if out["player_id"] is None or out["shot_x"] is None or out["shot_y"] is None:
@@ -368,7 +378,7 @@ def main() -> int:
     print(f"  (derived)                                              → season   [from --season]")
     print(f"  event                                                  → shot_type_code  [SHOT→506 GOAL→505 MISS→507]")
     print(f"  shotType                                               → shot_type       [lowercased]")
-    print(f"  (NULL)                                                 → {{7 moat features — never 0}}")
+    print(f"  (OMITTED)                                              → {{7 moat features + 10 companions — populated by Phase 0c, GAPS §15}}")
 
     db = SupabaseRest(SUPABASE_URL, SUPABASE_KEY) if not args.dry_run else None
 
@@ -380,7 +390,18 @@ def main() -> int:
     season_filtered = 0
     first_5_examples: List[dict] = []
     distinct_game_ids: set = set()
-    moat_check: Dict[str, int] = {k: 0 for k in MOAT_FEATURES_NULL_FOR_HISTORICAL}
+    # Post GAPS §15 unlock (a): moat features (and 10 Phase 0c companion cols)
+    # must be ABSENT from the payload dict, not present-as-None. This counter
+    # tracks how many mapped rows have each moat key absent — must equal the
+    # total mapped row count on every run, otherwise the trap-door has been
+    # re-opened by a code change.
+    moat_absence_check: Dict[str, int] = {k: 0 for k in MOAT_FEATURES_NOT_LOADED_BY_THIS_SCRIPT}
+    COMPANION_COLS_MUST_BE_ABSENT = [
+        "passer_id", "pass_x", "pass_y", "pass_angle", "time_before_shot",
+        "normalized_lateral_distance", "zone_relative_distance", "pass_zone",
+        "event_id", "sort_order",
+    ]
+    companion_absence_check: Dict[str, int] = {k: 0 for k in COMPANION_COLS_MUST_BE_ABSENT}
 
     start_ts = time.time()
     upserted = 0
@@ -411,9 +432,12 @@ def main() -> int:
             distinct_game_ids.add(mapped["game_id"])
             if len(first_5_examples) < 5:
                 first_5_examples.append(mapped)
-            for moat_col in MOAT_FEATURES_NULL_FOR_HISTORICAL:
-                if mapped.get(moat_col) is None:
-                    moat_check[moat_col] += 1
+            for moat_col in MOAT_FEATURES_NOT_LOADED_BY_THIS_SCRIPT:
+                if moat_col not in mapped:
+                    moat_absence_check[moat_col] += 1
+            for comp_col in COMPANION_COLS_MUST_BE_ABSENT:
+                if comp_col not in mapped:
+                    companion_absence_check[comp_col] += 1
 
         if not batch:
             continue
@@ -443,12 +467,15 @@ def main() -> int:
             deduped.append(row)
         within_batch_dedupes += batch_dedupes_this_round
         batch = deduped
-        # Reconcile moat_check (incremented during batch assembly above)
-        # so the strict NULL invariant check matches post-dedupe row count.
-        # All 7 moat features are written as None for every row by design,
-        # so each dropped row contributed one count to each moat counter.
-        for moat_col in MOAT_FEATURES_NULL_FOR_HISTORICAL:
-            moat_check[moat_col] -= batch_dedupes_this_round
+        # Reconcile absence counters (incremented during batch assembly above)
+        # so the invariant check matches post-dedupe row count. All 7 moat +
+        # 10 companion columns are absent from every row by design (GAPS §15
+        # unlock (a) applied), so each dropped row contributed one count to
+        # each counter.
+        for moat_col in MOAT_FEATURES_NOT_LOADED_BY_THIS_SCRIPT:
+            moat_absence_check[moat_col] -= batch_dedupes_this_round
+        for comp_col in COMPANION_COLS_MUST_BE_ABSENT:
+            companion_absence_check[comp_col] -= batch_dedupes_this_round
 
         # NOTE: Dry-run does NOT validate Postgres column-type coercion.
         # PostgREST serialization + Postgres type checking only run on
@@ -465,23 +492,24 @@ def main() -> int:
         else:
             try:
                 # ============================================================
-                # TRAP-DOOR: DO NOT RE-RUN AFTER PHASE 0C COMPLETION
+                # MOAT-SAFE UPSERT (GAPS §15 unlock path (a) applied 2026-07-26)
                 # ------------------------------------------------------------
-                # This loader explicitly writes NULL to the 7 moat features:
-                #   pass_quality_score, pass_immediacy_score, goalie_movement_score,
-                #   pass_zone_encoded, pass_lateral_distance, pass_to_net_distance,
-                #   has_pass_before_shot
+                # HISTORY: earlier versions of this loader explicitly wrote NULL
+                # to the 7 moat features. PostgREST's Prefer: resolution=merge-
+                # duplicates overwrites ALL payload columns INCLUDING NULLs on
+                # conflict, so re-running after Phase 0c would have CLOBBERED
+                # moat data back to NULL.
                 #
-                # Supabase REST UPSERT uses Prefer: resolution=merge-duplicates,
-                # which overwrites ALL payload columns INCLUDING NULLs on conflict.
-                # Re-running this loader after Phase 0c populates moat features for
-                # historical seasons WILL CLOBBER those features back to NULL.
+                # RESOLUTION: map_row() no longer includes the moat features
+                # (or the 10 Phase 0c companion columns: passer_id, pass_x,
+                # pass_y, pass_angle, time_before_shot, normalized_lateral_
+                # distance, zone_relative_distance, pass_zone, event_id,
+                # sort_order) in the payload dict. Absent columns are not
+                # touched by the upsert on conflict — Phase 0c's writes survive.
                 #
-                # Safe re-run paths post-0c:
-                #   (a) Modify loader to omit the 7 moat columns from the payload
-                #       entirely (so they are not written at all on conflict), OR
-                #   (b) Add precondition filter: WHERE season < 2025
-                #                                AND has_pass_before_shot IS NULL
+                # Any change that re-adds these keys to the payload WILL
+                # re-open the trap-door. Guard: MOAT_FEATURES_NOT_LOADED_BY_
+                # THIS_SCRIPT is the documented deny-list.
                 #
                 # See apps/web/docs/GAPS_AND_FUTURE_CAPABILITIES.md §15.
                 # ============================================================
@@ -518,10 +546,13 @@ def main() -> int:
     print(f"Distinct game_ids:         {len(distinct_game_ids)}  (range: {min(distinct_game_ids) if distinct_game_ids else 'n/a'} .. {max(distinct_game_ids) if distinct_game_ids else 'n/a'})")
     print(f"Wall-clock:                {_format_elapsed(total_elapsed)}")
 
-    print("\nMoat-feature NULL check (must all equal mapped row count):")
-    for moat_col in MOAT_FEATURES_NULL_FOR_HISTORICAL:
-        ok = "OK " if moat_check[moat_col] == rows_processed else "FAIL"
-        print(f"  [{ok}] {moat_col:32} NULL on {moat_check[moat_col]} / {rows_processed} rows")
+    print("\nMoat + companion ABSENCE check (GAPS §15 unlock (a); must all equal mapped row count):")
+    for moat_col in MOAT_FEATURES_NOT_LOADED_BY_THIS_SCRIPT:
+        ok = "OK " if moat_absence_check[moat_col] == rows_processed else "FAIL"
+        print(f"  [{ok}] {moat_col:38} absent on {moat_absence_check[moat_col]} / {rows_processed} rows")
+    for comp_col in COMPANION_COLS_MUST_BE_ABSENT:
+        ok = "OK " if companion_absence_check[comp_col] == rows_processed else "FAIL"
+        print(f"  [{ok}] {comp_col:38} absent on {companion_absence_check[comp_col]} / {rows_processed} rows")
 
     if args.dry_run and first_5_examples:
         print("\nFirst 5 mapped rows (raw_shots dict shape — for review):")

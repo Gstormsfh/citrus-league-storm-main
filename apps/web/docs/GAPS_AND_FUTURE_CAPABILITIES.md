@@ -376,7 +376,15 @@ GAR computation produces stable rates only when there's enough TOI sample size. 
 
 ---
 
-## §15. UPSERT clobbers moat features on re-run after Phase 0c
+## §15. UPSERT clobbers moat features on re-run after Phase 0c — **RESOLVED 2026-07-26**
+
+**Status: RESOLVED 2026-07-26** via unlock path (a). `scripts/utilities/load_historical_shots_csv.py`'s `map_row()` no longer writes the 7 moat features (nor the 10 Phase 0c companion columns: passer_id, pass_x, pass_y, pass_angle, time_before_shot, normalized_lateral_distance, zone_relative_distance, pass_zone, event_id, sort_order). PostgREST's `merge-duplicates` semantics leave absent columns untouched on conflict, so any re-run of the loader preserves 0c's writes. Trap-door comment on the upsert call was rewritten to record the fix.
+
+Deferred validation: **live survival test** — re-run the loader against a moat-populated game and confirm the 17 populated columns are unchanged post-load. Waiting for the staging 0c full-run to complete before running this test (a moat-populated game to test against needs to exist first at scale). Dry-run validation at fix time (2026-07-26): `--season 2024 --dry-run` exited 0, mapped count unchanged from the 0a baseline (119,870), 17-column payload keys absent from sample row.
+
+Original problem statement retained below for historical context.
+
+---
 
 **Capability:** safe re-run of `scripts/utilities/load_historical_shots_csv.py` post-Phase-0c without overwriting the 7 pre-shot moat features. As shipped today the loader cannot be re-run after 0c lands without code mitigation.
 
