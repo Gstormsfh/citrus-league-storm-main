@@ -103,6 +103,48 @@ describe('draftClientStore — snapshot + events', () => {
     expect(after.snapshot?.recentEvents[0].seq).toBe(2);
   });
 
+  it('10c-2 batch 3 C2: pick_submitted with pickDeadline updates stateSnapshot.currentPickDeadline', () => {
+    // Regression lock for the C2 client-side re-arm hook. The store's
+    // applyEvent must mirror the event's `pickDeadline` field into
+    // `stateSnapshot.currentPickDeadline` so DraftTimerV2's countdown
+    // stays authoritative without a resync.
+    const store = useDraftClientStore.getState();
+    store.setSnapshot(sampleSnapshot([]));
+    const deadlineIso = '2026-07-28T12:00:30.000Z';
+    store.applyEvent({
+      kind: 'pick_submitted',
+      seq: 3,
+      timestamp: '2026-07-28T12:00:00.000Z',
+      teamId: 'team-1',
+      playerId: 8478003,
+      roundNumber: 1,
+      pickNumber: 3,
+      correlationId: 'idem-C',
+      pickDeadline: deadlineIso,
+    });
+    const after = useDraftClientStore.getState();
+    expect(after.snapshot?.stateSnapshot.currentPickDeadline).toBe(deadlineIso);
+  });
+
+  it('10c-2 batch 3 C2: pick_submitted WITHOUT pickDeadline (v1 payload) preserves prior deadline', () => {
+    // Backwards-compat: pre-batch-2 v1 events replayed at bootstrap
+    // don't carry pickDeadline. The store must NOT clobber
+    // currentPickDeadline in that case — the snapshot's original
+    // value stays authoritative.
+    const store = useDraftClientStore.getState();
+    const priorDeadline = '2026-07-28T11:59:30.000Z';
+    store.setSnapshot({
+      ...sampleSnapshot([]),
+      stateSnapshot: {
+        ...sampleSnapshot([]).stateSnapshot,
+        currentPickDeadline: priorDeadline,
+      },
+    });
+    store.applyEvent(samplePickEvent(4, 'idem-D')); // no pickDeadline
+    const after = useDraftClientStore.getState();
+    expect(after.snapshot?.stateSnapshot.currentPickDeadline).toBe(priorDeadline);
+  });
+
   it('applyEvents reconciles multiple pending actions in one call', () => {
     const store = useDraftClientStore.getState();
     store.setSnapshot(sampleSnapshot([]));

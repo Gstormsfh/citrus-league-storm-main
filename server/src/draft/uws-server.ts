@@ -352,6 +352,38 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
         lobbyRegistry.forEachConnection((ws) => {
           candidates.push(ws);
         });
+        // ── Chunk 10c-2 batch 3 C1 — server-initiated ping floor ──
+        //
+        // The scanner now BOTH pings every connection AND culls timeouts
+        // in a single pass. Prior state: `sendPingsAutomatically: true`
+        // was set on the app.ws config (line 128) as a backstop, but
+        // uWS's built-in scheduler fired inconsistently under our
+        // observed workload (evidence: the S5 proof debugging window
+        // saw zero server-initiated pings for minutes at a time; the
+        // client shim in `scripts/proof/lib/ws-client.mjs` was added
+        // to work around it). Explicit `ws.ping()` at the scan cadence
+        // gives us a hard ≤10s ping guarantee independent of uWS's
+        // internal timer.
+        //
+        // Browsers auto-respond to protocol pings with pongs per RFC
+        // 6455 §5.5.2; the `pong:` handler at line 312 refreshes
+        // `lastPongAt`; the cull below still runs on the >30s stale
+        // window. Combined effect: healthy connections stay
+        // continuously alive without the client having to do anything
+        // (matches the "no app-level heartbeat needed in browsers"
+        // production reality); genuinely dead connections still cull.
+        //
+        // Errors from `ws.ping()` (connection closing race) are
+        // swallowed at DEBUG — the pong-timeout scanner will cull
+        // whatever's left.
+        for (const ws of candidates) {
+          try {
+            ws.ping();
+          } catch (err) {
+            structuredLogger.debug('heartbeat.ping_threw', {});
+            void err;
+          }
+        }
         const timedOut = findTimedOutConnections(candidates, now, {
           pongTimeoutMs: HEARTBEAT_PONG_TIMEOUT_MS,
         });
@@ -359,6 +391,7 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
           structuredLogger.debug('heartbeat.scan_completed', {
             connectionsScanned: candidates.length,
             timedOut: 0,
+            pingsSent: candidates.length,
           });
           return;
         }
@@ -384,6 +417,7 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
         structuredLogger.debug('heartbeat.scan_completed', {
           connectionsScanned: candidates.length,
           timedOut: timedOut.length,
+          pingsSent: candidates.length,
         });
       }, HEARTBEAT_SCAN_INTERVAL_MS);
       // unref() so the timer doesn't keep the Node event loop alive

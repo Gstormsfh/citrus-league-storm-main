@@ -69,6 +69,8 @@ import {
   createConsoleLogger,
   structuredLogger,
   createConsoleStructuredLogger,
+  DEFAULT_PICK_TIME_LIMIT_SECONDS,
+  PICK_CLOCK_PAD_SECONDS,
 } from '@citrus/shared';
 import { startUwsServer, type UwsServerHandle } from './uws-server';
 import { LobbyRegistry, type LobbyConfig } from './LobbyRegistry';
@@ -315,8 +317,8 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
       ? auctionBidWindowSeconds
       : typeof settings?.pickTimeLimit === 'number'
         ? settings.pickTimeLimit
-        : 90;
-  const pickClockSeconds = pickTimeLimit + 1;
+        : DEFAULT_PICK_TIME_LIMIT_SECONDS;
+  const pickClockSeconds = pickTimeLimit + PICK_CLOCK_PAD_SECONDS;
 
   const initialPickDeadline = leagueRow.pick_deadline
     ? new Date(leagueRow.pick_deadline as string)
@@ -632,6 +634,14 @@ const lobbyRegistry = new LobbyRegistry({
   supabase: supabaseAdmin,
 });
 
+// Chunk 10c-2 batch 3 (2026-07-27): start the idle-lobby eviction
+// scanner. Defaults (10-min idle window, 3-min scan cadence) come
+// from the registry's constructor; env overrides via
+// LOBBY_IDLE_EVICTION_MS / LOBBY_IDLE_EVICTION_SCAN_MS are honored.
+// Setting either to 0 disables the scanner (used by tests via the
+// vitest setup file).
+lobbyRegistry.startIdleEvictionTimer();
+
 // Phase 4.5 chunk 11g.10 sub-step 10b — mount engine-ops admin routes
 // at /api/admin/engine/* on the engine's Hono server.
 //
@@ -730,6 +740,13 @@ function shutdown(signal: string) {
   if (shuttingDown) return;
   shuttingDown = true;
   structuredLogger.info('shutdown.initiated', { signal });
+
+  // Chunk 10c-2 batch 3 (2026-07-27): stop the idle-eviction scanner
+  // BEFORE any other teardown so a late scan can't try to evict a
+  // lobby that's already being torn down elsewhere in this shutdown
+  // sequence. Mirrors the LobbyManager stopSnapshotTimer / uWS
+  // stopHeartbeat pattern.
+  lobbyRegistry.stopIdleEvictionTimer();
 
   // Chunk 11g.7 sub-step 7e: stop the LISTEN/NOTIFY subscription
   // FIRST so no new external events fire mid-teardown. The .stop()

@@ -51,6 +51,15 @@ interface MakeRegistryOpts {
   ) => Promise<CommissionerAuthorizationResult>;
   /** Step 6c: stub Supabase client; default is no-op chainable. */
   supabase?: SupabaseClient;
+  /**
+   * Chunk 10c-2 batch 3 (2026-07-27): idle-eviction window override
+   * for the batch-3 tests. Passed through to LobbyRegistry so tests
+   * can exercise the scanner with a small window (e.g. 100 ms)
+   * without waiting.
+   */
+  idleEvictionMs?: number;
+  /** As above; scan cadence override for batch-3 tests. */
+  idleEvictionScanMs?: number;
 }
 
 /**
@@ -122,6 +131,8 @@ function makeRegistry(opts: MakeRegistryOpts = {}) {
     verifyTeamAuthorization,
     verifyCommissionerAuthorization,
     supabase,
+    idleEvictionMs: opts.idleEvictionMs,
+    idleEvictionScanMs: opts.idleEvictionScanMs,
   });
   return { registry, lobbyConfigLookup, draftService, publish, verifyTeamAuthorization, supabase };
 }
@@ -539,4 +550,239 @@ describe('LobbyRegistry (chunk 11g.4 step 4)', () => {
     expect(lobby).toBeInstanceOf(LobbyManager);
     expect(lobbyConfigLookup).toHaveBeenCalledWith('league-1');
   });
+
+  // ── Chunk 10c-2 batch 3 (2026-07-27): idle-lobby eviction ──────
+  //
+  // Ratified per PROJECT_PLAN Decision Log 2026-07-27 "Snapshot
+  // retention + lobby hygiene chunk — spec drafted"; architect
+  // amendment specifies active-status exemption + 10-min window
+  // + ~3-min scan cadence + `registry.lobby_evicted_idle` log.
+  //
+  // Test strategy: construct the registry with explicit
+  // `idleEvictionMs` + `idleEvictionScanMs` values so tests can
+  // (a) hit the idle threshold with a small `age` value and
+  // (b) not rely on real setInterval timing. `scanIdleLobbies()`
+  // is exposed as a public method so tests can trigger the scan
+  // directly rather than driving fake timers.
+
+  describe('idle-lobby eviction', () => {
+    it('evicts a lobby whose connectionCount=0, draftStatus!=in_progress, and age > idleEvictionMs', async () => {
+      const { registry } = makeRegistry({ idleEvictionMs: 100 });
+      const lobby = await registry.getOrCreate('lobby-A', 'league-1');
+      // Force the lobby's activity clock into the past.
+      (lobby as unknown as { lastActivityAt: number }).lastActivityAt =
+        Date.now() - 1000;
+      // Default draftStatus after a fresh construction from an empty
+      // event log is 'not_started' — not in_progress → exempt does
+      // NOT apply. connectionCount is 0 (no addConnection called).
+      const result = registry.scanIdleLobbies();
+      expect(result.scanned).toBe(1);
+      expect(result.evicted).toBe(1);
+      expect(registry.get('lobby-A')).toBeUndefined();
+    });
+
+    it('does NOT evict a lobby with connectionCount > 0', async () => {
+      const { registry } = makeRegistry({ idleEvictionMs: 100 });
+      const lobby = await registry.getOrCreate('lobby-A', 'league-1');
+      (lobby as unknown as { lastActivityAt: number }).lastActivityAt =
+        Date.now() - 1000;
+      // Simulate a live connection.
+      const fakeWs = {
+        subscribe: vi.fn(),
+        send: vi.fn(),
+      } as unknown as WsMock;
+      (lobby as unknown as { connections: Map<unknown, unknown> })
+        .connections.set(fakeWs, {} as unknown);
+      const result = registry.scanIdleLobbies();
+      expect(result.scanned).toBe(1);
+      expect(result.evicted).toBe(0);
+      expect(registry.get('lobby-A')).toBe(lobby);
+    });
+
+    it('does NOT evict a lobby with draftStatus=in_progress (active-status exemption)', async () => {
+      const { registry } = makeRegistry({ idleEvictionMs: 100 });
+      const lobby = await registry.getOrCreate('lobby-A', 'league-1');
+      (lobby as unknown as { lastActivityAt: number }).lastActivityAt =
+        Date.now() - 1000;
+      // Direct field access to simulate an active draft. Real
+      // production transitions happen inside processSubmitPick;
+      // for this scanner test we just need the branch to trip.
+      (lobby as unknown as { draftStatus: string }).draftStatus =
+        'in_progress';
+      const result = registry.scanIdleLobbies();
+      expect(result.scanned).toBe(1);
+      expect(result.evicted).toBe(0);
+      expect(registry.get('lobby-A')).toBe(lobby);
+    });
+
+    it('does NOT evict a lobby with draftStatus=paused (Monday 2026-07-28 amendment)', async () => {
+      // The Monday brief tightened the exemption from "in_progress
+      // only" to "not_started | completed | cancelled evictable,
+      // in_progress | paused exempt." Rationale in the scanner
+      // comment: paused drafts have a commissioner-owned resume
+      // moment; the resume path relies on in-memory pauseState.
+      const { registry } = makeRegistry({ idleEvictionMs: 100 });
+      const lobby = await registry.getOrCreate('lobby-A', 'league-1');
+      (lobby as unknown as { lastActivityAt: number }).lastActivityAt =
+        Date.now() - 1000;
+      (lobby as unknown as { draftStatus: string }).draftStatus = 'paused';
+      const result = registry.scanIdleLobbies();
+      expect(result.scanned).toBe(1);
+      expect(result.evicted).toBe(0);
+      expect(registry.get('lobby-A')).toBe(lobby);
+    });
+
+    it('evicts draftStatus=completed lobbies (Monday 2026-07-28 amendment — explicit allow)', async () => {
+      const { registry } = makeRegistry({ idleEvictionMs: 100 });
+      const lobby = await registry.getOrCreate('lobby-A', 'league-1');
+      (lobby as unknown as { lastActivityAt: number }).lastActivityAt =
+        Date.now() - 1000;
+      (lobby as unknown as { draftStatus: string }).draftStatus = 'completed';
+      const result = registry.scanIdleLobbies();
+      expect(result.evicted).toBe(1);
+      expect(registry.get('lobby-A')).toBeUndefined();
+    });
+
+    it('evicts draftStatus=cancelled lobbies (Monday 2026-07-28 amendment — explicit allow)', async () => {
+      const { registry } = makeRegistry({ idleEvictionMs: 100 });
+      const lobby = await registry.getOrCreate('lobby-A', 'league-1');
+      (lobby as unknown as { lastActivityAt: number }).lastActivityAt =
+        Date.now() - 1000;
+      (lobby as unknown as { draftStatus: string }).draftStatus = 'cancelled';
+      const result = registry.scanIdleLobbies();
+      expect(result.evicted).toBe(1);
+      expect(registry.get('lobby-A')).toBeUndefined();
+    });
+
+    it('evict-during-shutdown safety: stopIdleEvictionTimer BEFORE lobby teardown prevents late-scan race', async () => {
+      // Regression lock for the graceful-shutdown ordering rule:
+      // `stopIdleEvictionTimer()` must be called first in the
+      // engine's shutdown() so a late setInterval fire can't evict
+      // a lobby that's already being torn down elsewhere (e.g., by
+      // uwsHandle.close() closing WS connections).
+      //
+      // We verify the property mechanically: after stopIdleEvictionTimer,
+      // scanIdleLobbies still works when called directly (it's public)
+      // BUT the interval is cancelled so no automatic scan will race.
+      const { registry } = makeRegistry({
+        idleEvictionMs: 100,
+        idleEvictionScanMs: 100,
+      });
+      const lobby = await registry.getOrCreate('lobby-A', 'league-1');
+      (lobby as unknown as { lastActivityAt: number }).lastActivityAt =
+        Date.now() - 1000;
+      registry.startIdleEvictionTimer();
+      registry.stopIdleEvictionTimer();
+      // Direct scan still works (evicts the eligible lobby) — the
+      // timer stop only prevents AUTOMATIC scans, not manual ones.
+      const result = registry.scanIdleLobbies();
+      expect(result.evicted).toBe(1);
+      // A second stopIdleEvictionTimer is idempotent (regression lock
+      // for the `if (idleEvictionTimer !== null)` guard).
+      registry.stopIdleEvictionTimer();
+      registry.stopIdleEvictionTimer();
+      expect(true).toBe(true); // no throw = pass
+    });
+
+    it('does NOT evict a lobby whose age is <= idleEvictionMs (still fresh)', async () => {
+      const { registry } = makeRegistry({ idleEvictionMs: 60_000 });
+      const lobby = await registry.getOrCreate('lobby-A', 'league-1');
+      // lastActivityAt is Date.now() at construction; scan runs
+      // immediately so age is ~0. Well within the 60-s window.
+      const result = registry.scanIdleLobbies();
+      expect(result.scanned).toBe(1);
+      expect(result.evicted).toBe(0);
+      expect(registry.get('lobby-A')).toBe(lobby);
+    });
+
+    it('emits registry.lobby_evicted_idle INFO with context on eviction', async () => {
+      const { registry } = makeRegistry({ idleEvictionMs: 100 });
+      const lobby = await registry.getOrCreate('lobby-A', 'league-1');
+      (lobby as unknown as { lastActivityAt: number }).lastActivityAt =
+        Date.now() - 500;
+      const { structuredLogger } = await import('@citrus/shared');
+      const infoSpy = vi.spyOn(structuredLogger, 'info');
+      infoSpy.mockClear();
+      registry.scanIdleLobbies();
+      const idleCalls = infoSpy.mock.calls.filter(
+        (call) => call[0] === 'registry.lobby_evicted_idle',
+      );
+      expect(idleCalls.length).toBe(1);
+      const ctx = idleCalls[0][1] as {
+        lobbyId: string;
+        ageMs: number;
+        idleEvictionMs: number;
+        connectionCount: number;
+        draftStatus: string;
+      };
+      expect(ctx.lobbyId).toBe('lobby-A');
+      expect(ctx.ageMs).toBeGreaterThan(100);
+      expect(ctx.idleEvictionMs).toBe(100);
+      expect(ctx.connectionCount).toBe(0);
+      expect(ctx.draftStatus).toBe('not_started');
+      infoSpy.mockRestore();
+    });
+
+    it('startIdleEvictionTimer emits registry.idle_eviction_timer_disabled when idleEvictionMs=0', async () => {
+      const { registry } = makeRegistry({ idleEvictionMs: 0 });
+      const { structuredLogger } = await import('@citrus/shared');
+      const infoSpy = vi.spyOn(structuredLogger, 'info');
+      infoSpy.mockClear();
+      registry.startIdleEvictionTimer();
+      const disabledCalls = infoSpy.mock.calls.filter(
+        (call) => call[0] === 'registry.idle_eviction_timer_disabled',
+      );
+      expect(disabledCalls.length).toBeGreaterThanOrEqual(1);
+      const ctx = disabledCalls[0][1] as {
+        idleEvictionMs: number;
+        idleEvictionScanMs: number;
+      };
+      expect(ctx.idleEvictionMs).toBe(0);
+      infoSpy.mockRestore();
+    });
+
+    it('stopIdleEvictionTimer is idempotent (safe to call multiple times)', () => {
+      const { registry } = makeRegistry({
+        idleEvictionMs: 100,
+        idleEvictionScanMs: 100,
+      });
+      registry.startIdleEvictionTimer();
+      registry.stopIdleEvictionTimer();
+      // Second stop is a no-op.
+      registry.stopIdleEvictionTimer();
+      expect(true).toBe(true); // no throw = pass
+    });
+
+    it('does not evict in-flight (Promise placeholder) entries', async () => {
+      // A construction in flight is a Promise in the map, not a
+      // LobbyManager instance. The scanner MUST skip it — no
+      // `getLastActivityAt` to consult; treating it as evictable
+      // would race with the resolve.
+      const { registry, lobbyConfigLookup } = makeRegistry({
+        idleEvictionMs: 100,
+      });
+      // Slow the lookup so getOrCreate stays in flight during
+      // scanIdleLobbies. Cast to the vi mock shape — makeRegistry
+      // types the returned lookup as the plain function type from
+      // LobbyRegistryOptions, but at runtime it IS the vi.fn()
+      // default from the makeRegistry defaults path.
+      (lobbyConfigLookup as unknown as {
+        mockImplementationOnce: (fn: () => Promise<LobbyConfig>) => void;
+      }).mockImplementationOnce(
+        () =>
+          new Promise<LobbyConfig>((resolve) =>
+            setTimeout(() => resolve(DEFAULT_LOBBY_CONFIG), 200),
+          ),
+      );
+      const getOrCreatePromise = registry.getOrCreate('lobby-A', 'league-1');
+      // Scan while the entry is still a Promise placeholder.
+      const result = registry.scanIdleLobbies();
+      expect(result.scanned).toBe(0); // Promise placeholder not counted
+      expect(result.evicted).toBe(0);
+      await getOrCreatePromise;
+    });
+  });
 });
+
+// Local type alias for the fake WS the connection-count test constructs.
+type WsMock = { subscribe: () => void; send: () => void };

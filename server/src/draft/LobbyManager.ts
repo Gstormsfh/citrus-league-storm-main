@@ -513,6 +513,19 @@ export class LobbyManager {
   private currentTimerDeadline: Date | null = null;
   private currentTimerHandle: NodeJS.Timeout | null = null;
   /**
+   * Chunk 10c-2 batch 3 (2026-07-27): activity timestamp used by
+   * LobbyRegistry's idle-eviction scanner. Updated on every
+   * connection open, every runtime engine event emission (via
+   * `appendEventAndCount`), and every external-event apply (via
+   * `processExternalEvent`). A lobby with `connectionCount() === 0`
+   * AND `draftStatus ∈ {not_started, completed, cancelled}` AND
+   * `now - lastActivityAt > LOBBY_IDLE_EVICTION_MS` is a candidate
+   * for eviction. See `LobbyRegistry.startIdleEvictionTimer` for the
+   * scanner + the Monday 2026-07-28 amendment's active/paused
+   * exemption rationale.
+   */
+  private lastActivityAt: number = Date.now();
+  /**
    * Chunk 10c-2 batch 2 (2026-07-27): timer arm sequence counter.
    * Incremented on every `setPickDeadline` AND every `cancelPickTimer`
    * call. The setTimeout callback captures the current value in its
@@ -970,6 +983,12 @@ export class LobbyManager {
    * next removeConnection or lobby teardown.
    */
   addConnection(ws: WebSocket<DraftSocketUserData>, userData: DraftSocketUserData): void {
+    // Chunk 10c-2 batch 3 (2026-07-27): touch activity clock. A new
+    // WS connection is the strongest liveness signal a lobby can get;
+    // resetting the idle-eviction window from here means a reconnect
+    // after a long disconnect immediately protects the lobby from
+    // the next scan.
+    this.lastActivityAt = Date.now();
     const alreadyRegistered = this.connections.has(ws);
     this.connections.set(ws, userData);
 
@@ -1106,6 +1125,29 @@ export class LobbyManager {
    */
   connectionCount(): number {
     return this.connections.size;
+  }
+
+  /**
+   * Chunk 10c-2 batch 3 (2026-07-27): activity-clock accessor for the
+   * LobbyRegistry idle-eviction scanner. Returns the epoch-ms
+   * timestamp of the most-recent activity signal (WS open, runtime
+   * event emission, or external-event apply). Never null — initialized
+   * to constructor time.
+   */
+  getLastActivityAt(): number {
+    return this.lastActivityAt;
+  }
+
+  /**
+   * Chunk 10c-2 batch 3 (2026-07-27): draft-status accessor for the
+   * LobbyRegistry idle-eviction scanner's active-status exemption.
+   * A lobby with `draftStatus === 'in_progress'` is NEVER evicted
+   * even if `connectionCount === 0` and `lastActivityAt` is old —
+   * the engine's autopick timer may still need to fire, and
+   * evicting mid-draft would disrupt the pending state machine.
+   */
+  getDraftStatus(): DraftStatus {
+    return this.draftStatus;
   }
 
   /**
@@ -1606,6 +1648,15 @@ export class LobbyManager {
       }
 
       const timestamp = new Date().toISOString();
+      // Chunk 10c-2 batch 3 C2 (2026-07-28): mirror the RPC's
+      // pick_deadline into the wire event so clients can re-arm
+      // their countdown UI. Symmetric with applyPickEvent's
+      // pickDeadline mirroring for external-apply events. Both
+      // paths converge on the same wire field.
+      const pickDeadlineForWire =
+        typeof result.pick_deadline === 'string' && result.pick_deadline.length > 0
+          ? result.pick_deadline
+          : undefined;
       const event: BufferedDraftEvent = {
         kind: 'pick_submitted',
         seq: result.seq,
@@ -1619,6 +1670,7 @@ export class LobbyManager {
         // settle when the broadcast comes back.
         correlationId: action.idempotencyKey,
         ...(isAutopick ? { isAutopick: true } : {}),
+        ...(pickDeadlineForWire !== undefined ? { pickDeadline: pickDeadlineForWire } : {}),
       };
       this.appendEventAndCount(event);
       const broadcastStart = Date.now();
@@ -2231,6 +2283,11 @@ export class LobbyManager {
   private appendEventAndCount(event: BufferedDraftEvent): void {
     this.events.append(event);
     this.eventsSinceLastSnapshot++;
+    // Chunk 10c-2 batch 3 (2026-07-27): touch activity clock so the
+    // idle-eviction scanner sees this lobby is live. Every engine-
+    // authored event flows through here (see the enumeration comment
+    // below); no per-callsite touch required.
+    this.lastActivityAt = Date.now();
     // Chunk 11g.7 sub-step 7e: every runtime emission path that
     // appends to the ring buffer is one that just successfully wrote
     // a `draft_events` row. Advance the dedup cursor here so external
@@ -3007,6 +3064,17 @@ export class LobbyManager {
     // were disconnected.
     const isAutopick =
       ((event.payload as Record<string, unknown>).is_autopick as boolean) === true;
+    // Chunk 10c-2 batch 3 C2 (2026-07-28): mirror the durable payload's
+    // pick_deadline into the wire event so clients can re-arm their
+    // countdown UI symmetric with the engine's own setPickDeadline
+    // re-arm (batch 2 pattern). Present iff the pick event was written
+    // by a post-batch-2 RPC; absent for v1 legacy events replayed at
+    // bootstrap (client guards on presence).
+    const rawPickDeadline = (event.payload as Record<string, unknown>).pick_deadline;
+    const pickDeadlineForWire =
+      typeof rawPickDeadline === 'string' && rawPickDeadline.length > 0
+        ? rawPickDeadline
+        : undefined;
     const buffered: BufferedDraftEvent = {
       kind: 'pick_submitted',
       seq: event.seq,
@@ -3017,6 +3085,7 @@ export class LobbyManager {
       pickNumber: slot.pickNumber,
       correlationId: event.idempotency_key ?? '',
       ...(isAutopick ? { isAutopick: true } : {}),
+      ...(pickDeadlineForWire !== undefined ? { pickDeadline: pickDeadlineForWire } : {}),
     };
     this.events.append(buffered);
 
@@ -5014,6 +5083,14 @@ export class LobbyManager {
         const applyStart = Date.now();
         this.applyEventDuringBootstrap(event);
         const applyMs = Date.now() - applyStart;
+        // Chunk 10c-2 batch 3 (2026-07-27): touch activity clock. Any
+        // external event applied is proof this lobby is being written
+        // to by a live producer (API server → RPC → NOTIFY). Prevents
+        // the idle-eviction scanner from evicting a lobby that has no
+        // connected WS clients but is actively receiving external
+        // picks (e.g., a background autopick worker or a scripted
+        // driver in a headless test).
+        this.lastActivityAt = Date.now();
         structuredLogger.debug('event_subscription.event_applied', {
           lobbyId: this.lobbyId,
           seq: event.seq,

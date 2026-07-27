@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
+import { DEFAULT_PICK_TIME_LIMIT_SECONDS } from '@citrus/shared';
 import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -123,7 +124,7 @@ const DraftRoom = () => {
     } catch { /* sessionStorage disabled (private browsing) — fall through */ }
     return DraftPhase.LOBBY;
   });
-  const [timeRemaining, setTimeRemaining] = useState(90); // Will be updated from league settings when loaded
+  const [timeRemaining, setTimeRemaining] = useState(DEFAULT_PICK_TIME_LIMIT_SECONDS); // Will be updated from league settings when loaded
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [pickInProgress, setPickInProgress] = useState(false);
   const [isCommissioner, setIsCommissioner] = useState(false);

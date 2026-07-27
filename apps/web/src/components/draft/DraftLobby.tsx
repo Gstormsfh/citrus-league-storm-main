@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { DEFAULT_PICK_TIME_LIMIT_SECONDS } from '@citrus/shared';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -114,7 +115,7 @@ export const DraftLobby = ({
   const [scheduleTimeInput, setScheduleTimeInput] = useState('');
   const [settings, setSettings] = useState<DraftSettings>({
     rounds: leagueDraftRounds, // Use league's draft_rounds setting
-    pickTimeLimit: leaguePickTimeLimit || 90, // Use league's saved pickTimeLimit
+    pickTimeLimit: leaguePickTimeLimit || DEFAULT_PICK_TIME_LIMIT_SECONDS, // Use league's saved pickTimeLimit
     draftOrder: 'serpentine',
     scoringFormat: 'standard'
   });

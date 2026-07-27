@@ -123,11 +123,30 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
       }
       // Append the event to the snapshot's recentEvents if a
       // snapshot is loaded — keeps the in-memory view fresh.
+      //
+      // Chunk 10c-2 batch 3 C2 (2026-07-28): also re-arm the
+      // countdown UI's authoritative deadline. `pick_submitted`
+      // events post-batch-2 carry `pickDeadline` (the next pick's
+      // deadline computed by the RPC); mirror that into
+      // `stateSnapshot.currentPickDeadline` so consumers of the
+      // snapshot see the fresh value without needing a resync.
+      // Guard on presence for backwards compat with pre-batch-2 rows.
       if (prev.snapshot !== null) {
-        next.snapshot = {
+        const patchedSnapshot = {
           ...prev.snapshot,
           recentEvents: [...prev.snapshot.recentEvents, event],
         };
+        if (
+          event.kind === 'pick_submitted' &&
+          typeof event.pickDeadline === 'string' &&
+          event.pickDeadline.length > 0
+        ) {
+          patchedSnapshot.stateSnapshot = {
+            ...prev.snapshot.stateSnapshot,
+            currentPickDeadline: event.pickDeadline,
+          };
+        }
+        next.snapshot = patchedSnapshot;
       }
       return next;
     }),

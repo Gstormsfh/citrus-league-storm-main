@@ -279,6 +279,22 @@ export interface LobbyRegistryOptions {
    * without affecting the RPC-write path.
    */
   supabase: SupabaseClient;
+
+  /**
+   * Chunk 10c-2 batch 3 (2026-07-27): idle-lobby eviction window.
+   * Maximum time a lobby can sit at `connectionCount === 0` and
+   * `draftStatus !== 'in_progress'` before being evicted. Overrides
+   * the `LOBBY_IDLE_EVICTION_MS` env; env overrides the 10-min
+   * default. `0` disables the scanner entirely.
+   */
+  idleEvictionMs?: number;
+  /**
+   * Chunk 10c-2 batch 3 (2026-07-27): idle-eviction scan cadence.
+   * How often `scanIdleLobbies` runs. Overrides
+   * `LOBBY_IDLE_EVICTION_SCAN_MS` env; env overrides the 3-min
+   * default. `0` disables the scanner.
+   */
+  idleEvictionScanMs?: number;
 }
 
 export class LobbyRegistry {
@@ -314,6 +330,20 @@ export class LobbyRegistry {
     this.verifyCommissionerAuthorization = opts.verifyCommissionerAuthorization;
     this.publish = opts.publish;
     this.supabase = opts.supabase;
+    // Chunk 10c-2 batch 3 (2026-07-27): idle-eviction config. Options
+    // override env; env overrides defaults (10 min idle / 3 min scan).
+    // Setting either to 0 disables the scanner (tests set both to 0
+    // via the vitest setup file; local dev may also disable).
+    this.idleEvictionMs =
+      opts.idleEvictionMs ??
+      (process.env.LOBBY_IDLE_EVICTION_MS !== undefined
+        ? parseInt(process.env.LOBBY_IDLE_EVICTION_MS, 10)
+        : 10 * 60 * 1000);
+    this.idleEvictionScanMs =
+      opts.idleEvictionScanMs ??
+      (process.env.LOBBY_IDLE_EVICTION_SCAN_MS !== undefined
+        ? parseInt(process.env.LOBBY_IDLE_EVICTION_SCAN_MS, 10)
+        : 3 * 60 * 1000);
   }
 
   /**
@@ -549,6 +579,180 @@ export class LobbyRegistry {
         entry.forEachConnection(fn);
       }
     }
+  }
+
+  // ── Chunk 10c-2 batch 3 (2026-07-27): idle-lobby eviction ────────
+  //
+  // Motivation: PROJECT_PLAN Decision Log 2026-07-27 "Snapshot
+  // retention + lobby hygiene chunk — spec drafted" surfaced the
+  // ghost-lobby class — a lobby whose WS clients all disconnected
+  // but which stayed in memory forever, its 30-s snapshot writer
+  // burning ~2,880 rows/day/lobby against `draft_snapshots`. The
+  // retention chunk (batch 1) fixed the storage side via UPSERT-per-
+  // league; this scanner fixes the lifecycle side by retiring the
+  // idle lobby entirely.
+  //
+  // Design:
+  //   - Every `LOBBY_IDLE_EVICTION_SCAN_MS` (default 3 min), walk
+  //     every constructed lobby and evict any that satisfy ALL of:
+  //       (a) `connectionCount() === 0`
+  //       (b) `getDraftStatus() !== 'in_progress'`  (exemption)
+  //       (c) `now - getLastActivityAt() > LOBBY_IDLE_EVICTION_MS`
+  //           (default 10 min)
+  //   - Evict = call `lobby.shutdown()` (stops snapshot writer,
+  //     heartbeat, and any pending timers via `shutDown` flag) and
+  //     remove from the registry map.
+  //   - Log `registry.lobby_evicted_idle` at INFO with age +
+  //     draftStatus + connectionCount context, distinct from
+  //     `registry.lobby_evicted` (chunk 11g.10 sub-step 10b admin
+  //     eviction) so ops filters can separate operator-initiated
+  //     vs system-initiated eviction.
+  //
+  // Active-status exemption (from architect ratification): lobbies
+  // with `draftStatus === 'in_progress'` are NEVER evicted, even at
+  // `connectionCount === 0` for hours. Rationale: an in-progress
+  // draft with no connected clients still has a live autopick timer
+  // that must fire on schedule; evicting the lobby would cancel the
+  // timer (via shutdown), and while bootstrap can reconstruct state
+  // on the next connect, the AUTOPICK moment could be missed if no
+  // connect happens between the eviction and the deadline. The
+  // catch-up-on-connect path (LobbyManager.setPickDeadline at
+  // deadline<=now clamps to 0 delayMs — verified in the S5 exposure
+  // Q1 report) is safety net, not primary. Active drafts stay
+  // resident until they complete or cancel.
+  //
+  // Env tunable via `LOBBY_IDLE_EVICTION_MS` and
+  // `LOBBY_IDLE_EVICTION_SCAN_MS`. Setting either to `0` disables
+  // the scanner (used in tests + local dev).
+
+  private idleEvictionTimer: NodeJS.Timeout | null = null;
+  private readonly idleEvictionMs: number;
+  private readonly idleEvictionScanMs: number;
+
+  /**
+   * Start the periodic idle-eviction scanner. Idempotent — a second
+   * call is a no-op. Called from engine entry-point startup after
+   * the registry is constructed. If `LOBBY_IDLE_EVICTION_MS` or
+   * `LOBBY_IDLE_EVICTION_SCAN_MS` is `0`, this is also a no-op
+   * (scanner is disabled).
+   */
+  startIdleEvictionTimer(): void {
+    if (this.idleEvictionTimer !== null) return;
+    if (this.idleEvictionMs <= 0 || this.idleEvictionScanMs <= 0) {
+      structuredLogger.info('registry.idle_eviction_timer_disabled', {
+        idleEvictionMs: this.idleEvictionMs,
+        idleEvictionScanMs: this.idleEvictionScanMs,
+      });
+      return;
+    }
+    this.idleEvictionTimer = setInterval(
+      () => this.scanIdleLobbies(),
+      this.idleEvictionScanMs,
+    );
+    if (typeof this.idleEvictionTimer.unref === 'function') {
+      this.idleEvictionTimer.unref();
+    }
+    structuredLogger.info('registry.idle_eviction_timer_started', {
+      idleEvictionMs: this.idleEvictionMs,
+      idleEvictionScanMs: this.idleEvictionScanMs,
+    });
+  }
+
+  /**
+   * Cancel the periodic idle-eviction scanner. Called from the
+   * engine's graceful-shutdown path (`shutdown()` in `index.ts`)
+   * BEFORE closing lobbies so a late scan doesn't try to evict a
+   * lobby that's already being torn down.
+   */
+  stopIdleEvictionTimer(): void {
+    if (this.idleEvictionTimer !== null) {
+      clearInterval(this.idleEvictionTimer);
+      this.idleEvictionTimer = null;
+      structuredLogger.info('registry.idle_eviction_timer_stopped', {});
+    }
+  }
+
+  /**
+   * Single scan pass. Iterates every constructed lobby (skips
+   * in-flight Promise placeholders) and evicts any that meet all
+   * three criteria (connectionCount=0, draftStatus!=in_progress,
+   * age>idleEvictionMs). Public for tests + admin diagnostics.
+   */
+  scanIdleLobbies(): { scanned: number; evicted: number } {
+    const now = Date.now();
+    let scanned = 0;
+    let evicted = 0;
+    // Snapshot the entries into an array first so evicting inside
+    // the loop (which mutates `this.lobbies`) doesn't corrupt the
+    // Map iterator.
+    const entries: Array<[string, LobbyManager]> = [];
+    for (const [lobbyId, entry] of this.lobbies.entries()) {
+      if (entry instanceof LobbyManager) {
+        entries.push([lobbyId, entry]);
+      }
+    }
+    for (const [lobbyId, lobby] of entries) {
+      scanned += 1;
+      const connectionCount = lobby.connectionCount();
+      const draftStatus = lobby.getDraftStatus();
+      const lastActivityAt = lobby.getLastActivityAt();
+      const ageMs = now - lastActivityAt;
+      if (connectionCount !== 0) continue;
+      // Chunk 10c-2 batch 3 amendment (Monday 2026-07-28): evict ONLY
+      // when draftStatus ∈ {not_started, completed, cancelled}. Both
+      // `in_progress` and `paused` are exempt.
+      //
+      // Rationale — `in_progress`: an active autopick timer may still
+      // need to fire; evicting cancels the timer via shutdown, and
+      // while bootstrap catches up on next connect, a fully-abandoned
+      // active draft has no reconstruction trigger. Self-advancement
+      // policy is a Zach call (queued behind gates).
+      //
+      // Rationale — `paused`: a paused draft has a commissioner-owned
+      // resume moment. Evicting mid-pause would race the resume RPC's
+      // event delivery against the eviction; the resume path relies
+      // on the lobby's in-memory `pauseState` to construct the resumed
+      // deadline. Bootstrap can reconstruct from durable state, but
+      // paused drafts are rare enough that eviction gain isn't worth
+      // the complexity of the resume-race edge.
+      if (
+        draftStatus !== 'not_started' &&
+        draftStatus !== 'completed' &&
+        draftStatus !== 'cancelled'
+      ) {
+        continue;
+      }
+      if (ageMs <= this.idleEvictionMs) continue;
+
+      // Eviction: shutdown the lobby (stops snapshot + heartbeat +
+      // pending timers via shutDown flag), then remove from map.
+      // Fire-and-forget shutdown; the promise resolves after
+      // internal teardown but the map-delete can happen immediately
+      // since no new lookup will find this lobbyId post-delete.
+      void lobby.shutdown().catch((err: unknown) => {
+        structuredLogger.debug('registry.idle_eviction_shutdown_threw', {
+          lobbyId,
+        });
+        void err;
+      });
+      this.lobbies.delete(lobbyId);
+      evicted += 1;
+      structuredLogger.info('registry.lobby_evicted_idle', {
+        lobbyId,
+        ageMs,
+        idleEvictionMs: this.idleEvictionMs,
+        connectionCount,
+        draftStatus,
+        lastActivityAt: new Date(lastActivityAt).toISOString(),
+      });
+    }
+    if (evicted > 0 || scanned > 0) {
+      structuredLogger.debug('registry.idle_eviction_scan_completed', {
+        scanned,
+        evicted,
+      });
+    }
+    return { scanned, evicted };
   }
 
   // ── Private ────────────────────────────────────────────────────

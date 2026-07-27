@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { DEFAULT_PICK_TIME_LIMIT_SECONDS } from '@citrus/shared';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Clock, Pause } from 'lucide-react';
@@ -10,7 +11,7 @@ interface DraftTimerProps {
   totalTime?: number;
 }
 
-export const DraftTimer = memo(({ timeRemaining, isActive, totalTime = 90 }: DraftTimerProps) => {
+export const DraftTimer = memo(({ timeRemaining, isActive, totalTime = DEFAULT_PICK_TIME_LIMIT_SECONDS }: DraftTimerProps) => {
   const clamped = Math.max(0, timeRemaining);
   const progress = Math.min(100, ((totalTime - clamped) / totalTime) * 100);
   const minutes = Math.floor(clamped / 60);

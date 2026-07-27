@@ -59,3 +59,18 @@ if (!process.env.HEARTBEAT_PONG_TIMEOUT_MS) {
 if (!process.env.EVENT_SUBSCRIPTION_DISABLED) {
   process.env.EVENT_SUBSCRIPTION_DISABLED = '1';
 }
+
+// Chunk 10c-2 batch 3 (2026-07-27) — disable the LobbyRegistry
+// idle-eviction scanner in tests by default. Setting either the
+// window or scan interval to `0` short-circuits
+// `startIdleEvictionTimer` so fake-timer-using tests don't trip on
+// a periodic setInterval. Idle-eviction-specific tests
+// (`LobbyRegistry.test.ts`'s new suite) override these per-test in
+// `beforeEach` OR pass `idleEvictionMs`/`idleEvictionScanMs` via
+// the constructor `opts` to exercise the scan path directly.
+if (!process.env.LOBBY_IDLE_EVICTION_MS) {
+  process.env.LOBBY_IDLE_EVICTION_MS = '0';
+}
+if (!process.env.LOBBY_IDLE_EVICTION_SCAN_MS) {
+  process.env.LOBBY_IDLE_EVICTION_SCAN_MS = '0';
+}

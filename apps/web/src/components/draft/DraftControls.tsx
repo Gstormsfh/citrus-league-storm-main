@@ -1,3 +1,4 @@
+import { DEFAULT_PICK_TIME_LIMIT_SECONDS } from '@citrus/shared';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,7 +33,7 @@ export const DraftControls = ({
   canPause = true,
   canContinue = true,
   canUndo = false,
-  pickTimeLimit = 90
+  pickTimeLimit = DEFAULT_PICK_TIME_LIMIT_SECONDS
 }: DraftControlsProps) => {
   const handlePause = onPause || onToggleDraft;
   const handleContinue = onContinue || onToggleDraft;

@@ -96,6 +96,21 @@ export type BufferedDraftEvent =
        * for backwards compatibility with pre-6c-buffered events.
        */
       isAutopick?: boolean;
+      /**
+       * Chunk 10c-2 batch 2 (2026-07-27) — the next pick's deadline,
+       * as ISO 8601. Paired with the durable `pick_deadline` field
+       * in `draft_events.payload` (migration
+       * `20260727010000_pick_event_carries_pick_deadline.sql`). The
+       * engine re-arms its own `setPickDeadline` from this value on
+       * external-event apply; clients use it symmetrically to re-arm
+       * their countdown UI without having to re-fetch a snapshot.
+       *
+       * Optional: pre-batch-2 buffered events (bootstrap replay of
+       * historical v1 rows) don't carry the field. Clients guard on
+       * presence and fall back to the snapshot's
+       * `stateSnapshot.currentPickDeadline` if missing.
+       */
+      pickDeadline?: string;
     }
   | {
       /**

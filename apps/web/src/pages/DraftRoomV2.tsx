@@ -20,6 +20,10 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { ConnectionBanner } from '@/components/draft/v2/ConnectionBanner';
+import {
+  DraftTimerV2,
+  useClockOffsetEstimator,
+} from '@/components/draft/v2/DraftTimerV2';
 import { DraftClientRunner } from '@/lib/draftClient/runner';
 import {
   useDraftClientStore,
@@ -40,6 +44,11 @@ export default function DraftRoomV2() {
 
   const runnerRef = useRef<DraftClientRunner | null>(null);
   const store = useDraftClientStore();
+  // Chunk 10c-2 batch 3 C2 (2026-07-28): rolling clock-offset
+  // estimator for the DraftTimerV2 countdown. Fed by every event
+  // frame's `timestamp` field; blended into an EMA. See
+  // `useClockOffsetEstimator` in DraftTimerV2.tsx.
+  const { offsetMs: clockOffsetMs, updateOffset } = useClockOffsetEstimator();
 
   // Mount: instantiate runner, wire callbacks to store, connect.
   // Unmount: disconnect + reset store.
@@ -60,8 +69,30 @@ export default function DraftRoomV2() {
       { leagueId, draftId },
       {
         onSnapshot: (snapshot) => store.setSnapshot(snapshot),
-        onEvent: (event) => store.applyEvent(event),
-        onEvents: (events) => store.applyEvents(events),
+        onEvent: (event) => {
+          // 10c-2 batch 3 C2: capture skew estimate BEFORE the store
+          // mutation so a slow store update doesn't skew the offset.
+          const clientReceiveMs = Date.now();
+          const serverMs = new Date(event.timestamp).getTime();
+          if (Number.isFinite(serverMs)) {
+            updateOffset(clientReceiveMs, serverMs);
+          }
+          store.applyEvent(event);
+        },
+        onEvents: (events) => {
+          // 10c-2 batch 3 C2: seed skew from the most-recent event
+          // in the batch (single sample rather than N; the resync
+          // path can carry a large batch and per-event offset
+          // updates would over-weight it in the EMA).
+          if (events.length > 0) {
+            const last = events[events.length - 1];
+            const serverMs = new Date(last.timestamp).getTime();
+            if (Number.isFinite(serverMs)) {
+              updateOffset(Date.now(), serverMs);
+            }
+          }
+          store.applyEvents(events);
+        },
         onPresence: (payload) => {
           store.applyPresence(payload);
           if (payload.kind === 'joined') {
@@ -97,14 +128,14 @@ export default function DraftRoomV2() {
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Draft Room v2</h1>
       <ConnectionBanner onRetryNow={handleRetryNow} />
-      <DraftStateView />
+      <DraftStateView clockOffsetMs={clockOffsetMs} />
     </div>
   );
 }
 
 // ── Barebones state view (5b minimum surface) ──────────────────────
 
-function DraftStateView() {
+function DraftStateView({ clockOffsetMs }: { clockOffsetMs: number }) {
   const connectionState = useDraftConnectionState();
   const snapshot = useDraftSnapshot();
   const presentUserIds = usePresence();
@@ -122,9 +153,20 @@ function DraftStateView() {
   }
 
   const stateSnapshot = snapshot.stateSnapshot;
+  // Chunk 10c-2 batch 3 C2 (2026-07-28): WS-open signal for the
+  // DraftTimerV2 stale indicator. The runner exposes `connected`
+  // (fully wired) vs any of the disconnected/reconnecting/fatal
+  // states. Only `connected` renders the timer without dim.
+  const wsOpen = connectionState.kind === 'connected';
 
   return (
     <div className="mt-4 space-y-4" data-testid="draft-state-view">
+      <DraftTimerV2
+        currentPickDeadline={stateSnapshot.currentPickDeadline}
+        draftStatus={stateSnapshot.draftStatus}
+        wsOpen={wsOpen}
+        clockOffsetMs={clockOffsetMs}
+      />
       <div className="grid grid-cols-2 gap-4">
         <StateCard label="Format" value={snapshot.format} />
         <StateCard
