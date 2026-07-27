@@ -82,13 +82,36 @@ function base64url(input) {
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
 }
+/**
+ * Generate a valid UUIDv4 string with all leading nibbles pinned to
+ * `9`s so probe connections stay identifiable in engine logs. Kept in
+ * the recognizable "99999999-9999-4999-8999-<random 12 hex>" range
+ * (the `4` in position 13 marks version 4; the `8` in position 17
+ * marks variant 1 — RFC 4122 compliant).
+ *
+ * Fixes the 2026-07-28 bug where `probe-<uuid>` (a non-UUID string)
+ * passed the engine's JWT signature check but caused the LobbyManager
+ * downstream to fail ~250 ms later during connection setup, producing
+ * a 1011 server_error close on every probe run. See PROJECT_PLAN.md
+ * Decision Log 2026-07-28 "Probe patch + hardening ledger" entry.
+ */
+function probeUserId() {
+  // 12 random hex chars for the node component.
+  const hex = randomUUID().replace(/-/g, '').slice(0, 12);
+  return `99999999-9999-4999-8999-${hex}`;
+}
+
 function mintDraftJwt(leagueId) {
   const nowSec = Math.floor(Date.now() / 1000);
   const header = { alg: 'HS256', typ: 'JWT' };
   // TTL: DURATION_MS + 60s slack so the JWT never expires mid-probe.
   const ttlSec = Math.ceil(DURATION_MS / 1000) + 60;
   const payload = {
-    sub: `probe-${randomUUID()}`,
+    // Probe sub is a valid UUIDv4 in the recognizable 99999999- range
+    // so downstream engine code (LobbyManager, presence, snapshot
+    // sender) doesn't 1011 on an unparseable UUID mid-connection-setup.
+    // See PROJECT_PLAN.md Decision Log 2026-07-28 for the bug details.
+    sub: probeUserId(),
     draftId: leagueId,
     leagueId,
     iat: nowSec,
