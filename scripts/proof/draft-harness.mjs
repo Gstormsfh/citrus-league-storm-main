@@ -87,9 +87,31 @@ const RUN_ID = opt('run-id', new Date().toISOString().replace(/[:.]/g, '-'));
 // (the RPC's +1 s pad; see pick-clock audit Q1). The next `pick` event
 // frame we receive is the autopick; measure its receive_ts relative to
 // the last-submit's returned `pick_deadline` from the RPC.
-const AUTOPICK_TIMEOUT_MS = parseInt(opt('autopick-timeout-ms', '60000'), 10);
-const S5_PRE_AUTOPICK_PICKS = parseInt(opt('s5-pre-autopick-picks', '3'), 10);
+//
+// Order matters: EXPECTED_PICK_CLOCK_SEC must be parsed BEFORE
+// AUTOPICK_TIMEOUT_MS so the default timeout can be computed as
+// (expectedPickClock + 30) * 1000. Prior default was a fixed 60000 ms
+// which under-provisions the wait for a 90-s pick clock (the tolerance
+// upper bound is (90+10) = 100 s, but we'd only wait 60 s and time
+// out with a false-negative). The startup assert below fails fast if
+// the effective timeout is <= the tolerance upper bound.
 const EXPECTED_PICK_CLOCK_SEC = opt('expected-pick-clock', null);
+const AUTOPICK_TIMEOUT_MS = (() => {
+  const explicit = opt('autopick-timeout-ms', null);
+  if (explicit !== null) return parseInt(explicit, 10);
+  // Default derivation: 30 s of headroom past the tolerance upper
+  // bound gives real network + broadcast-fanout latency a safe budget.
+  // Only meaningful for S5; for other scenarios the value is unused.
+  if (EXPECTED_PICK_CLOCK_SEC !== null && EXPECTED_PICK_CLOCK_SEC !== undefined) {
+    const clock = parseInt(EXPECTED_PICK_CLOCK_SEC, 10);
+    if (Number.isFinite(clock) && clock > 0) {
+      return (clock + 30) * 1000;
+    }
+  }
+  // Fallback for scenarios that don't use this value (S1..S4).
+  return 60_000;
+})();
+const S5_PRE_AUTOPICK_PICKS = parseInt(opt('s5-pre-autopick-picks', '3'), 10);
 
 if (flag('help') || flag('h')) {
   console.log(`Usage: node scripts/proof/draft-harness.mjs --scenario=<S1|S2|S3|S4|S5> [options]
@@ -113,7 +135,7 @@ Options (env-tunable defaults):
   --burst                    (skip inter-pick pacing; implied by S3)
   --idle-minutes=N           (S4 only; default 30)
   --idle-after-picks=N       (S4 only; default 6)
-  --autopick-timeout-ms=N    (S5 only; default 60000 — must exceed pickTimeLimit+1s)
+  --autopick-timeout-ms=N    (S5 only; default (expectedPickClock + 30) * 1000 ms — must exceed the tolerance upper bound)
   --s5-pre-autopick-picks=N  (S5 only; default 3 — how many picks before letting timer expire)
   --expected-pick-clock=N    (S5 only; expected pickTimeLimit — used for tolerance window assertion)
   --pace-min-ms=N            (default 2000)
@@ -138,6 +160,29 @@ if (SCENARIO === 'S5' && (EXPECTED_PICK_CLOCK_SEC === null || EXPECTED_PICK_CLOC
   console.error('FATAL: S5 requires --expected-pick-clock=<N> to be set.');
   console.error('       Run fixture-12 with --pick-clock=N first, then pass the same N here.');
   process.exit(2);
+}
+// S5 autopick-timeout must exceed the tolerance window's upper bound
+// or every S5 sample will time out as a false-negative drop.
+// Tolerance upper = (expectedPickClock + 10) * 1000. Autopick timeout
+// MUST be strictly greater; the default derivation gives 20 s of
+// headroom past that so the default always passes. A user-provided
+// --autopick-timeout-ms that trips this assert is almost certainly
+// the 60 s left-over from a 30-s clock run being reused on a 90-s
+// clock (the 2026-07-27 miscalibration this assert is here to prevent).
+if (SCENARIO === 'S5') {
+  const clock = parseInt(EXPECTED_PICK_CLOCK_SEC, 10);
+  const toleranceUpperMs = (clock + 10) * 1000;
+  if (!(AUTOPICK_TIMEOUT_MS > toleranceUpperMs)) {
+    console.error('FATAL: --autopick-timeout-ms is too small for --expected-pick-clock.');
+    console.error(`       autopickTimeoutMs=${AUTOPICK_TIMEOUT_MS} ms`);
+    console.error(`       expectedPickClock=${clock} s → tolerance upper bound=${toleranceUpperMs} ms`);
+    console.error('       The wait MUST exceed the tolerance upper bound; otherwise every S5');
+    console.error('       sample times out as a false-negative drop before the autopick can');
+    console.error(`       arrive. Recommended minimum: ${(clock + 10) * 1000 + 1000} ms; default is`);
+    console.error(`       ${(clock + 30) * 1000} ms (30 s of network + fanout headroom past the`);
+    console.error('       tolerance upper). Omit --autopick-timeout-ms to accept the default.');
+    process.exit(2);
+  }
 }
 if (CLIENTS < 1 || CLIENTS > TEAM_COUNT) {
   console.error(`FATAL: --clients must be in 1..${TEAM_COUNT} (got ${CLIENTS}).`);

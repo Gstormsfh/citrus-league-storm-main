@@ -5316,6 +5316,126 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     expect(lobby.getCurrentState().picksMade).toBe(0);
   });
 
+  // ── Chunk 10c-2 batch 2 (2026-07-27): external-apply timer re-arm ──
+  //
+  // Verify report ratified 2026-07-27 exposed that external pick events
+  // (production human picks: client → API → RPC → NOTIFY → engine)
+  // advanced picksMade via applyPickEvent but did NOT re-arm the pick
+  // timer. Stale timer would fire against a bootstrap-set deadline,
+  // autopicking for whoever's on the clock — premature-steal class.
+  // Fix: pick event payload now carries pick_deadline (migration
+  // 20260727010000_pick_event_carries_pick_deadline.sql); applyPickEvent
+  // reads it and re-arms via setPickDeadline. Backwards compat: v1
+  // events without the field skip re-arm (bootstrap's init() covers).
+
+  it('10c-2 batch 2: external pick apply WITH pick_deadline field re-arms the timer', async () => {
+    const teamIds = ['team-1', 'team-2', 'team-3'];
+    const draftOrder: DraftOrderSlot[] = generateDraftOrder(teamIds, 3, 'snake');
+    const firstSlot = draftOrder[0];
+    const newDeadlineIso = new Date(Date.now() + 60_000).toISOString();
+    const externalEvent: DraftEventRow = {
+      id: 5,
+      league_id: 'league-1',
+      seq: 5,
+      event_type: 'pick',
+      payload: {
+        team_id: firstSlot.teamId,
+        pick_number: firstSlot.pickNumber,
+        round: firstSlot.round,
+        player_id: 42,
+        picked_at: new Date().toISOString(),
+        is_autopick: false,
+        pick_deadline: newDeadlineIso,
+      },
+      payload_hash: '',
+      idempotency_key: null,
+      actor: { kind: 'user', id: 'u-1', session_id: 's-1' },
+      correlation_id: null,
+      created_at: new Date().toISOString(),
+    } as DraftEventRow;
+    const listDraftEvents = vi.fn(async () => [externalEvent]);
+    const lobby = await makeLobby({ listDraftEvents, draftOrder });
+    await lobby.enqueueExternalEvent(5);
+    expect(lobby.getCurrentState().picksMade).toBe(1);
+    // The re-arm must have taken effect: currentPickDeadline reflects
+    // the payload's pick_deadline (snapshot serializes it as ISO).
+    expect(lobby.getCurrentState().currentPickDeadline).toBe(newDeadlineIso);
+  });
+
+  it('10c-2 batch 2: external pick apply WITHOUT pick_deadline (v1 payload) does NOT re-arm', async () => {
+    // Backwards-compat check: pre-migration v1 events replayed at
+    // bootstrap (or delivered via NOTIFY if a pre-migration RPC is
+    // still on the wire during a rolling deploy) must not trip the
+    // re-arm path. The presence guard in applyPickEvent handles this.
+    const teamIds = ['team-1', 'team-2', 'team-3'];
+    const draftOrder: DraftOrderSlot[] = generateDraftOrder(teamIds, 3, 'snake');
+    const firstSlot = draftOrder[0];
+    const externalEvent: DraftEventRow = {
+      id: 5,
+      league_id: 'league-1',
+      seq: 5,
+      event_type: 'pick',
+      payload: {
+        team_id: firstSlot.teamId,
+        pick_number: firstSlot.pickNumber,
+        round: firstSlot.round,
+        player_id: 42,
+        // no pick_deadline (v1 payload shape)
+      },
+      payload_hash: '',
+      idempotency_key: null,
+      actor: { kind: 'user', id: 'u-1', session_id: 's-1' },
+      correlation_id: null,
+      created_at: new Date().toISOString(),
+    } as DraftEventRow;
+    const listDraftEvents = vi.fn(async () => [externalEvent]);
+    const lobby = await makeLobby({ listDraftEvents, draftOrder });
+    const deadlineBefore = lobby.getCurrentState().currentPickDeadline;
+    await lobby.enqueueExternalEvent(5);
+    expect(lobby.getCurrentState().picksMade).toBe(1);
+    // currentPickDeadline unchanged from before the apply — no re-arm.
+    expect(lobby.getCurrentState().currentPickDeadline).toBe(deadlineBefore);
+  });
+
+  it('10c-2 batch 2: external pick apply with unparseable pick_deadline does NOT re-arm', async () => {
+    // Malformed timestamp string in the pick_deadline field. Presence
+    // guard sees it as a string with length > 0, but Date parsing
+    // yields NaN — the else branch inside applyPickEvent skips the
+    // re-arm (defensive; the migration's validate_draft_event_payload
+    // is expected to reject at write time, but the engine guards at
+    // read time too).
+    const teamIds = ['team-1', 'team-2', 'team-3'];
+    const draftOrder: DraftOrderSlot[] = generateDraftOrder(teamIds, 3, 'snake');
+    const firstSlot = draftOrder[0];
+    const externalEvent: DraftEventRow = {
+      id: 5,
+      league_id: 'league-1',
+      seq: 5,
+      event_type: 'pick',
+      payload: {
+        team_id: firstSlot.teamId,
+        pick_number: firstSlot.pickNumber,
+        round: firstSlot.round,
+        player_id: 42,
+        picked_at: new Date().toISOString(),
+        is_autopick: false,
+        pick_deadline: 'not-a-date',
+      },
+      payload_hash: '',
+      idempotency_key: null,
+      actor: { kind: 'user', id: 'u-1', session_id: 's-1' },
+      correlation_id: null,
+      created_at: new Date().toISOString(),
+    } as DraftEventRow;
+    const listDraftEvents = vi.fn(async () => [externalEvent]);
+    const lobby = await makeLobby({ listDraftEvents, draftOrder });
+    const deadlineBefore = lobby.getCurrentState().currentPickDeadline;
+    await lobby.enqueueExternalEvent(5);
+    expect(lobby.getCurrentState().picksMade).toBe(1);
+    // Deadline unchanged; the unparseable value did not slip through.
+    expect(lobby.getCurrentState().currentPickDeadline).toBe(deadlineBefore);
+  });
+
   // ── Chunk 11g.10 sub-step 10c-1a: live external-apply broadcast ──
   //
   // Defect closure. Pre-10c-1a, `processExternalEvent` applied state

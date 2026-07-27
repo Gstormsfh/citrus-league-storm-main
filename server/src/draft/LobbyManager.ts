@@ -513,6 +513,24 @@ export class LobbyManager {
   private currentTimerDeadline: Date | null = null;
   private currentTimerHandle: NodeJS.Timeout | null = null;
   /**
+   * Chunk 10c-2 batch 2 (2026-07-27): timer arm sequence counter.
+   * Incremented on every `setPickDeadline` AND every `cancelPickTimer`
+   * call. The setTimeout callback captures the current value in its
+   * closure and passes it to `handleClockExpired`; if the captured
+   * value doesn't match `timerArmSeq` at fire time, the timer is
+   * stale (superseded by a later arm or cancelled), and the fire is
+   * skipped with a `autopick.stale_timer_skipped` log line.
+   *
+   * Why not just compare `currentTimerDeadline` reference identity?
+   * `cancelPickTimer` intentionally does NOT clear
+   * `currentTimerDeadline` (see comment at cancelPickTimer for the
+   * observability rationale). A stale fire after cancel would still
+   * see `armedDeadline === currentTimerDeadline` if the timer was
+   * cancelled without a replacement arm. The counter distinguishes
+   * "same arm" from "stale arm cancelled without replacement."
+   */
+  private timerArmSeq = 0;
+  /**
    * Single-timer-handle architecture (chunk 11g.6 sub-step 6c3).
    * At most one timer is active at runtime; this discriminates
    * the format-and-state-specific behavior on
@@ -2646,7 +2664,43 @@ export class LobbyManager {
         };
         break;
       case 'draft_resumed':
+        // Chunk 10c-2 batch 2 (2026-07-27): re-arm the pick timer from
+        // the event's new_pick_deadline. Live external-apply path uses
+        // THIS dispatcher (`applyEventDuringBootstrap` — see the
+        // matching processExternalEvent call at line 4897). Same
+        // defect class as applyPickEvent — the LIVE apply must re-arm
+        // or the engine's stale timer will fire against an
+        // out-of-date deadline. Bootstrap-mode still has init()'s
+        // covering fallback (line 920) reading leagues.pick_deadline.
         this.pauseState = null;
+        {
+          const resumedDeadline = (event.payload as Record<string, unknown>)
+            .new_pick_deadline;
+          if (typeof resumedDeadline === 'string' && resumedDeadline.length > 0) {
+            const parsed = new Date(resumedDeadline);
+            if (!Number.isNaN(parsed.getTime()) && this.draftStatus === 'in_progress') {
+              this.setPickDeadline(parsed, 'pick');
+            }
+          }
+        }
+        break;
+      case 'draft_extended':
+        // Chunk 10c-2 batch 2 (2026-07-27): draft_extended was NOT in
+        // this dispatcher's switch previously (fell through to default
+        // — the live-apply skip). Adding it with re-arm. new_pick_deadline
+        // has been in the event payload since chunk 11g.4 and is
+        // guaranteed present per validate_draft_event_payload; presence
+        // guard here is defense-in-depth.
+        {
+          const extendedDeadline = (event.payload as Record<string, unknown>)
+            .new_pick_deadline;
+          if (typeof extendedDeadline === 'string' && extendedDeadline.length > 0) {
+            const parsed = new Date(extendedDeadline);
+            if (!Number.isNaN(parsed.getTime()) && this.draftStatus === 'in_progress') {
+              this.setPickDeadline(parsed, 'pick');
+            }
+          }
+        }
         break;
       case 'auction_nomination_started':
         this.applyAuctionNominationStartedEvent(event);
@@ -2790,21 +2844,47 @@ export class LobbyManager {
           skippedCount++;
           break;
         case 'draft_resumed':
-          // Step 6c: clear pause state. Bootstrap doesn't need to
-          // schedule the timer here — `init()`'s post-replay step
-          // reads `leagues.pick_deadline` (which the resume RPC
-          // updated) and schedules from there. This keeps bootstrap
-          // single-pass and idempotent.
+          // Step 6c: clear pause state.
+          // Chunk 10c-2 batch 2 (2026-07-27): also re-arm the pick timer
+          // from the event's new_pick_deadline. Pre-batch-2 relied on
+          // init()'s post-replay leagues.pick_deadline read — fine for
+          // bootstrap but LEFT LIVE draft_resumed events (via
+          // processExternalEvent) without any re-arm. Same defect
+          // class as applyPickEvent — re-arm is now inline. Bootstrap
+          // still has the covering init() fallback.
           this.pauseState = null;
+          {
+            const resumedDeadline = (event.payload as Record<string, unknown>)
+              .new_pick_deadline;
+            if (typeof resumedDeadline === 'string' && resumedDeadline.length > 0) {
+              const parsed = new Date(resumedDeadline);
+              if (!Number.isNaN(parsed.getTime()) && this.draftStatus === 'in_progress') {
+                this.setPickDeadline(parsed, 'pick');
+              }
+            }
+          }
           skippedCount++;
           break;
         case 'draft_extended':
           // Deadline-extension event (commissioner adds time to the
-          // current pick's clock). No picksMade impact; timer
-          // reconstruction at `init()` end picks up the updated
-          // `leagues.pick_deadline`.
+          // current pick's clock).
+          // Chunk 10c-2 batch 2 (2026-07-27): re-arm from
+          // new_pick_deadline on live apply. Bootstrap covered by
+          // init()'s leagues.pick_deadline read; the inline re-arm here
+          // makes the LIVE external-apply path correct without needing
+          // a mode flag.
+          {
+            const extendedDeadline = (event.payload as Record<string, unknown>)
+              .new_pick_deadline;
+            if (typeof extendedDeadline === 'string' && extendedDeadline.length > 0) {
+              const parsed = new Date(extendedDeadline);
+              if (!Number.isNaN(parsed.getTime()) && this.draftStatus === 'in_progress') {
+                this.setPickDeadline(parsed, 'pick');
+              }
+            }
+          }
           structuredLogger.debug(
-            `[lobby] bootstrap skipping draft_extended event ` +
+            `[lobby] bootstrap applying draft_extended event ` +
               `seq=${event.seq} lobbyId=${this.lobbyId}`,
           );
           skippedCount++;
@@ -2946,6 +3026,47 @@ export class LobbyManager {
     }
     if (this.picksMade >= this.draftOrder.length) {
       this.draftStatus = 'completed';
+    }
+
+    // ── Chunk 10c-2 batch 2 (2026-07-27): re-arm the pick timer from
+    // the durable payload's pick_deadline field.
+    //
+    // Pre-batch-2 behavior: applyPickEvent advanced state but never
+    // re-armed the timer. Every human pick (which flows through the
+    // external NOTIFY path since production picks are submitted via
+    // POST /api/draft/v2/league/:leagueId/pick, not through the
+    // engine's own processSubmitPick) left the engine's timer pointed
+    // at the ORIGINAL bootstrap deadline — leading to stall (if the
+    // stale deadline was in the future) or premature-steal (if it was
+    // in the past). See PROJECT_PLAN.md Decision Log 2026-07-27
+    // "S5 exposed: external-event apply does not re-arm the pick-
+    // deadline timer" for the verify report.
+    //
+    // Backwards compat: v1 events written before the paired migration
+    // `20260727010000_pick_event_carries_pick_deadline.sql` have no
+    // pick_deadline field in the payload. Presence-guard here: skip
+    // the re-arm when the field is missing. During bootstrap replay,
+    // the engine's init() post-replay step (line 920) arms from
+    // leagues.pick_deadline as a single-pass covering-fallback for
+    // pre-migration rows.
+    //
+    // Draft transitions to `completed` here (line above) skip the re-arm:
+    // the final pick has no successor to arm a clock for.
+    const rawDeadline = payload.pick_deadline;
+    if (
+      typeof rawDeadline === 'string' &&
+      rawDeadline.length > 0 &&
+      this.draftStatus === 'in_progress'
+    ) {
+      const parsed = new Date(rawDeadline);
+      if (!Number.isNaN(parsed.getTime())) {
+        this.setPickDeadline(parsed, 'pick');
+      } else {
+        structuredLogger.warn(
+          `[lobby] applyPickEvent pick_deadline unparseable ` +
+            `lobbyId=${this.lobbyId} seq=${event.seq} raw=${String(rawDeadline)}`,
+        );
+      }
     }
   }
 
@@ -3644,13 +3765,20 @@ export class LobbyManager {
     }
     this.currentTimerDeadline = deadline;
     this.currentTimerKind = kind;
+    // Chunk 10c-2 batch 2 (2026-07-27): increment arm-seq and capture
+    // in the setTimeout closure so a stale fire (from a previously-
+    // armed timer that raced past cancelPickTimer or from a bug that
+    // leaked a handle) can be identified and skipped.
+    this.timerArmSeq += 1;
+    const armSeq = this.timerArmSeq;
+    const armedDeadline = deadline;
     const delayMs = Math.max(0, deadline.getTime() - Date.now());
     this.currentTimerHandle = setTimeout(() => {
       this.currentTimerHandle = null;
-      void this.handleClockExpired();
+      void this.handleClockExpired(armSeq, armedDeadline);
     }, delayMs);
     structuredLogger.debug(
-      `[lobby] timer scheduled lobbyId=${this.lobbyId} kind=${kind} deadline=${deadline.toISOString()} delayMs=${delayMs}`,
+      `[lobby] timer scheduled lobbyId=${this.lobbyId} kind=${kind} deadline=${deadline.toISOString()} delayMs=${delayMs} armSeq=${armSeq}`,
     );
   }
 
@@ -3661,7 +3789,54 @@ export class LobbyManager {
    * sub-step 6c3 extends with `currentTimerKind` dispatch for
    * auction lobbies (bid_window vs nomination_window).
    */
-  private async handleClockExpired(): Promise<void> {
+  private async handleClockExpired(
+    armSeq?: number,
+    armedDeadline?: Date,
+  ): Promise<void> {
+    // Chunk 10c-2 batch 2 (2026-07-27): identity guard + wall-clock
+    // gate. Kills the premature-steal class structurally.
+    //
+    // Identity check: if the setTimeout callback captured `armSeq` at
+    // arm time and the current `timerArmSeq` doesn't match, THIS timer
+    // was superseded — either by a later `setPickDeadline` that armed
+    // a fresh one (which cancelled this handle but the callback still
+    // fired due to a race — extremely rare, but possible) OR by a
+    // `cancelPickTimer` that cleared the handle without a replacement.
+    // Skip the fire and log the anomaly.
+    //
+    // Wall-clock gate: even if identity matches, sanity-check that the
+    // deadline actually elapsed. setTimeout can (rarely) fire early
+    // under specific fake-timer edge cases or system-clock adjustments.
+    // Firing before the deadline is exactly the premature-steal
+    // signature this guard is here to prevent.
+    //
+    // Backwards compat: `armSeq` and `armedDeadline` are optional so
+    // legacy call sites (there are none today, but the method
+    // signature must accommodate direct-test invocation) skip the
+    // guard when neither is passed.
+    if (armSeq !== undefined && armSeq !== this.timerArmSeq) {
+      structuredLogger.info('autopick.stale_timer_skipped', {
+        lobbyId: this.lobbyId,
+        reason: 'timer_superseded',
+        firedArmSeq: armSeq,
+        currentArmSeq: this.timerArmSeq,
+        expectedDeadline: this.currentTimerDeadline?.toISOString() ?? null,
+        armedDeadline: armedDeadline?.toISOString() ?? null,
+        firedAt: new Date().toISOString(),
+        driftMs: armedDeadline !== undefined ? Date.now() - armedDeadline.getTime() : null,
+      });
+      return;
+    }
+    if (armedDeadline !== undefined && Date.now() < armedDeadline.getTime()) {
+      structuredLogger.info('autopick.stale_timer_skipped', {
+        lobbyId: this.lobbyId,
+        reason: 'fired_before_deadline',
+        armedDeadline: armedDeadline.toISOString(),
+        firedAt: new Date().toISOString(),
+        driftMs: Date.now() - armedDeadline.getTime(),
+      });
+      return;
+    }
     if (this.shutDown) {
       structuredLogger.debug(`[lobby] clock fired post-shutdown — ignored lobbyId=${this.lobbyId}`);
       return;
@@ -3708,6 +3883,16 @@ export class LobbyManager {
     // subsequent `handleClockExpired` (e.g., a stale timer racing
     // a manual cancel) sees a null kind and bails defensively.
     this.currentTimerKind = null;
+    // Chunk 10c-2 batch 2 (2026-07-27): advance the arm-seq. If a
+    // stale timer callback fires after this cancel (either because
+    // clearTimeout raced with the fire OR because a bug leaked a
+    // handle that survived cancellation), its captured `armSeq` will
+    // be < this.timerArmSeq → handleClockExpired's identity guard
+    // logs and skips. Without this bump, a stale fire after
+    // cancel-without-replacement would still see the same
+    // `timerArmSeq` its closure captured and would pass the identity
+    // guard.
+    this.timerArmSeq += 1;
   }
 
   /**

@@ -410,6 +410,55 @@ node scripts/proof/draft-harness.mjs --scenario=S4
 # idle window.
 ```
 
+### 5.4.1  S5 semantics — post-batch-2 regression proof
+
+Chunk 10c-2 batch 2 (2026-07-27) shipped the migration + engine change
+that makes external-event apply re-arm the pick-deadline timer from
+the event payload's `pick_deadline` field. Before batch 2, external
+picks (all production human picks) advanced `picksMade` without
+re-arming; a stale timer would eventually fire against a bootstrap-set
+deadline — premature-steal for every human draft. See
+`PHASE_4_5_PROJECT_PLAN.md` Decision Log 2026-07-27 "S5 exposed" entry
+for the verify report and "10c-2 batch 2 external-apply timer re-arm"
+for the fix ratification.
+
+**S5 becomes the regression proof.** With batch 2 landed on both DB
+(migration `20260727010000_pick_event_carries_pick_deadline.sql`) and
+engine (paired commit), S5's `deltaFromLastSubmitMs` per client should
+land in the `(pickClock − 2 .. pickClock + 10)` tolerance window:
+
+- Submit N pre-autopick picks (default 3). Each pick's RPC-returned
+  `pick_deadline` re-arms the engine's timer via `applyPickEvent`
+  reading `payload.pick_deadline`.
+- After the N-th submit, STOP submitting. Engine's timer is now armed
+  for `pick_deadline = submit_call_ts + pickClock + 1s`. Autopick
+  fires when the timer expires and broadcasts.
+- Harness records per-client `receiveTs` and asserts
+  `deltaFromLastSubmitMs ∈ [(pickClock−2)·1000, (pickClock+10)·1000]`.
+- **Green result = regression proof that external picks re-arm.**
+- **Red result = the re-arm regressed; investigate `applyPickEvent`,
+  the migration, and the deploy-order pattern all together.**
+
+Pre-batch-2 (broken) behavior: `deltaFromLastSubmitMs` would either
+time out at `--autopick-timeout-ms` (stall — bootstrap deadline was in
+the future, so timer never fired) OR fire way before `pickClock`
+seconds (premature-steal — bootstrap deadline was in the past, so
+timer fired immediately). The tolerance window's exact shape is now
+load-bearing on the fix; the S5 timeout-default patch (`(pickClock +
+30) * 1000` ms) is set to comfortably exceed the upper bound so
+neither failure mode masquerades as a green run.
+
+Run twice per batch-2 verification cycle: once with fixture-12
+`--pick-clock=30 --expected-pick-clock=30`, once with `--pick-clock=90
+--expected-pick-clock=90`. Both should land within tolerance. Also
+verify the engine boot log's `pickClockSeconds` equals `N+1`:
+
+```powershell
+gcloud compute ssh citrus-draft-engine-staging `
+  --zone=northamerica-northeast1-a --project=citrus-fantasy-staging `
+  --command="sudo docker logs citrus-draft-engine 2>&1 | grep pickClockSeconds | tail -3"
+```
+
 ### 5.5  Output
 
 Every scenario produces two files under `scripts/proof/results/`:
