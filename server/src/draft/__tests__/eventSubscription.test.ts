@@ -128,6 +128,7 @@ describe('startEventSubscription (chunk 11g.7 sub-step 7e)', () => {
       dispatch,
       clientFactory: () => client as unknown as PgClient,
       selfTestTimeoutMs: 0, // disable self-test (timer)
+      watchdogIntervalMs: 0, // 10c-1d: disable the periodic watchdog probe
     });
 
     // Allow the async connect() chain to settle.
@@ -163,6 +164,7 @@ describe('startEventSubscription (chunk 11g.7 sub-step 7e)', () => {
       dispatch,
       clientFactory: () => client as unknown as PgClient,
       selfTestTimeoutMs: 0,
+      watchdogIntervalMs: 0, // 10c-1d: disable the periodic watchdog probe
     });
     await vi.runAllTimersAsync();
 
@@ -184,6 +186,7 @@ describe('startEventSubscription (chunk 11g.7 sub-step 7e)', () => {
       dispatch,
       clientFactory: () => client as unknown as PgClient,
       selfTestTimeoutMs: 0,
+      watchdogIntervalMs: 0, // 10c-1d: disable the periodic watchdog probe
     });
     await vi.runAllTimersAsync();
 
@@ -211,6 +214,7 @@ describe('startEventSubscription (chunk 11g.7 sub-step 7e)', () => {
         return (factoryCalls === 1 ? clientA : clientB) as unknown as PgClient;
       },
       selfTestTimeoutMs: 0,
+      watchdogIntervalMs: 0, // 10c-1d: disable the periodic watchdog probe
     });
     await vi.runAllTimersAsync();
     expect(factoryCalls).toBe(1);
@@ -235,6 +239,7 @@ describe('startEventSubscription (chunk 11g.7 sub-step 7e)', () => {
       dispatch: vi.fn(async () => {}),
       clientFactory: factory,
       selfTestTimeoutMs: 0,
+      watchdogIntervalMs: 0, // 10c-1d: disable the periodic watchdog probe
     });
     await vi.runAllTimersAsync();
     expect(factory).toHaveBeenCalledTimes(1);

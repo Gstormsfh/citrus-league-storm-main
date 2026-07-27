@@ -115,6 +115,35 @@ import { createDraftAdminRoutes } from '../routes/draftAdmin';
 const app = new Hono<AppEnv>();
 app.get('/health', (c) => c.json({ ok: true, server: 'hono' }));
 
+// Chunk 11g.10 sub-step 10c-1d: subscription-health endpoint.
+// The 10c-1c post-mortem showed the engine's LISTEN client can die
+// silently — pg_stat_activity had no LISTEN backend while the process
+// logs said `event_subscription.started`. This endpoint exposes the
+// in-process view (`startedAt`, `lastSelfTestOkAt`, `lastNotifyReceivedAt`,
+// reconnect counters) so an external monitor can detect deafness by
+// watching the freshness of those timestamps against the watchdog
+// cadence. Route is declared BEFORE `subscriptionHandle` is assigned;
+// the closure reads the current value at request time. Returns 503
+// with a diagnostic body while the subscription is not yet initialized.
+let subscriptionHandle: EventSubscriptionHandle | null = null;
+app.get('/health/subscription', (c) => {
+  if (!subscriptionHandle) {
+    return c.json(
+      {
+        ok: false,
+        reason: 'subscription_not_initialized',
+        note:
+          'Either startup has not yet reached the eventSubscription wiring, ' +
+          'EVENT_SUBSCRIPTION_DISABLED=1 was set, or SUPABASE_DB_URL/DATABASE_URL is missing.',
+      },
+      503,
+    );
+  }
+  const health = subscriptionHandle.getHealth();
+  const status = health.connected ? 200 : 503;
+  return c.json({ ok: health.connected, ...health }, status);
+});
+
 // ── Start Hono ──
 const processStartTimeMs = Date.now();
 const honoServer = serve(
@@ -650,7 +679,9 @@ startUwsServer({ port: wsPort, app: draftApp, lobbyRegistry })
 // `EVENT_SUBSCRIPTION_DISABLED=1` short-circuits startup — used in
 // tests (vitest setup sets it by default) and in environments without
 // a direct DB URL configured.
-let subscriptionHandle: EventSubscriptionHandle | null = null;
+// (Chunk 11g.10 sub-step 10c-1d: `subscriptionHandle` itself is
+// declared near the Hono app so the `/health/subscription` route
+// closure can read it. The assignment below reuses that variable.)
 const subscriptionDisabled = process.env.EVENT_SUBSCRIPTION_DISABLED === '1';
 const dbUrl = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL;
 if (subscriptionDisabled) {

@@ -1,4 +1,21 @@
 // Phase 4.5 chunk 11g.7 sub-step 7e — live event subscription via LISTEN/NOTIFY.
+// Phase 4.5 chunk 11g.10 sub-step 10c-1d — listener hardening:
+//   - TCP keepalive on the pg.Client (short initial delay) so a silently
+//     half-dead connection surfaces as a proper `error` / `end` event
+//     rather than sitting forever in "connected but deaf" state.
+//   - Periodic watchdog probe (self-NOTIFY with a per-probe id + timeout);
+//     failure logs AND destroys the client + reconnects with backoff.
+//   - `client.on('end', ...)` handler so clean FIN closes also trigger
+//     reconnect (prior code only wired `client.on('error', ...)`).
+//   - Health surface (`getHealth()`) exposing `startedAt`,
+//     `lastSelfTestOkAt`, `lastNotifyReceivedAt`, `reconnectAttempt`,
+//     and `connectionLostAt` for external monitoring via the engine's
+//     Hono `/health/subscription` endpoint.
+// Motivation: post-mortem of the 2026-07-22 → 2026-07-27 window showed
+// the LISTEN backend dying silently after minutes-scale idle with zero
+// reconnect activity and only one uncorrelated `self_test_succeeded`
+// at +500s. Both endpoints of the TCP looked healthy while the channel
+// was deaf. See PROJECT_PLAN.md Decision Log for full forensics.
 //
 // Dedicated `pg.Client` connection that runs `LISTEN draft_events`
 // permanently. When Postgres delivers a notification, the parsed
@@ -42,6 +59,7 @@
 // forbidden, reconnect boundary.
 
 import { Client as PgClient } from 'pg';
+import { randomUUID } from 'node:crypto';
 import { structuredLogger } from '@citrus/shared';
 
 /**
@@ -179,15 +197,63 @@ export interface StartEventSubscriptionOptions {
    * `0` disables the self-test (used in tests).
    */
   selfTestTimeoutMs?: number;
+  /**
+   * Watchdog probe interval in milliseconds. Chunk 11g.10 sub-step
+   * 10c-1d hardening: periodically issues a self-NOTIFY with a
+   * per-probe id and waits `watchdogTimeoutMs` for it to arrive.
+   * Failure = the pg-side LISTEN registration is silently broken;
+   * destroy the client, reconnect via backoff, re-LISTEN.
+   *
+   * Default `60000` (60s). `0` disables the watchdog (used in tests
+   * that assert the subscription doesn't fire background probes).
+   */
+  watchdogIntervalMs?: number;
+  /**
+   * Watchdog probe timeout in milliseconds. If the sentinel round-trip
+   * doesn't complete within this window, the client is destroyed and
+   * reconnect scheduled. Default `5000` (5s). Must be smaller than
+   * `watchdogIntervalMs` so probes don't overlap; the code guards
+   * against overlap defensively but the semantics assume no overlap.
+   */
+  watchdogTimeoutMs?: number;
+}
+
+/**
+ * Point-in-time health view of the subscription. Consumed by the engine's
+ * Hono `/health/subscription` route so external monitors can distinguish
+ * "connected and receiving traffic" from "connected but silent" from
+ * "reconnecting" without reading logs.
+ *
+ * Timestamps are ISO 8601 strings (not epoch ms) so the JSON response is
+ * human-readable at a glance in a curl.
+ */
+export interface EventSubscriptionHealth {
+  /** True while the pg client is connected AND LISTEN is registered. */
+  connected: boolean;
+  /** ISO timestamp when the current live connection began; null before first connect. */
+  startedAt: string | null;
+  /** ISO timestamp of most-recent self-test / watchdog ack. null before first ack. */
+  lastSelfTestOkAt: string | null;
+  /** ISO timestamp of most-recent NOTIFY payload received (any kind — real or sentinel). null before first receipt. */
+  lastNotifyReceivedAt: string | null;
+  /** Current reconnect attempt counter; 0 while connected + healthy. */
+  reconnectAttempt: number;
+  /** ISO timestamp of most-recent observed connection loss; null if never seen loss since boot. */
+  connectionLostAt: string | null;
 }
 
 export interface EventSubscriptionHandle {
   /**
    * Gracefully stop the subscription. Cancels any pending reconnect
-   * timer, ends the active pg client, resolves once teardown is
-   * complete. Idempotent — second call is a no-op.
+   * timer, cancels watchdog probes, ends the active pg client, resolves
+   * once teardown is complete. Idempotent — second call is a no-op.
    */
   stop: () => Promise<void>;
+  /**
+   * Return a point-in-time health snapshot. Cheap read of module-local
+   * state; never throws. Consumed by the `/health/subscription` route.
+   */
+  getHealth: () => EventSubscriptionHealth;
 }
 
 /**
@@ -211,8 +277,21 @@ export function startEventSubscription(
   const {
     connectionString,
     dispatch,
-    clientFactory = (cs: string) => new PgClient({ connectionString: cs }),
+    // Chunk 11g.10 sub-step 10c-1d: TCP keepAlive on the pg client.
+    // Without this, silently-half-dead TCPs (NAT idle, load-balancer
+    // reap, Supabase-side proxy timeout) sit in ESTABLISHED forever
+    // and pg.Client never emits `error` or `end`. keepAliveInitial-
+    // DelayMillis is set short (10s) so a break surfaces within one
+    // watchdog cycle rather than the OS default (~2 hours on Linux).
+    clientFactory = (cs: string) =>
+      new PgClient({
+        connectionString: cs,
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10_000,
+      }),
     selfTestTimeoutMs = 5_000,
+    watchdogIntervalMs = 60_000,
+    watchdogTimeoutMs = 5_000,
   } = opts;
 
   let stopped = false;
@@ -223,6 +302,22 @@ export function startEventSubscription(
   let selfTestTimer: NodeJS.Timeout | null = null;
   let selfTestReceived = false;
 
+  // ── Chunk 11g.10 sub-step 10c-1d hardening state ─────────────────
+  // `startedAt`, `lastSelfTestOkAt`, `lastNotifyReceivedAt` feed
+  // `getHealth()` and the `/health/subscription` route. `watchdog*`
+  // state drives the periodic probe. `pendingWatchdogId` correlates
+  // an outbound probe's random id with an inbound `_test` payload —
+  // ensures a straggler probe from a prior connection can't falsely
+  // clear a current-connection timer.
+  let startedAt: number | null = null;
+  let lastSelfTestOkAt: number | null = null;
+  let lastNotifyReceivedAt: number | null = null;
+  let watchdogInterval: NodeJS.Timeout | null = null;
+  let watchdogTimer: NodeJS.Timeout | null = null;
+  let pendingWatchdogId: string | null = null;
+  let pendingWatchdogStartedAt: number | null = null;
+  let watchdogReconnectInFlight = false;
+
   const handleNotification = (msg: { channel: string; payload?: string }): void => {
     // Chunk 11g.10 sub-step 10c-1b: stamp receipt time at the earliest
     // observable moment (pg client's notification event → this handler).
@@ -231,6 +326,11 @@ export function startEventSubscription(
     const notificationReceivedAtMs = Date.now();
     if (msg.channel !== 'draft_events') return;
     const raw = msg.payload ?? '';
+    // Chunk 11g.10 sub-step 10c-1d: any inbound frame on this channel
+    // is proof the LISTEN registration is alive — feed the health surface
+    // BEFORE branching on sentinel-vs-real so `/health/subscription`
+    // reflects reality regardless of payload class.
+    lastNotifyReceivedAt = notificationReceivedAtMs;
     // Self-test sentinel: any payload containing `"_test":true` (with
     // or without spaces) marks the self-test as received. We check
     // before parseNotificationPayload because parse returns null for
@@ -241,7 +341,43 @@ export function startEventSubscription(
         clearTimeout(selfTestTimer);
         selfTestTimer = null;
       }
-      structuredLogger.info('event_subscription.self_test_succeeded', {});
+      lastSelfTestOkAt = notificationReceivedAtMs;
+      // Chunk 11g.10 sub-step 10c-1d: correlate with watchdog probe.
+      // The payload may carry `_watchdog_id` — a per-probe uuid we
+      // set at `fireWatchdogProbe` time. Match against `pendingWatchdogId`
+      // to distinguish "watchdog ack" from "boot-time self-test ack"
+      // for logging clarity.
+      let watchdogId: string | null = null;
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        if (
+          parsed !== null &&
+          typeof parsed === 'object' &&
+          typeof (parsed as Record<string, unknown>)._watchdog_id === 'string'
+        ) {
+          watchdogId = (parsed as Record<string, unknown>)._watchdog_id as string;
+        }
+      } catch {
+        // Malformed sentinel — treat as non-watchdog self-test.
+      }
+      if (watchdogId !== null && watchdogId === pendingWatchdogId) {
+        const elapsedMs =
+          pendingWatchdogStartedAt !== null
+            ? notificationReceivedAtMs - pendingWatchdogStartedAt
+            : -1;
+        pendingWatchdogId = null;
+        pendingWatchdogStartedAt = null;
+        if (watchdogTimer) {
+          clearTimeout(watchdogTimer);
+          watchdogTimer = null;
+        }
+        structuredLogger.info('event_subscription.watchdog_ok', {
+          probeId: watchdogId,
+          elapsedMs,
+        });
+      } else {
+        structuredLogger.info('event_subscription.self_test_succeeded', {});
+      }
       return;
     }
     const parsed = parseNotificationPayload(raw);
@@ -282,6 +418,18 @@ export function startEventSubscription(
 
   const scheduleReconnect = (): void => {
     if (stopped) return;
+    // Chunk 11g.10 sub-step 10c-1d (R1 review fix): idempotency guard.
+    // If a reconnect is already pending, do not schedule a second one.
+    // Without this, concurrent triggers (watchdog failure + error event
+    // + end event from the same dead connection, or the R1 stale-client
+    // race with the identity guard) could each call setTimeout, each
+    // overwriting `reconnectTimer` while the prior setTimeout is still
+    // active — resulting in multiple concurrent `connect()` calls, each
+    // creating a fresh pg.Client. The oldest timer would still fire
+    // even after `reconnectTimer` is rebound. Idempotency here means at
+    // most one reconnect in flight; whichever caller wins races first
+    // arms the backoff and subsequent callers no-op.
+    if (reconnectTimer !== null) return;
     reconnectAttempt += 1;
     const delayMs = computeReconnectDelayMs(reconnectAttempt);
     structuredLogger.warn('event_subscription.connection_lost', {
@@ -329,6 +477,163 @@ export function startEventSubscription(
     }
   };
 
+  // ── Chunk 11g.10 sub-step 10c-1d: watchdog helpers ───────────────
+  //
+  // The 10c-1c post-mortem showed the LISTEN backend can die silently
+  // with no `error`/`end` event on the pg client. The watchdog is the
+  // sole active liveness signal: every `watchdogIntervalMs` we fire a
+  // self-NOTIFY carrying a per-probe id, and if the id doesn't come
+  // back within `watchdogTimeoutMs`, we declare the connection dead,
+  // destroy it, and reconnect via the existing backoff schedule. All
+  // transitions log at INFO/WARN/ERROR so the deafness that has bitten
+  // us historically becomes visible in Cloud Logging without any
+  // human intervention.
+
+  const stopWatchdog = (): void => {
+    if (watchdogInterval) {
+      clearInterval(watchdogInterval);
+      watchdogInterval = null;
+    }
+    if (watchdogTimer) {
+      clearTimeout(watchdogTimer);
+      watchdogTimer = null;
+    }
+    pendingWatchdogId = null;
+    pendingWatchdogStartedAt = null;
+  };
+
+  const handleWatchdogFailure = (probeId: string, elapsedMs: number): void => {
+    if (stopped || watchdogReconnectInFlight) return;
+    watchdogReconnectInFlight = true;
+    structuredLogger.error(
+      'event_subscription.watchdog_failed',
+      {
+        probeId,
+        elapsedMs,
+        remediation:
+          'Watchdog self-NOTIFY did not round-trip within timeout. ' +
+          'Destroying pg.Client and scheduling reconnect. If this fires ' +
+          'repeatedly on a fresh connection, verify SUPABASE_DB_URL is a ' +
+          'direct connection (not pooled) and that no network intermediary ' +
+          'is silently reaping idle TCPs.',
+      },
+    );
+    // Tear down the current client + watchdog state; scheduleReconnect
+    // will drive a fresh `connect()` after the backoff delay. Doing this
+    // in fire-and-forget mode lets the current setTimeout callback return
+    // promptly; the async .end() runs in the background.
+    stopWatchdog();
+    const dying = client;
+    client = null;
+    connectionLostAt = Date.now();
+    if (dying) {
+      void dying
+        .end()
+        .catch((err: unknown) => {
+          // Minor cleanup failure — we already logged the primary
+          // watchdog_failed above; a .end() error on an already-broken
+          // client is expected. Embed the message inline rather than
+          // using the 3-arg `error` form.
+          structuredLogger.debug(
+            'event_subscription.watchdog_client_end_threw',
+            {
+              endErrorMessage:
+                err instanceof Error ? err.message : String(err),
+            },
+          );
+        });
+    }
+    structuredLogger.warn('event_subscription.watchdog_forcing_reconnect', {
+      probeId,
+    });
+    scheduleReconnect();
+    watchdogReconnectInFlight = false;
+  };
+
+  const fireWatchdogProbe = (): void => {
+    if (stopped || client === null) return;
+    // Defensive: if a probe is still outstanding when the next interval
+    // fires, the timeout should have already tripped and cleaned up. If
+    // we're still holding a pending id here, treat it as a fault and
+    // skip this cycle rather than overlapping probes.
+    if (pendingWatchdogId !== null) {
+      structuredLogger.warn('event_subscription.watchdog_overlap', {
+        pendingProbeId: pendingWatchdogId,
+      });
+      return;
+    }
+    const probeId = randomUUID();
+    pendingWatchdogId = probeId;
+    pendingWatchdogStartedAt = Date.now();
+    // Payload contains both `"_test":true` (so the existing sentinel
+    // filter path fires) AND `_watchdog_id` (so the handler can
+    // correlate this specific probe with its ack). The probeId is a
+    // UUID → safe to embed in the JSON literal without escaping.
+    const payload = `{"_test":true,"_watchdog_id":"${probeId}"}`;
+    structuredLogger.debug('event_subscription.watchdog_probe_fired', {
+      probeId,
+      timeoutMs: watchdogTimeoutMs,
+    });
+    // Fire-and-forget: any query error surfaces via the client-error
+    // handler which schedules a reconnect. We don't await here because
+    // the setInterval callback shouldn't block the event loop.
+    if (client) {
+      void client
+        .query(`SELECT pg_notify('draft_events', $1)`, [payload])
+        .catch((err: unknown) => {
+          structuredLogger.warn(
+            'event_subscription.watchdog_query_failed',
+            { probeId },
+          );
+          // Don't call handleWatchdogFailure here — the client's error
+          // event will fire (or already has) and drive scheduleReconnect
+          // through the normal path. But do drop the pending id so a
+          // late-arriving unrelated frame doesn't accidentally clear it.
+          if (pendingWatchdogId === probeId) {
+            pendingWatchdogId = null;
+            pendingWatchdogStartedAt = null;
+          }
+          if (watchdogTimer) {
+            clearTimeout(watchdogTimer);
+            watchdogTimer = null;
+          }
+          void err;
+        });
+    }
+    watchdogTimer = setTimeout(() => {
+      if (pendingWatchdogId !== probeId) return;
+      // Timeout tripped without the ack arriving. This is the deafness
+      // signal we didn't have historically. Fire the failure path.
+      const elapsedMs =
+        pendingWatchdogStartedAt !== null
+          ? Date.now() - pendingWatchdogStartedAt
+          : watchdogTimeoutMs;
+      pendingWatchdogId = null;
+      pendingWatchdogStartedAt = null;
+      watchdogTimer = null;
+      handleWatchdogFailure(probeId, elapsedMs);
+    }, watchdogTimeoutMs);
+    if (typeof watchdogTimer.unref === 'function') {
+      watchdogTimer.unref();
+    }
+  };
+
+  const startWatchdog = (): void => {
+    if (watchdogIntervalMs <= 0) return;
+    // Defensive: if a previous connect() left an interval alive, clear
+    // it before starting a new one. (Shouldn't happen given stopWatchdog
+    // in the error/end paths, but cheap safety.)
+    stopWatchdog();
+    watchdogInterval = setInterval(fireWatchdogProbe, watchdogIntervalMs);
+    if (typeof watchdogInterval.unref === 'function') {
+      watchdogInterval.unref();
+    }
+    structuredLogger.info('event_subscription.watchdog_started', {
+      intervalMs: watchdogIntervalMs,
+      timeoutMs: watchdogTimeoutMs,
+    });
+  };
+
   const connect = async (): Promise<void> => {
     if (stopped) return;
     let nextClient: PgClient;
@@ -348,6 +653,21 @@ export function startEventSubscription(
       // pg.Client emits error on connection drop. Schedule reconnect
       // unless we're shutting down.
       if (stopped) return;
+      // Chunk 11g.10 sub-step 10c-1d (R1 review fix): identity guard.
+      // If this handler fires for a client we've already replaced
+      // (e.g., watchdog declared death, we reconnected, then the OLD
+      // socket's keepalive finally trips ~30s later and emits `error`),
+      // acting on it would null out our LIVE client, stop the watchdog
+      // running against the new connection, and schedule a second
+      // reconnect — orphaning the live LISTEN backend. Only mutate
+      // module state if the erroring client is still the one we
+      // consider live. Mirrors the same guard on the `end` handler.
+      if (client !== nextClient) {
+        structuredLogger.debug('event_subscription.stale_client_error_ignored', {
+          message: err.message,
+        });
+        return;
+      }
       structuredLogger.warn('event_subscription.client_error', {
         message: err.message,
       });
@@ -355,6 +675,32 @@ export function startEventSubscription(
       // stop() doesn't try to .end() a broken client.
       client = null;
       connectionLostAt = Date.now();
+      // Chunk 11g.10 sub-step 10c-1d: stop the watchdog interval so it
+      // doesn't fire against the dead client mid-reconnect.
+      stopWatchdog();
+      scheduleReconnect();
+    });
+    // Chunk 11g.10 sub-step 10c-1d: `end` handler.
+    // pg.Client emits `end` on a clean FIN close (server-initiated
+    // shutdown, some intermediary reap paths) — prior code only listened
+    // for `error`, so a clean close left the module in "connected"
+    // state forever with no reconnect. Symmetric with the error path.
+    nextClient.on('end', () => {
+      if (stopped) return;
+      // Distinguish an operator-initiated `stop()` (which already
+      // nulled `client` before calling `.end()`) from an unsolicited
+      // FIN: only treat as connection loss if we still consider the
+      // client live.
+      if (client !== nextClient) return;
+      structuredLogger.warn('event_subscription.client_ended', {
+        remediation:
+          'pg.Client emitted `end` without prior `error`. Likely a clean ' +
+          'FIN from the DB or an intermediary (idle-reap, deploy, migration). ' +
+          'Scheduling reconnect.',
+      });
+      client = null;
+      connectionLostAt = Date.now();
+      stopWatchdog();
       scheduleReconnect();
     });
     try {
@@ -370,6 +716,7 @@ export function startEventSubscription(
       return;
     }
     client = nextClient;
+    startedAt = Date.now();
     if (connectionLostAt !== null) {
       const downtimeMs = Date.now() - connectionLostAt;
       structuredLogger.info('event_subscription.connection_restored', {
@@ -382,6 +729,10 @@ export function startEventSubscription(
     }
     reconnectAttempt = 0;
     fireSelfTest();
+    // Chunk 11g.10 sub-step 10c-1d: start the watchdog probe cycle so
+    // deafness of this fresh connection becomes visible within one
+    // `watchdogIntervalMs` window (default 60s).
+    startWatchdog();
   };
 
   // Kick off the initial connection. Don't await — startEventSubscription
@@ -401,6 +752,10 @@ export function startEventSubscription(
         clearTimeout(selfTestTimer);
         selfTestTimer = null;
       }
+      // Chunk 11g.10 sub-step 10c-1d: stop the watchdog interval + any
+      // pending probe timeout so a late fire during shutdown doesn't
+      // trigger `handleWatchdogFailure` against a nulled client.
+      stopWatchdog();
       if (client) {
         try {
           await client.end();
@@ -411,6 +766,22 @@ export function startEventSubscription(
         client = null;
       }
       structuredLogger.info('event_subscription.stopped', {});
+    },
+    // Chunk 11g.10 sub-step 10c-1d: cheap health accessor for the Hono
+    // `/health/subscription` endpoint. Reads module-local state only —
+    // no I/O, no throws. `connected` is true iff we have a live client
+    // AND no reconnect is pending.
+    getHealth: (): EventSubscriptionHealth => {
+      const isoOrNull = (ms: number | null): string | null =>
+        ms === null ? null : new Date(ms).toISOString();
+      return {
+        connected: client !== null && reconnectTimer === null,
+        startedAt: isoOrNull(startedAt),
+        lastSelfTestOkAt: isoOrNull(lastSelfTestOkAt),
+        lastNotifyReceivedAt: isoOrNull(lastNotifyReceivedAt),
+        reconnectAttempt,
+        connectionLostAt: isoOrNull(connectionLostAt),
+      };
     },
   };
 }

@@ -86,7 +86,16 @@ interface StructuredLogPayload {
   lobbyId?: string;
   userId?: string;
   teamId?: string;
-  err?: { name?: string; message: string; stack?: string };
+  /**
+   * Serialized error info. `message` is always present. Additional
+   * fields (`name`, `stack`, `code`, `details`, `hint`, `status`,
+   * etc.) surface when the underlying throwable exposes them —
+   * e.g. `@supabase/supabase-js` returns plain-object errors with
+   * `{message, code, details, hint}` from PostgREST failures, and
+   * pg-native errors expose `{code, severity, position, ...}`.
+   * See `serializeError` for the extraction contract.
+   */
+  err?: { message: string; name?: string; stack?: string; [key: string]: unknown };
   [key: string]: unknown;
 }
 
@@ -144,10 +153,60 @@ function resolveLogLevel(): LogSeverity | 'SILENT' {
 }
 
 /**
- * Extract `name`/`message`/`stack` from a thrown value into the
- * on-wire `err` field. Handles `Error` instances and unknown
- * thrown values (strings, plain objects). Truncates `stack` to
- * 2 KB to bound log line size.
+ * Truncate a string to a max byte length (approximated as JS char
+ * length — good enough for the 2 KB and 4 KB bounds we apply below).
+ */
+function truncate(s: string, maxLen: number): string {
+  return s.length > maxLen ? s.slice(0, maxLen) : s;
+}
+
+/**
+ * Cycle-safe JSON stringify with a size cap. Used only for the
+ * plain-object fallback path in `serializeError`, where the caller
+ * threw a non-Error value that has no `message` field. Returns
+ * a bounded representation so a malformed error can't blow up
+ * the log line.
+ */
+function safeJsonStringify(value: unknown, maxLen: number): string {
+  const seen = new WeakSet<object>();
+  try {
+    const out = JSON.stringify(value, (_k, v) => {
+      if (v !== null && typeof v === 'object') {
+        if (seen.has(v as object)) return '[Circular]';
+        seen.add(v as object);
+      }
+      return v;
+    });
+    return out === undefined ? String(value) : truncate(out, maxLen);
+  } catch {
+    return truncate(String(value), maxLen);
+  }
+}
+
+/**
+ * Extract a structured `err` payload from a thrown value.
+ *
+ * Handles three cases so operators actually see the failure detail:
+ *
+ * 1. **`Error` instance** — pull `name`, `message`, and truncated
+ *    `stack` (2 KB cap).
+ *
+ * 2. **Plain object** — the case that motivated the 10c-1d fix.
+ *    Supabase's `@supabase/supabase-js` returns PostgREST errors as
+ *    plain objects shaped `{message, code, details, hint}`; pg-native
+ *    errors are `{message, code, severity, position, ...}`; Node
+ *    system errors are `{code, errno, syscall, ...}`. Prior behavior
+ *    called `String(err)` on these and produced the literal string
+ *    `"[object Object]"`, masking every field. New behavior:
+ *      - prefer `obj.message` (string) as the `message` field;
+ *      - fall back to a size-capped `JSON.stringify` (4 KB) so the
+ *        operator sees the shape even without a `message` field;
+ *      - pass through common diagnostic keys (`name`, `code`, `details`,
+ *        `hint`, `status`, `severity`, `errno`, `syscall`) as top-level
+ *        `err.<key>` entries so alert filters can query them directly.
+ *
+ * 3. **Everything else** (strings, numbers, symbols, null, undefined) —
+ *    `String(err)` as the message.
  */
 function serializeError(err: unknown): StructuredLogPayload['err'] {
   if (err instanceof Error) {
@@ -155,8 +214,52 @@ function serializeError(err: unknown): StructuredLogPayload['err'] {
     return {
       name: err.name,
       message: err.message,
-      ...(stack !== undefined ? { stack: stack.slice(0, 2048) } : {}),
+      ...(stack !== undefined ? { stack: truncate(stack, 2048) } : {}),
     };
+  }
+  if (err !== null && typeof err === 'object') {
+    const obj = err as Record<string, unknown>;
+    const rawMessage = obj.message;
+    const message =
+      typeof rawMessage === 'string' && rawMessage.length > 0
+        ? truncate(rawMessage, 2048)
+        : safeJsonStringify(obj, 4096);
+    const out: NonNullable<StructuredLogPayload['err']> = { message };
+    // Pass-through of common diagnostic fields so ops-side filtering
+    // can see them without extra structuredLogger scaffolding. Include
+    // only when present + non-null.
+    //
+    // 10c-1d review (M1) safety: each pass-through value is normalized
+    // to a JSON-safe primitive/string. A non-serializable value
+    // (circular ref, BigInt, function, Symbol) reaching the on-wire
+    // `JSON.stringify(payload)` call at log-write time would throw and
+    // potentially crash the emit path. Normalization here bounds the
+    // failure to this function.
+    for (const key of [
+      'name',
+      'code',
+      'details',
+      'hint',
+      'status',
+      'severity',
+      'errno',
+      'syscall',
+    ] as const) {
+      const v = obj[key];
+      if (v === undefined || v === null) continue;
+      const t = typeof v;
+      if (t === 'string') {
+        (out as Record<string, unknown>)[key] = truncate(v as string, 2048);
+      } else if (t === 'number' || t === 'boolean') {
+        // JSON-safe primitives — pass through unchanged.
+        (out as Record<string, unknown>)[key] = v;
+      } else {
+        // Object / array / BigInt / function / symbol — safe-stringify
+        // with cap so a rogue value cannot break the log write.
+        (out as Record<string, unknown>)[key] = safeJsonStringify(v, 1024);
+      }
+    }
+    return out;
   }
   return { message: String(err) };
 }
