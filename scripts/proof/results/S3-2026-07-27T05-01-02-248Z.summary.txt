@@ -1,0 +1,52 @@
+
+═══════════════════════════════════════════════════════════════════════════
+  MANDATE-CANDIDATE — draft harness results (10c-2)
+  These numbers are unratified until Garrett confirms the methodology
+  against them. Percentiles are single-clock (client host) unless noted.
+═══════════════════════════════════════════════════════════════════════════
+  scenario:      S3
+  client count:  12
+  pacing:        burst
+  run id:        2026-07-27T05-01-02-248Z
+  samples total: 432   delivered: 432   dropped: 0   ordering-violations: 0
+
+── FIRST-CLASS FAILURE METRICS (target 0) ──
+  drop rate:                0.00%   (0/432)
+  seq ordering violations:  0
+
+── PRIMARY — end-to-end ms (single-clock, client host) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+overall                           432     86.0     90.0     95.0      107      107
+  cold-bootstrap sample          12.0      107      107      107      107      107 ⚠<200
+  warm                            420     86.0     90.0     94.0     96.0     96.0
+
+── PER-CLIENT — end-to-end ms (single-clock) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+c01                              36.0     86.0     89.5     94.3      103      107 ⚠<200
+c02                              36.0     86.0     90.0     94.5      103      107 ⚠<200
+c03                              36.0     86.0     89.5     94.3      103      107 ⚠<200
+c04                              36.0     86.0     90.0     94.5      103      107 ⚠<200
+c05                              36.0     86.0     90.0     94.3      103      107 ⚠<200
+c06                              36.0     86.5     90.0     94.5      103      107 ⚠<200
+c07                              36.0     86.0     90.0     94.3      103      107 ⚠<200
+c08                              36.0     87.0     90.0     94.5      103      107 ⚠<200
+c09                              36.0     86.5     90.0     94.5      103      107 ⚠<200
+c10                              36.0     87.0     90.0     94.5      103      107 ⚠<200
+c11                              36.0     87.0     90.5     94.5      103      107 ⚠<200
+c12                              36.0     87.0     90.0     94.5      103      107 ⚠<200
+
+── ENGINE-INTERNAL SPLITS — ms (from external_event.applied; cross-clock, informational) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+applyMs                           0.0       --       --       --       --       --
+broadcastMs                       0.0       --       --       --       --       --
+notifyToBroadcastMs               0.0       --       --       --       --       --
+
+── RPC — pg submit_pick_v2 round-trip ms (single-clock) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+rpc_ms                            432     50.0     51.0     52.0     57.0     57.0
+
+═══════════════════════════════════════════════════════════════════════════
