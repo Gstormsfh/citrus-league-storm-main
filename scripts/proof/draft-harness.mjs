@@ -236,7 +236,12 @@ async function verifyFixture(client) {
 // Per-client last-received-seq tracks ordering violations (a seq
 // arriving out of monotonic order).
 
-async function runPickDriver(pgClient, wsClients) {
+async function runPickDriver(initialPgClient, wsClients) {
+  // Chunk 11g.10 sub-step 10c-2 (R3 review fix): pgClient is mutable
+  // so the S4 idle loop can swap it if the connection dies mid-idle.
+  // All uses inside this function go through the local; the outer
+  // caller retains the initial handle only for cleanup at end().
+  let pgClient = initialPgClient;
   const samples = [];
   const perClientLastSeq = new Map(wsClients.map((c) => [c.clientLabel, -1]));
 
@@ -402,17 +407,56 @@ async function runPickDriver(pgClient, wsClients) {
       if (!BURST) {
         await sleep(randomPace());
       }
-      // S4 idle window.
+      // S4 idle window. Chunk 11g.10 sub-step 10c-2 (R3 review fix):
+      // heartbeat the pg client with a per-minute `SELECT 1` alongside
+      // the client-side WS heartbeats. keepAlive:true on the client
+      // (createPgClient) is the primary defense; SELECT 1 is a
+      // second observability layer that ALSO triggers a full
+      // destroy+reconnect if the underlying TCP is silently dead
+      // — ensuring minute-31's real submit doesn't die and take the
+      // whole run with it under fault-atomic output.
       if (SCENARIO === 'S4' && pickNumber === IDLE_AFTER_PICKS) {
         console.log('');
-        console.log(`── S4 IDLE WINDOW — ${IDLE_MINUTES} minutes with clients heartbeating ──`);
+        console.log(`── S4 IDLE WINDOW — ${IDLE_MINUTES} minutes with clients + pg heartbeating ──`);
         const idleStart = Date.now();
         const idleEnd = idleStart + IDLE_MINUTES * 60 * 1000;
         while (Date.now() < idleEnd) {
           await sleep(60_000);
           const elapsed = Math.floor((Date.now() - idleStart) / 1000);
           const remaining = Math.max(0, idleEnd - Date.now());
-          console.log(`  idle: ${elapsed}s elapsed, ${Math.ceil(remaining / 1000)}s remaining, ${wsClients.filter((c) => c.ws.readyState === 1).length}/${wsClients.length} clients still open`);
+          const openClients = wsClients.filter((c) => c.ws.readyState === 1).length;
+
+          // pg SELECT 1 keepalive + auto-reconnect on failure.
+          let pgStatus;
+          try {
+            const t0 = Date.now();
+            await pgClient.query('SELECT 1');
+            pgStatus = `pg ok (${Date.now() - t0}ms)`;
+          } catch (err) {
+            console.warn(`  ⚠ pg SELECT 1 failed during idle: ${err.message} — reconnecting`);
+            try { await pgClient.end(); } catch (endErr) { void endErr; }
+            try {
+              pgClient = createPgClient();
+              await pgClient.connect();
+              // Restore the JWT-claims session var so the RPC's
+              // autopick actor branch keeps passing after reconnect.
+              await pgClient.query(
+                `SET SESSION "request.jwt.claims" TO '{"role":"service_role"}'`,
+              );
+              pgStatus = 'pg reconnected + jwt-claims restored';
+            } catch (reconnErr) {
+              // Reconnect itself failed. Log and keep polling — the
+              // next minute-tick will retry. If this persists into
+              // the resume window, the next real RPC will fail and
+              // fault-atomic will discard the run cleanly.
+              pgStatus = `pg RECONNECT FAILED: ${reconnErr.message}`;
+              console.error(`  ✗ ${pgStatus}`);
+            }
+          }
+          console.log(
+            `  idle: ${elapsed}s elapsed, ${Math.ceil(remaining / 1000)}s remaining, ` +
+            `${openClients}/${wsClients.length} clients open, ${pgStatus}`,
+          );
         }
         console.log('── idle window complete, resuming picks ──');
         console.log('');
@@ -423,13 +467,30 @@ async function runPickDriver(pgClient, wsClients) {
   return samples;
 }
 
-// ── Main ────────────────────────────────────────────────────────────
-async function main() {
-  const pgClient = new pg.Client({
+// ── pg client factory ───────────────────────────────────────────────
+//
+// Chunk 11g.10 sub-step 10c-2 (R3 review fix): pg client MUST survive
+// S4's 30-min idle window. Without TCP keepalive, a NAT-idle-reap or
+// LB session cull silently kills the connection; minute-31's submit
+// throws, the driver aborts, and fault-atomic discards the entire run.
+// Fix (mirrors the 10c-1d listener hardening pattern): enable keepAlive
+// on this pg.Client with a short initial delay so a silent break
+// surfaces as a proper error within one keepalive probe, plus the
+// runPickDriver idle loop below issues a periodic `SELECT 1` and
+// reconnects on failure BEFORE resuming picks.
+function createPgClient() {
+  return new pg.Client({
     connectionString: DB_URL,
     ssl: { rejectUnauthorized: false },
     statement_timeout: 30_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
   });
+}
+
+// ── Main ────────────────────────────────────────────────────────────
+async function main() {
+  const pgClient = createPgClient();
   await pgClient.connect();
 
   try {

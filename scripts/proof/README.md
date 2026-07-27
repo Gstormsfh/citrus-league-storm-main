@@ -306,6 +306,14 @@ noise; single-client scripts always show it).
 
 ### 5.3  Run sequence — general shape
 
+**Between every scenario: fixture reset + engine restart. Both are mandatory.**
+The engine keeps in-memory lobbies alive at `size=0` after all WS clients
+disconnect (chunk 11g.7-7c snapshot + bootstrap architecture) and dedupes
+replayed seqs via `lastAppliedSeq`. Without an engine restart, scenario 2's
+first pick would either race the dedup gate or bootstrap-replay scenario 1's
+events into scenario 2's fresh event log. Restart clears the in-memory
+`LobbyRegistry` so scenario N starts from a truly cold engine state.
+
 ```powershell
 cd C:\Users\garre\Documents\citrus-league-storm-phase45
 
@@ -327,13 +335,31 @@ node scripts/proof/draft-harness.mjs --scenario=S1
 # 4. RESET before next scenario — MANDATORY (each scenario starts clean).
 node scripts/proof/fixture-12.mjs --reset --execute
 
-# Repeat 2–4 for each scenario you want to measure.
+# 5. RESTART THE ENGINE — MANDATORY (clears in-memory LobbyRegistry
+#    + lastAppliedSeq dedup state so the next scenario's picks aren't
+#    silently deduped or bootstrap-replayed against the prior run).
+#    ~10s wait after restart lets startup complete before the next
+#    fixture setup verifies the engine is reachable.
+gcloud compute ssh citrus-draft-engine-staging `
+  --zone=northamerica-northeast1-a --project=citrus-fantasy-staging `
+  --command="sudo docker restart citrus-draft-engine"
+Start-Sleep -Seconds 10
+
+# 6. Optional but recommended — confirm the restart landed cleanly
+#    (subscription healthy, watchdog armed, deployment fingerprint
+#    matches the current image).
+curl -s http://35.203.89.236:3001/health/subscription | ConvertFrom-Json | Format-List
+
+# Repeat 2–6 for each scenario you want to measure.
 ```
 
 ### 5.4  Four scenarios
 
-Reset the fixture between EACH scenario (methodology law: cold-bootstrap
-sample is per-scenario).
+Reset the fixture AND restart the engine between EACH scenario. See §5.3
+for the full 6-step cookbook including the `docker restart` step and the
+10 s wait — do not skip either. Methodology law 5 (cold-bootstrap sample
+is per-scenario) depends on both a clean DB (fixture reset) AND a clean
+engine (restart-cleared `LobbyRegistry`).
 
 **S1 — single-client 36-pick paced.** Continuity with the 10c-1c proof.
 One WS client (with heartbeat), paced 2–5 s jitter between picks. Baseline
