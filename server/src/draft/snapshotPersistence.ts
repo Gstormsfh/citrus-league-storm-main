@@ -38,10 +38,20 @@ import { structuredLogger } from '@citrus/shared';
  */
 export const ENGINE_SNAPSHOT_VERSION = 1;
 
-/** Maximum snapshots retained per in-progress draft. Older rows
- *  pruned after each successful write. Completed/cancelled drafts
- *  keep ALL snapshots for audit. */
-const RETENTION_IN_PROGRESS = 5;
+// Chunk 11g.10 sub-step 10c-2 batch 1 (item A1): retention switched
+// from keep-latest-N with delete-on-write to UPSERT-per-league. The
+// prior `RETENTION_IN_PROGRESS = 5` constant + two-step keep-list+DELETE
+// pattern was silently failing to prune (999-row overnight accumulation
+// observed on staging 2026-07-27; the PostgREST `.not('id','in',...)`
+// string-built filter with double-quoted bigserial ids was probably
+// matching zero rows, deleting nothing, and returning success). The
+// migration at 20260727000000_draft_snapshots_upsert_per_league.sql
+// adds a UNIQUE INDEX on `(league_id)`; writeSnapshot now does a
+// single-row-per-league UPSERT and there is nothing to prune.
+//
+// Bootstrap fallback behavior unchanged: if the single-row snapshot
+// fails validation, the engine falls through to bootstrapFullEventReplay
+// per the chunk 11g.7 sub-step 7c Decision Log.
 
 /**
  * Engine-internal orchestration fields not in the wire `DraftSnapshot`.
@@ -292,15 +302,19 @@ export async function readMostRecentSnapshot(
 }
 
 /**
- * Write a snapshot row + run retention pruning. Pruning gated on
- * `draftStatus`: in-progress drafts keep only `RETENTION_IN_PROGRESS`
- * most recent; completed/cancelled drafts keep ALL snapshots for
- * audit trail.
+ * Write (or overwrite) the single snapshot row for this league.
  *
- * Atomicity: the INSERT and the prune-DELETE are separate calls
- * (no transaction). If the INSERT succeeds but pruning fails, the
- * worst case is a few stale rows accumulate — not a correctness
- * issue. The next successful write retries the prune.
+ * Chunk 11g.10 sub-step 10c-2 batch 1 (item A1): UPSERT-per-league.
+ * The unique index on `draft_snapshots(league_id)` created by
+ * `20260727000000_draft_snapshots_upsert_per_league.sql` makes this
+ * a single-row-per-league table. `.upsert({...}, { onConflict:
+ * 'league_id' })` inserts a new row for a fresh league or overwrites
+ * the existing row in-place. There is no retention prune to run.
+ *
+ * `draftStatus` parameter is retained for API compatibility but is
+ * no longer used to gate pruning (there is no prune). Callers can
+ * remove it in a future cleanup; kept here to avoid a churny signature
+ * change alongside the retention refactor.
  */
 export async function writeSnapshot(
   supabase: SupabaseClient,
@@ -312,76 +326,37 @@ export async function writeSnapshot(
     draftStatus: 'not_started' | 'in_progress' | 'completed' | 'cancelled';
   },
 ): Promise<void> {
-  const { error: insertErr } = await supabase
+  const { error: upsertErr } = await supabase
     .from('draft_snapshots')
-    .insert({
-      league_id: params.leagueId,
-      last_applied_seq: params.lastAppliedSeq,
-      engine_version: ENGINE_SNAPSHOT_VERSION,
-      snapshot_payload: params.snapshot,
-      engine_state: params.engineState,
-    });
-  if (insertErr) {
+    .upsert(
+      {
+        league_id: params.leagueId,
+        last_applied_seq: params.lastAppliedSeq,
+        engine_version: ENGINE_SNAPSHOT_VERSION,
+        snapshot_payload: params.snapshot,
+        engine_state: params.engineState,
+      },
+      { onConflict: 'league_id' },
+    );
+  if (upsertErr) {
     structuredLogger.error(
       'snapshot.persistence.write_failed',
       { leagueId: params.leagueId, lastAppliedSeq: params.lastAppliedSeq },
-      insertErr,
+      upsertErr,
     );
-    throw insertErr;
+    throw upsertErr;
   }
 
   structuredLogger.info('snapshot.persistence.written', {
     leagueId: params.leagueId,
     lastAppliedSeq: params.lastAppliedSeq,
     engineVersion: ENGINE_SNAPSHOT_VERSION,
+    // Kept in the log payload so downstream consumers of this line
+    // continue to see the field; helpful for filtering completed vs
+    // in-progress writes even though there is no per-status branching
+    // on the write side anymore.
+    draftStatus: params.draftStatus,
   });
-
-  // Retention: skip pruning for completed/cancelled drafts (audit).
-  if (params.draftStatus === 'completed' || params.draftStatus === 'cancelled') {
-    structuredLogger.debug('snapshot.persistence.retention_skipped', {
-      leagueId: params.leagueId,
-      draftStatus: params.draftStatus,
-      reason: 'completed_or_cancelled_audit_preserved',
-    });
-    return;
-  }
-
-  // For in-progress drafts: keep RETENTION_IN_PROGRESS most recent.
-  // Two-step approach because PostgREST/Supabase doesn't expose
-  // subquery DELETE; read the keep-list, then delete the rest.
-  const { data: keepRows, error: keepErr } = await supabase
-    .from('draft_snapshots')
-    .select('id')
-    .eq('league_id', params.leagueId)
-    .order('last_applied_seq', { ascending: false })
-    .limit(RETENTION_IN_PROGRESS);
-  if (keepErr) {
-    structuredLogger.warn('snapshot.persistence.retention_query_failed', {
-      leagueId: params.leagueId,
-    });
-    return; // non-fatal; row count grows mildly
-  }
-  const keepIds = (keepRows ?? []).map((r) => String(r.id));
-  if (keepIds.length === 0) {
-    return;
-  }
-  const { error: deleteErr, count } = await supabase
-    .from('draft_snapshots')
-    .delete({ count: 'exact' })
-    .eq('league_id', params.leagueId)
-    .not('id', 'in', `(${keepIds.map((id) => `"${id}"`).join(',')})`);
-  if (deleteErr) {
-    structuredLogger.warn('snapshot.persistence.retention_delete_failed', {
-      leagueId: params.leagueId,
-    });
-    return;
-  }
-  if ((count ?? 0) > 0) {
-    structuredLogger.debug('snapshot.persistence.pruned', {
-      leagueId: params.leagueId,
-      prunedCount: count ?? 0,
-    });
-  }
 }
 
 /**

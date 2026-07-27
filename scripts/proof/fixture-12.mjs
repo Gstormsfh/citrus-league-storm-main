@@ -86,6 +86,20 @@ const OPT_HELP = args.includes('--help') || args.includes('-h');
 const roundsArg = args.find((a) => a.startsWith('--rounds='));
 const ROUNDS = roundsArg ? parseInt(roundsArg.slice('--rounds='.length), 10) : 3;
 
+// Chunk 11g.10 sub-step 10c-2 batch 1 (item 4): --pick-clock=N writes
+// `settings.pickTimeLimit = N` on the whitelisted league during setup
+// so the harness's autopick-timing scenario (S5) exercises N-second
+// pick windows end-to-end. Writes to the JSONB `settings` field (the
+// only path any engine, RPC, or UI code reads today per the pick-clock
+// audit) — deliberately NOT to any `pick_time_limit` NUMERIC column
+// (which the audit confirmed no code reads even if it exists on some
+// legacy DB shape). Before-value is captured in the state file and
+// restored on --reset.
+const pickClockArg = args.find((a) => a.startsWith('--pick-clock='));
+const PICK_CLOCK = pickClockArg
+  ? parseInt(pickClockArg.slice('--pick-clock='.length), 10)
+  : null;
+
 if (OPT_HELP) {
   console.log(`Usage:
   node scripts/proof/fixture-12.mjs                       # DRY RUN setup (default, 3 rounds)
@@ -93,6 +107,7 @@ if (OPT_HELP) {
   node scripts/proof/fixture-12.mjs --reset               # DRY RUN reset
   node scripts/proof/fixture-12.mjs --reset --execute     # apply reset
   node scripts/proof/fixture-12.mjs --execute --rounds=5  # 5-round snake (60 picks)
+  node scripts/proof/fixture-12.mjs --execute --pick-clock=90  # set settings.pickTimeLimit=90 (S5 scenario)
 
 Env: SUPABASE_DB_URL (direct primary URL, not pooled).
 Whitelist: only operates on league ${WHITELISTED_LEAGUE_ID}.
@@ -104,6 +119,14 @@ Teams:    12 deterministic ids under prefix 77777777-7777-7777-7777-.
 if (ROUNDS < 1 || ROUNDS > 25 || !Number.isFinite(ROUNDS)) {
   console.error(`FATAL: invalid --rounds value ${ROUNDS} (expected 1..25).`);
   process.exit(2);
+}
+
+if (PICK_CLOCK !== null) {
+  // Match the server-side validate.ts clamp (batch 1 item 3): 30..300.
+  if (!Number.isFinite(PICK_CLOCK) || PICK_CLOCK < 30 || PICK_CLOCK > 300) {
+    console.error(`FATAL: invalid --pick-clock value ${PICK_CLOCK} (expected 30..300).`);
+    process.exit(2);
+  }
 }
 
 const DB_URL = process.env.SUPABASE_DB_URL;
@@ -153,6 +176,7 @@ async function runSetup(client) {
   console.log(`║  Team count:     ${String(TEAM_COUNT).padEnd(45)}║`);
   console.log(`║  Rounds:         ${String(ROUNDS).padEnd(45)}║`);
   console.log(`║  Total picks:    ${String(TEAM_COUNT * ROUNDS).padEnd(45)}║`);
+  console.log(`║  Pick clock:     ${(PICK_CLOCK !== null ? `${PICK_CLOCK}s (writes settings.pickTimeLimit)` : 'unchanged (settings.pickTimeLimit left as-is)').padEnd(45)}║`);
   console.log(`║  DB:             ${redactUrl(DB_URL).padEnd(45)}║`);
   console.log('╚═══════════════════════════════════════════════════════════════╝');
 
@@ -219,6 +243,11 @@ async function runSetup(client) {
         pick_deadline: leagueRow.pick_deadline,
         league_size: leagueRow.league_size,
         draft_event_counter: leagueRow.draft_event_counter,
+        // Chunk 11g.10 sub-step 10c-2 batch 1 (item 4): capture the
+        // JSONB pickTimeLimit before-value for --pick-clock restore.
+        // Read as text (settings->>'pickTimeLimit'); may be null if
+        // the field was absent.
+        pickTimeLimit: leagueRow.pick_time_limit,
       },
       existingHarnessTeamIds: [...existingTeamIds],
       existingDraftOrderRounds: existingOrder.rows.map((r) => ({
@@ -228,6 +257,7 @@ async function runSetup(client) {
     },
     steps: [],
     rounds: ROUNDS,
+    pickClock: PICK_CLOCK,
   };
 
   // Step: leagues update.
@@ -265,6 +295,26 @@ async function runSetup(client) {
       sql: `UPDATE public.leagues SET ${setClause} WHERE id = $1`,
       params: [WHITELISTED_LEAGUE_ID, ...leagueUpdateValues],
       before: leagueUpdateBefore,
+    });
+  }
+
+  // Chunk 11g.10 sub-step 10c-2 batch 1 (item 4): settings.pickTimeLimit
+  // update when --pick-clock=N was passed. Writes to the JSONB path
+  // (the only path any code reads today per the pick-clock audit).
+  // jsonb_set with `to_jsonb(N::int)` produces a numeric JSONB value.
+  if (PICK_CLOCK !== null) {
+    plan.steps.push({
+      label: `leagues UPDATE settings.pickTimeLimit=${PICK_CLOCK} (jsonb_set)`,
+      sql: `UPDATE public.leagues
+               SET settings = jsonb_set(
+                 COALESCE(settings, '{}'::jsonb),
+                 '{pickTimeLimit}',
+                 to_jsonb($2::int),
+                 true
+               )
+             WHERE id = $1`,
+      params: [WHITELISTED_LEAGUE_ID, PICK_CLOCK],
+      before: { pickTimeLimit: leagueRow.pick_time_limit },
     });
   }
 
@@ -413,6 +463,40 @@ async function runReset(client) {
         label: `leagues UPDATE (restore ${setPairs.length} column(s))`,
         sql: `UPDATE public.leagues SET ${setPairs.join(', ')} WHERE id = $1`,
         params: [WHITELISTED_LEAGUE_ID, ...values],
+      });
+    }
+
+    // Chunk 11g.10 sub-step 10c-2 batch 1 (item 4): restore
+    // settings.pickTimeLimit. Two cases:
+    //   (a) before-value was null/undefined (field was absent) → remove
+    //       the key entirely with `settings - 'pickTimeLimit'`.
+    //   (b) before-value was a number/string → jsonb_set back to it.
+    // The setup path only emitted the pickTimeLimit update if
+    // --pick-clock was passed, so we only need to restore if the state
+    // file records a `pickTimeLimit` update in stepsApplied. Restoring
+    // unconditionally would be a no-op for state files from non-
+    // --pick-clock runs but is cleaner and idempotent.
+    const beforePickTimeLimit = before.pickTimeLimit;
+    if (beforePickTimeLimit === null || beforePickTimeLimit === undefined) {
+      plan.push({
+        label: `leagues UPDATE settings (remove pickTimeLimit key — was absent)`,
+        sql: `UPDATE public.leagues
+                 SET settings = settings - 'pickTimeLimit'
+               WHERE id = $1`,
+        params: [WHITELISTED_LEAGUE_ID],
+      });
+    } else {
+      plan.push({
+        label: `leagues UPDATE settings.pickTimeLimit=${beforePickTimeLimit} (jsonb_set restore)`,
+        sql: `UPDATE public.leagues
+                 SET settings = jsonb_set(
+                   COALESCE(settings, '{}'::jsonb),
+                   '{pickTimeLimit}',
+                   to_jsonb($2::int),
+                   true
+                 )
+               WHERE id = $1`,
+        params: [WHITELISTED_LEAGUE_ID, parseInt(beforePickTimeLimit, 10)],
       });
     }
   }

@@ -4760,11 +4760,23 @@ export class LobbyManager {
     notificationReceivedAtMs?: number,
   ): Promise<void> {
     // Dedup gate: own-engine NOTIFY bounces or duplicate notifications.
+    // Chunk 11g.10 sub-step 10c-2 batch 1 (item C2): promoted from
+    // DEBUG-level `event_subscription.event_skipped_duplicate` to
+    // INFO-level `external_event.duplicate_skipped` with a `reason`
+    // discriminator. Rationale: the DEBUG line was invisible under
+    // production LOG_LEVEL=INFO, so seq-dedup activity was only
+    // INFERABLE (from downstream shape) rather than observable
+    // (visible in logs). The overnight 2026-07-27 snapshot-retention
+    // window is the first case where the invisibility was operationally
+    // costly — nine hours of dedup activity on the S4 lobby left no
+    // trace. Naming follows the `external_event.applied` /
+    // `external_event.duplicate_skipped` broadcast-rail symmetry.
     if (seq <= this.lastAppliedSeq) {
-      structuredLogger.debug('event_subscription.event_skipped_duplicate', {
+      structuredLogger.info('external_event.duplicate_skipped', {
         lobbyId: this.lobbyId,
         seq,
         lastAppliedSeq: this.lastAppliedSeq,
+        reason: 'seq_at_or_below_cursor',
       });
       return;
     }

@@ -81,36 +81,62 @@ const RECEIVE_TIMEOUT_MS = parseInt(opt('receive-timeout-ms', '15000'), 10);
 const OUT_DIR = opt('out-dir', join(dirname(fileURLToPath(import.meta.url)), 'results'));
 const RUN_ID = opt('run-id', new Date().toISOString().replace(/[:.]/g, '-'));
 
+// Chunk 11g.10 sub-step 10c-2 batch 1 (item 4): S5 scenario — autopick
+// timing verification. Submit k manual picks, then STOP the pick driver
+// and wait for the engine's autopick to fire at t ≈ pickTimeLimit+1 s
+// (the RPC's +1 s pad; see pick-clock audit Q1). The next `pick` event
+// frame we receive is the autopick; measure its receive_ts relative to
+// the last-submit's returned `pick_deadline` from the RPC.
+const AUTOPICK_TIMEOUT_MS = parseInt(opt('autopick-timeout-ms', '60000'), 10);
+const S5_PRE_AUTOPICK_PICKS = parseInt(opt('s5-pre-autopick-picks', '3'), 10);
+const EXPECTED_PICK_CLOCK_SEC = opt('expected-pick-clock', null);
+
 if (flag('help') || flag('h')) {
-  console.log(`Usage: node scripts/proof/draft-harness.mjs --scenario=<S1|S2|S3|S4> [options]
+  console.log(`Usage: node scripts/proof/draft-harness.mjs --scenario=<S1|S2|S3|S4|S5> [options]
 
 Scenarios (each expects a fresh fixture-12 setup):
   S1  single-client 36-pick paced
   S2  12-client paced
   S3  12-client burst
   S4  12-client paced with mid-draft ${IDLE_MINUTES}-min idle then resume
+  S5  12-client autopick timing verification (batch 1 item 4)
+      Submits N pre-autopick picks then stops the driver. Waits up to
+      --autopick-timeout-ms (default 60000) for the engine's autopick
+      event frame. Asserts the received deadline delta is within a
+      (N-2..N+10) window around --expected-pick-clock. Run twice:
+      once with fixture-12 --pick-clock=30 and --expected-pick-clock=30,
+      once with --pick-clock=90 and --expected-pick-clock=90.
 
 Options (env-tunable defaults):
-  --clients=N              (default: 1 for S1, 12 for S2-S4)
-  --rounds=N               (default: 3 → 36 picks)
-  --burst                  (skip inter-pick pacing; implied by S3)
-  --idle-minutes=N         (S4 only; default 30)
-  --idle-after-picks=N     (S4 only; default 6)
-  --pace-min-ms=N          (default 2000)
-  --pace-max-ms=N          (default 5000)
-  --receive-timeout-ms=N   (default 15000)
-  --out-dir=PATH           (default scripts/proof/results)
-  --run-id=STR             (default timestamp)
+  --clients=N                (default: 1 for S1, 12 for S2-S5)
+  --rounds=N                 (default: 3 → 36 picks)
+  --burst                    (skip inter-pick pacing; implied by S3)
+  --idle-minutes=N           (S4 only; default 30)
+  --idle-after-picks=N       (S4 only; default 6)
+  --autopick-timeout-ms=N    (S5 only; default 60000 — must exceed pickTimeLimit+1s)
+  --s5-pre-autopick-picks=N  (S5 only; default 3 — how many picks before letting timer expire)
+  --expected-pick-clock=N    (S5 only; expected pickTimeLimit — used for tolerance window assertion)
+  --pace-min-ms=N            (default 2000)
+  --pace-max-ms=N            (default 5000)
+  --receive-timeout-ms=N     (default 15000)
+  --out-dir=PATH             (default scripts/proof/results)
+  --run-id=STR               (default timestamp)
 
 Env: SUPABASE_DB_URL, SUPABASE_JWT_SECRET, HOST, WS_PORT.
 Fixture prereq: scripts/proof/fixture-12.mjs --execute --rounds=N
+S5 additionally requires: --pick-clock=N on fixture (writes settings.pickTimeLimit)
 Between scenarios: --reset then --execute the fixture.
 `);
   process.exit(0);
 }
 
-if (!['S1', 'S2', 'S3', 'S4'].includes(SCENARIO)) {
-  console.error(`FATAL: unknown scenario ${SCENARIO} (expected S1..S4).`);
+if (!['S1', 'S2', 'S3', 'S4', 'S5'].includes(SCENARIO)) {
+  console.error(`FATAL: unknown scenario ${SCENARIO} (expected S1..S5).`);
+  process.exit(2);
+}
+if (SCENARIO === 'S5' && (EXPECTED_PICK_CLOCK_SEC === null || EXPECTED_PICK_CLOCK_SEC === undefined)) {
+  console.error('FATAL: S5 requires --expected-pick-clock=<N> to be set.');
+  console.error('       Run fixture-12 with --pick-clock=N first, then pass the same N here.');
   process.exit(2);
 }
 if (CLIENTS < 1 || CLIENTS > TEAM_COUNT) {
@@ -131,7 +157,12 @@ for (const pat of ['pooler.supabase.com', 'pgbouncer', ':6543']) {
   }
 }
 
-const TOTAL_PICKS = CLIENTS === 1 ? TEAM_COUNT * ROUNDS : TEAM_COUNT * ROUNDS;
+// S5 submits only the pre-autopick picks and then waits for the engine's
+// autopick timer to fire — see the S5 autopick-wait phase in main().
+const TOTAL_PICKS =
+  SCENARIO === 'S5'
+    ? S5_PRE_AUTOPICK_PICKS
+    : TEAM_COUNT * ROUNDS;
 
 // ── Banner ──────────────────────────────────────────────────────────
 console.log('');
@@ -366,6 +397,12 @@ async function runPickDriver(initialPgClient, wsClients) {
 
     const receiveTimes = await Promise.all(perClientPromises);
 
+    // Chunk 11g.10 sub-step 10c-2 batch 1 (item 4): capture the RPC-
+    // returned pick_deadline for downstream S5 autopick-timing analysis.
+    // Every pick sample carries it — cheap to include; only the LAST
+    // pre-autopick sample's value is used for S5's fire-time delta.
+    const rpcPickDeadlineIso = rpcRow.pick_deadline ?? null;
+
     // Record one sample per client.
     for (let i = 0; i < wsClients.length; i++) {
       const c = wsClients[i];
@@ -382,6 +419,7 @@ async function runPickDriver(initialPgClient, wsClients) {
         receiveTs,
         rpcMs,
         endToEndMs,
+        rpcPickDeadlineIso, // batch 1 item 4
         engineApplyMs: null, // filled by post-run log join if enabled
         engineBroadcastMs: null,
         engineNotifyToBroadcastMs: null,
@@ -526,6 +564,118 @@ async function main() {
     console.log('');
     console.log('── PICK DRIVER ──');
     const samples = await runPickDriver(pgClient, wsClients);
+
+    // Chunk 11g.10 sub-step 10c-2 batch 1 (item 4): S5 autopick-wait
+    // phase. After the pre-autopick picks land, STOP the driver and
+    // wait for the engine's autopick timer to fire. The next `event`
+    // frame each client receives (pickNumber = last+1) is the autopick;
+    // record its receive_ts and compute the delta from the last-pick's
+    // RPC-returned pick_deadline. Assert the delta is within a
+    // (N-2..N+10) window around --expected-pick-clock (which the
+    // operator sets to match fixture-12's --pick-clock=N).
+    if (SCENARIO === 'S5') {
+      const expectedPickClock = parseInt(EXPECTED_PICK_CLOCK_SEC, 10);
+      const lastPickSample = samples
+        .filter((s) => s.pickNumber === S5_PRE_AUTOPICK_PICKS && s.rpcPickDeadlineIso)
+        [0];
+      if (!lastPickSample) {
+        throw new Error(
+          `S5: could not find sample for last pre-autopick pick #${S5_PRE_AUTOPICK_PICKS}`,
+        );
+      }
+      const rpcDeadlineMs = new Date(lastPickSample.rpcPickDeadlineIso).getTime();
+      const expectedAutopickPickNumber = S5_PRE_AUTOPICK_PICKS + 1;
+      console.log('');
+      console.log('╔═══════════════════════════════════════════════════════════════════════╗');
+      console.log(`║  S5 AUTOPICK WAIT — expecting autopick for pick #${expectedAutopickPickNumber}                    ║`);
+      console.log(`║  Last-pick RPC pick_deadline: ${lastPickSample.rpcPickDeadlineIso.padEnd(31)}    ║`);
+      console.log(`║  Expected pick clock:         ${(expectedPickClock + 's (fixture-12 --pick-clock=N)').padEnd(40)}║`);
+      console.log(`║  Timeout budget:              ${(AUTOPICK_TIMEOUT_MS + ' ms').padEnd(40)}║`);
+      console.log('╚═══════════════════════════════════════════════════════════════════════╝');
+      console.log('');
+
+      // Per-client autopick-wait waiters. Any incoming `event` frame
+      // is fair game — the engine's autopick fires ONE `pick` event
+      // and broadcasts it, so each client will receive one matching
+      // frame at approximately the same wall-clock time.
+      const autopickWaitStart = Date.now();
+      const perClientAutopickReceived = new Map(
+        wsClients.map((c) => [c.clientLabel, null]),
+      );
+      // Re-register onEvent to capture ANY event (the autopick's seq
+      // is not known in advance; the RPC we didn't call didn't return
+      // it). Match by pickNumber inside the event payload.
+      for (const c of wsClients) {
+        c.onEvent(({ frame, receivedAt }) => {
+          const parsed = frame.parsed;
+          if (!parsed || parsed.type !== 'event') return;
+          const p = parsed.payload;
+          if (!p || p.pickNumber !== expectedAutopickPickNumber) return;
+          if (perClientAutopickReceived.get(c.clientLabel) !== null) return;
+          perClientAutopickReceived.set(c.clientLabel, receivedAt);
+        });
+      }
+
+      // Poll every 500 ms; give up after AUTOPICK_TIMEOUT_MS.
+      while (Date.now() - autopickWaitStart < AUTOPICK_TIMEOUT_MS) {
+        const allReceived = [...perClientAutopickReceived.values()].every(
+          (v) => v !== null,
+        );
+        if (allReceived) break;
+        await sleep(500);
+      }
+
+      const toleranceMinMs = (expectedPickClock - 2) * 1000;
+      const toleranceMaxMs = (expectedPickClock + 10) * 1000;
+
+      for (const c of wsClients) {
+        const receiveTs = perClientAutopickReceived.get(c.clientLabel);
+        const deltaFromDeadlineMs = receiveTs === null ? null : receiveTs - rpcDeadlineMs;
+        const deltaFromLastSubmitMs = receiveTs === null ? null : receiveTs - lastPickSample.submitCallTs;
+        const withinTolerance =
+          receiveTs !== null &&
+          deltaFromLastSubmitMs >= toleranceMinMs &&
+          deltaFromLastSubmitMs <= toleranceMaxMs;
+        samples.push({
+          scenario: 'S5',
+          bootstrapClass: 'autopick_wait',
+          clientLabel: c.clientLabel,
+          pickNumber: expectedAutopickPickNumber,
+          seq: null, // not known — we didn't call the RPC
+          submitCallTs: lastPickSample.submitCallTs, // for the delta computation
+          receiveTs,
+          rpcMs: 0, // no RPC in this phase
+          endToEndMs: deltaFromLastSubmitMs,
+          rpcPickDeadlineIso: lastPickSample.rpcPickDeadlineIso,
+          deltaFromDeadlineMs, // autopick-specific
+          expectedPickClockSec: expectedPickClock, // for post-run interpretation
+          withinTolerance,
+          engineApplyMs: null,
+          engineBroadcastMs: null,
+          engineNotifyToBroadcastMs: null,
+          seqOrderingViolation: false,
+          rpcError: null,
+        });
+        const status = receiveTs === null
+          ? 'DROPPED (timeout)'
+          : withinTolerance
+            ? 'WITHIN TOLERANCE'
+            : 'OUT OF TOLERANCE';
+        console.log(
+          `  ${c.clientLabel}  autopick receive_ts=${receiveTs ? new Date(receiveTs).toISOString() : '(none)'}  ` +
+          `Δfrom_last_submit=${deltaFromLastSubmitMs === null ? '—' : `${deltaFromLastSubmitMs}ms`}  ` +
+          `Δfrom_deadline=${deltaFromDeadlineMs === null ? '—' : `${deltaFromDeadlineMs}ms`}  ` +
+          `[${status}]`,
+        );
+      }
+
+      const receivedCount = [...perClientAutopickReceived.values()].filter((v) => v !== null).length;
+      console.log('');
+      console.log(`  S5 result: ${receivedCount}/${wsClients.length} clients received the autopick within ${AUTOPICK_TIMEOUT_MS}ms.`);
+      console.log(`  Tolerance window: [${toleranceMinMs}, ${toleranceMaxMs}] ms from last submit call.`);
+      console.log(`  NOTE: engine boot log's pickClockSeconds MUST equal ${expectedPickClock + 1} to close the pick-clock audit loop.`);
+      console.log(`  Verify via: gcloud ssh ... "docker logs citrus-draft-engine 2>&1 | grep pickClockSeconds | tail -3"`);
+    }
 
     // Write NDJSON.
     if (!existsSync(OUT_DIR)) await mkdir(OUT_DIR, { recursive: true });

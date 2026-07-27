@@ -296,7 +296,14 @@ export const schemas = {
 
   draftSettings: z.object({
     draft_rounds: z.number().int().min(1).max(30).optional(),
-    pickTimeLimit: z.number().int().min(0).optional(),
+    // Chunk 11g.10 sub-step 10c-2 batch 1 (item 3): clamp pickTimeLimit
+    // to the UI dropdown's allowed range (30..300 seconds). Prior
+    // `.min(0)` accepted `0` — which would produce a 1-second RPC
+    // deadline window per submit_pick_v2 (§B.9 `now + 0s + 1s pad`) —
+    // and had no upper bound, so a scripted caller could bypass the UI
+    // and set unreasonable values. See pick-clock audit Q6 findings in
+    // PROJECT_PLAN.md Decision Log for the full narrative.
+    pickTimeLimit: z.number().int().min(30).max(300).optional(),
     draft_status: z.enum(DRAFT_STATUSES).optional(),
     scheduled_draft_time: z.string().optional(),
     teams_count: z.number().int().min(2).max(20).optional(),

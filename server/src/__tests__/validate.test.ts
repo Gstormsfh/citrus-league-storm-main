@@ -348,4 +348,33 @@ describe('Schema definitions', () => {
       expect(result.success).toBe(false);
     });
   });
+
+  // Chunk 11g.10 sub-step 10c-2 batch 1 (item 3): pickTimeLimit clamp
+  // regression. The prior schema was `z.number().int().min(0).optional()`
+  // which accepted `0` (→ 1-second RPC window per submit_pick_v2) and
+  // any value above the UI dropdown's 300 s cap. The new schema mirrors
+  // the DraftLobby.tsx <Select> options range.
+  describe('draftSettings.pickTimeLimit clamp (30..300)', () => {
+    it('accepts UI dropdown allowed values (30, 45, 60, 90, 120, 180, 300)', () => {
+      for (const v of [30, 45, 60, 90, 120, 180, 300]) {
+        const result = schemas.draftSettings.safeParse({ pickTimeLimit: v });
+        expect(result.success, `pickTimeLimit=${v} should pass`).toBe(true);
+      }
+    });
+
+    it('rejects below-min values (0, 29)', () => {
+      expect(schemas.draftSettings.safeParse({ pickTimeLimit: 0 }).success).toBe(false);
+      expect(schemas.draftSettings.safeParse({ pickTimeLimit: 29 }).success).toBe(false);
+    });
+
+    it('rejects above-max values (301, 999999)', () => {
+      expect(schemas.draftSettings.safeParse({ pickTimeLimit: 301 }).success).toBe(false);
+      expect(schemas.draftSettings.safeParse({ pickTimeLimit: 999999 }).success).toBe(false);
+    });
+
+    it('remains optional (accepts absence)', () => {
+      const result = schemas.draftSettings.safeParse({ draft_rounds: 21 });
+      expect(result.success).toBe(true);
+    });
+  });
 });

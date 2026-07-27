@@ -306,13 +306,25 @@ noise; single-client scripts always show it).
 
 ### 5.3  Run sequence — general shape
 
-**Between every scenario: fixture reset + engine restart. Both are mandatory.**
+**Between every scenario AND after the FINAL scenario: fixture reset + engine restart. Both are mandatory.**
 The engine keeps in-memory lobbies alive at `size=0` after all WS clients
 disconnect (chunk 11g.7-7c snapshot + bootstrap architecture) and dedupes
 replayed seqs via `lastAppliedSeq`. Without an engine restart, scenario 2's
 first pick would either race the dedup gate or bootstrap-replay scenario 1's
 events into scenario 2's fresh event log. Restart clears the in-memory
 `LobbyRegistry` so scenario N starts from a truly cold engine state.
+
+**Machine-verified reason to restart after the FINAL scenario too.** The S4
+run at 2026-07-27T05:01:14Z left one lobby alive at `size=0` overnight;
+by morning restart at 13:57:41Z (8h56m later) the lobby's 30 s periodic
+snapshot writer had inserted **~999 stale rows** into `draft_snapshots`
+for the whitelisted league. Extrapolated to production: ~2,880 rows per
+lobby per day of ghost life. Skipping the post-final-scenario restart
+leaves this pattern running until you next remember to touch the engine.
+Chunk 10c-3 (spec pending architect review — see PROJECT_PLAN.md Decision
+Log 2026-07-27 "Snapshot retention + lobby hygiene chunk — spec drafted")
+will retire this class of drift structurally. Until it lands, the discipline
+is: `docker restart` after every scenario, including the last one.
 
 ```powershell
 cd C:\Users\garre\Documents\citrus-league-storm-phase45

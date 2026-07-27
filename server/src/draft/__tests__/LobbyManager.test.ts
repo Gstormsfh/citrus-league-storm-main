@@ -5233,6 +5233,39 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     expect(listDraftEvents).not.toHaveBeenCalled();
   });
 
+  it('10c-2 batch 1 item C2: dedup-skip emits external_event.duplicate_skipped INFO with reason discriminator', async () => {
+    // Regression lock for the C2 log-line change: the seq-at-or-below-
+    // cursor dedup path MUST emit `external_event.duplicate_skipped` at
+    // INFO level with `reason: 'seq_at_or_below_cursor'` so operators
+    // can observe (not just infer) dedup activity. Prior line was
+    // `event_subscription.event_skipped_duplicate` at DEBUG — invisible
+    // under production LOG_LEVEL=INFO.
+    const listDraftEvents = vi.fn(async () => [] as DraftEventRow[]);
+    const lobby = await makeLobby({ listDraftEvents });
+    // Prime lastAppliedSeq by firing an engine-authored pick.
+    await lobby.enqueueAction(makeSubmitPick());
+    const { structuredLogger } = await import('@citrus/shared');
+    const infoSpy = vi.spyOn(structuredLogger, 'info');
+    infoSpy.mockClear();
+    // Bounce NOTIFY for the same seq the engine already applied.
+    await lobby.enqueueExternalEvent(1);
+    const dedupCalls = infoSpy.mock.calls.filter(
+      (call) => call[0] === 'external_event.duplicate_skipped',
+    );
+    expect(dedupCalls.length).toBeGreaterThanOrEqual(1);
+    const context = dedupCalls[0][1] as {
+      lobbyId: string;
+      seq: number;
+      lastAppliedSeq: number;
+      reason: string;
+    };
+    expect(context.seq).toBe(1);
+    expect(context.lastAppliedSeq).toBe(1);
+    expect(context.reason).toBe('seq_at_or_below_cursor');
+    expect(typeof context.lobbyId).toBe('string');
+    infoSpy.mockRestore();
+  });
+
   it('7e enqueueExternalEvent fetches via listDraftEvents(sinceSeq=lastAppliedSeq) and applies', async () => {
     // Construct a draftOrder so the pick event payload validates
     // against expected team/slot mapping.
