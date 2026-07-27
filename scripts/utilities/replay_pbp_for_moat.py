@@ -518,17 +518,21 @@ def process_game(
             over_tolerance.append({"nhl_abs": [nx, ny], "db_abs": [dx, dy], "delta": max_d})
 
     if over_tolerance:
+        # coord_backstop = bounded rapid-fire / systematic arena-adjustment
+        # class. Terminal but distinct from structural fails — status is
+        # 'ambiguous_unresolvable', skipped on resume (retrying deterministic
+        # ambiguity is wasted API). See PHASE_0C_NOTES.md breaker-v3 section.
         evidence = json.dumps(over_tolerance[:5])[:1800]
         if not dry_run:
             upsert_progress(db, {
-                "game_id": game_id, "season": season, "status": "match_integrity_fail",
+                "game_id": game_id, "season": season, "status": "ambiguous_unresolvable",
                 "error_detail": f"coord_backstop:{len(over_tolerance)}_pairs_over_tol{tolerance}; evidence={evidence}",
                 "rows_matched": 0, "rows_updated": 0,
                 "nhl_unmatched": len(r["nhl_um_508"]) + len(r["nhl_um_dedupe"]) + len(r["nhl_um_shootout"]) + len(unexplained),
                 "db_unmatched": 0, "has_pass_count": 0,
                 "attempted_at": started_iso, "completed_at": now_iso(),
             })
-        return {"game_id": game_id, "status": "match_integrity_fail", "reason": "coord_backstop",
+        return {"game_id": game_id, "status": "ambiguous_unresolvable", "reason": "coord_backstop",
                 "over_tolerance_count": len(over_tolerance), "delta_hist": dict(delta_hist)}
 
     # 4. Unmatched cap
@@ -627,18 +631,19 @@ def status_report(db) -> None:
             v = r.get(k)
             if v is not None:
                 totals[k] += int(v)
-    print("=" * 78)
+    print("=" * 82)
     print("  phase0c_progress ROLLUP")
-    print("=" * 78)
-    print(f"  {'season':>6} | {'complete':>8} {'in_progress':>11} {'match_fail':>10} {'error':>5} {'pending':>7}")
+    print("=" * 82)
+    print(f"  {'season':>6} | {'complete':>8} {'in_progress':>11} {'match_fail':>10} {'ambig':>5} {'error':>5} {'pending':>7}")
     seasons = sorted({s for (s, _st) in by_season_status})
     for s in seasons:
         c = by_season_status.get((s, "complete"), 0)
         ip = by_season_status.get((s, "in_progress"), 0)
         mf = by_season_status.get((s, "match_integrity_fail"), 0)
+        am = by_season_status.get((s, "ambiguous_unresolvable"), 0)
         er = by_season_status.get((s, "error"), 0)
         pe = by_season_status.get((s, "pending"), 0)
-        print(f"  {s:>6} | {c:>8} {ip:>11} {mf:>10} {er:>5} {pe:>7}")
+        print(f"  {s:>6} | {c:>8} {ip:>11} {mf:>10} {am:>5} {er:>5} {pe:>7}")
     print(f"\n  Totals: rows_matched={totals['rows_matched']} rows_updated={totals['rows_updated']} "
           f"has_pass={totals['has_pass_count']} nhl_um={totals['nhl_unmatched']} db_um={totals['db_unmatched']}")
     print("=" * 78)
@@ -674,6 +679,11 @@ def games_for_season(db, season: int, force: bool, limit: Optional[int] = None) 
     all_ids = sorted(all_ids_set)
     done_ids: set = set()
     if not force:
+        # Terminal statuses that are skipped on resume: 'complete' (success)
+        # and 'ambiguous_unresolvable' (bounded rapid-fire / arena-adjust
+        # drift — retrying is deterministic waste). 'match_integrity_fail'
+        # and 'error' are retried by default.
+        TERMINAL_STATUSES = {"complete", "ambiguous_unresolvable"}
         BATCH = 200
         for i in range(0, len(all_ids), BATCH):
             batch = all_ids[i:i + BATCH]
@@ -682,7 +692,7 @@ def games_for_season(db, season: int, force: bool, limit: Optional[int] = None) 
                 filters=[("game_id", "in", batch)], limit=BATCH,
             )
             for r in done_rows:
-                if r.get("status") == "complete":
+                if r.get("status") in TERMINAL_STATUSES:
                     done_ids.add(int(r["game_id"]))
     pending = [g for g in all_ids if g not in done_ids]
     if limit is not None:
@@ -712,9 +722,12 @@ def process_season_batch(db, season: int, args) -> Dict[str, Any]:
     season_rows_matched = 0
     season_coord_warn = 0
 
-    # Circuit breaker v2 state.
+    # Circuit breaker v3 state. "fails" counts structural failures only
+    # (match_integrity_fail + error). ambiguous_unresolvable is tracked
+    # separately and has its own rate-only condition.
     fails_absolute = 0
     fails_consecutive = 0
+    ambiguous_count = 0
     halted_reason: Optional[str] = None
     attempted = 0
 
@@ -740,25 +753,40 @@ def process_season_batch(db, season: int, args) -> Dict[str, Any]:
             fail_details.append(result)
             fails_absolute += 1
             fails_consecutive += 1
+        elif st == "ambiguous_unresolvable":
+            # Not counted toward structural fail conditions; own rate check below.
+            # Doesn't reset the consecutive-fail counter either (ambiguity is
+            # neither a success nor a systemic break).
+            ambiguous_count += 1
         elif st in ("complete", "dry_run_complete"):
             fails_consecutive = 0
 
-        # Circuit breaker v2: three conditions, any one halts the season.
-        # (1) absolute: >= --season-fail-absolute total fails
-        # (2) consecutive: >= --season-fail-consecutive fails in a row
-        # (3) rate: fails/attempted > --season-fail-cap, only evaluated once
-        #     attempted >= --season-fail-rate-min-attempts (default 100).
-        # Rationale: the old flat rate at small n halted on any single early
-        # fail (1/11 = 9% > 3% cap trivially). The floor restores meaning to
-        # the rate; (1)+(2) preserve fast-halt on genuine systemic breakage.
+        # Circuit breaker v3: four conditions, any one halts the season.
+        # Structural (match_integrity_fail + error):
+        #   (1) absolute: >= --season-fail-absolute (default 5)
+        #   (2) consecutive: >= --season-fail-consecutive (default 3)
+        #   (3) rate: fails/attempted > --season-fail-cap (default 3%),
+        #       ONLY at attempted >= --season-fail-rate-min-attempts (default 100)
+        # Ambiguous (bounded rapid-fire class):
+        #   (4) ambiguous rate: ambiguous_count/attempted > --season-ambiguous-cap
+        #       (default 10%), ONLY at attempted >= --season-fail-rate-min-attempts
+        # Rationale for v2→v3: ambiguous_unresolvable is a bounded, deterministic,
+        # not-our-fault class (either MoneyPuck arena-adjustment drift or a genuine
+        # rapid-fire time-collision the matcher can't distinguish). Counting it as
+        # a "fail" for structural conditions halts on data quirks, not systemic
+        # break. Its own rate ceiling exists so honesty is bounded — if a season
+        # has >10% ambiguous, something else is wrong.
         if fails_absolute >= args.season_fail_absolute:
-            halted_reason = f"absolute: {fails_absolute} fails >= {args.season_fail_absolute}"
+            halted_reason = f"absolute: {fails_absolute} structural fails >= {args.season_fail_absolute}"
         elif fails_consecutive >= args.season_fail_consecutive:
-            halted_reason = f"consecutive: {fails_consecutive} fails in a row >= {args.season_fail_consecutive}"
+            halted_reason = f"consecutive: {fails_consecutive} structural fails in a row >= {args.season_fail_consecutive}"
         elif attempted >= args.season_fail_rate_min_attempts:
             rate = fails_absolute / attempted
+            amb_rate = ambiguous_count / attempted
             if rate > args.season_fail_cap:
-                halted_reason = f"rate: {rate:.2%} > cap {args.season_fail_cap:.2%} at n={attempted} (>= min {args.season_fail_rate_min_attempts})"
+                halted_reason = f"structural rate: {rate:.2%} > cap {args.season_fail_cap:.2%} at n={attempted}"
+            elif amb_rate > args.season_ambiguous_cap:
+                halted_reason = f"ambiguous rate: {amb_rate:.2%} > cap {args.season_ambiguous_cap:.2%} at n={attempted}"
 
         # Periodic rollup every 50 games (plus first game so it's visible early)
         if i == 1 or i % 50 == 0 or i == len(game_ids) or halted_reason:
@@ -766,9 +794,11 @@ def process_season_batch(db, season: int, args) -> Dict[str, Any]:
             avg = elapsed / i
             remain = (len(game_ids) - i) * avg
             fails = per_status["match_integrity_fail"] + per_status["error"]
+            ambig = per_status["ambiguous_unresolvable"]
             print(f"  [season {season}] {i}/{len(game_ids)} complete={per_status['complete']} "
-                  f"fails={fails} rows_matched={season_rows_matched} has_pass={season_has_pass} "
-                  f"warn={season_coord_warn} elapsed={elapsed:.0f}s ETA={remain:.0f}s", flush=True)
+                  f"fails={fails} ambig={ambig} rows_matched={season_rows_matched} "
+                  f"has_pass={season_has_pass} warn={season_coord_warn} "
+                  f"elapsed={elapsed:.0f}s ETA={remain:.0f}s", flush=True)
 
         if halted_reason:
             print(f"\n  [season {season}] BREAKER TRIPPED — {halted_reason}", flush=True)
@@ -779,7 +809,9 @@ def process_season_batch(db, season: int, args) -> Dict[str, Any]:
     complete = per_status.get("complete", 0) + per_status.get("dry_run_complete", 0)
     mif = per_status.get("match_integrity_fail", 0)
     err = per_status.get("error", 0)
+    ambig = per_status.get("ambiguous_unresolvable", 0)
     fail_rate = (mif + err) / total if total else 0.0
+    ambig_rate = ambig / total if total else 0.0
 
     # Per-season summary
     print("\n" + "-" * 72)
@@ -788,8 +820,10 @@ def process_season_batch(db, season: int, args) -> Dict[str, Any]:
     print(f"  Games processed: {total}")
     print(f"  Complete:        {complete}")
     print(f"  match_fail:      {mif}")
+    print(f"  ambiguous:       {ambig}  (bounded rapid-fire / arena-adjust drift; skipped on resume)")
     print(f"  error:           {err}")
     print(f"  Fail rate:       {fail_rate:.2%}  (breaker: abs>={args.season_fail_absolute}, cons>={args.season_fail_consecutive}, rate>{args.season_fail_cap:.2%} at n>={args.season_fail_rate_min_attempts})")
+    print(f"  Ambig rate:      {ambig_rate:.2%}  (breaker: rate>{args.season_ambiguous_cap:.2%} at n>={args.season_fail_rate_min_attempts})")
     if halted_reason:
         print(f"  BREAKER TRIPPED: {halted_reason}")
     print(f"  Rows matched:    {season_rows_matched}")
@@ -812,6 +846,7 @@ def process_season_batch(db, season: int, args) -> Dict[str, Any]:
     return {
         "season": season, "games": total, "complete": complete,
         "match_integrity_fail": mif, "error": err, "fail_rate": fail_rate,
+        "ambiguous": ambig, "ambig_rate": ambig_rate,
         "elapsed": elapsed, "has_pass": season_has_pass,
         "rows_matched": season_rows_matched, "coord_warn": season_coord_warn,
         "delta_hist": dict(season_delta_hist),
@@ -842,6 +877,8 @@ def main() -> int:
                         help="CONSECUTIVE condition: halt if this many fails happen in a row (default 3)")
     parser.add_argument("--season-fail-rate-min-attempts", type=int, default=100,
                         help="RATE floor: don't evaluate rate condition until attempted >= this (default 100)")
+    parser.add_argument("--season-ambiguous-cap", type=float, default=0.10,
+                        help="AMBIGUOUS RATE condition: halt if ambiguous/attempted > this at n >= min-attempts (default 0.10). Honesty is bounded.")
     parser.add_argument("--env-file", type=str, default=os.path.join(_REPO_ROOT, ".env"))
     args = parser.parse_args()
 
@@ -938,11 +975,14 @@ def main() -> int:
         hp_rate = 100.0 * s["has_pass"] / max(1, s["rows_matched"])
         print(f"  {s['season']}: games={s['games']:>5} complete={s['complete']:>5} "
               f"fails={s['match_integrity_fail']+s['error']:>3} ({s['fail_rate']:.2%}) "
+              f"ambig={s.get('ambiguous', 0):>4} ({s.get('ambig_rate', 0):.2%}) "
               f"has_pass={s['has_pass']:>6} ({hp_rate:>4.1f}%) warn={s['coord_warn']:>4} "
               f"elapsed={s['elapsed']/60:>5.1f}min")
     total_fails = sum(s["match_integrity_fail"] + s["error"] for s in season_summaries)
+    total_ambig = sum(s.get("ambiguous", 0) for s in season_summaries)
     print(f"\n  Total elapsed: {total_elapsed/60:.1f}min ({total_elapsed/3600:.2f}h)")
-    print(f"  Total fails:   {total_fails}")
+    print(f"  Total structural fails: {total_fails}")
+    print(f"  Total ambiguous:        {total_ambig}")
     print("=" * 72)
     return 0 if total_fails == 0 else 1
 
