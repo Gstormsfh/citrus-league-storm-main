@@ -230,9 +230,23 @@ if (!VERBOSE) {
 }
 
 // ── Timeout / finish ───────────────────────────────────────────────
+//
+// Chunk 10c-2 batch 3 field-run fix (2026-07-28): reaching the
+// duration timer with the WS still open = PASS in browser-sim. The
+// prior code called ws.close() FIRST which triggered a 1005 close
+// event; by the time finish() ran, closeCode was 1005 and the
+// verdict logic flagged FAIL. Fix: set `probeReachedDurationEnd`
+// BEFORE the self-close so finish() knows the close was our own,
+// not the engine's. Field evidence: 130s run with 13 pings + engine
+// log confirmed zero pong_timeout for that userId, but the probe
+// stamped ✗ FAIL on its own 1005 self-close.
+let probeReachedDurationEnd = false;
 setTimeout(() => {
   if (closeMs === null) {
-    // Still open at duration end. Close cleanly and finish.
+    // Still open at duration end. Mark the intent BEFORE self-closing
+    // so the close handler + finish() can distinguish our clean end
+    // from a server-initiated close.
+    probeReachedDurationEnd = true;
     try { ws.close(); } catch { /* ignore */ }
     setTimeout(() => finish(), 500);
   }
@@ -264,17 +278,30 @@ function finish() {
   let ok;
   let reason;
   if (MODE === 'browser-sim') {
-    // Success = still open at end (no close code) AND at least one
-    // ping received (proves the server-initiated ping floor fires).
-    if (closeCode !== null) {
-      ok = false;
-      reason = `expected connection to survive to ${durationSec}s idle but closed at ${totalSec.toFixed(1)}s with code=${closeCode}`;
-    } else if (pingCount === 0) {
-      ok = false;
-      reason = `no server-initiated pings received in ${totalSec.toFixed(1)}s — B-floor is NOT firing`;
-    } else {
+    // Chunk 10c-2 batch 3 field-run fix (2026-07-28): evaluate PASS
+    // BEFORE the probe's own duration-end self-close. Only
+    // server-initiated closes count as browser-sim failures.
+    //
+    // Verdict order:
+    //   1. Reached duration end + received ≥1 ping → PASS
+    //      (regardless of close code — 1005 from our own ws.close()
+    //      is expected and NOT a failure signal).
+    //   2. Reached duration end + zero pings → FAIL (B-floor not firing)
+    //   3. Closed BEFORE duration end + server code → FAIL (unexpected)
+    //   4. Anything else → FAIL (defensive default)
+    if (probeReachedDurationEnd && pingCount >= 1) {
       ok = true;
-      reason = `survived ${totalSec.toFixed(1)}s idle with ${pingCount} ping(s) received — B-floor is firing`;
+      reason = `survived ${openSec.toFixed(1)}s open with ${pingCount} ping(s) received — B-floor is firing (probe self-closed with code=${closeCode ?? 'still open'})`;
+    } else if (probeReachedDurationEnd && pingCount === 0) {
+      ok = false;
+      reason = `probe reached ${openSec.toFixed(1)}s open but received zero server-initiated pings — B-floor is NOT firing`;
+    } else if (closeCode !== null) {
+      // Server-initiated close BEFORE duration end.
+      ok = false;
+      reason = `unexpected close at ${totalSec.toFixed(1)}s (before ${durationSec}s duration end) with code=${closeCode} reason=${closeReason || '<empty>'} — probe pings=${pingCount}`;
+    } else {
+      ok = false;
+      reason = `probe finished in indeterminate state (no close event, no duration-end mark) at ${totalSec.toFixed(1)}s — investigate`;
     }
   } else {
     // dead-sim: success = closed with code 4002 within ~30-40s.
