@@ -207,6 +207,16 @@ See §1.2 for the full table-by-table inventory in prod. **Critical schema quirk
   Monotonic improvement in NHL PBP capture over time; **2021 is an unexplained dip** (open question pending full-season 0c data). Cross-era comparisons of moat-derived metrics (pass_quality_score, goalie_movement_score, etc.) MUST account for capture-density differences — the same player's average moat scores in 2017 are structurally lower not because they made fewer setup passes but because fewer of them were captured.
 - **`passer_id` fallback to `eventOwnerTeamId` when previous event lacks `playerId`.** Pre-existing behavior from live scraper (`data_acquisition.py` lines 322-327). For events like hits, blocks, penalties whose `details` carries `hittingPlayerId`/`blockingPlayerId` instead of `playerId`, the pass-detection code falls back to the team_id. Downstream consumers joining `passer_id` against `player_directory` will get orphan joins on these fallback rows (team_id ≈ 1..32, distinguishable from player_ids ≈ 84xxxxx). Documented so consumers can filter.
 
+- **NHL PBP payload drift after `gameState=OFF`, and the duplication trap on naive refresh.** NHL revises play-by-play content after games settle (coord nudges of 1-3 units, playerId corrections on hit/block events, event insertions or removals when scoring gets overturned or credited to a different player). The live scraper captures at scrape-time, so `raw_shots` for live-era games reflects the payload as-it-was-then, not the current NHL API answer. Evidence from the 2026-07-26 parity audit on 49 live-era games: 9 prod rows had no partner in a naive unique-constraint join against a fresh NHL API extraction of the same games — a mix of dedupe-collapsed §16 buckets and likely settled-content changes.
+
+    **The trap:** the shot-coverage reconciler (`data-pipeline/monitoring/reconcile_shot_coverage.py`) is content-blind — it fires on `no_payload`, `stale_payload` (gameState-not-terminal), or `no_shots`, but NEVER on "same game, coords nudged 2 units by NHL post-facto." A settled-content refresh through the normal extract → `_save_shots_to_database` → `on_conflict=(game_id, player_id, shot_x, shot_y, shot_type_code)` path DOES NOT OVERWRITE drifted rows: a coord nudge changes the unique-constraint key, so the "same" shot lands as a NEW row beside the stale one. Result: duplicated shots on any subsequent naive reprocess. Same mechanism for playerId corrections.
+
+    **Safe refresh patterns** (either, not both):
+    1. Per-game DELETE-then-INSERT: `BEGIN; DELETE FROM raw_shots WHERE game_id = N; INSERT ... SELECT ... FROM extraction; COMMIT` — atomic, guarantees no residue.
+    2. Event-identity match: UPDATE by `(game_id, event_id, sort_order)` instead of the coord-tuple unique constraint. NHL `event_id`/`sort_order` are stable across API refetches for the same physical event; the unique-constraint columns are not. `event_id` is now populated on all 119,766/119,766 prod 2025 rows, so this path is available if the refresher opts into it.
+
+    Never naive-reprocess through the live path expecting `merge-duplicates` to overwrite. It won't.
+
 ---
 
 ## 5. Other related repos / directories (NOT canonical)

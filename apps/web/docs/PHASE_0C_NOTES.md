@@ -121,6 +121,41 @@ extraction is deterministic on payload input; the two call paths
 diverge only in what they do WITH the extraction output, not in the
 extraction itself.
 
+## NHL PBP payload drift + duplication trap (2026-07-26)
+
+The 2026-07-26 parity audit surfaced 9 prod rows across 49 games
+that had no partner in a naive unique-constraint join against
+a fresh NHL API extraction of the same games. Some are §16
+dedupe-collapsed buckets (documented); the residue is likely
+settled-content revisions after `gameState=OFF` — NHL nudges
+coords, corrects playerIds, occasionally inserts/removes events.
+
+**The trap.** The shot-coverage reconciler
+(`data-pipeline/monitoring/reconcile_shot_coverage.py`) is
+content-blind by design. It detects `no_payload`,
+`stale_payload` (gameState-not-terminal), or `no_shots` — but
+never "same game, coords nudged 2 units post-facto." A content
+refresh through the normal extract → `_save_shots_to_database` →
+`on_conflict=(game_id, player_id, shot_x, shot_y, shot_type_code)`
+path would DUPLICATE any drifted shot rather than overwrite: a
+coord nudge changes the unique key, so the "same" shot lands as a
+NEW row beside the stale one. Same mechanism for playerId
+corrections.
+
+Safe refresh patterns for the eventual settle-window reconciler
+(either, not both):
+
+1. Per-game DELETE-then-INSERT atomic transaction.
+2. Event-identity UPDATE via `(game_id, event_id, sort_order)`,
+   which are stable across NHL refetches (unlike the
+   coord-tuple unique constraint). `event_id` is populated on
+   all 119,766/119,766 prod 2025 rows, so this path is
+   available.
+
+Full documentation in `DATA_INVENTORY.md § 4`. Tracked for a
+future settle-window reconciler variant (backlog: pre-2026-27
+season deadline; see the linked GH issue).
+
 ## Pending decisions (tomorrow)
 
 - **Tolerance recalibration**: 3% per-season fail-cap is 30x the
