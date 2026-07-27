@@ -299,6 +299,150 @@ Staging fixture applied during 10b: league `993c9219-ecbf-4e4e-9fb0-e9837e1bded3
 
 > **UUID correction — corrected, 2026-07-24 (later same day):** the blockquote immediately above is itself wrong and is superseded. Canonical Staging League UUID is `993c9219-ecbf-4e4e-9fb0-e9837e1bded3` (the **4e4e form**) — the value in the original §15.8 paragraph at the top of this block. Establishment method: **in-database boolean comparison** — `SELECT id = '993c9219-ecbf-4e4e-9fb0-e9837e1bded3'::uuid FROM leagues WHERE id::text LIKE '993c9219%'` returns `true` for the sole matching row; the same comparison against the 4c4e form returns `false`; a direct-equality query for the 4c4e form returns zero rows. This method eliminates human glyph-reading (c/e confusion) entirely, unlike screenshot-derived assertions. **Root cause of the intermediate error:** architect screenshot misreading of the c/e glyphs in a rendered UUID; the misread was committed twice within the same day, and the second commit was used to wrongly impeach this file's original §15.8 record — which stands ratified. See `PHASE_4_5_PROJECT_PLAN.md` Decision Log 2026-07-24 "UUID correction — canonical" and "Protocol ratchet — identifier discipline" entries. Both intermediate blockquotes (the original §15.8 paragraph above and the first correction blockquote above this one) are preserved verbatim per the append-only evidence rule; **use the 4e4e form for all queries and fixtures.**
 
+### §15.9 Deploy reality post-10c-1d (2026-07-27) — supersession pointer
+
+Chunk 11g.10 sub-step 10c-1d shipped listener hardening (TCP keepalive + watchdog + `/health/subscription` + error-serialization fix) and, in the process of deploying it, exposed three concrete inaccuracies in this file's earlier deploy guidance. The three strikes and the corrected canonical runbook are captured in §15.10 through §15.14. §15.15 confirms Secret Manager naming for the two secrets the 10c-1d deploy verified end-to-end.
+
+**Supersession scope.** §15.10–§15.14 are canonical for the deploy pipeline as observed 2026-07-27. Where they conflict with §15.3 (startup log path is unchanged and still correct), §15.6 (Cloud Logging still applies), or any implicit "run the deploy" narrative in §15.1–§15.8, the newer subsections win. §15.1–§15.8 are preserved verbatim as evidence per the append-only rule established in the 2026-07-24 UUID incident.
+
+See `PHASE_4_5_PROJECT_PLAN.md` Decision Log 2026-07-27 entries "10c-1d incident closure", "Deploy strike #1/#2/#3", "Deploy runbook canonical", and "10c-1c.1 snapshot-clear debut" for the incident and decision-history record.
+
+### §15.10 Startup script mechanism — metadata-backed, not `/opt/citrus/*`
+
+The startup script is delivered via GCE VM metadata under the `startup-script` key and executed by Google's `google_metadata_script_runner`. **There is no file at `/opt/citrus/draft-engine-startup.sh`** — earlier drafts of this document implied one; the file does not and never did exist on the VM. The in-repo source of truth for the script's contents is `infra/gce/draft-engine-startup.sh`; deploying an updated script requires uploading it to the VM's metadata (`gcloud compute instances add-metadata … --metadata-from-file=startup-script=…`), NOT copying it to disk on the instance.
+
+To run the current metadata startup script on demand (redeploy after image push):
+
+```
+sudo google_metadata_script_runner startup
+```
+
+The script's own logs go to `/var/log/citrus-startup.log` (unchanged from §15.3 — that finding remains correct). The metadata delivery model does not affect the log path.
+
+### §15.11 Engine Dockerfile — `server/Dockerfile.draft-engine`, NOT `server/Dockerfile`
+
+Two Dockerfiles exist in `server/`:
+
+- `server/Dockerfile` — **API server**. `CMD` is `npx tsx server/src/index.ts`. Builds and runs the Hono API surface (the `citrus-api` service on Cloud Run in the pre-cutover topology).
+- `server/Dockerfile.draft-engine` — **draft engine**. `CMD` is `node --import tsx/esm server/src/draft/index.ts`. Builds the persistent-engine binary that runs on the GCE VM behind port 3001 (Hono) + 3002 (uWS).
+
+The two are NOT interchangeable; the API-server image has no engine surface and does not open the uWS port.
+
+**Strike #2 (~13 min staging outage, 2026-07-27 02:48–03:01Z).** The 10c-1d image was built with `docker build -f server/Dockerfile …` — the API-server Dockerfile. The pushed image had `CMD tsx server/src/index.ts` baked in; when the VM pulled and started it, an API server ran in the engine container's slot. The engine port responded with API-server routes; nothing was listening on uWS 3002; no LISTEN/NOTIFY loop was running. Symptom externally: everything looked green (health returned 200, container was up, image tag was current), but no draft functionality worked. Root cause: wrong `-f` on the docker build. Fix: rebuild with `-f server/Dockerfile.draft-engine`, push, redeploy — resolved at 03:01Z.
+
+**Correct build command:**
+
+```
+docker build `
+  -f server/Dockerfile.draft-engine `
+  -t northamerica-northeast1-docker.pkg.dev/citrus-fantasy-staging/citrus-draft-engine/draft-engine:<sha>-draft `
+  .
+```
+
+The `-draft` suffix on the tag is the convention established during the 10c-1d recovery: the tag itself carries the mnemonic "this is the engine build, not the API build." Reduces the chance of a future operator mistaking an accidentally-pushed API-server tag for an engine deploy.
+
+### §15.12 PowerShell `--metadata` escaping — quote or lose
+
+`gcloud compute instances add-metadata … --metadata k=v,k=v,k=v` invoked from PowerShell **splits the argument on commas** because PowerShell interprets an unquoted comma as an array separator. The result is that `gcloud` receives the first element as `--metadata`'s value and the remaining elements as separate positional arguments, which `gcloud` fails to parse — nothing gets set. Alternative failure mode observed: values from later `k=v` pairs get concatenated into the first key's value in odd ways depending on quoting boundaries.
+
+**Correct form (quoted, single argument):**
+
+```
+gcloud compute instances add-metadata citrus-draft-engine-staging `
+  --zone=northamerica-northeast1-a `
+  --project=citrus-fantasy-staging `
+  --metadata="image-tag=<sha>-draft,commit-sha=<full-sha>,image-sha=<digest>"
+```
+
+The `--metadata=` (equal sign) plus double-quoted value is the single canonical form; alternatives (backticked commas, `--metadata-from-file`, per-key repeated `--metadata` flags) work but add ceremony.
+
+**Strike #3, 2026-07-27.** Unquoted `--metadata` was used during the 10c-1d deploy; `image-tag` ended up with a corrupt value; the metadata-driven startup script fetched a nonexistent tag; `docker pull` failed with a "manifest unknown" error. The startup script exited before touching the running container. Failure was safe — see §15.13.
+
+### §15.13 Safety property — `docker pull` before `docker rm/stop`
+
+The metadata startup script's redeploy sequence is:
+
+```
+1. docker pull <new-tag>          # if this fails, exit here
+2. docker stop citrus-draft-engine
+3. docker rm citrus-draft-engine
+4. docker run … <new-tag>
+```
+
+Step 1 runs **before** any destructive step on the currently-running container. If the new tag is nonexistent, unreachable, or corrupt, `docker pull` errors out and the script exits without touching the running container. The current-running image keeps serving.
+
+This is the mechanism that saved us during strike #3: PowerShell unquoted metadata → wrong tag → pull failed → script bailed → running engine kept serving traffic through the deploy misfire. The operator saw a red error in the deploy terminal and could investigate before the service was affected.
+
+**Rule going forward:** any change to the startup script that reorders these steps (e.g., pre-emptively pruning the old container, or fetching config after stopping the current one) must preserve the invariant "no destructive action on the running container until the new image is confirmed pulled." A separate rehearsal test would be worth adding to 10c-2 or 10f: intentionally deploy with a bogus tag and confirm the running container is untouched.
+
+### §15.14 Canonical deploy runbook (2026-07-27 proven sequence)
+
+The following sequence was proven end-to-end during the 10c-1d deploy after the three strikes were corrected. Values are placeholders — substitute the current commit SHA / image digest at run time.
+
+```
+# 1. Push code.
+cd C:\Users\garre\Documents\citrus-league-storm-phase45
+git push origin phase-4-5-implementation
+
+# 2. Capture the short SHA for tagging.
+$commitSha = git rev-parse --short HEAD
+$fullSha = git rev-parse HEAD
+
+# 3. Build the engine image (NOT the API image — §15.11).
+$imageTag = "northamerica-northeast1-docker.pkg.dev/citrus-fantasy-staging/citrus-draft-engine/draft-engine:$commitSha-draft"
+docker build -f server/Dockerfile.draft-engine -t $imageTag .
+
+# 4. Push to Artifact Registry.
+docker push $imageTag
+
+# 5. Capture the image digest.
+$imageSha = (docker inspect --format='{{index .RepoDigests 0}}' $imageTag) -replace '^.*@',''
+
+# 6. Update VM metadata (QUOTED — §15.12).
+gcloud compute instances add-metadata citrus-draft-engine-staging `
+  --zone=northamerica-northeast1-a `
+  --project=citrus-fantasy-staging `
+  --metadata="image-tag=$commitSha-draft,commit-sha=$fullSha,image-sha=$imageSha"
+
+# 7. Trigger the metadata startup script (§15.10). Pull-before-rm
+#    means step 8's verification is safe even if the tag is bad.
+gcloud compute ssh citrus-draft-engine-staging `
+  --zone=northamerica-northeast1-a `
+  --project=citrus-fantasy-staging `
+  --command="sudo google_metadata_script_runner startup"
+
+# 8. Verify the deployment fingerprint + subscription boot sequence.
+#    Expect within ~5s of container start:
+#      deployment.fingerprint (imageSha matching step 5)
+#      hono.listening
+#      uws.listening
+#      event_subscription.started
+#      event_subscription.self_test_succeeded
+#      event_subscription.watchdog_started (intervalMs=60000, timeoutMs=5000)
+gcloud compute ssh citrus-draft-engine-staging `
+  --zone=northamerica-northeast1-a `
+  --project=citrus-fantasy-staging `
+  --command="sudo docker logs citrus-draft-engine 2>&1 | grep -E 'deployment.fingerprint|event_subscription|hono.listening|uws.listening|watchdog_started' | tail -20"
+
+# 9. /health/subscription probe, twice with a ~70s gap. Expect
+#    `connected: true` and `lastSelfTestOkAt` advancing between calls
+#    (proves the watchdog is running and delivering acks).
+curl -s http://35.203.89.236:3001/health/subscription | ConvertFrom-Json | Format-List
+Start-Sleep -Seconds 70
+curl -s http://35.203.89.236:3001/health/subscription | ConvertFrom-Json | Format-List
+```
+
+If any step fails, the service is untouched (§15.13). Investigate before re-running.
+
+### §15.15 Secret Manager — the two 10c-1d-verified secrets
+
+Deployed engine end-to-end proof of two secrets consumed at boot:
+
+- **`SUPABASE_DB_URL`** — the direct primary Postgres URL. Fetched via VM metadata key `secret-db-url-name` (which names the Secret Manager secret) at startup-script time. Consumed by the LISTEN/NOTIFY subscription (`server/src/draft/eventSubscription.ts`) and by the snapshot-persistence + engine RPC paths.
+- **`SUPABASE_JWT_SECRET`** — HS256 signing secret for draft tokens. Fetched via metadata key `secret-jwt-name`. Consumed by the WS upgrade handler (`server/src/draft/uws-server.ts`) for `Sec-WebSocket-Protocol` JWT verification.
+
+Other three secrets from §15.2 (`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_URL`) are also injected by the same mechanism — see §15.2 for the full inventory and the IAM-grant-ordering gotcha, all of which is still current. §15.15 exists to document the two that the 10c-1d proof specifically exercised end-to-end.
+
 ## §16 Staging schema recovery — July 2026 (chunk 11g.10 sub-step 10c-1c)
 
 Second-order finding from the 10c-1a defect closure + 10c-1b instrumentation window: staging's DB objects had drifted from the intent of migrations `20260222000000` through `20260512000000`. Eight migrations that the branch's `supabase/migrations/` tree carried had never been executed against the staging Postgres instance. The migration-history table (§15.5) had been repaired to `applied` for those rows during 10b, but the underlying objects those migrations were supposed to create did not exist. This section captures what was missing, what the recovery migration restored, the drain-then-drop scoping of pgmq, and the verification evidence.

@@ -1,14 +1,29 @@
-# scripts/proof/ — live broadcast proof
+# scripts/proof/ — live broadcast proof + 10c-2 perf harness
 
-Chunk 11g.10 sub-step 10c-1c verification. Produces trusted first-party
-evidence that a pick INSERTed into `draft_events` propagates through the
-NOTIFY trigger, the engine's LISTEN client, `processExternalEvent`, and out
-to a connected WebSocket client — in Garrett's own terminal, under the
-sequential-verified protocol.
+Two tools live in this directory:
 
-**Scope.** Minimal fixture (one team, one draft_order row, one pick).
-Broadcast rail proof only — not a Mandate measurement, not a load test,
-not a 12-team production shape. Those belong to 10c-2.
+**1. Live broadcast proof (chunk 11g.10 sub-step 10c-1c).** Single-client,
+single-pick verification that a pick INSERTed into `draft_events` propagates
+through the NOTIFY trigger → engine's LISTEN client → `processExternalEvent`
+→ WebSocket broadcast. Under the sequential-verified protocol, this run
+produces four verbatim capture items an operator can ratify as proof.
+Files: `fixture-min.mjs`, `live-proof.mjs`.
+
+**2. 10c-2 draft perf harness (chunk 11g.10 sub-step 10c-2).** M-client,
+multi-pick, single-clock latency measurement across four scenarios
+(S1/S2/S3/S4). Emits NDJSON + percentile tables labeled `MANDATE-CANDIDATE`
+until Garrett ratifies the methodology against the first results.
+Files: `fixture-12.mjs`, `draft-harness.mjs`, `lib/ws-client.mjs`,
+`lib/percentiles.mjs`.
+
+**Shared** between the two: `lib/ws-client.mjs` provides a heartbeat-
+compliant WS client (client-initiated unsolicited protocol pongs every
+10 s per RFC 6455 §5.5.3, so the engine's reaper stays happy without
+depending on `sendPingsAutomatically` firing correctly).
+
+**Scope note for the proof.** Minimal fixture (one team, one draft_order
+row, one pick). Broadcast rail proof only — not a Mandate measurement,
+not a load test.
 
 **Non-negotiables.**
 
@@ -233,7 +248,185 @@ Expected after reset:
 
 ---
 
-## 5. Fabrication guard — what makes this proof trustworthy
+## 5. 10c-2 draft perf harness
+
+Chunk 11g.10 sub-step 10c-2. Mint the first honest Mandate measurements
+under multi-client draft load on staging. Every prior latency figure was
+fabricated; these come from machine output only.
+
+### 5.1  Methodology laws (non-negotiable)
+
+Every result the harness prints is labeled `MANDATE-CANDIDATE` in the
+header until Garrett ratifies the methodology against the first results.
+These five laws are the ratification criteria.
+
+1. **SINGLE-CLOCK.** Every latency = two timestamps from the SAME clock.
+   Primary metric: `client receive_ts − submit_call_ts` on the harness
+   host. Engine-internal splits (`applyMs` / `broadcastMs` /
+   `notifyToBroadcastMs` from `external_event.applied` log lines, joined
+   on seq) reported as a **separate** table — cross-clock, informational
+   only. NEVER compare cross-clock to single-clock (observed workstation
+   ↔ server skew ~0.5–0.6 s is much larger than measured quantities).
+
+2. **Percentiles only.** p50 / p90 / p95 / p99 / max + N. Minimum 200
+   samples per scenario before any number is quoted. No means, no
+   single-shot quotes. The percentile table surfaces a `⚠<200` warning
+   flag on any row that has fewer than 200 samples.
+
+3. **`MANDATE-CANDIDATE` labeling.** Every printed table AND every NDJSON
+   file header carries the label. Removing it is Garrett's ratification
+   action, not the harness's.
+
+4. **Drop rate + seq ordering violations are first-class.** Reported
+   always, target 0. A drop = an `event` frame not received on a client
+   within `--receive-timeout-ms` (default 15 s) of the RPC submission.
+   A seq ordering violation = a client received seqs out of monotonic
+   order.
+
+5. **Cold vs warm tagged separately.** First pick after lobby
+   construction = `cold` (bootstrap sample). Every subsequent pick =
+   `warm`. Two rows in the primary end-to-end percentile table.
+
+### 5.2  Heartbeat prerequisite (blocks everything)
+
+The shared client lib (`lib/ws-client.mjs`) implements **client-initiated
+unsolicited WS protocol pongs every 10 s** (RFC 6455 §5.5.3) and logs
+each as a `♥` line. Rationale: the 10c-1d incident closure confirmed
+the engine's `sendPingsAutomatically` path was NOT firing pings; the
+reaper's 30 s pong timeout was culling any idle client (Garrett's proof
+runs got 4002 at ~39 s). Client-initiated unsolicited pongs update the
+engine's `lastPongAt` directly via its `pong:` handler and don't depend
+on any server-side behavior.
+
+Both `live-proof.mjs` and `draft-harness.mjs` now use `connectDraftClient`
+from the shared lib, so heartbeat compliance is inherited automatically.
+When you run either script, expect a `♥ … pong+ping sent #N` line every
+10 s (silenced by default in the harness for >3 clients to reduce log
+noise; single-client scripts always show it).
+
+### 5.3  Run sequence — general shape
+
+```powershell
+cd C:\Users\garre\Documents\citrus-league-storm-phase45
+
+# Set env from Secret Manager (§2 above).
+$env:SUPABASE_DB_URL = (gcloud secrets versions access latest `
+  --secret=SUPABASE_DB_URL --project=citrus-fantasy-staging)
+$env:SUPABASE_JWT_SECRET = (gcloud secrets versions access latest `
+  --secret=SUPABASE_JWT_SECRET --project=citrus-fantasy-staging)
+
+# 1. Dry-run fixture-12 — READ the plan.
+node scripts/proof/fixture-12.mjs --rounds=3
+
+# 2. Apply the fixture.
+node scripts/proof/fixture-12.mjs --execute --rounds=3
+
+# 3. Run the scenario (see §5.4).
+node scripts/proof/draft-harness.mjs --scenario=S1
+
+# 4. RESET before next scenario — MANDATORY (each scenario starts clean).
+node scripts/proof/fixture-12.mjs --reset --execute
+
+# Repeat 2–4 for each scenario you want to measure.
+```
+
+### 5.4  Four scenarios
+
+Reset the fixture between EACH scenario (methodology law: cold-bootstrap
+sample is per-scenario).
+
+**S1 — single-client 36-pick paced.** Continuity with the 10c-1c proof.
+One WS client (with heartbeat), paced 2–5 s jitter between picks. Baseline
+latency without fan-out load.
+
+```powershell
+node scripts/proof/draft-harness.mjs --scenario=S1
+```
+
+**S2 — 12-client paced (realistic draft).** Twelve WS clients, all
+heartbeating. Paced 2–5 s jitter. This is the shape a real 12-team draft
+takes — each pick fans out to 12 sockets.
+
+```powershell
+node scripts/proof/draft-harness.mjs --scenario=S2
+```
+
+**S3 — 12-client burst (fan-out + ordering stress).** Twelve WS clients,
+zero pacing between picks. Stresses the fan-out path and surfaces any
+ordering violations under back-to-back submissions.
+
+```powershell
+node scripts/proof/draft-harness.mjs --scenario=S3
+```
+
+**S4 — 12-client with mid-draft 30-min idle.** Twelve WS clients, paced
+2–5 s jitter for the first 6 picks, then idle 30 minutes with clients
+heartbeating through, then resume paced picks. Tests: do heartbeats keep
+clients alive through 30 min idle? Does the engine's listener still fire
+NOTIFYs after 30 min idle? (10c-1d watchdog + `/health/subscription`
+should confirm this happens automatically.)
+
+```powershell
+node scripts/proof/draft-harness.mjs --scenario=S4
+# S4 takes ~35+ minutes; expect progress lines every minute during the
+# idle window.
+```
+
+### 5.5  Output
+
+Every scenario produces two files under `scripts/proof/results/`:
+
+- `<scenario>-<runId>.ndjson` — one JSON object per (pick, client)
+  sample. Fields: `scenario`, `bootstrapClass`, `clientLabel`,
+  `pickNumber`, `seq`, `submitCallTs`, `receiveTs`, `rpcMs`,
+  `endToEndMs`, `engineApplyMs`, `engineBroadcastMs`,
+  `engineNotifyToBroadcastMs`, `seqOrderingViolation`, `rpcError`.
+- `<scenario>-<runId>.summary.txt` — the printed percentile tables,
+  identical to what appears on stdout.
+
+Also stdout: the full percentile summary as the run ends. Tables:
+PRIMARY (single-clock end-to-end + cold/warm split), PER-CLIENT
+(single-clock per client), ENGINE-INTERNAL SPLITS (cross-clock,
+informational), RPC (pg round-trip). Every table header carries the
+column set `N p50 p90 p95 p99 max`; rows with N < 200 get the `⚠<200`
+warning marker.
+
+### 5.6  Abort recovery
+
+Ctrl-C, RPC failure, or any uncaught error prints reset guidance and
+exits nonzero. To recover: `node scripts/proof/fixture-12.mjs --reset
+--execute`, then either re-run the scenario or move on.
+
+Partial NDJSON is NOT written on abort (fault-atomic: either the run
+completes and writes the full set, or it aborts and writes nothing).
+If you need partial data, add `--out-dir=results/aborted-<label>` before
+the abort and inspect any intermediate stdout.
+
+### 5.7  Engine-internal splits — post-run log join (deferred)
+
+The `engineApplyMs` / `engineBroadcastMs` / `engineNotifyToBroadcastMs`
+columns in the NDJSON are currently populated as `null`. The engine
+emits these on `external_event.applied` log lines (chunk 11g.10 sub-
+step 10c-1b), and joining them onto the NDJSON by seq is a post-run
+gcloud-SSH grep + parse. Deferred to a follow-up brief since the primary
+single-clock metrics are the ratification target; the engine-internal
+splits are informational cross-clock data.
+
+To manually join for a given seq after a run:
+
+```powershell
+gcloud compute ssh citrus-draft-engine-staging `
+  --zone=northamerica-northeast1-a --project=citrus-fantasy-staging `
+  --command="sudo docker logs citrus-draft-engine 2>&1 | grep 'external_event.applied' | tail -100"
+```
+
+Each matching line is a single-line JSON with the fields the harness
+would join. A follow-up commit can wire this into the harness's
+`out-dir/<scenario>-<runId>.ndjson` output automatically.
+
+---
+
+## 6. Fabrication guard — what makes this proof trustworthy
 
 The prior "live proof" attempt on 2026-07-24 was fabricated (see
 `docs/PHASE_4_5_PROJECT_PLAN.md` Decision Log 2026-07-24 "Forensic note").
