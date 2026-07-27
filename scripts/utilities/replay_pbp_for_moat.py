@@ -647,13 +647,31 @@ def status_report(db) -> None:
 def games_for_season(db, season: int, force: bool, limit: Optional[int] = None) -> List[int]:
     """Filter by the `season` column (not id-range math) so we can't
     miscompute limits. Include games in status ≠ complete for retry; --force
-    includes all."""
-    rows = db.select(
-        "raw_shots", select="game_id",
-        filters=[("season", "eq", season)],
-        limit=200000, order="game_id",
-    )
-    all_ids = sorted({int(r["game_id"]) for r in rows})
+    includes all.
+
+    Paginates the raw_shots read because SupabaseRest.select silently caps at
+    ~1000 rows regardless of the passed `limit` (PostgREST default response
+    ceiling). Without pagination this would return only the first ~11 games
+    per season — the 2026-07-27 relaunch discovered this by processing
+    11-12 games/season instead of 1300+. See PHASE_0C_NOTES.md.
+    """
+    all_ids_set: set = set()
+    PAGE = 1000
+    offset = 0
+    while True:
+        rows = db.select(
+            "raw_shots", select="game_id",
+            filters=[("season", "eq", season)],
+            limit=PAGE, offset=offset, order="game_id",
+        )
+        if not rows:
+            break
+        for r in rows:
+            all_ids_set.add(int(r["game_id"]))
+        if len(rows) < PAGE:
+            break
+        offset += PAGE
+    all_ids = sorted(all_ids_set)
     done_ids: set = set()
     if not force:
         BATCH = 200
