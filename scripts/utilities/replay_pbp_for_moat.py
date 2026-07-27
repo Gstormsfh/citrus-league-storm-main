@@ -445,9 +445,15 @@ def process_game(
         return {"game_id": game_id, "status": "error", "error": msg}
 
     try:
+        # NOT NULL cols (angle, distance, xg_value) fetched too — PostgREST's
+        # INSERT ... ON CONFLICT evaluates INSERT first (with NOT NULL checks)
+        # before conflict resolution, so any NOT NULL col not in the batch
+        # payload would 23502 even when the row already exists. Passing the
+        # existing DB value is a no-op update (SET col = EXCLUDED.col with
+        # identical value) but satisfies the pre-conflict NOT NULL gate.
         db_rows = db.select(
             "raw_shots",
-            select="id,player_id,shot_x,shot_y,shot_type_code,arena_adjusted_x_abs,arena_adjusted_y_abs",
+            select="id,player_id,shot_x,shot_y,shot_type_code,arena_adjusted_x_abs,arena_adjusted_y_abs,angle,distance,xg_value",
             filters=[("game_id", "eq", game_id)],
             limit=1000, order="id",
         )
@@ -546,10 +552,38 @@ def process_game(
     db_um_count = len(r["unclaimed_csv_after_nhl"])  # CSV/DB pairs with no NHL peer
     rows_updated = 0
     if not dry_run and matched:
+        # Batched UPSERT — one round-trip per game instead of one per row.
+        # Timing probe (2026-07-26 game 2017020097) showed per-row UPDATE loop
+        # was 7.4s / 46% of wall-clock at 78 rows. Batching to a single UPSERT
+        # on the unique constraint reduces that phase to ~0.5s. Extraction
+        # (7.3s) dominates the remaining envelope.
+        #
+        # Each row in the batch includes the unique-constraint columns
+        # (game_id, player_id, shot_x, shot_y, shot_type_code) so on_conflict
+        # resolves to the correct existing row. The matched pairs already
+        # satisfy the unique constraint (extraction is deterministic on the
+        # payload; matched rows are 1:1 to DB rows via the CSV bridge), so
+        # within-batch key collisions cannot occur — no dedupe needed.
+        batch: List[Dict[str, Any]] = []
         for (nhl_evt, db_row, _dt) in matched:
             patch = _clean_patch(nhl_evt)
-            db.update("raw_shots", patch, filters=[("id", "eq", db_row["id"])])
-            rows_updated += 1
+            # Unique-constraint columns (drive on_conflict resolution)
+            patch["game_id"] = game_id
+            patch["player_id"] = int(db_row["player_id"])
+            patch["shot_x"] = float(db_row["shot_x"])
+            patch["shot_y"] = float(db_row["shot_y"])
+            patch["shot_type_code"] = int(db_row["shot_type_code"])
+            # NOT NULL cols we don't touch — passed through from db_row as
+            # a no-op update to satisfy the pre-conflict INSERT gate.
+            patch["angle"] = float(db_row["angle"])
+            patch["distance"] = float(db_row["distance"])
+            patch["xg_value"] = float(db_row["xg_value"])
+            batch.append(patch)
+        db.upsert(
+            "raw_shots", batch,
+            on_conflict="game_id,player_id,shot_x,shot_y,shot_type_code",
+        )
+        rows_updated = len(batch)
 
     result = {
         "game_id": game_id, "status": "complete" if not dry_run else "dry_run_complete",
@@ -660,6 +694,12 @@ def process_season_batch(db, season: int, args) -> Dict[str, Any]:
     season_rows_matched = 0
     season_coord_warn = 0
 
+    # Circuit breaker v2 state.
+    fails_absolute = 0
+    fails_consecutive = 0
+    halted_reason: Optional[str] = None
+    attempted = 0
+
     for i, gid in enumerate(game_ids, 1):
         csv_rows_for_game = csv_slice.get(gid, [])
         result = process_game(
@@ -668,6 +708,7 @@ def process_season_batch(db, season: int, args) -> Dict[str, Any]:
         )
         st = result.get("status", "?")
         per_status[st] += 1
+        attempted = i
         if "delta_hist" in result:
             for k, v in result["delta_hist"].items():
                 season_delta_hist[k] += v
@@ -679,9 +720,30 @@ def process_season_batch(db, season: int, args) -> Dict[str, Any]:
             season_coord_warn += result["coord_warn"]
         if st in ("match_integrity_fail", "error"):
             fail_details.append(result)
+            fails_absolute += 1
+            fails_consecutive += 1
+        elif st in ("complete", "dry_run_complete"):
+            fails_consecutive = 0
+
+        # Circuit breaker v2: three conditions, any one halts the season.
+        # (1) absolute: >= --season-fail-absolute total fails
+        # (2) consecutive: >= --season-fail-consecutive fails in a row
+        # (3) rate: fails/attempted > --season-fail-cap, only evaluated once
+        #     attempted >= --season-fail-rate-min-attempts (default 100).
+        # Rationale: the old flat rate at small n halted on any single early
+        # fail (1/11 = 9% > 3% cap trivially). The floor restores meaning to
+        # the rate; (1)+(2) preserve fast-halt on genuine systemic breakage.
+        if fails_absolute >= args.season_fail_absolute:
+            halted_reason = f"absolute: {fails_absolute} fails >= {args.season_fail_absolute}"
+        elif fails_consecutive >= args.season_fail_consecutive:
+            halted_reason = f"consecutive: {fails_consecutive} fails in a row >= {args.season_fail_consecutive}"
+        elif attempted >= args.season_fail_rate_min_attempts:
+            rate = fails_absolute / attempted
+            if rate > args.season_fail_cap:
+                halted_reason = f"rate: {rate:.2%} > cap {args.season_fail_cap:.2%} at n={attempted} (>= min {args.season_fail_rate_min_attempts})"
 
         # Periodic rollup every 50 games (plus first game so it's visible early)
-        if i == 1 or i % 50 == 0 or i == len(game_ids):
+        if i == 1 or i % 50 == 0 or i == len(game_ids) or halted_reason:
             elapsed = time.time() - started
             avg = elapsed / i
             remain = (len(game_ids) - i) * avg
@@ -690,8 +752,12 @@ def process_season_batch(db, season: int, args) -> Dict[str, Any]:
                   f"fails={fails} rows_matched={season_rows_matched} has_pass={season_has_pass} "
                   f"warn={season_coord_warn} elapsed={elapsed:.0f}s ETA={remain:.0f}s", flush=True)
 
+        if halted_reason:
+            print(f"\n  [season {season}] BREAKER TRIPPED — {halted_reason}", flush=True)
+            break
+
     elapsed = time.time() - started
-    total = len(game_ids)
+    total = attempted
     complete = per_status.get("complete", 0) + per_status.get("dry_run_complete", 0)
     mif = per_status.get("match_integrity_fail", 0)
     err = per_status.get("error", 0)
@@ -705,7 +771,9 @@ def process_season_batch(db, season: int, args) -> Dict[str, Any]:
     print(f"  Complete:        {complete}")
     print(f"  match_fail:      {mif}")
     print(f"  error:           {err}")
-    print(f"  Fail rate:       {fail_rate:.2%} (cap {args.season_fail_cap:.2%})")
+    print(f"  Fail rate:       {fail_rate:.2%}  (breaker: abs>={args.season_fail_absolute}, cons>={args.season_fail_consecutive}, rate>{args.season_fail_cap:.2%} at n>={args.season_fail_rate_min_attempts})")
+    if halted_reason:
+        print(f"  BREAKER TRIPPED: {halted_reason}")
     print(f"  Rows matched:    {season_rows_matched}")
     print(f"  Has pass:        {season_has_pass}  ({100.0*season_has_pass/max(1, season_rows_matched):.1f}%)")
     print(f"  Coord warn:      {season_coord_warn}")
@@ -729,6 +797,7 @@ def process_season_batch(db, season: int, args) -> Dict[str, Any]:
         "elapsed": elapsed, "has_pass": season_has_pass,
         "rows_matched": season_rows_matched, "coord_warn": season_coord_warn,
         "delta_hist": dict(season_delta_hist),
+        "halted_reason": halted_reason,
     }
 
 
@@ -746,7 +815,15 @@ def main() -> int:
     parser.add_argument("--tolerance", type=int, default=15, help="max abs coord delta before integrity fail (default 15). Warn threshold fixed at 10.")
     parser.add_argument("--time-tolerance", type=int, default=2, help="max |seconds| between NHL and CSV for time-bridge match")
     parser.add_argument("--unmatched-cap", type=int, default=5, help="max unexplained NHL unmatched per game")
-    parser.add_argument("--season-fail-cap", type=float, default=0.03, help="halt sequential run if any season's fail rate exceeds this (default 0.03)")
+    # Circuit breaker v2: three-condition halt logic (any one trips the season).
+    parser.add_argument("--season-fail-cap", type=float, default=0.03,
+                        help="RATE condition: halt if fails/attempted > this, evaluated only once attempted >= --season-fail-rate-min-attempts (default 0.03)")
+    parser.add_argument("--season-fail-absolute", type=int, default=5,
+                        help="ABSOLUTE condition: halt if a season accumulates this many total fails (default 5)")
+    parser.add_argument("--season-fail-consecutive", type=int, default=3,
+                        help="CONSECUTIVE condition: halt if this many fails happen in a row (default 3)")
+    parser.add_argument("--season-fail-rate-min-attempts", type=int, default=100,
+                        help="RATE floor: don't evaluate rate condition until attempted >= this (default 100)")
     parser.add_argument("--env-file", type=str, default=os.path.join(_REPO_ROOT, ".env"))
     args = parser.parse_args()
 
@@ -830,8 +907,8 @@ def main() -> int:
     for season in seasons_to_run:
         summary = process_season_batch(db, season, args)
         season_summaries.append(summary)
-        if summary["fail_rate"] > args.season_fail_cap:
-            print(f"\n!!! HALT: season {season} fail rate {summary['fail_rate']:.2%} > cap {args.season_fail_cap:.2%}.")
+        if summary.get("halted_reason"):
+            print(f"\n!!! HALT: season {season} — {summary['halted_reason']}")
             print(f"!!! Not proceeding to remaining seasons: {seasons_to_run[seasons_to_run.index(season)+1:]}")
             break
 
