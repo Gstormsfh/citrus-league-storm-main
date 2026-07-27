@@ -1,0 +1,53 @@
+
+═══════════════════════════════════════════════════════════════════════════
+  MANDATE-CANDIDATE — draft harness results (10c-2)
+  These numbers are unratified until Garrett confirms the methodology
+  against them. Percentiles are single-clock (client host) unless noted.
+═══════════════════════════════════════════════════════════════════════════
+  scenario:      S5
+  client count:  12
+  pacing:        2000-5000 ms jitter
+  run id:        2026-07-27T16-58-10-801Z
+  samples total: 48   delivered: 48   dropped: 0   ordering-violations: 0
+  ⚠ SAMPLE COUNT BELOW METHODOLOGY MINIMUM (200) — numbers are informational only
+
+── FIRST-CLASS FAILURE METRICS (target 0) ──
+  drop rate:                0.00%   (0/48)
+  seq ordering violations:  0
+
+── PRIMARY — end-to-end ms (single-clock, client host) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+overall                          48.0      208    90983    90983    90983    90983 ⚠<200
+  cold-bootstrap sample          12.0      114      115      115      115      115 ⚠<200
+  warm                           24.0      199      305      305      305      305 ⚠<200
+
+── PER-CLIENT — end-to-end ms (single-clock) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+c01                               4.0      208    63778    77380    88262    90982 ⚠<200
+c02                               4.0      210    63780    77381    88263    90983 ⚠<200
+c03                               4.0      210    63780    77381    88263    90983 ⚠<200
+c04                               4.0      210    63780    77381    88263    90983 ⚠<200
+c05                               4.0      210    63780    77381    88263    90983 ⚠<200
+c06                               4.0      210    63780    77381    88263    90983 ⚠<200
+c07                               4.0      210    63780    77381    88263    90983 ⚠<200
+c08                               4.0      210    63780    77381    88263    90983 ⚠<200
+c09                               4.0      210    63780    77381    88263    90983 ⚠<200
+c10                               4.0      210    63780    77381    88263    90983 ⚠<200
+c11                               4.0      210    63780    77381    88263    90983 ⚠<200
+c12                               4.0      210    63780    77381    88263    90983 ⚠<200
+
+── ENGINE-INTERNAL SPLITS — ms (from external_event.applied; cross-clock, informational) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+applyMs                           0.0       --       --       --       --       --
+broadcastMs                       0.0       --       --       --       --       --
+notifyToBroadcastMs               0.0       --       --       --       --       --
+
+── RPC — pg submit_pick_v2 round-trip ms (single-clock) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+rpc_ms                           48.0     51.0     60.0     60.0     60.0     60.0 ⚠<200
+
+═══════════════════════════════════════════════════════════════════════════
