@@ -451,6 +451,13 @@ def process_game(
         # payload would 23502 even when the row already exists. Passing the
         # existing DB value is a no-op update (SET col = EXCLUDED.col with
         # identical value) but satisfies the pre-conflict NOT NULL gate.
+        # Note: raw shot_x/shot_y (also selected below via arena_adjusted_*_abs
+        # / angle / distance / xg_value) are BOTH consulted by the coord backstop.
+        # The primary check is against MoneyPuck's arena_adjusted_*_abs (its
+        # published normalized coordinates); a fallback re-verifies against raw
+        # shot_x/shot_y for the small population of shots where MP's adjustment
+        # differs materially from the raw coord (2018 corpus scan: 0.15% of shots).
+        # See PHASE_0C_NOTES.md for the diagnosis and the raw-fallback rationale.
         db_rows = db.select(
             "raw_shots",
             select="id,player_id,shot_x,shot_y,shot_type_code,arena_adjusted_x_abs,arena_adjusted_y_abs,angle,distance,xg_value",
@@ -494,9 +501,19 @@ def process_game(
     # 3. Verification backstop: coord check on each pair.
     # Histogram buckets: 0-3 (typical) / 3-10 (noisy but fine) / 10-15 (warn) / >15 (fail).
     # Warn threshold is fixed at 10; --tolerance is the fail threshold (default 15).
+    #
+    # Primary check compares NHL abs coords to DB's arena_adjusted_*_abs (MP's
+    # normalized coordinates). If a pair fails primary, a strict-widening
+    # FALLBACK re-verifies against DB's raw shot_x/shot_y (same abs convention,
+    # same --tolerance). A pair passes if EITHER check passes. Motivation:
+    # MoneyPuck's arena-adjustment moves a small fraction of shots 16-20+ ft
+    # from their raw coordinates (2018 corpus scan: 0.15%; game 2018020074
+    # exhibited two such pairs — raw agreed with NHL exactly, adjusted was the
+    # outlier). See PHASE_0C_NOTES.md.
     COORD_WARN_THRESHOLD = 10
     delta_hist: Counter = Counter()
     over_tolerance: List[Dict[str, Any]] = []
+    raw_fallback_used: List[Dict[str, Any]] = []
     coord_warn = 0
     for (nhl_evt, db_row, _dt) in matched:
         try:
@@ -514,8 +531,27 @@ def process_game(
             delta_hist["10-15"] += 1
             coord_warn += 1
         else:
-            delta_hist[">15"] += 1
-            over_tolerance.append({"nhl_abs": [nx, ny], "db_abs": [dx, dy], "delta": max_d})
+            # Primary (adjusted) check failed. Try raw shot_x/shot_y fallback.
+            # Strict widening: only engages when adjusted already failed; never
+            # rejects a pair the adjusted check already accepted.
+            try:
+                rx = abs(float(db_row["shot_x"])); ry = abs(float(db_row["shot_y"]))
+                raw_max_d = max(abs(nx - rx), abs(ny - ry))
+            except (ValueError, KeyError, TypeError):
+                raw_max_d = None
+            if raw_max_d is not None and raw_max_d <= tolerance:
+                # Pair passes via raw fallback. Do not add to over_tolerance.
+                # Histogram accounting: keep the primary >15 bucket count so
+                # the distribution of MP adjustment drift stays visible; ALSO
+                # record the fallback engagement.
+                delta_hist[">15"] += 1
+                raw_fallback_used.append({
+                    "nhl_abs": [nx, ny], "db_adj_abs": [dx, dy], "adj_delta": max_d,
+                    "db_raw_abs": [rx, ry], "raw_delta": raw_max_d,
+                })
+            else:
+                delta_hist[">15"] += 1
+                over_tolerance.append({"nhl_abs": [nx, ny], "db_abs": [dx, dy], "delta": max_d})
 
     if over_tolerance:
         # coord_backstop = bounded rapid-fire / systematic arena-adjustment
@@ -599,10 +635,17 @@ def process_game(
         "db_unmatched": db_um_count,
         "has_pass_count": has_pass_count,
         "coord_warn": coord_warn,
+        "raw_fallback_used_count": len(raw_fallback_used),
         "delta_hist": dict(delta_hist),
     }
     if not dry_run:
-        upsert_progress(db, {
+        # If any pair verified only via the raw fallback, tag the checkpoint
+        # error_detail (kept short: count + first 3 evidence entries) so the
+        # audit trail records which path verified each completing game. A
+        # completing game's error_detail is normally NULL; storing this
+        # forensic mark only when fallback engaged keeps the read-side query
+        # (`WHERE error_detail LIKE 'raw_fallback%'`) cheap.
+        checkpoint = {
             "game_id": game_id, "season": season, "status": "complete",
             "rows_matched": len(matched), "rows_updated": rows_updated,
             "nhl_unmatched": result["nhl_unmatched_508"] + result["nhl_unmatched_dedupe"] + result["nhl_unmatched_shootout"] + result["nhl_unmatched_unexplained"],
@@ -610,7 +653,13 @@ def process_game(
             "has_pass_count": has_pass_count,
             "coord_warn_count": coord_warn,
             "attempted_at": started_iso, "completed_at": now_iso(),
-        })
+        }
+        if raw_fallback_used:
+            evidence = json.dumps(raw_fallback_used[:3])[:1500]
+            checkpoint["error_detail"] = (
+                f"raw_fallback_used:{len(raw_fallback_used)}_pairs; evidence={evidence}"
+            )
+        upsert_progress(db, checkpoint)
     return result
 
 
