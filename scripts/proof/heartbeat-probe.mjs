@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // scripts/proof/heartbeat-probe.mjs
 //
-// Chunk 10c-2 batch 3 C1 acceptance tooling — verifies the engine's
-// B-floor heartbeat behavior end-to-end.
+// Chunk 10c-2 batch 3 acceptance tooling — verifies the engine's
+// B-floor heartbeat behavior (C1) end-to-end AND the join-path-
+// robustness gates (chunk pending architect ratification; probe modes
+// added 2026-07-28 so acceptance is fully mechanized when the chunk
+// lands).
 //
-// Two modes exercise the two ends of the design contract:
+// FOUR modes:
 //
-//   --mode=browser-sim  (default)
+//   --mode=browser-sim  (default) — C1 acceptance
 //     ws default autoPong=true, NO app-level pings/pongs sent by the
 //     probe. The engine's server-initiated ping floor MUST keep the
 //     connection alive indefinitely. Success criteria: probe survives
@@ -14,7 +17,7 @@
 //     This mimics real browsers: they auto-pong protocol pings but
 //     never send app-level heartbeats.
 //
-//   --mode=dead-sim
+//   --mode=dead-sim — C1 acceptance
 //     autoPong disabled AND no app-level pings. The engine's server
 //     pings arrive but nobody responds; the engine's cull path
 //     (`heartbeat.pong_timeout` scanner in `uws-server.ts:344+`) MUST
@@ -22,19 +25,40 @@
 //     mechanism still fires post-C1 change (regression lock — B-floor
 //     didn't accidentally disable the reaper).
 //
-// Both modes emit the observed WS lifecycle events (open, ping, pong,
-// message, close) to stdout with client-clock timestamps so the
-// operator can grep and diff the output against the engine's log
-// grep (`heartbeat.scan_completed`, `heartbeat.pong_timeout`).
+//   --mode=uninitialized — join-path-robustness gate (b) acceptance
+//     Connects to the whitelisted league AFTER fixture reset (zero
+//     draft_order rows). Expects clean close code 4400
+//     (draft_not_initialized) within ~1 s. Pre-deployment this mode
+//     gets 1011 (the current `server/src/draft/index.ts:387-392`
+//     throw path); post-deployment 4400. Fences the empty-order 1011
+//     regression class forever.
 //
-// Not intended for CI — this is an interactive verification tool.
-// Two-minute browser-sim run is short enough for one-shot ratification.
+//   --mode=bad-sub — join-path-robustness gate (a) acceptance
+//     Mints a deliberately non-UUID sub (the ORIGINAL 2026-07-28
+//     probe bug, resurrected as a test). Expects clean close code
+//     4300 (unauthorized_bad_shape) at upgrade time, BEFORE any
+//     `uws.connection.opened` log entry. Pre-deployment gets 1011;
+//     post-deployment 4300. Fences the bad-sub regression class.
+//
+// Field acceptance trio for the join-path-robustness chunk:
+//   1. bad-sub → 4300
+//   2. uninitialized → 4400
+//   3. browser-sim (against a properly set-up league) → survives
+//      (unchanged from batch 3 baseline)
+//
+// All modes emit observed WS lifecycle events (open, ping, pong,
+// message, close) with client-clock timestamps so the operator can
+// grep and diff against engine logs.
+//
+// Not intended for CI — interactive verification tool.
 //
 // Usage (PowerShell):
 //   $env:SUPABASE_JWT_SECRET = (gcloud secrets versions access latest `
 //     --secret=SUPABASE_JWT_SECRET --project=citrus-fantasy-staging)
 //   node scripts/proof/heartbeat-probe.mjs --mode=browser-sim
 //   node scripts/proof/heartbeat-probe.mjs --mode=dead-sim
+//   node scripts/proof/heartbeat-probe.mjs --mode=uninitialized
+//   node scripts/proof/heartbeat-probe.mjs --mode=bad-sub
 //
 // Optional:
 //   --host=HOST        (default 35.203.89.236)
@@ -58,12 +82,26 @@ const MODE = opt('mode', 'browser-sim');
 const HOST = opt('host', '35.203.89.236');
 const PORT = Number(opt('port', '3002'));
 const LEAGUE_ID = opt('league', '993c9219-ecbf-4e4e-9fb0-e9837e1bded3');
-const DEFAULT_DURATION = MODE === 'dead-sim' ? 60_000 : 130_000;
-const DURATION_MS = Number(opt('duration-ms', String(DEFAULT_DURATION)));
+// Chunk 10c-2 batch 3 join-path-robustness acceptance modes (added
+// 2026-07-28): `uninitialized` and `bad-sub` exercise the two new
+// pre-upgrade gates the chunk introduces. Both expect a fast reject
+// (< 1 s in practice — the gates fire before or during the upgrade
+// handshake). Default duration is 5 s: comfortably exceeds expected
+// reject time while keeping the acceptance suite fast.
+const DEFAULT_DURATION_BY_MODE = {
+  'browser-sim': 130_000,
+  'dead-sim': 60_000,
+  'uninitialized': 5_000,
+  'bad-sub': 5_000,
+};
+const DURATION_MS = Number(
+  opt('duration-ms', String(DEFAULT_DURATION_BY_MODE[MODE] ?? 130_000)),
+);
 const VERBOSE = flag('verbose');
 
-if (!['browser-sim', 'dead-sim'].includes(MODE)) {
-  console.error(`FATAL: unknown --mode=${MODE} (expected browser-sim | dead-sim).`);
+const VALID_MODES = ['browser-sim', 'dead-sim', 'uninitialized', 'bad-sub'];
+if (!VALID_MODES.includes(MODE)) {
+  console.error(`FATAL: unknown --mode=${MODE} (expected one of ${VALID_MODES.join(' | ')}).`);
   process.exit(2);
 }
 
@@ -101,7 +139,25 @@ function probeUserId() {
   return `99999999-9999-4999-8999-${hex}`;
 }
 
-function mintDraftJwt(leagueId) {
+/**
+ * Chunk 10c-2 batch 3 join-path-robustness acceptance (added
+ * 2026-07-28): deliberately non-UUID sub for the `bad-sub` acceptance
+ * mode. Same shape as the ORIGINAL probe bug (`probe-<uuid>`) so
+ * running this mode fences the earlier regression class forever.
+ *
+ * When the join-path-robustness chunk lands, gate (a) at the WS
+ * upgrade path (`uws-server.ts` post-`verifyDraftToken` in-cork
+ * check per the ratified async-upgrade guard checklist) rejects
+ * this shape with a `4300 unauthorized_bad_shape` close BEFORE
+ * the connection is accepted, BEFORE the `uws.connection.opened`
+ * log entry, and BEFORE any downstream LobbyManager code runs.
+ * PASS = 4300 close code observed.
+ */
+function badSubUserId() {
+  return `probe-${randomUUID()}`;
+}
+
+function mintDraftJwt(leagueId, subOverride = null) {
   const nowSec = Math.floor(Date.now() / 1000);
   const header = { alg: 'HS256', typ: 'JWT' };
   // TTL: DURATION_MS + 60s slack so the JWT never expires mid-probe.
@@ -111,7 +167,11 @@ function mintDraftJwt(leagueId) {
     // so downstream engine code (LobbyManager, presence, snapshot
     // sender) doesn't 1011 on an unparseable UUID mid-connection-setup.
     // See PROJECT_PLAN.md Decision Log 2026-07-28 for the bug details.
-    sub: probeUserId(),
+    //
+    // The `bad-sub` acceptance mode passes a `subOverride` to
+    // deliberately reproduce the original bug shape and exercise
+    // gate (a) of the join-path-robustness chunk (4300 close).
+    sub: subOverride ?? probeUserId(),
     draftId: leagueId,
     leagueId,
     iat: nowSec,
@@ -127,19 +187,21 @@ function mintDraftJwt(leagueId) {
 }
 
 // ── Banner ──────────────────────────────────────────────────────────
+const EXPECTED_BY_MODE = {
+  'browser-sim': 'Survive to duration end without close',
+  'dead-sim': 'Force-closed with code 4002 within 30-40 s',
+  'uninitialized': 'Force-closed with code 4400 (draft_not_initialized) within ~1 s',
+  'bad-sub': 'Force-closed with code 4300 (unauthorized_bad_shape) at upgrade time',
+};
 const wsUrl = `ws://${HOST}:${PORT}/ws/draft/${LEAGUE_ID}`;
 console.log('');
 console.log('╔═══════════════════════════════════════════════════════════════════════╗');
-console.log('║  10c-2 batch 3 C1 — heartbeat B-floor probe                          ║');
+console.log('║  10c-2 batch 3 — heartbeat + join-path-robustness probe              ║');
 console.log('╠═══════════════════════════════════════════════════════════════════════╣');
 console.log(`║  Mode:           ${MODE.padEnd(52)} ║`);
 console.log(`║  WS target:      ${wsUrl.padEnd(52)} ║`);
 console.log(`║  Duration:       ${(DURATION_MS + ' ms').padEnd(52)} ║`);
-if (MODE === 'browser-sim') {
-  console.log('║  Expected:       Survive to duration end without close             ║');
-} else {
-  console.log('║  Expected:       Force-closed with code 4002 within 30-40 s         ║');
-}
+console.log(`║  Expected:       ${(EXPECTED_BY_MODE[MODE] ?? '(unspecified)').padEnd(52)} ║`);
 console.log('╚═══════════════════════════════════════════════════════════════════════╝');
 console.log('');
 
@@ -161,7 +223,11 @@ function elapsedSec() {
 }
 
 // ── Connect ────────────────────────────────────────────────────────
-const jwt = mintDraftJwt(LEAGUE_ID);
+// Chunk 10c-2 batch 3 join-path-robustness (2026-07-28): `bad-sub`
+// deliberately mints a non-UUID sub to exercise gate (a); every
+// other mode uses the standard probe UUIDv4.
+const subOverride = MODE === 'bad-sub' ? badSubUserId() : null;
+const jwt = mintDraftJwt(LEAGUE_ID, subOverride);
 const wsOpts = {};
 if (MODE === 'dead-sim') {
   // ws v8.6+: autoPong=false disables the library's protocol-pong
@@ -303,7 +369,7 @@ function finish() {
       ok = false;
       reason = `probe finished in indeterminate state (no close event, no duration-end mark) at ${totalSec.toFixed(1)}s — investigate`;
     }
-  } else {
+  } else if (MODE === 'dead-sim') {
     // dead-sim: success = closed with code 4002 within ~30-40s.
     if (closeCode !== 4002) {
       ok = false;
@@ -318,12 +384,76 @@ function finish() {
       ok = true;
       reason = `culled at ${totalSec.toFixed(1)}s with code 4002 as expected`;
     }
+  } else if (MODE === 'uninitialized') {
+    // Chunk 10c-2 join-path-robustness gate (b) acceptance:
+    //   Expected: WS closed with code 4400 (draft_not_initialized)
+    //   within ~1 s of the connect attempt. The gate runs a cheap
+    //   pre-upgrade SELECT against draft_order and rejects when
+    //   empty. Before the chunk lands, this mode yields 1011
+    //   (server_error from the existing throw at
+    //   `server/src/draft/index.ts:387-392` — see prior Decision
+    //   Log entry) which registers as FAIL. After the chunk lands
+    //   the mode yields 4400 as expected → PASS.
+    //
+    //   1011 today = pre-deployment state, EXPECTED to fail until
+    //   the join-path-robustness chunk ships.
+    if (closeCode === 4400) {
+      ok = true;
+      reason = `gate (b) fired: 4400 draft_not_initialized close at ${totalSec.toFixed(1)}s — chunk deployed and working`;
+    } else if (closeCode === 1011) {
+      ok = false;
+      reason = `got 1011 server_error at ${totalSec.toFixed(1)}s — pre-deployment state (join-path-robustness chunk not shipped yet)`;
+    } else if (closeCode === null) {
+      ok = false;
+      reason = `no close by duration end (${durationSec}s) — gate (b) may not be firing OR the fixture has draft_order rows (should be zero for this mode)`;
+    } else {
+      ok = false;
+      reason = `expected close code 4400 (draft_not_initialized) but got ${closeCode} reason=${closeReason || '<empty>'} at ${totalSec.toFixed(1)}s`;
+    }
+  } else if (MODE === 'bad-sub') {
+    // Chunk 10c-2 join-path-robustness gate (a) acceptance:
+    //   Expected: WS closed with code 4300 (unauthorized_bad_shape)
+    //   at upgrade time, BEFORE the `uws.connection.opened` log
+    //   entry would fire. Gate (a) runs a post-verifyDraftToken
+    //   UUID-shape check on `claims.sub` and rejects non-UUIDv4
+    //   values. Same 1011-pre-deployment story as gate (b).
+    //
+    //   Additional PASS criterion: firstOpenMs should be null
+    //   (upgrade never accepted → no ws.on('open') fired) if the
+    //   gate is doing its job right. But since ws-library semantics
+    //   MAY fire 'open' before 'close' regardless of application-
+    //   layer close-during-upgrade timing, this is a secondary
+    //   signal — the close code is authoritative.
+    if (closeCode === 4300) {
+      ok = true;
+      reason = `gate (a) fired: 4300 unauthorized_bad_shape close at ${totalSec.toFixed(1)}s — chunk deployed and working${firstOpenMs === null ? ' (rejected at upgrade — no open event fired)' : ' (open event fired but close code correct)'}`;
+    } else if (closeCode === 1011) {
+      ok = false;
+      reason = `got 1011 server_error at ${totalSec.toFixed(1)}s — pre-deployment state (join-path-robustness chunk not shipped yet)`;
+    } else if (closeCode === null) {
+      ok = false;
+      reason = `no close by duration end (${durationSec}s) — gate (a) may not be firing; the sub was deliberately non-UUID`;
+    } else {
+      ok = false;
+      reason = `expected close code 4300 (unauthorized_bad_shape) but got ${closeCode} reason=${closeReason || '<empty>'} at ${totalSec.toFixed(1)}s`;
+    }
+  } else {
+    ok = false;
+    reason = `unhandled mode=${MODE} — verdict logic gap`;
   }
 
   console.log(ok ? `✓ PASS  ${reason}` : `✗ FAIL  ${reason}`);
   console.log('');
   console.log('Next: correlate with engine logs (via VM SSH):');
-  console.log(`  sudo docker logs citrus-draft-engine 2>&1 | grep -E 'heartbeat\\.(scan_completed|pong_timeout|ping)' | tail -20`);
+  if (MODE === 'browser-sim' || MODE === 'dead-sim') {
+    console.log(`  sudo docker logs citrus-draft-engine 2>&1 | grep -E 'heartbeat\\.(scan_completed|pong_timeout|ping)' | tail -20`);
+  } else if (MODE === 'uninitialized') {
+    // Expected engine log line (post-chunk): uws.upgrade.rejected with reason draft_not_initialized.
+    console.log(`  sudo docker logs citrus-draft-engine 2>&1 | grep -E 'uws\\.upgrade\\.rejected|draft_not_initialized' | tail -10`);
+  } else if (MODE === 'bad-sub') {
+    // Expected engine log line (post-chunk): uws.upgrade.rejected with reason unauthorized_bad_shape (or the equivalent).
+    console.log(`  sudo docker logs citrus-draft-engine 2>&1 | grep -E 'uws\\.upgrade\\.rejected|unauthorized_bad_shape|bad_shape' | tail -10`);
+  }
   console.log('');
   process.exit(ok ? 0 : 1);
 }

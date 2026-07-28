@@ -491,3 +491,160 @@ No performance measurement was taken against the recovered schema — the Mandat
 ### §16.5 Operational note — post-recovery staging schema state
 
 Staging schema now matches the intent of the `phase-4-5-implementation` branch through `master`'s `20260512000000` migration, **except** for the inert pgmq extension (see §16.3). Any operational tool, runbook step, or 10c-2 fixture builder can treat staging as post-11g.9 for correctness purposes; the extension-drop follow-up is a housekeeping migration, not a functional gate. If a future object-presence query reveals a divergence not captured here, treat that as a signal of further undocumented drift and repeat the recovery-migration pattern before ratifying downstream work.
+
+## §17 Watch-live local dev rig — first live-browser join path 2026-07-28
+
+The first end-to-end walk of the draft join path through a real browser happened 2026-07-28 evening (Decision Log entries F1, F2, F3 for the release-blocker findings). This section captures the local dev rig that made it possible so future operators can reproduce the setup for interactive verification of client-visible behavior (countdown snap, roster paint, presence toast).
+
+### §17.1 Topology
+
+```
+  browser (Chrome)
+       │
+       ▼
+  http://localhost:8080 ────────► Vite dev server (apps/web)
+       │
+       │ (client-side fetch)
+       ▼
+  http://localhost:3001 ────────► API server (server/, Hono)
+       │
+       │ (submit_pick_v2 RPC + discovery + snapshot)
+       ▼
+  Supabase Postgres (direct primary URL, IPv4 add-on)
+
+
+  browser (Chrome) ─────────────► ws://localhost:3002 ─── netsh portproxy ──► 35.203.89.236:3002
+                                       (bridge)                                    (staging engine WS)
+```
+
+The netsh portproxy bridge is the F1 workaround: browser JS at `localhost:8080` picks `ws://` because origin is HTTP-localhost (not `wss://` per `runner.ts:computeWsUrl`); the bridge forwards to the staging engine's plain `ws://` on 3002. When F1 lands (engine TLS termination), the bridge goes away and the browser connects directly to `wss://<engine-host>:3002`.
+
+### §17.2 Root `.env`
+
+**Never committed** — deliberate local-only, staging values, no secrets (the JWT_SECRET is pulled from the engine container at API startup, not baked into `.env`). Location: `<repo>/.env` (repo root — Vite reads it via `import.meta.env` and the server's `.env` loader picks it up from `../../../.env` per `server/src/draft/index.ts:22-43`).
+
+Minimum contents:
+```
+# Supabase project (staging)
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_ANON_KEY=<publishable staging anon key>
+SUPABASE_SERVICE_ROLE_KEY=<staging service role — required for RPC calls from local API>
+SUPABASE_DB_URL=postgresql://postgres:<pw>@db.<ref>.supabase.co:5432/postgres
+
+# Vite web env (VITE_ prefix required for browser exposure)
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<same as SUPABASE_ANON_KEY>
+VITE_API_BASE_URL=http://localhost:3001
+
+# Draft engine WS discovery — set explicit localhost so the discovery
+# endpoint returns the netsh-portproxy address rather than the staging
+# engine's public IP (which browsers on non-localhost origins would
+# try to hit via wss:// per F1).
+DRAFT_WS_HOST=localhost
+DRAFT_WS_PORT=3002
+```
+
+The `.env` file is in `.gitignore` at repo root. **Never commit it — even to a private repo, even briefly.** The SUPABASE_SERVICE_ROLE_KEY is a full-bypass-RLS credential; committing it (even to a private repo) escapes the Secret Manager control loop.
+
+### §17.3 netsh portproxy — `127.0.0.1:3002` → `35.203.89.236:3002`
+
+One-time Windows setup (elevated PowerShell):
+```
+netsh interface portproxy add v4tov4 `
+  listenaddress=127.0.0.1 listenport=3002 `
+  connectaddress=35.203.89.236 connectport=3002
+```
+
+Verify:
+```
+netsh interface portproxy show v4tov4
+# Expect: 127.0.0.1  3002  35.203.89.236  3002
+```
+
+Tear down (when F1 lands and the bridge is no longer needed):
+```
+netsh interface portproxy delete v4tov4 listenaddress=127.0.0.1 listenport=3002
+```
+
+**Firewall note.** `netsh portproxy` uses the local Windows TCP stack; if `Windows Defender Firewall` blocks outbound to `35.203.89.236:3002`, the bridge silently fails (browser sees TCP RST on the WS connect). Confirm by running `Test-NetConnection 35.203.89.236 -Port 3002` from PowerShell — should succeed. If it fails, add a firewall allow rule for the current profile.
+
+### §17.4 Launcher scripts (`.local.ps1`, never committed)
+
+Two PowerShell launchers live under `scripts/proof/` (both `.local.ps1` suffix so `.gitignore` excludes them automatically per the local-only convention):
+
+**`scripts/proof/start-api.local.ps1`** — starts the API server. Responsibilities:
+1. Fetch `SUPABASE_JWT_SECRET` from the running engine container via `gcloud compute ssh … --command="sudo docker exec citrus-draft-engine printenv SUPABASE_JWT_SECRET"` (avoids putting the secret in `.env` — same rationale as §15.15).
+2. `Set-Location` to `<repo>/server`.
+3. Set `$env:PORT = 3001` + inject the fetched JWT secret + `DRAFT_WS_HOST=localhost` + `DRAFT_WS_PORT=3002`.
+4. `npm run dev`.
+
+**`scripts/proof/start-web.local.ps1`** — starts the Vite dev server. Responsibilities:
+1. `Set-Location` to `<repo>/apps/web`.
+2. `npm run dev` (Vite reads `.env` from repo root automatically).
+
+Both scripts print a banner with the exact port + WS bridge so the operator sees the topology on start. Both are `.local.ps1` — DO NOT commit.
+
+### §17.5 Discovery-endpoint status gate — `set-draft-status.local.mjs`
+
+The API's `GET /api/drafts/:id/server` discovery endpoint returns `409 DRAFT_NOT_CONNECTABLE` unless `leagues.draft_status ∈ CONNECTABLE_DRAFT_STATUSES` (`packages/shared/src/types/league.ts`). Allowed values: `queued | in_progress | paused`. The Staging League sits at `completed` between test cycles, so a real browser can't reach the room even when the harness fixture is set up.
+
+**Critical distinction:** the fixture (`scripts/proof/fixture-12.mjs`) sets `leagues.draft_state = 'active'` (the v2 engine field) but does NOT touch `leagues.draft_status` (the legacy v1 field). The harness bypasses discovery entirely by signing its own WS tokens, so the harness never notices the gate. Real browsers go through discovery → hit the gate.
+
+`scripts/proof/set-draft-status.local.mjs` flips the field. Usage:
+
+```
+node scripts/proof/set-draft-status.local.mjs --to=in_progress            # DRY RUN
+node scripts/proof/set-draft-status.local.mjs --to=in_progress --execute  # open the room
+node scripts/proof/set-draft-status.local.mjs --to=completed --execute    # close the room
+```
+
+Convention: `.local.mjs` — never committed, matches the `kill-listener` / `clear-snapshots` / `apply-migration` pattern.
+
+**Discovery vs engine independence.** The draft engine itself does NOT read `draft_status` at all — probe experiments proved that foreign engine-side joins succeed against any status. `set-draft-status` only opens the API's front door; it doesn't affect engine behavior.
+
+### §17.6 Flip-check cookbook — the interactive verification cycle
+
+Interleaves agent commands (fixture, restart, harness) with Garrett's browser observations. The agent doesn't testify to browser-visible outcomes — Garrett does.
+
+```
+# 1. Reset fixture + restart engine + set up fresh fixture with a specific pick clock.
+node scripts/proof/fixture-12.mjs --reset --execute
+gcloud compute ssh citrus-draft-engine-staging `
+  --zone=northamerica-northeast1-a --project=citrus-fantasy-staging `
+  --command="sudo docker restart citrus-draft-engine && sleep 5"
+node scripts/proof/fixture-12.mjs --execute --rounds=3 --pick-clock=30
+
+# 2. Open the room in a real browser (Garrett does this):
+#    localhost:8080/draft-v2/993c9219-ecbf-4e4e-9fb0-e9837e1bded3
+#    Garrett refreshes (F5) and confirms fresh board state (Recent events empty).
+
+# 3. Fire the harness (agent does this ONLY after Garrett confirms):
+node scripts/proof/draft-harness.mjs --scenario=S5 --expected-pick-clock=30 --autopick-timeout-ms=60000
+
+# 4. Success = BOTH:
+#    (a) S5 12/12 GREEN in the terminal (agent's verdict), AND
+#    (b) Garrett testifies he saw "Recent events" grow live and/or
+#        the countdown snap 0:00 → 0:30 (Garrett's testimony).
+#    Either signal alone is INSUFFICIENT — the flip-check requires both.
+
+# 5. Cleanup after (final scenario included):
+node scripts/proof/fixture-12.mjs --reset --execute
+node scripts/proof/set-draft-status.local.mjs --to=completed --execute
+gcloud compute ssh citrus-draft-engine-staging `
+  --zone=northamerica-northeast1-a --project=citrus-fantasy-staging `
+  --command="sudo docker restart citrus-draft-engine && sleep 5"
+```
+
+**Env note for step 3:** the harness needs `SUPABASE_DB_URL` and `SUPABASE_JWT_SECRET` in the shell that runs it. Both can be pulled from the engine container via `sudo docker exec citrus-draft-engine printenv <NAME>` over gcloud ssh — matches the pattern the launcher scripts already use.
+
+### §17.7 Local-only files — never commit
+
+Enumerated so a future operator or the agent doesn't accidentally stage them:
+
+- `.env` (repo root) — Supabase staging credentials for local dev
+- `scripts/proof/*.local.mjs` — one-shot helpers (`apply-migration`, `clear-snapshots`, `kill-listener`, `set-draft-status`)
+- `scripts/proof/*.local.ps1` — launchers (`start-api`, `start-web`)
+- `scripts/proof/fixture-12-state.local.json` — ephemeral fixture-reset state file
+- `scripts/proof/fixture-state.local.json` — same, older fixture-min variant
+
+All match the `.local.*` glob and `.env` in `.gitignore`. If an operator sees any of these in `git status` under M or A, back out immediately and inspect.
