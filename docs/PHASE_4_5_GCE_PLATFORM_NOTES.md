@@ -519,22 +519,29 @@ The first end-to-end walk of the draft join path through a real browser happened
 
 The netsh portproxy bridge is the F1 workaround: browser JS at `localhost:8080` picks `ws://` because origin is HTTP-localhost (not `wss://` per `runner.ts:computeWsUrl`); the bridge forwards to the staging engine's plain `ws://` on 3002. When F1 lands (engine TLS termination), the bridge goes away and the browser connects directly to `wss://<engine-host>:3002`.
 
-### §17.2 Root `.env`
+### §17.2 Root `.env` — no secrets on disk
 
-**Never committed** — deliberate local-only, staging values, no secrets (the JWT_SECRET is pulled from the engine container at API startup, not baked into `.env`). Location: `<repo>/.env` (repo root — Vite reads it via `import.meta.env` and the server's `.env` loader picks it up from `../../../.env` per `server/src/draft/index.ts:22-43`).
+**Never committed and deliberately holds NO secrets.** Ratified 2026-07-28: the only credentials the local rig needs (`SUPABASE_DB_URL`, `SUPABASE_JWT_SECRET`) are pulled per-shell from the running engine container via gcloud (see §17.4). Nothing sensitive lives on the local filesystem. `SUPABASE_SERVICE_ROLE_KEY` is not needed by any local rig tool — the fixture and helper scripts talk to the direct-primary DB URL and the harness signs its own WS tokens from JWT_SECRET.
 
-Minimum contents:
+Location: `<repo>/.env` (repo root — Vite reads it via `import.meta.env`; the server's `.env` loader picks it up per `server/src/draft/index.ts:22-43`).
+
+Actual contents (all 14 keys, non-sensitive):
 ```
-# Supabase project (staging)
-SUPABASE_URL=https://<project-ref>.supabase.co
-SUPABASE_ANON_KEY=<publishable staging anon key>
-SUPABASE_SERVICE_ROLE_KEY=<staging service role — required for RPC calls from local API>
-SUPABASE_DB_URL=postgresql://postgres:<pw>@db.<ref>.supabase.co:5432/postgres
-
 # Vite web env (VITE_ prefix required for browser exposure)
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
-VITE_SUPABASE_ANON_KEY=<same as SUPABASE_ANON_KEY>
-VITE_API_BASE_URL=http://localhost:3001
+VITE_SUPABASE_ANON_KEY=<publishable anon key — staging>
+VITE_API_URL=http://localhost:3001
+VITE_ADSENSE_ENABLED=false
+VITE_ADSENSE_PUBLISHER_ID=<publisher id>
+VITE_FIREBASE_API_KEY=<staging web key>
+VITE_FIREBASE_APP_ID=<staging app id>
+VITE_FIREBASE_MEASUREMENT_ID=<GA measurement id>
+VITE_SENTRY_DSN=<dsn>
+VITE_TEST_MODE=false
+
+# Server (API) env
+NODE_ENV=development
+PORT=3001
 
 # Draft engine WS discovery — set explicit localhost so the discovery
 # endpoint returns the netsh-portproxy address rather than the staging
@@ -544,7 +551,11 @@ DRAFT_WS_HOST=localhost
 DRAFT_WS_PORT=3002
 ```
 
-The `.env` file is in `.gitignore` at repo root. **Never commit it — even to a private repo, even briefly.** The SUPABASE_SERVICE_ROLE_KEY is a full-bypass-RLS credential; committing it (even to a private repo) escapes the Secret Manager control loop.
+The anon key is the browser-exposed publishable credential (not a secret in the RLS-bypass sense) and does not endanger the DB.
+
+**File-encoding gotcha.** `.env` should be plain UTF-8 with NO byte-order mark. A UTF-8 BOM (`ef bb bf`) at the top makes both `bash source ./.env` (`. ./.env: line 1: ﻿#: command not found`) and `node --env-file=.env` fail silently by mis-parsing the first key. Verify with `od -c .env | head -1` — the first bytes should be the visible content, not `357 273 277`. Strip an existing BOM with `sed -i '1s/^\xef\xbb\xbf//' .env` (done for this repo 2026-07-28).
+
+The `.env` file is in `.gitignore` at repo root — but since the keys above are non-secret, the impact of accidental commit is limited. Still, keep it uncommitted: it's the source-of-truth boundary between "local rig config" and "checked-in code," and putting the file under version control invites drift over time.
 
 ### §17.3 netsh portproxy — `127.0.0.1:3002` → `35.203.89.236:3002`
 
@@ -573,9 +584,9 @@ netsh interface portproxy delete v4tov4 listenaddress=127.0.0.1 listenport=3002
 Two PowerShell launchers live under `scripts/proof/` (both `.local.ps1` suffix so `.gitignore` excludes them automatically per the local-only convention):
 
 **`scripts/proof/start-api.local.ps1`** — starts the API server. Responsibilities:
-1. Fetch `SUPABASE_JWT_SECRET` from the running engine container via `gcloud compute ssh … --command="sudo docker exec citrus-draft-engine printenv SUPABASE_JWT_SECRET"` (avoids putting the secret in `.env` — same rationale as §15.15).
+1. Fetch `SUPABASE_JWT_SECRET` **and** `SUPABASE_DB_URL` from the running engine container via `gcloud compute ssh … --command="sudo docker exec citrus-draft-engine printenv <NAME>"` (avoids putting either credential in `.env` — same rationale as §15.15 and the §17.2 ratification).
 2. `Set-Location` to `<repo>/server`.
-3. Set `$env:PORT = 3001` + inject the fetched JWT secret + `DRAFT_WS_HOST=localhost` + `DRAFT_WS_PORT=3002`.
+3. Set `$env:PORT = 3001` + inject the fetched secrets + `DRAFT_WS_HOST=localhost` + `DRAFT_WS_PORT=3002`.
 4. `npm run dev`.
 
 **`scripts/proof/start-web.local.ps1`** — starts the Vite dev server. Responsibilities:
@@ -606,6 +617,23 @@ Convention: `.local.mjs` — never committed, matches the `kill-listener` / `cle
 
 Interleaves agent commands (fixture, restart, harness) with Garrett's browser observations. The agent doesn't testify to browser-visible outcomes — Garrett does.
 
+Every fixture / helper / harness step needs `SUPABASE_DB_URL` in the shell (and the harness additionally needs `SUPABASE_JWT_SECRET`). Neither lives on disk — pull per-shell from the engine container. A one-liner that primes a bash shell for the rest of the cycle:
+
+```
+export SUPABASE_DB_URL="$(gcloud compute ssh citrus-draft-engine-staging \
+  --zone=northamerica-northeast1-a --project=citrus-fantasy-staging \
+  --command='sudo docker exec citrus-draft-engine printenv SUPABASE_DB_URL' \
+  2>/dev/null | tr -d '\r\n')"
+export SUPABASE_JWT_SECRET="$(gcloud compute ssh citrus-draft-engine-staging \
+  --zone=northamerica-northeast1-a --project=citrus-fantasy-staging \
+  --command='sudo docker exec citrus-draft-engine printenv SUPABASE_JWT_SECRET' \
+  2>/dev/null | tr -d '\r\n')"
+# Verify by length only (never echo the values): DB URL = 87 chars, JWT = 96 chars.
+echo "len DB_URL=${#SUPABASE_DB_URL} JWT=${#SUPABASE_JWT_SECRET}"
+```
+
+If you're running steps individually from separate Bash tool calls (as an agent does — each call is a fresh shell), chain the export inline with each command. The values are ~87/96 chars respectively; anything materially different means the container drifted from deploy-time expectations and you should investigate before proceeding.
+
 ```
 # 1. Reset fixture + restart engine + set up fresh fixture with a specific pick clock.
 node scripts/proof/fixture-12.mjs --reset --execute
@@ -614,20 +642,33 @@ gcloud compute ssh citrus-draft-engine-staging `
   --command="sudo docker restart citrus-draft-engine && sleep 5"
 node scripts/proof/fixture-12.mjs --execute --rounds=3 --pick-clock=30
 
-# 2. Open the room in a real browser (Garrett does this):
-#    localhost:8080/draft-v2/993c9219-ecbf-4e4e-9fb0-e9837e1bded3
-#    Garrett refreshes (F5) and confirms fresh board state (Recent events empty).
+# 2. Open the discovery-status gate BEFORE the browser can reach the room.
+#    Fixture-12 sets legacy draft_state='active' but never touches draft_status,
+#    which sits at 'completed' between cycles. Discovery returns 409 until:
+node scripts/proof/set-draft-status.local.mjs --to=in_progress --execute
 
-# 3. Fire the harness (agent does this ONLY after Garrett confirms):
+# 3. Open the room in a real browser (Garrett does this):
+#    localhost:8080/draft-v2/993c9219-ecbf-4e4e-9fb0-e9837e1bded3
+#    Garrett refreshes (F5) and confirms fresh board state (Recent events empty,
+#    countdown at the configured pick clock, no error toast).
+
+# 4. Fire the harness (agent does this ONLY after Garrett confirms):
 node scripts/proof/draft-harness.mjs --scenario=S5 --expected-pick-clock=30 --autopick-timeout-ms=60000
 
-# 4. Success = BOTH:
+# 5. Success = BOTH:
 #    (a) S5 12/12 GREEN in the terminal (agent's verdict), AND
 #    (b) Garrett testifies he saw "Recent events" grow live and/or
 #        the countdown snap 0:00 → 0:30 (Garrett's testimony).
 #    Either signal alone is INSUFFICIENT — the flip-check requires both.
 
-# 5. Cleanup after (final scenario included):
+# 6. Close the pick-clock audit loop: engine boot log's pickClockSeconds MUST equal
+#    the fixture --pick-clock value + PICK_CLOCK_PAD_SECONDS (currently 1).
+#    For --pick-clock=30 the expected value is 31.
+gcloud compute ssh citrus-draft-engine-staging `
+  --zone=northamerica-northeast1-a --project=citrus-fantasy-staging `
+  --command="sudo docker logs citrus-draft-engine 2>&1 | grep pickClockSeconds | tail -3"
+
+# 7. Cleanup after ratification:
 node scripts/proof/fixture-12.mjs --reset --execute
 node scripts/proof/set-draft-status.local.mjs --to=completed --execute
 gcloud compute ssh citrus-draft-engine-staging `
@@ -635,13 +676,11 @@ gcloud compute ssh citrus-draft-engine-staging `
   --command="sudo docker restart citrus-draft-engine && sleep 5"
 ```
 
-**Env note for step 3:** the harness needs `SUPABASE_DB_URL` and `SUPABASE_JWT_SECRET` in the shell that runs it. Both can be pulled from the engine container via `sudo docker exec citrus-draft-engine printenv <NAME>` over gcloud ssh — matches the pattern the launcher scripts already use.
-
 ### §17.7 Local-only files — never commit
 
 Enumerated so a future operator or the agent doesn't accidentally stage them:
 
-- `.env` (repo root) — Supabase staging credentials for local dev
+- `.env` (repo root) — non-sensitive local rig config only (no DB URL, no JWT secret, no service role — see §17.2)
 - `scripts/proof/*.local.mjs` — one-shot helpers (`apply-migration`, `clear-snapshots`, `kill-listener`, `set-draft-status`)
 - `scripts/proof/*.local.ps1` — launchers (`start-api`, `start-web`)
 - `scripts/proof/fixture-12-state.local.json` — ephemeral fixture-reset state file
