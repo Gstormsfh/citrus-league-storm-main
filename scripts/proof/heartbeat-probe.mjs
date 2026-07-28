@@ -81,6 +81,11 @@ const flag = (name) => args.includes(`--${name}`);
 const MODE = opt('mode', 'browser-sim');
 const HOST = opt('host', '35.203.89.236');
 const PORT = Number(opt('port', '3002'));
+// F1 chunk (2026-07-28): scheme override for WSS acceptance against
+// the TLS-terminating Caddy sidecar. Plain ws:// stays default for
+// backward compat during the tooling transition. Example:
+//   node heartbeat-probe.mjs --scheme=wss --host=draft-staging.citrusfantasysports.com --port=443
+const SCHEME = opt('scheme', 'ws');
 const LEAGUE_ID = opt('league', '993c9219-ecbf-4e4e-9fb0-e9837e1bded3');
 // Chunk 10c-2 batch 3 join-path-robustness acceptance modes (added
 // 2026-07-28): `uninitialized` and `bad-sub` exercise the two new
@@ -193,7 +198,7 @@ const EXPECTED_BY_MODE = {
   'uninitialized': 'Force-closed with code 4400 (draft_not_initialized) within ~1 s',
   'bad-sub': 'Force-closed with code 4300 (unauthorized_bad_shape) at upgrade time',
 };
-const wsUrl = `ws://${HOST}:${PORT}/ws/draft/${LEAGUE_ID}`;
+const wsUrl = `${SCHEME}://${HOST}:${PORT}/ws/draft/${LEAGUE_ID}`;
 console.log('');
 console.log('╔═══════════════════════════════════════════════════════════════════════╗');
 console.log('║  10c-2 batch 3 — heartbeat + join-path-robustness probe              ║');

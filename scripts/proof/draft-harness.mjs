@@ -193,6 +193,11 @@ const DB_URL = process.env.SUPABASE_DB_URL;
 const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 const HOST = process.env.HOST || '35.203.89.236';
 const WS_PORT = Number(process.env.WS_PORT || 3002);
+// F1 chunk (2026-07-28): scheme override for WSS acceptance against
+// the TLS-terminating Caddy sidecar. Plain ws stays default during
+// the tooling transition. Example env for wss acceptance:
+//   HOST=draft-staging.citrusfantasysports.com WS_PORT=443 SCHEME=wss node draft-harness.mjs ...
+const SCHEME = process.env.SCHEME || 'ws';
 if (!DB_URL) { console.error('FATAL: SUPABASE_DB_URL not set.'); process.exit(2); }
 if (!JWT_SECRET) { console.error('FATAL: SUPABASE_JWT_SECRET not set.'); process.exit(2); }
 for (const pat of ['pooler.supabase.com', 'pgbouncer', ':6543']) {
@@ -223,7 +228,7 @@ if (SCENARIO === 'S4') {
   console.log(`║  idle after picks:    ${String(IDLE_AFTER_PICKS).padEnd(48)}║`);
   console.log(`║  idle duration:       ${(IDLE_MINUTES + ' minutes').padEnd(48)}║`);
 }
-console.log(`║  WS target:           ${`ws://${HOST}:${WS_PORT}`.padEnd(48)}║`);
+console.log(`║  WS target:           ${`${SCHEME}://${HOST}:${WS_PORT}`.padEnd(48)}║`);
 console.log(`║  league:              ${WHITELISTED_LEAGUE_ID.padEnd(48)}║`);
 console.log(`║  run id:              ${RUN_ID.padEnd(48)}║`);
 console.log('╚═══════════════════════════════════════════════════════════════════════╝');
@@ -590,6 +595,7 @@ async function main() {
         const handle = await connectDraftClient({
           host: HOST,
           port: WS_PORT,
+          scheme: SCHEME,
           leagueId: WHITELISTED_LEAGUE_ID,
           userId,
           jwtSecret: JWT_SECRET,

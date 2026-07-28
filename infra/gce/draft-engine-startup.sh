@@ -314,16 +314,53 @@ else
   docker network create --driver bridge "${DOCKER_NETWORK_NAME}"
 fi
 
+# ── Step 4c-pre: Write Caddyfile so its hash can gate idempotency ───
+# F1 WSS-acceptance follow-up: earlier rev wrote the Caddyfile inside
+# Step 7 (after the docker run), which meant Caddyfile-only changes
+# were silently skipped by the digest-only idempotency check in
+# Step 4c below (both containers on target images → exit 0 before
+# ever touching the Caddyfile). Writing the file HERE and comparing
+# hashes lets the idempotency check treat a Caddyfile change as a
+# reconverge trigger — the durable pipeline is now the only path to
+# apply Caddy config edits.
+echo "Writing Caddyfile to /opt/caddy/Caddyfile..."
+mkdir -p /opt/caddy
+CADDYFILE_HASH_PRE=""
+if [ -f /opt/caddy/Caddyfile ]; then
+  CADDYFILE_HASH_PRE="$(sha256sum /opt/caddy/Caddyfile | awk '{print $1}')"
+fi
+cat > /opt/caddy/Caddyfile <<CADDYFILE
+{
+    email ${LETSENCRYPT_EMAIL}
+}
+
+${DRAFT_DOMAIN} {
+    reverse_proxy ${CONTAINER_NAME}:3002 {
+        transport http {
+            versions 1.1
+            keepalive off
+        }
+    }
+}
+CADDYFILE
+CADDYFILE_HASH_POST="$(sha256sum /opt/caddy/Caddyfile | awk '{print $1}')"
+CADDYFILE_CHANGED=false
+if [ "${CADDYFILE_HASH_PRE}" != "${CADDYFILE_HASH_POST}" ]; then
+  CADDYFILE_CHANGED=true
+  echo "Caddyfile content changed (pre=${CADDYFILE_HASH_PRE:0:12}, post=${CADDYFILE_HASH_POST:0:12})."
+fi
+
 # ── Step 4c: Idempotency check — skip restart only if BOTH containers
-# are already running on their pinned images ─────────────────────────
+# are already running on their pinned images AND the Caddyfile
+# content did not change since the last converge ─────────────────────
 # Re-running this script (VM reboot, manual re-trigger) should not
-# disrupt a healthy stack unless one of the images actually changed.
-# F1 chunk expanded this from an engine-only check to an engine +
-# Caddy check: skipping the restart when Caddy is down would leave
-# the TLS layer offline indefinitely. The first F1 deploy (Caddy
-# not yet running) intentionally trips the "replace" branch — the
-# architect's amendment (c) expects the engine container to be
-# recreated once so it can join the new user-defined bridge.
+# disrupt a healthy stack unless something actually changed. F1 chunk
+# expanded this from an engine-only check to an engine + Caddy check;
+# the WSS-acceptance follow-up further added Caddyfile-hash to the
+# skip condition (see Step 4c-pre above). If the Caddyfile changed
+# but both containers are otherwise up, we attempt an in-place
+# `caddy reload` first and only fall through to full replace if the
+# reload fails.
 RUNNING_CONTAINER_ID="$(docker ps -q --filter "name=^/${CONTAINER_NAME}$" --filter "status=running" 2>/dev/null || echo "")"
 RUNNING_CADDY_ID="$(docker ps -q --filter "name=^/${CADDY_CONTAINER_NAME}$" --filter "status=running" 2>/dev/null || echo "")"
 if [ -n "${RUNNING_CONTAINER_ID}" ] && [ -n "${RUNNING_CADDY_ID}" ]; then
@@ -335,9 +372,21 @@ if [ -n "${RUNNING_CONTAINER_ID}" ] && [ -n "${RUNNING_CADDY_ID}" ]; then
      [ -n "${RUNNING_CADDY_DIGEST}" ] && [ -n "${CURRENT_CADDY_DIGEST}" ] && \
      [ "${RUNNING_IMAGE_DIGEST}" = "${CURRENT_IMAGE_DIGEST}" ] && \
      [ "${RUNNING_CADDY_DIGEST}" = "${CURRENT_CADDY_DIGEST}" ]; then
-    echo "Both ${CONTAINER_NAME} and ${CADDY_CONTAINER_NAME} already running on current image digests. Skipping restart (idempotency)."
-    echo "=== citrus-draft-engine startup script complete (idempotent skip): $(date -u +%FT%TZ) ==="
-    exit 0
+    if [ "${CADDYFILE_CHANGED}" = "true" ]; then
+      # Images match but Caddyfile changed — attempt in-place reload.
+      # Falls through to full replace if the reload fails.
+      echo "Images unchanged but Caddyfile updated — attempting in-place caddy reload..."
+      if docker exec "${CADDY_CONTAINER_NAME}" caddy reload --config /etc/caddy/Caddyfile; then
+        echo "In-place Caddyfile reload succeeded. Skipping container replace (idempotency)."
+        echo "=== citrus-draft-engine startup script complete (Caddyfile hot-reload): $(date -u +%FT%TZ) ==="
+        exit 0
+      fi
+      echo "WARN: in-place Caddyfile reload failed; falling through to full container replace."
+    else
+      echo "Both ${CONTAINER_NAME} and ${CADDY_CONTAINER_NAME} already running on current image digests and Caddyfile unchanged. Skipping restart (idempotency)."
+      echo "=== citrus-draft-engine startup script complete (idempotent skip): $(date -u +%FT%TZ) ==="
+      exit 0
+    fi
   fi
   echo "One or both containers are on a different image. Replacing..."
 fi
@@ -413,18 +462,26 @@ docker run -d \
 # engine's :3001 Hono /health endpoint is NOT proxied through Caddy;
 # scope creep would delay F1 and add surface area. Follow-up chunk
 # for /health proxying if/when we retire direct :3001 access.
-echo "Writing Caddyfile to /opt/caddy/Caddyfile..."
-mkdir -p /opt/caddy
-cat > /opt/caddy/Caddyfile <<CADDYFILE
-{
-    email ${LETSENCRYPT_EMAIL}
-}
-
-${DRAFT_DOMAIN} {
-    reverse_proxy ${CONTAINER_NAME}:3002
-}
-CADDYFILE
-
+# 2026-07-28 F1 chunk WSS-acceptance finding: Caddy's Go http.Transport
+# defaults to HTTP/1.1 keep-alive connection pooling to the backend.
+# uWS on port 3002 does not conform to Go transport's expectations for
+# idle-channel behavior after a WebSocket upgrade — the SECOND WS a
+# reverse_proxy tries to open through a pooled connection hits an
+# "Unsolicited response received on idle HTTP channel" error in Caddy
+# and the second/subsequent client's connection drops with WS 1006
+# BEFORE the snapshot delivery completes. Symptom: harness sequential
+# connects succeed for c01/c02 then hang c03+. Only surfaces under
+# sequential re-use of the same pooled dial — a single client, or
+# clients from different source IPs, works fine (which is why the
+# single-client browser-sim probe over wss passed cleanly).
+#
+# Fix: `keepalive off` in the transport block (in the Caddyfile written
+# at Step 4c-pre above) forces a fresh TCP dial per proxied request.
+# Minor per-request overhead (~1 TCP handshake) but eliminates the
+# pool-reuse hazard entirely. Since Caddy → engine both live on the
+# same VM's user-defined bridge, the dial cost is sub-millisecond
+# intra-host — not a meaningful latency contributor vs the TLS-layer
+# overhead the client already pays.
 echo "Starting ${CADDY_CONTAINER_NAME}..."
 docker run -d \
   --name "${CADDY_CONTAINER_NAME}" \

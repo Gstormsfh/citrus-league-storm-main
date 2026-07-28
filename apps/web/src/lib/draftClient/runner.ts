@@ -92,8 +92,7 @@ export interface DraftClientRunnerOptions {
   /**
    * Override the WS protocol scheme. Defaults to `'wss:'` if
    * `window.location.protocol === 'https:'`, else `'ws:'` for
-   * dev (HTTP page on localhost). The `VITE_DRAFT_WS_PROTOCOL`
-   * env var is the explicit production override path.
+   * dev (HTTP page on localhost).
    *
    * **Note for future readers:** the localhost branch is
    * dev-only — in production the page is always HTTPS, and

@@ -123,6 +123,11 @@ export function connectDraftClient({
   silentHeartbeat = false, // set true in harness for many-client cases
   onEvent = null,
   onError = null,
+  // F1 chunk (2026-07-28): scheme override so callers can hit the
+  // TLS-terminating Caddy sidecar at wss://<domain>:443 instead of
+  // plain ws://<vm-ip>:3002. Default stays 'ws' — plain ws remains
+  // open through the tooling transition.
+  scheme = 'ws',
 }) {
   if (!host) throw new Error('connectDraftClient: host required');
   if (!port) throw new Error('connectDraftClient: port required');
@@ -131,7 +136,7 @@ export function connectDraftClient({
   if (!jwtSecret) throw new Error('connectDraftClient: jwtSecret required');
   const label = clientLabel ?? `client-${userId.slice(0, 8)}`;
 
-  const url = `ws://${host}:${port}/ws/draft/${leagueId}`;
+  const url = `${scheme}://${host}:${port}/ws/draft/${leagueId}`;
   const jwt = mintDraftJwt({ leagueId, userId, jwtSecret });
 
   const state = {

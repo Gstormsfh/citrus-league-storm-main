@@ -517,7 +517,38 @@ The first end-to-end walk of the draft join path through a real browser happened
                                        (bridge)                                    (staging engine WS)
 ```
 
-The netsh portproxy bridge is the F1 workaround: browser JS at `localhost:8080` picks `ws://` because origin is HTTP-localhost (not `wss://` per `runner.ts:computeWsUrl`); the bridge forwards to the staging engine's plain `ws://` on 3002. When F1 lands (engine TLS termination), the bridge goes away and the browser connects directly to `wss://<engine-host>:3002`.
+The netsh portproxy bridge WAS the F1 workaround before F1 landed 2026-07-28. Post-F1 the browser connects directly to `wss://draft-staging.citrusfantasysports.com:443` — the Caddy sidecar on the engine VM terminates TLS and reverse-proxies to the engine's uWS on :3002. Local dev topology is now:
+
+```
+  browser (Chrome) ─────────────► wss://draft-staging.citrusfantasysports.com:443
+                                                  │
+                                                  ▼
+                                    Caddy (on engine VM, port 443)
+                                                  │
+                                                  ▼
+                                    citrus-draft-engine:3002 (uWS)
+```
+
+**Bridge retirement.** After the F1 deploy, tear down the netsh portproxy — it's no longer needed and its presence can mask real reachability issues. Elevated PowerShell:
+```
+netsh interface portproxy delete v4tov4 listenaddress=127.0.0.1 listenport=3002
+```
+
+**Local `.env` change.** Update `DRAFT_WS_HOST` + `DRAFT_WS_PORT` in the repo-root `.env` from the bridge target to the wss target:
+```
+# Was (pre-F1, via netsh bridge):
+DRAFT_WS_HOST=localhost
+DRAFT_WS_PORT=3002
+
+# Now (post-F1, direct wss):
+DRAFT_WS_HOST=draft-staging.citrusfantasysports.com
+DRAFT_WS_PORT=443
+```
+The `runner.ts:computeWsUrl` picks `wss://` automatically for any non-localhost host (or when the page origin is HTTPS), so no scheme override is needed in `.env`.
+
+**Cloud Run API env is a SEPARATE cloud-path task** — the production API's `DRAFT_WS_HOST` / `DRAFT_WS_PORT` config needs the same update via its own Cloud Run env var editor. Not touched by this chunk; ledgered as a follow-up before the wss cutover ships to production users.
+
+**Plain `ws://:3002` stays open** during the F1 tooling transition per the ratified scope. The `citrus-draft-engine-allow` firewall rule still admits tcp:3002 from 0.0.0.0/0, and the engine still binds :3002 on host. Retirement is a follow-up chunk once every tool + client speaks wss.
 
 ### §17.2 Root `.env` — no secrets on disk
 

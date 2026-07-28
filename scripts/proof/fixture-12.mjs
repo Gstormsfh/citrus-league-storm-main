@@ -55,9 +55,19 @@ const HARNESS_SESSION_ID = '77777777-7777-7777-7777-777777777777';
 // lib will still mint JWTs with per-slot sub so the engine's uWS
 // upgrade log has a distinguishing userId per client.
 // (Exposed by the file so draft-harness.mjs can import it.)
+//
+// 2026-07-28 F1 chunk — must be VALID UUIDv4 per join-path-robustness
+// chunk 11g.10 sub-step 10c-2 gate (a) UUID_V4_REGEX at
+// server/src/draft/uws-server.ts:116. The pre-chunk `88888888-8888-
+// 8888-8888-<12 hex>` shape had `8` in the third group's first
+// position (v4 marker requires `4`) and would fail the gate. Third
+// group's first char is now `4`; fourth group's first char stays `8`
+// (valid v4 variant marker). Change is scope-contained: harness user
+// IDs are ephemeral JWT-sub-only values, never persisted in DB
+// (teams.owner_id stays NULL per the fixture setup path).
 export function harnessUserId(slot) {
   const s = String(slot).padStart(12, '0');
-  return `88888888-8888-8888-8888-${s}`;
+  return `88888888-8888-4888-8888-${s}`;
 }
 export const HARNESS_USER_IDS = Array.from({ length: TEAM_COUNT }, (_, i) => harnessUserId(i + 1));
 
