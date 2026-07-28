@@ -478,8 +478,23 @@ async function defaultFetchDiscovery(draftId: string): Promise<DraftServerDiscov
   const response = await apiClient.get<DraftServerDiscovery>(
     `/api/drafts/${encodeURIComponent(draftId)}/server`,
   );
-  if (response.error || !response.data) {
-    const err = new Error(response.error ?? 'Discovery fetch failed') as Error & {
+  // 2026-07-28 (first live-browser walk of the join path): the chunk-11g.1
+  // discovery endpoint returns `{ host, port, token }` at the TOP LEVEL of
+  // the response body — NOT wrapped in apiClient's `{ data }` envelope.
+  // The old `!response.data` check therefore threw 'Discovery fetch failed'
+  // on every successful 200, meaning the real browser join path had never
+  // once worked (harness bypasses discovery; unit tests stub this fetcher).
+  // Accept both shapes so a future server-side envelope migration is safe.
+  const payload =
+    response.data ?? (response as unknown as DraftServerDiscovery);
+  if (
+    response.error ||
+    typeof payload?.host !== 'string' ||
+    typeof payload?.token !== 'string'
+  ) {
+    const err = new Error(
+      typeof response.error === 'string' ? response.error : 'Discovery fetch failed',
+    ) as Error & {
       statusCode?: number;
     };
     // apiClient doesn't surface status codes today; if it did,
@@ -487,7 +502,7 @@ async function defaultFetchDiscovery(draftId: string): Promise<DraftServerDiscov
     // For now any error is treated as transient.
     throw err;
   }
-  return response.data;
+  return payload;
 }
 
 /**
@@ -507,13 +522,22 @@ async function defaultFetchSnapshot(draftId: string): Promise<DraftSnapshot> {
   const response = await apiClient.get<DraftSnapshot>(
     `/api/drafts/${encodeURIComponent(draftId)}/snapshot`,
   );
-  if (response.error || !response.data) {
-    const err = new Error(response.error ?? 'Snapshot fetch failed') as Error & {
+  // Same top-level-vs-envelope mismatch as defaultFetchDiscovery above:
+  // the chunk-11g.7-7b snapshot endpoint returns the DraftSnapshot at the
+  // top level (`c.json(snapshot)`), not wrapped in `{ data }`. Accept both.
+  const payload = response.data ?? (response as unknown as DraftSnapshot);
+  if (
+    response.error ||
+    typeof (payload as { format?: unknown })?.format !== 'string'
+  ) {
+    const err = new Error(
+      typeof response.error === 'string' ? response.error : 'Snapshot fetch failed',
+    ) as Error & {
       statusCode?: number;
     };
     throw err;
   }
-  return response.data;
+  return payload;
 }
 
 function generateSessionId(): string {
