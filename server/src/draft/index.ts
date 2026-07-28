@@ -73,6 +73,7 @@ import {
   PICK_CLOCK_PAD_SECONDS,
 } from '@citrus/shared';
 import { startUwsServer, type UwsServerHandle } from './uws-server';
+import { createDraftInitializedPredicate } from './joinPathPrecheck';
 import { LobbyRegistry, type LobbyConfig } from './LobbyRegistry';
 import { DraftServiceV2 } from '../services/DraftServiceV2';
 import { supabaseAdmin } from '../lib/supabase';
@@ -664,7 +665,12 @@ app.route(
 
 // ── Start uWS ──
 let uwsHandle: UwsServerHandle | null = null;
-startUwsServer({ port: wsPort, app: draftApp, lobbyRegistry })
+startUwsServer({
+  port: wsPort,
+  app: draftApp,
+  lobbyRegistry,
+  isDraftInitialized: createDraftInitializedPredicate(supabaseAdmin),
+})
   .then((handle) => {
     uwsHandle = handle;
   })

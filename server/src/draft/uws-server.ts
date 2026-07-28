@@ -78,7 +78,55 @@ export interface StartUwsServerOptions {
    * `DraftServiceV2` + a real Supabase `formatLookup`.
    */
   lobbyRegistry: LobbyRegistry;
+  /**
+   * Chunk 11g.10 sub-step 10c-2 join-path-robustness — gate (b)
+   * predicate. Called after gate (a) shape-check passes and after
+   * `verifyDraftToken` succeeds. Returns `'ready' | 'empty' | 'error'`
+   * with three-way disambiguation MANDATORY per the Tuesday architect
+   * ruling: `'empty'` closes 4400 (KNOWN not-configured), `'error'`
+   * closes 1011 (retained defense-in-depth — DB blip, timeout, or
+   * pool unavailable). Dependency-injected so this file stays
+   * DB-agnostic; production implementation lives in `index.ts`.
+   */
+  isDraftInitialized: (leagueId: string) => Promise<'ready' | 'empty' | 'error'>;
 }
+
+// ── Pre-upgrade gates (chunk 11g.10 sub-step 10c-2) ──────────────────
+//
+// Custom close codes emitted after a `res.upgrade(...)` succeeds so
+// the client's `onclose(code, reason)` observes the specific gate
+// rejection. Client-side disposition mapping lives in
+// `apps/web/src/lib/draftClient/closeCodes.ts`; regression tests in
+// the sibling `__tests__/closeCodes.test.ts`.
+//
+//   - 4300 unauthorized_bad_shape — gate (a): `claims.sub` failed
+//     UUIDv4 shape check. Should never fire for real browsers; exists
+//     for probes + defense-in-depth against future token-issuer bugs.
+//     Client disposition: `permanent_auth` (fresh auth is the only
+//     legitimate remediation).
+//   - 4400 draft_not_initialized — gate (b): `SELECT 1 FROM
+//     draft_order WHERE league_id = $1 LIMIT 1` returned zero rows,
+//     i.e. commissioner hasn't set up the draft yet. Client
+//     disposition: `permanent_not_initialized` (no auto-reconnect,
+//     distinct banner; manual RETRY NOW affordance stays).
+//
+// The pre-existing 1011 catch is retained (not replaced) as the
+// defense-in-depth fallback for gate (b) 'error' returns, for
+// `LobbyManager` construction failures downstream, and for any
+// future race the gates don't anticipate.
+const GATE_A_BAD_SHAPE_CLOSE_CODE = 4300;
+const GATE_B_DRAFT_NOT_INITIALIZED_CLOSE_CODE = 4400;
+const GATE_B_PRECHECK_ERROR_CLOSE_CODE = 1011;
+
+// UUID v4 canonical shape. `claims.sub` is minted by `signDraftToken`
+// (server/src/lib/draftToken.ts) from the authenticated user's
+// Supabase `auth.uid()`, which is always a UUIDv4 in this project.
+// Anything else in `sub` means either a probe / attacker, or a
+// future token-issuer bug — either way, a UUIDv4 is the shape
+// contract of every downstream consumer (`teams.owner_id`,
+// `LobbyManager.userId`, RPC `p_actor.user_id`).
+const UUID_V4_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // ── Heartbeat configuration (chunk 11g.7 sub-step 7d) ────────────────
 //
@@ -112,7 +160,7 @@ const HEARTBEAT_SCAN_INTERVAL_MS = Math.min(
 );
 
 export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHandle> {
-  const { port, app, lobbyRegistry } = opts;
+  const { port, app, lobbyRegistry, isDraftInitialized } = opts;
   return new Promise((resolve, reject) => {
     let listenSocket: unknown = null;
     let heartbeatTimer: NodeJS.Timeout | null = null;
@@ -160,7 +208,7 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
         // built into verifyDraftToken; we just pass the URL param as
         // expectedDraftId.
         verifyDraftToken(secProto, lobbyId)
-          .then((result) => {
+          .then(async (result) => {
             if (aborted) return;
 
             // Narrow via property-existence (`'claims' in result`) rather
@@ -169,9 +217,66 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
             // setting; `in`-based narrowing works in either mode.
             if ('claims' in result) {
               const { claims } = result;
+
+              // ── Gate (a) shape check (chunk 11g.10 sub-step 10c-2) ──
+              // Cheap sync check runs BEFORE the DB precheck so garbage
+              // subs eat zero DB cost. `claims.sub` is a UUIDv4 in the
+              // production issuer path; anything else is a probe /
+              // attacker / future-issuer-bug — close with 4300.
+              let closeAfterUpgrade: DraftSocketUserData['closeAfterUpgrade'];
+              if (!UUID_V4_REGEX.test(claims.sub)) {
+                structuredLogger.info('uws.upgrade.gate_a_bad_shape', {
+                  lobbyId,
+                  subLen: claims.sub.length,
+                });
+                closeAfterUpgrade = {
+                  code: GATE_A_BAD_SHAPE_CLOSE_CODE,
+                  reason: 'unauthorized_bad_shape',
+                };
+              } else {
+                // ── Gate (b) DB precheck (chunk 11g.10 sub-step 10c-2) ─
+                // Awaited predicate — the new abort window. `isDraftInitialized`
+                // internally enforces the 1500ms overall timeout via
+                // Promise.race and returns 'error' on timeout / query
+                // failure. Three-way disambiguation is MANDATORY: only
+                // 'empty' produces 4400; 'error' falls through to 1011
+                // (retained defense-in-depth) so DB blips never tell
+                // real users the draft "isn't set up."
+                const precheck = await isDraftInitialized(claims.leagueId);
+
+                // ── ABORT RE-CHECK (mirrors line 164 / 210 pattern) ────
+                // The predicate await is the ONLY new abort window
+                // introduced by this chunk. If the client disconnected
+                // while the SELECT was in flight, `res` may have been
+                // recycled by uWS; every downstream `res.cork(...)` or
+                // `res.upgrade(...)` would be a use-after-free.
+                if (aborted) return;
+
+                if (precheck === 'empty') {
+                  structuredLogger.info('uws.upgrade.gate_b_not_initialized', {
+                    lobbyId,
+                    leagueId: claims.leagueId,
+                  });
+                  closeAfterUpgrade = {
+                    code: GATE_B_DRAFT_NOT_INITIALIZED_CLOSE_CODE,
+                    reason: 'draft_not_initialized',
+                  };
+                } else if (precheck === 'error') {
+                  structuredLogger.warn('uws.upgrade.gate_b_precheck_error', {
+                    lobbyId,
+                    leagueId: claims.leagueId,
+                  });
+                  closeAfterUpgrade = {
+                    code: GATE_B_PRECHECK_ERROR_CLOSE_CODE,
+                    reason: 'draft_precheck_error',
+                  };
+                }
+              }
+
               structuredLogger.debug('uws.upgrade.accepted', {
                 lobbyId,
                 userId: claims.sub,
+                closeAfterUpgradeCode: closeAfterUpgrade?.code,
               });
               res.cork(() => {
                 res.upgrade(
@@ -187,6 +292,11 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
                     // cork). Initialized to 0 here as a placeholder;
                     // overwritten before any soft-check scan can see it.
                     lastPongAt: 0,
+                    // Chunk 11g.10 sub-step 10c-2: if either gate
+                    // failed, `open` reads this marker and closes the
+                    // WS immediately with the specific code. Absent
+                    // (undefined) means proceed normally.
+                    closeAfterUpgrade,
                   },
                   secKey,
                   secProto,
@@ -223,7 +333,34 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
 
       open: (ws) => {
         const userData = ws.getUserData();
-        const { lobbyId, userId, leagueId } = userData;
+        const { lobbyId, userId, leagueId, closeAfterUpgrade } = userData;
+
+        // Chunk 11g.10 sub-step 10c-2 join-path-robustness — if either
+        // pre-upgrade gate failed, the upgrade succeeded ONLY so we
+        // could deliver a distinguishable close code to the client
+        // (`ws.onclose` observes 4300 / 4400 / 1011). Close the WS
+        // immediately without touching heartbeat state or the
+        // LobbyRegistry — this connection is not a real participant.
+        if (closeAfterUpgrade) {
+          structuredLogger.info('uws.connection.rejected_post_upgrade', {
+            lobbyId,
+            userId,
+            leagueId,
+            code: closeAfterUpgrade.code,
+            reason: closeAfterUpgrade.reason,
+          });
+          try {
+            ws.end(closeAfterUpgrade.code, closeAfterUpgrade.reason);
+          } catch (closeErr) {
+            structuredLogger.debug(
+              'uws.ws_end_threw_after_gate_rejection',
+              { lobbyId, code: closeAfterUpgrade.code },
+            );
+            void closeErr;
+          }
+          return;
+        }
+
         // Chunk 11g.7 sub-step 7d: stamp lastPongAt before any
         // soft-check scan can observe this connection. Initialization
         // happens here (post-upgrade) rather than in the upgrade

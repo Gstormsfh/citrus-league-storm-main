@@ -127,17 +127,31 @@ export type DraftClientState =
        * Terminal state. No more retries. Triggered by:
        *   - `auth_failure`: 401/403 from token discovery, or
        *     close codes 4001-4099 from the WS handshake (token
-       *     verification failed server-side).
+       *     verification failed server-side). Also close code 4300
+       *     (chunk 11g.10 sub-step 10c-2 gate (a) — non-UUIDv4 sub,
+       *     "bad shape" that can't be fixed by retrying the same
+       *     token; only remediation is fresh auth).
        *   - `invalid_lobby`: lobby not found, draft completed, or
        *     close codes 4100-4199.
        *   - `permanent_server_error`: close code 4200+ or any
        *     close code the server explicitly marked permanent.
+       *   - `draft_not_initialized`: close code 4400 (chunk 11g.10
+       *     sub-step 10c-2 gate (b) — commissioner hasn't configured
+       *     the draft yet). Distinct from server error: banner reads
+       *     "This draft hasn't been set up yet"; UX offers a manual
+       *     RETRY NOW affordance for the "commissioner just finished"
+       *     case, but no auto-reconnect fires.
        *
        * The UX layer presents an error UI; user must take an
-       * action (re-login, return to dashboard) to recover.
+       * action (re-login, return to dashboard, or RETRY NOW for
+       * `draft_not_initialized`) to recover.
        */
       kind: 'fatal';
-      reason: 'auth_failure' | 'invalid_lobby' | 'permanent_server_error';
+      reason:
+        | 'auth_failure'
+        | 'invalid_lobby'
+        | 'permanent_server_error'
+        | 'draft_not_initialized';
       errorMessage: string;
     };
 

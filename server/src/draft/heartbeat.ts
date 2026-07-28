@@ -91,6 +91,36 @@ export interface HeartbeatConfig {
  *
  * Reserved-codes header in `closeCodes.ts` documents this allocation
  * to prevent collisions if future close-code work adds new 4xxx codes.
+ *
+ * ── Reserved custom close codes (allocation table) ──────────────────
+ *
+ * Any new 4xxx close code MUST be added to BOTH this table and the
+ * mirrored table in `apps/web/src/lib/draftClient/closeCodes.ts`.
+ *
+ *   - 4002 — heartbeat pong-timeout (this file, chunk 11g.7 sub-step
+ *            7d). Client disposition: transient. Reconnect with backoff.
+ *   - 4300 — chunk 11g.10 sub-step 10c-2 gate (a) unauthorized_bad_shape.
+ *            `claims.sub` failed the UUIDv4 shape check inside the uWS
+ *            upgrade handler (`uws-server.ts`); emitted via the
+ *            `closeAfterUpgrade` marker in `DraftSocketUserData`.
+ *            Client disposition: `permanent_auth` (fresh auth flow —
+ *            not a retryable server condition).
+ *   - 4400 — chunk 11g.10 sub-step 10c-2 gate (b) draft_not_initialized.
+ *            The awaited `SELECT 1 FROM draft_order ... LIMIT 1` from
+ *            `isDraftInitialized` returned zero rows (KNOWN not
+ *            configured). Client disposition:
+ *            `permanent_not_initialized` — no auto-reconnect, distinct
+ *            banner; manual RETRY NOW affordance stays. Never emitted
+ *            from an error path (see 1011 fallback below).
+ *
+ * Standard codes also emitted by the engine:
+ *
+ *   - 1011 — server_error / gate (b) precheck error (`'error'` return
+ *            from `isDraftInitialized` — DB timeout, query error, pool
+ *            unavailable). Retained as defense-in-depth per the
+ *            architect's TOCTOU stance (Decision Log 2026-07-28
+ *            "join-path-robustness chunk — architect pre-ratification
+ *            conditions folded in"). Client disposition: transient.
  */
 export const HEARTBEAT_PONG_TIMEOUT_CLOSE_CODE = 4002;
 

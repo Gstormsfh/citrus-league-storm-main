@@ -152,4 +152,22 @@ describe('notifyConnectionFatal', () => {
       expect.any(Object),
     );
   });
+
+  it('renders the distinct not-initialized title for chunk 11g.10 sub-step 10c-2 gate (b)', () => {
+    // Regression lock: 4400 draft_not_initialized must NOT collapse
+    // into the generic "Draft unavailable" (invalid_lobby) title.
+    // The recovery flow is different: commissioner-just-finished
+    // → RETRY NOW; lobby-gone → return to dashboard.
+    notifyConnectionFatal(
+      'draft_not_initialized',
+      'Commissioner has not set up the draft',
+    );
+    expect(toastError).toHaveBeenCalledWith(
+      "This draft hasn't been set up yet",
+      expect.objectContaining({
+        description: 'Commissioner has not set up the draft',
+        duration: Infinity,
+      }),
+    );
+  });
 });

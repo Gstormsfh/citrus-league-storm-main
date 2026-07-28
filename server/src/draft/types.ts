@@ -54,6 +54,24 @@ export interface DraftSocketUserData {
    * a single integer op per connection per scan.
    */
   lastPongAt: number;
+  /**
+   * Chunk 11g.10 sub-step 10c-2 join-path-robustness — gate (a)
+   * (non-UUIDv4 sub) and gate (b) (empty draft_order OR precheck
+   * error) signal upgrade rejection via this optional marker rather
+   * than via a WS-handshake HTTP status. Rationale: HTTP-status
+   * rejections during upgrade surface to the browser as a failed
+   * connection with no observable close code (`onopen` never fires;
+   * `onclose` fires with 1006). To deliver a distinguishable close
+   * code to the client (4300 / 4400 / 1011) the upgrade must succeed
+   * and `open` must immediately `ws.end(code, reason)`. The upgrade
+   * handler sets this field when either gate fails; the `open`
+   * handler reads it first and closes without ever calling
+   * `LobbyRegistry.getOrCreate`. Absence == proceed normally.
+   */
+  closeAfterUpgrade?: {
+    code: number;
+    reason: string;
+  };
 }
 
 /**

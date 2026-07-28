@@ -60,4 +60,53 @@ describe('classifyCloseCode (chunk 11g.5a)', () => {
     expect(classifyCloseCode(1009, '')).toBe('transient');
     expect(classifyCloseCode(1010, '')).toBe('transient');
   });
+
+  it('4300 is permanent_auth — chunk 11g.10 sub-step 10c-2 gate (a) carve-out', () => {
+    // Regression lock: 4300 sits numerically inside the 4200-4999
+    // "permanent_server" range but its semantic is "bad identity
+    // shape" (non-UUIDv4 sub). The only legitimate remediation is
+    // fresh auth → fresh discovery token, which is exactly the
+    // permanent_auth recovery flow the client already renders. The
+    // carve-out in classifyCloseCode runs BEFORE the 4200-4999 range
+    // check; if a future refactor reorders those checks, this test
+    // is the canary.
+    expect(classifyCloseCode(4300, 'unauthorized_bad_shape')).toBe('permanent_auth');
+    // Empty reason still classifies the same — disposition doesn't
+    // depend on reason today.
+    expect(classifyCloseCode(4300, '')).toBe('permanent_auth');
+    // Boundary: 4299 (just below the carve-out) stays in the
+    // permanent_server range.
+    expect(classifyCloseCode(4299, '')).toBe('permanent_server');
+    // Boundary: 4301 (just above the carve-out) falls back to
+    // permanent_server per the range default.
+    expect(classifyCloseCode(4301, '')).toBe('permanent_server');
+  });
+
+  it('4400 is permanent_not_initialized — chunk 11g.10 sub-step 10c-2 gate (b) carve-out', () => {
+    // Regression lock: 4400 sits numerically inside the 4200-4999
+    // "permanent_server" range but has NEW distinct semantics — not
+    // auth, not lobby-gone, not server fault. Genuinely new product
+    // state ("commissioner hasn't configured the draft yet"). Its
+    // own disposition drives a distinct banner + no auto-reconnect
+    // per the architect's ruling.
+    expect(classifyCloseCode(4400, 'draft_not_initialized')).toBe(
+      'permanent_not_initialized',
+    );
+    expect(classifyCloseCode(4400, '')).toBe('permanent_not_initialized');
+    // Boundary: 4399 stays permanent_server (below the carve-out).
+    expect(classifyCloseCode(4399, '')).toBe('permanent_server');
+    // Boundary: 4401 stays permanent_server (above the carve-out).
+    expect(classifyCloseCode(4401, '')).toBe('permanent_server');
+  });
+
+  it('gate carve-outs run BEFORE the 4200-4999 range check (ordering canary)', () => {
+    // Belt-and-suspenders coverage of the ordering guarantee. If a
+    // future refactor moves the range check ahead of the equality
+    // carve-outs, 4300 would return permanent_server (wrong — should
+    // be permanent_auth) and 4400 would return permanent_server
+    // (wrong — should be permanent_not_initialized). This test
+    // fails immediately in both cases.
+    expect(classifyCloseCode(4300, '')).not.toBe('permanent_server');
+    expect(classifyCloseCode(4400, '')).not.toBe('permanent_server');
+  });
 });

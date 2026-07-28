@@ -351,6 +351,19 @@ function handleWsClosed(
       sideEffects: [],
     };
   }
+  if (disposition === 'permanent_not_initialized') {
+    // Chunk 11g.10 sub-step 10c-2 gate (b). No auto-reconnect; the
+    // banner explains the state and the UX layer offers a manual
+    // RETRY NOW affordance for the "commissioner just finished" case.
+    return {
+      state: {
+        kind: 'fatal',
+        reason: 'draft_not_initialized',
+        errorMessage: `Draft not yet configured (code ${event.code}: ${event.reason})`,
+      },
+      sideEffects: [],
+    };
+  }
 
   // Transient — schedule backoff + retry.
   const attempt = currentAttempt(state) + 1;

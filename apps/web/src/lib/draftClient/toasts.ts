@@ -129,13 +129,22 @@ export function _resetPresenceThrottleForTests(): void {
  * banner state.
  */
 export function notifyConnectionFatal(
-  reason: 'auth_failure' | 'invalid_lobby' | 'permanent_server_error',
+  reason:
+    | 'auth_failure'
+    | 'invalid_lobby'
+    | 'permanent_server_error'
+    | 'draft_not_initialized',
   message: string,
 ): void {
   const titles: Record<typeof reason, string> = {
     auth_failure: 'Authorization expired',
     invalid_lobby: 'Draft unavailable',
     permanent_server_error: 'Connection error',
+    // Chunk 11g.10 sub-step 10c-2 gate (b) — distinct banner text
+    // per the architect's product ruling. Do NOT collapse into a
+    // generic "Draft unavailable"; the commissioner-just-finished
+    // recovery flow is different from the lobby-gone recovery flow.
+    draft_not_initialized: "This draft hasn't been set up yet",
   };
   toast.error(titles[reason], {
     description: message,

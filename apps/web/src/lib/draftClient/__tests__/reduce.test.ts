@@ -430,6 +430,44 @@ describe('reduce — ws_closed', () => {
     }
   });
 
+  it('connected + 4300 (gate (a) bad shape) → fatal (auth_failure)', () => {
+    // Chunk 11g.10 sub-step 10c-2 gate (a). Non-UUIDv4 sub can only
+    // be fixed by re-authenticating (fresh token from discovery), so
+    // 4300 shares the auth_failure disposition despite living in
+    // the 4200-4999 range numerically. Regression lock on the
+    // closeCodes.ts carve-out ordering.
+    const result = reduce(
+      connectedState(),
+      { type: 'ws_closed', code: 4300, reason: 'unauthorized_bad_shape' },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('fatal');
+    if (result.state.kind === 'fatal') {
+      expect(result.state.reason).toBe('auth_failure');
+    }
+    expect(effectKinds(result.sideEffects)).toEqual([]);
+  });
+
+  it('connected + 4400 (gate (b) not initialized) → fatal (draft_not_initialized)', () => {
+    // Chunk 11g.10 sub-step 10c-2 gate (b). Distinct disposition
+    // and reason — the banner reads "This draft hasn't been set up
+    // yet" and NO auto-reconnect fires (empty sideEffects). Manual
+    // RETRY NOW affordance is the client-side re-entry path.
+    const result = reduce(
+      connectedState(),
+      { type: 'ws_closed', code: 4400, reason: 'draft_not_initialized' },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('fatal');
+    if (result.state.kind === 'fatal') {
+      expect(result.state.reason).toBe('draft_not_initialized');
+    }
+    // Critical: no schedule_backoff_timer effect. A not-configured
+    // league must never get the retry hammer per the architect's
+    // requirement (i).
+    expect(effectKinds(result.sideEffects)).toEqual([]);
+  });
+
   it('connected + 1000 (normal closure) → idle (no retry)', () => {
     const result = reduce(
       connectedState(),
