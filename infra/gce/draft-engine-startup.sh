@@ -148,6 +148,32 @@ HONO_HOST_PORT="${HONO_HOST_PORT:-3001}"
 DRAFT_WS_HOST_PORT="$(metadata_get draft-ws-host-port)"
 DRAFT_WS_HOST_PORT="${DRAFT_WS_HOST_PORT:-3002}"
 
+# ── F1 chunk (2026-07-28) — Caddy TLS-termination sidecar config ────
+# Named user-defined bridge lets Docker's built-in DNS resolve the
+# engine container by name from inside Caddy — trivial reverse_proxy
+# target, no host:port coupling. Persistent named volumes (data,
+# config) survive both container restart and VM reboot; without them
+# Let's Encrypt would re-issue on every startup and burn the 5/wk
+# rate limit within days. Image tag pinned to a specific patch per
+# the F1 ratification ("verify, pin, record" at deploy time).
+CADDY_CONTAINER_NAME="$(metadata_get caddy-container-name)"
+CADDY_CONTAINER_NAME="${CADDY_CONTAINER_NAME:-citrus-caddy}"
+
+CADDY_IMAGE="$(metadata_get caddy-image)"
+CADDY_IMAGE="${CADDY_IMAGE:-caddy:2.11.4-alpine}"
+
+DOCKER_NETWORK_NAME="$(metadata_get docker-network-name)"
+DOCKER_NETWORK_NAME="${DOCKER_NETWORK_NAME:-citrus-net}"
+
+DRAFT_DOMAIN="$(metadata_get draft-domain)"
+DRAFT_DOMAIN="${DRAFT_DOMAIN:-draft-staging.citrusfantasysports.com}"
+
+# Let's Encrypt account email. Cert renewal expiry warnings and
+# rate-limit override requests both use this address; do NOT leave
+# blank for a production-adjacent staging environment.
+LETSENCRYPT_EMAIL="$(metadata_get letsencrypt-email)"
+LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-gstormsff@gmail.com}"
+
 echo "Configuration:"
 echo "  PROJECT_ID=${PROJECT_ID}"
 echo "  ENVIRONMENT=${ENVIRONMENT}"
@@ -162,6 +188,11 @@ echo "  HONO_HOST_PORT=${HONO_HOST_PORT} (-> container 3001)"
 echo "  DRAFT_WS_HOST_PORT=${DRAFT_WS_HOST_PORT} (-> container 3002)"
 echo "  IMAGE_SHA_META=${IMAGE_SHA_META:-<unset>}"
 echo "  COMMIT_SHA_META=${COMMIT_SHA_META:-<unset>}"
+echo "  CADDY_CONTAINER_NAME=${CADDY_CONTAINER_NAME}"
+echo "  CADDY_IMAGE=${CADDY_IMAGE}"
+echo "  DOCKER_NETWORK_NAME=${DOCKER_NETWORK_NAME}"
+echo "  DRAFT_DOMAIN=${DRAFT_DOMAIN}"
+echo "  LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}"
 
 # ── Step 1: Install Docker ──────────────────────────────────────────
 # Debian's docker.io package + systemd integration. apt-get install is
@@ -263,29 +294,60 @@ docker pull "${IMAGE_URI}"
 # Capture the local image's digest for the idempotency check below.
 LOCAL_IMAGE_DIGEST="$(docker image inspect --format='{{index .RepoDigests 0}}' "${IMAGE_URI}" 2>/dev/null || echo "")"
 
-# ── Step 4b: Idempotency check — skip restart if container is already
-# running on the current image ───────────────────────────────────────
+# ── Step 4a: Pull Caddy image (F1 chunk) ────────────────────────────
+# Pinned tag — same pull-caches-layers idempotency as Step 4.
+echo "Pulling ${CADDY_IMAGE}..."
+docker pull "${CADDY_IMAGE}"
+
+# ── Step 4b: Create user-defined bridge network (F1 chunk) ──────────
+# Idempotent-guarded per architect condition (a): `docker network
+# create` fails with exit 1 if the network already exists, so the
+# inspect probe short-circuits the create call. `docker network
+# create` on the default bridge is a no-op alternative that would
+# not give us container-name DNS resolution — the user-defined
+# bridge is required for Caddy's `reverse_proxy citrus-draft-engine:3002`
+# to resolve.
+if docker network inspect "${DOCKER_NETWORK_NAME}" >/dev/null 2>&1; then
+  echo "Docker network ${DOCKER_NETWORK_NAME} already exists (idempotent skip)."
+else
+  echo "Creating docker network ${DOCKER_NETWORK_NAME}..."
+  docker network create --driver bridge "${DOCKER_NETWORK_NAME}"
+fi
+
+# ── Step 4c: Idempotency check — skip restart only if BOTH containers
+# are already running on their pinned images ─────────────────────────
 # Re-running this script (VM reboot, manual re-trigger) should not
-# disrupt a healthy container unless the image actually changed. If a
-# container with the same name is running on the same image digest,
-# log + skip the restart.
+# disrupt a healthy stack unless one of the images actually changed.
+# F1 chunk expanded this from an engine-only check to an engine +
+# Caddy check: skipping the restart when Caddy is down would leave
+# the TLS layer offline indefinitely. The first F1 deploy (Caddy
+# not yet running) intentionally trips the "replace" branch — the
+# architect's amendment (c) expects the engine container to be
+# recreated once so it can join the new user-defined bridge.
 RUNNING_CONTAINER_ID="$(docker ps -q --filter "name=^/${CONTAINER_NAME}$" --filter "status=running" 2>/dev/null || echo "")"
-if [ -n "${RUNNING_CONTAINER_ID}" ]; then
+RUNNING_CADDY_ID="$(docker ps -q --filter "name=^/${CADDY_CONTAINER_NAME}$" --filter "status=running" 2>/dev/null || echo "")"
+if [ -n "${RUNNING_CONTAINER_ID}" ] && [ -n "${RUNNING_CADDY_ID}" ]; then
   RUNNING_IMAGE_DIGEST="$(docker inspect --format='{{.Image}}' "${RUNNING_CONTAINER_ID}" 2>/dev/null || echo "")"
   CURRENT_IMAGE_DIGEST="$(docker image inspect --format='{{.Id}}' "${IMAGE_URI}" 2>/dev/null || echo "")"
+  RUNNING_CADDY_DIGEST="$(docker inspect --format='{{.Image}}' "${RUNNING_CADDY_ID}" 2>/dev/null || echo "")"
+  CURRENT_CADDY_DIGEST="$(docker image inspect --format='{{.Id}}' "${CADDY_IMAGE}" 2>/dev/null || echo "")"
   if [ -n "${RUNNING_IMAGE_DIGEST}" ] && [ -n "${CURRENT_IMAGE_DIGEST}" ] && \
-     [ "${RUNNING_IMAGE_DIGEST}" = "${CURRENT_IMAGE_DIGEST}" ]; then
-    echo "Container ${CONTAINER_NAME} already running on current image digest. Skipping restart (idempotency)."
+     [ -n "${RUNNING_CADDY_DIGEST}" ] && [ -n "${CURRENT_CADDY_DIGEST}" ] && \
+     [ "${RUNNING_IMAGE_DIGEST}" = "${CURRENT_IMAGE_DIGEST}" ] && \
+     [ "${RUNNING_CADDY_DIGEST}" = "${CURRENT_CADDY_DIGEST}" ]; then
+    echo "Both ${CONTAINER_NAME} and ${CADDY_CONTAINER_NAME} already running on current image digests. Skipping restart (idempotency)."
     echo "=== citrus-draft-engine startup script complete (idempotent skip): $(date -u +%FT%TZ) ==="
     exit 0
   fi
-  echo "Container ${CONTAINER_NAME} is running but on a different image. Replacing..."
+  echo "One or both containers are on a different image. Replacing..."
 fi
 
-# ── Step 5: Stop + remove any existing container with the same name ─
+# ── Step 5: Stop + remove any existing containers with these names ──
 # Idempotent: succeeds whether the container exists or not.
 echo "Removing any existing ${CONTAINER_NAME} container..."
 docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+echo "Removing any existing ${CADDY_CONTAINER_NAME} container..."
+docker rm -f "${CADDY_CONTAINER_NAME}" 2>/dev/null || true
 
 # ── Step 6: Run the new container ───────────────────────────────────
 # --restart=always: container restarts on crash and on VM reboot.
@@ -310,6 +372,7 @@ echo "Starting ${CONTAINER_NAME}..."
 docker run -d \
   --name "${CONTAINER_NAME}" \
   --restart=always \
+  --network "${DOCKER_NETWORK_NAME}" \
   --log-driver=gcplogs \
   --log-opt gcp-project="${PROJECT_ID}" \
   --log-opt labels=app,environment \
@@ -328,5 +391,55 @@ docker run -d \
   -e PORT=3001 \
   -e DRAFT_WS_PORT=3002 \
   "${IMAGE_URI}"
+
+# ── Step 7: Write Caddyfile + run Caddy sidecar (F1 chunk) ──────────
+# Caddyfile is written to a host bind-mount path so config changes
+# don't require a container image rebuild. Container reads it from
+# the default location `/etc/caddy/Caddyfile`. Certs + autosaved
+# config land in the two named volumes (data + config) which survive
+# container restart, VM reboot, and startup-script re-runs — the ONE
+# thing that would burn them is `docker volume rm caddy-data` which
+# is intentional operator action.
+#
+# `reverse_proxy` is websocket-aware by default (Caddy 2.x): the
+# `Connection: Upgrade` + `Upgrade: websocket` handshake headers are
+# forwarded transparently, no `handle_websocket` block needed. The
+# container-name DNS target (`${CONTAINER_NAME}:3002`) resolves via
+# the user-defined bridge network's built-in DNS — this is the whole
+# reason for the `--network ${DOCKER_NETWORK_NAME}` on both containers.
+#
+# Scope note per architect ratification: this chunk fronts ONLY the
+# :443 WSS endpoint against the engine's :3002 uWS listener. The
+# engine's :3001 Hono /health endpoint is NOT proxied through Caddy;
+# scope creep would delay F1 and add surface area. Follow-up chunk
+# for /health proxying if/when we retire direct :3001 access.
+echo "Writing Caddyfile to /opt/caddy/Caddyfile..."
+mkdir -p /opt/caddy
+cat > /opt/caddy/Caddyfile <<CADDYFILE
+{
+    email ${LETSENCRYPT_EMAIL}
+}
+
+${DRAFT_DOMAIN} {
+    reverse_proxy ${CONTAINER_NAME}:3002
+}
+CADDYFILE
+
+echo "Starting ${CADDY_CONTAINER_NAME}..."
+docker run -d \
+  --name "${CADDY_CONTAINER_NAME}" \
+  --restart=always \
+  --network "${DOCKER_NETWORK_NAME}" \
+  --log-driver=gcplogs \
+  --log-opt gcp-project="${PROJECT_ID}" \
+  --log-opt labels=app,environment \
+  --label app=citrus-caddy \
+  --label environment="${ENVIRONMENT}" \
+  -p 80:80 \
+  -p 443:443 \
+  -v /opt/caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
+  -v caddy-data:/data \
+  -v caddy-config:/config \
+  "${CADDY_IMAGE}"
 
 echo "=== citrus-draft-engine startup script complete: $(date -u +%FT%TZ) ==="
