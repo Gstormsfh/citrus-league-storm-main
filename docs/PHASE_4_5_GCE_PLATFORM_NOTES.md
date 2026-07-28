@@ -670,6 +670,15 @@ gcloud compute ssh citrus-draft-engine-staging `
 
 # 7. Cleanup after ratification:
 node scripts/proof/fixture-12.mjs --reset --execute
+# 7a. Belt-and-suspenders clear-snapshots sweep (durable pattern
+#     ratified 2026-07-28 after rider 2's task-6 residual): fixture
+#     reset already DELETEs draft_snapshots as part of its 8-step
+#     RESET WRITES block, but any lifecycle path that skips fixture
+#     reset (partial reset, engine writes between reset COMMIT and
+#     docker restart, etc.) can leave a stray UPSERT-per-league row.
+#     Running clear-snapshots explicitly is idempotent + cheap and
+#     catches those residuals. Post-reset, deleted rows should be 0.
+node scripts/proof/clear-snapshots.local.mjs --league=<league-id> --execute
 node scripts/proof/set-draft-status.local.mjs --to=completed --execute
 gcloud compute ssh citrus-draft-engine-staging `
   --zone=northamerica-northeast1-a --project=citrus-fantasy-staging `
