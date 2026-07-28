@@ -470,7 +470,7 @@ export class DraftClientRunner {
 
 // ── Default fetchers ─────────────────────────────────────────────────
 
-async function defaultFetchDiscovery(draftId: string): Promise<DraftServerDiscovery> {
+export async function defaultFetchDiscovery(draftId: string): Promise<DraftServerDiscovery> {
   // Dynamic import — keeps test paths that pass their own
   // `fetchDiscovery` override from triggering the apiClient module
   // load (and its top-level Supabase env-var check).
@@ -517,7 +517,7 @@ async function defaultFetchDiscovery(draftId: string): Promise<DraftServerDiscov
  * production data shows 4xx/5xx mis-routing, enhance apiClient
  * at that point (Decision Log 2026-05-07).
  */
-async function defaultFetchSnapshot(draftId: string): Promise<DraftSnapshot> {
+export async function defaultFetchSnapshot(draftId: string): Promise<DraftSnapshot> {
   const { apiClient } = await import('@/api/client');
   const response = await apiClient.get<DraftSnapshot>(
     `/api/drafts/${encodeURIComponent(draftId)}/snapshot`,
