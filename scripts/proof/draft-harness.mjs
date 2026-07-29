@@ -357,7 +357,15 @@ async function runPickDriver(initialPgClient, wsClients) {
     new Map(), // seq -> {resolve, receivedAt (set on fire)}
   ]));
 
-  for (const c of wsClients) {
+  // F7 (2026-07-29) — ws-client.mjs:260 `onEvent(cb)` is a SETTER, not
+  // add-listener; each call overwrites the previous callback. The
+  // --human-slot wait branch (below) installs its own onEvent to filter
+  // by pickNumber. Without restoration, subsequent picks arrive but hit
+  // the human-slot filter and are silently dropped, freezing delivery
+  // accounting at 0/N for all post-wait picks. Extract the default
+  // receive-waiter callback so it can be re-installed after each
+  // human-slot resolution branch.
+  const installDefaultReceiveHandler = (c) => {
     c.onEvent(({ seq, receivedAt }) => {
       // Ordering violation check.
       const last = perClientLastSeq.get(c.clientLabel) ?? -1;
@@ -373,6 +381,10 @@ async function runPickDriver(initialPgClient, wsClients) {
         waiters.delete(seq);
       }
     });
+  };
+
+  for (const c of wsClients) {
+    installDefaultReceiveHandler(c);
   }
 
   // Set request.jwt.claims once per pg connection so the RPC's
@@ -552,6 +564,16 @@ async function runPickDriver(initialPgClient, wsClients) {
           seq: observedSeq,
         });
       }
+      // F7 (2026-07-29) — restore the default receive-waiter handler
+      // on every client. Without this, the human-slot filter callback
+      // (installed line ~425) remains active and silently drops all
+      // subsequent picks' broadcasts, freezing delivery accounting at
+      // 0/N for picks (HUMAN_SLOT+1)..TOTAL_PICKS. Root cause: the
+      // ws-client.mjs onEvent SETS (not appends) the callback.
+      for (const c of wsClients) {
+        installDefaultReceiveHandler(c);
+      }
+
       // Regardless of outcome, continue driving. Next pick's snake
       // team is computed from pickNumber+1 on the next loop iter.
       continue;

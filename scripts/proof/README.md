@@ -306,6 +306,20 @@ noise; single-client scripts always show it).
 
 ### 5.3  Run sequence — general shape
 
+**PROHIBITED: hand-rolled sweeps.** Cleanup between and after scenarios MUST go
+through `fixture-12.mjs --reset --execute` (or `fixture-min.mjs --reset --execute`
+for the single-client rig). Do NOT paste ad-hoc SQL to clear `draft_events` /
+`draft_snapshots` / `leagues` columns / `teams` / `draft_order` — the fixture's
+state file records the exact before-values (harness team ownership, human user's
+prior team, `settings.pickTimeLimit`, `league_size`, `draft_state`) and the
+reset path restores them; a hand-rolled sweep will silently leave `league_size=12`,
+`slot3_owner` still on the human user, harness teams still present, or the
+pre-run `pickTimeLimit` clobbered. Architect ruling (2026-07-29 post-DR-2 sweep):
+**fixture reset or nothing.** If the fixture state file is missing or suspected
+poisoned, DELETE it and re-run `fixture-12.mjs --execute` from a clean baseline
+so the state file captures pristine before-values — do not attempt a targeted
+manual restore.
+
 **Between every scenario AND after the FINAL scenario: fixture reset + engine restart. Both are mandatory.**
 The engine keeps in-memory lobbies alive at `size=0` after all WS clients
 disconnect (chunk 11g.7-7c snapshot + bootstrap architecture) and dedupes
