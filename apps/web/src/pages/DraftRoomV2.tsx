@@ -1,23 +1,30 @@
-// Phase 4.5 chunk 11g.5b — minimum v2 draft room.
+// Phase 4.5 chunk 11g DR-3 (2026-07-29) — the visual room.
 //
-// Consumes chunk-11g.5a's `DraftClientRunner` end-to-end, wires it
-// into the chunk-11g.5b `useDraftClientStore`, and renders:
-//   - `<ConnectionBanner />` at the top
-//   - barebones state view (current pick, on-clock team, presence
-//     count, recent events list)
+// The v2 page mounts the proven v1 draft components (DraftBoard,
+// PlayerPool, DraftHistory, TeamRosters) on the v2 rail via thin
+// adapter functions (lib/draftClient/v1Adapters.ts). Zero-touch to
+// v1 component internals per architect ratification 1a.
 //
-// **Minimum surface by design.** The full visual integration of the
-// 8 reusable v1 components (DraftBoard, PlayerPool, DraftHistory,
-// DraftTimer, etc. — see chunk-11g.5b recon) is iterative work
-// post-5b. 5b's job is to prove the protocol-to-UX wiring works
-// end-to-end; the visual richness lands in follow-up PRs.
+// The pool's Draft button is the DR-2 submit path's trigger (same
+// submitPick, same optimistic flow, zero plumbing changes). One
+// submit surface, never two — the DR-2 minimal control was removed
+// in the DR-3 first commit.
 //
-// Routing: `/draft-v2/:leagueId/:draftId?` (App.tsx wires the
-// route). v1 `DraftRoom.tsx` continues to serve `/draft` and
-// `/draft-room` for the cutover-safety window — chunk 11g.9 retires
-// v1 once all leagues have migrated.
+// DraftControls ships HIDDEN — v2 HTTP routes for /pause and /resume
+// don't exist yet (only /undo does). Per architect ruling: wiring
+// commissioner tools to nothing is worse than absence; the panel
+// lands properly with the post-Zach policy chunk that ships the
+// missing routes.
+//
+// Layout mirrors v1 (lifted CSS from DraftRoom.tsx:3631, :3972):
+//   Sticky header: connection banner + timer + on-clock label
+//   Main col (lg:3): Tabs { Players | Board | History }
+//   Sidebar (lg:1): TeamRosters + DraftQueue (local-only) + [hidden Controls]
+//
+// Player index is pre-fetched non-blocking; the room renders
+// immediately with `#<id>` fallbacks and hydrates as names resolve.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ConnectionBanner } from '@/components/draft/v2/ConnectionBanner';
@@ -25,6 +32,13 @@ import {
   DraftTimerV2,
   useClockOffsetEstimator,
 } from '@/components/draft/v2/DraftTimerV2';
+import { DraftBoard } from '@/components/draft/DraftBoard';
+import { PlayerPool } from '@/components/draft/PlayerPool';
+import { DraftHistory } from '@/components/draft/DraftHistory';
+import { TeamRosters } from '@/components/draft/TeamRosters';
+import { DraftQueue } from '@/components/draft/DraftQueue';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card } from '@/components/ui/card';
 import { DraftClientRunner } from '@/lib/draftClient/runner';
 import { fetchDraftOrderMatrix } from '@/lib/draftClient/fetchDraftOrderMatrix';
 import { submitPick } from '@/lib/draftClient/submitPick';
@@ -32,17 +46,24 @@ import {
   useDraftClientStore,
   useDraftConnectionState,
   useDraftSnapshot,
-  usePresence,
   useDerivedDraftState,
   useDraftLastFoldGaps,
   useMyTeamId,
-  usePendingActions,
 } from '@/stores/draftClientStore';
 import {
   notifyConnectionFatal,
   notifyPresenceJoined,
   notifyPresenceLeft,
 } from '@/lib/draftClient/toasts';
+import { usePreloadedPlayers } from '@/hooks/usePreloadedPlayers';
+import {
+  toAvailablePlayers,
+  toDraftHistory,
+  toDraftedPlayerIds,
+  toV1Teams,
+  type FetchedTeam,
+} from '@/lib/draftClient/v1Adapters';
+import type { Player } from '@/services/PlayerService';
 
 export default function DraftRoomV2() {
   const params = useParams<{ leagueId: string; draftId?: string }>();
@@ -51,46 +72,27 @@ export default function DraftRoomV2() {
 
   const runnerRef = useRef<DraftClientRunner | null>(null);
   const store = useDraftClientStore();
-  // Chunk 10c-2 batch 3 C2 (2026-07-28): rolling clock-offset
-  // estimator for the DraftTimerV2 countdown. Fed by every event
-  // frame's `timestamp` field; blended into an EMA. See
-  // `useClockOffsetEstimator` in DraftTimerV2.tsx.
   const { offsetMs: clockOffsetMs, updateOffset } = useClockOffsetEstimator();
 
-  // DR-2 (2026-07-29) — fetch the caller's teamId in this league on
-  // mount. Non-fatal on failure (spectator flow): the submit control
-  // simply never renders when myTeamId stays null. Uses the existing
-  // v1 route GET /api/leagues/:id/my-team. Dynamic import keeps
-  // vi.mock hoisting clean for the page tests.
-  //
-  // DR-2 round-2 diagnostic (2026-07-29): expose the outcome via
-  // console.log AND via the debug overlay in DraftStateView so the
-  // "control never rendered" bug is diagnosable at the pixel level.
+  // DR-2 (2026-07-29) — fetch the caller's teamId. Non-fatal on
+  // failure (spectator flow).
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const { apiClient } = await import('@/api/client');
         const path = `/api/leagues/${encodeURIComponent(leagueId)}/my-team`;
-        // eslint-disable-next-line no-console
-        console.log('[DR-2 my-team] fetching', path);
         const response = await apiClient.get<{ id?: string }>(path);
         if (cancelled) return;
-        // eslint-disable-next-line no-console
-        console.log('[DR-2 my-team] response', response);
         const payload = response.data ?? (response as unknown as { id?: string });
         const teamId =
           payload && typeof payload === 'object' && typeof payload.id === 'string'
             ? payload.id
             : null;
-        // eslint-disable-next-line no-console
-        console.log('[DR-2 my-team] extracted teamId:', teamId);
         useDraftClientStore.getState().setMyTeamId(teamId);
       } catch (err) {
-        // Non-fatal — spectator flow. But LOG the error so we can see
-        // it in the DevTools console during acceptance.
-        // eslint-disable-next-line no-console
-        console.error('[DR-2 my-team] fetch failed', err);
+        // Non-fatal; spectator flow. Reachable in dev via network tab.
+        void err;
       }
     })();
     return () => {
@@ -98,23 +100,45 @@ export default function DraftRoomV2() {
     };
   }, [leagueId]);
 
-  // Mount: instantiate runner, wire callbacks to store, connect.
-  // Unmount: disconnect + reset store.
-  //
-  // DR-1b (2026-07-28) additions:
-  //   - onSnapshot: kick off `fetchDraftOrderMatrix` (non-fatal per F1
-  //     ratification; caller retries on transition — see the derived-
-  //     state watcher useEffect further down).
-  //   - onEvent / onEvents already surface gaps into `lastFoldGaps`
-  //     via the store; the gap-triggered resync useEffect watches it.
+  // DR-3 (2026-07-29) — fetch the league's teams once on mount.
+  // Non-blocking: the room shell renders immediately; adapters
+  // produce empty teams[] until this resolves and re-renders happen
+  // via setTeams triggering re-derivation upstream.
+  const [teams, setTeams] = useState<FetchedTeam[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { apiClient } = await import('@/api/client');
+        const path = `/api/leagues/${encodeURIComponent(leagueId)}/teams`;
+        const response = await apiClient.get<FetchedTeam[]>(path);
+        if (cancelled) return;
+        const payload = Array.isArray(response.data)
+          ? response.data
+          : Array.isArray(response as unknown as FetchedTeam[])
+          ? (response as unknown as FetchedTeam[])
+          : [];
+        setTeams(payload);
+      } catch {
+        // Non-fatal; adapters fall through to empty teams and each
+        // roster entry renders with teamId prefix as the name.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
+
+  // DR-3 (2026-07-29) — pre-fetch all players non-blocking.
+  const { playersById, isLoading: playersLoading } = usePreloadedPlayers();
+
+  // Mount / unmount: runner lifecycle (unchanged from DR-1b/DR-2).
   useEffect(() => {
     const runner = new DraftClientRunner();
     runnerRef.current = runner;
 
     const unsubscribe = runner.subscribe((state) => {
       store.setConnectionState(state);
-      // Surface fatal states via toast (banner is the primary
-      // surface; toast is the secondary).
       if (state.kind === 'fatal') {
         notifyConnectionFatal(state.reason, state.errorMessage);
       }
@@ -125,13 +149,6 @@ export default function DraftRoomV2() {
       {
         onSnapshot: (snapshot) => {
           store.setSnapshot(snapshot);
-          // DR-1b F1 ratification: fetch the draft-order matrix on
-          // first snapshot receipt. Non-fatal — a null return leaves
-          // derivedState.onClockTeamId null (board still renders
-          // picks-made + rosters); refetch happens on the
-          // not_started → in_progress transition (see the watcher
-          // below) so a mid-draft configuration lands as soon as the
-          // commissioner completes setup.
           void fetchDraftOrderMatrix(
             leagueId,
             snapshot.stateSnapshot.totalPicks,
@@ -140,36 +157,23 @@ export default function DraftRoomV2() {
           });
         },
         onEvent: (event) => {
-          // 10c-2 batch 3 C2: capture skew estimate BEFORE the store
-          // mutation so a slow store update doesn't skew the offset.
           const clientReceiveMs = Date.now();
           const serverMs = new Date(event.timestamp).getTime();
-          if (Number.isFinite(serverMs)) {
-            updateOffset(clientReceiveMs, serverMs);
-          }
+          if (Number.isFinite(serverMs)) updateOffset(clientReceiveMs, serverMs);
           store.applyEvent(event);
         },
         onEvents: (events) => {
-          // 10c-2 batch 3 C2: seed skew from the most-recent event
-          // in the batch (single sample rather than N; the resync
-          // path can carry a large batch and per-event offset
-          // updates would over-weight it in the EMA).
           if (events.length > 0) {
             const last = events[events.length - 1];
             const serverMs = new Date(last.timestamp).getTime();
-            if (Number.isFinite(serverMs)) {
-              updateOffset(Date.now(), serverMs);
-            }
+            if (Number.isFinite(serverMs)) updateOffset(Date.now(), serverMs);
           }
           store.applyEvents(events);
         },
         onPresence: (payload) => {
           store.applyPresence(payload);
-          if (payload.kind === 'joined') {
-            notifyPresenceJoined(payload.userId);
-          } else {
-            notifyPresenceLeft(payload.userId);
-          }
+          if (payload.kind === 'joined') notifyPresenceJoined(payload.userId);
+          else notifyPresenceLeft(payload.userId);
         },
         onError: (error) => store.setError(error),
       },
@@ -184,12 +188,7 @@ export default function DraftRoomV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, draftId]);
 
-  // DR-1b (2026-07-28) F1 ratification — refetch matrix on
-  // not_started → in_progress transition. Guards pre-draft reorders
-  // while the room sits open: the commissioner may finish configuring
-  // the draft (or reorder teams) after the client's initial connect,
-  // and the first-snapshot fetch's matrix would be stale (or null).
-  // Watch the derived draftStatus; on the transition, retry the fetch.
+  // DR-1b F1 — matrix refetch on not_started → in_progress.
   const derivedForRefetch = useDerivedDraftState();
   const prevStatusRef = useRef<string | null>(null);
   useEffect(() => {
@@ -204,11 +203,7 @@ export default function DraftRoomV2() {
     }
   }, [derivedForRefetch, leagueId]);
 
-  // DR-1b (2026-07-28) F3 ratification — gap-triggered resync
-  // dispatch. When the derivation surfaces missing seqs, ask the
-  // runner to resync from the last contiguous seq. Loop guard lives
-  // inside `runner.requestResyncForGap` (a repeat sinceSeq escalates
-  // to full close-and-reconnect via 1006 → backoff).
+  // DR-1b F3 — gap-triggered resync.
   const lastFoldGaps = useDraftLastFoldGaps();
   const derivedForGap = useDerivedDraftState();
   useEffect(() => {
@@ -230,325 +225,368 @@ export default function DraftRoomV2() {
   );
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Draft Room v2</h1>
-      <ConnectionBanner onRetryNow={handleRetryNow} />
-      <DraftStateView clockOffsetMs={clockOffsetMs} leagueId={leagueId} />
+    <div className="container mx-auto p-4" data-testid="draft-room-v2">
+      <StickyHeader
+        onRetryNow={handleRetryNow}
+        clockOffsetMs={clockOffsetMs}
+      />
+      <DraftRoomBody
+        leagueId={leagueId}
+        teams={teams}
+        playersById={playersById}
+        playersLoading={playersLoading}
+      />
     </div>
   );
 }
 
-// ── DR-2 (2026-07-29) — submit-pick control ────────────────────────
+// ── Sticky header ─────────────────────────────────────────────────
 //
-// Minimal by design (PlayerPool + player picker land in DR-3): text
-// input for playerId + Submit button, double-click guard via disabled
-// state while a pending action exists. Optimistic:
-//   1. Generate attemptId (UUIDv4).
-//   2. store.recordPending({correlationId=attemptId, ...}) — control
-//      disables + shows "Submitting…".
-//   3. submitPick(...) — 8s timeout inside apiClient.
-//   4a. Success → the WS broadcast will arrive with matching
-//       correlationId and reconcileOnBroadcast (already wired into
-//       store.applyEvent) removes the pending entry.
-//   4b. Failure → store.rollBackPending + toast with the mapped copy.
-//
-// Post-submit safety timer (architect amendment): even on a
-// successful HTTP submit, if no broadcast lands within 8s the pending
-// pick dangles forever — so we schedule a rollback that fires if the
-// entry is still pending after 8s. If the broadcast beat it,
-// rollBackPending is a no-op (correlationId already removed).
-interface SubmitPickControlProps {
-  leagueId: string;
-  teamId: string;
-  roundNumber: number;
-  pickNumber: number;
-}
+// Connection banner + timer + one-line pick/round/on-clock label.
+// Kept small so per-event fold re-renders don't ripple past this
+// section. Selector granularity per architect ratification 5.
 
-function SubmitPickControl({
-  leagueId,
-  teamId,
-  roundNumber,
-  pickNumber,
-}: SubmitPickControlProps) {
-  const [playerIdText, setPlayerIdText] = useState('');
-  const pendingActions = usePendingActions();
-  // We only care about pending actions submitted from THIS control —
-  // i.e., ones for our team. Rendered as "you have a pending pick".
-  const myPending = useMemo(
-    () =>
-      Array.from(pendingActions.values()).find(
-        (p) => p.teamId === teamId && p.optimisticState === 'pending',
-      ) ?? null,
-    [pendingActions, teamId],
-  );
-  const disabled = myPending !== null;
-
-  const handleSubmit = async () => {
-    const playerId = parseInt(playerIdText.trim(), 10);
-    if (!Number.isFinite(playerId) || playerId <= 0) {
-      toast.error('Enter a valid player ID');
-      return;
-    }
-    const attemptId = crypto.randomUUID();
-    const submittedAt = Date.now();
-    // Optimistic entry — control disables via pendingActions.
-    useDraftClientStore.getState().recordPending({
-      correlationId: attemptId,
-      teamId,
-      playerId,
-      submittedAt,
-    });
-
-    // Dangle-safety timer (architect amendment): if no broadcast lands
-    // within 8s and no synchronous rejection fired, the connection may
-    // have swallowed a confirm. Roll back with the "check the board"
-    // copy so the user sees a clear signal; the fold will show the
-    // pick if it actually landed.
-    const dangleTimer = setTimeout(() => {
-      const current = useDraftClientStore
-        .getState()
-        .pendingActions.get(attemptId);
-      if (current !== undefined && current.optimisticState === 'pending') {
-        useDraftClientStore
-          .getState()
-          .rollBackPending(
-            attemptId,
-            "We couldn't confirm your pick — check the board",
-          );
-        toast.error("We couldn't confirm your pick — check the board");
-      }
-    }, 8000);
-
-    try {
-      const result = await submitPick({
-        leagueId,
-        teamId,
-        playerId,
-        roundNumber,
-        pickNumber,
-        attemptId,
-      });
-      if (!result.ok) {
-        // Synchronous rejection — roll back immediately. The dangle
-        // timer's guard will find the entry already rolled_back and
-        // no-op, so it's safe to leave the timer running.
-        useDraftClientStore
-          .getState()
-          .rollBackPending(attemptId, result.message);
-        toast.error(result.message);
-      }
-      // On success: DO NOT clear the dangle timer (architect amendment
-      // 2026-07-29). A connected socket with a lost confirm must not
-      // dangle a pending pick forever — even a successful HTTP submit
-      // needs the safety net. If the broadcast arrives before 8s, the
-      // timer's guard finds no pending entry and is a no-op.
-    } catch (err) {
-      // Defensive — submitPick catches its own errors and returns a
-      // typed result. Any error here is a programming bug; still
-      // roll back to avoid dangling optimistic state. Dangle timer
-      // left running per the same architect amendment.
-      useDraftClientStore
-        .getState()
-        .rollBackPending(attemptId, 'Unexpected error');
-      toast.error('Unexpected error');
-      void err;
-    } finally {
-      setPlayerIdText('');
-    }
-  };
-
-  // DR-2 (2026-07-29) — UX survivability under a 30s clock: the
-  // placeholder shows a VALID example ID a user can literally type
-  // and submit; the hint tells them the clock is ticking. This is
-  // still a minimal control per brief scope (PlayerPool is DR-3),
-  // but "usable enough that Garrett actually submits within 30s".
-  return (
-    <div
-      className="border-2 border-primary rounded-md p-4 bg-card space-y-2"
-      data-testid="submit-pick-control"
-    >
-      <div className="text-base font-bold text-primary">
-        You're on the clock
-      </div>
-      <div className="text-xs text-muted-foreground">
-        Pick {pickNumber} · Round {roundNumber} · Type any valid NHL
-        player ID and click Submit before the clock runs out.
-      </div>
-      <div className="flex gap-2 items-center">
-        <input
-          type="text"
-          inputMode="numeric"
-          placeholder="Player ID — try 8478050"
-          className="flex-1 rounded border-2 px-3 py-2 text-base"
-          value={playerIdText}
-          disabled={disabled}
-          onChange={(e) => setPlayerIdText(e.target.value)}
-          data-testid="submit-pick-input"
-          autoFocus
-        />
-        <button
-          type="button"
-          className="rounded bg-primary text-primary-foreground px-4 py-2 text-base font-semibold disabled:opacity-50"
-          disabled={disabled}
-          onClick={handleSubmit}
-          data-testid="submit-pick-button"
-        >
-          {disabled ? 'Submitting…' : 'Submit pick →'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── Barebones state view (5b minimum surface) ──────────────────────
-
-function DraftStateView({
-  clockOffsetMs,
-  leagueId,
-}: {
+interface StickyHeaderProps {
+  onRetryNow: () => void;
   clockOffsetMs: number;
-  leagueId: string;
-}) {
+}
+
+function StickyHeader({ onRetryNow, clockOffsetMs }: StickyHeaderProps) {
   const connectionState = useDraftConnectionState();
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
-  const presentUserIds = usePresence();
-  const myTeamId = useMyTeamId();
+  const wsOpen = connectionState.kind === 'connected';
 
-  if (connectionState.kind === 'idle') {
-    return null;
-  }
+  return (
+    <div className="sticky top-0 z-30 bg-background border-b border-border pb-3 mb-4">
+      <h1 className="text-xl font-bold mb-2">Draft Room</h1>
+      <ConnectionBanner onRetryNow={onRetryNow} />
+      {snapshot !== null && derived !== null && (
+        <>
+          <div className="mt-2">
+            <DraftTimerV2
+              currentPickDeadline={snapshot.stateSnapshot.currentPickDeadline}
+              draftStatus={derived.draftStatus}
+              wsOpen={wsOpen}
+              clockOffsetMs={clockOffsetMs}
+            />
+          </div>
+          <div
+            className="mt-2 text-sm text-muted-foreground"
+            data-testid="draft-header-label"
+          >
+            {derived.currentPickNumber !== null &&
+            derived.currentRoundNumber !== null ? (
+              <>
+                Round {derived.currentRoundNumber} · Pick{' '}
+                {derived.currentPickNumber} / {derived.totalPicks} ·{' '}
+                Status: {derived.draftStatus}
+              </>
+            ) : (
+              <>
+                {derived.picksMade} / {derived.totalPicks} picks made ·{' '}
+                Status: {derived.draftStatus}
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Main body ─────────────────────────────────────────────────────
+
+interface DraftRoomBodyProps {
+  leagueId: string;
+  teams: FetchedTeam[];
+  playersById: ReadonlyMap<string, Player>;
+  playersLoading: boolean;
+}
+
+function DraftRoomBody({
+  leagueId,
+  teams,
+  playersById,
+  playersLoading,
+}: DraftRoomBodyProps) {
+  const snapshot = useDraftSnapshot();
+  const derived = useDerivedDraftState();
+  const myTeamId = useMyTeamId();
 
   if (snapshot === null || derived === null) {
     return (
-      <div className="mt-4 text-muted-foreground">
+      <div className="text-muted-foreground" data-testid="draft-loading">
         Waiting for draft state…
       </div>
     );
   }
 
-  // Chunk 10c-2 batch 3 C2 (2026-07-28): WS-open signal for the
-  // DraftTimerV2 stale indicator. The runner exposes `connected`
-  // (fully wired) vs any of the disconnected/reconnecting/fatal
-  // states. Only `connected` renders the timer without dim.
-  const wsOpen = connectionState.kind === 'connected';
-
-  // DR-1b (2026-07-28): cards render from `derived` (folded from
-  // events + fetched matrix), NOT from `snapshot.stateSnapshot`'s
-  // convenience fields — those are seed-only per the F4 fix. The
-  // ONE field we still consume from `snapshot.stateSnapshot` is
-  // `currentPickDeadline`, which is authoritative per-event (batch
-  // 3 C2 keeps it fresh via the applyEvent's pickDeadline mirror).
   return (
-    <div className="mt-4 space-y-4" data-testid="draft-state-view">
-      {/* DR-2 round-2 diagnostic (2026-07-29): pixel-level view of the
-          three values the submit-control-render gate depends on.
-          Remove after acceptance passes. */}
-      <div
-        className="border border-dashed border-yellow-500 rounded p-2 text-xs font-mono bg-yellow-50"
-        data-testid="dr2-debug"
-      >
-        <div>DEBUG (remove after DR-2 ratifies)</div>
-        <div>myTeamId: {myTeamId ?? '<NOT LOADED>'}</div>
-        <div>derived.onClockTeamId: {derived.onClockTeamId ?? '<null>'}</div>
-        <div>
-          amIOnClock:{' '}
-          {myTeamId !== null &&
-          derived.onClockTeamId !== null &&
-          myTeamId === derived.onClockTeamId
-            ? 'YES — control should render below'
-            : 'no'}
-        </div>
-        <div>
-          derived.currentPickNumber:{' '}
-          {derived.currentPickNumber !== null
-            ? String(derived.currentPickNumber)
-            : '<null>'}
-        </div>
-        <div>
-          derived.currentRoundNumber:{' '}
-          {derived.currentRoundNumber !== null
-            ? String(derived.currentRoundNumber)
-            : '<null>'}
-        </div>
-      </div>
-      {/* DR-2 (2026-07-29): submit control renders ONLY when the
-         caller's team is on the clock. Spectators + off-clock members
-         see nothing here. */}
-      {derived.onClockTeamId !== null &&
-        myTeamId !== null &&
-        derived.onClockTeamId === myTeamId &&
-        derived.currentPickNumber !== null &&
-        derived.currentRoundNumber !== null && (
-          <SubmitPickControl
-            leagueId={leagueId}
-            teamId={myTeamId}
-            roundNumber={derived.currentRoundNumber}
-            pickNumber={derived.currentPickNumber}
-          />
-        )}
-      <DraftTimerV2
-        currentPickDeadline={snapshot.stateSnapshot.currentPickDeadline}
-        draftStatus={derived.draftStatus}
-        wsOpen={wsOpen}
-        clockOffsetMs={clockOffsetMs}
-      />
-      <div className="grid grid-cols-2 gap-4">
-        <StateCard label="Format" value={snapshot.format} />
-        <StateCard label="Status" value={derived.draftStatus} />
-        <StateCard
-          label="Pick"
-          value={
-            derived.currentPickNumber !== null
-              ? `${derived.currentPickNumber} / ${derived.totalPicks}`
-              : `${derived.picksMade} / ${derived.totalPicks} done`
-          }
-        />
-        <StateCard
-          label="Round"
-          value={
-            derived.currentRoundNumber !== null
-              ? String(derived.currentRoundNumber)
-              : '—'
-          }
-        />
-        <StateCard
-          label="On the clock"
-          value={derived.onClockTeamId ?? '—'}
-        />
-        <StateCard
-          label="Connected users"
-          value={String(presentUserIds.size)}
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div className="lg:col-span-3 space-y-4">
+        <MainTabs
+          leagueId={leagueId}
+          teams={teams}
+          playersById={playersById}
+          playersLoading={playersLoading}
+          myTeamId={myTeamId}
         />
       </div>
-      <details>
-        <summary className="cursor-pointer text-sm font-medium">
-          Recent events ({snapshot.recentEvents.length})
-        </summary>
-        <ul className="mt-2 space-y-1 text-xs font-mono">
-          {snapshot.recentEvents.map((event) => (
-            <li key={event.seq} className="border-l-2 border-muted pl-2">
-              [seq={event.seq}] {event.kind}
-            </li>
-          ))}
-        </ul>
-      </details>
+      <div className="hidden lg:block space-y-4">
+        <SidebarPanel
+          leagueId={leagueId}
+          teams={teams}
+          playersById={playersById}
+          myTeamId={myTeamId}
+        />
+      </div>
     </div>
   );
 }
 
-interface StateCardProps {
-  label: string;
-  value: string;
+// ── Tabs ──────────────────────────────────────────────────────────
+
+interface MainTabsProps {
+  leagueId: string;
+  teams: FetchedTeam[];
+  playersById: ReadonlyMap<string, Player>;
+  playersLoading: boolean;
+  myTeamId: string | null;
 }
 
-function StateCard({ label, value }: StateCardProps) {
+function MainTabs({
+  leagueId,
+  teams,
+  playersById,
+  playersLoading,
+  myTeamId,
+}: MainTabsProps) {
+  const derived = useDerivedDraftState();
+  const [tab, setTab] = useState<'players' | 'board' | 'history'>('players');
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+
+  // Adapt derived state → v1 prop shapes. Memoized against the exact
+  // inputs so per-event folds only re-derive when derived changes.
+  const v1Teams = useMemo(
+    () => (derived ? toV1Teams(teams, derived, playersById) : []),
+    [teams, derived, playersById],
+  );
+  const draftHistory = useMemo(
+    () => (derived ? toDraftHistory(teams, derived, playersById) : []),
+    [teams, derived, playersById],
+  );
+  const draftedIds = useMemo(
+    () => (derived ? toDraftedPlayerIds(derived) : []),
+    [derived],
+  );
+  const availablePlayers = useMemo(
+    () => (derived ? toAvailablePlayers(playersById, derived) : []),
+    [playersById, derived],
+  );
+
+  // Is it my turn? Same predicate as the DR-2 SubmitPickControl gate.
+  const amIOnClock =
+    derived !== null &&
+    myTeamId !== null &&
+    derived.onClockTeamId !== null &&
+    derived.onClockTeamId === myTeamId;
+
+  // Pool's Draft button → DR-2 submit path. Same submitPick, same
+  // optimistic flow. Fires only when it's the user's turn AND we know
+  // the current pick number / round from derived.
+  const handleDraftFromPool = useCallback(
+    async (player: Player) => {
+      if (
+        !amIOnClock ||
+        myTeamId === null ||
+        derived === null ||
+        derived.currentPickNumber === null ||
+        derived.currentRoundNumber === null
+      ) {
+        toast.error("It's not your turn");
+        return;
+      }
+      const playerIdNum = parseInt(player.id, 10);
+      if (!Number.isFinite(playerIdNum) || playerIdNum <= 0) {
+        toast.error('Invalid player');
+        return;
+      }
+      const attemptId = crypto.randomUUID();
+      const submittedAt = Date.now();
+      useDraftClientStore.getState().recordPending({
+        correlationId: attemptId,
+        teamId: myTeamId,
+        playerId: playerIdNum,
+        submittedAt,
+      });
+      // Dangle-safety timer (DR-2 architect amendment) — see
+      // submitPick.ts and the removed SubmitPickControl.
+      const dangleTimer = setTimeout(() => {
+        const current = useDraftClientStore
+          .getState()
+          .pendingActions.get(attemptId);
+        if (current !== undefined && current.optimisticState === 'pending') {
+          useDraftClientStore
+            .getState()
+            .rollBackPending(
+              attemptId,
+              "We couldn't confirm your pick — check the board",
+            );
+          toast.error("We couldn't confirm your pick — check the board");
+        }
+      }, 8000);
+      try {
+        const result = await submitPick({
+          leagueId,
+          teamId: myTeamId,
+          playerId: playerIdNum,
+          roundNumber: derived.currentRoundNumber,
+          pickNumber: derived.currentPickNumber,
+          attemptId,
+        });
+        if (!result.ok) {
+          useDraftClientStore
+            .getState()
+            .rollBackPending(attemptId, result.message);
+          toast.error(result.message);
+        }
+        // Success: dangle timer stays armed per DR-2 amendment.
+      } catch (err) {
+        useDraftClientStore
+          .getState()
+          .rollBackPending(attemptId, 'Unexpected error');
+        toast.error('Unexpected error');
+        void err;
+      } finally {
+        void dangleTimer; // keep the ref; timer runs regardless
+        setSelectedPlayer(null);
+      }
+    },
+    [amIOnClock, myTeamId, derived, leagueId],
+  );
+
+  const isDraftActive = derived?.draftStatus === 'in_progress';
+
   return (
-    <div className="border rounded-md p-3 bg-card">
-      <div className="text-xs text-muted-foreground uppercase tracking-wide">
-        {label}
+    <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="players">Players</TabsTrigger>
+        <TabsTrigger value="board">Board</TabsTrigger>
+        <TabsTrigger value="history">History</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="players" className="mt-4">
+        {playersLoading ? (
+          <Card className="p-4 text-muted-foreground" data-testid="pool-loading">
+            Loading players…
+          </Card>
+        ) : (
+          <PlayerPool
+            onPlayerSelect={setSelectedPlayer}
+            onPlayerDraft={handleDraftFromPool}
+            selectedPlayer={selectedPlayer}
+            draftedPlayers={draftedIds}
+            isDraftActive={isDraftActive}
+            availablePlayers={availablePlayers}
+          />
+        )}
+      </TabsContent>
+
+      <TabsContent value="board" className="mt-4">
+        <DraftBoard
+          teams={v1Teams}
+          draftHistory={draftHistory}
+          currentPick={derived?.currentPickNumber ?? 0}
+          currentRound={derived?.currentRoundNumber ?? 0}
+          draftType="snake"
+        />
+      </TabsContent>
+
+      <TabsContent value="history" className="mt-4">
+        <DraftHistory draftHistory={draftHistory} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────
+
+interface SidebarPanelProps {
+  leagueId: string;
+  teams: FetchedTeam[];
+  playersById: ReadonlyMap<string, Player>;
+  myTeamId: string | null;
+}
+
+function SidebarPanel({
+  leagueId,
+  teams,
+  playersById,
+  myTeamId,
+}: SidebarPanelProps) {
+  const derived = useDerivedDraftState();
+  const [queue, setQueue] = useState<string[]>([]);
+
+  const v1Teams = useMemo(
+    () => (derived ? toV1Teams(teams, derived, playersById) : []),
+    [teams, derived, playersById],
+  );
+  const draftHistory = useMemo(
+    () => (derived ? toDraftHistory(teams, derived, playersById) : []),
+    [teams, derived, playersById],
+  );
+  const draftedIds = useMemo(
+    () => (derived ? toDraftedPlayerIds(derived) : []),
+    [derived],
+  );
+  const allPlayers = useMemo(() => Array.from(playersById.values()), [playersById]);
+
+  const amIOnClock =
+    derived !== null &&
+    myTeamId !== null &&
+    derived.onClockTeamId !== null &&
+    derived.onClockTeamId === myTeamId;
+
+  return (
+    <>
+      <TeamRosters
+        teams={v1Teams}
+        draftHistory={draftHistory}
+        userTeamId={myTeamId}
+      />
+      <div>
+        <DraftQueue
+          queue={queue}
+          players={allPlayers}
+          draftedPlayers={draftedIds}
+          onQueueChange={setQueue}
+          onDraftFromQueue={() => {
+            // Queue-drive submit is post-DR-3. For now, users draft
+            // via the pool's Draft button. Queue is display-only per
+            // architect ruling 1c.
+            toast.info('Draft from the Players tab');
+          }}
+          isDraftActive={derived?.draftStatus === 'in_progress'}
+          isYourTurn={amIOnClock}
+          leagueId={leagueId}
+          currentPick={derived?.currentPickNumber ?? undefined}
+          totalPicks={derived?.totalPicks ?? undefined}
+        />
+        <div
+          className="text-xs text-muted-foreground mt-1"
+          data-testid="queue-persistence-note"
+        >
+          Saved on this device
+        </div>
       </div>
-      <div className="text-lg font-semibold">{value}</div>
-    </div>
+      {/* DR-3 (2026-07-29) — DraftControls HIDDEN per architect ruling:
+          v2 HTTP routes for /pause and /resume don't exist yet (only
+          /undo is exposed at server/src/routes/draft.ts:273). Wiring
+          commissioner tools to nothing is worse than absence. The
+          panel lands properly with the post-Zach policy chunk that
+          ships the missing routes. */}
+      {false && null}
+    </>
   );
 }
