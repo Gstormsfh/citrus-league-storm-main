@@ -160,7 +160,7 @@ function callbacks() {
 function markConnected() {
   const [listener] = subscribeMock.mock.calls[
     subscribeMock.mock.calls.length - 1
-  ] as [(state: unknown) => void];
+  ] as unknown as [(state: unknown) => void];
   act(() => {
     listener({
       kind: 'connected',

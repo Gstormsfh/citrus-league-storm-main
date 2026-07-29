@@ -41,7 +41,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { DraftClientRunner } from '@/lib/draftClient/runner';
 import { fetchDraftOrderMatrix } from '@/lib/draftClient/fetchDraftOrderMatrix';
-import { submitPick } from '@/lib/draftClient/submitPick';
+import { submitPick, isSubmitPickFailure } from '@/lib/draftClient/submitPick';
 import {
   useDraftClientStore,
   useDraftConnectionState,
@@ -445,7 +445,7 @@ function MainTabs({
           pickNumber: derived.currentPickNumber,
           attemptId,
         });
-        if (!result.ok) {
+        if (isSubmitPickFailure(result)) {
           useDraftClientStore
             .getState()
             .rollBackPending(attemptId, result.message);
@@ -585,7 +585,14 @@ function SidebarPanel({
           /undo is exposed at server/src/routes/draft.ts:273). Wiring
           commissioner tools to nothing is worse than absence. The
           panel lands properly with the post-Zach policy chunk that
-          ships the missing routes. */}
+          ships the missing routes.
+
+          KI-012 (see docs/REGISTRY.md): when the post-Zach chunk lands
+          the missing HTTP routes, undo MUST flow through the v2 event
+          path (pick_undone via v2 RPC + LISTEN/NOTIFY + WS broadcast).
+          Do NOT wire the v1 /undo route at server/src/routes/draft.ts:273
+          into this room — it bypasses the persistent engine's in-memory
+          fold and desyncs state. */}
       {false && null}
     </>
   );

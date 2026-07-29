@@ -30,7 +30,7 @@ vi.mock('@/api/client', () => ({
   },
 }));
 
-import { submitPick } from '../submitPick';
+import { submitPick, isSubmitPickFailure } from '../submitPick';
 
 const BASE = {
   leagueId: 'league-abc',
@@ -208,7 +208,7 @@ describe('submitPick — error taxonomy → reason + human copy', () => {
       apiClientPostMock.mockRejectedValueOnce(c.thrown);
       const r = await submitPick(BASE);
       expect(r.ok).toBe(false);
-      if (!r.ok) {
+      if (isSubmitPickFailure(r)) {
         expect(r.reason).toBe(c.reason);
         expect(r.message).toContain(c.messageContains);
         expect(r.statusCode).toBe(c.statusCode);
@@ -226,7 +226,7 @@ describe('submitPick — network / timeout', () => {
     );
     const r = await submitPick(BASE);
     expect(r.ok).toBe(false);
-    if (!r.ok) {
+    if (isSubmitPickFailure(r)) {
       expect(r.reason).toBe('network_or_timeout');
       expect(r.message).toContain('check the board');
     }
@@ -238,7 +238,7 @@ describe('submitPick — network / timeout', () => {
     );
     const r = await submitPick(BASE);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe('network_or_timeout');
+    if (isSubmitPickFailure(r)) expect(r.reason).toBe('network_or_timeout');
   });
 
   it('classifies raw AbortError (name-based) as network_or_timeout', async () => {
@@ -247,7 +247,7 @@ describe('submitPick — network / timeout', () => {
     apiClientPostMock.mockRejectedValueOnce(abort);
     const r = await submitPick(BASE);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe('network_or_timeout');
+    if (isSubmitPickFailure(r)) expect(r.reason).toBe('network_or_timeout');
   });
 
   it('classifies raw TimeoutError (name-based) as network_or_timeout', async () => {
@@ -256,14 +256,14 @@ describe('submitPick — network / timeout', () => {
     apiClientPostMock.mockRejectedValueOnce(to);
     const r = await submitPick(BASE);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe('network_or_timeout');
+    if (isSubmitPickFailure(r)) expect(r.reason).toBe('network_or_timeout');
   });
 
   it('classifies a bare Error with no status as network_or_timeout (safe default)', async () => {
     apiClientPostMock.mockRejectedValueOnce(new Error('unknown transport failure'));
     const r = await submitPick(BASE);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe('network_or_timeout');
+    if (isSubmitPickFailure(r)) expect(r.reason).toBe('network_or_timeout');
   });
 });
 
@@ -272,6 +272,6 @@ describe('submitPick — unexpected shapes', () => {
     apiClientPostMock.mockResolvedValueOnce({ data: { seq: 1 } });
     const r = await submitPick(BASE);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe('server_error');
+    if (isSubmitPickFailure(r)) expect(r.reason).toBe('server_error');
   });
 });

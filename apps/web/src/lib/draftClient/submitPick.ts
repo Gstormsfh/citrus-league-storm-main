@@ -80,6 +80,20 @@ export interface SubmitPickFailure {
 
 export type SubmitPickResult = SubmitPickSuccess | SubmitPickFailure;
 
+/**
+ * Type predicate for the failure branch. Narrows `SubmitPickResult`
+ * to `SubmitPickFailure` explicitly — TypeScript's built-in narrowing
+ * on the `ok` discriminant is inconsistent across call sites in the
+ * test suite (works in application code, fails in a subset of Vitest
+ * `it` closures), so a predicate delivers zero TS errors on every
+ * consumer regardless of surrounding context.
+ */
+export function isSubmitPickFailure(
+  r: SubmitPickResult,
+): r is SubmitPickFailure {
+  return r.ok === false;
+}
+
 // ── Human copy ─────────────────────────────────────────────────────
 //
 // Kept out of any i18n framework for DR-2 scope; can be lifted later.
