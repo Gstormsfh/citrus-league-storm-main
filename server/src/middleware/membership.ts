@@ -30,6 +30,17 @@ export async function membershipMiddleware(c: Context<Env>, next: Next) {
   const membership = new LeagueMembershipService(supabase);
   const result = await membership.checkMembership(leagueId, userId);
 
+  // DR-2 diagnostic (2026-07-29) — temporary logging to isolate the
+  // "discovery returns 200 but my-team returns 403" divergence for the
+  // same user+league. Remove after DR-2 rendering bug ratifies. Logs
+  // to API-server stdout: the launcher's window shows these lines.
+  // eslint-disable-next-line no-console
+  console.log(
+    `[DR-2 diag membershipMiddleware] path=${c.req.path} userId=${userId} ` +
+      `leagueId=${leagueId} isMember=${result.isMember} isCommissioner=${result.isCommissioner} ` +
+      `teamId=${result.teamId ?? '<none>'}`,
+  );
+
   if (!result.isMember) {
     return c.json({ error: { code: 'FORBIDDEN', message: 'Access denied: You are not a member of this league' } }, 403);
   }

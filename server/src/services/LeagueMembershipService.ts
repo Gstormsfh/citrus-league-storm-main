@@ -51,6 +51,10 @@ export class LeagueMembershipService {
     const key = getCacheKey(leagueId, userId);
     const cached = membershipCache.get(key);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[DR-2 diag checkMembership CACHE HIT] key=${key} isMember=${cached.result.isMember} isCommissioner=${cached.result.isCommissioner} ageMs=${Date.now() - cached.timestamp}`,
+      );
       return cached.result;
     }
 
@@ -65,6 +69,14 @@ export class LeagueMembershipService {
         logger.error('[LeagueMembershipService] Error checking commissioner:', leagueError);
       }
 
+      // DR-2 diagnostic (2026-07-29): print raw query results so we
+      // can see what the user-scoped RLS actually returns for Garrett.
+      // eslint-disable-next-line no-console
+      console.log(
+        `[DR-2 diag checkMembership leagues query] leagueId=${leagueId} userId=${userId} ` +
+          `leagueData=${JSON.stringify(leagueData)} leagueError=${leagueError ? JSON.stringify(leagueError) : 'null'}`,
+      );
+
       const isCommissioner = leagueData?.commissioner_id === userId;
 
       const { data: teamData, error: teamError } = await this.supabase
@@ -78,6 +90,11 @@ export class LeagueMembershipService {
       if (teamError && teamError.code !== 'PGRST116') {
         logger.error('[LeagueMembershipService] Error checking team ownership:', teamError);
       }
+
+      // eslint-disable-next-line no-console
+      console.log(
+        `[DR-2 diag checkMembership teams query] teamData=${JSON.stringify(teamData)} teamError=${teamError ? JSON.stringify(teamError) : 'null'}`,
+      );
 
       const isMember = isCommissioner || !!teamData;
       const result: MembershipCheckResult = {
