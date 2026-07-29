@@ -21,16 +21,30 @@ Auth headers:
 from __future__ import annotations
 
 import json
+import logging
 import os
+import random
+import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlencode
 
 import requests
 from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+
+
+logger = logging.getLogger(__name__)
 
 
 Filter = Tuple[str, str, Any]  # (col, op, value) where op in {"eq","neq","gte","gt","lte","lt","in"}
+
+# Patient backoff for 5xx bursts + connection/timeout errors. Waits between
+# 8 attempts (7 retries): ~1 + 2 + 4 + 8 + 16 + 30 + 30 = 91s ceiling before
+# raising. Small jitter (±10%) prevents thundering-herd. Introduced after the
+# 2026-07 phase 0c campaign crashed 4× on transient PostgREST 500 squalls that
+# resolve in seconds — the prior urllib3 Retry(total=5, backoff_factor=1)
+# gave up after ~15s. Success path is untouched: no retry, no sleep, no log
+# when the first attempt returns < 500 without raising.
+_RETRY_WAITS_SECONDS: Tuple[int, ...] = (1, 2, 4, 8, 16, 30, 30)
 
 
 class SupabaseRest:
@@ -64,23 +78,62 @@ class SupabaseRest:
       "Content-Profile": self.schema,
     })
     
-    # Configure retry strategy for transient errors
-    retry_strategy = Retry(
-      total=5,
-      backoff_factor=1,
-      status_forcelist=[500, 502, 503, 504, 429],  # Internal Server Error, Bad Gateway, Service Unavailable, Gateway Timeout, Too Many Requests
-      allowed_methods=["GET", "POST", "PATCH", "DELETE"]
-    )
-    
-    # Mount adapter with connection pooling
+    # Connection pooling only — retries live in _request_with_retry (see
+    # module-level _RETRY_WAITS_SECONDS). Byte-identical success path: no
+    # sleep, no log, no extra request on first-try success.
     adapter = HTTPAdapter(
-      max_retries=retry_strategy,
       pool_connections=100,  # Number of connection pools to cache
       pool_maxsize=100,       # Max connections per pool
       pool_block=False         # Don't block if pool is full
     )
     self.session.mount("https://", adapter)
     self.session.mount("http://", adapter)
+
+  def _log_path(self, url: str) -> str:
+    tail = url.split("/rest/v1/", 1)[-1]
+    return tail.split("?", 1)[0]
+
+  def _request_with_retry(self, method: str, url: str, **kwargs) -> requests.Response:
+    """Send an HTTP request; retry on 5xx or connection/timeout errors with a
+    patient exponential schedule (see _RETRY_WAITS_SECONDS). Non-5xx responses
+    (including 4xx client errors) return immediately — the caller decides how
+    to handle them, preserving existing error semantics."""
+    last_exc: Optional[BaseException] = None
+    last_response: Optional[requests.Response] = None
+    max_attempts = len(_RETRY_WAITS_SECONDS) + 1
+    for attempt in range(1, max_attempts + 1):
+      try:
+        r = self.session.request(method, url, **kwargs)
+      except (requests.ConnectionError, requests.Timeout) as e:
+        last_exc = e
+        last_response = None
+        status_repr: Union[int, str] = f"exc:{type(e).__name__}"
+      else:
+        last_exc = None
+        last_response = r
+        # Success path or non-retriable client error: return immediately.
+        # Byte-identical to pre-refactor behavior on first attempt.
+        if r.status_code < 500:
+          return r
+        status_repr = r.status_code
+      if attempt == max_attempts:
+        # Exhausted retries. Re-raise the last connection/timeout error, or
+        # return the last 5xx response so the caller's existing status-code
+        # handling raises with the server's message.
+        if last_exc is not None:
+          raise last_exc
+        return last_response  # type: ignore[return-value]
+      wait_base = _RETRY_WAITS_SECONDS[attempt - 1]
+      wait = wait_base * (1.0 + random.uniform(-0.1, 0.1))
+      logger.warning(
+        "[supabase_rest] retry attempt=%d/%d status=%s method=%s path=%s sleeping=%.1fs",
+        attempt, max_attempts, status_repr, method, self._log_path(url), wait,
+      )
+      time.sleep(wait)
+    # Unreachable — the loop either returns or raises.
+    if last_exc is not None:  # pragma: no cover
+      raise last_exc
+    return last_response  # type: ignore[return-value]
 
   @property
   def rest_base(self) -> str:
@@ -128,8 +181,7 @@ class SupabaseRest:
     url = f"{self.rest_base}/{table}"
     if qs:
       url = f"{url}?{qs}"
-    # Use session.get() instead of requests.get() for connection pooling
-    r = self.session.get(url, headers=self._headers(), timeout=self.timeout_seconds)
+    r = self._request_with_retry("GET", url, headers=self._headers(), timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase select failed ({table}): {r.status_code} {r.text}")
     return r.json() if r.text else []
@@ -153,8 +205,7 @@ class SupabaseRest:
       }
     )
     body = rows if isinstance(rows, list) else [rows]
-    # Use session.post() instead of requests.post() for connection pooling
-    r = self.session.post(url, headers=hdr, data=json.dumps(body), timeout=self.timeout_seconds)
+    r = self._request_with_retry("POST", url, headers=hdr, data=json.dumps(body), timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase upsert failed ({table}): {r.status_code} {r.text}")
 
@@ -163,7 +214,7 @@ class SupabaseRest:
     url = f"{self.rest_base}/{table}"
     hdr = self._headers({"Prefer": "return=minimal"})
     body = rows if isinstance(rows, list) else [rows]
-    r = self.session.post(url, headers=hdr, data=json.dumps(body), timeout=self.timeout_seconds)
+    r = self._request_with_retry("POST", url, headers=hdr, data=json.dumps(body), timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase insert failed ({table}): {r.status_code} {r.text}")
 
@@ -171,8 +222,7 @@ class SupabaseRest:
     qs = self._build_query(filters=filters)
     url = f"{self.rest_base}/{table}?{qs}"
     hdr = self._headers({"Prefer": "return=minimal"})
-    # Use session.patch() instead of requests.patch() for connection pooling
-    r = self.session.patch(url, headers=hdr, data=json.dumps(values), timeout=self.timeout_seconds)
+    r = self._request_with_retry("PATCH", url, headers=hdr, data=json.dumps(values), timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase update failed ({table}): {r.status_code} {r.text}")
 
@@ -180,8 +230,7 @@ class SupabaseRest:
     qs = self._build_query(filters=filters)
     url = f"{self.rest_base}/{table}?{qs}"
     hdr = self._headers({"Prefer": "return=minimal"})
-    # Use session.delete() instead of requests.delete() for connection pooling
-    r = self.session.delete(url, headers=hdr, timeout=self.timeout_seconds)
+    r = self._request_with_retry("DELETE", url, headers=hdr, timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase delete failed ({table}): {r.status_code} {r.text}")
 
@@ -191,8 +240,7 @@ class SupabaseRest:
 
   def rpc(self, fn: str, payload: dict) -> Any:
     url = f"{self.rest_base}/rpc/{fn}"
-    # Use session.post() instead of requests.post() for connection pooling
-    r = self.session.post(url, headers=self._headers(), data=json.dumps(payload), timeout=self.timeout_seconds)
+    r = self._request_with_retry("POST", url, headers=self._headers(), data=json.dumps(payload), timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase rpc failed ({fn}): {r.status_code} {r.text}")
     return r.json() if r.text else None
