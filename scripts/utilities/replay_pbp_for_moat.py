@@ -708,23 +708,36 @@ def games_for_season(db, season: int, force: bool, limit: Optional[int] = None) 
     ceiling). Without pagination this would return only the first ~11 games
     per season — the 2026-07-27 relaunch discovered this by processing
     11-12 games/season instead of 1300+. See PHASE_0C_NOTES.md.
+
+    Pagination uses KEYSET (game_id > last-seen max) rather than OFFSET
+    because offset-based pagination crashes with PostgREST 500s at deep
+    offsets (>~80K rows) on large seasons — 3 crashes at 82000/101000/
+    122000 on season 2023 (largest at 122,410 rows). The same query via
+    direct SQL runs in 77ms; VACUUM ANALYZE + project restart did not cure.
+    Keyset avoids the counting cost PostgREST imposes on OFFSET past the
+    default response ceiling. Order-by-game_id + game_id-gt-cursor gives an
+    index range scan every page regardless of depth. See PHASE_0C_NOTES.md
+    (2026-07-28 keyset-fix entry).
     """
     all_ids_set: set = set()
     PAGE = 1000
-    offset = 0
+    last_max: Optional[int] = None
     while True:
+        page_filters: List[Tuple[str, str, Any]] = [("season", "eq", season)]
+        if last_max is not None:
+            page_filters.append(("game_id", "gt", last_max))
         rows = db.select(
             "raw_shots", select="game_id",
-            filters=[("season", "eq", season)],
-            limit=PAGE, offset=offset, order="game_id",
+            filters=page_filters,
+            limit=PAGE, order="game_id",
         )
         if not rows:
             break
-        for r in rows:
-            all_ids_set.add(int(r["game_id"]))
+        page_ids = [int(r["game_id"]) for r in rows]
+        all_ids_set.update(page_ids)
+        last_max = page_ids[-1]  # rows are ordered ASC by game_id
         if len(rows) < PAGE:
             break
-        offset += PAGE
     all_ids = sorted(all_ids_set)
     done_ids: set = set()
     if not force:
