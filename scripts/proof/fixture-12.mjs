@@ -298,6 +298,27 @@ async function runSetup(client) {
   );
   console.log(`harness-prefix teams already present: ${existingTeamIds.size}/${TEAM_COUNT}`);
 
+  // DR-2 (2026-07-29): teams table has UNIQUE (league_id, owner_id).
+  // A single user can own AT MOST one team per league. If --human-user
+  // already owns a (non-harness) team in this league, the setup UPDATE
+  // for the harness slot would collide with that constraint. Look up
+  // any pre-existing team owned by the human user AND null out its
+  // owner_id BEFORE assigning the harness slot; restore on --reset.
+  let humanUserPriorTeamId = null;
+  if (HUMAN_USER !== null) {
+    const priorTeamRes = await client.query(
+      `SELECT id FROM public.teams
+        WHERE league_id = $1 AND owner_id = $2::uuid`,
+      [WHITELISTED_LEAGUE_ID, HUMAN_USER],
+    );
+    if (priorTeamRes.rows.length > 0) {
+      humanUserPriorTeamId = priorTeamRes.rows[0].id;
+      console.log(
+        `human user ${HUMAN_USER.slice(0, 8)}… already owns team ${humanUserPriorTeamId.slice(0, 8)}… — will un-own for setup and restore on reset`,
+      );
+    }
+  }
+
   const existingOrder = await client.query(
     `SELECT round_number, team_order FROM public.draft_order
       WHERE league_id = $1 ORDER BY round_number`,
@@ -328,6 +349,12 @@ async function runSetup(client) {
       existingHarnessOwners: Array.from(existingOwnerByTeamId.entries()).map(
         ([teamId, ownerId]) => ({ teamId, ownerId }),
       ),
+      // DR-2 (2026-07-29): if the human user already owned a
+      // non-harness team in this league, we NULL its owner_id during
+      // setup (unique-per-league constraint requires it) and restore
+      // on reset.
+      humanUserPriorTeamId: humanUserPriorTeamId,
+      humanUserId: HUMAN_USER,
       existingDraftOrderRounds: existingOrder.rows.map((r) => ({
         round_number: r.round_number,
         team_order: r.team_order,
@@ -415,6 +442,19 @@ async function runSetup(client) {
   // before-value (NULL for a fresh fixture, or whatever was there for
   // a re-run).
   if (HUMAN_SLOT !== null) {
+    // teams table has UNIQUE (league_id, owner_id). If the human user
+    // already owns another team in this league, null out that team's
+    // owner_id FIRST — otherwise the harness UPDATE below collides
+    // with the unique index. Ordered BEFORE the harness UPDATE so the
+    // transaction sees the un-own before the re-own.
+    if (humanUserPriorTeamId !== null) {
+      plan.steps.push({
+        label: `teams UPDATE owner_id=NULL (un-own prior team ${humanUserPriorTeamId.slice(0, 8)}… of human user for unique constraint)`,
+        sql: `UPDATE public.teams SET owner_id = NULL WHERE id = $1`,
+        params: [humanUserPriorTeamId],
+        before: { owner_id: HUMAN_USER },
+      });
+    }
     const humanTeamId = HARNESS_TEAM_IDS[HUMAN_SLOT - 1];
     plan.steps.push({
       label: `teams UPDATE owner_id (slot ${HUMAN_SLOT} → human user ${HUMAN_USER.slice(0, 8)}…)`,
@@ -645,9 +685,15 @@ async function runReset(client) {
   // records the before-value for every harness team; on reset, walk
   // the currently-pre-existing (not-deleted) rows and restore their
   // owner_id. Rows scheduled for delete below don't need restore.
+  // Order matters: (a) null out any harness team currently owned by
+  // the human user, (b) restore the pre-existing team's owner_id back
+  // to the human user. Doing (b) before (a) would collide with the
+  // unique constraint just like setup did.
   if (state && state.plan) {
     const preExistingTeamIds = new Set(state.plan.existingHarnessTeamIds ?? []);
     const owners = state.plan.existingHarnessOwners ?? [];
+    // (a) restore harness-team owner_id (typically un-own the slot we
+    // human-assigned during setup).
     for (const { teamId, ownerId } of owners) {
       // Only restore for rows that will still exist after Step 5's
       // DELETE (i.e., rows that were there BEFORE the setup ran).
@@ -658,6 +704,32 @@ async function runReset(client) {
           params: [teamId, ownerId],
         });
       }
+    }
+    // Also un-own any harness team CURRENTLY belonging to the human
+    // user (belt-and-suspenders — the (a) block above handles the
+    // pre-existing case, but if the user was assigned to a slot that
+    // was NOT pre-existing, we still need to un-own it before restoring
+    // their non-harness team below).
+    if (state.plan.humanUserId) {
+      plan.push({
+        label: `teams UPDATE owner_id=NULL (un-own any harness team currently held by human user)`,
+        sql: `UPDATE public.teams SET owner_id = NULL
+               WHERE league_id = $1 AND owner_id = $2::uuid
+                 AND id::text LIKE '77777777-%'`,
+        params: [WHITELISTED_LEAGUE_ID, state.plan.humanUserId],
+      });
+    }
+    // (b) restore the human user's pre-existing (non-harness) team
+    // ownership. Runs AFTER (a) so the unique constraint is satisfied.
+    if (
+      state.plan.humanUserPriorTeamId &&
+      state.plan.humanUserId
+    ) {
+      plan.push({
+        label: `teams UPDATE owner_id (restore human user's prior team ${state.plan.humanUserPriorTeamId.slice(0, 8)}…)`,
+        sql: `UPDATE public.teams SET owner_id = $2::uuid WHERE id = $1`,
+        params: [state.plan.humanUserPriorTeamId, state.plan.humanUserId],
+      });
     }
   }
 
