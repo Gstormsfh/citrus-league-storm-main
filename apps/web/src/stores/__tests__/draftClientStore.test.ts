@@ -245,3 +245,171 @@ describe('draftClientStore — reset', () => {
     expect(after.lastError).toBeNull();
   });
 });
+
+// ── DR-1b (2026-07-28) — derived state, matrix, gap surfacing ─────
+
+describe('draftClientStore — DR-1b derived state', () => {
+  const TEAMS = Array.from({ length: 12 }, (_, i) => `team-${i + 1}`);
+  // Snake 12x3 matrix used across tests. Mirrors
+  // draftOrderGenerator.ts:68 (even rounds reversed).
+  const MATRIX: { round: number; pickNumber: number; teamId: string }[] = [];
+  {
+    let pn = 1;
+    for (let round = 1; round <= 3; round++) {
+      const reverse = round % 2 === 0;
+      const ordered = reverse ? [...TEAMS].reverse() : [...TEAMS];
+      for (const teamId of ordered) {
+        MATRIX.push({ round, pickNumber: pn++, teamId });
+      }
+    }
+  }
+
+  function baselineSnap(events: BufferedDraftEvent[] = []): DraftSnapshot {
+    return {
+      lobbyId: 'lobby-derived',
+      format: 'snake',
+      recentEvents: events,
+      stateSnapshot: {
+        // Convenience fields DELIBERATELY set to stale/wrong values
+        // — the whole DR-1b point is that they're seed-only and the
+        // store re-derives from events.
+        currentPickNumber: null,
+        currentRoundNumber: null,
+        onClockTeamId: null,
+        picksMade: 0,
+        totalPicks: 36,
+        draftStatus: 'not_started',
+        currentPickDeadline: null,
+      },
+    };
+  }
+
+  function pickEv(
+    seq: number,
+    teamId: string,
+    pickNumber: number,
+    roundNumber: number,
+  ): BufferedDraftEvent {
+    return {
+      kind: 'pick_submitted',
+      seq,
+      timestamp: `2026-07-28T00:00:${String(seq).padStart(2, '0')}.000Z`,
+      teamId,
+      playerId: 8478000 + seq,
+      roundNumber,
+      pickNumber,
+      correlationId: `corr-${seq}`,
+    };
+  }
+
+  it('initial state: derivedState is null, matrix is null, lastFoldGaps is empty', () => {
+    const s = useDraftClientStore.getState();
+    expect(s.derivedState).toBeNull();
+    expect(s.matrix).toBeNull();
+    expect(s.lastFoldGaps).toEqual([]);
+  });
+
+  it('setSnapshot: seeds derivedState via deriveFromSnapshot', () => {
+    const store = useDraftClientStore.getState();
+    store.setSnapshot(baselineSnap([pickEv(1, TEAMS[0], 1, 1)]));
+    const after = useDraftClientStore.getState();
+    expect(after.derivedState).not.toBeNull();
+    expect(after.derivedState?.picksMade).toBe(1);
+    expect(after.derivedState?.draftStatus).toBe('in_progress');
+    // Matrix not fetched yet — on-clock stays null.
+    expect(after.derivedState?.onClockTeamId).toBeNull();
+    expect(after.lastFoldGaps).toEqual([]);
+  });
+
+  it('setMatrix after snapshot: re-derives with on-clock populated', () => {
+    const store = useDraftClientStore.getState();
+    store.setSnapshot(baselineSnap([pickEv(1, TEAMS[0], 1, 1)]));
+    store.setMatrix(MATRIX);
+    const after = useDraftClientStore.getState();
+    expect(after.derivedState?.onClockTeamId).toBe('team-2');
+    expect(after.derivedState?.currentPickNumber).toBe(2);
+    expect(after.derivedState?.currentRoundNumber).toBe(1);
+  });
+
+  it('setMatrix before snapshot: stashes matrix without derive', () => {
+    const store = useDraftClientStore.getState();
+    store.setMatrix(MATRIX);
+    const afterMatrix = useDraftClientStore.getState();
+    expect(afterMatrix.matrix).toEqual(MATRIX);
+    expect(afterMatrix.derivedState).toBeNull();
+    // Now a snapshot lands — derivation uses the stashed matrix.
+    store.setSnapshot(baselineSnap([pickEv(1, TEAMS[0], 1, 1)]));
+    const afterSnap = useDraftClientStore.getState();
+    expect(afterSnap.derivedState?.onClockTeamId).toBe('team-2');
+  });
+
+  it('applyEvent folds a new event into derivedState + surfaces empty gaps', () => {
+    const store = useDraftClientStore.getState();
+    store.setSnapshot(baselineSnap([]));
+    store.setMatrix(MATRIX);
+    store.applyEvent(pickEv(1, TEAMS[0], 1, 1));
+    const after = useDraftClientStore.getState();
+    expect(after.derivedState?.picksMade).toBe(1);
+    expect(after.derivedState?.foldedThroughSeq).toBe(1);
+    expect(after.derivedState?.onClockTeamId).toBe('team-2');
+    expect(after.lastFoldGaps).toEqual([]);
+  });
+
+  it('applyEvent surfaces gaps when seq jumps', () => {
+    const store = useDraftClientStore.getState();
+    store.setSnapshot(baselineSnap([pickEv(1, TEAMS[0], 1, 1)]));
+    store.setMatrix(MATRIX);
+    // Jump from seq 1 to seq 3 → seq 2 missing.
+    store.applyEvent(pickEv(3, TEAMS[2], 3, 1));
+    const after = useDraftClientStore.getState();
+    expect(after.lastFoldGaps).toEqual([2]);
+    // Fold halted at seq 1 — seq 3 not applied.
+    expect(after.derivedState?.foldedThroughSeq).toBe(1);
+    expect(after.derivedState?.picksMade).toBe(1);
+  });
+
+  it('applyEvents folds a batch + surfaces gaps if any', () => {
+    const store = useDraftClientStore.getState();
+    store.setSnapshot(baselineSnap([]));
+    store.setMatrix(MATRIX);
+    store.applyEvents([
+      pickEv(1, TEAMS[0], 1, 1),
+      pickEv(2, TEAMS[1], 2, 1),
+      pickEv(3, TEAMS[2], 3, 1),
+    ]);
+    const after = useDraftClientStore.getState();
+    expect(after.derivedState?.picksMade).toBe(3);
+    expect(after.derivedState?.foldedThroughSeq).toBe(3);
+    expect(after.lastFoldGaps).toEqual([]);
+  });
+
+  it('F4 REGRESSION: stale stateSnapshot ignored; derivedState matches events', () => {
+    const store = useDraftClientStore.getState();
+    const events = TEAMS.slice(0, 5).map((teamId, i) =>
+      pickEv(i + 1, teamId, i + 1, 1),
+    );
+    store.setSnapshot(baselineSnap(events));
+    store.setMatrix(MATRIX);
+    const after = useDraftClientStore.getState();
+    expect(after.derivedState?.picksMade).toBe(5);
+    expect(after.derivedState?.draftStatus).toBe('in_progress');
+    expect(after.derivedState?.currentPickNumber).toBe(6);
+    expect(after.derivedState?.onClockTeamId).toBe('team-6');
+    // The stale stateSnapshot on the snapshot object is preserved
+    // as-is for the Recent-events pane's read of totalPicks +
+    // currentPickDeadline, but it doesn't corrupt derivedState.
+    expect(after.snapshot?.stateSnapshot.picksMade).toBe(0); // stale, seed-only
+  });
+
+  it('reset clears derivedState + matrix + lastFoldGaps', () => {
+    const store = useDraftClientStore.getState();
+    store.setSnapshot(baselineSnap([pickEv(1, TEAMS[0], 1, 1)]));
+    store.setMatrix(MATRIX);
+    store.reset();
+    const after = useDraftClientStore.getState();
+    expect(after.derivedState).toBeNull();
+    expect(after.matrix).toBeNull();
+    expect(after.lastFoldGaps).toEqual([]);
+    expect(after.snapshot).toBeNull();
+  });
+});

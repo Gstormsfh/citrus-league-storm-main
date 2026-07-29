@@ -25,11 +25,14 @@ import {
   useClockOffsetEstimator,
 } from '@/components/draft/v2/DraftTimerV2';
 import { DraftClientRunner } from '@/lib/draftClient/runner';
+import { fetchDraftOrderMatrix } from '@/lib/draftClient/fetchDraftOrderMatrix';
 import {
   useDraftClientStore,
   useDraftConnectionState,
   useDraftSnapshot,
   usePresence,
+  useDerivedDraftState,
+  useDraftLastFoldGaps,
 } from '@/stores/draftClientStore';
 import {
   notifyConnectionFatal,
@@ -52,6 +55,13 @@ export default function DraftRoomV2() {
 
   // Mount: instantiate runner, wire callbacks to store, connect.
   // Unmount: disconnect + reset store.
+  //
+  // DR-1b (2026-07-28) additions:
+  //   - onSnapshot: kick off `fetchDraftOrderMatrix` (non-fatal per F1
+  //     ratification; caller retries on transition — see the derived-
+  //     state watcher useEffect further down).
+  //   - onEvent / onEvents already surface gaps into `lastFoldGaps`
+  //     via the store; the gap-triggered resync useEffect watches it.
   useEffect(() => {
     const runner = new DraftClientRunner();
     runnerRef.current = runner;
@@ -68,7 +78,22 @@ export default function DraftRoomV2() {
     runner.connect(
       { leagueId, draftId },
       {
-        onSnapshot: (snapshot) => store.setSnapshot(snapshot),
+        onSnapshot: (snapshot) => {
+          store.setSnapshot(snapshot);
+          // DR-1b F1 ratification: fetch the draft-order matrix on
+          // first snapshot receipt. Non-fatal — a null return leaves
+          // derivedState.onClockTeamId null (board still renders
+          // picks-made + rosters); refetch happens on the
+          // not_started → in_progress transition (see the watcher
+          // below) so a mid-draft configuration lands as soon as the
+          // commissioner completes setup.
+          void fetchDraftOrderMatrix(
+            leagueId,
+            snapshot.stateSnapshot.totalPicks,
+          ).then((matrix) => {
+            store.setMatrix(matrix);
+          });
+        },
         onEvent: (event) => {
           // 10c-2 batch 3 C2: capture skew estimate BEFORE the store
           // mutation so a slow store update doesn't skew the offset.
@@ -114,6 +139,41 @@ export default function DraftRoomV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, draftId]);
 
+  // DR-1b (2026-07-28) F1 ratification — refetch matrix on
+  // not_started → in_progress transition. Guards pre-draft reorders
+  // while the room sits open: the commissioner may finish configuring
+  // the draft (or reorder teams) after the client's initial connect,
+  // and the first-snapshot fetch's matrix would be stale (or null).
+  // Watch the derived draftStatus; on the transition, retry the fetch.
+  const derivedForRefetch = useDerivedDraftState();
+  const prevStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    const cur = derivedForRefetch?.draftStatus ?? null;
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = cur;
+    if (prev === 'not_started' && cur === 'in_progress') {
+      const totalPicks = derivedForRefetch?.totalPicks ?? 0;
+      void fetchDraftOrderMatrix(leagueId, totalPicks).then((matrix) => {
+        useDraftClientStore.getState().setMatrix(matrix);
+      });
+    }
+  }, [derivedForRefetch, leagueId]);
+
+  // DR-1b (2026-07-28) F3 ratification — gap-triggered resync
+  // dispatch. When the derivation surfaces missing seqs, ask the
+  // runner to resync from the last contiguous seq. Loop guard lives
+  // inside `runner.requestResyncForGap` (a repeat sinceSeq escalates
+  // to full close-and-reconnect via 1006 → backoff).
+  const lastFoldGaps = useDraftLastFoldGaps();
+  const derivedForGap = useDerivedDraftState();
+  useEffect(() => {
+    if (lastFoldGaps.length === 0) return;
+    if (derivedForGap === null) return;
+    const runner = runnerRef.current;
+    if (runner === null) return;
+    runner.requestResyncForGap(derivedForGap.foldedThroughSeq);
+  }, [lastFoldGaps, derivedForGap]);
+
   const handleRetryNow = useMemo(
     () => () => {
       const runner = runnerRef.current;
@@ -138,13 +198,14 @@ export default function DraftRoomV2() {
 function DraftStateView({ clockOffsetMs }: { clockOffsetMs: number }) {
   const connectionState = useDraftConnectionState();
   const snapshot = useDraftSnapshot();
+  const derived = useDerivedDraftState();
   const presentUserIds = usePresence();
 
   if (connectionState.kind === 'idle') {
     return null;
   }
 
-  if (snapshot === null) {
+  if (snapshot === null || derived === null) {
     return (
       <div className="mt-4 text-muted-foreground">
         Waiting for draft state…
@@ -152,46 +213,48 @@ function DraftStateView({ clockOffsetMs }: { clockOffsetMs: number }) {
     );
   }
 
-  const stateSnapshot = snapshot.stateSnapshot;
   // Chunk 10c-2 batch 3 C2 (2026-07-28): WS-open signal for the
   // DraftTimerV2 stale indicator. The runner exposes `connected`
   // (fully wired) vs any of the disconnected/reconnecting/fatal
   // states. Only `connected` renders the timer without dim.
   const wsOpen = connectionState.kind === 'connected';
 
+  // DR-1b (2026-07-28): cards render from `derived` (folded from
+  // events + fetched matrix), NOT from `snapshot.stateSnapshot`'s
+  // convenience fields — those are seed-only per the F4 fix. The
+  // ONE field we still consume from `snapshot.stateSnapshot` is
+  // `currentPickDeadline`, which is authoritative per-event (batch
+  // 3 C2 keeps it fresh via the applyEvent's pickDeadline mirror).
   return (
     <div className="mt-4 space-y-4" data-testid="draft-state-view">
       <DraftTimerV2
-        currentPickDeadline={stateSnapshot.currentPickDeadline}
-        draftStatus={stateSnapshot.draftStatus}
+        currentPickDeadline={snapshot.stateSnapshot.currentPickDeadline}
+        draftStatus={derived.draftStatus}
         wsOpen={wsOpen}
         clockOffsetMs={clockOffsetMs}
       />
       <div className="grid grid-cols-2 gap-4">
         <StateCard label="Format" value={snapshot.format} />
-        <StateCard
-          label="Status"
-          value={stateSnapshot.draftStatus}
-        />
+        <StateCard label="Status" value={derived.draftStatus} />
         <StateCard
           label="Pick"
           value={
-            stateSnapshot.currentPickNumber !== null
-              ? `${stateSnapshot.currentPickNumber} / ${stateSnapshot.totalPicks}`
-              : `${stateSnapshot.picksMade} / ${stateSnapshot.totalPicks} done`
+            derived.currentPickNumber !== null
+              ? `${derived.currentPickNumber} / ${derived.totalPicks}`
+              : `${derived.picksMade} / ${derived.totalPicks} done`
           }
         />
         <StateCard
           label="Round"
           value={
-            stateSnapshot.currentRoundNumber !== null
-              ? String(stateSnapshot.currentRoundNumber)
+            derived.currentRoundNumber !== null
+              ? String(derived.currentRoundNumber)
               : '—'
           }
         />
         <StateCard
           label="On the clock"
-          value={stateSnapshot.onClockTeamId ?? '—'}
+          value={derived.onClockTeamId ?? '—'}
         />
         <StateCard
           label="Connected users"
