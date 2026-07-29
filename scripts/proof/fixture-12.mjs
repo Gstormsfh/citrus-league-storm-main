@@ -110,6 +110,23 @@ const PICK_CLOCK = pickClockArg
   ? parseInt(pickClockArg.slice('--pick-clock='.length), 10)
   : null;
 
+// DR-2 (2026-07-29) — --human-slot=N + --human-user=<uuid> sets team N's
+// owner_id to a supplied real user UUID so a human can be on-clock. All
+// 12 harness teams have owner_id NULL by default (see line 53 comment);
+// the RPC's on-clock check reads teams.owner_id and compares to
+// auth.uid(), so without an owner no human can ever submit. Before-value
+// captured in the state file and restored on --reset (same pattern as
+// --pick-clock). Requires --human-user; validates 1..12 for slot and
+// UUID shape for user.
+const humanSlotArg = args.find((a) => a.startsWith('--human-slot='));
+const HUMAN_SLOT = humanSlotArg
+  ? parseInt(humanSlotArg.slice('--human-slot='.length), 10)
+  : null;
+const humanUserArg = args.find((a) => a.startsWith('--human-user='));
+const HUMAN_USER = humanUserArg
+  ? humanUserArg.slice('--human-user='.length)
+  : null;
+
 if (OPT_HELP) {
   console.log(`Usage:
   node scripts/proof/fixture-12.mjs                       # DRY RUN setup (default, 3 rounds)
@@ -118,6 +135,7 @@ if (OPT_HELP) {
   node scripts/proof/fixture-12.mjs --reset --execute     # apply reset
   node scripts/proof/fixture-12.mjs --execute --rounds=5  # 5-round snake (60 picks)
   node scripts/proof/fixture-12.mjs --execute --pick-clock=90  # set settings.pickTimeLimit=90 (S5 scenario)
+  node scripts/proof/fixture-12.mjs --execute --human-slot=3 --human-user=<uuid>  # assign team 3 to a real user for DR-2
 
 Env: SUPABASE_DB_URL (direct primary URL, not pooled).
 Whitelist: only operates on league ${WHITELISTED_LEAGUE_ID}.
@@ -135,6 +153,45 @@ if (PICK_CLOCK !== null) {
   // Match the server-side validate.ts clamp (batch 1 item 3): 30..300.
   if (!Number.isFinite(PICK_CLOCK) || PICK_CLOCK < 30 || PICK_CLOCK > 300) {
     console.error(`FATAL: invalid --pick-clock value ${PICK_CLOCK} (expected 30..300).`);
+    process.exit(2);
+  }
+}
+
+// DR-2 validation. Guarded by an is-main check: draft-harness.mjs
+// imports this module for HARNESS_TEAM_IDS et al., and passes its own
+// `--human-slot=N` on the CLI (draft-harness's flag, distinct semantic).
+// Without the guard, importing fixture-12 into the harness would trip
+// the "must be used together" check because the harness never passes
+// `--human-user=`. isMain is true iff we're being run as the script.
+const IS_MAIN =
+  typeof process !== 'undefined' &&
+  Array.isArray(process.argv) &&
+  process.argv[1] &&
+  import.meta.url.includes('fixture-12.mjs') &&
+  process.argv[1].replace(/\\/g, '/').endsWith('fixture-12.mjs');
+const UUID_V4_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+if (IS_MAIN && (HUMAN_SLOT !== null || HUMAN_USER !== null)) {
+  if (HUMAN_SLOT === null || HUMAN_USER === null) {
+    console.error(
+      `FATAL: --human-slot and --human-user must be used together.`,
+    );
+    process.exit(2);
+  }
+  if (
+    !Number.isFinite(HUMAN_SLOT) ||
+    HUMAN_SLOT < 1 ||
+    HUMAN_SLOT > 12
+  ) {
+    console.error(
+      `FATAL: invalid --human-slot value ${HUMAN_SLOT} (expected 1..12).`,
+    );
+    process.exit(2);
+  }
+  if (!UUID_V4_RE.test(HUMAN_USER)) {
+    console.error(
+      `FATAL: invalid --human-user value ${HUMAN_USER} (expected UUIDv4).`,
+    );
     process.exit(2);
   }
 }
@@ -230,9 +287,15 @@ async function runSetup(client) {
   }
 
   const existingHarnessTeams = await client.query(
-    `SELECT id, team_name FROM public.teams WHERE id::text LIKE '77777777-%' ORDER BY id`,
+    `SELECT id, team_name, owner_id FROM public.teams WHERE id::text LIKE '77777777-%' ORDER BY id`,
   );
   const existingTeamIds = new Set(existingHarnessTeams.rows.map((r) => r.id));
+  // DR-2: capture the pre-run owner_id for the --human-slot team (if any).
+  // Restored on --reset. Keyed by team id so multiple slots would work
+  // if we ever extend beyond one human.
+  const existingOwnerByTeamId = new Map(
+    existingHarnessTeams.rows.map((r) => [r.id, r.owner_id]),
+  );
   console.log(`harness-prefix teams already present: ${existingTeamIds.size}/${TEAM_COUNT}`);
 
   const existingOrder = await client.query(
@@ -260,6 +323,11 @@ async function runSetup(client) {
         pickTimeLimit: leagueRow.pick_time_limit,
       },
       existingHarnessTeamIds: [...existingTeamIds],
+      // DR-2 (2026-07-29): per-team owner_id before-capture. Only the
+      // slot(s) we mutate get restored on --reset; others are untouched.
+      existingHarnessOwners: Array.from(existingOwnerByTeamId.entries()).map(
+        ([teamId, ownerId]) => ({ teamId, ownerId }),
+      ),
       existingDraftOrderRounds: existingOrder.rows.map((r) => ({
         round_number: r.round_number,
         team_order: r.team_order,
@@ -338,6 +406,25 @@ async function runSetup(client) {
             VALUES ($1, $2, $3, NULL)`,
       params: [tid, WHITELISTED_LEAGUE_ID, `Harness Team ${String(i).padStart(2, '0')}`],
       before: { existed: false },
+    });
+  }
+
+  // DR-2 (2026-07-29): --human-slot=N + --human-user=<uuid> assigns
+  // team N's owner_id so the user can be on-clock. Runs AFTER the
+  // team INSERT block so we know the row exists. Reset restores the
+  // before-value (NULL for a fresh fixture, or whatever was there for
+  // a re-run).
+  if (HUMAN_SLOT !== null) {
+    const humanTeamId = HARNESS_TEAM_IDS[HUMAN_SLOT - 1];
+    plan.steps.push({
+      label: `teams UPDATE owner_id (slot ${HUMAN_SLOT} → human user ${HUMAN_USER.slice(0, 8)}…)`,
+      sql: `UPDATE public.teams SET owner_id = $2::uuid WHERE id = $1`,
+      params: [humanTeamId, HUMAN_USER],
+      before: {
+        // Pre-existing owner (null unless a prior run left it set).
+        // Reset restores exactly this.
+        owner_id: existingOwnerByTeamId.get(humanTeamId) ?? null,
+      },
     });
   }
 
@@ -551,6 +638,27 @@ async function runReset(client) {
              WHERE league_id = $1 AND draft_session_id = $2`,
       params: [WHITELISTED_LEAGUE_ID, HARNESS_SESSION_ID],
     });
+  }
+
+  // DR-2 (2026-07-29): restore owner_id for any team whose setup step
+  // mutated it via --human-slot. State file's existingHarnessOwners
+  // records the before-value for every harness team; on reset, walk
+  // the currently-pre-existing (not-deleted) rows and restore their
+  // owner_id. Rows scheduled for delete below don't need restore.
+  if (state && state.plan) {
+    const preExistingTeamIds = new Set(state.plan.existingHarnessTeamIds ?? []);
+    const owners = state.plan.existingHarnessOwners ?? [];
+    for (const { teamId, ownerId } of owners) {
+      // Only restore for rows that will still exist after Step 5's
+      // DELETE (i.e., rows that were there BEFORE the setup ran).
+      if (preExistingTeamIds.has(teamId)) {
+        plan.push({
+          label: `teams UPDATE owner_id (restore slot ${HARNESS_TEAM_IDS.indexOf(teamId) + 1})`,
+          sql: `UPDATE public.teams SET owner_id = $2 WHERE id = $1`,
+          params: [teamId, ownerId],
+        });
+      }
+    }
   }
 
   // Step 5: delete harness teams that we created (state-informed) or

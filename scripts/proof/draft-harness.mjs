@@ -113,6 +113,30 @@ const AUTOPICK_TIMEOUT_MS = (() => {
 })();
 const S5_PRE_AUTOPICK_PICKS = parseInt(opt('s5-pre-autopick-picks', '3'), 10);
 
+// DR-2 (2026-07-29) — --human-slot=N tells the driver to SKIP driving
+// the pick whose snake team is slot N, and instead WAIT (generous
+// timeout via --human-wait-ms; default = pickClock*1000 + 15000) for
+// the seq to advance externally (a real user submitting via the
+// browser). On arrival, the driver resumes. The waited pick is a
+// full sample in delivery stats; it counts toward the 12/12 acceptance
+// criterion. Soft-skip: if the human times out, the driver continues
+// with the next pick's harness driver — but the summary prints a
+// first-class "HUMAN PICK: TIMED OUT" line per architect Q6 amendment.
+const humanSlotArg = opt('human-slot', null);
+const HUMAN_SLOT = humanSlotArg !== null ? parseInt(humanSlotArg, 10) : null;
+const humanWaitArg = opt('human-wait-ms', null);
+const HUMAN_WAIT_MS = humanWaitArg !== null
+  ? parseInt(humanWaitArg, 10)
+  : (EXPECTED_PICK_CLOCK_SEC !== null && EXPECTED_PICK_CLOCK_SEC !== undefined
+      ? (parseInt(EXPECTED_PICK_CLOCK_SEC, 10) * 1000 + 15_000)
+      : 45_000);
+if (HUMAN_SLOT !== null) {
+  if (!Number.isFinite(HUMAN_SLOT) || HUMAN_SLOT < 1 || HUMAN_SLOT > 12) {
+    console.error(`FATAL: invalid --human-slot value ${HUMAN_SLOT} (expected 1..12).`);
+    process.exit(2);
+  }
+}
+
 if (flag('help') || flag('h')) {
   console.log(`Usage: node scripts/proof/draft-harness.mjs --scenario=<S1|S2|S3|S4|S5> [options]
 
@@ -355,8 +379,88 @@ async function runPickDriver(initialPgClient, wsClients) {
   // auth.role() returns 'service_role' (per live-proof pattern).
   await pgClient.query(`SET SESSION "request.jwt.claims" TO '{"role":"service_role"}'`);
 
+  // DR-2 (2026-07-29): human-slot outcome tracker. Populated by the
+  // human-wait path; consumed by the summary block for the mandatory
+  // first-class outcome line (architect Q6 amendment).
+  const humanOutcomes = [];
+
   for (let pickNumber = 1; pickNumber <= TOTAL_PICKS; pickNumber++) {
     const { round, teamId } = snakeTeamForPick(pickNumber);
+
+    // DR-2 (2026-07-29): if this pick's team is the --human-slot team,
+    // SKIP the RPC and WAIT for the seq to advance externally via any
+    // client's WS event stream. Soft-skip on timeout so post-human
+    // picks continue driving (matches architect Q6 ratification).
+    if (
+      HUMAN_SLOT !== null &&
+      teamId === HARNESS_TEAM_IDS[HUMAN_SLOT - 1]
+    ) {
+      console.log(
+        `  pick ${String(pickNumber).padStart(3)}  team=${teamId.slice(0, 8)}  ` +
+          `HUMAN SLOT (skip harness driver; wait up to ${HUMAN_WAIT_MS} ms)`,
+      );
+      // Any client's onEvent captures the human's pick_submitted event
+      // (matched by pickNumber inside the wire payload). We register a
+      // one-shot listener per client and race until either the earliest
+      // client receives it OR the timeout fires.
+      const humanWaitStart = Date.now();
+      const perClientHumanReceived = new Map(
+        wsClients.map((c) => [c.clientLabel, null]),
+      );
+      let humanSeq = null;
+      for (const c of wsClients) {
+        c.onEvent(({ frame, receivedAt, seq }) => {
+          const parsed = frame.parsed;
+          if (!parsed || parsed.type !== 'event') return;
+          const p = parsed.payload;
+          if (!p || p.pickNumber !== pickNumber) return;
+          if (perClientHumanReceived.get(c.clientLabel) !== null) return;
+          perClientHumanReceived.set(c.clientLabel, receivedAt);
+          if (humanSeq === null && Number.isFinite(seq)) humanSeq = seq;
+        });
+      }
+      // Poll every 500 ms.
+      while (Date.now() - humanWaitStart < HUMAN_WAIT_MS) {
+        const allReceived = [...perClientHumanReceived.values()].every(
+          (v) => v !== null,
+        );
+        if (allReceived) break;
+        await sleep(500);
+      }
+      const delivered = [...perClientHumanReceived.values()].filter(
+        (v) => v !== null,
+      ).length;
+      const elapsedMs = Date.now() - humanWaitStart;
+      if (delivered === wsClients.length) {
+        console.log(
+          `  ✓ HUMAN PICK: RECEIVED at pick ${pickNumber} (delivered ${delivered}/${wsClients.length}, elapsed=${elapsedMs} ms, seq=${humanSeq ?? '?'})`,
+        );
+        humanOutcomes.push({
+          pickNumber,
+          outcome: 'received',
+          delivered,
+          expected: wsClients.length,
+          elapsedMs,
+          seq: humanSeq,
+        });
+      } else {
+        console.log(
+          `  ✗ HUMAN PICK: TIMED OUT — autopick covered; acceptance criterion NOT met (delivered ${delivered}/${wsClients.length} within ${HUMAN_WAIT_MS} ms)`,
+        );
+        humanOutcomes.push({
+          pickNumber,
+          outcome: 'timeout',
+          delivered,
+          expected: wsClients.length,
+          elapsedMs,
+          seq: humanSeq,
+        });
+      }
+      // Regardless of outcome, continue driving. Next pick's snake
+      // team is computed from pickNumber+1 on the next loop iter.
+      continue;
+    }
+
     const playerId = HARNESS_PLAYER_IDS[pickNumber - 1];
     const idempotencyKey = randomUUID();
     const sessionId = randomUUID();
@@ -552,7 +656,7 @@ async function runPickDriver(initialPgClient, wsClients) {
     }
   }
 
-  return samples;
+  return { samples, humanOutcomes };
 }
 
 // ── pg client factory ───────────────────────────────────────────────
@@ -614,7 +718,7 @@ async function main() {
     // Run the pick driver.
     console.log('');
     console.log('── PICK DRIVER ──');
-    const samples = await runPickDriver(pgClient, wsClients);
+    const { samples, humanOutcomes } = await runPickDriver(pgClient, wsClients);
 
     // Chunk 11g.10 sub-step 10c-2 batch 1 (item 4): S5 autopick-wait
     // phase. After the pre-autopick picks land, STOP the driver and
@@ -743,9 +847,32 @@ async function main() {
       paced: BURST ? 'burst' : `${PACE_MIN_MS}-${PACE_MAX_MS} ms jitter`,
       runId: RUN_ID,
     });
-    console.log(summary);
+    // DR-2 (2026-07-29) — first-class HUMAN PICK outcome block per
+    // architect Q6 amendment. Prints RECEIVED at pick N (delivered
+    // 12/12) OR TIMED OUT — a WARN buried in scroll is not evidence.
+    let humanBlock = '';
+    if (HUMAN_SLOT !== null) {
+      humanBlock += '\n══ DR-2 HUMAN PICK OUTCOMES ══\n';
+      if (humanOutcomes.length === 0) {
+        humanBlock +=
+          `  (no human-slot picks driven — --human-slot=${HUMAN_SLOT} but the driver did not reach that pick)\n`;
+      } else {
+        for (const o of humanOutcomes) {
+          if (o.outcome === 'received') {
+            humanBlock +=
+              `  ✓ HUMAN PICK: RECEIVED at pick ${o.pickNumber} (delivered ${o.delivered}/${o.expected}, elapsed=${o.elapsedMs} ms, seq=${o.seq ?? '?'})\n`;
+          } else {
+            humanBlock +=
+              `  ✗ HUMAN PICK: TIMED OUT at pick ${o.pickNumber} — autopick covered; acceptance criterion NOT met (delivered ${o.delivered}/${o.expected} within ${HUMAN_WAIT_MS} ms)\n`;
+          }
+        }
+      }
+      humanBlock += '\n';
+    }
+    const fullSummary = summary + humanBlock;
+    console.log(fullSummary);
     const summaryPath = join(OUT_DIR, `${SCENARIO}-${RUN_ID}.summary.txt`);
-    await writeFile(summaryPath, summary + '\n');
+    await writeFile(summaryPath, fullSummary + '\n');
     console.log(`  summary written: ${summaryPath}`);
     console.log('');
     console.log('── DONE. Reset before next scenario:  node scripts/proof/fixture-12.mjs --reset --execute ──');

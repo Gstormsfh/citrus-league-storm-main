@@ -7,7 +7,7 @@
 // route to the store.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, act, within } from '@testing-library/react';
+import { render, screen, cleanup, act, within, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import type { DraftSnapshot, BufferedDraftEvent } from '@citrus/shared';
 import { useDraftClientStore } from '@/stores/draftClientStore';
@@ -54,10 +54,33 @@ vi.mock('@/lib/draftClient/fetchDraftOrderMatrix', () => ({
   fetchDraftOrderMatrix: fetchDraftOrderMatrixMock,
 }));
 
+// DR-2 — mock submitPick + apiClient.get (for /my-team fetch).
+const { submitPickMock, apiClientGetMock } = vi.hoisted(() => ({
+  submitPickMock: vi.fn(),
+  apiClientGetMock: vi.fn(),
+}));
+vi.mock('@/lib/draftClient/submitPick', () => ({
+  submitPick: submitPickMock,
+}));
+vi.mock('@/api/client', () => ({
+  apiClient: {
+    get: apiClientGetMock,
+    post: vi.fn(),
+    put: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
+
+// DR-2 — mock sonner's toast so tests can assert on error messages.
+const { toastErrorMock } = vi.hoisted(() => ({
+  toastErrorMock: vi.fn(),
+}));
+
 // Mock sonner so toast helpers don't render real toasts in tests.
 vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), {
-    error: vi.fn(),
+    error: toastErrorMock,
     success: vi.fn(),
   }),
 }));
@@ -79,6 +102,9 @@ beforeEach(() => {
   subscribeMock.mockClear();
   requestResyncForGapMock.mockClear();
   fetchDraftOrderMatrixMock.mockReset();
+  submitPickMock.mockReset();
+  apiClientGetMock.mockReset();
+  toastErrorMock.mockReset();
   // Default happy-path: matrix returns a 12x3 snake matrix for
   // team-1..team-12. Individual tests can override.
   const teams = Array.from({ length: 12 }, (_, i) => `team-${i + 1}`);
@@ -92,6 +118,9 @@ beforeEach(() => {
     }
   }
   fetchDraftOrderMatrixMock.mockResolvedValue(matrix);
+  // Default: not a team owner (spectator). Individual tests override
+  // apiClientGetMock to install a myTeamId.
+  apiClientGetMock.mockResolvedValue({ data: null });
   useDraftClientStore.getState().reset();
 });
 
@@ -348,6 +377,346 @@ describe('DraftRoomV2 (chunk 11g.5b)', () => {
         await Promise.resolve();
       });
       expect(requestResyncForGapMock).toHaveBeenCalledWith(1);
+    });
+  });
+
+  // ── DR-2 (2026-07-29) — submit-pick control ─────────────────────
+  describe('DR-2 — SubmitPickControl', () => {
+    // Helper: pull the onSnapshot / onEvent callbacks from the last
+    // connect() call.
+    function callbacks() {
+      const [, cbs] = connectMock.mock.calls[connectMock.mock.calls.length - 1];
+      return cbs as {
+        onSnapshot: (s: DraftSnapshot) => void;
+        onEvent: (e: BufferedDraftEvent) => void;
+        onEvents: (evs: ReadonlyArray<BufferedDraftEvent>) => void;
+        onPresence: (p: unknown) => void;
+        onError: (e: unknown) => void;
+      };
+    }
+    function markConnected() {
+      const [listener] = subscribeMock.mock.calls[
+        subscribeMock.mock.calls.length - 1
+      ] as [(state: unknown) => void];
+      act(() => {
+        listener({
+          kind: 'connected',
+          wsUrl: 'wss://x',
+          sessionId: 's1',
+          lastSeenSeq: 0,
+        });
+      });
+    }
+    function pickEvent(
+      seq: number,
+      teamId: string,
+      pickNumber: number,
+      roundNumber: number,
+      correlationId?: string,
+    ): BufferedDraftEvent {
+      return {
+        kind: 'pick_submitted',
+        seq,
+        timestamp: `2026-07-29T00:00:${String(seq).padStart(2, '0')}.000Z`,
+        teamId,
+        playerId: 8478000 + seq,
+        roundNumber,
+        pickNumber,
+        correlationId: correlationId ?? `corr-${seq}`,
+      };
+    }
+    const emptySnap: DraftSnapshot = {
+      lobbyId: 'lobby-1',
+      format: 'snake',
+      recentEvents: [],
+      stateSnapshot: {
+        currentPickNumber: null,
+        currentRoundNumber: null,
+        onClockTeamId: null,
+        picksMade: 0,
+        totalPicks: 36,
+        draftStatus: 'not_started',
+        currentPickDeadline: null,
+      },
+    };
+    // DR-2 acceptance scenario: harness drives picks 1-2, then human
+    // (owner of team-3) is on-clock at pick 3. This snapshot mirrors
+    // the state at that moment — 2 events pre-loaded so the derivation
+    // transitions status → in_progress and on-clock advances to team-3.
+    const snapWith2PicksTeam3OnClock: DraftSnapshot = {
+      lobbyId: 'lobby-1',
+      format: 'snake',
+      recentEvents: [
+        {
+          kind: 'pick_submitted',
+          seq: 1,
+          timestamp: '2026-07-29T00:00:01.000Z',
+          teamId: 'team-1',
+          playerId: 8478001,
+          roundNumber: 1,
+          pickNumber: 1,
+          correlationId: 'pre-1',
+        },
+        {
+          kind: 'pick_submitted',
+          seq: 2,
+          timestamp: '2026-07-29T00:00:02.000Z',
+          teamId: 'team-2',
+          playerId: 8478002,
+          roundNumber: 1,
+          pickNumber: 2,
+          correlationId: 'pre-2',
+        },
+      ],
+      stateSnapshot: {
+        // Convenience fields deliberately mid-stale — the derivation
+        // ignores them anyway (F4 fix).
+        currentPickNumber: 3,
+        currentRoundNumber: 1,
+        onClockTeamId: 'team-3',
+        picksMade: 2,
+        totalPicks: 36,
+        draftStatus: 'in_progress',
+        currentPickDeadline: '2026-07-29T00:00:32.000Z',
+      },
+    };
+    async function bootRoomAsTeam3OwnerOnClock() {
+      // Install my-team = team-3 (on-clock at pick 3 after 2 pre-picks).
+      apiClientGetMock.mockResolvedValue({ data: { id: 'team-3' } });
+      renderRoute('/draft-v2/league-abc/draft-xyz');
+      markConnected();
+      await act(async () => {
+        callbacks().onSnapshot(snapWith2PicksTeam3OnClock);
+        // Yield for matrix fetch + my-team fetch.
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+    }
+
+    it('does NOT render the control for a spectator (no myTeamId)', async () => {
+      // Default apiClientGetMock returns {data: null} → spectator.
+      renderRoute('/draft-v2/league-abc/draft-xyz');
+      markConnected();
+      await act(async () => {
+        callbacks().onSnapshot(emptySnap);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.queryByTestId('submit-pick-control')).not.toBeInTheDocument();
+    });
+
+    it('does NOT render the control when off-clock (myTeamId set but not on-clock)', async () => {
+      // My team is team-5; on-clock is team-1.
+      apiClientGetMock.mockResolvedValue({ data: { id: 'team-5' } });
+      renderRoute('/draft-v2/league-abc/draft-xyz');
+      markConnected();
+      await act(async () => {
+        callbacks().onSnapshot(emptySnap);
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      // Fire pick 1 (team-1) — on-clock becomes team-2 next.
+      // But even before, at not_started, on-clock is null. Then
+      // status transitions to in_progress after pick 1 — on-clock
+      // becomes team-2. Team-5 is never on the clock during this
+      // window; control should stay hidden.
+      expect(screen.queryByTestId('submit-pick-control')).not.toBeInTheDocument();
+    });
+
+    it('RENDERS the control when derived.onClockTeamId === myTeamId', async () => {
+      await bootRoomAsTeam3OwnerOnClock();
+      // After folding 2 pre-picks, on-clock is team-3 (matches
+      // myTeamId). Control should be visible showing Pick 3 · Round 1.
+      const control = await screen.findByTestId('submit-pick-control');
+      expect(control).toBeInTheDocument();
+      expect(within(control).getByText(/Pick 3/)).toBeInTheDocument();
+      expect(within(control).getByText(/Round 1/)).toBeInTheDocument();
+    });
+
+    it('SUBMIT HAPPY PATH: click → optimistic pending → broadcast confirms', async () => {
+      await bootRoomAsTeam3OwnerOnClock();
+      let attemptId = '';
+      submitPickMock.mockImplementationOnce(async (input) => {
+        attemptId = input.attemptId;
+        return {
+          ok: true,
+          eventId: '1',
+          seq: 1,
+          pickDeadline: null,
+          wasDuplicate: false,
+        };
+      });
+
+      const control = screen.getByTestId('submit-pick-control');
+      const input = within(control).getByTestId('submit-pick-input');
+      const button = within(control).getByTestId('submit-pick-button');
+
+      await act(async () => {
+        fireEvent.change(input, { target: { value: '8478000' } });
+        fireEvent.click(button);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(submitPickMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          leagueId: 'league-abc',
+          teamId: 'team-3',
+          playerId: 8478000,
+          roundNumber: 1,
+          pickNumber: 3,
+        }),
+      );
+
+      // Pending recorded → control disabled.
+      const state = useDraftClientStore.getState();
+      expect(state.pendingActions.size).toBe(1);
+      expect(state.pendingActions.has(attemptId)).toBe(true);
+
+      // Simulate the broadcast: engine echoes an event with matching
+      // correlationId (== attemptId). store.applyEvent →
+      // reconcileOnBroadcast removes the pending entry.
+      await act(async () => {
+        callbacks().onEvent(pickEvent(3, 'team-3', 3, 1, attemptId));
+        await Promise.resolve();
+      });
+      expect(useDraftClientStore.getState().pendingActions.size).toBe(0);
+    });
+
+    it('SUBMIT REJECTION: server error rolls back with the mapped copy in a toast', async () => {
+      await bootRoomAsTeam3OwnerOnClock();
+      submitPickMock.mockResolvedValueOnce({
+        ok: false,
+        reason: 'player_taken',
+        message: 'Someone already took that player',
+        statusCode: 409,
+      });
+
+      const control = screen.getByTestId('submit-pick-control');
+      const input = within(control).getByTestId('submit-pick-input');
+      const button = within(control).getByTestId('submit-pick-button');
+      await act(async () => {
+        fireEvent.change(input, { target: { value: '8478000' } });
+        fireEvent.click(button);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // Toast fired with the mapped copy.
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        'Someone already took that player',
+      );
+      // Pending entry marked rolled_back (kept for animation).
+      const state = useDraftClientStore.getState();
+      const entry = Array.from(state.pendingActions.values())[0];
+      expect(entry?.optimisticState).toBe('rolled_back');
+      expect(entry?.rejectionReason).toContain('already took that player');
+    });
+
+    it('CLOCK-RAN-OUT race: pick_out_of_order → clock_expired copy', async () => {
+      await bootRoomAsTeam3OwnerOnClock();
+      submitPickMock.mockResolvedValueOnce({
+        ok: false,
+        reason: 'clock_expired',
+        message: 'Your clock ran out — autopick made your choice',
+        statusCode: 409,
+      });
+      const control = screen.getByTestId('submit-pick-control');
+      const input = within(control).getByTestId('submit-pick-input');
+      const button = within(control).getByTestId('submit-pick-button');
+      await act(async () => {
+        fireEvent.change(input, { target: { value: '8478000' } });
+        fireEvent.click(button);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        expect.stringContaining('autopick made your choice'),
+      );
+    });
+
+    it('8s DANGLE ROLLBACK: successful submit with no broadcast → toast + rollback after 8s (architect amendment)', async () => {
+      vi.useFakeTimers();
+      try {
+        await bootRoomAsTeam3OwnerOnClock();
+        let attemptId = '';
+        submitPickMock.mockImplementationOnce(async (input) => {
+          attemptId = input.attemptId;
+          return {
+            ok: true,
+            eventId: '1',
+            seq: 1,
+            pickDeadline: null,
+            wasDuplicate: false,
+          };
+        });
+        const control = screen.getByTestId('submit-pick-control');
+        const input = within(control).getByTestId('submit-pick-input');
+        const button = within(control).getByTestId('submit-pick-button');
+        await act(async () => {
+          fireEvent.change(input, { target: { value: '8478000' } });
+          fireEvent.click(button);
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+        // Pending recorded; broadcast has NOT arrived.
+        expect(useDraftClientStore.getState().pendingActions.has(attemptId)).toBe(true);
+        // Advance past 8s.
+        await act(async () => {
+          vi.advanceTimersByTime(8100);
+          await Promise.resolve();
+        });
+        // Toast fired with the architect-mandated copy.
+        expect(toastErrorMock).toHaveBeenCalledWith(
+          expect.stringContaining("check the board"),
+        );
+        // Pending entry marked rolled_back.
+        const entry = useDraftClientStore.getState().pendingActions.get(attemptId);
+        expect(entry?.optimisticState).toBe('rolled_back');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('OFF-CLOCK BROADCAST INTERLEAVE: another team\'s pick lands during pending; store still tracks our pending', async () => {
+      // Regression note (i) from DR-2 Phase 1: gap detection or
+      // another team's broadcast should NOT accidentally clear OUR
+      // pending action. reconcileOnBroadcast only removes when
+      // correlationId matches — verify.
+      await bootRoomAsTeam3OwnerOnClock();
+      let attemptId = '';
+      submitPickMock.mockImplementationOnce(async (input) => {
+        attemptId = input.attemptId;
+        return {
+          ok: true,
+          eventId: '1',
+          seq: 1,
+          pickDeadline: null,
+          wasDuplicate: false,
+        };
+      });
+      const control = screen.getByTestId('submit-pick-control');
+      const input = within(control).getByTestId('submit-pick-input');
+      const button = within(control).getByTestId('submit-pick-button');
+      await act(async () => {
+        fireEvent.change(input, { target: { value: '8478000' } });
+        fireEvent.click(button);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(useDraftClientStore.getState().pendingActions.has(attemptId)).toBe(true);
+      // Someone else's pick arrives with a DIFFERENT correlationId —
+      // our pending should stay.
+      await act(async () => {
+        callbacks().onEvent(pickEvent(3, 'team-3', 3, 1, 'someone-else'));
+        await Promise.resolve();
+      });
+      expect(useDraftClientStore.getState().pendingActions.has(attemptId)).toBe(true);
+      expect(useDraftClientStore.getState().pendingActions.get(attemptId)?.optimisticState).toBe(
+        'pending',
+      );
     });
   });
 });

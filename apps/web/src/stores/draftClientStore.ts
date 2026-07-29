@@ -58,6 +58,17 @@ interface DraftClientStoreState {
   // Mirror of `runner.getState()` — kept in sync via runner.subscribe.
   connectionState: DraftClientState;
   /**
+   * DR-2 (2026-07-29) — the caller's teamId in this league. Fetched by
+   * the page on room mount via `GET /api/leagues/:leagueId/my-team`.
+   * Consumed by the submit-pick control's on-clock gating (control
+   * renders iff `derived.onClockTeamId === myTeamId`).
+   *
+   * `null` before the fetch resolves and stays `null` if the caller
+   * isn't a team owner in this league (spectator flow — control never
+   * renders).
+   */
+  myTeamId: string | null;
+  /**
    * Latest server snapshot, or null if none received yet.
    *
    * DR-1b (2026-07-28) note: `stateSnapshot.currentPickNumber`,
@@ -102,6 +113,8 @@ interface DraftClientStoreState {
 
   // ── Setters / reducers ─────────────────────────────────────────
   setConnectionState: (state: DraftClientState) => void;
+  /** DR-2 (2026-07-29) — set the caller's teamId in this league. */
+  setMyTeamId: (teamId: string | null) => void;
   setSnapshot: (snapshot: DraftSnapshot) => void;
   applyEvent: (event: BufferedDraftEvent) => void;
   applyEvents: (events: ReadonlyArray<BufferedDraftEvent>) => void;
@@ -133,6 +146,7 @@ interface DraftClientStoreState {
 const initialState: Omit<
   DraftClientStoreState,
   | 'setConnectionState'
+  | 'setMyTeamId'
   | 'setSnapshot'
   | 'applyEvent'
   | 'applyEvents'
@@ -145,6 +159,7 @@ const initialState: Omit<
   | 'reset'
 > = {
   connectionState: { kind: 'idle' },
+  myTeamId: null,
   snapshot: null,
   derivedState: null,
   matrix: null,
@@ -158,6 +173,8 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
   ...initialState,
 
   setConnectionState: (state) => set({ connectionState: state }),
+
+  setMyTeamId: (teamId) => set({ myTeamId: teamId }),
 
   setSnapshot: (snapshot) =>
     set((prev) => {
@@ -310,6 +327,7 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
   reset: () =>
     set({
       connectionState: { kind: 'idle' },
+      myTeamId: null,
       snapshot: null,
       derivedState: null,
       matrix: null,
@@ -357,4 +375,10 @@ export const useDraftMatrix = () => useDraftClientStore((s) => s.matrix);
  */
 export const useDraftLastFoldGaps = () =>
   useDraftClientStore((s) => s.lastFoldGaps);
+
+/**
+ * DR-2 (2026-07-29) — the caller's teamId in this league (null before
+ * fetch resolves or if the caller is a spectator).
+ */
+export const useMyTeamId = () => useDraftClientStore((s) => s.myTeamId);
 

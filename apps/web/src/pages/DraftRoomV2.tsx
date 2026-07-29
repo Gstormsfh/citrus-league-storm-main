@@ -17,8 +17,9 @@
 // `/draft-room` for the cutover-safety window — chunk 11g.9 retires
 // v1 once all leagues have migrated.
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { ConnectionBanner } from '@/components/draft/v2/ConnectionBanner';
 import {
   DraftTimerV2,
@@ -26,6 +27,7 @@ import {
 } from '@/components/draft/v2/DraftTimerV2';
 import { DraftClientRunner } from '@/lib/draftClient/runner';
 import { fetchDraftOrderMatrix } from '@/lib/draftClient/fetchDraftOrderMatrix';
+import { submitPick } from '@/lib/draftClient/submitPick';
 import {
   useDraftClientStore,
   useDraftConnectionState,
@@ -33,6 +35,8 @@ import {
   usePresence,
   useDerivedDraftState,
   useDraftLastFoldGaps,
+  useMyTeamId,
+  usePendingActions,
 } from '@/stores/draftClientStore';
 import {
   notifyConnectionFatal,
@@ -52,6 +56,35 @@ export default function DraftRoomV2() {
   // frame's `timestamp` field; blended into an EMA. See
   // `useClockOffsetEstimator` in DraftTimerV2.tsx.
   const { offsetMs: clockOffsetMs, updateOffset } = useClockOffsetEstimator();
+
+  // DR-2 (2026-07-29) — fetch the caller's teamId in this league on
+  // mount. Non-fatal on failure (spectator flow): the submit control
+  // simply never renders when myTeamId stays null. Uses the existing
+  // v1 route GET /api/leagues/:id/my-team. Dynamic import keeps
+  // vi.mock hoisting clean for the page tests.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { apiClient } = await import('@/api/client');
+        const response = await apiClient.get<{ id?: string }>(
+          `/api/leagues/${encodeURIComponent(leagueId)}/my-team`,
+        );
+        if (cancelled) return;
+        const payload = response.data ?? (response as unknown as { id?: string });
+        const teamId =
+          payload && typeof payload === 'object' && typeof payload.id === 'string'
+            ? payload.id
+            : null;
+        useDraftClientStore.getState().setMyTeamId(teamId);
+      } catch {
+        // Non-fatal — spectator flow.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
 
   // Mount: instantiate runner, wire callbacks to store, connect.
   // Unmount: disconnect + reset store.
@@ -188,18 +221,178 @@ export default function DraftRoomV2() {
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Draft Room v2</h1>
       <ConnectionBanner onRetryNow={handleRetryNow} />
-      <DraftStateView clockOffsetMs={clockOffsetMs} />
+      <DraftStateView clockOffsetMs={clockOffsetMs} leagueId={leagueId} />
+    </div>
+  );
+}
+
+// ── DR-2 (2026-07-29) — submit-pick control ────────────────────────
+//
+// Minimal by design (PlayerPool + player picker land in DR-3): text
+// input for playerId + Submit button, double-click guard via disabled
+// state while a pending action exists. Optimistic:
+//   1. Generate attemptId (UUIDv4).
+//   2. store.recordPending({correlationId=attemptId, ...}) — control
+//      disables + shows "Submitting…".
+//   3. submitPick(...) — 8s timeout inside apiClient.
+//   4a. Success → the WS broadcast will arrive with matching
+//       correlationId and reconcileOnBroadcast (already wired into
+//       store.applyEvent) removes the pending entry.
+//   4b. Failure → store.rollBackPending + toast with the mapped copy.
+//
+// Post-submit safety timer (architect amendment): even on a
+// successful HTTP submit, if no broadcast lands within 8s the pending
+// pick dangles forever — so we schedule a rollback that fires if the
+// entry is still pending after 8s. If the broadcast beat it,
+// rollBackPending is a no-op (correlationId already removed).
+interface SubmitPickControlProps {
+  leagueId: string;
+  teamId: string;
+  roundNumber: number;
+  pickNumber: number;
+}
+
+function SubmitPickControl({
+  leagueId,
+  teamId,
+  roundNumber,
+  pickNumber,
+}: SubmitPickControlProps) {
+  const [playerIdText, setPlayerIdText] = useState('');
+  const pendingActions = usePendingActions();
+  // We only care about pending actions submitted from THIS control —
+  // i.e., ones for our team. Rendered as "you have a pending pick".
+  const myPending = useMemo(
+    () =>
+      Array.from(pendingActions.values()).find(
+        (p) => p.teamId === teamId && p.optimisticState === 'pending',
+      ) ?? null,
+    [pendingActions, teamId],
+  );
+  const disabled = myPending !== null;
+
+  const handleSubmit = async () => {
+    const playerId = parseInt(playerIdText.trim(), 10);
+    if (!Number.isFinite(playerId) || playerId <= 0) {
+      toast.error('Enter a valid player ID');
+      return;
+    }
+    const attemptId = crypto.randomUUID();
+    const submittedAt = Date.now();
+    // Optimistic entry — control disables via pendingActions.
+    useDraftClientStore.getState().recordPending({
+      correlationId: attemptId,
+      teamId,
+      playerId,
+      submittedAt,
+    });
+
+    // Dangle-safety timer (architect amendment): if no broadcast lands
+    // within 8s and no synchronous rejection fired, the connection may
+    // have swallowed a confirm. Roll back with the "check the board"
+    // copy so the user sees a clear signal; the fold will show the
+    // pick if it actually landed.
+    const dangleTimer = setTimeout(() => {
+      const current = useDraftClientStore
+        .getState()
+        .pendingActions.get(attemptId);
+      if (current !== undefined && current.optimisticState === 'pending') {
+        useDraftClientStore
+          .getState()
+          .rollBackPending(
+            attemptId,
+            "We couldn't confirm your pick — check the board",
+          );
+        toast.error("We couldn't confirm your pick — check the board");
+      }
+    }, 8000);
+
+    try {
+      const result = await submitPick({
+        leagueId,
+        teamId,
+        playerId,
+        roundNumber,
+        pickNumber,
+        attemptId,
+      });
+      if (!result.ok) {
+        // Synchronous rejection — roll back immediately. The dangle
+        // timer's guard will find the entry already rolled_back and
+        // no-op, so it's safe to leave the timer running.
+        useDraftClientStore
+          .getState()
+          .rollBackPending(attemptId, result.message);
+        toast.error(result.message);
+      }
+      // On success: DO NOT clear the dangle timer (architect amendment
+      // 2026-07-29). A connected socket with a lost confirm must not
+      // dangle a pending pick forever — even a successful HTTP submit
+      // needs the safety net. If the broadcast arrives before 8s, the
+      // timer's guard finds no pending entry and is a no-op.
+    } catch (err) {
+      // Defensive — submitPick catches its own errors and returns a
+      // typed result. Any error here is a programming bug; still
+      // roll back to avoid dangling optimistic state. Dangle timer
+      // left running per the same architect amendment.
+      useDraftClientStore
+        .getState()
+        .rollBackPending(attemptId, 'Unexpected error');
+      toast.error('Unexpected error');
+      void err;
+    } finally {
+      setPlayerIdText('');
+    }
+  };
+
+  return (
+    <div
+      className="border rounded-md p-3 bg-card space-y-2"
+      data-testid="submit-pick-control"
+    >
+      <div className="text-sm font-semibold">You're on the clock</div>
+      <div className="text-xs text-muted-foreground">
+        Pick {pickNumber} · Round {roundNumber}
+      </div>
+      <div className="flex gap-2 items-center">
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="Player ID"
+          className="flex-1 rounded border px-2 py-1 text-sm"
+          value={playerIdText}
+          disabled={disabled}
+          onChange={(e) => setPlayerIdText(e.target.value)}
+          data-testid="submit-pick-input"
+        />
+        <button
+          type="button"
+          className="rounded bg-primary text-primary-foreground px-3 py-1 text-sm disabled:opacity-50"
+          disabled={disabled}
+          onClick={handleSubmit}
+          data-testid="submit-pick-button"
+        >
+          {disabled ? 'Submitting…' : 'Submit pick'}
+        </button>
+      </div>
     </div>
   );
 }
 
 // ── Barebones state view (5b minimum surface) ──────────────────────
 
-function DraftStateView({ clockOffsetMs }: { clockOffsetMs: number }) {
+function DraftStateView({
+  clockOffsetMs,
+  leagueId,
+}: {
+  clockOffsetMs: number;
+  leagueId: string;
+}) {
   const connectionState = useDraftConnectionState();
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
   const presentUserIds = usePresence();
+  const myTeamId = useMyTeamId();
 
   if (connectionState.kind === 'idle') {
     return null;
@@ -227,6 +420,21 @@ function DraftStateView({ clockOffsetMs }: { clockOffsetMs: number }) {
   // 3 C2 keeps it fresh via the applyEvent's pickDeadline mirror).
   return (
     <div className="mt-4 space-y-4" data-testid="draft-state-view">
+      {/* DR-2 (2026-07-29): submit control renders ONLY when the
+         caller's team is on the clock. Spectators + off-clock members
+         see nothing here. */}
+      {derived.onClockTeamId !== null &&
+        myTeamId !== null &&
+        derived.onClockTeamId === myTeamId &&
+        derived.currentPickNumber !== null &&
+        derived.currentRoundNumber !== null && (
+          <SubmitPickControl
+            leagueId={leagueId}
+            teamId={myTeamId}
+            roundNumber={derived.currentRoundNumber}
+            pickNumber={derived.currentPickNumber}
+          />
+        )}
       <DraftTimerV2
         currentPickDeadline={snapshot.stateSnapshot.currentPickDeadline}
         draftStatus={derived.draftStatus}

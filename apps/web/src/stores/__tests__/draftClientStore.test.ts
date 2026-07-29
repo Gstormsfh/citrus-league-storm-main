@@ -413,3 +413,28 @@ describe('draftClientStore — DR-1b derived state', () => {
     expect(after.snapshot).toBeNull();
   });
 });
+
+// ── DR-2 (2026-07-29) — myTeamId slice ────────────────────────────
+
+describe('draftClientStore — DR-2 myTeamId', () => {
+  it('starts null', () => {
+    expect(useDraftClientStore.getState().myTeamId).toBeNull();
+  });
+
+  it('setMyTeamId writes the value', () => {
+    useDraftClientStore.getState().setMyTeamId('team-3');
+    expect(useDraftClientStore.getState().myTeamId).toBe('team-3');
+  });
+
+  it('setMyTeamId(null) clears the value (spectator flow)', () => {
+    useDraftClientStore.getState().setMyTeamId('team-3');
+    useDraftClientStore.getState().setMyTeamId(null);
+    expect(useDraftClientStore.getState().myTeamId).toBeNull();
+  });
+
+  it('reset clears myTeamId', () => {
+    useDraftClientStore.getState().setMyTeamId('team-3');
+    useDraftClientStore.getState().reset();
+    expect(useDraftClientStore.getState().myTeamId).toBeNull();
+  });
+});
