@@ -1,0 +1,41 @@
+
+═══════════════════════════════════════════════════════════════════════════
+  MANDATE-CANDIDATE — draft harness results (10c-2)
+  These numbers are unratified until Garrett confirms the methodology
+  against them. Percentiles are single-clock (client host) unless noted.
+═══════════════════════════════════════════════════════════════════════════
+  scenario:      S5
+  client count:  12
+  pacing:        2000-5000 ms jitter
+  run id:        2026-07-29T04-00-52-001Z
+  samples total: 48   delivered: 0   dropped: 48   ordering-violations: 0
+  ⚠ SAMPLE COUNT BELOW METHODOLOGY MINIMUM (200) — numbers are informational only
+
+── FIRST-CLASS FAILURE METRICS (target 0) ──
+  drop rate:                100.00%   (48/48)
+  seq ordering violations:  0
+
+── PRIMARY — end-to-end ms (single-clock, client host) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+overall                           0.0       --       --       --       --       --
+  cold-bootstrap sample           0.0       --       --       --       --       --
+  warm                            0.0       --       --       --       --       --
+
+── PER-CLIENT — end-to-end ms (single-clock) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+
+── ENGINE-INTERNAL SPLITS — ms (from external_event.applied; cross-clock, informational) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+applyMs                           0.0       --       --       --       --       --
+broadcastMs                       0.0       --       --       --       --       --
+notifyToBroadcastMs               0.0       --       --       --       --       --
+
+── RPC — pg submit_pick_v2 round-trip ms (single-clock) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+rpc_ms                           48.0     50.5     74.0     74.0     74.0     74.0 ⚠<200
+
+═══════════════════════════════════════════════════════════════════════════
