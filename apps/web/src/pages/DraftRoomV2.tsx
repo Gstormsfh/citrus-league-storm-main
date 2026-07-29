@@ -62,23 +62,35 @@ export default function DraftRoomV2() {
   // simply never renders when myTeamId stays null. Uses the existing
   // v1 route GET /api/leagues/:id/my-team. Dynamic import keeps
   // vi.mock hoisting clean for the page tests.
+  //
+  // DR-2 round-2 diagnostic (2026-07-29): expose the outcome via
+  // console.log AND via the debug overlay in DraftStateView so the
+  // "control never rendered" bug is diagnosable at the pixel level.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const { apiClient } = await import('@/api/client');
-        const response = await apiClient.get<{ id?: string }>(
-          `/api/leagues/${encodeURIComponent(leagueId)}/my-team`,
-        );
+        const path = `/api/leagues/${encodeURIComponent(leagueId)}/my-team`;
+        // eslint-disable-next-line no-console
+        console.log('[DR-2 my-team] fetching', path);
+        const response = await apiClient.get<{ id?: string }>(path);
         if (cancelled) return;
+        // eslint-disable-next-line no-console
+        console.log('[DR-2 my-team] response', response);
         const payload = response.data ?? (response as unknown as { id?: string });
         const teamId =
           payload && typeof payload === 'object' && typeof payload.id === 'string'
             ? payload.id
             : null;
+        // eslint-disable-next-line no-console
+        console.log('[DR-2 my-team] extracted teamId:', teamId);
         useDraftClientStore.getState().setMyTeamId(teamId);
-      } catch {
-        // Non-fatal — spectator flow.
+      } catch (err) {
+        // Non-fatal — spectator flow. But LOG the error so we can see
+        // it in the DevTools console during acceptance.
+        // eslint-disable-next-line no-console
+        console.error('[DR-2 my-team] fetch failed', err);
       }
     })();
     return () => {
@@ -429,6 +441,37 @@ function DraftStateView({
   // 3 C2 keeps it fresh via the applyEvent's pickDeadline mirror).
   return (
     <div className="mt-4 space-y-4" data-testid="draft-state-view">
+      {/* DR-2 round-2 diagnostic (2026-07-29): pixel-level view of the
+          three values the submit-control-render gate depends on.
+          Remove after acceptance passes. */}
+      <div
+        className="border border-dashed border-yellow-500 rounded p-2 text-xs font-mono bg-yellow-50"
+        data-testid="dr2-debug"
+      >
+        <div>DEBUG (remove after DR-2 ratifies)</div>
+        <div>myTeamId: {myTeamId ?? '<NOT LOADED>'}</div>
+        <div>derived.onClockTeamId: {derived.onClockTeamId ?? '<null>'}</div>
+        <div>
+          amIOnClock:{' '}
+          {myTeamId !== null &&
+          derived.onClockTeamId !== null &&
+          myTeamId === derived.onClockTeamId
+            ? 'YES — control should render below'
+            : 'no'}
+        </div>
+        <div>
+          derived.currentPickNumber:{' '}
+          {derived.currentPickNumber !== null
+            ? String(derived.currentPickNumber)
+            : '<null>'}
+        </div>
+        <div>
+          derived.currentRoundNumber:{' '}
+          {derived.currentRoundNumber !== null
+            ? String(derived.currentRoundNumber)
+            : '<null>'}
+        </div>
+      </div>
       {/* DR-2 (2026-07-29): submit control renders ONLY when the
          caller's team is on the clock. Spectators + off-clock members
          see nothing here. */}
