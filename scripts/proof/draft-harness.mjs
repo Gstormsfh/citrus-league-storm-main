@@ -399,78 +399,107 @@ async function runPickDriver(initialPgClient, wsClients) {
         `  pick ${String(pickNumber).padStart(3)}  team=${teamId.slice(0, 8)}  ` +
           `HUMAN SLOT (skip harness driver; wait up to ${HUMAN_WAIT_MS} ms)`,
       );
-      // Any client's onEvent captures the human's pick_submitted event
-      // (matched by pickNumber inside the wire payload). We register a
-      // one-shot listener per client and race until either the earliest
-      // client receives it OR the timeout fires. Also capture the
-      // event's pickDeadline (batch 2 field) so the S5 autopick-wait
-      // phase has the "next pick's deadline" to compute delta against.
+      // DR-2 (2026-07-29) EVIDENCE FIX: match ANY event with the
+      // human's expected pickNumber (whether human OR autopick), then
+      // inspect the payload to determine actor. isAutopick is a
+      // top-level field on the pick_submitted wire event
+      // (BufferedDraftEvent per @citrus/shared): present + true means
+      // engine-authored autopick, absent/false means user-submitted.
+      // Also capture playerId so the outcome line prints unambiguous
+      // evidence a human can cross-check ("the player Garrett actually
+      // typed vs the player the engine's projections chose").
       const humanWaitStart = Date.now();
-      const perClientHumanReceived = new Map(
+      const perClientEventReceived = new Map(
         wsClients.map((c) => [c.clientLabel, null]),
       );
-      const perClientHumanPickDeadline = new Map(
+      const perClientPickDeadline = new Map(
         wsClients.map((c) => [c.clientLabel, null]),
       );
-      let humanSeq = null;
+      const perClientIsAutopick = new Map(
+        wsClients.map((c) => [c.clientLabel, null]),
+      );
+      const perClientPlayerId = new Map(
+        wsClients.map((c) => [c.clientLabel, null]),
+      );
+      let observedSeq = null;
       for (const c of wsClients) {
         c.onEvent(({ frame, receivedAt, seq }) => {
           const parsed = frame.parsed;
           if (!parsed || parsed.type !== 'event') return;
           const p = parsed.payload;
           if (!p || p.pickNumber !== pickNumber) return;
-          if (perClientHumanReceived.get(c.clientLabel) !== null) return;
-          perClientHumanReceived.set(c.clientLabel, receivedAt);
+          if (perClientEventReceived.get(c.clientLabel) !== null) return;
+          perClientEventReceived.set(c.clientLabel, receivedAt);
+          perClientIsAutopick.set(c.clientLabel, p.isAutopick === true);
+          perClientPlayerId.set(c.clientLabel, p.playerId ?? null);
           if (typeof p.pickDeadline === 'string' && p.pickDeadline.length > 0) {
-            perClientHumanPickDeadline.set(c.clientLabel, p.pickDeadline);
+            perClientPickDeadline.set(c.clientLabel, p.pickDeadline);
           }
-          if (humanSeq === null && Number.isFinite(seq)) humanSeq = seq;
+          if (observedSeq === null && Number.isFinite(seq)) observedSeq = seq;
         });
       }
       // Poll every 500 ms.
       while (Date.now() - humanWaitStart < HUMAN_WAIT_MS) {
-        const allReceived = [...perClientHumanReceived.values()].every(
+        const allReceived = [...perClientEventReceived.values()].every(
           (v) => v !== null,
         );
         if (allReceived) break;
         await sleep(500);
       }
-      const delivered = [...perClientHumanReceived.values()].filter(
+      const delivered = [...perClientEventReceived.values()].filter(
         (v) => v !== null,
       ).length;
       const elapsedMs = Date.now() - humanWaitStart;
-      if (delivered === wsClients.length) {
+
+      // DR-2 EVIDENCE FIX (2026-07-29): the pick 3 broadcast event
+      // matches the wait's pickNumber filter WHETHER it was human OR
+      // engine-authored autopick. isAutopick on the wire event
+      // discriminates. All 12 clients see the SAME broadcast so the
+      // flag is consistent across clients. Print actor + player_id in
+      // the outcome line so the evidence is spoof-resistant.
+      const isAutopickAcross = [...perClientIsAutopick.values()].filter(
+        (v) => v !== null,
+      );
+      const isAutopickPickEvent =
+        isAutopickAcross.length > 0 && isAutopickAcross[0] === true;
+      const playerIdAcross = [...perClientPlayerId.values()].filter(
+        (v) => v !== null,
+      );
+      const observedPlayerId = playerIdAcross.length > 0 ? playerIdAcross[0] : null;
+      const actorLabel = isAutopickPickEvent ? 'autopick' : 'user';
+
+      if (delivered === wsClients.length && !isAutopickPickEvent) {
+        // Real human pick: all delivered AND event is NOT autopick.
         console.log(
-          `  ✓ HUMAN PICK: RECEIVED at pick ${pickNumber} (delivered ${delivered}/${wsClients.length}, elapsed=${elapsedMs} ms, seq=${humanSeq ?? '?'})`,
+          `  ✓ HUMAN PICK: RECEIVED at pick ${pickNumber} ` +
+            `(actor=${actorLabel}, player_id=${observedPlayerId}, ` +
+            `delivered ${delivered}/${wsClients.length}, ` +
+            `elapsed=${elapsedMs} ms, seq=${observedSeq ?? '?'})`,
         );
         humanOutcomes.push({
           pickNumber,
           outcome: 'received',
+          actor: actorLabel,
+          playerId: observedPlayerId,
           delivered,
           expected: wsClients.length,
           elapsedMs,
-          seq: humanSeq,
+          seq: observedSeq,
         });
         // Push per-client samples so the S5 autopick-wait phase can
-        // find `lastPickSample` and compute deltas normally. Human
-        // picks don't have an RPC round-trip we measured (they went
-        // through the API server, not the harness's pg client), so
-        // rpcMs is 0 and endToEndMs uses the earliest receive_ts as
-        // the submitCallTs proxy (best available signal).
+        // find `lastPickSample` and compute deltas normally.
         const earliestReceive = Math.min(
-          ...[...perClientHumanReceived.values()].filter(
-            (v) => v !== null,
-          ),
+          ...[...perClientEventReceived.values()].filter((v) => v !== null),
         );
         for (const c of wsClients) {
-          const receiveTs = perClientHumanReceived.get(c.clientLabel);
-          const pickDeadline = perClientHumanPickDeadline.get(c.clientLabel);
+          const receiveTs = perClientEventReceived.get(c.clientLabel);
+          const pickDeadline = perClientPickDeadline.get(c.clientLabel);
           samples.push({
             scenario: SCENARIO,
             bootstrapClass: pickNumber === 1 ? 'cold' : 'warm',
             clientLabel: c.clientLabel,
             pickNumber,
-            seq: humanSeq,
+            seq: observedSeq,
             submitCallTs: earliestReceive,
             receiveTs,
             rpcMs: 0,
@@ -483,17 +512,44 @@ async function runPickDriver(initialPgClient, wsClients) {
             isHumanPick: true,
           });
         }
-      } else {
+      } else if (delivered === wsClients.length && isAutopickPickEvent) {
+        // The 30s clock expired mid-wait and engine autopick covered
+        // pick N. Every client received the autopick's broadcast. The
+        // acceptance criterion is NOT met — a human pick was expected.
         console.log(
-          `  ✗ HUMAN PICK: TIMED OUT — autopick covered; acceptance criterion NOT met (delivered ${delivered}/${wsClients.length} within ${HUMAN_WAIT_MS} ms)`,
+          `  ✗ HUMAN PICK: TIMED OUT — engine autopick covered pick ${pickNumber} ` +
+            `(actor=${actorLabel}, player_id=${observedPlayerId}, ` +
+            `delivered ${delivered}/${wsClients.length}, ` +
+            `elapsed=${elapsedMs} ms, seq=${observedSeq ?? '?'}) — ` +
+            `Garrett did not submit within the clock window OR the control did not render.`,
         );
         humanOutcomes.push({
           pickNumber,
-          outcome: 'timeout',
+          outcome: 'timeout_autopick_covered',
+          actor: actorLabel,
+          playerId: observedPlayerId,
           delivered,
           expected: wsClients.length,
           elapsedMs,
-          seq: humanSeq,
+          seq: observedSeq,
+        });
+      } else {
+        // Not even the autopick landed on all clients — event delivery
+        // partial or nonexistent. Rare but possible under connection
+        // trouble; distinct from the autopick-covered timeout.
+        console.log(
+          `  ✗ HUMAN PICK: TIMED OUT — pick ${pickNumber} event partial or absent ` +
+            `(delivered ${delivered}/${wsClients.length}, elapsed=${elapsedMs} ms).`,
+        );
+        humanOutcomes.push({
+          pickNumber,
+          outcome: 'timeout_no_event',
+          actor: actorLabel,
+          playerId: observedPlayerId,
+          delivered,
+          expected: wsClients.length,
+          elapsedMs,
+          seq: observedSeq,
         });
       }
       // Regardless of outcome, continue driving. Next pick's snake
@@ -900,10 +956,20 @@ async function main() {
         for (const o of humanOutcomes) {
           if (o.outcome === 'received') {
             humanBlock +=
-              `  ✓ HUMAN PICK: RECEIVED at pick ${o.pickNumber} (delivered ${o.delivered}/${o.expected}, elapsed=${o.elapsedMs} ms, seq=${o.seq ?? '?'})\n`;
+              `  ✓ HUMAN PICK: RECEIVED at pick ${o.pickNumber} ` +
+              `(actor=${o.actor}, player_id=${o.playerId ?? '?'}, ` +
+              `delivered ${o.delivered}/${o.expected}, ` +
+              `elapsed=${o.elapsedMs} ms, seq=${o.seq ?? '?'})\n`;
+          } else if (o.outcome === 'timeout_autopick_covered') {
+            humanBlock +=
+              `  ✗ HUMAN PICK: TIMED OUT at pick ${o.pickNumber} — engine autopick covered ` +
+              `(actor=${o.actor}, player_id=${o.playerId ?? '?'}, ` +
+              `delivered ${o.delivered}/${o.expected}, ` +
+              `elapsed=${o.elapsedMs} ms, seq=${o.seq ?? '?'}) — acceptance criterion NOT met\n`;
           } else {
             humanBlock +=
-              `  ✗ HUMAN PICK: TIMED OUT at pick ${o.pickNumber} — autopick covered; acceptance criterion NOT met (delivered ${o.delivered}/${o.expected} within ${HUMAN_WAIT_MS} ms)\n`;
+              `  ✗ HUMAN PICK: TIMED OUT at pick ${o.pickNumber} — event partial or absent ` +
+              `(delivered ${o.delivered}/${o.expected}, elapsed=${o.elapsedMs} ms)\n`;
           }
         }
       }

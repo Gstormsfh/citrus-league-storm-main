@@ -345,34 +345,43 @@ function SubmitPickControl({
     }
   };
 
+  // DR-2 (2026-07-29) — UX survivability under a 30s clock: the
+  // placeholder shows a VALID example ID a user can literally type
+  // and submit; the hint tells them the clock is ticking. This is
+  // still a minimal control per brief scope (PlayerPool is DR-3),
+  // but "usable enough that Garrett actually submits within 30s".
   return (
     <div
-      className="border rounded-md p-3 bg-card space-y-2"
+      className="border-2 border-primary rounded-md p-4 bg-card space-y-2"
       data-testid="submit-pick-control"
     >
-      <div className="text-sm font-semibold">You're on the clock</div>
+      <div className="text-base font-bold text-primary">
+        You're on the clock
+      </div>
       <div className="text-xs text-muted-foreground">
-        Pick {pickNumber} · Round {roundNumber}
+        Pick {pickNumber} · Round {roundNumber} · Type any valid NHL
+        player ID and click Submit before the clock runs out.
       </div>
       <div className="flex gap-2 items-center">
         <input
           type="text"
           inputMode="numeric"
-          placeholder="Player ID"
-          className="flex-1 rounded border px-2 py-1 text-sm"
+          placeholder="Player ID — try 8478050"
+          className="flex-1 rounded border-2 px-3 py-2 text-base"
           value={playerIdText}
           disabled={disabled}
           onChange={(e) => setPlayerIdText(e.target.value)}
           data-testid="submit-pick-input"
+          autoFocus
         />
         <button
           type="button"
-          className="rounded bg-primary text-primary-foreground px-3 py-1 text-sm disabled:opacity-50"
+          className="rounded bg-primary text-primary-foreground px-4 py-2 text-base font-semibold disabled:opacity-50"
           disabled={disabled}
           onClick={handleSubmit}
           data-testid="submit-pick-button"
         >
-          {disabled ? 'Submitting…' : 'Submit pick'}
+          {disabled ? 'Submitting…' : 'Submit pick →'}
         </button>
       </div>
     </div>
