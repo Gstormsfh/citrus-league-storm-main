@@ -664,11 +664,30 @@ def process_game(
 
 
 def status_report(db) -> None:
-    rows = db.select(
-        "phase0c_progress",
-        select="season,status,rows_matched,rows_updated,nhl_unmatched,db_unmatched,has_pass_count",
-        limit=100000,
-    )
+    # KEYSET pagination over game_id — SupabaseRest.select silently caps at
+    # ~1000 rows regardless of the passed `limit` (PostgREST default response
+    # ceiling). Same class of bug fixed in d2e92c3b for games_for_season;
+    # this call previously returned only the first 1000 checkpoints, so the
+    # rollup under-counted the 10,475-game corpus by ~9,475 rows.
+    rows: List[Dict[str, Any]] = []
+    PAGE = 1000
+    last_max: Optional[int] = None
+    while True:
+        page_filters: List[Tuple[str, str, Any]] = []
+        if last_max is not None:
+            page_filters.append(("game_id", "gt", last_max))
+        page = db.select(
+            "phase0c_progress",
+            select="game_id,season,status,rows_matched,rows_updated,nhl_unmatched,db_unmatched,has_pass_count",
+            filters=page_filters or None,
+            limit=PAGE, order="game_id",
+        )
+        if not page:
+            break
+        rows.extend(page)
+        last_max = int(page[-1]["game_id"])
+        if len(page) < PAGE:
+            break
     if not rows:
         print("(no phase0c_progress rows yet)")
         return
@@ -693,9 +712,17 @@ def status_report(db) -> None:
         er = by_season_status.get((s, "error"), 0)
         pe = by_season_status.get((s, "pending"), 0)
         print(f"  {s:>6} | {c:>8} {ip:>11} {mf:>10} {am:>5} {er:>5} {pe:>7}")
-    print(f"\n  Totals: rows_matched={totals['rows_matched']} rows_updated={totals['rows_updated']} "
+    tc = sum(by_season_status.get((s, "complete"), 0) for s in seasons)
+    tip = sum(by_season_status.get((s, "in_progress"), 0) for s in seasons)
+    tmf = sum(by_season_status.get((s, "match_integrity_fail"), 0) for s in seasons)
+    tam = sum(by_season_status.get((s, "ambiguous_unresolvable"), 0) for s in seasons)
+    ter = sum(by_season_status.get((s, "error"), 0) for s in seasons)
+    tpe = sum(by_season_status.get((s, "pending"), 0) for s in seasons)
+    tall = tc + tip + tmf + tam + ter + tpe
+    print(f"  {'TOTAL':>6} | {tc:>8} {tip:>11} {tmf:>10} {tam:>5} {ter:>5} {tpe:>7}   (games={tall})")
+    print(f"\n  Row totals: rows_matched={totals['rows_matched']} rows_updated={totals['rows_updated']} "
           f"has_pass={totals['has_pass_count']} nhl_um={totals['nhl_unmatched']} db_um={totals['db_unmatched']}")
-    print("=" * 78)
+    print("=" * 82)
 
 
 def games_for_season(db, season: int, force: bool, limit: Optional[int] = None) -> List[int]:
