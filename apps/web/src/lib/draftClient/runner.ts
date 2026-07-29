@@ -121,6 +121,21 @@ export class DraftClientRunner {
    */
   private lastSeenSeq = 0;
 
+  /**
+   * DR-1 chunk (2026-07-28) F3 — loop guard for gap-triggered resync
+   * requests. Tracks the `sinceSeq` of the most recent
+   * `requestResyncForGap` call. When a second call arrives for the
+   * SAME `sinceSeq`, the previous resync failed to fill the gap;
+   * runner escalates to a full close-and-reconnect. Cleared on any
+   * successful contiguous fold (store re-invokes `requestResyncForGap`
+   * with a different, newer `lastContiguousSeq` — the reset happens
+   * implicitly via the equality check).
+   *
+   * Also cleared on `disconnect()` / new `connect()` so a stale value
+   * from a prior session never survives.
+   */
+  private lastGapResyncSinceSeq: number | null = null;
+
   private readonly randomFn: RandomFn;
   private readonly fetchDiscovery: (draftId: string) => Promise<DraftServerDiscovery>;
   private readonly fetchSnapshot: (draftId: string) => Promise<DraftSnapshot>;
@@ -162,6 +177,7 @@ export class DraftClientRunner {
     this.params = params;
     this.callbacks = callbacks;
     this.lastSeenSeq = 0;
+    this.lastGapResyncSinceSeq = null;
     this.attachBrowserListeners();
     this.dispatch({ type: 'connect_requested' });
   }
@@ -175,6 +191,45 @@ export class DraftClientRunner {
     this.detachBrowserListeners();
     this.params = null;
     this.lastSeenSeq = 0;
+    this.lastGapResyncSinceSeq = null;
+  }
+
+  /**
+   * DR-1 chunk (2026-07-28) F3 — gap-triggered resync request. Called
+   * by the store when `deriveDraftState.foldEvents` returns a
+   * non-empty `foldResult.gaps` list. `lastContiguousSeq` is the seq
+   * the derivation folded THROUGH cleanly — the resync's `sinceSeq`.
+   *
+   * Loop guard: if the SAME `sinceSeq` is requested twice in a row,
+   * the resync didn't fill the gap (server side-effect lost, or the
+   * gap represents a durable break in the stream). Escalate to a
+   * full close-and-reconnect via the existing 1006 → backoff path
+   * rather than dispatching resync-in-a-loop. Never emits > 1 resync
+   * per unique `sinceSeq` value in a row.
+   *
+   * Silent no-op if the runner is not in a state that can send
+   * messages (e.g. `idle`, `fetching_token`) — the dispatch itself
+   * would be dropped by the reducer and the store's next event
+   * arrival will re-trigger detection anyway.
+   */
+  requestResyncForGap(lastContiguousSeq: number): void {
+    if (this.state.kind !== 'connected' && this.state.kind !== 'resyncing') {
+      return;
+    }
+    if (this.lastGapResyncSinceSeq === lastContiguousSeq) {
+      // Repeat request for the same gap → resync didn't help.
+      // Escalate to reconnect. `close(1006)` mimics an abnormal
+      // network drop; the existing `handleWsClose` path schedules
+      // backoff + re-opens.
+      this.lastGapResyncSinceSeq = null;
+      this.runCloseWebSocket(1006, 'gap_resync_exhausted');
+      return;
+    }
+    this.lastGapResyncSinceSeq = lastContiguousSeq;
+    this.runSendMessage({
+      type: 'resync',
+      payload: { sinceSeq: lastContiguousSeq },
+    });
   }
 
   /** Read-only view of the current state. */

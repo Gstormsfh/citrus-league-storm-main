@@ -416,4 +416,85 @@ describe('DraftClientRunner (chunk 11g.5a)', () => {
       statusCode: 403,
     });
   });
+
+  // ── DR-1 chunk F3 — gap-triggered resync ─────────────────────────
+  describe('requestResyncForGap (DR-1 F3, 2026-07-28)', () => {
+    async function connectedRunner() {
+      const { runner } = makeRunner();
+      runner.connect({ leagueId: 'league-1', draftId: 'draft-1' });
+      await vi.waitFor(() => expect(runner.getState().kind).toBe('connecting'));
+      const ws = MockWebSocket.lastInstance();
+      ws.triggerOpen();
+      expect(runner.getState().kind).toBe('connected');
+      // Drop the auto-issued "no prior seq" state — sent[] may be
+      // empty (lastSeenSeq=0 short-circuits the on-open resync).
+      ws.sent.length = 0;
+      return { runner, ws };
+    }
+
+    it('sends a resync message with the given sinceSeq while connected', async () => {
+      const { runner, ws } = await connectedRunner();
+      runner.requestResyncForGap(5);
+      expect(ws.sent).toHaveLength(1);
+      expect(JSON.parse(ws.sent[0])).toEqual({
+        type: 'resync',
+        payload: { sinceSeq: 5 },
+      });
+    });
+
+    it('is a no-op when the runner is idle (not connected)', async () => {
+      const { runner } = makeRunner();
+      // No connect() call — state is 'idle'.
+      expect(runner.getState().kind).toBe('idle');
+      runner.requestResyncForGap(5);
+      // No websocket created, nothing sent.
+      expect(MockWebSocket.instances).toHaveLength(0);
+    });
+
+    it('sends distinct resync messages for different sinceSeq values', async () => {
+      const { runner, ws } = await connectedRunner();
+      runner.requestResyncForGap(3);
+      runner.requestResyncForGap(7);
+      runner.requestResyncForGap(11);
+      expect(ws.sent).toHaveLength(3);
+      expect(JSON.parse(ws.sent[0])).toEqual({
+        type: 'resync',
+        payload: { sinceSeq: 3 },
+      });
+      expect(JSON.parse(ws.sent[1])).toEqual({
+        type: 'resync',
+        payload: { sinceSeq: 7 },
+      });
+      expect(JSON.parse(ws.sent[2])).toEqual({
+        type: 'resync',
+        payload: { sinceSeq: 11 },
+      });
+    });
+
+    it('LOOP GUARD: a second request for the SAME sinceSeq closes the WS with 1006 instead of re-sending', async () => {
+      const { runner, ws } = await connectedRunner();
+      runner.requestResyncForGap(5);
+      expect(ws.sent).toHaveLength(1);
+      // Same sinceSeq — the previous resync didn't fill the gap.
+      // Runner escalates to close-and-reconnect (1006 → backoff path).
+      runner.requestResyncForGap(5);
+      // No new send message.
+      expect(ws.sent).toHaveLength(1);
+      // WS was closed with 1006.
+      expect(ws.readyState).toBe(3);
+      // After the close, the runner has transitioned out of connected
+      // (through the ws_closed dispatch → reconnect scheduling).
+      expect(runner.getState().kind).not.toBe('connected');
+    });
+
+    it('LOOP GUARD RESETS: after a successful newer request, an old sinceSeq can trigger a fresh resync', async () => {
+      const { runner, ws } = await connectedRunner();
+      runner.requestResyncForGap(5); // sent
+      runner.requestResyncForGap(7); // sent (different seq resets the guard)
+      // Now sinceSeq 5 is not the last-tracked value; requesting it
+      // again should send a fresh resync (not trigger the loop guard).
+      runner.requestResyncForGap(5);
+      expect(ws.sent).toHaveLength(3);
+    });
+  });
 });
