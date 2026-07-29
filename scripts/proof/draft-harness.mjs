@@ -402,9 +402,14 @@ async function runPickDriver(initialPgClient, wsClients) {
       // Any client's onEvent captures the human's pick_submitted event
       // (matched by pickNumber inside the wire payload). We register a
       // one-shot listener per client and race until either the earliest
-      // client receives it OR the timeout fires.
+      // client receives it OR the timeout fires. Also capture the
+      // event's pickDeadline (batch 2 field) so the S5 autopick-wait
+      // phase has the "next pick's deadline" to compute delta against.
       const humanWaitStart = Date.now();
       const perClientHumanReceived = new Map(
+        wsClients.map((c) => [c.clientLabel, null]),
+      );
+      const perClientHumanPickDeadline = new Map(
         wsClients.map((c) => [c.clientLabel, null]),
       );
       let humanSeq = null;
@@ -416,6 +421,9 @@ async function runPickDriver(initialPgClient, wsClients) {
           if (!p || p.pickNumber !== pickNumber) return;
           if (perClientHumanReceived.get(c.clientLabel) !== null) return;
           perClientHumanReceived.set(c.clientLabel, receivedAt);
+          if (typeof p.pickDeadline === 'string' && p.pickDeadline.length > 0) {
+            perClientHumanPickDeadline.set(c.clientLabel, p.pickDeadline);
+          }
           if (humanSeq === null && Number.isFinite(seq)) humanSeq = seq;
         });
       }
@@ -443,6 +451,38 @@ async function runPickDriver(initialPgClient, wsClients) {
           elapsedMs,
           seq: humanSeq,
         });
+        // Push per-client samples so the S5 autopick-wait phase can
+        // find `lastPickSample` and compute deltas normally. Human
+        // picks don't have an RPC round-trip we measured (they went
+        // through the API server, not the harness's pg client), so
+        // rpcMs is 0 and endToEndMs uses the earliest receive_ts as
+        // the submitCallTs proxy (best available signal).
+        const earliestReceive = Math.min(
+          ...[...perClientHumanReceived.values()].filter(
+            (v) => v !== null,
+          ),
+        );
+        for (const c of wsClients) {
+          const receiveTs = perClientHumanReceived.get(c.clientLabel);
+          const pickDeadline = perClientHumanPickDeadline.get(c.clientLabel);
+          samples.push({
+            scenario: SCENARIO,
+            bootstrapClass: pickNumber === 1 ? 'cold' : 'warm',
+            clientLabel: c.clientLabel,
+            pickNumber,
+            seq: humanSeq,
+            submitCallTs: earliestReceive,
+            receiveTs,
+            rpcMs: 0,
+            endToEndMs: receiveTs - earliestReceive,
+            engineApplyMs: null,
+            engineBroadcastMs: null,
+            engineNotifyToBroadcastMs: null,
+            seqOrderingViolation: false,
+            rpcPickDeadlineIso: pickDeadline,
+            isHumanPick: true,
+          });
+        }
       } else {
         console.log(
           `  ✗ HUMAN PICK: TIMED OUT — autopick covered; acceptance criterion NOT met (delivered ${delivered}/${wsClients.length} within ${HUMAN_WAIT_MS} ms)`,
