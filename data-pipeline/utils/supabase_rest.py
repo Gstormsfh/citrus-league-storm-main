@@ -25,6 +25,7 @@ import logging
 import os
 import random
 import time
+from email.utils import parsedate_to_datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlencode
 
@@ -45,6 +46,37 @@ Filter = Tuple[str, str, Any]  # (col, op, value) where op in {"eq","neq","gte",
 # gave up after ~15s. Success path is untouched: no retry, no sleep, no log
 # when the first attempt returns < 500 without raising.
 _RETRY_WAITS_SECONDS: Tuple[int, ...] = (1, 2, 4, 8, 16, 30, 30)
+
+# Statuses that trigger a retry in addition to 5xx: 429 (Too Many Requests).
+# When a 429 or 503 response carries a Retry-After header, honor it (up to
+# _RETRY_AFTER_CAP_SECONDS) instead of the next ladder step.
+_RETRY_STATUSES_BELOW_500: Tuple[int, ...] = (429,)
+_RETRY_AFTER_CAP_SECONDS: int = 60
+
+
+def _parse_retry_after(header_value: str) -> Optional[float]:
+  """Parse an RFC 7231 Retry-After header. Returns seconds to wait, or None if
+  the value can't be interpreted."""
+  if not header_value:
+    return None
+  s = header_value.strip()
+  # Try delta-seconds first (integer)
+  try:
+    return max(0.0, float(s))
+  except ValueError:
+    pass
+  # Fall back to HTTP-date
+  try:
+    dt = parsedate_to_datetime(s)
+    if dt is None:
+      return None
+    from datetime import datetime, timezone
+    if dt.tzinfo is None:
+      dt = dt.replace(tzinfo=timezone.utc)
+    delta = (dt - datetime.now(timezone.utc)).total_seconds()
+    return max(0.0, delta)
+  except (TypeError, ValueError):
+    return None
 
 
 class SupabaseRest:
@@ -94,14 +126,16 @@ class SupabaseRest:
     return tail.split("?", 1)[0]
 
   def _request_with_retry(self, method: str, url: str, **kwargs) -> requests.Response:
-    """Send an HTTP request; retry on 5xx or connection/timeout errors with a
-    patient exponential schedule (see _RETRY_WAITS_SECONDS). Non-5xx responses
-    (including 4xx client errors) return immediately — the caller decides how
-    to handle them, preserving existing error semantics."""
+    """Send an HTTP request; retry on 5xx, 429, or connection/timeout errors
+    with a patient exponential schedule (see _RETRY_WAITS_SECONDS). 429 and
+    503 responses honor a Retry-After header if present (capped at
+    _RETRY_AFTER_CAP_SECONDS). Other 4xx responses return immediately — the
+    caller decides how to handle them, preserving existing error semantics."""
     last_exc: Optional[BaseException] = None
     last_response: Optional[requests.Response] = None
     max_attempts = len(_RETRY_WAITS_SECONDS) + 1
     for attempt in range(1, max_attempts + 1):
+      retry_after: Optional[float] = None
       try:
         r = self.session.request(method, url, **kwargs)
       except (requests.ConnectionError, requests.Timeout) as e:
@@ -111,24 +145,38 @@ class SupabaseRest:
       else:
         last_exc = None
         last_response = r
-        # Success path or non-retriable client error: return immediately.
+        # Success or non-retriable client error: return immediately.
         # Byte-identical to pre-refactor behavior on first attempt.
-        if r.status_code < 500:
+        if r.status_code < 500 and r.status_code not in _RETRY_STATUSES_BELOW_500:
           return r
         status_repr = r.status_code
+        # 429 and 503 may carry a Retry-After telling us exactly how long to
+        # wait; honor it if present, capped to prevent pathological delays.
+        if r.status_code in (429, 503):
+          hint = _parse_retry_after(r.headers.get("Retry-After", ""))
+          if hint is not None:
+            retry_after = min(hint, float(_RETRY_AFTER_CAP_SECONDS))
       if attempt == max_attempts:
         # Exhausted retries. Re-raise the last connection/timeout error, or
-        # return the last 5xx response so the caller's existing status-code
+        # return the last response so the caller's existing status-code
         # handling raises with the server's message.
         if last_exc is not None:
           raise last_exc
         return last_response  # type: ignore[return-value]
-      wait_base = _RETRY_WAITS_SECONDS[attempt - 1]
-      wait = wait_base * (1.0 + random.uniform(-0.1, 0.1))
-      logger.warning(
-        "[supabase_rest] retry attempt=%d/%d status=%s method=%s path=%s sleeping=%.1fs",
-        attempt, max_attempts, status_repr, method, self._log_path(url), wait,
-      )
+      if retry_after is not None:
+        wait = retry_after
+        logger.warning(
+          "[supabase_rest] retry attempt=%d/%d status=%s method=%s path=%s "
+          "sleeping=%.1fs (honoring Retry-After)",
+          attempt, max_attempts, status_repr, method, self._log_path(url), wait,
+        )
+      else:
+        wait_base = _RETRY_WAITS_SECONDS[attempt - 1]
+        wait = wait_base * (1.0 + random.uniform(-0.1, 0.1))
+        logger.warning(
+          "[supabase_rest] retry attempt=%d/%d status=%s method=%s path=%s sleeping=%.1fs",
+          attempt, max_attempts, status_repr, method, self._log_path(url), wait,
+        )
       time.sleep(wait)
     # Unreachable — the loop either returns or raises.
     if last_exc is not None:  # pragma: no cover
