@@ -279,12 +279,6 @@ async function runSetup(client) {
     [WHITELISTED_LEAGUE_ID],
   );
   console.log(`draft_events: ${eventsCount.rows[0].c}   draft_picks_v2: ${picksCount.rows[0].c}`);
-  if (eventsCount.rows[0].c > 0 || picksCount.rows[0].c > 0) {
-    throw new Error(
-      `League has existing draft_events (${eventsCount.rows[0].c}) or draft_picks_v2 ` +
-      `(${picksCount.rows[0].c}). Run --reset --execute first.`,
-    );
-  }
 
   const existingHarnessTeams = await client.query(
     `SELECT id, team_name, owner_id FROM public.teams WHERE id::text LIKE '77777777-%' ORDER BY id`,
@@ -325,6 +319,46 @@ async function runSetup(client) {
     [WHITELISTED_LEAGUE_ID],
   );
   console.log(`draft_order rows already present: ${existingOrder.rows.length}`);
+
+  // ── F10 (2026-07-29) — ALREADY-CONFIGURED PRECONDITION ────────────
+  //
+  // Architect ruling: fixture-12 setup must ABORT when the league is
+  // already fixture-configured. Two prior post-cleanups required
+  // hand-completion because a second --execute overwrote a poisoned
+  // state file (captured before-values from an already-configured
+  // league → subsequent --reset restored a DIRTY baseline instead of
+  // pristine). Extend the earlier events/picks abort to cover the
+  // full "fixture-configured" surface:
+  //   (a) any harness-prefix teams present (77777777-…)
+  //   (b) any draft_order rows for this league
+  //   (c) an existing state file (fixture-12-state.local.json)
+  //   (d) any draft_events / draft_picks_v2 (original condition)
+  //
+  // Message per architect: single stop signal that names the recovery.
+  const stateFileExists = existsSync(STATE_FILE_PATH);
+  const configuredSignals = [];
+  if (eventsCount.rows[0].c > 0) {
+    configuredSignals.push(`draft_events=${eventsCount.rows[0].c}`);
+  }
+  if (picksCount.rows[0].c > 0) {
+    configuredSignals.push(`draft_picks_v2=${picksCount.rows[0].c}`);
+  }
+  if (existingTeamIds.size > 0) {
+    configuredSignals.push(`harness_teams=${existingTeamIds.size}`);
+  }
+  if (existingOrder.rows.length > 0) {
+    configuredSignals.push(`draft_order_rows=${existingOrder.rows.length}`);
+  }
+  if (stateFileExists) {
+    configuredSignals.push(`state_file_exists=${STATE_FILE_PATH}`);
+  }
+  if (configuredSignals.length > 0) {
+    throw new Error(
+      `League is already fixture-configured — run --reset --execute first ` +
+      `(double-setup poisons the restore state).\n` +
+      `Signals: ${configuredSignals.join(', ')}`,
+    );
+  }
 
   // ── Build plan ────────────────────────────────────────────────────
   const now = new Date();
@@ -538,6 +572,17 @@ async function runSetup(client) {
     plan: plan.beforeValues,
     stepsApplied: plan.steps.map((s) => ({ label: s.label, before: s.before })),
   };
+  // F10 (2026-07-29) — belt-and-suspenders: NEVER overwrite an
+  // existing state file. The precondition check earlier in runSetup
+  // should have aborted before reaching this point, but a defense-
+  // in-depth guard here catches any code path that ever bypasses it
+  // (e.g., a future refactor that reorders the setup steps).
+  if (existsSync(STATE_FILE_PATH)) {
+    throw new Error(
+      `Refusing to overwrite existing state file at ${STATE_FILE_PATH}. ` +
+      `Run --reset --execute first (double-setup poisons the restore state).`,
+    );
+  }
   await writeFile(STATE_FILE_PATH, JSON.stringify(state, null, 2));
   console.log('');
   console.log(`  state written: ${STATE_FILE_PATH}`);

@@ -1,0 +1,58 @@
+
+═══════════════════════════════════════════════════════════════════════════
+  MANDATE-CANDIDATE — draft harness results (10c-2)
+  These numbers are unratified until Garrett confirms the methodology
+  against them. Percentiles are single-clock (client host) unless noted.
+═══════════════════════════════════════════════════════════════════════════
+  scenario:      S2
+  client count:  12
+  pacing:        2000-5000 ms jitter
+  run id:        2026-07-29T22-05-09-968Z
+  samples total: 408   delivered: 408   dropped: 0   ordering-violations: 0
+
+── FIRST-CLASS FAILURE METRICS (target 0) ──
+  drop rate:                0.00%   (0/408)
+  seq ordering violations:  0
+
+── PRIMARY — end-to-end ms (single-clock, client host) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+overall                           408     97.0      136      146      227      227
+  cold-bootstrap sample          12.0      227      227      227      227      227 ⚠<200
+  warm                            396     97.0      135      136      146      146
+
+── PER-CLIENT — end-to-end ms (single-clock) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+c01                              34.0     98.0      136      140      200      227 ⚠<200
+c02                              34.0     97.5      135      140      200      227 ⚠<200
+c03                              34.0     97.0      135      139      200      227 ⚠<200
+c04                              34.0     97.5      135      140      200      227 ⚠<200
+c05                              34.0     97.5      135      139      200      227 ⚠<200
+c06                              34.0     97.0      135      139      200      227 ⚠<200
+c07                              34.0     97.0      135      139      200      226 ⚠<200
+c08                              34.0     97.0      135      139      200      226 ⚠<200
+c09                              34.0     96.0      135      138      200      227 ⚠<200
+c10                              34.0     97.5      135      139      200      227 ⚠<200
+c11                              34.0     97.0      135      139      200      227 ⚠<200
+c12                              34.0     98.0      136      140      200      227 ⚠<200
+
+── ENGINE-INTERNAL SPLITS — ms (from external_event.applied; cross-clock, informational) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+applyMs                           0.0       --       --       --       --       --
+broadcastMs                       0.0       --       --       --       --       --
+notifyToBroadcastMs               0.0       --       --       --       --       --
+
+── RPC — pg submit_pick_v2 round-trip ms (single-clock) ──
+metric                              N      p50      p90      p95      p99      max
+──────────────────────────────────────────────────────────────────────────────────
+rpc_ms                            408     51.0     53.0     55.0      145      145
+
+═══════════════════════════════════════════════════════════════════════════
+══ DR-2 HUMAN PICK OUTCOMES ══
+  ✗ HUMAN PICK: TIMED OUT at pick 3 — engine autopick covered (actor=autopick, player_id=8477492, delivered 12/12, elapsed=56307 ms, seq=3) — acceptance criterion NOT met
+  ✗ HUMAN PICK: TIMED OUT at pick 22 — engine autopick covered (actor=autopick, player_id=8478402, delivered 12/12, elapsed=57269 ms, seq=22) — acceptance criterion NOT met
+  ✓ HUMAN PICK: RECEIVED at pick 27 (actor=user, player_id=8482116, delivered 12/12, elapsed=53730 ms, seq=27)
+
+
