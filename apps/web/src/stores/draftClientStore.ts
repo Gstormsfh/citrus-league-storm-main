@@ -203,9 +203,12 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
         snapshot.presentUserIds !== undefined
           ? new Set<string>(snapshot.presentUserIds)
           : prev.presentUserIds;
-      // DR-4 (2026-07-30) SMOKE — temporary log for architect field-
-      // proof that the wire payload carries presentUserIds. Remove
-      // after DR-4 acceptance ratifies.
+      // DR-4 (2026-07-30) SMOKE — REMOVE-BEFORE-SHIP-REPORT — temporary
+      // log for architect field-proof that the wire payload carries
+      // presentUserIds. Architect ruling 2026-07-30: same class as
+      // the DR-3 yellow debug panel; strip before DR-4 ship report.
+      // Greppable marker above lets a pre-ship-report `git grep
+      // 'REMOVE-BEFORE-SHIP-REPORT'` catch this if manual delete misses.
       // eslint-disable-next-line no-console
       console.log(
         '[DR-4 presence smoke] setSnapshot seeded presentUserIds:',
