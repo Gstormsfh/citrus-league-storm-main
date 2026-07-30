@@ -33,6 +33,7 @@ import {
   useClockOffsetEstimator,
 } from '@/components/draft/v2/DraftTimerV2';
 import { OnClockActionBar } from '@/components/draft/v2/OnClockActionBar';
+import { ManagerPresencePanel } from '@/components/draft/v2/ManagerPresencePanel';
 import { DraftBoard } from '@/components/draft/DraftBoard';
 import { PlayerPool } from '@/components/draft/PlayerPool';
 import { DraftHistory } from '@/components/draft/DraftHistory';
@@ -689,8 +690,17 @@ function SidebarPanel({
   // TeamRosters renders normally.
   const anyPicksMade = derived !== null && derived.picksMade > 0;
 
+  // DR-4 (2026-07-30) — participating-teams filter (in draft_order)
+  // for the ManagerPresencePanel. Same filter as v1Teams: a spectator
+  // team is not part of THIS draft's manager set.
+  const participatingTeams = useMemo(
+    () => teams.filter((t) => participatingTeamIds.has(t.id)),
+    [teams, participatingTeamIds],
+  );
+
   return (
     <>
+      <ManagerPresencePanel teams={participatingTeams} />
       {!anyPicksMade && derived !== null && (
         <div
           className="rounded border border-dashed border-muted-foreground/30 bg-muted/20 p-3 text-xs text-muted-foreground"

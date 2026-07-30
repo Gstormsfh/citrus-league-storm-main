@@ -203,6 +203,18 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
         snapshot.presentUserIds !== undefined
           ? new Set<string>(snapshot.presentUserIds)
           : prev.presentUserIds;
+      // DR-4 (2026-07-30) SMOKE — temporary log for architect field-
+      // proof that the wire payload carries presentUserIds. Remove
+      // after DR-4 acceptance ratifies.
+      // eslint-disable-next-line no-console
+      console.log(
+        '[DR-4 presence smoke] setSnapshot seeded presentUserIds:',
+        snapshot.presentUserIds === undefined
+          ? '<field absent from snapshot>'
+          : Array.isArray(snapshot.presentUserIds)
+          ? `[${snapshot.presentUserIds.join(', ')}] (count=${snapshot.presentUserIds.length})`
+          : String(snapshot.presentUserIds),
+      );
       return {
         snapshot,
         derivedState: foldResult.state,
