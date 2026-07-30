@@ -574,11 +574,6 @@ function MainTabs({
               // Double-submit — the first one already landed.
               // Silent no-op is honest: the user sees their pick.
               // A toast would be noise for a non-error state.
-              // eslint-disable-next-line no-console
-              console.debug('[DR-4 F11] double-submit suppressed', {
-                submittingForPickNumber,
-                attemptId,
-              });
             } else {
               // Real clock expiry — autopick took the slot.
               toast.error(result.message);
