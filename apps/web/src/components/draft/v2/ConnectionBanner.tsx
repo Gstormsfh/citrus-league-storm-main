@@ -70,7 +70,7 @@ export function ConnectionBanner({ onRetryNow }: ConnectionBannerProps) {
         <ReconnectingBanner state={state} onRetryNow={onRetryNow} />
       );
     case 'fatal':
-      return <FatalBanner state={state} />;
+      return <FatalBanner state={state} onRetryNow={onRetryNow} />;
   }
 }
 
@@ -153,9 +153,10 @@ function useCountdown(targetAt: number): number {
 
 interface FatalBannerProps {
   state: Extract<DraftClientState, { kind: 'fatal' }>;
+  onRetryNow?: () => void;
 }
 
-function FatalBanner({ state }: FatalBannerProps) {
+function FatalBanner({ state, onRetryNow }: FatalBannerProps) {
   if (state.reason === 'auth_failure') {
     return (
       <Alert variant="destructive" role="alert" data-banner-kind="fatal-auth">
@@ -184,26 +185,78 @@ function FatalBanner({ state }: FatalBannerProps) {
       </Alert>
     );
   }
-  // permanent_server_error
+  // DR-4 (2026-07-30) — 4400 waiting-room disposition. Server returns
+  // this when the draft schedule is up but the draft_order hasn't been
+  // configured yet (commissioner still setting up). Toast copy already
+  // reads "This draft hasn't been set up yet"; the banner now matches
+  // instead of silently falling through to the generic-server case.
+  // Auto-retry stays OFF (per DR-2 disposition ruling); user clicks
+  // Retry when the commissioner signals they're done.
+  if (state.reason === 'draft_not_initialized') {
+    return (
+      <Alert role="alert" data-banner-kind="fatal-not-initialized">
+        <AlertTitle>Waiting on your commissioner</AlertTitle>
+        <AlertDescription className="flex items-center justify-between gap-4">
+          <span>
+            This draft hasn’t been set up yet — your commissioner still
+            needs to set the draft order. Check back shortly.
+          </span>
+          {onRetryNow && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onRetryNow}
+            >
+              Retry now
+            </Button>
+          )}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  // DR-4 (2026-07-30) — permanent_server_error rewrite per architect
+  // ruling: never write copy that promises behavior the code doesn't
+  // perform (invariant I2 generalizes beyond the clock). This
+  // disposition does NOT auto-retry, so the copy must not say "we'll
+  // keep trying". Retry is manual; technical details collapsed and
+  // opt-in.
   return (
     <Alert variant="destructive" role="alert" data-banner-kind="fatal-server">
-      <AlertTitle>Connection error</AlertTitle>
-      <AlertDescription>
+      <AlertTitle>Can’t reach the draft server</AlertTitle>
+      <AlertDescription className="space-y-2">
+        <div>
+          The draft server isn’t reachable right now. Tap Retry to try
+          again — your picks are safe.
+        </div>
+        <div className="flex items-center gap-2">
+          {onRetryNow && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onRetryNow}
+            >
+              Retry now
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => window.location.reload()}
+          >
+            Reload page
+          </Button>
+        </div>
         <details>
-          <summary className="cursor-pointer">Technical details</summary>
-          <pre className="text-xs mt-2 whitespace-pre-wrap">
+          <summary className="cursor-pointer text-xs text-muted-foreground">
+            Technical details
+          </summary>
+          <pre className="text-xs mt-2 whitespace-pre-wrap text-muted-foreground">
             {state.errorMessage}
           </pre>
         </details>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-2"
-          onClick={() => window.location.reload()}
-        >
-          Reload page
-        </Button>
       </AlertDescription>
     </Alert>
   );

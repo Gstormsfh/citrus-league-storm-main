@@ -58,6 +58,7 @@ import {
   notifyPresenceLeft,
 } from '@/lib/draftClient/toasts';
 import { usePreloadedPlayers } from '@/hooks/usePreloadedPlayers';
+import { useOnClockAlarm } from '@/hooks/useOnClockAlarm';
 import {
   toAvailablePlayers,
   toDraftHistory,
@@ -174,9 +175,35 @@ export default function DraftRoomV2() {
           store.applyEvents(events);
         },
         onPresence: (payload) => {
+          // DR-4 (2026-07-30) — toast ONLY on a genuine ADD (for
+          // 'joined') or genuine REMOVE (for 'left'). Two failure
+          // modes this guards against:
+          //   1. Self-join post-snapshot-seed: server broadcasts
+          //      `joined` for the connecting user AFTER the snapshot
+          //      already seeded self into presentUserIds → the set
+          //      doesn't change → no "you joined" toast fires at
+          //      the user for their own connect (was the DR-1
+          //      anomaly's cosmetic tail).
+          //   2. Duplicate co-manager attaches: the server's presence
+          //      broadcast fires with the SAME set on every socket
+          //      the user opens (multi-device / reconnect); we don't
+          //      toast on every duplicate.
+          const before = useDraftClientStore.getState().presentUserIds;
           store.applyPresence(payload);
-          if (payload.kind === 'joined') notifyPresenceJoined(payload.userId);
-          else notifyPresenceLeft(payload.userId);
+          const after = useDraftClientStore.getState().presentUserIds;
+          if (
+            payload.kind === 'joined' &&
+            !before.has(payload.userId) &&
+            after.has(payload.userId)
+          ) {
+            notifyPresenceJoined(payload.userId);
+          } else if (
+            payload.kind === 'left' &&
+            before.has(payload.userId) &&
+            !after.has(payload.userId)
+          ) {
+            notifyPresenceLeft(payload.userId);
+          }
         },
         onError: (error) => store.setError(error),
       },
@@ -254,6 +281,25 @@ interface StickyHeaderProps {
   clockOffsetMs: number;
 }
 
+// DR-4 (2026-07-30) — honest status label. Pre-DR-4 the header showed
+// "Status: not_started" while the DB draft_status was in_progress —
+// confusing because the client-derived draftStatus only flips on the
+// first pick fold. This helper maps derived status → plain-language
+// copy that matches the user's expectation.
+function describeStatus(
+  derivedStatus: string,
+  picksMade: number,
+): string {
+  if (derivedStatus === 'not_started' && picksMade === 0) {
+    return 'active — waiting for pick 1';
+  }
+  if (derivedStatus === 'in_progress') return 'in progress';
+  if (derivedStatus === 'completed') return 'completed';
+  if (derivedStatus === 'paused') return 'paused';
+  if (derivedStatus === 'cancelled') return 'cancelled';
+  return derivedStatus;
+}
+
 function StickyHeader({ onRetryNow, clockOffsetMs }: StickyHeaderProps) {
   const connectionState = useDraftConnectionState();
   const snapshot = useDraftSnapshot();
@@ -283,12 +329,12 @@ function StickyHeader({ onRetryNow, clockOffsetMs }: StickyHeaderProps) {
               <>
                 Round {derived.currentRoundNumber} · Pick{' '}
                 {derived.currentPickNumber} / {derived.totalPicks} ·{' '}
-                Status: {derived.draftStatus}
+                Status: {describeStatus(derived.draftStatus, derived.picksMade)}
               </>
             ) : (
               <>
                 {derived.picksMade} / {derived.totalPicks} picks made ·{' '}
-                Status: {derived.draftStatus}
+                Status: {describeStatus(derived.draftStatus, derived.picksMade)}
               </>
             )}
           </div>
@@ -370,6 +416,19 @@ function MainTabs({
   const [tab, setTab] = useState<'players' | 'board' | 'history'>('players');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
+  // Is it my turn? (computed early — feeds alarm + on-clock action bar.)
+  const amIOnClock =
+    derived !== null &&
+    myTeamId !== null &&
+    derived.onClockTeamId !== null &&
+    derived.onClockTeamId === myTeamId;
+
+  // DR-4 (2026-07-30) — alarm system: title flash + notification +
+  // sound when on-clock AND tab is hidden. Mute toggle persists to
+  // localStorage. See useOnClockAlarm for the honesty contract
+  // (only when tab hidden; stops instantly on any exit).
+  const alarm = useOnClockAlarm({ amIOnClock });
+
   // Adapt derived state → v1 prop shapes. Memoized against the exact
   // inputs so per-event folds only re-derive when derived changes.
   // DR-3.1 F9 fix: filter teams to only those in the draft-order
@@ -399,12 +458,8 @@ function MainTabs({
     [playersById, derived],
   );
 
-  // Is it my turn? Same predicate as the DR-2 SubmitPickControl gate.
-  const amIOnClock =
-    derived !== null &&
-    myTeamId !== null &&
-    derived.onClockTeamId !== null &&
-    derived.onClockTeamId === myTeamId;
+  // amIOnClock is computed once at the top of MainTabs (feeds alarm +
+  // action bar + pool + handleDraftFromPool).
 
   // Pool's Draft button → DR-2 submit path. Same submitPick, same
   // optimistic flow. Fires only when it's the user's turn AND we know
@@ -481,9 +536,28 @@ function MainTabs({
   );
 
   const isDraftActive = derived?.draftStatus === 'in_progress';
+  const isDraftComplete = derived?.draftStatus === 'completed';
 
   return (
     <div className="space-y-3">
+      {/* DR-4 (2026-07-30) — completed-draft empty state. Deliberate
+          copy + link to /roster (route verified at App.tsx:184). */}
+      {isDraftComplete && (
+        <div
+          className="rounded border-2 border-green-600 bg-green-50 p-4 text-sm text-green-900"
+          data-testid="completed-draft-banner"
+        >
+          <div className="font-semibold text-base">Draft complete</div>
+          <div className="mt-1">
+            All {derived?.totalPicks ?? 0} picks are in. Head to your{' '}
+            <a href="/roster" className="underline font-medium">
+              roster
+            </a>{' '}
+            to see the team you built.
+          </div>
+        </div>
+      )}
+
       {/* DR-3.1 (2026-07-29) — F8 fix: sticky on-clock action bar
           renders above the tabs so it's visible in every tab of the
           room. Returns null when off-clock. */}
@@ -496,6 +570,20 @@ function MainTabs({
           pickNumber={derived?.currentPickNumber ?? null}
           roundNumber={derived?.currentRoundNumber ?? null}
         />
+        {/* DR-4 (2026-07-30) — alarm mute toggle. Persistent, small,
+            always visible when on-clock. Beeping at a user who's
+            already looking is obnoxious; muting is one click. */}
+        {amIOnClock && (
+          <button
+            type="button"
+            onClick={() => alarm.setMuted(!alarm.muted)}
+            className="mt-1 text-xs text-muted-foreground hover:text-foreground underline"
+            data-testid="alarm-mute-toggle"
+            aria-pressed={alarm.muted}
+          >
+            {alarm.muted ? '🔇 Alarm muted — click to unmute' : '🔊 Alarm on — click to mute'}
+          </button>
+        )}
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
@@ -524,6 +612,16 @@ function MainTabs({
         </TabsContent>
 
         <TabsContent value="board" className="mt-4">
+          {/* DR-4 (2026-07-30) — pre-draft board copy. */}
+          {derived?.draftStatus === 'not_started' && (
+            <div
+              className="mb-3 rounded border border-dashed border-muted-foreground/40 bg-muted/30 p-4 text-sm text-muted-foreground"
+              data-testid="board-pre-draft-copy"
+            >
+              Draft hasn’t started yet — the board will fill in live as
+              picks land.
+            </div>
+          )}
           <DraftBoard
             teams={v1Teams}
             draftHistory={draftHistory}
@@ -586,8 +684,21 @@ function SidebarPanel({
     derived.onClockTeamId !== null &&
     derived.onClockTeamId === myTeamId;
 
+  // DR-4 (2026-07-30) — empty rosters copy: shown when no team has
+  // any picks yet. Once the first pick lands the copy hides and
+  // TeamRosters renders normally.
+  const anyPicksMade = derived !== null && derived.picksMade > 0;
+
   return (
     <>
+      {!anyPicksMade && derived !== null && (
+        <div
+          className="rounded border border-dashed border-muted-foreground/30 bg-muted/20 p-3 text-xs text-muted-foreground"
+          data-testid="rosters-empty-copy"
+        >
+          No picks yet — rosters will fill in as the draft progresses.
+        </div>
+      )}
       <TeamRosters
         teams={v1Teams}
         draftHistory={draftHistory}

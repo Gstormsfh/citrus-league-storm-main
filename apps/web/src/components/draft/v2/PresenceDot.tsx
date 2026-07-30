@@ -1,36 +1,78 @@
 // Phase 4.5 chunk 11g.5b — PresenceDot primitive.
+// DR-4 (2026-07-30) — extended to a three-state indicator:
 //
-// Small visual indicator: green dot if `userId` is in
-// `presentUserIds`, gray dot otherwise. Used wherever team rows /
-// avatars are rendered so users can see who's connected at a
-// glance.
+//   connected     — in `presentUserIds` (green)
+//   away          — NOT in `presentUserIds` AND observed leaving this
+//                   session (in `observedLeftUserIds`) (amber)
+//   not-connected — in neither (neutral grey)
 //
-// Multi-device dedup is server-side (chunk 11g.4 step 5's
-// `presentUserIds` Set is already deduped); this component just
-// renders the union state.
+// Architect ruling 2026-07-30 (DR-4 Phase 1): show AWAY only for a
+// user OBSERVED leaving during THIS session (a positive observation).
+// On a fresh page load, anyone not currently in the presence set is
+// simply "not connected" (grey) — we do not claim a user "never
+// joined" when we merely weren't watching. Unowned teams (harness
+// slots, spectator team rows) render neutral, which is correct.
 
-import { usePresence } from '@/stores/draftClientStore';
+import { useMemo } from 'react';
+import {
+  usePresence,
+  useObservedLeftUserIds,
+} from '@/stores/draftClientStore';
 import { cn } from '@/lib/utils';
 
+export type PresenceStatus = 'connected' | 'away' | 'not_connected';
+
 interface PresenceDotProps {
-  userId: string;
+  /**
+   * User id whose presence we render. Pass `null` or `undefined` for
+   * an unowned team (renders neutral).
+   */
+  userId?: string | null;
   /** Optional className passthrough for layout / sizing overrides. */
   className?: string;
 }
 
+/**
+ * Compute the presence status for a userId given the current sets.
+ * Pure — extracted so it can be unit-tested without React.
+ */
+export function computePresenceStatus(
+  userId: string | null | undefined,
+  presentUserIds: ReadonlySet<string>,
+  observedLeftUserIds: ReadonlySet<string>,
+): PresenceStatus {
+  if (!userId) return 'not_connected';
+  if (presentUserIds.has(userId)) return 'connected';
+  if (observedLeftUserIds.has(userId)) return 'away';
+  return 'not_connected';
+}
+
+const STATUS_META: Record<
+  PresenceStatus,
+  { color: string; label: string }
+> = {
+  connected: { color: 'bg-green-500', label: 'connected' },
+  away: { color: 'bg-amber-500', label: 'away' },
+  not_connected: { color: 'bg-gray-400', label: 'not connected' },
+};
+
 export function PresenceDot({ userId, className }: PresenceDotProps) {
   const presentUserIds = usePresence();
-  const isOnline = presentUserIds.has(userId);
+  const observedLeftUserIds = useObservedLeftUserIds();
+  const status = useMemo(
+    () => computePresenceStatus(userId, presentUserIds, observedLeftUserIds),
+    [userId, presentUserIds, observedLeftUserIds],
+  );
+  const { color, label } = STATUS_META[status];
+  const ariaUser = userId ?? 'unowned team';
 
   return (
     <span
       role="status"
-      aria-label={isOnline ? `${userId} is online` : `${userId} is offline`}
-      className={cn(
-        'inline-block h-2 w-2 rounded-full',
-        isOnline ? 'bg-green-500' : 'bg-gray-400',
-        className,
-      )}
+      aria-label={`${ariaUser} is ${label}`}
+      data-testid="presence-dot"
+      data-presence-status={status}
+      className={cn('inline-block h-2 w-2 rounded-full', color, className)}
     />
   );
 }

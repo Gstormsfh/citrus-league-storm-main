@@ -108,6 +108,15 @@ interface DraftClientStoreState {
   pendingActions: Map<string, PendingAction>;
   /** Distinct userIds currently connected (server-deduped per ADR-005). */
   presentUserIds: Set<string>;
+  /**
+   * DR-4 (2026-07-30) — userIds observed leaving during THIS session
+   * (a positive `presence.left` event received). Distinct from "never
+   * joined": we only claim a user is AWAY when we witnessed their
+   * departure. On a fresh page load, users not in `presentUserIds`
+   * are neutral "not connected" — we do not infer AWAY from absence.
+   * Architect ruling 2026-07-30: honesty over inference.
+   */
+  observedLeftUserIds: Set<string>;
   /** Last error from the server's `error` wire message. */
   lastError: ErrorPayload | null;
 
@@ -166,6 +175,7 @@ const initialState: Omit<
   lastFoldGaps: [],
   pendingActions: new Map(),
   presentUserIds: new Set(),
+  observedLeftUserIds: new Set(),
   lastError: null,
 };
 
@@ -185,10 +195,19 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
       // league / draft session); if it's null, on-clock stays null
       // until `setMatrix` lands.
       const foldResult = deriveFromSnapshot(snapshot, prev.matrix);
+      // DR-4 (2026-07-30) — seed presentUserIds from the snapshot.
+      // Pre-DR-4 servers omit the field; treat that as empty and
+      // let subsequent presence events populate (legacy behavior).
+      // Post-DR-4 servers guarantee the connecting user is included.
+      const seededPresence =
+        snapshot.presentUserIds !== undefined
+          ? new Set<string>(snapshot.presentUserIds)
+          : prev.presentUserIds;
       return {
         snapshot,
         derivedState: foldResult.state,
         lastFoldGaps: foldResult.gaps,
+        presentUserIds: seededPresence,
         // Reconcile any pending actions whose correlationIds appear
         // in the snapshot's recent events (path 2 / path 4 of the
         // reconciliation contract per `optimistic.ts`).
@@ -299,9 +318,38 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
     }),
 
   applyPresence: (payload) =>
-    set(() => ({
-      presentUserIds: new Set(payload.presentUserIds),
-    })),
+    set((prev) => {
+      // DR-4 (2026-07-30) — replace the Set from the server's payload.
+      // The server sends the FULL current set on every presence event
+      // (join or leave) so the client's local state is authoritative
+      // from any single message. If the incoming set is identical to
+      // ours (same members, same size), skip the presentUserIds
+      // mutation so React doesn't rerender on a no-op.
+      //
+      // ALSO track observedLeftUserIds — a positive record of users
+      // observed leaving this session. Feeds PresenceDot's three-
+      // state rendering: connected (in presentUserIds), away (in
+      // observedLeftUserIds AND NOT in presentUserIds), not-connected
+      // (in neither — we never claim someone is AWAY based purely
+      // on absence at load time).
+      const incoming = new Set<string>(payload.presentUserIds);
+      const prevSet = prev.presentUserIds;
+      const setUnchanged =
+        prevSet.size === incoming.size &&
+        [...incoming].every((id) => prevSet.has(id));
+      const changes: Partial<DraftClientStoreState> = {};
+      if (!setUnchanged) changes.presentUserIds = incoming;
+      if (payload.kind === 'left') {
+        // Record the positive observation. If the same user later
+        // rejoins, we leave them in observedLeftUserIds — the "away"
+        // state only shows when they're currently absent, so a
+        // rejoin flips them back to "connected" via presentUserIds.has().
+        const nextObserved = new Set(prev.observedLeftUserIds);
+        nextObserved.add(payload.userId);
+        changes.observedLeftUserIds = nextObserved;
+      }
+      return changes;
+    }),
 
   setError: (error) => set({ lastError: error }),
 
@@ -334,6 +382,7 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
       lastFoldGaps: [],
       pendingActions: new Map(),
       presentUserIds: new Set(),
+      observedLeftUserIds: new Set(),
       lastError: null,
     }),
 }));
@@ -353,6 +402,13 @@ export const usePendingActions = () =>
 
 export const usePresence = () =>
   useDraftClientStore((s) => s.presentUserIds);
+
+/**
+ * DR-4 (2026-07-30) — session-observed leaves. See store state
+ * definition for the honesty contract.
+ */
+export const useObservedLeftUserIds = () =>
+  useDraftClientStore((s) => s.observedLeftUserIds);
 
 export const useDraftError = () => useDraftClientStore((s) => s.lastError);
 

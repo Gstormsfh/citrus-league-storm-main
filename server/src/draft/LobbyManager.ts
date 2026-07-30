@@ -1002,6 +1002,25 @@ export class LobbyManager {
       }
     }
 
+    // DR-4 (2026-07-30) — add the connecting user to presentUserIds
+    // BEFORE building the snapshot, so the snapshot carries the user's
+    // OWN presence. This is the server half of the DR-4 F-fix for the
+    // presence-count-anomaly (first client sees 0 because their own
+    // join broadcast races the snapshot they just received). Post-DR-4
+    // the client's setSnapshot seeds presentUserIds directly from the
+    // snapshot, so the count is correct from render-1. See
+    // packages/shared/src/types/draftWire.ts:DraftSnapshot.presentUserIds
+    // for the wire contract.
+    //
+    // `isFirstConnection` captures the pre-add state so the subsequent
+    // presence broadcast (still needed for OTHER already-connected
+    // clients) only fires on the true first connection for this user
+    // (not subsequent co-manager multi-device attaches).
+    const isFirstConnection = !this.presentUserIds.has(userData.userId);
+    if (isFirstConnection) {
+      this.presentUserIds.add(userData.userId);
+    }
+
     // Snapshot send — point-to-point, not via the broadcast topic.
     //
     // Chunk 11g.10 sub-step 10c-1b: lobby.snapshot_sent_on_connect
@@ -1041,10 +1060,12 @@ export class LobbyManager {
       `[lobby] connection added lobbyId=${this.lobbyId} userId=${userData.userId} size=${this.connections.size}`,
     );
 
-    // Presence join — only on the FIRST connection for this userId.
-    // Subsequent connections (co-manager multi-device) don't re-emit.
-    if (!this.presentUserIds.has(userData.userId)) {
-      this.presentUserIds.add(userData.userId);
+    // Presence join broadcast — only on the FIRST connection for this
+    // userId. Subsequent connections (co-manager multi-device) don't
+    // re-emit. Broadcast still goes to the topic so OTHER connected
+    // clients update their presence set; the JOINING client itself
+    // now learns of its own presence via the snapshot seed above.
+    if (isFirstConnection) {
       this.broadcast({
         v: WIRE_PROTOCOL_VERSION,
         type: 'presence',
@@ -1285,6 +1306,11 @@ export class LobbyManager {
       recentEvents: this.events.snapshot(),
       stateSnapshot: this.getCurrentState(),
       ...(auctionState !== undefined ? { auctionState } : {}),
+      // DR-4 (2026-07-30) — carry current presence in the snapshot so
+      // newly-connecting clients see themselves + all other present
+      // users on render-1. See addConnection() for the ordering
+      // guarantee (join added to Set BEFORE this snapshot is built).
+      presentUserIds: [...this.presentUserIds],
     };
   }
 

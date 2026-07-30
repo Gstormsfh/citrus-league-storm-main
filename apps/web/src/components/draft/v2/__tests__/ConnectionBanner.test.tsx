@@ -147,15 +147,55 @@ describe('ConnectionBanner — fatal states', () => {
     expect(screen.getByRole('link', { name: /Back to dashboard/i })).toBeInTheDocument();
   });
 
-  it('renders permanent_server_error banner with technical-details details element', () => {
+  it('renders permanent_server_error banner with DR-4 honest copy (no auto-retry promise)', () => {
     setStateTo({
       kind: 'fatal',
       reason: 'permanent_server_error',
       errorMessage: 'WebSocket closed with server code 4500',
     });
     renderBanner();
+    // DR-4: copy must NOT promise auto-retry behavior the code doesn't
+    // perform (invariant I2 generalizes beyond the clock).
+    expect(screen.getByText(/Can.t reach the draft server/i)).toBeInTheDocument();
+    expect(screen.getByText(/isn.t reachable right now/i)).toBeInTheDocument();
+    expect(screen.getByText(/your picks are safe/i)).toBeInTheDocument();
+    // Absent: the pre-DR-4 title, and any "we'll keep trying" language.
+    expect(screen.queryByText(/^Connection error$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/we.ll keep trying/i)).not.toBeInTheDocument();
+    // Technical details collapsed by default (details element present,
+    // pre content not visible without expanding — but the raw text is
+    // still in the DOM behind a summary).
     expect(screen.getByText(/Technical details/)).toBeInTheDocument();
+    // Reload-page button remains as a blunt option, but Retry-now is
+    // the primary path.
     expect(screen.getByRole('button', { name: /Reload page/i })).toBeInTheDocument();
+  });
+
+  // DR-4 (2026-07-30) — 4400 waiting-room disposition test. Pre-DR-4
+  // this case fell through to the generic permanent_server_error
+  // banner and rendered "Connection error" — misleading. Now renders
+  // the explicit "waiting on your commissioner" copy per architect.
+  it('renders draft_not_initialized banner with waiting-room copy + manual Retry', () => {
+    setStateTo({
+      kind: 'fatal',
+      reason: 'draft_not_initialized',
+      errorMessage: 'Draft not yet configured (code 4400)',
+    });
+    const onRetryNow = vi.fn();
+    renderBanner(onRetryNow);
+    expect(screen.getByText(/Waiting on your commissioner/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/hasn.t been set up yet/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/still needs to set the draft order/i),
+    ).toBeInTheDocument();
+    // Manual Retry button present + wired.
+    const retryBtn = screen.getByRole('button', { name: /Retry now/i });
+    fireEvent.click(retryBtn);
+    expect(onRetryNow).toHaveBeenCalledTimes(1);
+    // Absent: the wrong pre-DR-4 fallthrough copy.
+    expect(screen.queryByText(/^Connection error$/)).not.toBeInTheDocument();
   });
 });
 

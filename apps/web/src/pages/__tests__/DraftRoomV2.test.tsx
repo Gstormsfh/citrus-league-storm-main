@@ -309,7 +309,9 @@ describe('DraftRoomV2 (chunk 11g.5b)', () => {
       const label = await screen.findByTestId('draft-header-label');
       expect(label.textContent).toMatch(/Round 1/);
       expect(label.textContent).toMatch(/Pick 6 \/ 36/);
-      expect(label.textContent).toMatch(/in_progress/);
+      // DR-4 (2026-07-30): describeStatus rewrites derived status to
+      // plain language. "in_progress" now reads "in progress".
+      expect(label.textContent).toMatch(/in progress/);
     });
 
     it('cards ADVANCE LIVE as events land after the snapshot', async () => {
@@ -337,7 +339,11 @@ describe('DraftRoomV2 (chunk 11g.5b)', () => {
       // DR-3 (2026-07-29): rewritten for the sticky-header label.
       const label = await screen.findByTestId('draft-header-label');
       // Pre-picks: not_started, 0/36 done.
-      expect(label.textContent).toMatch(/not_started/);
+      // DR-4 (2026-07-30): describeStatus rewrites derived
+      // "not_started" + picksMade=0 to "active — waiting for pick 1"
+      // so users don't see a confusing "not_started" when the DB
+      // schedule is in_progress.
+      expect(label.textContent).toMatch(/waiting for pick 1/);
       expect(label.textContent).toMatch(/0 \/ 36/);
 
       // Simulate the first pick landing.
@@ -345,7 +351,9 @@ describe('DraftRoomV2 (chunk 11g.5b)', () => {
         callbacks().onEvent(pickEvent(1, 'team-1', 1, 1));
         await Promise.resolve();
       });
-      expect(label.textContent).toMatch(/in_progress/);
+      // DR-4 (2026-07-30): describeStatus rewrites derived status to
+      // plain language. "in_progress" now reads "in progress".
+      expect(label.textContent).toMatch(/in progress/);
       expect(label.textContent).toMatch(/Pick 2 \/ 36/);
 
       // Second pick.

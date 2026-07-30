@@ -487,6 +487,22 @@ export interface DraftSnapshot {
   recentEvents: ReadonlyArray<BufferedDraftEvent>;
   stateSnapshot: DraftStateSnapshot;
   auctionState?: AuctionStateSnapshot;
+  /**
+   * DR-4 (2026-07-30) — the userIds present in the lobby at snapshot
+   * build time, including the connecting client itself. Fixes the
+   * DR-1 presence-count-anomaly: without this, a newly-connecting
+   * client's presentUserIds Set stays empty until an EXTERNAL join
+   * event fires, so the first client sees 0 (their own presence not
+   * counted). The client's `setSnapshot` seeds `presentUserIds` from
+   * this array. Optional for backwards compatibility with servers on
+   * older wire versions — clients treat `undefined` as an empty
+   * seed and rely on subsequent presence events to populate.
+   *
+   * Server contract (LobbyManager.addConnection): the connecting
+   * user's id is added to the internal `presentUserIds` Set BEFORE
+   * the snapshot is built, so the snapshot always includes self.
+   */
+  presentUserIds?: ReadonlyArray<string>;
 }
 
 // ── Wire envelope ──────────────────────────────────────────────────
