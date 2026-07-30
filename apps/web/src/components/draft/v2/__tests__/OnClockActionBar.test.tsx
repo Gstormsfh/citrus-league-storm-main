@@ -156,6 +156,41 @@ describe('OnClockActionBar', () => {
     expect(screen.getByTestId('on-clock-countdown').textContent).toBe('0:00');
   });
 
+  // DR-4 F11 fix (2026-07-30) — isSubmitPending guard.
+  it('disables Draft button and shows "Submitting…" when isSubmitPending=true', () => {
+    render(
+      <OnClockActionBar
+        amIOnClock={true}
+        currentPickDeadline={new Date(Date.now() + 60_000).toISOString()}
+        selectedPlayer={mkPlayer()}
+        onDraft={vi.fn()}
+        pickNumber={3}
+        roundNumber={1}
+        isSubmitPending={true}
+      />,
+    );
+    const btn = screen.getByTestId('on-clock-draft-button') as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    expect(btn.textContent).toContain('Submitting…');
+  });
+
+  it('does NOT fire onDraft when isSubmitPending=true (defense-in-depth)', () => {
+    const onDraft = vi.fn();
+    render(
+      <OnClockActionBar
+        amIOnClock={true}
+        currentPickDeadline={new Date(Date.now() + 60_000).toISOString()}
+        selectedPlayer={mkPlayer()}
+        onDraft={onDraft}
+        pickNumber={3}
+        roundNumber={1}
+        isSubmitPending={true}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('on-clock-draft-button'));
+    expect(onDraft).not.toHaveBeenCalled();
+  });
+
   it('renders "—:—" when currentPickDeadline is null', () => {
     render(
       <OnClockActionBar

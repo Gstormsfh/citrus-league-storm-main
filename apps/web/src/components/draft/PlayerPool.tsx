@@ -35,6 +35,15 @@ interface PlayerPoolProps {
    * see the original select-first behavior.
    */
   isYourTurn?: boolean;
+  /**
+   * DR-4 (2026-07-30) — F11 fix (layer 1 GUARD): while the caller has
+   * a pending pick in-flight for their team, every Draft button in
+   * the pool disables + shows "Submitting…". Prevents the
+   * double-submit that surfaces the pick_out_of_order → clock-expired
+   * copy mismatch (see DraftRoomV2.tsx:handleDraftFromPool for the
+   * layer 2 DISAMBIGUATE that catches any race that slips this guard).
+   */
+  isSubmitPending?: boolean;
 }
 
 // Normalize position (L -> LW, R -> RW)
@@ -61,6 +70,7 @@ export const PlayerPool = memo(({
   scoringSettings,
   projectedFptsMap = new Map(),
   isYourTurn = false,
+  isSubmitPending = false,
 }: PlayerPoolProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -365,6 +375,7 @@ export const PlayerPool = memo(({
               <Button
                 size="sm"
                 className="h-7 px-3 text-xs bg-fantasy-primary hover:bg-fantasy-primary/90 relative z-20 pointer-events-auto"
+                disabled={isSubmitPending}
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
@@ -372,7 +383,7 @@ export const PlayerPool = memo(({
                 }}
                 data-testid="pool-row-draft-button"
               >
-                Draft
+                {isSubmitPending ? 'Submitting…' : 'Draft'}
               </Button>
             )}
           </div>
@@ -382,7 +393,7 @@ export const PlayerPool = memo(({
   });
     Row.displayName = 'PlayerRow';
     return Row;
-  }, [selectedPlayer?.id, draftedSet, isDraftActive, isYourTurn, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, fptsMap, projectedFptsMap]);
+  }, [selectedPlayer?.id, draftedSet, isDraftActive, isYourTurn, isSubmitPending, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, fptsMap, projectedFptsMap]);
 
   return (
     <Card className="p-2 sm:p-4 border-fantasy-border bg-fantasy-surface">
@@ -625,9 +636,10 @@ export const PlayerPool = memo(({
                         )}
                         {(isSelected || isYourTurn) && isDraftActive && !isDrafted && (
                           <Button size="sm" className="h-7 px-2 text-[10px] bg-fantasy-primary hover:bg-fantasy-primary/90"
+                            disabled={isSubmitPending}
                             onClick={(e) => { e.stopPropagation(); e.preventDefault(); onPlayerDraft(player); }}
                             data-testid="pool-row-draft-button">
-                            Draft
+                            {isSubmitPending ? 'Submitting…' : 'Draft'}
                           </Button>
                         )}
                       </div>

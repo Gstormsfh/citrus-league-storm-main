@@ -42,6 +42,14 @@ export interface OnClockActionBarProps {
   pickNumber: number | null;
   /** Optional round number for the header line. */
   roundNumber: number | null;
+  /**
+   * DR-4 (2026-07-30) — F11 fix (layer 1 GUARD): disable the Draft
+   * button + show "Submitting…" while a pending pick is in flight
+   * for this team. Prevents the double-submit → pick_out_of_order
+   * → false clock-expiry copy chain. Same signal wired to
+   * PlayerPool's inline row buttons.
+   */
+  isSubmitPending?: boolean;
 }
 
 function formatCountdown(secondsRemaining: number): string {
@@ -58,6 +66,7 @@ export function OnClockActionBar({
   onDraft,
   pickNumber,
   roundNumber,
+  isSubmitPending = false,
 }: OnClockActionBarProps) {
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -134,11 +143,11 @@ export function OnClockActionBar({
       <Button
         size="lg"
         className="bg-white text-fantasy-primary hover:bg-white/90 font-bold px-6"
-        disabled={!canDraft}
-        onClick={() => canDraft && onDraft(selectedPlayer)}
+        disabled={!canDraft || isSubmitPending}
+        onClick={() => canDraft && !isSubmitPending && onDraft(selectedPlayer)}
         data-testid="on-clock-draft-button"
       >
-        Draft
+        {isSubmitPending ? 'Submitting…' : 'Draft'}
       </Button>
     </div>
   );

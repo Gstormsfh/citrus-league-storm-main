@@ -81,6 +81,19 @@ $env:SUPABASE_JWT_SECRET = (gcloud secrets versions access latest `
   --secret=SUPABASE_JWT_SECRET `
   --project=citrus-fantasy-staging)
 
+# DR-4 (2026-07-30) — F-ledger cookbook update: the harness's WS
+# transport defaults to plain ws:// via HOST=35.203.89.236 WS_PORT=3002
+# SCHEME=ws (draft-harness.mjs:218-224). To exercise the SAME wss/Caddy
+# path a real browser rides, set SCHEME=wss + HOST=draft-staging.
+# citrusfantasysports.com + WS_PORT=443 before firing the harness.
+# The prior acceptance run (2026-07-30T16-12-24-468Z) ran mixed-transport
+# because these were unset — 12 harness clients on plain ws, browser
+# on wss. Numbers still cleared Mandate but architect required the
+# honest transport label in the report.
+$env:SCHEME = 'wss'
+$env:HOST = 'draft-staging.citrusfantasysports.com'
+$env:WS_PORT = '443'
+
 # Sanity — should print the redacted host, NOT the password:
 $env:SUPABASE_DB_URL -replace ':\/\/[^:]+:[^@]+@', '://REDACTED:REDACTED@'
 ```
@@ -94,6 +107,9 @@ resolve to `db.jjgspcpvqaiitloglxbb.supabase.co:5432` (per §15.4 of
 ```powershell
 Remove-Item Env:\SUPABASE_DB_URL
 Remove-Item Env:\SUPABASE_JWT_SECRET
+Remove-Item Env:\SCHEME
+Remove-Item Env:\HOST
+Remove-Item Env:\WS_PORT
 ```
 
 ---

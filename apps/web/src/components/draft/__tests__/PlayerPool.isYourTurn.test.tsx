@@ -127,6 +127,30 @@ describe('PlayerPool — isYourTurn inline Draft button gate (DR-3.1 F8 fix)', (
     expect(screen.queryAllByTestId('pool-row-draft-button').length).toBe(0);
   });
 
+  // DR-4 F11 fix (2026-07-30) — isSubmitPending guard.
+  it('disables inline Draft buttons and shows "Submitting…" when isSubmitPending=true', () => {
+    render(
+      <PlayerPool
+        onPlayerSelect={vi.fn()}
+        onPlayerDraft={vi.fn()}
+        selectedPlayer={null}
+        draftedPlayers={[]}
+        isDraftActive={true}
+        availablePlayers={POOL}
+        isYourTurn={true}
+        isSubmitPending={true}
+      />,
+    );
+    const buttons = screen.getAllByTestId(
+      'pool-row-draft-button',
+    ) as HTMLButtonElement[];
+    expect(buttons.length).toBe(POOL.length * LAYOUTS);
+    for (const btn of buttons) {
+      expect(btn.disabled).toBe(true);
+      expect(btn.textContent).toContain('Submitting…');
+    }
+  });
+
   it('does NOT render Draft button on drafted rows even when isYourTurn=true', () => {
     render(
       <PlayerPool

@@ -52,6 +52,7 @@ import {
   useDraftLastFoldGaps,
   useDraftMatrix,
   useMyTeamId,
+  usePendingActions,
 } from '@/stores/draftClientStore';
 import {
   notifyConnectionFatal,
@@ -414,6 +415,7 @@ function MainTabs({
 }: MainTabsProps) {
   const derived = useDerivedDraftState();
   const snapshot = useDraftSnapshot();
+  const pendingActions = usePendingActions();
   const [tab, setTab] = useState<'players' | 'board' | 'history'>('players');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
@@ -423,6 +425,21 @@ function MainTabs({
     myTeamId !== null &&
     derived.onClockTeamId !== null &&
     derived.onClockTeamId === myTeamId;
+
+  // DR-4 (2026-07-30) — F11 fix (layer 1 GUARD): am I currently
+  // submitting a pick? Threaded to PlayerPool + OnClockActionBar so
+  // every Draft button disables + shows "Submitting…" while
+  // in-flight. Prevents the double-submit that surfaces the
+  // pick_out_of_order → clock-expired copy mismatch.
+  const isSubmitPending = useMemo(() => {
+    if (myTeamId === null) return false;
+    for (const p of pendingActions.values()) {
+      if (p.teamId === myTeamId && p.optimisticState === 'pending') {
+        return true;
+      }
+    }
+    return false;
+  }, [pendingActions, myTeamId]);
 
   // DR-4 (2026-07-30) — alarm system: title flash + notification +
   // sound when on-clock AND tab is hidden. Mute toggle persists to
@@ -477,6 +494,19 @@ function MainTabs({
         toast.error("It's not your turn");
         return;
       }
+      // DR-4 (2026-07-30) — F11 fix (layer 1 GUARD, defense-in-depth):
+      // if we already have a pending pick in-flight for this team,
+      // silently no-op. The button should already be disabled at the
+      // render level (isSubmitPending prop), but this catches any
+      // race — very-fast double-click before React re-renders the
+      // disabled state, or a stale click event queued behind a
+      // slow re-render.
+      const currentPending = [...pendingActions.values()].find(
+        (p) => p.teamId === myTeamId && p.optimisticState === 'pending',
+      );
+      if (currentPending) {
+        return;
+      }
       const playerIdNum = parseInt(player.id, 10);
       if (!Number.isFinite(playerIdNum) || playerIdNum <= 0) {
         toast.error('Invalid player');
@@ -484,6 +514,9 @@ function MainTabs({
       }
       const attemptId = crypto.randomUUID();
       const submittedAt = Date.now();
+      // Capture the currentPickNumber we're submitting for; feeds the
+      // F11 layer 2 disambiguate check on the pick_out_of_order path.
+      const submittingForPickNumber = derived.currentPickNumber;
       useDraftClientStore.getState().recordPending({
         correlationId: attemptId,
         teamId: myTeamId,
@@ -519,7 +552,40 @@ function MainTabs({
           useDraftClientStore
             .getState()
             .rollBackPending(attemptId, result.message);
-          toast.error(result.message);
+          // DR-4 (2026-07-30) — F11 fix (layer 2 DISAMBIGUATE):
+          // pick_out_of_order translates to reason='clock_expired'
+          // per submitPick.ts:129-133 (architect DR-2 mapping). BUT:
+          // it also fires on a DOUBLE-SUBMIT — the second submit
+          // hits the server AFTER the first one landed, and the
+          // server correctly rejects the stale pick_number. Copy
+          // must not lie: check whether the SAME pickNumber we
+          // just tried to submit for is now present in our own
+          // team's roster. If YES → it was a double-submit
+          // (the first click succeeded); silent no-op — the user
+          // sees their pick on the board. If NO → real clock
+          // expiry; keep the DR-2 copy.
+          if (result.reason === 'clock_expired') {
+            const myRoster =
+              useDraftClientStore.getState().derivedState?.teamRosters.get(myTeamId) ?? [];
+            const alreadyPicked = myRoster.some(
+              (r) => r.pickNumber === submittingForPickNumber,
+            );
+            if (alreadyPicked) {
+              // Double-submit — the first one already landed.
+              // Silent no-op is honest: the user sees their pick.
+              // A toast would be noise for a non-error state.
+              // eslint-disable-next-line no-console
+              console.debug('[DR-4 F11] double-submit suppressed', {
+                submittingForPickNumber,
+                attemptId,
+              });
+            } else {
+              // Real clock expiry — autopick took the slot.
+              toast.error(result.message);
+            }
+          } else {
+            toast.error(result.message);
+          }
         }
         // Success: dangle timer stays armed per DR-2 amendment.
       } catch (err) {
@@ -533,7 +599,7 @@ function MainTabs({
         setSelectedPlayer(null);
       }
     },
-    [amIOnClock, myTeamId, derived, leagueId],
+    [amIOnClock, myTeamId, derived, leagueId, pendingActions],
   );
 
   const isDraftActive = derived?.draftStatus === 'in_progress';
@@ -570,6 +636,7 @@ function MainTabs({
           onDraft={handleDraftFromPool}
           pickNumber={derived?.currentPickNumber ?? null}
           roundNumber={derived?.currentRoundNumber ?? null}
+          isSubmitPending={isSubmitPending}
         />
         {/* DR-4 (2026-07-30) — alarm mute toggle. Persistent, small,
             always visible when on-clock. Beeping at a user who's
@@ -608,6 +675,7 @@ function MainTabs({
               isDraftActive={isDraftActive}
               availablePlayers={availablePlayers}
               isYourTurn={amIOnClock}
+              isSubmitPending={isSubmitPending}
             />
           )}
         </TabsContent>
