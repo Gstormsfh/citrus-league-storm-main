@@ -63,11 +63,14 @@ def get_unique_player_ids_from_raw_shots():
     print("=" * 80)
     
     print("Loading player IDs from raw_shots...")
-    
+
+    # Unfiltered scan is intentional (A4 per 0C-CONSUMER-SCOPING decision):
+    # raw_shots is multi-season since phase 0c, so this now discovers
+    # historical player/goalie IDs too. Benign — the directory just gets more names.
     # Get unique player_ids (shooters)
     response = supabase.table('raw_shots').select('player_id').not_.is_('player_id', 'null').limit(50000).execute()
     df_players = pd.DataFrame(response.data)
-    
+
     # Get unique goalie_ids
     response_goalies = supabase.table('raw_shots').select('goalie_id').not_.is_('goalie_id', 'null').limit(50000).execute()
     df_goalies = pd.DataFrame(response_goalies.data)

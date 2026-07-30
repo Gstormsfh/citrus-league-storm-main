@@ -27,6 +27,7 @@ from supabase import create_client, Client
 from datetime import datetime
 from typing import Dict, Optional
 from apply_qoc_adjustments import apply_qoc_to_projections
+from data_pipeline.utils.season_config import CURRENT_SEASON
 import logging
 
 logger = logging.getLogger(__name__)
@@ -138,9 +139,13 @@ def get_goalie_games_played() -> Dict[int, int]:
         batch_size = 1000
         
         while True:
+            # Live product path: current season only. raw_shots is multi-season
+            # since phase 0c (seasons 2017-2024 backfilled); this pipeline must
+            # only see the currently-active season so historical rows don't
+            # inflate games_played. See data_pipeline/utils/season_config.py.
             response = supabase.table('raw_shots').select(
                 'goalie_id, game_id'
-            ).range(offset, offset + batch_size - 1).execute()
+            ).eq('season', CURRENT_SEASON).range(offset, offset + batch_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break
@@ -232,9 +237,11 @@ def get_player_talent_adjusted_xg() -> Dict[int, float]:
         batch_size = 1000
         
         while True:
+            # Live product path: current season only (see companion note in
+            # get_goalie_games_played above).
             response = supabase.table('raw_shots').select(
                 'player_id, shooting_talent_adjusted_xg, flurry_adjusted_xg, xg_value, game_id'
-            ).range(offset, offset + batch_size - 1).execute()
+            ).eq('season', CURRENT_SEASON).range(offset, offset + batch_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break

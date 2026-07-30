@@ -114,6 +114,9 @@ def discover_players_from_our_data(db: SupabaseRest, season: int) -> Set[int]:
     shot_count = 0
     last_progress_time = time.time()
     
+    # Unfiltered scan is intentional (A4 per 0C-CONSUMER-SCOPING decision):
+    # raw_shots is multi-season since phase 0c, so this now discovers
+    # historical player IDs too. Benign — the directory just gets more names.
     while True:
       shots = db.select("raw_shots", select="player_id,passer_id,goalie_id", limit=batch_size, offset=offset)
       if not shots:

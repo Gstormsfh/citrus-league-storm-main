@@ -51,6 +51,11 @@ temp_*.json
 test-*.html
 fix_*.sql
 
+# Phase 0c pre/post-load golden baselines (contain prod fingerprints;
+# treat as ephemeral run artifacts, not committed provenance)
+scripts/utilities/_golden_preload.json
+scripts/utilities/_golden_postload.json
+
 # Ignore stray PowerShell scratch scripts, but allow our ops scripts
 *.ps1
 !ops/windows/*.ps1

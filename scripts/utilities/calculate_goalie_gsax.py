@@ -20,12 +20,19 @@ This script:
 6. Outputs regressed GSAx for each goalie
 """
 
+import argparse
 import pandas as pd
 import numpy as np
 import os
+import sys
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from datetime import datetime
+
+# Shared season constant — one source of truth for the data-pipeline.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "data-pipeline"))
+from data_pipeline.utils.season_config import CURRENT_SEASON  # noqa: E402
 
 # Load environment variables
 load_dotenv()
@@ -43,32 +50,43 @@ supabase = SupabaseRest(supabase_url, supabase_key)
 
 # Season label for storing results in `goalie_gsax` (table may include historical seasons).
 # For NHL game IDs like 2025020xxx, the season year is 2025.
-SEASON = 2025
+SEASON = CURRENT_SEASON
 
-def load_historical_shots_data():
+def load_historical_shots_data(seasons=None):
     """
     Load historical shots data from raw_shots table.
-    
+
+    Args:
+        seasons: iterable of season start-years. Default [CURRENT_SEASON] —
+            phase 0c backfilled 2017-2024 into raw_shots; this default keeps
+            behavior unchanged. Pass multi-season list via --seasons to opt in.
+
     Returns:
-        DataFrame with columns: goalie_id, is_goal, shooting_talent_adjusted_xg, 
+        DataFrame with columns: goalie_id, is_goal, shooting_talent_adjusted_xg,
         flurry_adjusted_xg, xg_value, is_empty_net
     """
+    if seasons is None:
+        seasons = [CURRENT_SEASON]
+    seasons_list = [int(s) for s in seasons]
+
     print("=" * 80)
     print("LOADING HISTORICAL SHOTS DATA")
     print("=" * 80)
-    
+    print(f"  seasons filter: {seasons_list}")
+
     print("Loading from Supabase raw_shots table...")
     print("(Using pagination to fetch all records)")
-    
+
     try:
         all_shots = []
         offset = 0
         batch_size = 1000
-        
+
         while True:
             batch = supabase.select(
                 'raw_shots',
                 select='goalie_id, goalie_name, is_goal, shooting_talent_adjusted_xg, flurry_adjusted_xg, xg_value, is_empty_net, game_id, period, distance, angle, is_power_play, shot_type',
+                filters=[('season', 'in', seasons_list)],
                 limit=batch_size,
                 offset=offset
             )
@@ -354,15 +372,18 @@ def calculate_bayesian_regression(goalie_stats):
     return goalie_stats
 
 
-def main():
+def main(seasons=None):
     """Main execution function."""
+    if seasons is None:
+        seasons = [CURRENT_SEASON]
     print("\n" + "=" * 80)
     print("GOALIE GSAX CALCULATION")
     print("=" * 80)
     print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
+    print(f"Seasons: {seasons}")
+
     # Load data
-    df_shots = load_historical_shots_data()
+    df_shots = load_historical_shots_data(seasons=seasons)
     if df_shots is None or len(df_shots) == 0:
         print("ERROR: Failed to load shots data")
         return
@@ -518,8 +539,25 @@ def upsert_to_database(goalie_stats):
 
 def main_with_export():
     """Main execution function with export."""
-    results = main()
-    
+    parser = argparse.ArgumentParser(description="Calculate goalie GSAx (Bayesian-regressed).")
+    parser.add_argument(
+        "--seasons",
+        type=str,
+        default=str(CURRENT_SEASON),
+        help=(
+            f"Comma-separated season start-years to include (default: {CURRENT_SEASON}). "
+            "Behavior unchanged from pre-phase-0c; opt into the multi-season "
+            "corpus explicitly (e.g. --seasons 2017,2018,2019,2020,2021,2022,2023,2024,2025)."
+        ),
+    )
+    args = parser.parse_args()
+    try:
+        seasons = [int(s.strip()) for s in args.seasons.split(",") if s.strip()]
+    except ValueError as e:
+        raise SystemExit(f"--seasons parse error: {e}")
+
+    results = main(seasons=seasons)
+
     if results is not None and len(results) > 0:
         # Export to CSV
         export_to_csv(results)

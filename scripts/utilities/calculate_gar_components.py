@@ -28,13 +28,20 @@ For initial implementation, we'll use shooter's xG as a proxy for on-ice xGF,
 then enhance with full on-ice tracking when available.
 """
 
+import argparse
 import pandas as pd
 import numpy as np
 import os
+import sys
 from dotenv import load_dotenv
 from supabase_rest import SupabaseRest
 from datetime import datetime
 from typing import Dict, Optional
+
+# Shared season constant — one source of truth for the data-pipeline.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "data-pipeline"))
+from data_pipeline.utils.season_config import CURRENT_SEASON  # noqa: E402
 
 # Load environment variables
 load_dotenv()
@@ -56,31 +63,42 @@ SITUATION_PP = "PP"
 SITUATION_PK = "PK"
 
 
-def load_shots_data():
+def load_shots_data(seasons=None):
     """
     Load shots data from raw_shots table.
-    
+
+    Args:
+        seasons: iterable of season start-years. Default [CURRENT_SEASON] —
+            phase 0c backfilled 2017-2024 into raw_shots; this default keeps
+            behavior unchanged. Pass multi-season list via --seasons to opt in.
+
     Returns:
         DataFrame with columns: player_id, game_id, period, shooting_talent_adjusted_xg,
         flurry_adjusted_xg, xg_value, is_goal, is_empty_net, home_skaters_on_ice,
         away_skaters_on_ice, team_code, is_home_team
     """
+    if seasons is None:
+        seasons = [CURRENT_SEASON]
+    seasons_list = [int(s) for s in seasons]
+
     print("=" * 80)
     print("LOADING SHOTS DATA")
     print("=" * 80)
-    
+    print(f"  seasons filter: {seasons_list}")
+
     print("Loading from Supabase raw_shots table...")
     print("(Using pagination to fetch all records)")
-    
+
     try:
         all_shots = []
         offset = 0
         batch_size = 1000
-        
+
         while True:
             batch = supabase.select(
                 'raw_shots',
                 select='id, player_id, game_id, period, time_remaining_seconds, shooting_talent_adjusted_xg, flurry_adjusted_xg, xg_value, is_goal, is_empty_net, home_skaters_on_ice, away_skaters_on_ice, team_code, is_home_team, goalie_id',
+                filters=[('season', 'in', seasons_list)],
                 limit=batch_size,
                 offset=offset
             )
@@ -434,13 +452,30 @@ def main():
     """
     Main function to calculate GAR component rates.
     """
+    parser = argparse.ArgumentParser(description="Calculate GAR component rates.")
+    parser.add_argument(
+        "--seasons",
+        type=str,
+        default=str(CURRENT_SEASON),
+        help=(
+            f"Comma-separated season start-years (default: {CURRENT_SEASON}). "
+            "Behavior unchanged from pre-phase-0c; opt into multi-season corpus explicitly."
+        ),
+    )
+    args = parser.parse_args()
+    try:
+        seasons = [int(s.strip()) for s in args.seasons.split(",") if s.strip()]
+    except ValueError as e:
+        raise SystemExit(f"--seasons parse error: {e}")
+
     print("=" * 80)
     print("CALCULATE GAR COMPONENT RATES")
     print("=" * 80)
+    print(f"Seasons: {seasons}")
     print()
-    
+
     # Load data
-    df_shots = load_shots_data()
+    df_shots = load_shots_data(seasons=seasons)
     if df_shots is None:
         print("ERROR: Failed to load shots data")
         return

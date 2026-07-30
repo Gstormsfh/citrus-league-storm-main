@@ -17,13 +17,20 @@ This script:
 3. Outputs shooting_talent_multiplier for each player
 """
 
+import argparse
 import pandas as pd
 import numpy as np
 from scipy import stats
 import os
+import sys
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import joblib
+
+# Shared season constant — one source of truth for the data-pipeline.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "data-pipeline"))
+from data_pipeline.utils.season_config import CURRENT_SEASON  # noqa: E402
 
 # Load environment variables
 load_dotenv()
@@ -43,20 +50,29 @@ if not supabase_url or not supabase_key:
 supabase: Client = create_client(supabase_url, supabase_key)
 
 
-def load_historical_shooting_data(source='database'):
+def load_historical_shooting_data(source='database', seasons=None):
     """
     Load historical shooting data (goals, xG, shots) per player.
-    
+
     Args:
         source: 'database' to load from Supabase, 'csv' to load from our_shots_2025.csv
-    
+        seasons: iterable of season numbers to include (start-year, e.g. [2025]).
+            None = defaults to [CURRENT_SEASON]. Since phase 0c raw_shots now
+            spans 2017-2024 + current, this default keeps behavior unchanged;
+            opt into the multi-season training corpus via --seasons.
+
     Returns:
         DataFrame with columns: player_id, total_goals, total_xG, total_shots
     """
+    if seasons is None:
+        seasons = [CURRENT_SEASON]
+    seasons_list = [int(s) for s in seasons]
+
     print("=" * 80)
     print("LOADING HISTORICAL SHOOTING DATA")
     print("=" * 80)
-    
+    print(f"  seasons filter: {seasons_list}")
+
     if source == 'database':
         print("Loading from Supabase raw_shots table...")
         print("(Using pagination to fetch all records, not just the first 1000)")
@@ -65,11 +81,11 @@ def load_historical_shooting_data(source='database'):
             all_shots = []
             offset = 0
             batch_size = 1000
-            
+
             while True:
                 response = supabase.table('raw_shots').select(
                     'player_id, is_goal, xg_value'
-                ).range(offset, offset + batch_size - 1).execute()
+                ).in_('season', seasons_list).range(offset, offset + batch_size - 1).execute()
                 
                 if not response.data or len(response.data) == 0:
                     break
@@ -333,13 +349,31 @@ def save_shooting_talent_dict(talent_df, filename='player_shooting_talent.joblib
 
 def main():
     """Main execution function."""
+    parser = argparse.ArgumentParser(description="Calculate Bayesian shooting talent per player.")
+    parser.add_argument(
+        "--seasons",
+        type=str,
+        default=str(CURRENT_SEASON),
+        help=(
+            "Comma-separated season start-years to include (e.g. '2025' or "
+            f"'2017,2018,2019,2020,2021,2022,2023,2024,{CURRENT_SEASON}'). "
+            f"Default: {CURRENT_SEASON} (behavior unchanged from pre-phase-0c). "
+            "Opt into the multi-season corpus explicitly."
+        ),
+    )
+    args = parser.parse_args()
+    try:
+        seasons = [int(s.strip()) for s in args.seasons.split(",") if s.strip()]
+    except ValueError as e:
+        raise SystemExit(f"--seasons parse error: {e}")
+
     print("=" * 80)
     print("SHOOTING TALENT CALCULATION")
     print("=" * 80)
     print()
-    
+
     # Load historical data
-    player_stats = load_historical_shooting_data(source='database')
+    player_stats = load_historical_shooting_data(source='database', seasons=seasons)
     
     if player_stats is None or len(player_stats) == 0:
         print("❌ Failed to load historical data. Exiting.")

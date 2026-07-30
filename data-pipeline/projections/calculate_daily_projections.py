@@ -596,12 +596,15 @@ def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) ->
 
     actual_goals = float(player_stats[0].get("nhl_goals", 0))
     
-    # Get xG total from raw_shots (prefer shooting_talent_adjusted_xg)
+    # Get xG total from raw_shots (prefer shooting_talent_adjusted_xg).
+    # Live product path: filter by the caller's season. raw_shots is
+    # multi-season since phase 0c backfilled 2017-2024, so an unfiltered
+    # read would sum career xG into the current-season finishing-talent ratio.
     try:
         shots = db.select(
             "raw_shots",
             select="shooting_talent_adjusted_xg,flurry_adjusted_xg,xg_value",
-            filters=[("player_id", "eq", player_id)],
+            filters=[("player_id", "eq", player_id), ("season", "eq", season)],
             limit=10000  # Large limit to get all shots
         )
         
