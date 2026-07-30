@@ -56,12 +56,9 @@ from dotenv import load_dotenv
 
 from data_pipeline.utils.supabase_rest import SupabaseRest
 
-load_dotenv()
-
-SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
+# Env loading is deferred to main() so --env-file can select the target
+# project (prod vs staging) explicitly. Without an explicit --env-file the
+# behavior matches historical runs: load_dotenv() reads .env in the cwd.
 
 # ─── MoneyPuck → raw_shots column mapping ──────────────────────────────────────
 # Static dict for review. Every entry has a clear MoneyPuck source.
@@ -344,15 +341,36 @@ def main() -> int:
                              "e.g. 2024020001). Applied post-mapping against "
                              "the derived NHL game_id, not the MoneyPuck 5-digit "
                              "source value. Default None = no filter.")
+    parser.add_argument("--env-file", type=str, default=None,
+                        help="Path to a .env file to load (e.g. .env.prod). "
+                             "Default None = load the cwd .env if present. "
+                             "Explicit selection is required for prod runs so "
+                             "the target project is never ambiguous.")
     args = parser.parse_args()
 
     if not os.path.exists(args.csv):
         print(f"ERROR: CSV not found at {args.csv}")
         return 1
 
+    # Load env AFTER arg parse so --env-file selects the target project.
+    if args.env_file is not None:
+        env_path = os.path.abspath(args.env_file)
+        if not os.path.exists(env_path):
+            print(f"ERROR: --env-file not found: {env_path}")
+            return 1
+        load_dotenv(env_path, override=True, encoding="utf-8-sig")
+    else:
+        load_dotenv()
+
+    supabase_url = os.getenv("VITE_SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not supabase_url or not supabase_key:
+        print("ERROR: Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
+        return 1
+
     # Parse the project ref from the configured Supabase URL so every run
     # — dry or live — surfaces the actual target unambiguously.
-    target_url = SUPABASE_URL or os.getenv("SUPABASE_URL") or ""
+    target_url = supabase_url or os.getenv("SUPABASE_URL") or ""
     try:
         if target_url.startswith("https://") and ".supabase.co" in target_url:
             target_project = target_url[len("https://"):target_url.index(".supabase.co")]
@@ -380,7 +398,7 @@ def main() -> int:
     print(f"  shotType                                               → shot_type       [lowercased]")
     print(f"  (OMITTED)                                              → {{7 moat features + 10 companions — populated by Phase 0c, GAPS §15}}")
 
-    db = SupabaseRest(SUPABASE_URL, SUPABASE_KEY) if not args.dry_run else None
+    db = SupabaseRest(supabase_url, supabase_key) if not args.dry_run else None
 
     mapped_rows: List[dict] = []
     unmappable = 0
