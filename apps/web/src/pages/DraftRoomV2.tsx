@@ -32,6 +32,7 @@ import {
   DraftTimerV2,
   useClockOffsetEstimator,
 } from '@/components/draft/v2/DraftTimerV2';
+import { OnClockActionBar } from '@/components/draft/v2/OnClockActionBar';
 import { DraftBoard } from '@/components/draft/DraftBoard';
 import { PlayerPool } from '@/components/draft/PlayerPool';
 import { DraftHistory } from '@/components/draft/DraftHistory';
@@ -363,6 +364,7 @@ function MainTabs({
   myTeamId,
 }: MainTabsProps) {
   const derived = useDerivedDraftState();
+  const snapshot = useDraftSnapshot();
   const [tab, setTab] = useState<'players' | 'board' | 'history'>('players');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
@@ -469,44 +471,61 @@ function MainTabs({
   const isDraftActive = derived?.draftStatus === 'in_progress';
 
   return (
-    <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-      <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="players">Players</TabsTrigger>
-        <TabsTrigger value="board">Board</TabsTrigger>
-        <TabsTrigger value="history">History</TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="players" className="mt-4">
-        {playersLoading ? (
-          <Card className="p-4 text-muted-foreground" data-testid="pool-loading">
-            Loading players…
-          </Card>
-        ) : (
-          <PlayerPool
-            onPlayerSelect={setSelectedPlayer}
-            onPlayerDraft={handleDraftFromPool}
-            selectedPlayer={selectedPlayer}
-            draftedPlayers={draftedIds}
-            isDraftActive={isDraftActive}
-            availablePlayers={availablePlayers}
-          />
-        )}
-      </TabsContent>
-
-      <TabsContent value="board" className="mt-4">
-        <DraftBoard
-          teams={v1Teams}
-          draftHistory={draftHistory}
-          currentPick={derived?.currentPickNumber ?? 0}
-          currentRound={derived?.currentRoundNumber ?? 0}
-          draftType="snake"
+    <div className="space-y-3">
+      {/* DR-3.1 (2026-07-29) — F8 fix: sticky on-clock action bar
+          renders above the tabs so it's visible in every tab of the
+          room. Returns null when off-clock. */}
+      <div className="sticky top-24 z-20">
+        <OnClockActionBar
+          amIOnClock={amIOnClock}
+          currentPickDeadline={snapshot?.stateSnapshot.currentPickDeadline ?? null}
+          selectedPlayer={selectedPlayer}
+          onDraft={handleDraftFromPool}
+          pickNumber={derived?.currentPickNumber ?? null}
+          roundNumber={derived?.currentRoundNumber ?? null}
         />
-      </TabsContent>
+      </div>
 
-      <TabsContent value="history" className="mt-4">
-        <DraftHistory draftHistory={draftHistory} />
-      </TabsContent>
-    </Tabs>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="players">Players</TabsTrigger>
+          <TabsTrigger value="board">Board</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="players" className="mt-4">
+          {playersLoading ? (
+            <Card className="p-4 text-muted-foreground" data-testid="pool-loading">
+              Loading players…
+            </Card>
+          ) : (
+            <PlayerPool
+              onPlayerSelect={setSelectedPlayer}
+              onPlayerDraft={handleDraftFromPool}
+              selectedPlayer={selectedPlayer}
+              draftedPlayers={draftedIds}
+              isDraftActive={isDraftActive}
+              availablePlayers={availablePlayers}
+              isYourTurn={amIOnClock}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="board" className="mt-4">
+          <DraftBoard
+            teams={v1Teams}
+            draftHistory={draftHistory}
+            currentPick={derived?.currentPickNumber ?? 0}
+            currentRound={derived?.currentRoundNumber ?? 0}
+            draftType="snake"
+          />
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-4">
+          <DraftHistory draftHistory={draftHistory} />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
 

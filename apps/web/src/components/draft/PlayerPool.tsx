@@ -27,6 +27,14 @@ interface PlayerPoolProps {
   scoringSettings?: ScoringSettings | null;
   /** Pre-computed projected FPTS from ROS projections */
   projectedFptsMap?: Map<string, { total: number; perGp: number; gamesRemaining: number }>;
+  /**
+   * DR-3.1 (2026-07-29) — F8 fix: when the caller is on the clock,
+   * EVERY available row shows an always-visible inline Draft button
+   * (industry pattern: Yahoo/ESPN). One click from "I want him" to
+   * submitted, no select-then-locate-elsewhere step. Off-clock users
+   * see the original select-first behavior.
+   */
+  isYourTurn?: boolean;
 }
 
 // Normalize position (L -> LW, R -> RW)
@@ -51,7 +59,8 @@ export const PlayerPool = memo(({
   watchlist = new Set(),
   draftedPlayerSet: externalDraftedSet,
   scoringSettings,
-  projectedFptsMap = new Map()
+  projectedFptsMap = new Map(),
+  isYourTurn = false,
 }: PlayerPoolProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -352,7 +361,7 @@ export const PlayerPool = memo(({
                 )} />
               </Button>
             )}
-            {isSelected && isDraftActive && !isDrafted && (
+            {(isSelected || isYourTurn) && isDraftActive && !isDrafted && (
               <Button
                 size="sm"
                 className="h-7 px-3 text-xs bg-fantasy-primary hover:bg-fantasy-primary/90 relative z-20 pointer-events-auto"
@@ -361,6 +370,7 @@ export const PlayerPool = memo(({
                   e.preventDefault();
                   onPlayerDraft(player);
                 }}
+                data-testid="pool-row-draft-button"
               >
                 Draft
               </Button>
@@ -372,7 +382,7 @@ export const PlayerPool = memo(({
   });
     Row.displayName = 'PlayerRow';
     return Row;
-  }, [selectedPlayer?.id, draftedSet, isDraftActive, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, fptsMap, projectedFptsMap]);
+  }, [selectedPlayer?.id, draftedSet, isDraftActive, isYourTurn, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, fptsMap, projectedFptsMap]);
 
   return (
     <Card className="p-2 sm:p-4 border-fantasy-border bg-fantasy-surface">
@@ -613,9 +623,10 @@ export const PlayerPool = memo(({
                             <Star className={cn("h-4 w-4", isInQueue ? "fill-fantasy-tertiary text-fantasy-tertiary" : "text-muted-foreground")} />
                           </Button>
                         )}
-                        {isSelected && isDraftActive && !isDrafted && (
+                        {(isSelected || isYourTurn) && isDraftActive && !isDrafted && (
                           <Button size="sm" className="h-7 px-2 text-[10px] bg-fantasy-primary hover:bg-fantasy-primary/90"
-                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onPlayerDraft(player); }}>
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onPlayerDraft(player); }}
+                            data-testid="pool-row-draft-button">
                             Draft
                           </Button>
                         )}
