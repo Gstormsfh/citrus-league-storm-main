@@ -49,6 +49,7 @@ import {
   useDraftSnapshot,
   useDerivedDraftState,
   useDraftLastFoldGaps,
+  useDraftMatrix,
   useMyTeamId,
 } from '@/stores/draftClientStore';
 import {
@@ -62,6 +63,7 @@ import {
   toDraftHistory,
   toDraftedPlayerIds,
   toV1Teams,
+  participatingTeamIdsFromMatrix,
   type FetchedTeam,
 } from '@/lib/draftClient/v1Adapters';
 import type { Player } from '@/services/PlayerService';
@@ -370,9 +372,19 @@ function MainTabs({
 
   // Adapt derived state → v1 prop shapes. Memoized against the exact
   // inputs so per-event folds only re-derive when derived changes.
+  // DR-3.1 F9 fix: filter teams to only those in the draft-order
+  // matrix; v1's TeamRosters + DraftBoard derive pick-in-round + grid
+  // columns from teams.length, so a league holding non-participating
+  // members (like a spectator team) would corrupt every pick label
+  // from round 2 onward without this filter.
+  const matrix = useDraftMatrix();
+  const participatingTeamIds = useMemo(
+    () => participatingTeamIdsFromMatrix(matrix ?? null),
+    [matrix],
+  );
   const v1Teams = useMemo(
-    () => (derived ? toV1Teams(teams, derived, playersById) : []),
-    [teams, derived, playersById],
+    () => (derived ? toV1Teams(teams, derived, playersById, participatingTeamIds) : []),
+    [teams, derived, playersById, participatingTeamIds],
   );
   const draftHistory = useMemo(
     () => (derived ? toDraftHistory(teams, derived, playersById) : []),
@@ -545,11 +557,18 @@ function SidebarPanel({
   myTeamId,
 }: SidebarPanelProps) {
   const derived = useDerivedDraftState();
+  const matrix = useDraftMatrix();
   const [queue, setQueue] = useState<string[]>([]);
 
+  // DR-3.1 F9 fix: same filter as MainTabs — TeamRosters' pick label
+  // formula reads teams.length as round size.
+  const participatingTeamIds = useMemo(
+    () => participatingTeamIdsFromMatrix(matrix ?? null),
+    [matrix],
+  );
   const v1Teams = useMemo(
-    () => (derived ? toV1Teams(teams, derived, playersById) : []),
-    [teams, derived, playersById],
+    () => (derived ? toV1Teams(teams, derived, playersById, participatingTeamIds) : []),
+    [teams, derived, playersById, participatingTeamIds],
   );
   const draftHistory = useMemo(
     () => (derived ? toDraftHistory(teams, derived, playersById) : []),

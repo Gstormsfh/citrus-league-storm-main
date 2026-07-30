@@ -10,6 +10,7 @@ import {
   toDraftHistory,
   toDraftedPlayerIds,
   toAvailablePlayers,
+  participatingTeamIdsFromMatrix,
   type FetchedTeam,
 } from '../v1Adapters';
 import type {
@@ -235,6 +236,122 @@ describe('toDraftedPlayerIds', () => {
 
   it('returns empty array when no picks have been made', () => {
     expect(toDraftedPlayerIds(mkDerived())).toEqual([]);
+  });
+});
+
+// ── DR-3.1 F9 regression tests ────────────────────────────────────
+//
+// The Showcase (2026-07-29) surfaced F9: v1's TeamRosters.tsx:97
+// renders pick labels as `${round}.${pick.pick % teams.length ||
+// teams.length}` — teams.length is treated as round size. A league
+// with 12 in-draft-order + 1 spectator team (Gbaby, 4c742dae) fed
+// 13 teams to the component and produced 2.9 / 3.1 for picks 22 / 27
+// (should have been 2.10 / 3.3). Architect ratified: authoritative
+// round size is the DRAFT ORDER's team count, never teams.length.
+// The adapter filter is the fix — non-participating teams are
+// excluded from the v1 shape at the boundary.
+
+describe('participatingTeamIdsFromMatrix (DR-3.1 F9 helper)', () => {
+  it('extracts a set of teamIds from a draft-order matrix', () => {
+    const matrix = [
+      { round: 1, pickNumber: 1, teamId: 'team-a' },
+      { round: 1, pickNumber: 2, teamId: 'team-b' },
+      { round: 2, pickNumber: 3, teamId: 'team-b' },
+      { round: 2, pickNumber: 4, teamId: 'team-a' },
+    ];
+    const set = participatingTeamIdsFromMatrix(matrix);
+    expect(set.size).toBe(2);
+    expect(set.has('team-a')).toBe(true);
+    expect(set.has('team-b')).toBe(true);
+  });
+
+  it('returns an empty set for a null matrix (pre-fetch state)', () => {
+    expect(participatingTeamIdsFromMatrix(null).size).toBe(0);
+  });
+});
+
+describe('toV1Teams — DR-3.1 F9 filter (12-in-order + 1 spectator)', () => {
+  // Fixture mirrors the Showcase state: 12 harness teams in the
+  // draft_order matrix + 1 spectator team (Gbaby-shape) NOT in the
+  // order. Every pick's round/pickNumber comes from the server's
+  // authoritative event (which used the true 12-team snake); the
+  // adapter's job is to make sure the v1 components see teams.length=12
+  // so their pick-in-round formula lands on the correct value.
+
+  const HARNESS_IDS = Array.from({ length: 12 }, (_, i) =>
+    `77777777-7777-7777-7777-${String(i + 1).padStart(12, '0')}`,
+  );
+  const SPECTATOR_ID = '4c742dae-6770-43f5-b310-cc24741e8148';
+
+  const THIRTEEN_TEAMS: FetchedTeam[] = [
+    ...HARNESS_IDS.map((id, i) => ({
+      id,
+      team_name: `Harness Team ${String(i + 1).padStart(2, '0')}`,
+      owner_name: `Owner ${i + 1}`,
+    })),
+    { id: SPECTATOR_ID, team_name: 'Gbaby', owner_name: 'Garrett' },
+  ];
+
+  const MATRIX_12_TEAMS = HARNESS_IDS.map((teamId, i) => ({
+    round: 1,
+    pickNumber: i + 1,
+    teamId,
+  }));
+
+  it('filters spectator team out when participatingTeamIds is provided', () => {
+    const participating = participatingTeamIdsFromMatrix(MATRIX_12_TEAMS);
+    const teams = toV1Teams(THIRTEEN_TEAMS, mkDerived(), new Map(), participating);
+    expect(teams.length).toBe(12);
+    expect(teams.map((t) => t.id).includes(SPECTATOR_ID)).toBe(false);
+  });
+
+  it('includes all teams when participatingTeamIds is undefined (legacy caller compat)', () => {
+    const teams = toV1Teams(THIRTEEN_TEAMS, mkDerived(), new Map());
+    expect(teams.length).toBe(13);
+    expect(teams.map((t) => t.id).includes(SPECTATOR_ID)).toBe(true);
+  });
+
+  it('returns zero teams when participatingTeamIds is empty (pre-matrix state)', () => {
+    const teams = toV1Teams(THIRTEEN_TEAMS, mkDerived(), new Map(), new Set());
+    expect(teams.length).toBe(0);
+  });
+
+  it('feeds v1 TeamRosters formula the correct round size — picks 3 / 22 / 27 → 1.3 / 2.10 / 3.3', () => {
+    // Simulate the Showcase rosters: slot 3 (Garrett's harness team)
+    // has 3 picks at pick_number 3, 22, 27. Adapter output should
+    // preserve these pick_numbers and give teams.length=12 so the
+    // v1 formula `pick.pick % teams.length || teams.length` computes:
+    //   pick 3  → 3 % 12 = 3  → "1.3"  ✓
+    //   pick 22 → 22 % 12 = 10 → "2.10" ✓
+    //   pick 27 → 27 % 12 = 3  → "3.3"  ✓
+    // (Pre-fix with teams.length=13: 3%13=3, 22%13=9, 27%13=1 → 2.9/3.1 ✗)
+    const slot3 = HARNESS_IDS[2];
+    const derived = mkDerived({
+      picksMade: 3,
+      teamRosters: new Map([
+        [slot3, [
+          { seq: 3,  playerId: 8480000, pickNumber: 3,  roundNumber: 1 },
+          { seq: 22, playerId: 8478402, pickNumber: 22, roundNumber: 2 },
+          { seq: 27, playerId: 8482116, pickNumber: 27, roundNumber: 3 },
+        ]],
+      ]),
+    });
+    const participating = participatingTeamIdsFromMatrix(MATRIX_12_TEAMS);
+    const teams = toV1Teams(THIRTEEN_TEAMS, derived, new Map(), participating);
+
+    expect(teams.length).toBe(12); // ← the round size v1 will use
+
+    const slot3Team = teams.find((t) => t.id === slot3);
+    expect(slot3Team).toBeDefined();
+    expect(slot3Team!.picks.map((p) => p.pick)).toEqual([3, 22, 27]);
+    expect(slot3Team!.picks.map((p) => p.round)).toEqual([1, 2, 3]);
+
+    // Apply the v1 TeamRosters formula (line 97) with teams.length=12:
+    const roundSize = teams.length;
+    const labels = slot3Team!.picks.map(
+      (p) => `${p.round}.${p.pick % roundSize || roundSize}`,
+    );
+    expect(labels).toEqual(['1.3', '2.10', '3.3']);
   });
 });
 

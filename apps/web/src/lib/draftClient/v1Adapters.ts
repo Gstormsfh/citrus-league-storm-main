@@ -146,13 +146,35 @@ export function rosterEntryToDraftPick(
  * Build the v1 Team[] array from fetched teams + derived rosters.
  * Every team gets a stable color from the palette (index rotation).
  * `owner` falls back to 'Manager' when no name is present.
+ *
+ * DR-3.1 (2026-07-29) — F9 fix: when `participatingTeamIds` is
+ * provided (populated from the draft-order matrix), fetchedTeams is
+ * filtered to only teams that appear in the draft order. This is
+ * critical because v1's TeamRosters.tsx:97 derives the pick-in-round
+ * label from `teams.length` (`pick.round.pick.pick % teams.length`),
+ * and DraftBoard.tsx:71 derives pickNumber from `teams.length`.
+ * A league can legitimately hold teams that aren't in the draft order
+ * (spectator/non-participating members); passing all fetchedTeams
+ * would give teams.length=13 for a 12-team draft, corrupting every
+ * pick label from round 2 onward. Architect ratification 2026-07-29:
+ * authoritative round size is the DRAFT ORDER's team count, never
+ * teams.length.
+ *
+ * When `participatingTeamIds` is undefined (legacy callers), the
+ * filter is a no-op — pre-DR-3.1 behavior preserved for callers that
+ * haven't been updated.
  */
 export function toV1Teams(
   fetchedTeams: ReadonlyArray<FetchedTeam>,
   derived: DerivedDraftState,
   playersById: ReadonlyMap<string, Player>,
+  participatingTeamIds?: ReadonlySet<string>,
 ): V1Team[] {
-  return fetchedTeams.map((t, index) => {
+  const filtered =
+    participatingTeamIds !== undefined
+      ? fetchedTeams.filter((t) => participatingTeamIds.has(t.id))
+      : fetchedTeams;
+  return filtered.map((t, index) => {
     const roster = derived.teamRosters.get(t.id) ?? [];
     const picks = roster.map((entry) =>
       rosterEntryToDraftPick(entry, t.id, t.team_name, playersById),
@@ -165,6 +187,23 @@ export function toV1Teams(
       picks,
     };
   });
+}
+
+/**
+ * DR-3.1 (2026-07-29) — F9 helper: build the participating-teams set
+ * from a draft-order matrix. Callers pass this to `toV1Teams` so the
+ * v1 pick-label formulas see the correct round size.
+ *
+ * Returns an empty set when `matrix` is null (matrix fetch hasn't
+ * landed yet); toV1Teams treats an empty set as "filter everything
+ * out" which correctly renders zero teams pre-matrix (the room shows
+ * its loading/waiting UI in that case, not an empty board).
+ */
+export function participatingTeamIdsFromMatrix(
+  matrix: ReadonlyArray<{ teamId: string }> | null,
+): ReadonlySet<string> {
+  if (matrix === null) return new Set<string>();
+  return new Set(matrix.map((slot) => slot.teamId));
 }
 
 /**
