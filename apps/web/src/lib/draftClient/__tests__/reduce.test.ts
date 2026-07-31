@@ -408,6 +408,39 @@ describe('reduce — ws_closed', () => {
     }
   });
 
+  it('connected + 4010 (client-watchdog stale) → reconnecting with staleTriggered=true (chunk 11g.10)', () => {
+    // The client-side liveness watchdog self-closes with 4010 when it
+    // detects N consecutive missed application-level pongs. Reduce
+    // MUST route through the transient reconnecting path AND flag
+    // `staleTriggered` so the banner renders distinct copy. Regression
+    // lock on the flag propagation.
+    const result = reduce(
+      connectedState(),
+      { type: 'ws_closed', code: 4010, reason: 'client_watchdog_stale' },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('reconnecting');
+    if (result.state.kind === 'reconnecting') {
+      expect(result.state.staleTriggered).toBe(true);
+    }
+    expect(effectKinds(result.sideEffects)).toEqual(['schedule_backoff_timer']);
+  });
+
+  it('connected + 1006 does NOT set staleTriggered — only 4010 does', () => {
+    // Negative case: ordinary network drop must not flag the state as
+    // stale-triggered. Only the client-watchdog code triggers the
+    // distinct-banner branch.
+    const result = reduce(
+      connectedState(),
+      { type: 'ws_closed', code: 1006, reason: 'abnormal' },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('reconnecting');
+    if (result.state.kind === 'reconnecting') {
+      expect(result.state.staleTriggered).toBeUndefined();
+    }
+  });
+
   it('connected + 4100 (lobby gone) → fatal (invalid_lobby)', () => {
     const result = reduce(
       connectedState(),

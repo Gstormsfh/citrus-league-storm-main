@@ -48,6 +48,7 @@ import {
   findTimedOutConnections,
   initializeHeartbeat,
   recordPong,
+  type TimedOutConnection,
 } from './heartbeat';
 
 export interface UwsServerHandle {
@@ -532,8 +533,51 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
           });
           return;
         }
+        // ── Chunk 11g.10 F5 — escalation ladder for stale connections ──
+        //
+        // Prior state (bug): rung 1 only. `ws.end()` was called on every
+        // stale connection every 10s, but if the uWS `close:` handler
+        // didn't fire (Caddy tunneling a silently-dead client-side TCP,
+        // uWS refusing repeat close on a "closing" WS, or the underlying
+        // write erroring silently), the ws stayed in
+        // `LobbyManager.connections` forever — same pong_timeout log
+        // every 10s, `lastPongAgeMs` growing linearly, broadcast fanout
+        // targeting dead sockets, presence counts lying to other clients.
+        // Field observation: lastPongAgeMs hit ~7.2 HOURS on one leak.
+        //
+        // Ladder per architect ruling:
+        //   rung 1 (cullAttempts becomes 1 this scan) — ws.end(4002)
+        //     graceful close frame. Works for healthy peers.
+        //   rung 2 (cullAttempts becomes 2) — ws.close() forceful. uWS
+        //     documents this as "no close message sent"; the C++ layer
+        //     resets the underlying TCP. Through Caddy, this manifests
+        //     as an upstream RST, which Caddy propagates to the client
+        //     side and closes both halves — engine close: fires.
+        //   rung 3+ (cullAttempts >= 3) — LobbyManager.forceRemoveConnection.
+        //     Unconditional map removal + presence.left broadcast. The
+        //     map is what drives fanout and presence; purging it fixes
+        //     the observable damage regardless of what uWS does with
+        //     the doomed WS reference. Idempotent w.r.t. any later
+        //     close: firing.
+        //
+        // The counter lives on DraftSocketUserData (see types.ts) so
+        // it survives across scan invocations for the same ws.
+        // Distinct INFO logs per rung: the rung whose count stops
+        // growing in the field is the rung that actually stopped the
+        // leak, which names the mechanism for the post-mortem.
+        const rung1: Array<TimedOutConnection<uWS.WebSocket<DraftSocketUserData>>> = [];
+        const rung2: Array<TimedOutConnection<uWS.WebSocket<DraftSocketUserData>>> = [];
+        const rung3: Array<TimedOutConnection<uWS.WebSocket<DraftSocketUserData>>> = [];
         for (const entry of timedOut) {
-          structuredLogger.warn('heartbeat.pong_timeout', {
+          const userData = entry.ws.getUserData();
+          const attempt = (userData.cullAttempts ?? 0) + 1;
+          userData.cullAttempts = attempt;
+          if (attempt === 1) rung1.push(entry);
+          else if (attempt === 2) rung2.push(entry);
+          else rung3.push(entry);
+        }
+        for (const entry of rung1) {
+          structuredLogger.info('heartbeat.cull.rung1_end', {
             lobbyId: entry.lobbyId,
             userId: entry.userId,
             lastPongAgeMs: entry.lastPongAgeMs,
@@ -542,18 +586,61 @@ export function startUwsServer(opts: StartUwsServerOptions): Promise<UwsServerHa
           try {
             entry.ws.end(HEARTBEAT_PONG_TIMEOUT_CLOSE_CODE, 'pong_timeout');
           } catch (err) {
-            // ws may already be closed if the close happened
-            // concurrently with the scan; swallow + log.
-            structuredLogger.debug('heartbeat.ws_end_threw', {
+            // Was DEBUG pre-F5; elevated to WARN per architect ruling
+            // so we learn IMMEDIATELY next time this hypothesis (uWS
+            // throws) fires in production.
+            structuredLogger.warn('heartbeat.ws_end_threw', {
               lobbyId: entry.lobbyId,
               userId: entry.userId,
             });
             void err;
           }
         }
+        for (const entry of rung2) {
+          structuredLogger.info('heartbeat.cull.rung2_close', {
+            lobbyId: entry.lobbyId,
+            userId: entry.userId,
+            lastPongAgeMs: entry.lastPongAgeMs,
+          });
+          try {
+            entry.ws.close();
+          } catch (err) {
+            // Elevated DEBUG->WARN alongside ws_end_threw for the same
+            // "we want to see this the first time it happens" reason.
+            structuredLogger.warn('heartbeat.ws_close_threw', {
+              lobbyId: entry.lobbyId,
+              userId: entry.userId,
+            });
+            void err;
+          }
+        }
+        for (const entry of rung3) {
+          const userData = entry.ws.getUserData();
+          structuredLogger.info('heartbeat.cull.rung3_force_purge', {
+            lobbyId: entry.lobbyId,
+            userId: entry.userId,
+            lastPongAgeMs: entry.lastPongAgeMs,
+            cullAttempts: userData.cullAttempts,
+          });
+          const lobby = lobbyRegistry.get(entry.lobbyId);
+          if (lobby) {
+            try {
+              lobby.forceRemoveConnection(entry.ws);
+            } catch (err) {
+              structuredLogger.warn('heartbeat.force_purge_threw', {
+                lobbyId: entry.lobbyId,
+                userId: entry.userId,
+              });
+              void err;
+            }
+          }
+        }
         structuredLogger.debug('heartbeat.scan_completed', {
           connectionsScanned: candidates.length,
           timedOut: timedOut.length,
+          rung1: rung1.length,
+          rung2: rung2.length,
+          rung3: rung3.length,
           pingsSent: candidates.length,
         });
       }, HEARTBEAT_SCAN_INTERVAL_MS);

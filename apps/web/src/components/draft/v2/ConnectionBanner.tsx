@@ -102,10 +102,25 @@ interface ReconnectingBannerProps {
 
 function ReconnectingBanner({ state, onRetryNow }: ReconnectingBannerProps) {
   const secondsRemaining = useCountdown(state.nextAttemptAt);
+  // Chunk 11g.10 client-liveness watchdog — distinct title when this
+  // reconnect was triggered by the CLIENT's watchdog noticing missed
+  // application-level pongs, rather than by a server-observed close.
+  // The countdown copy "Reconnecting in Xs" is preserved verbatim for
+  // both paths so existing regression tests (and muscle-memory reading
+  // of the banner) keep working; the distinction lives in the title +
+  // the data-stale-triggered attribute (queryable in tests + e2e).
+  const title = state.staleTriggered
+    ? 'Connection appears stale'
+    : 'Connection lost';
 
   return (
-    <Alert variant="destructive" role="alert" data-banner-kind="reconnecting">
-      <AlertTitle>Connection lost</AlertTitle>
+    <Alert
+      variant="destructive"
+      role="alert"
+      data-banner-kind="reconnecting"
+      data-stale-triggered={state.staleTriggered ? 'true' : undefined}
+    >
+      <AlertTitle>{title}</AlertTitle>
       <AlertDescription className="flex items-center justify-between gap-4">
         <span>
           Reconnecting in {Math.max(0, secondsRemaining)}s

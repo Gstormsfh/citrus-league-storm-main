@@ -98,12 +98,17 @@ export type DraftClientState =
     }
   | {
       /**
-       * Server returned `too_old` from the resync request. The
-       * runner must fetch a full snapshot via the HTTP endpoint
-       * (chunk 11g.7's followup — currently throws `not_implemented`).
-       * On `snapshot_fetched`, transitions to `connected` with
-       * state replaced from the snapshot. On `snapshot_fetch_failed`,
-       * transitions to `reconnecting`.
+       * Server returned `too_old` from the resync request (the engine's
+       * in-memory ring buffer evicted past the client's cursor — happens
+       * after long outages during busy drafts, e.g. laptop sleeps for
+       * 20+ minutes mid-round). The runner fetches a full snapshot via
+       * `GET /api/drafts/:draftId/snapshot` (chunk 11g.7 sub-step 7b;
+       * server route at server/src/routes/drafts.ts:192, client fetcher
+       * `defaultFetchSnapshot` in runner.ts). On `snapshot_fetched`,
+       * transitions to `connected` with state replaced from the
+       * snapshot. On `snapshot_fetch_failed`, transitions to
+       * `reconnecting` (fresh WS open re-runs resync; if the ring is
+       * still too small, the snapshot fetch retries with fresh HTTP).
        */
       kind: 'snapshot_required';
       wsUrl: string;
@@ -121,6 +126,18 @@ export type DraftClientState =
       nextAttemptAt: number;
       attempt: number;
       lastError: string | null;
+      /**
+       * Chunk 11g.10 client-liveness watchdog — set to `true` when this
+       * reconnect was triggered by the client-side watchdog detecting
+       * N consecutive missed application-level pongs (close code 4010),
+       * rather than by a server-initiated close or a browser-observed
+       * disconnect. Consumed by `ConnectionBanner` to render distinct
+       * copy ("Connection appears stale…" instead of "Connection lost…")
+       * so the user understands their client noticed the death first.
+       *
+       * Optional/absent (undefined) for reconnects from any other cause.
+       */
+      staleTriggered?: boolean;
     }
   | {
       /**
@@ -224,11 +241,13 @@ export type SideEffect =
   | {
       kind: 'fetch_snapshot';
       /**
-       * The HTTP snapshot endpoint for the chunk-11g.4 in-memory
-       * `DraftSnapshot` shape doesn't exist yet (tracked as a
-       * Decision Log followup). The runner's handler currently
-       * dispatches `snapshot_fetch_failed` immediately so the
-       * state machine routes through `reconnecting` cleanly.
+       * HTTP snapshot endpoint (chunk 11g.7 sub-step 7b) — runner
+       * fetches from `/api/drafts/:draftId/snapshot` via
+       * `defaultFetchSnapshot`. Runner ignores this field's value and
+       * uses `this.params.draftId` (= leagueId per data model) so
+       * tests can stub the fetcher without wiring URL construction.
+       * Kept named `leagueId` for backwards-compat with earlier
+       * signatures; the value is unused by the runner.
        */
       leagueId: string;
     }

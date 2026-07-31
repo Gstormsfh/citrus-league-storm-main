@@ -55,6 +55,25 @@ export interface DraftSocketUserData {
    */
   lastPongAt: number;
   /**
+   * Chunk 11g.10 connection-resilience (F5) — cull-attempt counter used
+   * by the heartbeat scanner's escalation ladder. Starts at 0; the
+   * scanner in `uws-server.ts` increments it on every pass that finds
+   * this connection still stale:
+   *   - attempt 1 → `ws.end(4002, 'pong_timeout')` (graceful close)
+   *   - attempt 2 → `ws.close()` (forceful — no close frame, TCP RST)
+   *   - attempt 3+ → `LobbyManager.forceRemoveConnection(ws)` (unconditional
+   *     map removal + presence.left broadcast; does not require the uWS
+   *     `close:` handler to fire)
+   *
+   * Each rung emits a distinct INFO log — the rung that stops the leak
+   * in the field names the mechanism (whether `ws.end` throws silently,
+   * whether uWS refuses subsequent `end` calls on a "closing" WS, or
+   * whether the Caddy-tunneled upstream never drops the way close-handler
+   * would need it to). See file-level JSDoc on `LobbyManager.forceRemoveConnection`
+   * for the presence-integrity rationale.
+   */
+  cullAttempts?: number;
+  /**
    * Chunk 11g.10 sub-step 10c-2 join-path-robustness — gate (a)
    * (non-UUIDv4 sub) and gate (b) (empty draft_order OR precheck
    * error) signal upgrade rejection via this optional marker rather
@@ -445,6 +464,28 @@ export function parseClientMessage(raw: string): _DraftClientMessage | null {
     return {
       type: 'resync',
       payload: { sinceSeq: (payload as { sinceSeq: number }).sinceSeq },
+    };
+  }
+
+  if (obj.type === 'ping') {
+    // Chunk 11g.10 client-liveness watchdog. `t` is the client's
+    // wall-clock at ping-send; server echoes it back in the pong
+    // payload so the client can compute RTT. Validated minimally
+    // — deep validation would just spam the debug log; the pong
+    // path never touches lobby state so garbage `t` is harmless.
+    const payload = obj.payload;
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      !('t' in payload) ||
+      typeof (payload as { t?: unknown }).t !== 'number' ||
+      !Number.isFinite((payload as { t: number }).t)
+    ) {
+      return null;
+    }
+    return {
+      type: 'ping',
+      payload: { t: (payload as { t: number }).t },
     };
   }
 

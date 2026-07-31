@@ -118,6 +118,40 @@ describe('ConnectionBanner — reconnecting state', () => {
     renderBanner(); // no onRetryNow
     expect(screen.queryByRole('button', { name: /Retry/i })).toBeNull();
   });
+
+  it('chunk 11g.10: staleTriggered=true renders "Connection appears stale" title + data attr', () => {
+    setStateTo({
+      kind: 'reconnecting',
+      attempt: 1,
+      nextAttemptAt: Date.now() + 3000,
+      lastError: 'client_watchdog_stale',
+      staleTriggered: true,
+    });
+    renderBanner();
+    // Title flips to the stale-specific copy.
+    expect(screen.getByText(/Connection appears stale/)).toBeInTheDocument();
+    // "Connection lost" (non-stale copy) MUST NOT appear.
+    expect(screen.queryByText(/Connection lost/)).toBeNull();
+    // Countdown copy is unchanged so muscle-memory + regression tests
+    // keep working; distinction lives in the title + data attr.
+    expect(screen.getByText(/Reconnecting in/)).toBeInTheDocument();
+    // data-stale-triggered attr is present for e2e / analytics.
+    const alert = screen.getByRole('alert');
+    expect(alert.getAttribute('data-stale-triggered')).toBe('true');
+  });
+
+  it('chunk 11g.10: staleTriggered absent (ordinary reconnect) does NOT set stale attr', () => {
+    setStateTo({
+      kind: 'reconnecting',
+      attempt: 1,
+      nextAttemptAt: Date.now() + 3000,
+      lastError: null,
+    });
+    renderBanner();
+    const alert = screen.getByRole('alert');
+    expect(alert.getAttribute('data-stale-triggered')).toBe(null);
+    expect(screen.getByText(/Connection lost/)).toBeInTheDocument();
+  });
 });
 
 describe('ConnectionBanner — fatal states', () => {

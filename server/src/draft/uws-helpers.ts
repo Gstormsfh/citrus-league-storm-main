@@ -108,9 +108,40 @@ export function handleClientMessage(
     return;
   }
 
-  // `parsed.type` is exhaustively narrowed at this point; this
-  // branch is unreachable today but kept for future-extension safety.
-  // (TypeScript will error if a new variant is added without a case.)
-  const _exhaustive: never = parsed.type;
-  void _exhaustive;
+  if (parsed.type === 'ping') {
+    // Chunk 11g.10 client-liveness watchdog. Server responds with a
+    // pong echoing the client's `t` so the client can compute RTT and
+    // detect missed responses. No lobby lookup — the ping path is
+    // pure round-trip on the connection; if the ws is up, we can
+    // respond. Logs at DEBUG so healthy pings don't spam INFO.
+    const pong: DraftServerMessage = {
+      v: WIRE_PROTOCOL_VERSION,
+      type: 'pong',
+      timestamp: new Date().toISOString(),
+      payload: { t: parsed.payload.t },
+    };
+    try {
+      ws.send(serializeServerMessage(pong));
+    } catch (err) {
+      structuredLogger.debug('uws.send.pong_threw', {
+        lobbyId: userData.lobbyId,
+        userId: userData.userId,
+      });
+      void err;
+    }
+    return;
+  }
+
+  // Unreachable under normal operation — `parseClientMessage` only
+  // returns 'resync' or 'ping' shapes today. A bug in the parser (new
+  // variant added without a case here) surfaces as a DEBUG log.
+  // NOTE: the previous `const _exhaustive: never` guard broke under
+  // server/tsconfig.json's `strict: false` — `never.type` doesn't
+  // resolve to `never` there, so the exhaustive assertion fires a
+  // spurious TS2339. Runtime log is the substitute.
+  structuredLogger.debug('uws.message.unknown_type_dropped', {
+    lobbyId: userData.lobbyId,
+    userId: userData.userId,
+    type: (parsed as { type?: string }).type,
+  });
 }

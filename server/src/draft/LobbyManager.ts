@@ -399,6 +399,16 @@ const IDEMPOTENCY_CACHE_MAX = 200;
  * may exceed snake/linear (one nomination plus many bids per roster
  * slot). If the buffer evicts before clients can resume reliably,
  * raise this cap or move to time-based retention.
+ *
+ * **Chunk 11g.10 checkpoint-2 LEDGER (no action):** 200 events holds a
+ * full 12-team × 15-round snake/linear draft (180 pick events + slack
+ * for presence + snapshot events). A 20-team × 20-round league (400
+ * events) exceeds this — a long mid-draft absence in a big league
+ * takes the client's `too_old` → HTTP snapshot fallback path (server
+ * route `GET /api/drafts/:draftId/snapshot`, tested end-to-end in
+ * `apps/web/src/lib/draftClient/__tests__/reduce.test.ts`). This is
+ * correct behavior, not a bug. Noted here so nobody rediscovers it
+ * as one.
  */
 const EVENT_BUFFER_CAPACITY = 200;
 
@@ -1100,6 +1110,50 @@ export class LobbyManager {
    * reconnects to pick up the ring buffer).
    */
   removeConnection(ws: WebSocket<DraftSocketUserData>): void {
+    this.cleanupConnection(ws, 'close_handler');
+  }
+
+  /**
+   * Chunk 11g.10 F5 — unconditional map removal for a stale connection
+   * that the uWS `close:` handler failed to fire on.
+   *
+   * Called by the heartbeat scanner's rung 3 after ws.end() (rung 1)
+   * and ws.close() (rung 2) both failed to induce a close-handler
+   * invocation across multiple scan passes. The mechanism is
+   * fundamentally the same as `removeConnection` — same cleanup, same
+   * presence.left broadcast — but the CALL SITE is the scanner, not
+   * uWS itself. This guarantees the LobbyManager's `connections` map
+   * (which drives broadcast fanout and presence counts) is not lying
+   * about a dead socket regardless of what uWS or Caddy do downstream.
+   *
+   * Idempotent — same idempotence guarantee as `removeConnection`;
+   * if the uWS `close:` handler eventually DOES fire later (e.g., after
+   * Caddy's dead-client TCP finally times out an hour later), the
+   * subsequent `removeConnection` no-ops on the empty-map lookup.
+   */
+  forceRemoveConnection(ws: WebSocket<DraftSocketUserData>): void {
+    this.cleanupConnection(ws, 'force_purge');
+  }
+
+  /**
+   * Shared cleanup for `removeConnection` (uWS close handler path) and
+   * `forceRemoveConnection` (heartbeat scanner rung-3 force-purge path).
+   *
+   * The `origin` discriminator lets the two paths emit distinguishable
+   * INFO logs so ops can see which path is responsible for a given
+   * disconnect — critical for F5 field diagnosis, where the whole
+   * point of the escalation ladder is to learn which rung actually
+   * stops the leak.
+   *
+   * Idempotent by construction: if `ws` is not in the map, we early-
+   * return without emitting logs or presence.left. This covers the
+   * race where `forceRemoveConnection` purges first and then the
+   * uWS `close:` handler fires later.
+   */
+  private cleanupConnection(
+    ws: WebSocket<DraftSocketUserData>,
+    origin: 'close_handler' | 'force_purge',
+  ): void {
     const userData = this.connections.get(ws);
     if (!userData) {
       // ws was never registered (or already removed); idempotent no-op.
@@ -1111,17 +1165,27 @@ export class LobbyManager {
       ws.unsubscribe(this.topicName);
     } catch (err) {
       structuredLogger.debug(
-        `[lobby] ws.unsubscribe threw during removeConnection lobbyId=${this.lobbyId} userId=${userData.userId}`,
+        `[lobby] ws.unsubscribe threw during ${origin} lobbyId=${this.lobbyId} userId=${userData.userId}`,
+      );
+      void err;
+    }
+
+    if (origin === 'force_purge') {
+      structuredLogger.warn(
+        `[lobby] connection FORCE-purged (uWS close never fired) lobbyId=${this.lobbyId} userId=${userData.userId} size=${this.connections.size}`,
+      );
+    } else {
+      structuredLogger.info(
+        `[lobby] connection removed lobbyId=${this.lobbyId} userId=${userData.userId} size=${this.connections.size}`,
       );
     }
 
-    structuredLogger.info(
-      `[lobby] connection removed lobbyId=${this.lobbyId} userId=${userData.userId} size=${this.connections.size}`,
-    );
-
     // Presence leave — only when this was the LAST connection for
     // the userId (co-manager / multi-device case keeps presence
-    // alive while at least one ws remains).
+    // alive while at least one ws remains). Applies identically for
+    // close-handler and force-purge origins per the F5 ruling:
+    // silently-purging a connection that still shows as "connected"
+    // to other clients would trade one lie for another.
     const stillPresent = this.hasOtherConnectionForUser(userData.userId);
     if (!stillPresent) {
       this.presentUserIds.delete(userData.userId);

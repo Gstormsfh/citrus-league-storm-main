@@ -246,6 +246,21 @@ export default function DraftRoomV2() {
     runner.requestResyncForGap(derivedForGap.foldedThroughSeq);
   }, [lastFoldGaps, derivedForGap]);
 
+  // Chunk 11g.10 client-liveness watchdog wiring.
+  //
+  // The runner's application-level ping/pong watchdog only fires while
+  // the draft is `in_progress`. Paused / not_started / completed
+  // lobbies are legitimately silent for arbitrary durations, so the
+  // watchdog must not accumulate missed-pong evidence during those
+  // windows (architect ruling: "must never fire while the draft is
+  // paused or not started"). Toggling on every derived-state transition
+  // is safe — setDraftActive is idempotent on same-value calls.
+  useEffect(() => {
+    const runner = runnerRef.current;
+    if (runner === null) return;
+    runner.setDraftActive(derivedForGap?.draftStatus === 'in_progress');
+  }, [derivedForGap]);
+
   const handleRetryNow = useMemo(
     () => () => {
       const runner = runnerRef.current;

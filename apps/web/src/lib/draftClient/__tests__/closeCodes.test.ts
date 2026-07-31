@@ -45,6 +45,20 @@ describe('classifyCloseCode (chunk 11g.5a)', () => {
     expect(classifyCloseCode(4002, '')).toBe('transient');
   });
 
+  it('4010 is transient — chunk 11g.10 client-watchdog carve-out', () => {
+    // Regression lock: 4010 sits numerically inside the 4001-4099
+    // "permanent_auth" range but its semantic is "client-side liveness
+    // watchdog detected N missed pongs and self-closed" — a network /
+    // keepalive failure, NOT an auth problem. Client reconnects with
+    // backoff. Mirrors the 4002 carve-out pattern. The carve-out in
+    // classifyCloseCode runs BEFORE the 4001-4099 range check; if a
+    // future refactor reorders those checks, this test is the canary.
+    expect(classifyCloseCode(4010, 'client_watchdog_stale')).toBe('transient');
+    // Boundary: 4009 and 4011 stay in permanent_auth.
+    expect(classifyCloseCode(4009, '')).toBe('permanent_auth');
+    expect(classifyCloseCode(4011, '')).toBe('permanent_auth');
+  });
+
   it('4100-4199 are permanent_lobby', () => {
     expect(classifyCloseCode(4100, 'lobby_not_found')).toBe('permanent_lobby');
     expect(classifyCloseCode(4150, 'draft_completed')).toBe('permanent_lobby');

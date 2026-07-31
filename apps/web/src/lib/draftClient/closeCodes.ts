@@ -27,6 +27,14 @@
 //                   despite living in the 4001-4099 auth range; carved
 //                   out explicitly because it represents a network /
 //                   keepalive failure rather than a token problem.
+//   - 4010        — client watchdog stale (chunk 11g.10). Client-side
+//                   watchdog detected N consecutive missed application-
+//                   level pongs and self-closed the WS to trigger the
+//                   backoff-reconnect path. TRANSIENT, carved out ahead
+//                   of the 4001-4099 range. The reduce.ts handler for
+//                   ws_closed reads this code and sets `staleTriggered`
+//                   on the `reconnecting` state so the banner can render
+//                   distinct text ("Connection stale — reconnecting…").
 //   - 4001-4099   — token / auth failures (token expired mid-session,
 //                   token revoked, etc.). DEFAULT permanent_auth.
 //                   Reserve 4001 specifically for "token expired",
@@ -115,6 +123,15 @@ export function classifyCloseCode(code: number, _reason: string): CloseCodeDispo
   // not an auth failure, so the client reconnects with backoff
   // instead of falling into a fatal `permanent_auth` state.
   if (code === 4002) {
+    return 'transient';
+  }
+  // Chunk 11g.10 client-watchdog carve-out. MUST run before the
+  // 4001-4099 range check for the same reason as 4002 — 4010 is a
+  // client-detected stale-connection signal, not an auth failure.
+  // The runner emits this code when it self-closes after N missed
+  // application-level pongs; reduce.handleWsClosed reads it and
+  // flags `staleTriggered` on the resulting `reconnecting` state.
+  if (code === 4010) {
     return 'transient';
   }
   // Chunk 11g.10 sub-step 10c-2 gate (a) carve-out. MUST run before

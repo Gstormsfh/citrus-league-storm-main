@@ -49,6 +49,16 @@ import { reduce, type RandomFn } from './reduce';
 // Supabase client at module load time (which throws in test
 // environments without the VITE_SUPABASE_* env vars set).
 
+// ── Chunk 11g.10 client-liveness watchdog: exported constants ──────
+//
+// Named constants so tests + any future config layer reference one
+// source (architect ratification, chunk 11g.10 checkpoint 2). No env
+// plumbing today — the values are locked at build time. Numbers were
+// chosen to sit comfortably inside the smallest legal pick clock (30s)
+// with 2.5x headroom AND inside the largest (300s) with wide margin.
+export const WATCHDOG_PING_INTERVAL_MS = 12_000;
+export const WATCHDOG_MISS_THRESHOLD_MS = 36_000;
+
 // ── Public API ─────────────────────────────────────────────────────
 
 export interface ConnectParams {
@@ -114,6 +124,62 @@ export class DraftClientRunner {
 
   private ws: WebSocket | null = null;
   private backoffTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // ── Chunk 11g.10 client-liveness watchdog ────────────────────────
+  //
+  // Mirrors the engine-side heartbeat scanner (server/src/draft/uws-
+  // server.ts) but on the client. Motivation: browsers cannot observe
+  // uWS's protocol-level ping/pong (RFC 6455 §5.5.2 — the JS layer
+  // never sees them), so an idle-TCP-death that leaves both ends in
+  // ESTABLISHED with no traffic looks identical to "quiet moment"
+  // from the client's perspective. The engine's watchdog fires
+  // server-side; the client watchdog fires client-side; together
+  // they close the pincer.
+  //
+  // Design (architect ruling, checkpoint 1):
+  //   - Application-level ping every WATCHDOG_PING_INTERVAL_MS (12s).
+  //     The server (uws-helpers.handleClientMessage 'ping' branch)
+  //     responds with a pong echoing the client's `t`.
+  //   - `lastPongAt` refreshed on every pong received in onmessage.
+  //   - Check timer runs on the same cadence; if
+  //     `now - lastPongAt > WATCHDOG_MISS_THRESHOLD_MS` (36s ~= 3
+  //     missed cycles), close the WS with custom code 4010 →
+  //     reduce.handleWsClosed flags `staleTriggered` on the
+  //     reconnecting state, existing backoff-reconnect path runs.
+  //   - Only ACTIVE when `setDraftActive(true)` has been called.
+  //     Draft-paused / pre-draft lobbies are legitimately silent;
+  //     firing the watchdog then would false-positive. The caller
+  //     (DraftRoomV2) observes derived draftStatus and toggles.
+  //   - Timers cleared on WS open (fresh window), ws close, and
+  //     disconnect().
+  private watchdogActive = false;
+  private watchdogPingTimer: ReturnType<typeof setInterval> | null = null;
+  private watchdogCheckTimer: ReturnType<typeof setInterval> | null = null;
+  private watchdogLastPongAt = 0;
+  /**
+   * Chunk 11g.10 checkpoint-2 amendment — background-tab suspension.
+   *
+   * Browsers throttle background-tab timers to roughly one per minute
+   * (WHATWG HTML spec §Timers: "the setTimeout() / setInterval() timer
+   * nesting level is greater than 5 and the associated document is
+   * fully hidden"). A backgrounded room would (a) send pings late and
+   * (b) fire the check timer late — the check reads `Date.now()`,
+   * which is not throttled, so it sees a huge age and self-closes with
+   * 4010 SPURIOUSLY on legitimate alt-tab users, defeating the whole
+   * point of the alarm for exactly the audience we built it for.
+   *
+   * Fix: while `document.visibilityState === 'hidden'`, mark the
+   * watchdog SUSPENDED. Timers keep running (cheaper than
+   * cancel/recreate on every tab switch) but the check callback
+   * short-circuits and the ping callback still sends (harmless — the
+   * server just echoes). On visibility → visible, reset `lastPongAt`
+   * to now (grace period so the first post-visible check doesn't fire
+   * against a stale-clock delta) AND issue an immediate ping to
+   * shorten the "am I still connected" round-trip below the check
+   * cadence.
+   */
+  private watchdogSuspended = false;
+
   /**
    * Persists across reconnects so the runner can issue resync
    * requests on `ws_opened` when there's a prior cursor. Reset to
@@ -145,9 +211,25 @@ export class DraftClientRunner {
   private readonly stateListeners = new Set<(s: DraftClientState) => void>();
 
   private readonly visibilityListener = () => {
+    const isVisible = document.visibilityState === 'visible';
+    // Chunk 11g.10 checkpoint-2: background-tab throttling defense.
+    // On hidden → suspend the watchdog's staleness check (timers keep
+    // running; the check callback short-circuits). On visible → resume
+    // via `resumeWatchdog`, which resets the pong clock + sends an
+    // immediate ping. Prevents alt-tabbed users from getting kicked by
+    // their own watchdog once the browser stops throttling and Date.now
+    // deltas balloon.
+    if (isVisible) {
+      this.resumeWatchdog();
+    } else {
+      this.watchdogSuspended = true;
+    }
+    // Keep the reduce dispatch AFTER the watchdog control so the state
+    // machine (which today no-ops on visibility) has the same event
+    // ordering it did before this amendment.
     this.dispatch({
       type: 'visibility_changed',
-      isVisible: document.visibilityState === 'visible',
+      isVisible,
     });
   };
   private readonly onlineListener = () => {
@@ -189,9 +271,38 @@ export class DraftClientRunner {
   disconnect(): void {
     this.dispatch({ type: 'disconnect_requested' });
     this.detachBrowserListeners();
+    this.stopWatchdog();
+    this.watchdogActive = false;
     this.params = null;
     this.lastSeenSeq = 0;
     this.lastGapResyncSinceSeq = null;
+  }
+
+  /**
+   * Chunk 11g.10 client-liveness watchdog — enable/disable the
+   * application-level ping/pong probe. Called by the consuming
+   * component (DraftRoomV2) as `draftStatus` transitions:
+   *
+   *   - `in_progress`  → `setDraftActive(true)` — start watching
+   *   - anything else  → `setDraftActive(false)` — a paused / not-
+   *     started / completed draft is legitimately silent for arbitrary
+   *     durations; firing the watchdog would false-positive.
+   *
+   * Idempotent — same active-state call is a no-op. Safe to call
+   * before or after `connect()` (the watchdog respects ws.readyState).
+   */
+  setDraftActive(active: boolean): void {
+    if (this.watchdogActive === active) return;
+    this.watchdogActive = active;
+    if (active) {
+      // Kick off the watchdog if a WS is already open; otherwise
+      // it starts inside ws.onopen after the next connect completes.
+      if (this.ws !== null && this.ws.readyState === this.ws.OPEN) {
+        this.startWatchdog();
+      }
+    } else {
+      this.stopWatchdog();
+    }
   }
 
   /**
@@ -378,6 +489,13 @@ export class DraftClientRunner {
           payload: { sinceSeq: this.lastSeenSeq },
         });
       }
+      // Chunk 11g.10: (re)start the watchdog if the draft is active.
+      // Fresh-connection window: lastPongAt seeded to `now` so the
+      // first check-tick doesn't false-positive before the first
+      // pong can arrive.
+      if (this.watchdogActive) {
+        this.startWatchdog();
+      }
     };
     ws.onmessage = (msgEvent) => {
       const raw = typeof msgEvent.data === 'string' ? msgEvent.data : '';
@@ -387,6 +505,14 @@ export class DraftClientRunner {
       } catch {
         // Malformed wire data — ignore. Real production telemetry
         // (chunk 11g.7) would log this at warn.
+        return;
+      }
+      // Chunk 11g.10 client-watchdog: pong messages feed the liveness
+      // check directly and are NOT routed through reduce. Purely
+      // transport-layer signals; the state machine has nothing to
+      // decide about them.
+      if (parsed.type === 'pong') {
+        this.watchdogLastPongAt = Date.now();
         return;
       }
       this.dispatch({ type: 'ws_message', message: parsed });
@@ -401,6 +527,10 @@ export class DraftClientRunner {
     ws.onclose = (closeEvent) => {
       this.detachWsListeners();
       this.ws = null;
+      // Chunk 11g.10: kill the watchdog timers on WS close. They'll
+      // be re-started inside the next ws.onopen if setDraftActive is
+      // still true. Prevents timers targeting a stale WS reference.
+      this.stopWatchdog();
       this.dispatch({
         type: 'ws_closed',
         code: closeEvent.code,
@@ -465,6 +595,103 @@ export class DraftClientRunner {
         type: 'snapshot_fetch_failed',
         error: err instanceof Error ? err.message : String(err),
       });
+    }
+  }
+
+  // ── Chunk 11g.10 client-liveness watchdog internals ─────────────
+
+  /**
+   * (Re)start the ping + check timers. Idempotent — restarting when
+   * already running clears the prior timers first so we never end up
+   * with two concurrent scanners. Called from ws.onopen when
+   * `watchdogActive === true` and from `setDraftActive(true)` when a
+   * WS is already open.
+   */
+  private startWatchdog(): void {
+    this.stopWatchdog();
+    this.watchdogLastPongAt = Date.now();
+    // Reflect current visibility state so a tab that starts hidden
+    // does not judge staleness on its first check tick. `document`
+    // may be undefined in node/SSR test environments — treat missing
+    // document as visible (tests bypass this path anyway).
+    this.watchdogSuspended =
+      typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    this.watchdogPingTimer = setInterval(() => {
+      // Send a ping only if the WS is still OPEN. `runSendMessage`
+      // already guards on readyState so a race with close is safe,
+      // but the extra check here avoids the DEBUG-noise of the guard.
+      // Suspended tabs still send pings (browsers deliver whatever
+      // the throttled timer resolves to) — the server just echoes;
+      // no harm done.
+      if (this.ws !== null && this.ws.readyState === this.ws.OPEN) {
+        this.runSendMessage({
+          type: 'ping',
+          payload: { t: Date.now() },
+        });
+      }
+    }, WATCHDOG_PING_INTERVAL_MS);
+    this.watchdogCheckTimer = setInterval(() => {
+      // Background-tab short-circuit: while the tab is hidden the check
+      // MUST NOT judge staleness. Date.now() is not throttled; if we
+      // read it under a delayed-fire callback we'd see an artificially
+      // large age and spuriously self-close 4010 on legitimate alt-tabs.
+      if (this.watchdogSuspended) return;
+      const age = Date.now() - this.watchdogLastPongAt;
+      if (age <= WATCHDOG_MISS_THRESHOLD_MS) {
+        return;
+      }
+      // Stale: N consecutive missed pongs. Self-close with code 4010
+      // (transient per closeCodes.ts carve-out) so the standard
+      // reduce.handleWsClosed → backoff → reconnect path runs. Stops
+      // the timers as a side effect of the close handler firing.
+      // No re-entry — stopWatchdog is called in ws.onclose.
+      this.runCloseWebSocket(4010, 'client_watchdog_stale');
+    }, WATCHDOG_PING_INTERVAL_MS);
+  }
+
+  /**
+   * Chunk 11g.10 checkpoint-2: called from the visibilitychange handler
+   * when the tab becomes visible again. Restores watchdog observation
+   * from a clean baseline:
+   *   1. Clears the suspended flag.
+   *   2. Resets `lastPongAt = now` — grace window so the first
+   *      post-visible check doesn't compare against a Date.now() that
+   *      moved during hidden throttle.
+   *   3. Sends an immediate ping so the round-trip resolves BEFORE the
+   *      next check-timer tick, further reducing the chance of a
+   *      spurious self-close.
+   *
+   * No-op if the watchdog is not running (draft inactive, WS not open,
+   * or setDraftActive(false)).
+   */
+  private resumeWatchdog(): void {
+    this.watchdogSuspended = false;
+    if (this.watchdogPingTimer === null && this.watchdogCheckTimer === null) {
+      return;
+    }
+    this.watchdogLastPongAt = Date.now();
+    if (this.ws !== null && this.ws.readyState === this.ws.OPEN) {
+      this.runSendMessage({
+        type: 'ping',
+        payload: { t: Date.now() },
+      });
+    }
+  }
+
+  /**
+   * Cancel any active watchdog timers. Idempotent — safe to call
+   * multiple times, safe to call when timers are already null. Does
+   * NOT touch `watchdogActive` (that flag reflects caller intent;
+   * timers reflect runtime state).
+   */
+  private stopWatchdog(): void {
+    if (this.watchdogPingTimer !== null) {
+      clearInterval(this.watchdogPingTimer);
+      this.watchdogPingTimer = null;
+    }
+    if (this.watchdogCheckTimer !== null) {
+      clearInterval(this.watchdogCheckTimer);
+      this.watchdogCheckTimer = null;
     }
   }
 

@@ -575,20 +575,48 @@ export type DraftServerMessage =
       type: 'error';
       timestamp: string;
       payload: { code: string; message: string };
+    }
+  | {
+      /**
+       * Chunk 11g.10 — application-level pong. Echoes the client-supplied
+       * `t` (client wall-clock at ping-send) so the client can compute
+       * round-trip latency AND detect missed responses (its own watchdog
+       * counts consecutive missed pongs).
+       *
+       * Distinct from uWS's protocol-level ping/pong (which browsers
+       * respond to internally per RFC 6455 §5.5.2 — a JS runtime cannot
+       * observe those). This is an APPLICATION message parsed by the
+       * client's onmessage handler; the browser doesn't invent it.
+       *
+       * Server-side handler in `uws-helpers.handleClientMessage` responds
+       * immediately without touching lobby state.
+       */
+      v: typeof WIRE_PROTOCOL_VERSION;
+      type: 'pong';
+      timestamp: string;
+      payload: { t: number };
     };
 
 /**
  * Discriminated union of client-to-server messages.
  *
- * Today: only `resync` (chunk 11g.5's reconnect protocol primitive
- * is the server-side `handleResyncRequest`; chunk 11g.5a is the
- * client-side state machine that issues these). Pick submissions,
- * bids, nominations route through `LobbyManager.enqueueAction`
- * directly via `DraftAction`, NOT through this wire union — they
- * require server-issued correlation IDs and structured validation
- * that the action API provides.
+ * Variants:
+ *   - `resync` (chunk 11g.5): reconnect resume protocol primitive.
+ *     Server-side handler: `LobbyManager.handleResyncRequest`.
+ *   - `ping` (chunk 11g.10): client-driven liveness watchdog. Server
+ *     responds with a `pong` server message echoing `t`. See the
+ *     `pong` DraftServerMessage variant for the round-trip semantics.
+ *     Pick submissions, bids, nominations do NOT route through this
+ *     union — they use `LobbyManager.enqueueAction` directly via
+ *     `DraftAction` because they need server-issued correlation IDs
+ *     and structured validation the action API provides.
  */
-export type DraftClientMessage = {
-  type: 'resync';
-  payload: { sinceSeq: number };
-};
+export type DraftClientMessage =
+  | {
+      type: 'resync';
+      payload: { sinceSeq: number };
+    }
+  | {
+      type: 'ping';
+      payload: { t: number };
+    };

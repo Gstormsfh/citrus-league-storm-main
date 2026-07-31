@@ -497,4 +497,185 @@ describe('DraftClientRunner (chunk 11g.5a)', () => {
       expect(ws.sent).toHaveLength(3);
     });
   });
+
+  // ── Chunk 11g.10 client-liveness watchdog ────────────────────────
+  //
+  // The watchdog sends application-level `ping` messages every 12s
+  // when `setDraftActive(true)` AND ws is open. Pongs refresh
+  // `lastPongAt`. After 36s (3 missed cycles) with no pong, the runner
+  // self-closes the WS with code 4010, which the reduce path treats as
+  // transient with `staleTriggered=true`.
+  //
+  // These tests use fake timers to drive the interval without waiting
+  // for real seconds. They validate three properties:
+  //   1. setDraftActive(true) after WS open sends pings on interval
+  //   2. Missed pongs → self-close with code 4010
+  //   3. setDraftActive(false) stops the watchdog cold
+  describe('client-liveness watchdog (chunk 11g.10)', () => {
+    async function connectedRunnerForWatchdog() {
+      const { runner } = makeRunner();
+      runner.connect({ leagueId: 'league-1', draftId: 'draft-1' });
+      await vi.waitFor(() => expect(runner.getState().kind).toBe('connecting'));
+      const ws = MockWebSocket.lastInstance();
+      ws.triggerOpen();
+      expect(runner.getState().kind).toBe('connected');
+      return { runner, ws };
+    }
+
+    it('setDraftActive(true) after WS open triggers periodic pings', async () => {
+      const { runner, ws } = await connectedRunnerForWatchdog();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      runner.setDraftActive(true);
+      // Before any interval tick, no pings sent.
+      expect(ws.sent).toHaveLength(0);
+      vi.advanceTimersByTime(12_000);
+      expect(ws.sent).toHaveLength(1);
+      const parsed = JSON.parse(ws.sent[0]);
+      expect(parsed.type).toBe('ping');
+      expect(typeof parsed.payload.t).toBe('number');
+      vi.advanceTimersByTime(12_000);
+      expect(ws.sent).toHaveLength(2);
+    });
+
+    it('missed pongs (>36s no pong) → self-close with code 4010 + reconnecting w/ staleTriggered', async () => {
+      const { runner, ws } = await connectedRunnerForWatchdog();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      runner.setDraftActive(true);
+      // First interval fires at 12s (ping sent, no pong echoed back).
+      vi.advanceTimersByTime(12_000);
+      // Second interval at 24s. Ping sent. lastPongAt still at
+      // watchdog-start, so age ~24s — under 36s threshold, no close yet.
+      vi.advanceTimersByTime(12_000);
+      expect(runner.getState().kind).toBe('connected');
+      // Cross the strict `> 36_000ms` threshold. 36s exactly is NOT
+      // stale (boundary leniency); the next tick at 48s pushes age
+      // past threshold → self-close with 4010. onclose fires
+      // synchronously via MockWebSocket.close.
+      vi.advanceTimersByTime(12_000); // t=36s — still connected (boundary)
+      expect(runner.getState().kind).toBe('connected');
+      vi.advanceTimersByTime(12_000); // t=48s — stale → close 4010
+      expect(runner.getState().kind).toBe('reconnecting');
+      if (runner.getState().kind === 'reconnecting') {
+        const st = runner.getState() as { staleTriggered?: boolean };
+        expect(st.staleTriggered).toBe(true);
+      }
+    });
+
+    it('pong messages refresh lastPongAt, preventing watchdog fire', async () => {
+      const { runner, ws } = await connectedRunnerForWatchdog();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      runner.setDraftActive(true);
+      // Advance 12s (ping 1), server echoes pong.
+      vi.advanceTimersByTime(12_000);
+      ws.triggerMessage({
+        v: 1,
+        type: 'pong',
+        timestamp: 'x',
+        payload: { t: Date.now() },
+      });
+      vi.advanceTimersByTime(12_000);
+      ws.triggerMessage({
+        v: 1,
+        type: 'pong',
+        timestamp: 'x',
+        payload: { t: Date.now() },
+      });
+      // Now advance 36s+ from the last pong — with fresh pongs, no
+      // close. But we also need one more ping/check cycle to confirm.
+      vi.advanceTimersByTime(12_000);
+      ws.triggerMessage({
+        v: 1,
+        type: 'pong',
+        timestamp: 'x',
+        payload: { t: Date.now() },
+      });
+      expect(runner.getState().kind).toBe('connected');
+    });
+
+    it('CHECKPOINT-2: hidden tab → long gap → visible does NOT trigger 4010 (background-tab defense)', async () => {
+      // Regression lock for architect-mandated background-tab throttling
+      // defense. Sequence:
+      //   1. WS connected, draft active, watchdog running.
+      //   2. Tab goes hidden (visibilitychange fires with hidden state).
+      //      Runner marks watchdog suspended.
+      //   3. Real browsers throttle timers to ~1/min while hidden. We
+      //      simulate by advancing MORE than the miss threshold with NO
+      //      pong having arrived — the check callback fires but must
+      //      short-circuit on the suspended flag.
+      //   4. Tab returns to visible → resumeWatchdog resets lastPongAt
+      //      to now and sends an immediate ping.
+      //   5. State must still be 'connected' (no 4010 close).
+      const { runner, ws } = await connectedRunnerForWatchdog();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      runner.setDraftActive(true);
+
+      // Simulate the browser going hidden. Mock document.visibilityState
+      // via an own-property getter so the listener reads the value we
+      // want. Clean up with `delete` in finally so the prototype's
+      // original descriptor takes effect again — otherwise the shadow
+      // persists into subsequent tests and everything downstream sees
+      // 'hidden' or 'visible' from whatever the last test set.
+      try {
+        Object.defineProperty(document, 'visibilityState', {
+          configurable: true,
+          get: () => 'hidden',
+        });
+        document.dispatchEvent(new Event('visibilitychange'));
+
+        // Advance well past the miss threshold — 5 minutes — the check
+        // would fire multiple times but MUST NOT close because the
+        // watchdog is suspended.
+        vi.advanceTimersByTime(5 * 60_000);
+        expect(runner.getState().kind).toBe('connected');
+
+        // Now flip back to visible. Runner resets lastPongAt + sends
+        // immediate ping. Must remain connected AFTER a subsequent
+        // check tick — the reset gave the watchdog a fresh window.
+        Object.defineProperty(document, 'visibilityState', {
+          configurable: true,
+          get: () => 'visible',
+        });
+        document.dispatchEvent(new Event('visibilitychange'));
+        // Advance one full ping+check cycle. Age from post-visible
+        // reset is 12s — under 36s threshold. Still connected.
+        vi.advanceTimersByTime(12_000);
+        expect(runner.getState().kind).toBe('connected');
+
+        // Confirm the immediate-ping side effect fired: at least one
+        // ping was sent since the visible transition (in addition to
+        // whatever the ping timer sent while hidden).
+        const pingsSent = ws.sent.filter((raw) => {
+          try {
+            return JSON.parse(raw).type === 'ping';
+          } catch {
+            return false;
+          }
+        });
+        expect(pingsSent.length).toBeGreaterThan(0);
+      } finally {
+        // Restore prototype visibility by deleting the instance shadow.
+        // Object.defineProperty with configurable:true allows delete.
+        try {
+          delete (document as { visibilityState?: unknown }).visibilityState;
+        } catch {
+          /* jsdom may not permit; best-effort cleanup */
+        }
+      }
+    });
+
+    it('setDraftActive(false) stops the watchdog — no further pings', async () => {
+      const { runner, ws } = await connectedRunnerForWatchdog();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      runner.setDraftActive(true);
+      vi.advanceTimersByTime(12_000);
+      expect(ws.sent).toHaveLength(1);
+      runner.setDraftActive(false);
+      vi.advanceTimersByTime(60_000);
+      // No additional pings after deactivation.
+      expect(ws.sent).toHaveLength(1);
+      // And no close was triggered — draft is inactive so missed
+      // pongs are not observed.
+      expect(runner.getState().kind).toBe('connected');
+    });
+  });
 });

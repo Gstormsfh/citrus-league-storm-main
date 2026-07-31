@@ -367,10 +367,17 @@ function handleWsClosed(
 
   // Transient — schedule backoff + retry.
   const attempt = currentAttempt(state) + 1;
+  // Chunk 11g.10 client-liveness watchdog: close code 4010 signals the
+  // watchdog self-closed after N missed application-level pongs. Flag
+  // the resulting reconnecting state so the banner can render distinct
+  // "Connection appears stale…" copy. classifyCloseCode already routed
+  // 4010 to 'transient'; this branch only annotates.
+  const staleTriggered = event.code === 4010;
   return scheduleReconnect(
     attempt,
     `WebSocket closed: code=${event.code} reason=${event.reason}`,
     randomFn,
+    staleTriggered,
   );
 }
 
@@ -418,9 +425,14 @@ function handleSnapshotFetchFailed(
   if (state.kind !== 'snapshot_required') {
     return noTransition(state);
   }
-  // Snapshot fetch failed (today: always fails because the endpoint
-  // doesn't exist yet — deferred per Decision Log). Treat as a
-  // transient error and retry the whole reconnect cycle.
+  // Snapshot fetch failed. The endpoint exists (chunk 11g.7 sub-step
+  // 7b — `GET /api/drafts/:draftId/snapshot` at server/src/routes/drafts.ts:192,
+  // client wire in runner.ts `defaultFetchSnapshot`), so failure here
+  // means a transient HTTP error, not a missing route. Treat as
+  // transient and retry the whole reconnect cycle — a fresh WS open
+  // will re-issue resync from lastSeenSeq; if still `too_old` the
+  // fetch retries from a fresh HTTP request. Chunk 11g.10 verified
+  // the too_old → snapshot fallback end-to-end in reduce.test.ts.
   return scheduleReconnect(1, event.error, randomFn);
 }
 
@@ -512,6 +524,7 @@ function scheduleReconnect(
   attempt: number,
   errorMessage: string,
   randomFn: RandomFn,
+  staleTriggered?: boolean,
 ): ReduceResult {
   const delayMs = computeBackoffMs(attempt, randomFn);
   return {
@@ -520,6 +533,7 @@ function scheduleReconnect(
       attempt,
       nextAttemptAt: Date.now() + delayMs,
       lastError: errorMessage,
+      ...(staleTriggered ? { staleTriggered: true } : {}),
     },
     sideEffects: [{ kind: 'schedule_backoff_timer', delayMs }],
   };

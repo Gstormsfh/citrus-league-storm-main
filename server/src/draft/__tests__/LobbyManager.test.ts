@@ -1072,6 +1072,85 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     });
   });
 
+  // ── Chunk 11g.10 F5 — forceRemoveConnection tests ────────────────
+  //
+  // The heartbeat scanner's rung-3 force-purge path calls
+  // `lobby.forceRemoveConnection(ws)` when the uWS `close:` handler
+  // has failed to fire after two prior scans. These tests prove:
+  //   1. force-purge removes from the map + broadcasts presence.left
+  //   2. subsequent removeConnection (uWS close fires late) is a no-op
+  //      that does NOT double-broadcast presence.left
+  //   3. force-purge on an already-removed ws is a no-op
+  //
+  // Idempotency is the architect-mandated invariant (ratification: "the
+  // close handler may fire later for an already-purged ws").
+
+  it('F5: forceRemoveConnection removes from map + broadcasts presence left', async () => {
+    const publish = vi.fn();
+    const lobby = await makeLobby({ lobbyId: 'lobby-force-1', publish });
+    const { ws } = makeMockWs();
+    const userData = makeUserData({ userId: 'user-force-1', lobbyId: 'lobby-force-1' });
+
+    lobby.addConnection(ws, userData);
+    publish.mockClear(); // discard 'joined' broadcast
+
+    lobby.forceRemoveConnection(ws);
+
+    expect(lobby.connectionCount()).toBe(0);
+    expect(publish).toHaveBeenCalledTimes(1);
+    const [topic, message] = publish.mock.calls[0];
+    expect(topic).toBe('draft:lobby-force-1');
+    expect(JSON.parse(message)).toMatchObject({
+      type: 'presence',
+      payload: { kind: 'left', userId: 'user-force-1', presentUserIds: [] },
+    });
+  });
+
+  it('F5: removeConnection after forceRemoveConnection is a no-op (idempotent, no double presence.left)', async () => {
+    const publish = vi.fn();
+    const lobby = await makeLobby({ publish });
+    const { ws } = makeMockWs();
+    const userData = makeUserData({ userId: 'user-force-2' });
+
+    lobby.addConnection(ws, userData);
+    publish.mockClear();
+
+    lobby.forceRemoveConnection(ws);
+    expect(publish).toHaveBeenCalledTimes(1); // presence.left
+
+    publish.mockClear();
+    // The uWS close: handler eventually fires — must be a no-op.
+    lobby.removeConnection(ws);
+    expect(publish).not.toHaveBeenCalled();
+    expect(lobby.connectionCount()).toBe(0);
+  });
+
+  it('F5: forceRemoveConnection on an already-removed ws is a safe no-op', async () => {
+    const publish = vi.fn();
+    const lobby = await makeLobby({ publish });
+    const { ws } = makeMockWs();
+    expect(() => lobby.forceRemoveConnection(ws)).not.toThrow();
+    expect(lobby.connectionCount()).toBe(0);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('F5: forceRemoveConnection does NOT broadcast presence left when other connections for the same userId remain', async () => {
+    const publish = vi.fn();
+    const lobby = await makeLobby({ publish });
+    const { ws: ws1 } = makeMockWs();
+    const { ws: ws2 } = makeMockWs();
+    const userData = makeUserData({ userId: 'user-force-multi' });
+
+    lobby.addConnection(ws1, userData);
+    lobby.addConnection(ws2, userData);
+    publish.mockClear();
+
+    // Force-purge ws1 — user is still present via ws2 → no presence.left.
+    lobby.forceRemoveConnection(ws1);
+    expect(publish).not.toHaveBeenCalled();
+    expect(lobby.connectionCount()).toBe(1);
+  });
+
   it('addConnection calls ws.subscribe and removeConnection calls ws.unsubscribe with the correct topic', async () => {
     const publish = vi.fn();
     const lobby = await makeLobby({ lobbyId: 'lobby-sub-1', publish });

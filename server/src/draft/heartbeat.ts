@@ -99,6 +99,14 @@ export interface HeartbeatConfig {
  *
  *   - 4002 — heartbeat pong-timeout (this file, chunk 11g.7 sub-step
  *            7d). Client disposition: transient. Reconnect with backoff.
+ *   - 4010 — client-side liveness watchdog stale (chunk 11g.10). Emitted
+ *            by the BROWSER runner (apps/web/src/lib/draftClient/runner.ts)
+ *            after N consecutive missed application-level pongs on an
+ *            active draft. Server never emits this code; documented here
+ *            to keep the allocation table authoritative. Client
+ *            disposition: transient, with `staleTriggered=true` set on
+ *            the resulting reconnecting state so the banner renders
+ *            distinct copy.
  *   - 4300 — chunk 11g.10 sub-step 10c-2 gate (a) unauthorized_bad_shape.
  *            `claims.sub` failed the UUIDv4 shape check inside the uWS
  *            upgrade handler (`uws-server.ts`); emitted via the
