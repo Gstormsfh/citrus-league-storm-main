@@ -40,7 +40,7 @@
 import pg from 'pg';
 import { randomUUID, createHash } from 'node:crypto';
 import { writeFile, mkdir } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, createWriteStream, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
@@ -341,13 +341,27 @@ async function verifyFixture(client) {
 // Per-client last-received-seq tracks ordering violations (a seq
 // arriving out of monotonic order).
 
-async function runPickDriver(initialPgClient, wsClients) {
+async function runPickDriver(initialPgClient, wsClients, onSample = () => {}) {
   // Chunk 11g.10 sub-step 10c-2 (R3 review fix): pgClient is mutable
   // so the S4 idle loop can swap it if the connection dies mid-idle.
   // All uses inside this function go through the local; the outer
   // caller retains the initial handle only for cleanup at end().
+  //
+  // F13 (2026-07-31): `onSample(sample)` is invoked after every
+  // `samples.push(sample)` so an NDJSON append stream can capture the
+  // sample immediately. Crash-safety: if the process dies mid-run,
+  // every sample up to the last successful push is already on disk.
   let pgClient = initialPgClient;
   const samples = [];
+  const pushSample = (s) => {
+    samples.push(s);
+    try {
+      onSample(s);
+    } catch {
+      // Never let the sample-write path abort the driver — the
+      // fault-flush path will handle recovery.
+    }
+  };
   const perClientLastSeq = new Map(wsClients.map((c) => [c.clientLabel, -1]));
 
   // Attach per-pick receive resolvers. Each client's onEvent callback
@@ -506,7 +520,7 @@ async function runPickDriver(initialPgClient, wsClients) {
         for (const c of wsClients) {
           const receiveTs = perClientEventReceived.get(c.clientLabel);
           const pickDeadline = perClientPickDeadline.get(c.clientLabel);
-          samples.push({
+          pushSample({
             scenario: SCENARIO,
             bootstrapClass: pickNumber === 1 ? 'cold' : 'warm',
             clientLabel: c.clientLabel,
@@ -626,7 +640,7 @@ async function runPickDriver(initialPgClient, wsClients) {
       console.error(`  ✗ pick ${pickNumber} RPC failed:`, err.message);
       // Record RPC failure as a drop for every client.
       for (const c of wsClients) {
-        samples.push({
+        pushSample({
           scenario: SCENARIO,
           bootstrapClass: pickNumber === 1 ? 'cold' : 'warm',
           clientLabel: c.clientLabel,
@@ -681,7 +695,7 @@ async function runPickDriver(initialPgClient, wsClients) {
       const receiveTs = receiveTimes[i];
       const endToEndMs = receiveTs === null ? null : receiveTs - submitCallTs;
       const perClient = perClientLastSeq.get(c.clientLabel) ?? -1;
-      samples.push({
+      pushSample({
         scenario: SCENARIO,
         bootstrapClass: pickNumber === 1 ? 'cold' : 'warm',
         clientLabel: c.clientLabel,
@@ -798,10 +812,115 @@ function createPgClient() {
   });
 }
 
+// ── F13 (2026-07-31): fault-flush state ─────────────────────────────
+//
+// Motivation: the harness measures resilience, and the harness itself
+// must survive the disruptions it stages. Prior state (bug): all
+// samples accumulated in memory; NDJSON + summary written once at the
+// end of `main()`; SIGINT / crash / pg 'error' silently discarded the
+// entire run. F13 broke this in the field when a transient network
+// blip fired an unhandled pg `'error'` and killed Node before writing.
+//
+// Fix (architect ruling): open NDJSON as an APPEND STREAM at run start,
+// write one line per sample as it's recorded — every sample up to the
+// last successful push survives any crash. Register pg 'error' handler,
+// uncaughtException / unhandledRejection / SIGINT / SIGTERM handlers
+// that flush the summary from whatever the module-level state captured.
+//
+// Module-level so process-wide fault handlers can access it. The
+// contents are strictly WRITE-ONCE from `main()` — the fault handlers
+// only READ (and write the summary + close the stream).
+const faultState = {
+  ndjsonStream: null,
+  ndjsonPath: null,
+  summaryPath: null,
+  samples: [],
+  humanOutcomes: [],
+  pgClient: null,
+  wsClients: [],
+  flushed: false,
+};
+
+function writeSampleToStream(sample) {
+  if (!faultState.ndjsonStream) return;
+  try {
+    faultState.ndjsonStream.write(JSON.stringify(sample) + '\n');
+  } catch (err) {
+    // Best-effort: log to stderr and keep going. Do NOT abort the
+    // driver — losing one sample on disk is preferable to losing all.
+    console.error(`[F13] ndjson write failed: ${err.message}`);
+  }
+}
+
+async function flushFaultSummary(exitReason) {
+  if (faultState.flushed) return;
+  faultState.flushed = true;
+  try {
+    if (faultState.ndjsonStream) {
+      faultState.ndjsonStream.end();
+    }
+    // Write a summary from whatever samples we captured, tagged with
+    // the exitReason so ops can distinguish planned end from fault.
+    if (faultState.summaryPath) {
+      let body;
+      try {
+        body = formatSummary(faultState.samples, {
+          scenario: SCENARIO,
+          clientCount: CLIENTS,
+          paced: BURST ? 'burst' : `${PACE_MIN_MS}-${PACE_MAX_MS} ms jitter`,
+          runId: RUN_ID,
+        });
+      } catch (err) {
+        body = `formatSummary threw: ${err.message}`;
+      }
+      const header = `── PARTIAL SUMMARY (${exitReason}) — ${faultState.samples.length} samples captured before exit ──\n\n`;
+      try {
+        // Sync file write via appendFile fallback would need fs/promises
+        // in scope; simplest is to use the raw stream API through Node's
+        // writeFileSync equivalent. Use writeFile from fs/promises.
+        await writeFile(faultState.summaryPath, header + body + '\n');
+        console.error(`[F13] partial summary written: ${faultState.summaryPath}`);
+      } catch (err) {
+        console.error(`[F13] partial summary write failed: ${err.message}`);
+      }
+    }
+  } catch (err) {
+    console.error(`[F13] flush failed: ${err.message}`);
+  }
+}
+
 // ── Main ────────────────────────────────────────────────────────────
 async function main() {
   const pgClient = createPgClient();
+  // F13: register pg 'error' handler BEFORE connect. pg's Client emits
+  // 'error' on any unexpected connection termination (network blip,
+  // NAT reap, server restart). Without a listener, Node crashes with
+  // an uncaught EventEmitter error — the whole reason the run was
+  // being measured for resilience gets discarded. We log + let the
+  // ongoing operation surface the error naturally (the next query
+  // throws with a comparable message and the retry logic in the
+  // driver's idle loop reconnects), rather than terminating.
+  pgClient.on('error', (err) => {
+    console.error(`[F13] pgClient 'error' event: ${err.message}. Continuing; the next query attempt will surface the error and the driver's reconnect logic will handle it.`);
+  });
   await pgClient.connect();
+  faultState.pgClient = pgClient;
+
+  // F13: open NDJSON as an APPEND STREAM at run start. Every sample
+  // is written to disk immediately after being recorded, so a crash
+  // (pg error, SIGINT, power loss) still leaves every sample-so-far
+  // durably on disk. Path uses the same convention as the prior
+  // batched writeFile (see below).
+  if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
+  faultState.ndjsonPath = join(OUT_DIR, `${SCENARIO}-${RUN_ID}.ndjson`);
+  faultState.summaryPath = join(OUT_DIR, `${SCENARIO}-${RUN_ID}.summary.txt`);
+  faultState.ndjsonStream = createWriteStream(faultState.ndjsonPath, {
+    flags: 'a',
+    encoding: 'utf8',
+  });
+  faultState.ndjsonStream.on('error', (err) => {
+    console.error(`[F13] ndjson stream 'error' event: ${err.message}`);
+  });
 
   try {
     await verifyFixture(pgClient);
@@ -832,11 +951,19 @@ async function main() {
       }
     }
     console.log(`  ${wsClients.length}/${CLIENTS} clients open with heartbeat.`);
+    faultState.wsClients = wsClients;
 
-    // Run the pick driver.
+    // Run the pick driver. F13: pass writeSampleToStream so every
+    // recorded sample lands on disk immediately — crash-safety.
     console.log('');
     console.log('── PICK DRIVER ──');
-    const { samples, humanOutcomes } = await runPickDriver(pgClient, wsClients);
+    const { samples, humanOutcomes } = await runPickDriver(
+      pgClient,
+      wsClients,
+      writeSampleToStream,
+    );
+    faultState.samples = samples;
+    faultState.humanOutcomes = humanOutcomes;
 
     // Chunk 11g.10 sub-step 10c-2 batch 1 (item 4): S5 autopick-wait
     // phase. After the pre-autopick picks land, STOP the driver and
@@ -909,7 +1036,7 @@ async function main() {
           receiveTs !== null &&
           deltaFromLastSubmitMs >= toleranceMinMs &&
           deltaFromLastSubmitMs <= toleranceMaxMs;
-        samples.push({
+        pushSample({
           scenario: 'S5',
           bootstrapClass: 'autopick_wait',
           clientLabel: c.clientLabel,
@@ -950,13 +1077,17 @@ async function main() {
       console.log(`  Verify via: gcloud ssh ... "docker logs citrus-draft-engine 2>&1 | grep pickClockSeconds | tail -3"`);
     }
 
-    // Write NDJSON.
-    if (!existsSync(OUT_DIR)) await mkdir(OUT_DIR, { recursive: true });
-    const ndjsonPath = join(OUT_DIR, `${SCENARIO}-${RUN_ID}.ndjson`);
-    const ndjson = samples.map((s) => JSON.stringify(s)).join('\n') + '\n';
-    await writeFile(ndjsonPath, ndjson);
+    // F13: NDJSON was streamed sample-by-sample already; close the
+    // stream to flush the OS buffer. The batched-writeFile approach
+    // (prior behavior) is intentionally gone — it was the F13 vector.
+    if (faultState.ndjsonStream) {
+      await new Promise((resolve) => {
+        faultState.ndjsonStream.end(resolve);
+      });
+      faultState.ndjsonStream = null;
+    }
     console.log('');
-    console.log(`  ndjson written: ${ndjsonPath}  (${samples.length} rows)`);
+    console.log(`  ndjson written: ${faultState.ndjsonPath}  (${samples.length} rows, streamed)`);
 
     // Print summary.
     const summary = formatSummary(samples, {
@@ -999,41 +1130,81 @@ async function main() {
     }
     const fullSummary = summary + humanBlock;
     console.log(fullSummary);
-    const summaryPath = join(OUT_DIR, `${SCENARIO}-${RUN_ID}.summary.txt`);
-    await writeFile(summaryPath, fullSummary + '\n');
-    console.log(`  summary written: ${summaryPath}`);
+    await writeFile(faultState.summaryPath, fullSummary + '\n');
+    console.log(`  summary written: ${faultState.summaryPath}`);
     console.log('');
     console.log('── DONE. Reset before next scenario:  node scripts/proof/fixture-12.mjs --reset --execute ──');
     console.log('');
 
+    // F13: mark the clean-exit flush as done so fault handlers don't
+    // overwrite the full summary with a partial one on later teardown.
+    faultState.flushed = true;
+
     // Clean shutdown of clients.
     for (const c of wsClients) c.close();
   } finally {
-    await pgClient.end();
+    try {
+      await pgClient.end();
+    } catch (err) {
+      // pg client may already be in a broken state after a fault;
+      // don't let cleanup errors mask the original failure.
+      console.error(`[F13] pgClient.end() threw: ${err.message}`);
+    }
   }
 }
 
-// Ctrl-C handling: allow abort, print reset guidance, exit nonzero.
+// F13 (2026-07-31): fault handlers flush the append-stream + write a
+// partial summary from module state before exit. Prior state: SIGINT
+// exited nonzero without writing anything, and no uncaughtException /
+// unhandledRejection handlers existed — a pg 'error' event silently
+// killed the run mid-flight, discarding the entire NDJSON.
+//
+// New guarantees:
+//   - Every sample recorded before fault is already on disk (append
+//     stream writes per-sample).
+//   - A `.summary.txt` labeled with the exit reason is written from
+//     whatever samples were captured.
+//   - Ctrl-C, SIGTERM, uncaught exceptions, and unhandled rejections
+//     all route through the same flush path.
 let shuttingDown = false;
-function abort(signal) {
+async function abort(reason) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.error('');
-  console.error(`── ABORTED (${signal}) ──`);
-  console.error('   Partial results NOT written. To recover:');
+  console.error(`── ABORTED (${reason}) ──`);
+  console.error(`   Samples captured: ${faultState.samples.length}`);
+  await flushFaultSummary(reason);
+  console.error('   To recover:');
   console.error('     node scripts/proof/fixture-12.mjs --reset --execute');
   console.error('     node scripts/proof/fixture-12.mjs --execute');
   console.error('');
   process.exit(130);
 }
-process.on('SIGINT', () => abort('SIGINT'));
-process.on('SIGTERM', () => abort('SIGTERM'));
+process.on('SIGINT', () => { void abort('SIGINT'); });
+process.on('SIGTERM', () => { void abort('SIGTERM'); });
+process.on('uncaughtException', (err) => {
+  console.error('');
+  console.error('UNCAUGHT EXCEPTION:', err && err.message ? err.message : String(err));
+  if (err && err.stack) console.error(err.stack);
+  void abort('uncaughtException');
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('');
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  console.error('UNHANDLED REJECTION:', msg);
+  if (reason instanceof Error && reason.stack) console.error(reason.stack);
+  void abort('unhandledRejection');
+});
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error('');
   console.error('FATAL:', err.message);
   if (err.stack) console.error(err.stack);
   console.error('');
+  // F13: flush before exit — even for the main() rejection path, so a
+  // fatal thrown mid-driver still preserves the partial NDJSON +
+  // partial summary. abort() is idempotent (guarded by `shuttingDown`).
+  await flushFaultSummary('main_rejection');
   console.error('  Recovery: node scripts/proof/fixture-12.mjs --reset --execute');
   console.error('');
   process.exit(1);
