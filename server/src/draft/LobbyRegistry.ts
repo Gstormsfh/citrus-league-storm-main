@@ -460,11 +460,12 @@ export class LobbyRegistry {
         ws.end(4002, 'engine_admin_eviction');
         closed += 1;
       } catch (err) {
-        structuredLogger.debug(
-          'registry.evict_connection_close_threw',
-          { lobbyId },
-          err,
-        );
+        // structuredLogger.debug takes (event, ctx) — no third err
+        // param (only info/warn/error accept one). Fold err into ctx.
+        structuredLogger.debug('registry.evict_connection_close_threw', {
+          lobbyId,
+          err: err instanceof Error ? err.message : String(err),
+        });
       }
     });
     this.lobbies.delete(lobbyId);

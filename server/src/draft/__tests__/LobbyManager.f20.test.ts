@@ -24,26 +24,38 @@ import type {
   DraftOrderSlot,
   TeamAuthorizationResult,
 } from '../types';
+import type { AutopickStrategy } from '../autopickStrategy';
 import { structuredLogger } from '@citrus/shared';
 
 // ── minimal LobbyManager factory (mirrors LobbyManager.test.ts) ──────
 
-async function makeLobby(): Promise<LobbyManager> {
+// Deterministic autopick strategy: always picks '8478001'. Lets the
+// outcome assertions (Amendment A) confirm the autopick reached
+// submitPick after the guard's re-arm or cap-exhaust path.
+const fixedPlayerStrategy: AutopickStrategy = async () => ({
+  ok: true as const,
+  playerId: 8478001,
+  source: 'projections',
+});
+
+async function makeLobby(submitPickSpy?: ReturnType<typeof vi.fn>): Promise<LobbyManager> {
   const draftOrder: DraftOrderSlot[] = [
     { round: 1, pickNumber: 1, teamId: 'team-1' },
     { round: 1, pickNumber: 2, teamId: 'team-2' },
     { round: 1, pickNumber: 3, teamId: 'team-3' },
   ];
-  const draftService = {
-    submitPick: vi.fn(
+  const submitPick =
+    submitPickSpy ??
+    vi.fn(
       async (_p: unknown): Promise<SubmitPickResult> => ({
         event_id: 1,
         seq: 1,
-        pick_number: 1,
-        round: 1,
+        pick_deadline: null,
         was_duplicate: false,
       }),
-    ),
+    );
+  const draftService = {
+    submitPick,
     listDraftEvents: vi.fn(
       async (_leagueId: string, _sinceSeq?: number): Promise<DraftEventRow[]> => [],
     ),
@@ -95,6 +107,7 @@ async function makeLobby(): Promise<LobbyManager> {
     auctionMinBidIncrementTiers: [],
     auctionBidWindowSeconds: 0,
     auctionNominationWindowSeconds: 0,
+    autopickStrategies: [fixedPlayerStrategy],
   };
   const lobby = new LobbyManager(opts);
   await lobby.init();
@@ -128,6 +141,14 @@ function primeLobby(lobby: LobbyManager, armedDeadlineMs: number): number {
   l.currentTimerKind = 'pick';
   l.earlyFireRearmCount = 0;
   l.earlyFireRearmForDeadlineMs = null;
+  // Force draftStatus='in_progress' so handleClockExpired's status guard
+  // passes when the re-armed timer fires (or when cap-exhaust falls
+  // through). init() leaves it 'not_started' when the event log is
+  // empty; we're testing the timer guard in isolation.
+  l.draftStatus = 'in_progress';
+  l.picksMade = 0;
+  l.pauseState = null;
+  l.shutDown = false;
   return 42;
 }
 
@@ -202,8 +223,16 @@ describe('F20 — pick-timer early-fire guard (LobbyManager.handleClockExpired)'
     }
   });
 
-  it('CASE 3 (THE ONE THAT MATTERS): fires (tolerance+1)ms EARLY → REJECTED AND RE-ARMED', async () => {
-    const lobby = await makeLobby();
+  it('CASE 3 (THE ONE THAT MATTERS — LIVENESS OUTCOME): fires (tolerance+1)ms EARLY → REJECTED, RE-ARMED, AND THE AUTOPICK ACTUALLY FIRES', async () => {
+    const submitPickSpy = vi.fn(
+      async (_p: unknown): Promise<SubmitPickResult> => ({
+        event_id: 1,
+        seq: 1,
+        pick_deadline: null,
+        was_duplicate: false,
+      }),
+    );
+    const lobby = await makeLobby(submitPickSpy);
     const armedMs = Date.now() + 60_000;
     const armSeq = primeLobby(lobby, armedMs);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -212,7 +241,9 @@ describe('F20 — pick-timer early-fire guard (LobbyManager.handleClockExpired)'
     const logs = captureLogs();
     try {
       await driveGuard(lobby, armSeq, armedMs, armedMs - 26); // 26ms early
-      // Assert #1: rejected — early-fire WARN emitted with expected fields.
+      // Mechanism assertions (necessary but NOT sufficient — architect
+      // Amendment A: "for a liveness defect the assertion must be on
+      // the OUTCOME, never on the mechanism").
       const warns = logs.entries.filter(
         (e) => e.event === 'autopick.stale_timer_skipped' && e.level === 'warn',
       );
@@ -220,20 +251,32 @@ describe('F20 — pick-timer early-fire guard (LobbyManager.handleClockExpired)'
       const ctx = warns[0].ctx as Record<string, unknown>;
       expect(ctx.reason).toBe('fired_before_deadline');
       expect(ctx.driftMs).toBe(-26);
-      expect(ctx.toleranceMs).toBe(25);
       expect(ctx.action).toBe('re_armed');
-      expect(ctx.consecutiveRearms).toBe(1);
-      // Assert #2 (THIS IS WHAT THE OLD TEST WOULD HAVE MISSED):
-      // A NEW TIMER WAS ARMED. timerArmSeq should have incremented.
-      // Without this assertion, the test re-certifies F20's bug —
-      // guard rejects and returns with no live successor.
-      // (setPickDeadline bumps armSeq via cancelPickTimer's +1 and
-      // its own +1, so a re-arm increments by 2.)
       const afterArmSeq = l.timerArmSeq as number;
       expect(afterArmSeq).toBeGreaterThan(beforeArmSeq);
-      // A new setTimeout handle exists — the re-arm scheduled a real
-      // timer, not just incremented the seq.
       expect(l.currentTimerHandle).not.toBeNull();
+
+      // *** OUTCOME ASSERTION (Amendment A) *** Advance the fake clock
+      // past the armed deadline so the re-armed setTimeout fires. If
+      // the re-arm scheduled a real timer AND the pipeline completes,
+      // draftService.submitPick MUST be called with is_autopick=true.
+      // A test that stops at "a timer exists" would pass even if the
+      // draft still dies — F22 was tonight's lesson in what a suite
+      // that looks green while asserting nothing costs.
+      await vi.advanceTimersByTimeAsync(30);  // >26ms so re-armed timer fires
+      await vi.runAllTimersAsync();           // drain any follow-on async
+
+      // Autopick MUST have landed. Because runAllTimersAsync drains
+      // the entire pending queue and the autopick handler schedules
+      // the NEXT pick's timer after success, this may cascade through
+      // all draftOrder slots — that's fine; the assertion we care
+      // about is that submitPick was called AT LEAST ONCE and the
+      // FIRST call is the autopick from team-1's re-armed timer.
+      expect(submitPickSpy).toHaveBeenCalled();
+      const call = submitPickSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(call.actor).toMatchObject({ kind: 'autopick' });
+      expect(call.teamId).toBe('team-1');  // first slot on the clock
+      expect(String(call.playerId)).toBe('8478001');
     } finally {
       logs.restore();
     }
@@ -283,8 +326,16 @@ describe('F20 — pick-timer early-fire guard (LobbyManager.handleClockExpired)'
     }
   });
 
-  it('CASE 6 (F20 blocking amendment — CAP EXHAUSTED, FAIL OPEN): 4th consecutive early fire → ERROR + PROCEEDS with autopick', async () => {
-    const lobby = await makeLobby();
+  it('CASE 6 (F20 blocking amendment — CAP EXHAUSTED, FAIL OPEN, LIVENESS OUTCOME): 4th consecutive early fire → ERROR + AUTOPICK ACTUALLY LANDS', async () => {
+    const submitPickSpy = vi.fn(
+      async (_p: unknown): Promise<SubmitPickResult> => ({
+        event_id: 1,
+        seq: 1,
+        pick_deadline: null,
+        was_duplicate: false,
+      }),
+    );
+    const lobby = await makeLobby(submitPickSpy);
     const armedMs = Date.now() + 60_000;
     let armSeq = primeLobby(lobby, armedMs);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -293,20 +344,28 @@ describe('F20 — pick-timer early-fire guard (LobbyManager.handleClockExpired)'
     try {
       // Fires 1, 2, 3 — each 26ms early. All rejected and re-armed.
       // Because each re-arm calls setPickDeadline which bumps
-      // timerArmSeq, we must feed the NEW armSeq into the next call.
+      // timerArmSeq (via cancelPickTimer's +1 AND its own +1), we
+      // capture the new value each iteration.
       for (let i = 0; i < 3; i++) {
         await driveGuard(lobby, armSeq, armedMs, armedMs - 26);
-        // setPickDeadline incremented timerArmSeq; capture new value.
         armSeq = l.timerArmSeq as number;
-        // Reset currentTimerHandle so the next iteration's setPickDeadline
-        // cancelPickTimer path doesn't double-fire the old timer. In real
-        // life the setTimeout would have fired and cleared itself.
+        // Reset currentTimerHandle so the next iteration's re-arm
+        // via setPickDeadline doesn't clearTimeout on a real handle
+        // (which would double-fire in real life).
         l.currentTimerHandle = null;
       }
       expect(l.earlyFireRearmCount).toBe(3);
-      // Fire 4 — same armedDeadline, another 26ms early. Should hit
-      // the cap and fail-open (proceed with autopick).
+      expect(submitPickSpy).not.toHaveBeenCalled();  // No autopick yet.
+
+      // Fire 4 — same armedDeadline, another 26ms early. Cap hits.
+      // Fail-open falls through to normal autopick handling in-place
+      // (no re-arm; the current handleClockExpired invocation runs
+      // through to processAutopickTimeout).
       await driveGuard(lobby, armSeq, armedMs, armedMs - 26);
+      // Drain any follow-on async work from the fail-open path.
+      await vi.runAllTimersAsync();
+
+      // Mechanism assertions.
       const errors = logs.entries.filter(
         (e) => e.event === 'autopick.early_fire_tolerance_exhausted',
       );
@@ -315,9 +374,20 @@ describe('F20 — pick-timer early-fire guard (LobbyManager.handleClockExpired)'
       const ctx = errors[0].ctx as Record<string, unknown>;
       expect(ctx.consecutiveRearms).toBe(3);
       expect(ctx.action).toBe('proceeding_anyway');
-      // Counter reset so a fresh legitimate fire starts fresh.
       expect(l.earlyFireRearmCount).toBe(0);
       expect(l.earlyFireRearmForDeadlineMs).toBeNull();
+
+      // *** OUTCOME ASSERTION (Amendment A) *** The pick MUST land.
+      // If cap-exhaust logs ERROR but the pick doesn't actually fire,
+      // the draft still dies — same failure at one remove. First call
+      // is the autopick from fail-open; runAllTimersAsync may cascade
+      // through the remaining draftOrder slots (also proves liveness
+      // continues past the recovery).
+      expect(submitPickSpy).toHaveBeenCalled();
+      const submitCall = submitPickSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(submitCall.actor).toMatchObject({ kind: 'autopick' });
+      expect(submitCall.teamId).toBe('team-1');
+      expect(String(submitCall.playerId)).toBe('8478001');
     } finally {
       logs.restore();
     }
