@@ -9,6 +9,7 @@
  *   const leagues = await apiClient.get('/api/leagues');
  */
 
+import { isAuthApiError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 // In development, use empty string (same-origin) so requests go through
@@ -48,23 +49,65 @@ interface RequestOptions {
 // All others await the same promise to avoid a stampede of refreshSession() calls.
 let refreshPromise: Promise<string | null> | null = null;
 
+// F19 (2026-07-31): allowlist of positively-identified credential-failure
+// codes. supabase.auth.refreshSession() RESOLVES with an
+// AuthRetryableFetchError on network failure (it does not reject), so the
+// pre-fix code — which called signOut() on any truthy `error` — destroyed
+// local sessions on wifi blips, logging users out of a running draft.
+// Amendment 1 (architect 2026-07-31): allowlist credentials, default to
+// transient. The set of "the refresh token is dead" errors is small,
+// stable and enumerable; the set of "the network broke" errors grows with
+// every runtime, proxy and browser. Allowlist rots slower than denylist.
+const CREDENTIAL_FAILURE_CODES = new Set([
+  'invalid_grant',
+  'refresh_token_not_found',
+  'refresh_token_already_used',
+  'bad_jwt',
+  'token_expired',
+  'invalid_token',
+  'session_not_found',
+]);
+
+function isCredentialFailure(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  if (isAuthApiError(err)) {
+    if (err.status === 400 || err.status === 401) return true;
+  }
+  const code = (err as { code?: unknown }).code;
+  if (typeof code === 'string' && CREDENTIAL_FAILURE_CODES.has(code)) return true;
+  return false;
+}
+
 async function refreshTokenOnce(): Promise<string | null> {
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = supabase.auth.refreshSession().then(({ data, error }) => {
     refreshPromise = null;
-    if (error || !data.session) {
-      // Refresh token is dead (expired / revoked) — sign the user out so
-      // they get a clean login prompt instead of being stuck in an error loop.
-      // (Network errors hit the .catch() branch below and do NOT sign out.)
-      supabase.auth.signOut().catch(() => {});
+    if (error) {
+      // Amendment 1: only positively-identified credential failures
+      // trigger signOut. Everything else (AuthRetryableFetchError,
+      // unrecognised shapes, undefined errors) is treated as transient:
+      // return null, let the caller fail gracefully, let the user retry
+      // when connectivity returns. The refresh token in localStorage is
+      // still valid across network blips.
+      if (isCredentialFailure(error)) {
+        supabase.auth.signOut().catch(() => {});
+      }
+      return null;
+    }
+    if (!data.session) {
+      // No error AND no session — treat as no-session (defensive; this
+      // shouldn't happen without an error). Do not sign out.
       return null;
     }
     return data.session.access_token;
   }).catch(() => {
-    // Network / transient error — don't sign out; just return null so
-    // the request fails gracefully.  The user can retry when connectivity
-    // is restored.
+    // Amendment 4 (architect 2026-07-31): the .catch() branch NEVER
+    // signs out, full stop. supabase-js resolves-with-error for
+    // network faults today, so a rejection here is by definition
+    // unexpected — the weakest possible evidence that credentials
+    // are bad. Simpler and strictly safer than mirroring the
+    // discrimination.
     refreshPromise = null;
     return null;
   });

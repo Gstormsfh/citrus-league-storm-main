@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { AuthApiError, AuthRetryableFetchError } from '@supabase/supabase-js';
 
 // ── Mock supabase ──────────────────────────────────────────────────────
 const mockGetSession = vi.fn();
@@ -347,7 +348,51 @@ describe('proactive token refresh (jwtExpiry behavior)', () => {
     expect(mockRefreshSession).not.toHaveBeenCalled();
   });
 
-  it('signs out when proactive refresh fails due to dead refresh token', async () => {
+  // F19 (2026-07-31): amendment 1 — signOut ONLY on positively-identified
+  // credential failure. Generic Error (like the pre-fix synthetic
+  // "Token revoked" here) is treated as transient and does NOT signOut,
+  // so this test now uses a real AuthApiError with a credential-death
+  // status to exercise the discrimination path.
+  it('signs out when proactive refresh fails with AuthApiError 401 (invalid_grant)', async () => {
+    mockSession(EXPIRING_TOKEN);
+    mockRefreshSession.mockResolvedValue({
+      data: { session: null },
+      error: new AuthApiError('Invalid refresh token', 401, 'invalid_grant'),
+    });
+    mockFetchOk();
+
+    await apiClient.get('/api/test');
+
+    expect(mockSignOut).toHaveBeenCalled();
+  });
+
+  it('does not sign out on network error during refresh (reject path)', async () => {
+    mockSession(EXPIRING_TOKEN);
+    mockRefreshSession.mockRejectedValue(new Error('Network error'));
+    mockFetchOk();
+
+    await apiClient.get('/api/test');
+
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  // ── F19 discrimination — cover the resolve-with-error path
+  //    (this is where the pre-fix bug lived) ─────────────────────────
+
+  it('does NOT sign out when refresh resolves with AuthRetryableFetchError (F19 fix — the exact scenario that caused the bug)', async () => {
+    mockSession(EXPIRING_TOKEN);
+    mockRefreshSession.mockResolvedValue({
+      data: { session: null },
+      error: new AuthRetryableFetchError('Failed to fetch', 0),
+    });
+    mockFetchOk();
+
+    await apiClient.get('/api/test');
+
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('does NOT sign out when refresh resolves with a generic Error (amendment 1 regression guard)', async () => {
     mockSession(EXPIRING_TOKEN);
     mockRefreshSession.mockResolvedValue({
       data: { session: null },
@@ -357,17 +402,63 @@ describe('proactive token refresh (jwtExpiry behavior)', () => {
 
     await apiClient.get('/api/test');
 
-    expect(mockSignOut).toHaveBeenCalled();
+    expect(mockSignOut).not.toHaveBeenCalled();
   });
 
-  it('does not sign out on network error during refresh', async () => {
+  it('does NOT sign out when refresh resolves with an unrecognised error shape (amendment 1 regression guard)', async () => {
     mockSession(EXPIRING_TOKEN);
-    mockRefreshSession.mockRejectedValue(new Error('Network error'));
+    mockRefreshSession.mockResolvedValue({
+      data: { session: null },
+      error: { name: 'AuthUnknownError', message: 'weird', originalError: null },
+    });
     mockFetchOk();
 
     await apiClient.get('/api/test');
 
     expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('does NOT sign out when refresh resolves with no error AND no session (defensive)', async () => {
+    mockSession(EXPIRING_TOKEN);
+    mockRefreshSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+    mockFetchOk();
+
+    await apiClient.get('/api/test');
+
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('signs out when refresh resolves with an error carrying a credential-failure code (e.g. refresh_token_not_found)', async () => {
+    mockSession(EXPIRING_TOKEN);
+    // Some GoTrue paths return the code without the AuthApiError class
+    // (e.g. custom errors). Match by code alone.
+    const err: Error & { code?: string } = new Error('Refresh token not found');
+    err.code = 'refresh_token_not_found';
+    mockRefreshSession.mockResolvedValue({
+      data: { session: null },
+      error: err,
+    });
+    mockFetchOk();
+
+    await apiClient.get('/api/test');
+
+    expect(mockSignOut).toHaveBeenCalled();
+  });
+
+  it('signs out when refresh resolves with AuthApiError 400 (bad_jwt)', async () => {
+    mockSession(EXPIRING_TOKEN);
+    mockRefreshSession.mockResolvedValue({
+      data: { session: null },
+      error: new AuthApiError('Bad JWT', 400, 'bad_jwt'),
+    });
+    mockFetchOk();
+
+    await apiClient.get('/api/test');
+
+    expect(mockSignOut).toHaveBeenCalled();
   });
 });
 
