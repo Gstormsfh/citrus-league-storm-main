@@ -3931,15 +3931,40 @@ export class LobbyManager {
     this.timerArmSeq += 1;
     const armSeq = this.timerArmSeq;
     const armedDeadline = deadline;
+    // F20 (2026-08-01 architect ruling — correctness fix): CAPTURE
+    // `kind` in the closure. `this.currentTimerKind` is mutable
+    // instance state read at FIRE time; if handleClockExpired's
+    // opportunistic re-arm reads it instead of the captured value,
+    // a fire from a previous ARM could resurrect a different kind
+    // of timer than the one that fired (e.g. auction nomination
+    // re-armed as pick). Same discipline as F21's single-Date.now()
+    // capture: read the value that was true when the decision
+    // context was created.
+    const armedKind = kind;
     const delayMs = Math.max(0, deadline.getTime() - Date.now());
     this.currentTimerHandle = setTimeout(() => {
       this.currentTimerHandle = null;
-      void this.handleClockExpired(armSeq, armedDeadline);
+      void this.handleClockExpired(armSeq, armedDeadline, armedKind);
     }, delayMs);
     structuredLogger.debug(
       `[lobby] timer scheduled lobbyId=${this.lobbyId} kind=${kind} deadline=${deadline.toISOString()} delayMs=${delayMs} armSeq=${armSeq}`,
     );
   }
+
+  // F20 (2026-08-01 architect ruling — blocking amendment): consecutive
+  // early-fire re-arm counter, keyed on `armedDeadline.getTime()`. After
+  // 3 consecutive re-arms for the same armedDeadline, STOP re-arming
+  // and PROCEED WITH THE AUTOPICK ANYWAY. Fail open, not closed.
+  // Reasoning: an autopick that fires 26ms early is indistinguishable
+  // from an on-time one in every way that matters to a user; a draft
+  // that never advances is not. When defence-in-depth (the wall-clock
+  // gate is redundant with the armSeq identity check) and liveness
+  // conflict, liveness wins.
+  //
+  // Reset to 0 whenever a fire is accepted (drift within tolerance) or
+  // when a new setPickDeadline arms a different deadline.
+  private earlyFireRearmCount: number = 0;
+  private earlyFireRearmForDeadlineMs: number | null = null;
 
   /**
    * Format-aware AND timer-kind-aware clock-expiry dispatch. Common
@@ -3951,6 +3976,7 @@ export class LobbyManager {
   private async handleClockExpired(
     armSeq?: number,
     armedDeadline?: Date,
+    armedKind?: 'pick' | 'bid_window' | 'nomination_window',
   ): Promise<void> {
     // Chunk 10c-2 batch 2 (2026-07-27): identity guard + wall-clock
     // gate. Kills the premature-steal class structurally.
@@ -3965,15 +3991,27 @@ export class LobbyManager {
     //
     // Wall-clock gate: even if identity matches, sanity-check that the
     // deadline actually elapsed. setTimeout can (rarely) fire early
-    // under specific fake-timer edge cases or system-clock adjustments.
-    // Firing before the deadline is exactly the premature-steal
-    // signature this guard is here to prevent.
+    // under GC pressure, event-loop scheduling, or system-clock
+    // adjustments. F20 (2026-08-01) added a 25ms tolerance because a
+    // strict `<` on wall-clock ms-boundary rejects legitimate on-time
+    // fires; rejections that DO fall outside tolerance re-arm rather
+    // than discard the draft's only clock.
     //
-    // Backwards compat: `armSeq` and `armedDeadline` are optional so
-    // legacy call sites (there are none today, but the method
-    // signature must accommodate direct-test invocation) skip the
-    // guard when neither is passed.
+    // Backwards compat: `armSeq`, `armedDeadline`, `armedKind` are
+    // optional so legacy call sites (there are none today, but the
+    // method signature must accommodate direct-test invocation) skip
+    // the guard when neither is passed.
     if (armSeq !== undefined && armSeq !== this.timerArmSeq) {
+      // F20 (2026-08-01 architect ruling): superseded branch stays
+      // BARE RETURN and INFO severity. A superseded armSeq means a
+      // newer arm exists (either via setPickDeadline or via a
+      // successor already in flight); re-arming here would race the
+      // successor. SAFETY OF THIS BEHAVIOUR DEPENDS ON THE F20
+      // CLOCK-LIVENESS SCANNER — if the scanner is ever removed,
+      // audit every cancelPickTimer / clearTimeout path to prove a
+      // superseded fire always implies a live successor. Without
+      // that audit, this bare return re-inherits the F20 defect
+      // class (rejected timer, no live replacement).
       structuredLogger.info('autopick.stale_timer_skipped', {
         lobbyId: this.lobbyId,
         reason: 'timer_superseded',
@@ -3986,15 +4024,96 @@ export class LobbyManager {
       });
       return;
     }
-    if (armedDeadline !== undefined && Date.now() < armedDeadline.getTime()) {
-      structuredLogger.info('autopick.stale_timer_skipped', {
-        lobbyId: this.lobbyId,
-        reason: 'fired_before_deadline',
-        armedDeadline: armedDeadline.toISOString(),
-        firedAt: new Date().toISOString(),
-        driftMs: Date.now() - armedDeadline.getTime(),
-      });
-      return;
+    if (armedDeadline !== undefined) {
+      // F21 (2026-08-01 architect ruling): capture Date.now() ONCE.
+      // The pre-fix code called Date.now() three times (once for the
+      // guard check, twice for the log's firedAt/driftMs), so the log
+      // measured microseconds after the guard's decision — F20's
+      // sub-millisecond-early fire recorded as driftMs=0, invisible.
+      const firedAtMs = Date.now();
+      const armedMs = armedDeadline.getTime();
+      const driftMs = firedAtMs - armedMs;
+
+      // F20 amendment 1 (2026-08-01 architect ruling): tolerance
+      // replaces strict `<`. 25ms is generous against setTimeout slop
+      // and the ms-floor boundary, tight enough that a backward
+      // system-clock step still registers. With the re-arm below and
+      // its cap, the exact value is a noise-tuning knob — a wrong
+      // tolerance produces noisy WARNs, not dead drafts.
+      const EARLY_FIRE_TOLERANCE_MS = 25;
+      const MAX_CONSECUTIVE_EARLY_REARMS = 3;
+
+      if (driftMs < -EARLY_FIRE_TOLERANCE_MS) {
+        // Track consecutive re-arms per-deadline. Reset when the
+        // armedDeadline changes (new setPickDeadline for a different
+        // instant clears the strike-set for the previous instant).
+        if (this.earlyFireRearmForDeadlineMs !== armedMs) {
+          this.earlyFireRearmForDeadlineMs = armedMs;
+          this.earlyFireRearmCount = 0;
+        }
+
+        if (this.earlyFireRearmCount >= MAX_CONSECUTIVE_EARLY_REARMS) {
+          // F20 blocking amendment (2026-08-01): CAP EXHAUSTED, FAIL
+          // OPEN. An autopick 26ms early is indistinguishable from
+          // an on-time one to a user; a draft that never advances is
+          // not. When defence-in-depth and liveness conflict,
+          // liveness wins. Proceed with the autopick as if the fire
+          // had landed within tolerance.
+          structuredLogger.error('autopick.early_fire_tolerance_exhausted', {
+            lobbyId: this.lobbyId,
+            armedDeadline: armedDeadline.toISOString(),
+            firedAt: new Date(firedAtMs).toISOString(),
+            firedAtMs,
+            armedMs,
+            driftMs,
+            toleranceMs: EARLY_FIRE_TOLERANCE_MS,
+            consecutiveRearms: this.earlyFireRearmCount,
+            action: 'proceeding_anyway',
+          });
+          // Reset so the next legitimate fire starts a fresh count.
+          this.earlyFireRearmCount = 0;
+          this.earlyFireRearmForDeadlineMs = null;
+          // Fall through to the normal accept path below.
+        } else {
+          // F20 ruling 4 (2026-08-01): MANDATORY OPPORTUNISTIC RE-ARM.
+          // A timer that fires early is not garbage — it is "not yet."
+          // The guard rejects the bad fire AND schedules an immediate
+          // re-arm for the remaining delay. Uses the CAPTURED
+          // armedKind (F20 correctness fix), not the mutable
+          // this.currentTimerKind — a fire from a previous arm must
+          // not resurrect a different kind of timer than the one
+          // that fired.
+          this.earlyFireRearmCount += 1;
+          this.setPickDeadline(armedDeadline, armedKind ?? 'pick');
+          // Log AFTER the re-arm succeeds (F20 minor amendment): the
+          // pre-amendment version logged action='re_armed' before
+          // setPickDeadline ran, asserting an outcome the code had
+          // not yet produced — the same species as F19's stale
+          // comment. Severity WARN (ruling 6): self-healed but
+          // visible.
+          structuredLogger.warn('autopick.stale_timer_skipped', {
+            lobbyId: this.lobbyId,
+            reason: 'fired_before_deadline',
+            armedDeadline: armedDeadline.toISOString(),
+            firedAt: new Date(firedAtMs).toISOString(),
+            firedAtMs,
+            armedMs,
+            driftMs,
+            toleranceMs: EARLY_FIRE_TOLERANCE_MS,
+            armedKind: armedKind ?? null,
+            consecutiveRearms: this.earlyFireRearmCount,
+            maxConsecutiveRearms: MAX_CONSECUTIVE_EARLY_REARMS,
+            action: 're_armed',
+          });
+          return;
+        }
+      } else {
+        // Accepted fire (within tolerance or late) — reset the
+        // consecutive-re-arm counter for whatever deadline it belonged
+        // to. Next early-fire against a fresh deadline starts fresh.
+        this.earlyFireRearmCount = 0;
+        this.earlyFireRearmForDeadlineMs = null;
+      }
     }
     if (this.shutDown) {
       structuredLogger.debug(`[lobby] clock fired post-shutdown — ignored lobbyId=${this.lobbyId}`);
