@@ -39,6 +39,8 @@ vi.mock('@/lib/draftClient/runner', () => ({
     subscribe = subscribeMock;
     getState = vi.fn(() => ({ kind: 'idle' as const }));
     requestResyncForGap = vi.fn();
+    // F22 (2026-08-03): see DraftRoomV2.test.tsx for the story.
+    setDraftActive = vi.fn();
   },
 }));
 

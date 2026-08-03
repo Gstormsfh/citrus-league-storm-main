@@ -41,6 +41,11 @@ vi.mock('@/lib/draftClient/runner', () => ({
     subscribe = subscribeMock;
     getState = getStateMock;
     requestResyncForGap = requestResyncForGapMock;
+    // F22 (2026-08-03): mock the chunk-11g.10 client-liveness watchdog
+    // toggle. DraftRoomV2 calls setDraftActive(draftStatus === 'in_progress')
+    // in a useEffect; without this stub the whole test file threw
+    // TypeError: runner.setDraftActive is not a function on every test.
+    setDraftActive = vi.fn();
   },
 }));
 
