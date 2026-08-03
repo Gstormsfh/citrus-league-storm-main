@@ -74,3 +74,15 @@ if (!process.env.LOBBY_IDLE_EVICTION_MS) {
 if (!process.env.LOBBY_IDLE_EVICTION_SCAN_MS) {
   process.env.LOBBY_IDLE_EVICTION_SCAN_MS = '0';
 }
+
+// F20 Piece 3 (2026-08-02) — disable the LobbyRegistry clock-liveness
+// scanner in tests by default. Same rationale as idle-eviction: a
+// periodic setInterval interferes with fake-timer-using tests. Tests
+// that exercise scanClockLiveness directly pass a non-zero override
+// via constructor opts or call scanClockLiveness() manually.
+if (!process.env.CLOCK_LIVENESS_SCAN_MS) {
+  process.env.CLOCK_LIVENESS_SCAN_MS = '0';
+}
+if (!process.env.CLOCK_LIVENESS_STALL_MS) {
+  process.env.CLOCK_LIVENESS_STALL_MS = '0';
+}

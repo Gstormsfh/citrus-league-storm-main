@@ -643,6 +643,15 @@ const lobbyRegistry = new LobbyRegistry({
 // vitest setup file).
 lobbyRegistry.startIdleEvictionTimer();
 
+// Phase 4.5 chunk 11g.10 F20 Piece 3 (2026-08-02): start the global
+// pick-clock liveness scanner. Every 5s the scanner iterates
+// in-registry lobbies and hands any stalled clocks to the lobby's
+// attemptClockRecovery method. Backstops the guard-side re-arm in
+// LobbyManager.handleClockExpired for any stall cause the guard
+// never sees. Config: CLOCK_LIVENESS_SCAN_MS / CLOCK_LIVENESS_STALL_MS
+// env, or opts; 0 disables. Tests disable via vitest setup.
+lobbyRegistry.startClockLivenessScanner();
+
 // Phase 4.5 chunk 11g.10 sub-step 10b — mount engine-ops admin routes
 // at /api/admin/engine/* on the engine's Hono server.
 //
@@ -753,6 +762,12 @@ function shutdown(signal: string) {
   // sequence. Mirrors the LobbyManager stopSnapshotTimer / uWS
   // stopHeartbeat pattern.
   lobbyRegistry.stopIdleEvictionTimer();
+
+  // F20 Piece 3 (2026-08-02): stop the clock-liveness scanner BEFORE
+  // any other teardown so a late scan can't try to recover a lobby
+  // that's already being torn down. Same pattern as the idle-eviction
+  // stop above.
+  lobbyRegistry.stopClockLivenessScanner();
 
   // Chunk 11g.7 sub-step 7e: stop the LISTEN/NOTIFY subscription
   // FIRST so no new external events fire mid-teardown. The .stop()

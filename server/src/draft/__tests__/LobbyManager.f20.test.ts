@@ -126,7 +126,7 @@ function driveGuard(
   vi.setSystemTime(firedAtMs);
   const armedDeadline = new Date(armedDeadlineMs);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (lobby as any).handleClockExpired(armSeq, armedDeadline, armedKind);
+  return (lobby as any).handleClockExpired({ armSeq, armedDeadline, armedKind });
 }
 
 // Force `timerArmSeq` to match what the caller expects, and set an

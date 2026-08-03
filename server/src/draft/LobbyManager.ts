@@ -624,6 +624,19 @@ export class LobbyManager {
    */
   private queue: Promise<unknown> = Promise.resolve();
 
+  // F20 Piece 3 (2026-08-02 architect ruling): in-flight action counter
+  // consulted by attemptClockRecovery() before re-arming a stalled
+  // clock. The queue serializes actions, so any nonzero value means an
+  // action is currently in the queue — re-arming while a submit is
+  // about to bump timerArmSeq would create a timer for state that's
+  // about to be superseded. Not strictly necessary given the
+  // observedSeq guard, but defence in depth against a race window
+  // where the submit is queued but hasn't yet advanced the seq.
+  //
+  // Incremented in enqueueAction before the .then; decremented in a
+  // .finally so BOTH success and failure paths clear it.
+  private pendingActionCount = 0;
+
   /**
    * Idempotency cache: `idempotencyKey -> Promise<DraftActionResult>`.
    * Stores the **in-flight promise**, not the resolved value, so
@@ -1236,6 +1249,28 @@ export class LobbyManager {
   }
 
   /**
+   * F20 Piece 3 (2026-08-02): read-only accessor for the current
+   * pick-timer deadline. Null when no timer is armed (pre-first-arm
+   * window in an in_progress lobby, or immediately after
+   * cancelPickTimer). Consumed by the LobbyRegistry clock-liveness
+   * scanner to detect stalled clocks.
+   */
+  getCurrentTimerDeadline(): Date | null {
+    return this.currentTimerDeadline;
+  }
+
+  /**
+   * F20 Piece 3 (2026-08-02): read-only accessor for the current
+   * timer-arm sequence. Scanner captures this at scan time and passes
+   * it to attemptClockRecovery so the recovery path can detect
+   * "someone else advanced the state between the scan and now" and
+   * abort idempotently.
+   */
+  getTimerArmSeq(): number {
+    return this.timerArmSeq;
+  }
+
+  /**
    * Phase 4.5 chunk 11g.10 sub-step 10b — engine-admin diagnostic.
    *
    * Returns a read-only snapshot of the lobby's identity + replay
@@ -1335,9 +1370,13 @@ export class LobbyManager {
     // action doesn't poison the chain — handleQueueError converts
     // the rejection to a resolved DraftActionResult (`internal_error`)
     // so the next enqueueAction call still runs.
+    this.pendingActionCount += 1;
     const next: Promise<DraftActionResult> = this.queue
       .then(() => this.processAction(action))
-      .catch((err: unknown) => this.handleQueueError(err, action));
+      .catch((err: unknown) => this.handleQueueError(err, action))
+      .finally(() => {
+        this.pendingActionCount -= 1;
+      });
 
     this.queue = next;
 
@@ -3944,7 +3983,7 @@ export class LobbyManager {
     const delayMs = Math.max(0, deadline.getTime() - Date.now());
     this.currentTimerHandle = setTimeout(() => {
       this.currentTimerHandle = null;
-      void this.handleClockExpired(armSeq, armedDeadline, armedKind);
+      void this.handleClockExpired({ armSeq, armedDeadline, armedKind });
     }, delayMs);
     structuredLogger.debug(
       `[lobby] timer scheduled lobbyId=${this.lobbyId} kind=${kind} deadline=${deadline.toISOString()} delayMs=${delayMs} armSeq=${armSeq}`,
@@ -3974,10 +4013,23 @@ export class LobbyManager {
    * auction lobbies (bid_window vs nomination_window).
    */
   private async handleClockExpired(
-    armSeq?: number,
-    armedDeadline?: Date,
-    armedKind?: 'pick' | 'bid_window' | 'nomination_window',
+    fire?: {
+      armSeq: number;
+      armedDeadline: Date;
+      armedKind: 'pick' | 'bid_window' | 'nomination_window';
+    },
   ): Promise<void> {
+    // F20 amendment C (2026-08-02 architect ruling): the three fields
+    // are captured together in the setTimeout closure at arm time; the
+    // ONLY production caller passes all three. Bundling them into a
+    // single optional object param enforces "defined together" at the
+    // type system level so the pre-refactor `armedKind ?? 'pick'`
+    // fallback (dead but paperable-over-a-mutable-state-read) is now
+    // impossible to write. Legacy signature stays optional so
+    // direct-test invocations that pass nothing skip all guards.
+    const armSeq = fire?.armSeq;
+    const armedDeadline = fire?.armedDeadline;
+    const armedKind = fire?.armedKind;
     // Chunk 10c-2 batch 2 (2026-07-27): identity guard + wall-clock
     // gate. Kills the premature-steal class structurally.
     //
@@ -4084,7 +4136,10 @@ export class LobbyManager {
           // not resurrect a different kind of timer than the one
           // that fired.
           this.earlyFireRearmCount += 1;
-          this.setPickDeadline(armedDeadline, armedKind ?? 'pick');
+          // armedKind is defined-together with armedDeadline (see the
+          // fire?: { … } object param at the top of this function) —
+          // no `?? 'pick'` fallback needed.
+          this.setPickDeadline(armedDeadline, armedKind!);
           // Log AFTER the re-arm succeeds (F20 minor amendment): the
           // pre-amendment version logged action='re_armed' before
           // setPickDeadline ran, asserting an outcome the code had
@@ -4143,6 +4198,109 @@ export class LobbyManager {
     } else {
       await this.handleAutopickTimeout();
     }
+  }
+
+  /**
+   * F20 Piece 3 (2026-08-02 architect ruling 2 + 3): pick-clock
+   * liveness recovery entry point, called by the LobbyRegistry's
+   * global scanner. Scanner proposes ("this lobby looks stalled at
+   * observedSeq X"), lobby disposes ("here's my current view; do
+   * I re-arm?"). Idempotent — safe to call repeatedly.
+   *
+   * The scanner's view is racy — by the time this method executes
+   * the state may have advanced under it. Every gate below re-verifies
+   * a specific pre-condition rather than trusting the caller:
+   *
+   *   1. shut_down            — lobby is tearing down.
+   *   2. not_in_progress      — draftStatus advanced past in_progress
+   *                             (completed/cancelled after the scan).
+   *   3. paused               — pause landed after the scan; do not
+   *                             fight the pause.
+   *   4. seq_advanced         — a submit / re-arm happened between the
+   *                             scan and this call; observedSeq is
+   *                             stale, someone already moved.
+   *   5. no_deadline          — pre-first-arm window (currentTimerDeadline
+   *                             is null while the lobby is in_progress
+   *                             but no pick has been scheduled yet). NOT
+   *                             a stall. Edge (a) per architect ruling.
+   *   6. no_stall             — re-verify wall-clock stall under lobby's
+   *                             view; the scanner's clock may have drifted
+   *                             or the deadline may have been advanced.
+   *   7. submit_in_flight     — an action is queued but hasn't yet bumped
+   *                             the seq; its imminent setPickDeadline
+   *                             would supersede our re-arm anyway.
+   *
+   * On re-arm: calls setPickDeadline with the CURRENT currentTimerDeadline
+   * (the deadline the lobby knows about, not the one the scanner
+   * observed). Edge (b) — a deadline already in the past re-arms with
+   * delay 0 via setPickDeadline's `Math.max(0, deadline - now)`, and
+   * fires on the next event-loop tick. That is CORRECT AND DELIBERATE:
+   * an overdue pick firing NOW is the recovery working. Do not "fix"
+   * this into a skip.
+   */
+  public async attemptClockRecovery(observedSeq: number): Promise<{
+    recovered: boolean;
+    reason:
+      | 're_armed'
+      | 'shut_down'
+      | 'not_in_progress'
+      | 'paused'
+      | 'seq_advanced'
+      | 'no_deadline'
+      | 'no_stall'
+      | 'submit_in_flight';
+    currentSeq: number;
+    deadlineOverdueMs: number | null;
+  }> {
+    const CLOCK_LIVENESS_STALL_MS = 10_000;  // architect ruling 3
+    const currentSeq = this.timerArmSeq;
+    const deadline = this.currentTimerDeadline;
+    const overdueMs = deadline !== null ? Date.now() - deadline.getTime() : null;
+
+    if (this.shutDown) {
+      return { recovered: false, reason: 'shut_down', currentSeq, deadlineOverdueMs: overdueMs };
+    }
+    if (this.draftStatus !== 'in_progress') {
+      return { recovered: false, reason: 'not_in_progress', currentSeq, deadlineOverdueMs: overdueMs };
+    }
+    if (this.pauseState !== null) {
+      return { recovered: false, reason: 'paused', currentSeq, deadlineOverdueMs: overdueMs };
+    }
+    if (observedSeq !== currentSeq) {
+      return { recovered: false, reason: 'seq_advanced', currentSeq, deadlineOverdueMs: overdueMs };
+    }
+    if (deadline === null) {
+      // Edge (a) per architect ruling: pre-first-arm window is NOT a
+      // stall. Lobby is in_progress but no pick has been armed yet.
+      return { recovered: false, reason: 'no_deadline', currentSeq, deadlineOverdueMs: overdueMs };
+    }
+    if (overdueMs === null || overdueMs <= CLOCK_LIVENESS_STALL_MS) {
+      // Re-verify stall under lobby's own view — scanner may have been
+      // stale by the time we got here.
+      return { recovered: false, reason: 'no_stall', currentSeq, deadlineOverdueMs: overdueMs };
+    }
+    if (this.pendingActionCount > 0) {
+      // A submit is queued but hasn't yet bumped the seq. Its
+      // imminent setPickDeadline will supersede any re-arm we do
+      // here; step back and let the submit land.
+      return { recovered: false, reason: 'submit_in_flight', currentSeq, deadlineOverdueMs: overdueMs };
+    }
+    // All gates passed. Re-arm using the lobby's OWN view of the
+    // deadline (not the scanner's cached copy). currentTimerKind
+    // is the kind of the last arm — preserved through the recovery.
+    // Fallback to 'pick' only if the discriminator is null (which
+    // happens after cancelPickTimer — but we already gated on
+    // deadline !== null AND draftStatus === 'in_progress', so a
+    // null kind here implies an internal inconsistency; 'pick' is
+    // the safe default for snake/linear formats).
+    const kind = this.currentTimerKind ?? 'pick';
+    this.setPickDeadline(deadline, kind);
+    return {
+      recovered: true,
+      reason: 're_armed',
+      currentSeq: this.timerArmSeq,
+      deadlineOverdueMs: overdueMs,
+    };
   }
 
   /**

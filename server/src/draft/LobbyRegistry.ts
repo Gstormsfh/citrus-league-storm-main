@@ -295,6 +295,21 @@ export interface LobbyRegistryOptions {
    * default. `0` disables the scanner.
    */
   idleEvictionScanMs?: number;
+  /**
+   * F20 Piece 3 (2026-08-02): clock-liveness scanner cadence. How
+   * often `scanClockLiveness` runs. Overrides `CLOCK_LIVENESS_SCAN_MS`
+   * env; env overrides the 5-second default. `0` disables.
+   */
+  clockLivenessScanMs?: number;
+  /**
+   * F20 Piece 3: how far past a pick_deadline a lobby must be to be
+   * considered stalled. Overrides `CLOCK_LIVENESS_STALL_MS` env; env
+   * overrides the 10-second default. Legitimate autopick lands at
+   * deadline + 1s pad + ~150ms submit; under DB load that reaches
+   * 3-4s past deadline. 10s has real margin — 5s sits too close to
+   * normal behaviour (architect ruling 3).
+   */
+  clockLivenessStallMs?: number;
 }
 
 export class LobbyRegistry {
@@ -344,6 +359,19 @@ export class LobbyRegistry {
       (process.env.LOBBY_IDLE_EVICTION_SCAN_MS !== undefined
         ? parseInt(process.env.LOBBY_IDLE_EVICTION_SCAN_MS, 10)
         : 3 * 60 * 1000);
+    // F20 Piece 3 (2026-08-02): clock-liveness scanner config. Ruling
+    // 3: 5s scan / 10s stall. Env overrides for tests + local dev
+    // (setting either to 0 disables — matches idleEviction pattern).
+    this.clockLivenessScanMs =
+      opts.clockLivenessScanMs ??
+      (process.env.CLOCK_LIVENESS_SCAN_MS !== undefined
+        ? parseInt(process.env.CLOCK_LIVENESS_SCAN_MS, 10)
+        : 5_000);
+    this.clockLivenessStallMs =
+      opts.clockLivenessStallMs ??
+      (process.env.CLOCK_LIVENESS_STALL_MS !== undefined
+        ? parseInt(process.env.CLOCK_LIVENESS_STALL_MS, 10)
+        : 10_000);
   }
 
   /**
@@ -630,6 +658,47 @@ export class LobbyRegistry {
   private readonly idleEvictionMs: number;
   private readonly idleEvictionScanMs: number;
 
+  // ── Clock-liveness scanner (F20 Piece 3, 2026-08-02) ────────────
+  //
+  // Global registry-side backstop for the guard-side re-arm. Iterates
+  // every in-registry lobby every clockLivenessScanMs; any lobby whose
+  // pick_deadline is more than clockLivenessStallMs in the past gets
+  // handed to attemptClockRecovery, which re-verifies the stall under
+  // its own view and re-arms if warranted.
+  //
+  // Per architect ruling 2: this MUST be a GLOBAL scanner, not a
+  // per-lobby setInterval. A per-lobby watchdog living inside the
+  // subsystem it monitors reproduces the F20 blindness pattern
+  // (event_subscription.watchdog_ok fired 19 times over a dead draft).
+  // The scanner sits in the registry so it can see lobbies whose own
+  // machinery has wedged.
+  //
+  // Per architect ruling 2 (2026-08-02 addendum): UNKILLABLE. One
+  // throwing lobby must not shield the others in the same scan pass,
+  // and no scan error can terminate the interval.
+  private clockLivenessTimer: NodeJS.Timeout | null = null;
+  private readonly clockLivenessScanMs: number;
+  private readonly clockLivenessStallMs: number;
+
+  // Strike map keyed on lobbyId. Every scanner-driven recovery
+  // increments count; at MAX we escalate (log ERROR + alertable) and
+  // stop re-arming that lobby to prevent an infinite recovery loop
+  // (architect ruling 3b: "a recovery loop that silently spins
+  // forever is its own hazard").
+  //
+  // Hygiene (architect ruling 2, 2026-08-02):
+  //   - Entries pruned when the lobby leaves the registry (start of
+  //     each scan pass — cheap, covers eviction / force-purge /
+  //     completion without hooking every removal path).
+  //   - Entries cleared on natural recovery (a scan where the lobby
+  //     shows no stall) — so an unrelated stall next week starts at
+  //     zero instead of inheriting strikes from tonight.
+  private clockLivenessStrikes = new Map<
+    string,
+    { seq: number; count: number }
+  >();
+  private static readonly MAX_CLOCK_LIVENESS_STRIKES = 3;
+
   /**
    * Start the periodic idle-eviction scanner. Idempotent — a second
    * call is a no-op. Called from engine entry-point startup after
@@ -754,6 +823,217 @@ export class LobbyRegistry {
       });
     }
     return { scanned, evicted };
+  }
+
+  // ── F20 Piece 3 (2026-08-02): clock-liveness scanner ─────────────
+
+  /**
+   * Start the periodic clock-liveness scanner. Idempotent — a second
+   * call is a no-op. Called from the engine entry-point startup
+   * alongside startIdleEvictionTimer(). If `CLOCK_LIVENESS_SCAN_MS`
+   * or `CLOCK_LIVENESS_STALL_MS` is `0` (env or options), this is a
+   * no-op (scanner disabled).
+   *
+   * Per architect ruling 2 (2026-08-02): TOP-LEVEL TRY/CATCH inside
+   * the setInterval callback ensures no scan error can ever terminate
+   * the interval. The per-lobby try/catch inside scanClockLiveness
+   * ensures one throwing lobby cannot shield the rest.
+   */
+  startClockLivenessScanner(): void {
+    if (this.clockLivenessTimer !== null) return;
+    if (this.clockLivenessScanMs <= 0 || this.clockLivenessStallMs <= 0) {
+      structuredLogger.info('registry.clock_liveness_scanner_disabled', {
+        clockLivenessScanMs: this.clockLivenessScanMs,
+        clockLivenessStallMs: this.clockLivenessStallMs,
+      });
+      return;
+    }
+    this.clockLivenessTimer = setInterval(() => {
+      // Top-level try/catch: unkillable. A scan error must NOT stop
+      // the interval — F20's whole lesson is that the engine watched
+      // the thing that didn't break; a liveness watchdog that dies
+      // silently on the first malformed lobby is the same defect
+      // wearing the fix's clothes.
+      void this.scanClockLiveness().catch((err: unknown) => {
+        structuredLogger.error('registry.clock_liveness_scan_threw', {
+          err: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }, this.clockLivenessScanMs);
+    if (typeof this.clockLivenessTimer.unref === 'function') {
+      this.clockLivenessTimer.unref();
+    }
+    structuredLogger.info('registry.clock_liveness_scanner_started', {
+      clockLivenessScanMs: this.clockLivenessScanMs,
+      clockLivenessStallMs: this.clockLivenessStallMs,
+    });
+  }
+
+  /**
+   * Cancel the periodic clock-liveness scanner. Called from the
+   * engine's graceful-shutdown path BEFORE closing lobbies so a late
+   * scan doesn't try to recover a lobby that's already being torn
+   * down. Idempotent.
+   */
+  stopClockLivenessScanner(): void {
+    if (this.clockLivenessTimer !== null) {
+      clearInterval(this.clockLivenessTimer);
+      this.clockLivenessTimer = null;
+      structuredLogger.info('registry.clock_liveness_scanner_stopped', {});
+    }
+  }
+
+  /**
+   * Single scan pass. Public for tests + admin diagnostics.
+   *
+   * For each in-registry lobby that is in_progress with a
+   * pick_deadline more than clockLivenessStallMs in the past:
+   * proposes recovery via `lobby.attemptClockRecovery(observedSeq)`;
+   * the lobby has final say. Strike-map records recovery attempts
+   * per-lobby; at MAX we log ERROR + alertable and stop re-arming.
+   *
+   * Unkillable (architect ruling 2, 2026-08-02): every lobby is
+   * wrapped in its own try/catch so one throwing lobby cannot
+   * shield the rest. The setInterval callback in
+   * `startClockLivenessScanner` wraps this whole method in a
+   * top-level catch.
+   */
+  async scanClockLiveness(): Promise<{
+    scanned: number;
+    stalled: number;
+    recovered: number;
+    escalated: number;
+    errored: number;
+  }> {
+    // Strike-map hygiene (architect ruling 2, 2026-08-02): prune
+    // entries whose lobbies have left the registry. One-liner at the
+    // top of each scan covers eviction / force-purge / completion
+    // without hooking every removal path. Slow leak F5's family.
+    for (const lobbyId of Array.from(this.clockLivenessStrikes.keys())) {
+      if (!this.lobbies.has(lobbyId)) {
+        this.clockLivenessStrikes.delete(lobbyId);
+      }
+    }
+
+    // Snapshot entries so a re-arm mid-loop that mutates timer state
+    // doesn't corrupt the iterator (attemptClockRecovery may indirectly
+    // touch this.lobbies via LobbyManager's internal wiring).
+    const entries: Array<[string, LobbyManager]> = [];
+    for (const [lobbyId, entry] of this.lobbies.entries()) {
+      if (entry instanceof LobbyManager) {
+        entries.push([lobbyId, entry]);
+      }
+    }
+
+    let scanned = 0;
+    let stalled = 0;
+    let recovered = 0;
+    let escalated = 0;
+    let errored = 0;
+
+    for (const [lobbyId, lobby] of entries) {
+      scanned += 1;
+      try {
+        // Per-lobby try/catch (architect ruling 2, 2026-08-02): one
+        // throwing lobby MUST NOT shield the rest. Every accessor
+        // below (getDraftStatus, getCurrentTimerDeadline,
+        // getTimerArmSeq, attemptClockRecovery) is a candidate for
+        // "malformed lobby throws unexpectedly."
+        if (lobby.getDraftStatus() !== 'in_progress') {
+          this.clockLivenessStrikes.delete(lobbyId);
+          continue;
+        }
+        const deadline = lobby.getCurrentTimerDeadline();
+        if (deadline === null) {
+          // Edge (a) per architect ruling: pre-first-arm window
+          // (in_progress but no pick armed yet) is NOT a stall. Clear
+          // any lingering strike.
+          this.clockLivenessStrikes.delete(lobbyId);
+          continue;
+        }
+        const overdueMs = Date.now() - deadline.getTime();
+        if (overdueMs <= this.clockLivenessStallMs) {
+          // Healthy. Natural recovery clears the strike map so a
+          // future unrelated stall starts fresh.
+          this.clockLivenessStrikes.delete(lobbyId);
+          continue;
+        }
+
+        // STALL. Consult strike map before proposing recovery.
+        stalled += 1;
+        const observedSeq = lobby.getTimerArmSeq();
+        const strike = this.clockLivenessStrikes.get(lobbyId);
+
+        if (strike && strike.count >= LobbyRegistry.MAX_CLOCK_LIVENESS_STRIKES) {
+          // Already escalated on a prior scan. Do NOT re-arm again —
+          // recovery loop that silently spins forever is its own
+          // hazard (architect ruling 3b). ERROR emitted at
+          // escalation; skip here to avoid log spam.
+          continue;
+        }
+
+        const result = await lobby.attemptClockRecovery(observedSeq);
+
+        if (result.recovered) {
+          recovered += 1;
+          const nextCount = (strike?.count ?? 0) + 1;
+          if (nextCount >= LobbyRegistry.MAX_CLOCK_LIVENESS_STRIKES) {
+            // Third recovery of the same lobby without natural healing.
+            // Something is preventing the re-armed timer from firing
+            // (event-loop starvation, wedged autopick handler, etc.).
+            // Log ERROR + alertable and refuse further recovery.
+            structuredLogger.error('registry.clock_stall_giving_up', {
+              lobbyId,
+              alertable: true,
+              consecutiveRecoveries: nextCount,
+              observedSeq,
+              newSeq: result.currentSeq,
+              overdueMs,
+            });
+            escalated += 1;
+            this.clockLivenessStrikes.set(lobbyId, {
+              seq: result.currentSeq,
+              count: LobbyRegistry.MAX_CLOCK_LIVENESS_STRIKES,
+            });
+          } else {
+            this.clockLivenessStrikes.set(lobbyId, {
+              seq: result.currentSeq,
+              count: nextCount,
+            });
+          }
+          structuredLogger.error('registry.clock_stall_recovered', {
+            lobbyId,
+            observedSeq,
+            newSeq: result.currentSeq,
+            overdueMs,
+            consecutiveRecoveries: nextCount,
+          });
+          continue;
+        }
+
+        // Not recovered. Reason tells us what to do with strikes.
+        if (
+          result.reason === 'seq_advanced' ||
+          result.reason === 'not_in_progress' ||
+          result.reason === 'paused' ||
+          result.reason === 'shut_down' ||
+          result.reason === 'no_deadline' ||
+          result.reason === 'no_stall'
+        ) {
+          // Benign: scanner was stale or lobby moved on. Clear strikes.
+          this.clockLivenessStrikes.delete(lobbyId);
+        }
+        // submit_in_flight: leave strikes alone; next scan re-evaluates.
+      } catch (err) {
+        errored += 1;
+        structuredLogger.error('registry.clock_liveness_scan_lobby_threw', {
+          lobbyId,
+          err: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return { scanned, stalled, recovered, escalated, errored };
   }
 
   // ── Private ────────────────────────────────────────────────────
