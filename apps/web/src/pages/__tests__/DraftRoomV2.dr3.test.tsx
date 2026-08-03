@@ -26,22 +26,19 @@ import { useDraftClientStore } from '@/stores/draftClientStore';
 
 // ── Mocks: runner + matrix + submitPick + apiClient + PlayerService ─
 
-const { connectMock, disconnectMock, subscribeMock } = vi.hoisted(() => ({
-  connectMock: vi.fn(),
-  disconnectMock: vi.fn(),
-  subscribeMock: vi.fn(() => () => {}),
-}));
+// F22 structural (2026-08-03) — shared mock factory. See
+// DraftRoomV2.test.tsx for the story.
+import {
+  MockDraftClientRunner,
+  runnerHandles,
+} from '@/lib/draftClient/__mocks__/mockRunner';
+
+const connectMock = runnerHandles.connect;
+const disconnectMock = runnerHandles.disconnect;
+const subscribeMock = runnerHandles.subscribe;
 
 vi.mock('@/lib/draftClient/runner', () => ({
-  DraftClientRunner: class {
-    connect = connectMock;
-    disconnect = disconnectMock;
-    subscribe = subscribeMock;
-    getState = vi.fn(() => ({ kind: 'idle' as const }));
-    requestResyncForGap = vi.fn();
-    // F22 (2026-08-03): see DraftRoomV2.test.tsx for the story.
-    setDraftActive = vi.fn();
-  },
+  DraftClientRunner: MockDraftClientRunner,
 }));
 
 const { fetchDraftOrderMatrixMock } = vi.hoisted(() => ({

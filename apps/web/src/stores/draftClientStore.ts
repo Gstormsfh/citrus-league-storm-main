@@ -120,10 +120,42 @@ interface DraftClientStoreState {
   /** Last error from the server's `error` wire message. */
   lastError: ErrorPayload | null;
 
+  /**
+   * F14(b) (2026-08-03) — client-side identity-resolution failure state.
+   * Set when the cross-check `myTeamId ∈ matrix.teamIds` fails during
+   * an ACTIVE draft, AFTER a re-resolve attempt.
+   *
+   * When non-null, the draft room MUST fail loudly (visible banner +
+   * refuse to render draft controls) rather than silently degrade to
+   * a working-looking room with dead buttons. The F14 incident (dead
+   * cache serving a stale teamId not in the draft) reached this exact
+   * failure mode; the pre-fix UI had no indication the user could not
+   * draft, they only discovered it by clicking Draft and seeing
+   * "It's not your turn."
+   *
+   *   'my_team_not_in_matrix' — myTeamId resolved but does not appear
+   *     in the draft-order matrix. Membership cache is likely stale
+   *     (F14 mechanism) OR the user's team was removed from the draft.
+   *
+   * Set to null when the cross-check subsequently passes (e.g., a
+   * fresh matrix arrives with the expected team, or myTeamId is
+   * re-resolved to a team that IS in the matrix).
+   */
+  identityFailure: { reason: 'my_team_not_in_matrix' } | null;
+
   // ── Setters / reducers ─────────────────────────────────────────
   setConnectionState: (state: DraftClientState) => void;
   /** DR-2 (2026-07-29) — set the caller's teamId in this league. */
   setMyTeamId: (teamId: string | null) => void;
+  /**
+   * F14(b) (2026-08-03) — set the client-side identity-resolution
+   * failure state. Called by the cross-check effect in DraftRoomV2
+   * when myTeamId does not appear in the draft-order matrix AND a
+   * re-resolve attempt did not fix it. Pass null to clear.
+   */
+  setIdentityFailure: (
+    failure: { reason: 'my_team_not_in_matrix' } | null,
+  ) => void;
   setSnapshot: (snapshot: DraftSnapshot) => void;
   applyEvent: (event: BufferedDraftEvent) => void;
   applyEvents: (events: ReadonlyArray<BufferedDraftEvent>) => void;
@@ -156,6 +188,7 @@ const initialState: Omit<
   DraftClientStoreState,
   | 'setConnectionState'
   | 'setMyTeamId'
+  | 'setIdentityFailure'
   | 'setSnapshot'
   | 'applyEvent'
   | 'applyEvents'
@@ -177,6 +210,7 @@ const initialState: Omit<
   presentUserIds: new Set(),
   observedLeftUserIds: new Set(),
   lastError: null,
+  identityFailure: null,
 };
 
 export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
@@ -185,6 +219,8 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
   setConnectionState: (state) => set({ connectionState: state }),
 
   setMyTeamId: (teamId) => set({ myTeamId: teamId }),
+
+  setIdentityFailure: (failure) => set({ identityFailure: failure }),
 
   setSnapshot: (snapshot) =>
     set((prev) => {
@@ -384,6 +420,7 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
       presentUserIds: new Set(),
       observedLeftUserIds: new Set(),
       lastError: null,
+      identityFailure: null,
     }),
 }));
 
@@ -437,4 +474,7 @@ export const useDraftLastFoldGaps = () =>
  * fetch resolves or if the caller is a spectator).
  */
 export const useMyTeamId = () => useDraftClientStore((s) => s.myTeamId);
+/** F14(b) — expose identity-failure state to banner + control gates. */
+export const useIdentityFailure = () =>
+  useDraftClientStore((s) => s.identityFailure);
 

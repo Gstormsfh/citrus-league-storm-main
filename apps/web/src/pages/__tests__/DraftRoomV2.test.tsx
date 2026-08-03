@@ -14,39 +14,28 @@ import { useDraftClientStore } from '@/stores/draftClientStore';
 
 // ── Mock the runner BEFORE importing the page ─────────────────────
 //
-// vi.hoisted hoists mock-state init above imports so the vi.mock
-// factory body can reference these names safely.
+// F22 structural (2026-08-03 architect ruling): shared factory typed
+// against the real DraftClientRunner interface. Adding a new public
+// method to runner.ts breaks the mock at typecheck (in mockRunner.ts)
+// rather than silently at runtime here. That is why this file no
+// longer defines the mock class inline — the hand-copied class
+// expression was the F22 mechanism.
+import {
+  MockDraftClientRunner,
+  runnerHandles,
+} from '@/lib/draftClient/__mocks__/mockRunner';
 
-const {
-  connectMock,
-  disconnectMock,
-  subscribeMock,
-  getStateMock,
-  requestResyncForGapMock,
-} = vi.hoisted(() => ({
-  connectMock: vi.fn(),
-  disconnectMock: vi.fn(),
-  subscribeMock: vi.fn(() => () => {}),
-  getStateMock: vi.fn(() => ({ kind: 'idle' as const })),
-  requestResyncForGapMock: vi.fn(),
-}));
+// Legacy aliases for test bodies that reference connectMock /
+// disconnectMock / etc. — kept so this migration is a code-shape
+// change, not an assertion rewrite.
+const connectMock = runnerHandles.connect;
+const disconnectMock = runnerHandles.disconnect;
+const subscribeMock = runnerHandles.subscribe;
+const getStateMock = runnerHandles.getState;
+const requestResyncForGapMock = runnerHandles.requestResyncForGap;
 
 vi.mock('@/lib/draftClient/runner', () => ({
-  // Constructor must be a real `class` (or `function` with prototype)
-  // for `new DraftClientRunner()` to work — `vi.fn().mockImplementation`
-  // returns an arrow function which can't be `new`'d.
-  DraftClientRunner: class {
-    connect = connectMock;
-    disconnect = disconnectMock;
-    subscribe = subscribeMock;
-    getState = getStateMock;
-    requestResyncForGap = requestResyncForGapMock;
-    // F22 (2026-08-03): mock the chunk-11g.10 client-liveness watchdog
-    // toggle. DraftRoomV2 calls setDraftActive(draftStatus === 'in_progress')
-    // in a useEffect; without this stub the whole test file threw
-    // TypeError: runner.setDraftActive is not a function on every test.
-    setDraftActive = vi.fn();
-  },
+  DraftClientRunner: MockDraftClientRunner,
 }));
 
 // DR-1b — mock the matrix fetcher so tests control the matrix landing

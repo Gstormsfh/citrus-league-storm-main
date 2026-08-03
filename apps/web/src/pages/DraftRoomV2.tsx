@@ -52,8 +52,10 @@ import {
   useDraftLastFoldGaps,
   useDraftMatrix,
   useMyTeamId,
+  useIdentityFailure,
   usePendingActions,
 } from '@/stores/draftClientStore';
+import { useMyTeamIdCrossCheck } from '@/hooks/useMyTeamIdCrossCheck';
 import {
   notifyConnectionFatal,
   notifyPresenceJoined,
@@ -261,6 +263,14 @@ export default function DraftRoomV2() {
     runner.setDraftActive(derivedForGap?.draftStatus === 'in_progress');
   }, [derivedForGap]);
 
+  // F14(b) (2026-08-03) — client-side cross-check that the resolved
+  // myTeamId appears in the fetched draft-order matrix. Fires during
+  // active drafts only; re-resolves once on mismatch; sets
+  // identityFailure state on confirmed miss so the room fails loud
+  // instead of silently letting the user sit there unable to draft
+  // (the F14 incident's user-visible surface).
+  useMyTeamIdCrossCheck({ leagueId });
+
   const handleRetryNow = useMemo(
     () => () => {
       const runner = runnerRef.current;
@@ -277,12 +287,52 @@ export default function DraftRoomV2() {
         onRetryNow={handleRetryNow}
         clockOffsetMs={clockOffsetMs}
       />
+      <IdentityFailureBanner />
       <DraftRoomBody
         leagueId={leagueId}
         teams={teams}
         playersById={playersById}
         playersLoading={playersLoading}
       />
+    </div>
+  );
+}
+
+// F14(b) (2026-08-03) — hard-error banner rendered when the
+// myTeamId ↔ draft-order-matrix cross-check has failed (see
+// useMyTeamIdCrossCheck). Prominent, red, and permanent until
+// the state clears — because "silent-degrade-to-can't-draft" was
+// the F14 defect and this is the invariant I1 guarantee that
+// prevents recurrence. NOT dismissable by the user; the user
+// cannot make this go away by clicking, only the underlying
+// membership resolution can.
+function IdentityFailureBanner() {
+  const failure = useIdentityFailure();
+  if (failure === null) return null;
+  return (
+    <div
+      role="alert"
+      className="mb-4 rounded border border-destructive bg-destructive/10 p-4 text-destructive"
+      data-testid="identity-failure-banner"
+      data-identity-failure-reason={failure.reason}
+    >
+      <div className="font-semibold mb-1">
+        We can't identify your team in this draft.
+      </div>
+      <div className="text-sm">
+        The draft server doesn't recognize you as an owner of any team
+        in this draft's order. This usually means a commissioner just
+        changed your team assignment and the change hasn't reached the
+        draft yet. Refreshing the page usually resolves it.
+        {' '}
+        <button
+          type="button"
+          className="underline font-medium"
+          onClick={() => window.location.reload()}
+        >
+          Reload page
+        </button>
+      </div>
     </div>
   );
 }
@@ -378,7 +428,17 @@ function DraftRoomBody({
 }: DraftRoomBodyProps) {
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
-  const myTeamId = useMyTeamId();
+  const resolvedMyTeamId = useMyTeamId();
+  const identityFailure = useIdentityFailure();
+  // F14(b) (2026-08-03): when the client-side identity cross-check
+  // has failed, refuse to render draft controls by forcing myTeamId
+  // to null downstream. Every downstream gate already checks
+  // `myTeamId !== null` (submit button, on-clock label, roster
+  // highlight), so a single mask here disables all draft affordances
+  // without touching each callsite. The banner rendered above the
+  // body tells the user WHY controls are absent — silent-degrade
+  // was the F14 defect that this fix prevents.
+  const myTeamId = identityFailure !== null ? null : resolvedMyTeamId;
 
   if (snapshot === null || derived === null) {
     return (
