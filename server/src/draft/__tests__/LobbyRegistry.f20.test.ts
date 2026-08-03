@@ -21,8 +21,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   CommissionerAuthorizationResult,
   DraftFormat,
+  DraftOrderSlot,
   TeamAuthorizationResult,
 } from '../types';
+import type { SubmitPickResult, DraftEventRow } from '../../services/DraftServiceV2';
+import type { AutopickStrategy } from '../autopickStrategy';
+import type { LobbyManagerOptions } from '../LobbyManager';
 import { structuredLogger } from '@citrus/shared';
 
 // ── Test helpers ─────────────────────────────────────────────────────
@@ -232,6 +236,121 @@ describe('F20 Piece 3 — LobbyRegistry.scanClockLiveness', () => {
       expect(recoveryErrors).toHaveLength(1);
     } finally {
       logs.restore();
+    }
+  });
+
+  it('CASE 5b (LIVENESS OUTCOME): scanner drives a REAL LobbyManager end-to-end — recovery leads to submitPick actually firing', async () => {
+    // Build a real LobbyManager, prime it into a stalled state, insert
+    // into a real registry, run scanClockLiveness, advance the fake
+    // clock past the re-derived deadline, and assert draftService's
+    // submitPick was called. This closes Amendment A's rule for
+    // Piece 3: assert the OUTCOME (autopick lands), not just the
+    // mechanism (attemptClockRecovery returned re_armed).
+
+    // Use vi.useFakeTimers so we can drive the re-armed setTimeout.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-03T00:00:00.000Z'));
+    try {
+      const draftOrder: DraftOrderSlot[] = [
+        { round: 1, pickNumber: 1, teamId: 'team-1' },
+        { round: 1, pickNumber: 2, teamId: 'team-2' },
+      ];
+      const submitPickSpy = vi.fn(
+        async (_p: unknown): Promise<SubmitPickResult> => ({
+          event_id: 1,
+          seq: 1,
+          pick_deadline: null,
+          was_duplicate: false,
+        }),
+      );
+      const fixedStrategy: AutopickStrategy = async () => ({
+        ok: true as const,
+        playerId: 8478001,
+        source: 'projections',
+      });
+      const draftService = {
+        submitPick: submitPickSpy,
+        listDraftEvents: vi.fn(
+          async (_l: string, _s?: number): Promise<DraftEventRow[]> => [],
+        ),
+        nominatePlayer: vi.fn(),
+        placeBid: vi.fn(),
+        closeNomination: vi.fn(),
+        pauseAuction: vi.fn(),
+        resumeAuction: vi.fn(),
+        skipNomination: vi.fn(),
+        commissionerOverride: vi.fn(),
+      } as unknown as DraftServiceV2;
+
+      const opts: LobbyManagerOptions = {
+        lobbyId: 'lobby-e2e',
+        leagueId: 'league-e2e',
+        format: 'snake',
+        draftOrder,
+        draftService,
+        publish: vi.fn(),
+        verifyTeamAuthorization: async () => ({ authorized: true }),
+        verifyCommissionerAuthorization: async () => ({ authorized: true }),
+        pickClockSeconds: 60,
+        initialPickDeadline: null,
+        initialDraftState: 'in_progress',
+        supabase: makeStubSupabase(),
+        nominationOrder: [],
+        auctionBudget: 0,
+        auctionMinBid: 0,
+        draftRounds: 0,
+        initialTeamBudgets: new Map(),
+        initialPlayersWon: new Map(),
+        initialActiveNomination: null,
+        auctionAntiSnipeThresholdSeconds: 0,
+        auctionAntiSnipeExtensionSeconds: 0,
+        auctionMinBidIncrementTiers: [],
+        auctionBidWindowSeconds: 0,
+        auctionNominationWindowSeconds: 0,
+        autopickStrategies: [fixedStrategy],
+      };
+      const lobby = new LobbyManager(opts);
+      await lobby.init();
+
+      // Prime the lobby into a stalled in_progress state with a
+      // pick_deadline 60s in the past. Same pattern as the guard
+      // tests' primeLobby helper.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const l = lobby as any;
+      const armedMs = Date.now() - 60_000;
+      l.timerArmSeq = 42;
+      l.currentTimerDeadline = new Date(armedMs);
+      l.currentTimerKind = 'pick';
+      l.draftStatus = 'in_progress';
+      l.picksMade = 0;
+      l.pauseState = null;
+      l.shutDown = false;
+      l.earlyFireRearmCount = 0;
+      l.earlyFireRearmForDeadlineMs = null;
+
+      injectLobby(registry, 'lobby-e2e', lobby);
+
+      // Scanner runs → detects stall → attemptClockRecovery →
+      // setPickDeadline(armedDeadline in past) → setTimeout(0)
+      // (edge (b): overdue re-arm fires immediately).
+      const scanResult = await registry.scanClockLiveness();
+      expect(scanResult.recovered).toBe(1);
+
+      // Advance fake timers to fire the re-armed setTimeout and
+      // drain the autopick pipeline.
+      await vi.runAllTimersAsync();
+
+      // *** OUTCOME ASSERTION (Amendment A rule extended to scanner) ***
+      // Scanner-driven recovery MUST land an autopick, not just log
+      // "re_armed". If cap-exhaust logs ERROR + "re_armed" but the
+      // pick doesn't actually fire, the draft dies at one remove.
+      expect(submitPickSpy).toHaveBeenCalled();
+      const call = submitPickSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(call.actor).toMatchObject({ kind: 'autopick' });
+      expect(call.teamId).toBe('team-1');
+      expect(String(call.playerId)).toBe('8478001');
+    } finally {
+      vi.useRealTimers();
     }
   });
 
