@@ -266,7 +266,7 @@ Related but out-of-scope for KI-021: KI-025 (F23 DB-side vanished-lobby scan).
 
 ### KI-026 — Ledger: deployed engine at 73a587ff runs OLD authMiddleware on /api/admin
 
-**RESOLVED-BY-DEPLOY (pending).** Draft-engine image at `73a587ff` still returns 401 for provider-unreachable on `/api/admin/*` routes (F15 fix is in tree at `0752c6fb` but not deployed to engine). Not blocking acceptance run (no admin actions in normal draft). The engine-deploy step of the ship-report round carries F15 to that surface. Ledger row so nobody debugs an admin-route 401 during an outage in the meantime.
+**RESOLVED (deploy 527ceb38, 2026-08-04).** Draft-engine image tag `527ceb38-draft` (digest `sha256:d693189d6b2966e27164e9288bec314ef9a34c8907aa4b5165a9c8a39d6cb614`) deployed to citrus-draft-engine-staging. 9-item boot verification passed at 2026-08-04T15:51:55Z; `deployment.fingerprint` shows `imageSha` == push digest AND `commitSha` == `527ceb384d280ed3853de6e36000b442a54fdc76`. Admin surface (`/api/admin/*`) now runs post-F15 authMiddleware — provider-unreachable errors return 503 instead of 401.
 
 ### KI-027 — Ledger: systemFlags.ts:96 — F21-family observability bug (err argument silently dropped)
 
