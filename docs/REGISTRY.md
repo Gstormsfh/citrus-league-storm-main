@@ -253,6 +253,8 @@ Related but out-of-scope for KI-021: KI-025 (F23 DB-side vanished-lobby scan).
 
 ### KI-025 — F23: draft-engine registry-blind stall recovery (DB-side scan for vanished lobbies)
 
+**Field illustration (2026-08-04):** the zombie draft from the 2026-07-31 void run (league `993c9219…`, max_seq 25, draft_status=in_progress) was still stalled in the DB post-deploy of `527ceb38`. New engine ran for 13+ min after boot without touching it. This is F20's scanner working AS DESIGNED — it iterates lobbies in the in-memory registry, and the zombie league has no lobby (nobody connected post-restart, so the lazy `getOrCreateLobby` never fired). F23's whole surface is exactly this case: the DB says a draft is live, but no in-process lobby represents it. Recorded as the first concrete demonstration of the KI-025 gap.
+
 | | |
 |---|---|
 | **Severity** | medium — F20's in-memory scanner does not cover the case where a lobby VANISHED from the registry while the DB still says in_progress (no lobby, no scan, no recovery). |
