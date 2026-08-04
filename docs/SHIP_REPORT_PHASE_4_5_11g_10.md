@@ -22,9 +22,9 @@ This is the strongest possible field confirmation of the F20 fix: the exact bug 
 | | Criterion | Result | Evidence |
 |---|---|---|---|
 | **A** | Human drafts at slot 3 | **PASS** | Two human picks machine-flagged through the full fixed stack (F14+F15+F19+F20+F22 all live) |
-| **B(i)** | Stale banner appears within ~36s of wifi kill | **PENDS Garrett's screenshot testimony** | Room + client-watchdog behavior verified; screenshot capture to be attached |
+| **B(i)** | Stale banner appears within ~36s of wifi kill | **PASS BY TESTIMONY** | Garrett witnessed the banner appearing. No screenshot capture was taken this run, so the 4010-watchdog-specific wording vs generic reconnecting-banner wording stays a named residual — closes for free when the Playwright fault-injection layer lands. |
 | **B(ii)** | NO `auth/v1/logout` calls; session survives | **PASS** | F15/F19 field proof: Garrett drafted pick 22 and sat pick 27's window post-restore WITHOUT ever re-authenticating. The session demonstrably survived the outage window. |
-| **B(iii)** | Auto-reconnect + resync + board rebuild COMPLETE vs DB census | **PENDS Garrett's screenshot testimony** | DB census on file: no gaps, no missing picks, snake ordering intact |
+| **B(iii)** | Auto-reconnect + resync + board rebuild COMPLETE vs DB census | **PASS** | Room recovered BY ITSELF, no manual refresh (Garrett's testimony). Combined with the DB census (36/36, no gaps, snake ordering intact) = auto-reconnect + resync + complete rebuild under real network loss, WITNESSED. This is the chunk's founding requirement met. |
 | **C** | Freshly-authenticated rejoin (sign out → sign in → rejoin live → draft) | **NOT RUN — folds into F13 SIGINT mini-run** | Scheduled as a ~10-minute follow-up |
 | **D** | Draft reaches 36/36; raw log census | **PASS** | See "Field census" below. Zero interventions across the run. |
 | **E** | F5 census from docker logs BEFORE cleanup restart | **PASS** | See "F5 — first field exercise" below |
@@ -57,7 +57,7 @@ heartbeat.ws_end_threw          = 0
 heartbeat.ws_close_threw        = 0
 ```
 
-**Perfect 12+1 accounting:** 12 harness clients (one per bot in the S2 scenario) + 1 for Garrett's dead browser socket at the wifi-kill window. **Rung 1 sufficient for the abrupt-death class** — `ws.end(4002)` closed every dying connection cleanly, no rung-2 escalation needed, no rung-3 force-purge invoked, zero throws. Distinct-connection-id verification pending (13 lines, verify 13 unique ids to rule out repeat-cull inflation).
+**Perfect 12+1 accounting:** 12 harness clients (one per bot in the S2 scenario) + 1 for Garrett's dead browser socket at the wifi-kill window. **Rung 1 sufficient for the abrupt-death class** — `ws.end(4002)` closed every dying connection cleanly, no rung-2 escalation needed, no rung-3 force-purge invoked, zero throws. **Distinct-connection-id verification VERIFIED** — 13 rung-1 lines carry 13 distinct connection ids, no repeat-cull inflation.
 
 **Named residual:** the long-idle 7-hour zombie class — the specific scenario where the Caddy → engine tunneled TCP survives idle for hours after browser TCP dies — remains **unreproduced**. Rung-2 and rung-3 have unit-proven behavior but no field exercise. Bank as "F5 field-exercised at rung 1; long-idle class stays a named unreproduced residual."
 
@@ -169,11 +169,11 @@ Contract tests (unstubbed, hermetic via `.invalid` hostname per RFC 6761 §6.4):
 
 ## Honest ledger — what did NOT close tonight, folded into the follow-up mini-run
 
-- **B(i)** stale banner screenshot — pends Garrett's testimony
-- **B(iii)** restored board screenshot — pends Garrett's testimony
+- **B(i)** — PASS by testimony (banner witnessed); no capture, so 4010-vs-generic wording stays a named residual — closes for free via Playwright fault-injection layer later
+- **B(iii)** — PASS by testimony + DB census (room recovered by itself, no refresh; 36/36 complete against DB)
 - **C** freshly-authenticated rejoin — folds into the F13 SIGINT mini-run (~10 minutes, TBD)
 - **F13** second half (fault-flush path directly exercised via SIGINT) — same mini-run
-- **F5** distinct-connection-id verification on the 13 rung-1 lines — one grep away
+- **F5** distinct-connection-id verification — 13 rung-1 lines, 13 distinct connection ids VERIFIED (no repeat-cull inflation)
 - **F18** false-red observed again in the harness summary — annotated by hand for now
 - **F24 (KI-029)** — own chunk, week-2 refinement tier, Draft-Night adjacent priority
 - **KI-025 (F23)** — deferred pending F24 landing, or independent board-fullness derivation
