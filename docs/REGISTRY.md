@@ -117,6 +117,163 @@
 | **Target phase / timeline** | **Pre-first-demo work.** Trigger: any planned demo where a non-Citrus observer will see the room. When triggered, expand `fixture-12.mjs` setup to query `player_directory` for top-N candidates (via `SUPABASE_DB_URL` since fixture already has it) and use their real ids as `HARNESS_PLAYER_IDS`. Delete or generalize the sequential `8478000+` constant. |
 | **Verification test** | Post-fix acceptance run (same DR-4 shape) should produce screenshots where every pick's playerName column reads a real NHL name (Auston Matthews, Connor McDavid, etc.) and NO row shows `#8478xxx`. The `#<id>` fallback path stays covered by unit tests in `v1Adapters.test.ts` (already: "emits #<id> fallback name + ? position when player is unresolved"), so removing synthetic ids from the fixture doesn't lose coverage of the fallback contract itself. |
 
+### KI-014 — F6 close-out: "unreproducible 403" mechanism identified as stale cached membership
+
+**RESOLVED (0752c6fb, 2026-08-03).** Mechanism identified — stale cached membership; teamId variant eliminated by F14(a); boolean variant accepted with documented 30s tolerance. See KI-015.
+
+Beta-triage advance notice (must reach September on-call):
+1. A transient 403 within ~30s of any membership change is **EXPECTED**, not an F6 recurrence.
+2. A just-joined user opening the draft room may hit a ≤30s denial (stale negative for isMember). Acceptable for v1; logged here so September support does not file it as a bug.
+
+### KI-015 — F14: stale cached membership served a teamId not in the live draft; user silently could not draft
+
+**RESOLVED (0752c6fb, 2026-08-03).** Two-layer fix landed as F14(b) + F14(a).
+
+| | |
+|---|---|
+| **Severity** | high — I1 invariant violation ("never lose a pick"). Symptomatic on Garrett's 2026-07-31 rig: room mounted with header/clock healthy, Managers panel read "0 of 0 connected," draft submit refused "It's not your turn." |
+| **Surface** | `server/src/services/LeagueMembershipService.ts` (cache); `server/src/routes/draft.ts:154, :299` (v1 pick routes that consumed cached `.teamId`); `apps/web/src/hooks/useMyTeamIdCrossCheck.ts` + `apps/web/src/pages/DraftRoomV2.tsx` (client cross-check + fail-loud banner). |
+| **Description** | LeagueMembershipService holds a module-level 30s cache keyed `(leagueId, userId)`. Team ownership changed out-of-band (fixture-12 un-owns Gbaby, assigns harness slot 3 to Garrett); nothing invalidated the cache. The room mounted inside the stale window and resolved `myTeamId` to a team not in this draft; myTeamId was fetched once on mount and never re-resolved. **Live-path mechanism trace (Amendment 1):** the v2 pick route (`draftV2Pick.ts`) does NOT consult cached teamId — body.team_id passes straight through to `submit_pick_v2` RPC, which enforces `auth.uid() = team.owner_id`. So on Garrett's incident, F14(b)'s client cross-check was the load-bearing fix; the `[DR-2 diag]` log at `membership.ts:41` was EVIDENCE of staleness, not the mechanism of denial. F14(a) is v1-hardening (`draft.ts:154/:299` still consumed cached `.teamId`) + defense-in-depth hygiene. |
+| **Why deferred** | Not deferred. Fixed in the same campaign as F15/F19/F20/F22 (2026-07-31 → 2026-08-03). |
+| **Target phase / timeline** | Fixed in phase-4-5-implementation branch across commits `fe268e1c` (F14(b) client cross-check + honest-copy) and `0752c6fb` (F14(a) server cache restructure + honest-copy amendment). |
+| **Verification test** | (a) `server/src/__tests__/draftRoutes.f14.test.ts` — BRANCH A (rightful new owner) + BRANCH B (former owner, F14 REPRO). Cache stays warm throughout; divergence between branches proves the route consults `getUserTeamIdFresh`, not cached `.teamId`. (b) `server/src/__tests__/LeagueMembershipService.test.ts` — `getUserTeamIdFresh` method tests including the cache-warm/stale-value F14 repro at method level. (c) `apps/web/src/hooks/__tests__/useMyTeamIdCrossCheck.test.ts` — BRANCH 2 (LOAD-BEARING) confirmed still-stale after re-resolve, BRANCH 2b honest-copy `my_team_unverifiable` on network throw. Field verification pends the fresh acceptance run (criterion C: freshly-authenticated member rejoining a LIVE draft). |
+
+Amendment 3 note (invalidation-unreachable writers): `public.join_league_with_code(...)` (latest: `20260418100000_idempotent_join_league.sql`) writes `owner_id` via DB-side RPC; Node code is unaware after the RPC returns. `clearCache` is structurally unreachable. Boolean cache TTL is the ONLY invalidation for that writer. Future trade/co-manager RPCs (ADR-003) will inherit the same limitation. See KI-024.
+
+### KI-016 — F15: authMiddleware returned 401 for provider-unreachable (should have been 503)
+
+**RESOLVED (9ea634db, 2026-07-31).** Root cause and repro documented in commit.
+
+| | |
+|---|---|
+| **Severity** | high — Draft-Night blocker. Any Supabase network blip during a request would return 401 to the client; the client (F19 pre-fix) then destroyed the local session. F15+F19 together produced logout on wifi drop. |
+| **Surface** | `server/src/middleware/auth.ts` (server); `apps/web/src/api/client.ts:52-107` (client — see KI-020). |
+| **Description** | `supabase.auth.getUser()` resolves-with-error (does not reject) for network failures — returning `AuthRetryableFetchError` on the `error` field. Pre-fix middleware returned 401 unconditionally on any truthy error, indistinguishable from "your token is invalid." Fix: allowlist positively-identified credential failures (`AuthApiError` with 400/401 status; enumerated credential codes) → 401; everything else → 503 with `AUTH_PROVIDER_UNREACHABLE` code (apiClient retries 503 with backoff). Amendment 1 rationale: the set of "your token is dead" errors is small, stable, and enumerable; the set of "the network broke" errors grows with every runtime, proxy, and browser. Allowlist rots slower than denylist. Amendment 2 rationale: prefer supabase-js's exported `isAuthApiError` / `isAuthRetryableFetchError` type guards over string-name comparison. |
+| **Why deferred** | Not deferred. |
+| **Target phase / timeline** | Fixed in phase-4-5-implementation branch commit `9ea634db`. |
+| **Verification test** | `server/src/__tests__/authMiddleware.test.ts` (10 tests covering all discrimination paths + amendment-1 regression guards). `server/src/__tests__/supabaseAuthErrorContract.test.ts` (unstubbed contract test at `.invalid` hostname — confirms supabase-js resolves-with-`AuthRetryableFetchError` for network failures; if that ever changes to reject, this test fails immediately). |
+
+### KI-017 — F16: draft harness has never exercised the human-actor branch of submit_pick_v2
+
+| | |
+|---|---|
+| **Severity** | medium — instrument coverage gap, not a product defect. |
+| **Surface** | `scripts/proof/draft-harness.mjs`; `submit_pick_v2` RPC (which branches on `v_actor_kind = 'autopick'` vs `'user'`). |
+| **Description** | Every pick the harness has ever submitted was tagged `is_autopick = true` (harness signs its own tokens using service_role and drives the autopick branch). The RPC's rail (insert / trigger / NOTIFY / broadcast / ordering) is downstream of the branch and therefore branch-agnostic, so ratified latency/delivery/ordering numbers stand. What is NOT covered by harness runs is the validation branch upstream of the insert for `actor.kind='user'`. Field coverage of that branch: ~4 browser picks by one person per acceptance run. Same-shape family as KI-014 (harness never resolved membership) and F3 (harness bypasses discovery + signs its own tokens). |
+| **Why deferred** | Fix is a new harness client mode that authenticates as a real Supabase user owning a real team. Requires the `garrett.storms+staging2@citrusfantasysports.com` account (queued for multi-user presence work). One account, two ledger items. |
+| **Target phase / timeline** | Before public beta / Draft Night. Bundle with the multi-user presence acceptance work. |
+| **Verification test** | New harness scenario running as staging2 user with actor.kind='user', asserting the RPC accepts, event lands with `is_autopick=false`, and downstream rail delivers unchanged. **Ship-report caveat**: every mandate number cited from a harness run today carries the actor-branch qualifier — measured on the autopick branch only, human-actor branch validation covers ~4 browser picks per acceptance run. |
+
+### KI-018 — F17: fixture-12's `--human-slot` strips the user's real team ownership for the duration of the run
+
+| | |
+|---|---|
+| **Severity** | low — documented tooling contract, not a bug. |
+| **Surface** | `scripts/proof/fixture-12.mjs`; the staging league's `teams` table. |
+| **Description** | `fixture-12.mjs --human-slot=N --human-user=X` un-owns the user's pre-existing team (owner_id → NULL) and assigns a harness team to them for the run. Consequences: (1) The pristine-baseline assertion "Gbaby owned by c4489220" is the ONLY tripwire that catches an incomplete reset (`--reset` restores from the captured state file). Never skip the tripwire — a failed reset orphans Garrett from his own team on staging. (2) Managers panel evidence during a human-slot run reads "Harness Team N," not the user's real team name (per F17 acceptance-criterion F). |
+| **Why deferred** | Not a bug; contract documented here and in the ship report. |
+| **Target phase / timeline** | N/A — contract lives here and in fixture-12.mjs's header. |
+| **Verification test** | Cleanup cookbook's pristine-baseline check verifies `4c742dae… owner_id = c4489220`. |
+
+### KI-019 — F18: earlier drop-rate summary miscounted its own not-submitted partition
+
+| | |
+|---|---|
+| **Severity** | low — instrument reporting; ratified numbers stand once partition annotated. |
+| **Surface** | `scripts/proof/draft-harness.mjs` summary generator. |
+| **Description** | The harness's summary output counted certain not-submitted picks as drops. The corrected drop-rate story is that the "true drop rate is 0%" once the not-submitted partition is separated (per architect ruling on 2026-07-31 arithmetic reconciliation). Same-shape family as F16 (instrument gap) — instrument counted itself incorrectly. |
+| **Why deferred** | Fix folds into the harness improvement work with F16. Meanwhile, the ship report annotates the drop partition manually. |
+| **Target phase / timeline** | With KI-017's harness client-mode work. |
+| **Verification test** | Post-fix harness summary emits the not-submitted count as its own field, distinct from delivered/dropped. Ship-report footnote until then. |
+
+### KI-020 — F19: refreshTokenOnce signed the user out on network failure
+
+**RESOLVED (9ea634db, 2026-07-31).** Same commit as KI-016 (F15+F19 are the same defect at two layers).
+
+| | |
+|---|---|
+| **Severity** | high — Draft-Night blocker. Wifi drop mid-draft → forced signout → cannot rejoin. |
+| **Surface** | `apps/web/src/api/client.ts:52-107`. |
+| **Description** | `supabase.auth.refreshSession()` resolves-with-error (not rejects) on network failure. Pre-fix code called `signOut()` on any truthy error in the `.then` branch, destroying the local session on wifi blips. The `.catch` branch was dead code for network faults. The line-59 comment asserted the exact safety property that did NOT hold. Fix: same allowlist as KI-016 (positively-identified credential failures only). Amendment 4: `.catch` NEVER signs out — a rejection is the weakest possible evidence of a bad credential. Field-verification test C (freshly-authenticated rejoin) exercises this path directly. |
+| **Why deferred** | Not deferred. |
+| **Target phase / timeline** | Commit `9ea634db`. |
+| **Verification test** | `apps/web/src/api/__tests__/client.test.ts` (6 new discrimination tests + updated pre-existing test whose fixture was a bad proxy for its stated intent). Unstubbed contract test at `.invalid` hostname confirms library behavior. Fresh acceptance run criterion B(ii): NO auth/v1/logout calls in console during the 90s outage; session survives. |
+
+### KI-021 — F20: draft stalled at seq 25/36 (guard rejected an on-time timer, no re-arm)
+
+**RESOLVED at code level (856a5fe0, 2026-08-03).** Field closure pends the engine deploy + fresh acceptance run — the deployed engine at `73a587ff` still carries the original guard until then.
+
+| | |
+|---|---|
+| **Severity** | critical — league-that-cannot-finish. Twelve people watching a dead clock with nothing to click. Above F14/F15/F19 in severity: F14/F15/F19 each produce a user who cannot act; F20 produces a LEAGUE that cannot finish. |
+| **Surface** | `server/src/draft/LobbyManager.ts:setPickDeadline` + `:handleClockExpired`; new global scanner in `server/src/draft/LobbyRegistry.ts:startClockLivenessScanner` + `:scanClockLiveness`; new public `LobbyManager.attemptClockRecovery(observedSeq)`. |
+| **Description** | `handleClockExpired`'s wall-clock guard used strict `<` against a wall clock coming out of `setTimeout`. `setTimeout` can fire sub-millisecond early under GC or event-loop pressure; a fire at 44999.6ms rounds to 44999ms via `Date.now()`'s integer floor, tripping `44999 < 45000`. The pre-fix guard responded with bare `return`. No re-arm. Draft dies logging "healthy" every 30 seconds. The engine sat on a dead league for 44 minutes, logging itself healthy every 30 seconds. **Boundary confirmed by reproduction**: red at tolerance=0 on a 1ms-early fire; sub-ms floor is sole explanation consistent with source, log, and two drift-0 successes at seqs 19 and 25. Fix landed in four commits: (1) guard tolerance 25ms + mandatory re-arm + fail-open cap after 3 consecutive re-arms; (2) Amendment A outcome-assertion tests; (3) global registry scanner (5s scan / 10s stall / idempotent / 3-strike escalation / unkillable per-lobby try-catch + top-level catch); (4) CASE 5b end-to-end outcome test with real LobbyManager. Includes F21 (log-truth: single `Date.now()` capture — pre-fix code called `Date.now()` three times per guard invocation, making sub-ms early fires invisible in the log). |
+| **Why deferred** | Not deferred at code level. Field closure pends engine deploy at post-F14 SHA. |
+| **Target phase / timeline** | Field closure: after acceptance run criterion D (draft reaches 36/36 with no stall; census of `stale_timer_skipped` / `clock_stall_recovered` / rung1/2/3 counts). |
+| **Verification test** | `server/src/draft/__tests__/LobbyManager.f20.test.ts` (8 boundary tests including the CASE 3 tolerance+1ms-early rejection + re-arm + autopick actually fires, and CASE 6 cap exhausted + fail-open + autopick actually lands). `server/src/draft/__tests__/LobbyRegistry.f20.test.ts` (10 tests: scanner detects stall, does NOT re-arm during in-flight submit, escalates at 3 strikes and stops, UNKILLABLE with one throwing lobby, strike-map hygiene on eviction + natural recovery, CASE 5b end-to-end scanner-driven autopick outcome). Field-verification test D on the fresh acceptance run. |
+
+Related but out-of-scope for KI-021: KI-025 (F23 DB-side vanished-lobby scan).
+
+### KI-022 — F22: DraftRoomV2 test suite was not executing (13 tests throwing before assertions)
+
+**RESOLVED (5e5c884e + fe268e1c, 2026-08-03).** Primary fix + structural follow-up.
+
+| | |
+|---|---|
+| **Severity** | high (test infrastructure). The suite included F4 REGRESSION and F11 DISAMBIGUATION guards — two campaign-paid-for defects. Both still hold at the assertion level (post-fix run), so no silent regression during the chunk-11g.10 window. But the suite was DARK for the entire window. Fourth instance-of-species (F3 stubs lied about the real producer, F17/F16 harness never drove the human path, KI-019 instrument miscounted itself, F22 suite never executed). |
+| **Surface** | `apps/web/src/pages/__tests__/DraftRoomV2.test.tsx` + `.dr3.test.tsx` + `.f11.test.tsx`. Runner mock class in each file. |
+| **Description** | 11g.10 added `setDraftActive` to `DraftClientRunner`. Three hand-copied mock runner classes drifted from the real interface independently — none got the new method. Every test in all three files threw `TypeError: runner.setDraftActive is not a function` at `DraftRoomV2.tsx:261` BEFORE its first assertion. Primary fix: add `setDraftActive = vi.fn()` to each mock. Structural fix: consolidated to one shared factory `apps/web/src/lib/draftClient/__mocks__/mockRunner.ts` with `satisfies Record<RunnerMethodKey, Mock>` load-bearing type check. `RunnerMethodKey` auto-derived from the real class via `PublicMethodKeys<T>`. **Red-demo observed**: adding a scratch public method to `runner.ts` produced `TS1360` in `mockRunner.ts` verbatim — the next runner method CANNOT go dark silently. |
+| **Why deferred** | Not deferred. Fixed in same campaign. |
+| **Target phase / timeline** | Commits `5e5c884e` (primary) + `fe268e1c` (structural). |
+| **Verification test** | All 13 tests execute; 13/13 pass. Structural guarantee verified by red-demo. See test-strategy provenance table. |
+
+### KI-023 — F13: harness NDJSON append stream + fault-flush + pg-error survival
+
+**RESOLVED (73a587ff, 2026-07-31); named-gap CLOSED via SIGINT test in acceptance-run round.**
+
+| | |
+|---|---|
+| **Severity** | medium — instrument reliability. |
+| **Surface** | `scripts/proof/draft-harness.mjs`. |
+| **Description** | Harness now uses an append-stream NDJSON writer; a pg 'error' handler registered before connect; uncaughtException / unhandledRejection / SIGINT / SIGTERM route through an idempotent flush that writes a PARTIAL SUMMARY tagged with the reason. First half proven by the voided 2026-07-31 run (32,424-byte ndjson, 4,830-byte summary, pg-error survival). Second half (fault-flush path itself entering) pending — closed by deliberate SIGINT-mid-run test in the acceptance-run round. |
+| **Why deferred** | N/A. |
+| **Target phase / timeline** | Fresh acceptance run round. |
+| **Verification test** | (a) Full-run summary + ndjson on disk with matching byte counts (proven 2026-07-31). (b) Deliberate SIGINT during a short run produces a "── PARTIAL SUMMARY (SIGINT) ──" header (F13 both halves closed). |
+
+### KI-024 — Cloud Run per-instance in-memory caches cannot be coherently invalidated across instances
+
+| | |
+|---|---|
+| **Severity** | medium — pre-production architecture concern. |
+| **Surface** | `server/src/services/LeagueMembershipService.ts` (module-scope `membershipCache` Map); any future service that uses a module-scope Map for cross-request state. |
+| **Description** | Cloud Run runs N instances. A `clearCache(leagueId, userId)` call on instance A does NOT touch instances B..N. This is a structural limitation of module-scope caches in horizontally-scaled runtimes — cache invalidation on write is INCAPABLE of being coherent across instances. F14(a) mitigated by removing identity-critical `teamId` from the cache entirely (allowlist-boolean-only design: only cache what a stale positive is low-harm for), so cross-instance staleness reduces to the documented ≤30s TTL on boolean membership. Amendment 3 enumeration extends the argument: DB-side RPC writers (`public.join_league_with_code(...)`; future trade/co-manager RPCs per ADR-003) are ALSO invalidation-unreachable — no Node code runs when they mutate ownership. This is the strongest possible case for the boolean-only cache design: no wiring discipline can cover writers the process never sees. |
+| **Why deferred** | Structural — cannot be "fixed" within the module-scope cache paradigm. Real solutions require either a shared cache tier (Redis, Memorystore per Stage 4 of `PHASE_4_5_ARCHITECTURE.md`) or dropping caching entirely (measured freshness cost). Both are ADR-scope decisions. |
+| **Target phase / timeline** | Ambient — beta triage protocol acknowledges the ≤30s tolerance (KI-014's two advance-notice items). Revisit if v1 scale surfaces user-visible cache-coherence anomalies. |
+| **Verification test** | N/A structurally. The design property to preserve: teamId (or any identity-critical value) never enters the cache. `getUserTeamIdFresh` is the invariant carrier; a review that adds a cache to it renames the method into a lie. |
+
+### KI-025 — F23: draft-engine registry-blind stall recovery (DB-side scan for vanished lobbies)
+
+| | |
+|---|---|
+| **Severity** | medium — F20's in-memory scanner does not cover the case where a lobby VANISHED from the registry while the DB still says in_progress (no lobby, no scan, no recovery). |
+| **Surface** | `server/src/draft/LobbyRegistry.ts` (would host the new DB-side scanner); a new query on `leagues WHERE draft_status='in_progress' AND pick_deadline < now() - threshold`. |
+| **Description** | F20's `scanClockLiveness` iterates lobbies IN the registry. If a lobby is evicted or force-purged while the DB still says the draft is in_progress, no scanner sees it. The related open question — after an engine restart mid-draft with NO client connected, does anything resurrect the lobby? — is also unanswered by tonight's abandoned-draft observation (which ran on a lobby already in memory). F23 addresses both: DB-side scan detects the DB-vs-registry mismatch and rehydrates. Not scoped into F20 to keep the fix ship narrow. |
+| **Why deferred** | Ships narrow beats ships broad for a load-bearing fix. F20's in-memory scanner covers the observed failure; F23 covers the class ruling 2 called out explicitly. Own chunk. |
+| **Target phase / timeline** | Its own chunk, post-launch triage or pre-launch if a DR reveals a vanished-lobby scenario. |
+| **Verification test** | (a) DB-side scanner detects a lobby whose DB `pick_deadline` is > threshold past AND no in-registry lobby exists → rehydrates via `getOrCreateLobby` → scanner then advances the clock. (b) Engine restart mid-draft with no client connected → next scanner tick rehydrates and resumes. |
+
+### KI-026 — Ledger: deployed engine at 73a587ff runs OLD authMiddleware on /api/admin
+
+**RESOLVED-BY-DEPLOY (pending).** Draft-engine image at `73a587ff` still returns 401 for provider-unreachable on `/api/admin/*` routes (F15 fix is in tree at `0752c6fb` but not deployed to engine). Not blocking acceptance run (no admin actions in normal draft). The engine-deploy step of the ship-report round carries F15 to that surface. Ledger row so nobody debugs an admin-route 401 during an outage in the meantime.
+
+### KI-027 — Ledger: systemFlags.ts:96 — F21-family observability bug (err argument silently dropped)
+
+`server/src/lib/systemFlags.ts:96` passes an `err` third argument to a 2-arg `structuredLogger.debug` signature. At runtime the error object is SILENTLY DROPPED from the log. Not just a type error — a live observability defect in F21's family (log lies by omission). One-minute fix any time; not touched during the F14 campaign because outside scope.
+
+### KI-028 — Ledger: History table "Drafted By" column renders raw UUID
+
+Same demo-optics family as KI-013 (F12). Cosmetic; must not ship to Zach or investors. Fix during pre-first-demo work alongside KI-013.
+
 ---
 
 ## How to add a row

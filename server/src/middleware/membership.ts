@@ -30,22 +30,6 @@ export async function membershipMiddleware(c: Context<Env>, next: Next) {
   const membership = new LeagueMembershipService(supabase);
   const result = await membership.checkMembership(leagueId, userId);
 
-  // DR-2 diagnostic (2026-07-29) — temporary logging to isolate the
-  // "discovery returns 200 but my-team returns 403" divergence for
-  // the same user+league. Remove after ship-report prep per ledger
-  // rule. Logs to API-server stdout: the launcher's window shows
-  // these lines.
-  //
-  // F14(a) (2026-08-03): teamId field removed from this log — the
-  // cache no longer holds teamId (identity-critical values must be
-  // resolved fresh via getUserTeamIdFresh). What remains is the
-  // boolean surface: the isMember gate this middleware enforces.
-  // eslint-disable-next-line no-console
-  console.log(
-    `[DR-2 diag membershipMiddleware] path=${c.req.path} userId=${userId} ` +
-      `leagueId=${leagueId} isMember=${result.isMember} isCommissioner=${result.isCommissioner}`,
-  );
-
   if (!result.isMember) {
     return c.json({ error: { code: 'FORBIDDEN', message: 'Access denied: You are not a member of this league' } }, 403);
   }
