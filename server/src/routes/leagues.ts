@@ -357,6 +357,13 @@ leagueRoutes.post('/:leagueId/simulate-fill', commissionerMiddleware, async (c) 
 
     if (error) return handleError(c, error, 'Failed to add AI teams');
 
+    // F14(a) (2026-08-03): no clearCache call — AI teams write
+    // owner_id=null so no user's isMember/isCommissioner flips from
+    // this operation. If a future revision assigns AI teams to a
+    // real user (co-manager style), add clearCache(leagueId, ownerId)
+    // adjacent to the write. Leaving the sentinel comment so nobody
+    // greps for "F14" here and thinks it was forgotten.
+
     const audit = new AuditService(createUserClient(c.get('userToken')));
     audit.log('ADMIN_ACTION', leagueId, { action: 'add_ai_teams', count: (teams || []).length, addedBy: userId });
 

@@ -17,13 +17,26 @@ import { logger } from '@citrus/shared';
  * ============================================================================
  */
 
+/**
+ * F14(a) (2026-08-03 architect ruling): `teamId` REMOVED from the
+ * cached result. Team ownership is identity-critical and must be
+ * resolved fresh on every read — see getUserTeamIdFresh() below.
+ * Only boolean membership + commissioner status is cached, and only
+ * for CACHE_TTL. Stale positive tolerance ≤30s is accepted by design:
+ *
+ *   - Kicked user retains route access for ≤30s
+ *   - Just-joined user is denied for ≤30s
+ *   - Neither is an F6 recurrence — this is the documented behavior
+ *
+ * Anything requiring stricter freshness (identity, ownership) MUST
+ * NOT touch this cache.
+ */
 interface MembershipCheckResult {
   isMember: boolean;
   isCommissioner: boolean;
-  teamId?: string;
 }
 
-// Cache for membership checks (30s TTL)
+// Cache for membership checks (30s TTL). Boolean-only per F14(a).
 const membershipCache = new Map<string, {
   result: MembershipCheckResult;
   timestamp: number;
@@ -100,7 +113,6 @@ export class LeagueMembershipService {
       const result: MembershipCheckResult = {
         isMember,
         isCommissioner,
-        teamId: teamData?.id,
       };
 
       membershipCache.set(key, { result, timestamp: Date.now() });
@@ -136,14 +148,73 @@ export class LeagueMembershipService {
     return result.isCommissioner;
   }
 
-  async getUserTeamId(leagueId: string, userId: string): Promise<string | null> {
-    const result = await this.checkMembership(leagueId, userId);
-    return result.teamId || null;
+  /**
+   * F14(a) (2026-08-03) — canonical fresh teamId resolver. Always
+   * issues a direct `teams` DB query for the (leagueId, userId) pair.
+   * NEVER touches the membership cache — the name carries the
+   * contract, not the mechanism. If someone later adds caching inside
+   * this method, the name becomes a lie a reviewer can catch (the
+   * F19 lesson: an asserted-but-false property is the same species
+   * of defect as a false name).
+   *
+   * Used by:
+   *   - draft.ts:154 (v1 makePick "you can only pick for your own
+   *     team" enforcement — see F14 registry entry for why the v1
+   *     path is hardened even though the F14 incident hit v2)
+   *   - draft.ts:299 (v1 pick submission parallel path)
+   *   - Any future callsite that needs team-identity certainty.
+   *
+   * The `/api/leagues/:leagueId/my-team` route ALSO bypasses this
+   * service (goes through LeagueService.getUserTeam's direct query).
+   * This method is here for callers that already have a
+   * LeagueMembershipService in hand.
+   */
+  async getUserTeamIdFresh(leagueId: string, userId: string): Promise<string | null> {
+    if (!userId || userId === 'undefined') {
+      throw new Error(`SECURITY ERROR: getUserTeamIdFresh called with invalid userId: "${userId}"`);
+    }
+    const { data, error } = await this.supabase
+      .from('teams')
+      .select('id')
+      .eq('league_id', leagueId)
+      .eq('owner_id', userId)
+      .limit(1)
+      .maybeSingle();
+    if (error && error.code !== 'PGRST116') {
+      logger.error('[LeagueMembershipService] getUserTeamIdFresh error:', error);
+    }
+    return data?.id ?? null;
   }
 
-  static clearCache(leagueId?: string, userId?: string): void {
+  /**
+   * Invalidate cached membership entries. F14(a) contract:
+   *
+   *   - `clearCache(leagueId, userId)` — clear ONE entry (single-side
+   *     ownership change).
+   *   - `clearCache(leagueId, userIdA, userIdB)` — clear BOTH entries
+   *     (A → B ownership transfer per Amendment 4). Prevents A from
+   *     briefly appearing to still own a team AFTER the transfer.
+   *   - `clearCache()` — nuke the whole cache (mostly for tests).
+   *
+   * WHY THIS IS DEFENSE IN DEPTH, NOT A SILVER BULLET: the cache is
+   * module-scope and per-process. Cloud Run runs N instances; a
+   * clearCache call from instance A does not touch B..N. See the
+   * pre-production architecture note in the F14 registry entry —
+   * this wiring covers the SAME instance's cache, which is the
+   * common case for a follow-up request from the same client after
+   * a write. Cross-instance invalidation is a separate problem.
+   *
+   * Structurally unreachable writers (per F14 Amendment 3
+   * enumeration): DB-side RPCs like `public.join_league_with_code`
+   * write owner_id without any Node code running. Their invalidation
+   * relies on the TTL alone.
+   */
+  static clearCache(leagueId?: string, userId?: string, alsoUserId?: string): void {
     if (leagueId && userId) {
       membershipCache.delete(getCacheKey(leagueId, userId));
+      if (alsoUserId) {
+        membershipCache.delete(getCacheKey(leagueId, alsoUserId));
+      }
     } else {
       membershipCache.clear();
     }

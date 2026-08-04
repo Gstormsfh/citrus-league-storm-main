@@ -27,7 +27,10 @@ describe('LeagueMembershipService', () => {
 
       expect(result.isMember).toBe(true);
       expect(result.isCommissioner).toBe(true);
-      expect(result.teamId).toBe('team-1');
+      // F14(a) (2026-08-03): teamId removed from cached result.
+      // Cache holds boolean membership only; identity resolved via
+      // getUserTeamIdFresh (tested below).
+      expect((result as { teamId?: string }).teamId).toBeUndefined();
     });
 
     it('returns isMember=true for team owner who is not commissioner', async () => {
@@ -43,7 +46,8 @@ describe('LeagueMembershipService', () => {
 
       expect(result.isMember).toBe(true);
       expect(result.isCommissioner).toBe(false);
-      expect(result.teamId).toBe('team-2');
+      // F14(a) (2026-08-03): teamId removed from cache.
+      expect((result as { teamId?: string }).teamId).toBeUndefined();
     });
 
     it('returns isMember=false for non-member', async () => {
@@ -59,7 +63,8 @@ describe('LeagueMembershipService', () => {
 
       expect(result.isMember).toBe(false);
       expect(result.isCommissioner).toBe(false);
-      expect(result.teamId).toBeUndefined();
+      // F14(a) (2026-08-03): teamId no longer on the cached result.
+      expect((result as { teamId?: string }).teamId).toBeUndefined();
     });
 
     it('throws on invalid userId', async () => {
@@ -241,33 +246,65 @@ describe('LeagueMembershipService', () => {
     });
   });
 
-  describe('getUserTeamId', () => {
-    it('returns team ID for member', async () => {
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return createChain({ data: { commissioner_id: 'other' }, error: null });
-        if (callCount === 2) return createChain({ data: { id: 'team-1' }, error: null });
-        return createChain();
-      });
+  // F14(a) (2026-08-03): `getUserTeamId` deleted (was cached-lookup
+  // helper for the removed `.teamId` field). Replaced with
+  // `getUserTeamIdFresh` — always a direct DB query, never cached.
+  // Name carries the contract; if someone later adds caching inside,
+  // the name becomes a lie a reviewer can catch. See below.
+  describe('getUserTeamIdFresh', () => {
+    it('returns team ID via fresh DB query (bypasses cache)', async () => {
+      mockSupabase.from = vi.fn(() =>
+        createChain({ data: { id: 'team-1' }, error: null }),
+      );
 
-      const teamId = await service.getUserTeamId('league-1', 'user-1');
-
+      const teamId = await service.getUserTeamIdFresh('league-1', 'user-1');
       expect(teamId).toBe('team-1');
+      // Single query — no cache read + no commissioner check.
+      expect(mockSupabase.from).toHaveBeenCalledTimes(1);
     });
 
-    it('returns null for non-member', async () => {
+    it('returns null when user does not own a team in the league', async () => {
+      mockSupabase.from = vi.fn(() => createChain({ data: null, error: null }));
+      const teamId = await service.getUserTeamIdFresh('league-1', 'user-1');
+      expect(teamId).toBeNull();
+    });
+
+    it('throws on invalid userId (matches checkMembership guard)', async () => {
+      await expect(service.getUserTeamIdFresh('league-1', '')).rejects.toThrow(
+        'SECURITY ERROR',
+      );
+      await expect(
+        service.getUserTeamIdFresh('league-1', 'undefined'),
+      ).rejects.toThrow('SECURITY ERROR');
+    });
+
+    // F14 EXACT REPRO (method-level): prime cache with stale
+    // membership, rewrite owner_id in DB, call getUserTeamIdFresh
+    // WITHIN the 30s TTL — the fresh method must return the NEW
+    // value regardless of the cache. Route-level version of the
+    // same repro lives in draftRoutes.f14.test.ts (Amendment 2).
+    it('F14 REPRO (method-level): returns fresh teamId even when membership cache is warm with stale value', async () => {
+      // Prime the cache with a checkMembership call (isMember=true).
       let callCount = 0;
       mockSupabase.from = vi.fn(() => {
         callCount++;
-        if (callCount === 1) return createChain({ data: { commissioner_id: 'other' }, error: null });
-        if (callCount === 2) return createChain({ data: null, error: null });
-        return createChain();
+        if (callCount === 1)
+          return createChain({ data: { commissioner_id: 'other' }, error: null });
+        if (callCount === 2)
+          return createChain({ data: { id: 'old-team-uuid' }, error: null });
+        // After priming, subsequent teams queries return the NEW value.
+        return createChain({ data: { id: 'new-team-uuid' }, error: null });
       });
+      await service.checkMembership('league-1', 'user-1');
+      expect(callCount).toBe(2); // 2 queries: leagues + teams
 
-      const teamId = await service.getUserTeamId('league-1', 'user-1');
-
-      expect(teamId).toBeNull();
+      // Simulated ownership rewrite happens externally (DB direct or
+      // DB-side RPC — either bypasses this cache). Now call the
+      // fresh resolver.
+      const teamId = await service.getUserTeamIdFresh('league-1', 'user-1');
+      expect(teamId).toBe('new-team-uuid');
+      // Extra call proves the fresh method went to DB, not cache.
+      expect(callCount).toBe(3);
     });
   });
 

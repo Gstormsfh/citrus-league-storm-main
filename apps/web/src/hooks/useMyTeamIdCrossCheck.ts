@@ -135,14 +135,16 @@ export function useMyTeamIdCrossCheck({
           });
         }
       } catch {
-        // Re-resolve failed (network / 5xx). Treat as confirmed
-        // failure since we cannot verify. F15's transient-503
-        // machinery will retry the underlying request behind the
-        // scenes; this hook fires the banner immediately so the user
-        // is never silently stuck.
+        // Re-resolve failed (network / 5xx). Distinct from a
+        // confirmed mismatch (F11/F15 honest-copy lineage — do not
+        // assert a fact you couldn't verify). Set a separate reason
+        // so the banner can say "couldn't verify" rather than
+        // "not in draft." F15's transient-503 machinery retries the
+        // underlying request; this hook fires the banner immediately
+        // so the user is never silently stuck while retries happen.
         if (!cancelled) {
           useDraftClientStore.getState().setIdentityFailure({
-            reason: 'my_team_not_in_matrix',
+            reason: 'my_team_unverifiable',
           });
         }
       }

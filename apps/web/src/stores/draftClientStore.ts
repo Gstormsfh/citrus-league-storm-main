@@ -141,7 +141,10 @@ interface DraftClientStoreState {
    * fresh matrix arrives with the expected team, or myTeamId is
    * re-resolved to a team that IS in the matrix).
    */
-  identityFailure: { reason: 'my_team_not_in_matrix' } | null;
+  identityFailure:
+    | { reason: 'my_team_not_in_matrix' }
+    | { reason: 'my_team_unverifiable' }
+    | null;
 
   // ── Setters / reducers ─────────────────────────────────────────
   setConnectionState: (state: DraftClientState) => void;

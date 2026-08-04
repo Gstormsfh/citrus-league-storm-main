@@ -175,7 +175,7 @@ describe('useMyTeamIdCrossCheck', () => {
     expect(apiGetMock).toHaveBeenCalledTimes(1);
   });
 
-  it('BRANCH 2b: mismatch + re-resolve THROWS → identityFailure SET (defensive — never leave user silently stuck)', async () => {
+  it('BRANCH 2b (honest-copy — F11/F15 lineage): re-resolve THROWS → identityFailure reason=my_team_unverifiable (distinct from confirmed mismatch)', async () => {
     apiGetMock.mockRejectedValue(new Error('network is down'));
     primeStore({
       myTeamId: 'team-stale',
@@ -186,8 +186,11 @@ describe('useMyTeamIdCrossCheck', () => {
     renderHook(() => useMyTeamIdCrossCheck({ leagueId: 'league-a' }));
 
     await waitFor(() => {
+      // Do NOT set 'my_team_not_in_matrix' — we didn't verify anything;
+      // that would assert a fact we couldn't confirm (the F11/F15
+      // honest-copy rule).
       expect(useDraftClientStore.getState().identityFailure).toEqual({
-        reason: 'my_team_not_in_matrix',
+        reason: 'my_team_unverifiable',
       });
     });
   });

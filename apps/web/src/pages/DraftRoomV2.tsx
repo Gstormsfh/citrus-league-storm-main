@@ -309,6 +309,37 @@ export default function DraftRoomV2() {
 function IdentityFailureBanner() {
   const failure = useIdentityFailure();
   if (failure === null) return null;
+  // F14(b) honest-copy (2026-08-03 architect ruling — F11/F15 lineage):
+  // distinguish the CONFIRMED mismatch (we saw a fresh answer and it
+  // still isn't in the draft) from the UNVERIFIABLE state (re-resolve
+  // threw; we don't actually know). Do not assert a fact that wasn't
+  // verified. Copy differs; the mask-to-null downstream behavior is
+  // the same either way.
+  const { title, body } =
+    failure.reason === 'my_team_not_in_matrix'
+      ? {
+          title: "We can't identify your team in this draft.",
+          body: (
+            <>
+              The draft server doesn't recognize you as an owner of any
+              team in this draft's order. This usually means a
+              commissioner just changed your team assignment and the
+              change hasn't reached the draft yet. Refreshing the page
+              usually resolves it.
+            </>
+          ),
+        }
+      : {
+          title: "Couldn't verify your team — check your connection.",
+          body: (
+            <>
+              We couldn't reach the server to confirm which team you
+              own in this draft. Draft controls are hidden until we
+              can verify. If your connection is back, refreshing the
+              page should recover.
+            </>
+          ),
+        };
   return (
     <div
       role="alert"
@@ -316,15 +347,9 @@ function IdentityFailureBanner() {
       data-testid="identity-failure-banner"
       data-identity-failure-reason={failure.reason}
     >
-      <div className="font-semibold mb-1">
-        We can't identify your team in this draft.
-      </div>
+      <div className="font-semibold mb-1">{title}</div>
       <div className="text-sm">
-        The draft server doesn't recognize you as an owner of any team
-        in this draft's order. This usually means a commissioner just
-        changed your team assignment and the change hasn't reached the
-        draft yet. Refreshing the page usually resolves it.
-        {' '}
+        {body}{' '}
         <button
           type="button"
           className="underline font-medium"

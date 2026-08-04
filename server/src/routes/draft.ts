@@ -149,10 +149,19 @@ draftRoutes.post('/league/:leagueId/pick', membershipMiddleware, validateBody(sc
   // Without this, any league member could submit picks assigning players to ANY team in
   // the league (the underlying make_draft_pick RPC only verifies league membership, not
   // team ownership). Commissioners may pick on behalf of any team for offline/manual drafts.
+  //
+  // F14(a) (2026-08-03): use getUserTeamIdFresh — resolveUserTeamId
+  // via a direct query rather than the membership cache's teamId
+  // field (which no longer exists). Team-identity checks must never
+  // consult a cache; see LeagueMembershipService.getUserTeamIdFresh
+  // docstring for the rationale.
   const membership = new LeagueMembershipService(supabase);
   const membershipResult = await membership.checkMembership(leagueId, userId);
-  if (!membershipResult.isCommissioner && membershipResult.teamId !== String(teamId)) {
-    return fail(c, AppError.forbidden('You can only make picks for your own team'));
+  if (!membershipResult.isCommissioner) {
+    const ownedTeamId = await membership.getUserTeamIdFresh(leagueId, userId);
+    if (ownedTeamId !== String(teamId)) {
+      return fail(c, AppError.forbidden('You can only make picks for your own team'));
+    }
   }
 
   // SECURITY: Verify the league draft is actually in progress before accepting picks.
@@ -294,10 +303,16 @@ draftRoutes.post('/league/:leagueId/autopick', membershipMiddleware, validateBod
 
   // SECURITY: Only the team's owner or the commissioner may trigger an autopick
   // for a given team. Otherwise any league member could exhaust an opponent's queue.
+  //
+  // F14(a) (2026-08-03): same reasoning as line 154 above — fresh
+  // teamId query, not cache.
   const membership = new LeagueMembershipService(supabase);
   const membershipResult = await membership.checkMembership(leagueId, userId);
-  if (!membershipResult.isCommissioner && membershipResult.teamId !== String(body.teamId)) {
-    return fail(c, AppError.forbidden('You can only autopick for your own team'));
+  if (!membershipResult.isCommissioner) {
+    const ownedTeamId = await membership.getUserTeamIdFresh(leagueId, userId);
+    if (ownedTeamId !== String(body.teamId)) {
+      return fail(c, AppError.forbidden('You can only autopick for your own team'));
+    }
   }
 
   const result = await service.autopickForTeam(

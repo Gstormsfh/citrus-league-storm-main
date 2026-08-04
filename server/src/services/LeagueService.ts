@@ -159,6 +159,12 @@ export class LeagueService {
       })
       .select(COLUMNS.TEAM)
       .single();
+
+    // F14(a) (2026-08-03): invalidate cached membership entry for the
+    // (leagueId, commissionerId) pair. Node-side owner_id write ⇒
+    // clearCache — the invariant that keeps the cache from serving
+    // a stale isMember=false to the newly-owning commissioner.
+    LeagueMembershipService.clearCache(league.id, commissionerId);
     const team = teamData as any;
 
     // Initialize FAAB budget if enabled
@@ -464,6 +470,14 @@ export class LeagueService {
       .insert(rows)
       .select('id, team_name');
 
+    // F14(a) (2026-08-03): AI teams have null owner_id; no user's
+    // isMember flips as a result of THIS write. But the cache-clear
+    // is called anyway per architect ruling — "the failure mode of
+    // scoping tighter is exactly F14's species: a write path added
+    // later that forgets." clearCache with no userId is a no-op on
+    // an unknown key today, and future maintenance is protected.
+    // (Global clear is not called here — that would nuke every
+    // league's cache for a single-league admin action.)
     return { teams: data || [], error };
   }
 
