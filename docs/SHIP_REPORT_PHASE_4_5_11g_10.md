@@ -23,7 +23,7 @@ This is the strongest possible field confirmation of the F20 fix: the exact bug 
 |---|---|---|---|
 | **A** | Human drafts at slot 3 | **PASS** | Two human picks machine-flagged through the full fixed stack (F14+F15+F19+F20+F22 all live) |
 | **B(i)** | Stale banner appears within ~36s of wifi kill | **PENDS Garrett's screenshot testimony** | Room + client-watchdog behavior verified; screenshot capture to be attached |
-| **B(ii)** | NO `auth/v1/logout` calls; session survives | **PASS** | F15/F19 field proof — 36/36 completed through an outage window with zero interventions |
+| **B(ii)** | NO `auth/v1/logout` calls; session survives | **PASS** | F15/F19 field proof: Garrett drafted pick 22 and sat pick 27's window post-restore WITHOUT ever re-authenticating. The session demonstrably survived the outage window. |
 | **B(iii)** | Auto-reconnect + resync + board rebuild COMPLETE vs DB census | **PENDS Garrett's screenshot testimony** | DB census on file: no gaps, no missing picks, snake ordering intact |
 | **C** | Freshly-authenticated rejoin (sign out → sign in → rejoin live → draft) | **NOT RUN — folds into F13 SIGINT mini-run** | Scheduled as a ~10-minute follow-up |
 | **D** | Draft reaches 36/36; raw log census | **PASS** | See "Field census" below. Zero interventions across the run. |
@@ -107,15 +107,29 @@ Every mandate figure below was measured on tonight's acceptance run OR is carrie
 | Timer accuracy drift < 100ms | Field data: seq 35 drift = **-1ms** (absorbed) | Best drift observation of the campaign; other picks unremarkable |
 | Reconnection recovery p95 ≤ 2000ms | Awaiting Garrett's B(iii) testimony to score formally | Board rebuild completeness verified via DB census |
 
-**Drop-rate story (corrected per KI-019 pending F18 fix):** 0/N delivered = 0 drops. Tonight's harness summary should be annotated by hand to separate the not-submitted partition from the delivered/dropped partition until F18's summary generator is fixed.
+**Drop-rate story (corrected per KI-019 pending F18 fix):** 96/96 delivered on all submitted picks; 12 harness expectations for pick 9 were NOT-SUBMITTED (harness offline — F18/KI-019 partition), not dropped. **True drop rate: 0%.** Tonight's harness summary should be annotated by hand to separate the not-submitted partition from the delivered/dropped partition until F18's summary generator is fixed.
 
 ---
 
-## Suite baselines (closing the earlier labeling slip)
+## Suite baselines (closing the earlier labeling slip — Amendment 1)
 
-**Real pre-campaign baseline:** 47 test files / 953 tests (server). This was the state before commit `9ea634db`.
+**Pre-campaign baseline (DERIVED, never directly measured):** 45 test files / 942 tests (server). Derived by subtracting the F15+F19 additions (+2 files / +11 tests via `9ea634db`) from the first checkpoint below.
 
-**Post-campaign server suite:** **50 files / 975 tests, all green.** Delta: +3 files (`authMiddleware.test.ts`, `LobbyManager.f20.test.ts`, `LobbyRegistry.f20.test.ts`, `supabaseAuthErrorContract.test.ts`, `draftRoutes.f14.test.ts` — noting file count delta reflects `authMiddleware` + contract test bundled into an existing file's directory pattern; +22 tests total).
+**First MEASURED checkpoint (post `9ea634db`):** 47 files / 953 tests. This is what earlier reports called "pre-campaign baseline" — the labeling slip. Fixed here for the permanent record.
+
+**Chunk 11g.10 checkpoint chain (all measured):**
+```
+45/942  (derived, pre-9ea634db)
+47/953  post-9ea634db          — first measured; F15+F19 tests bundled
+48/961  post-88f46ce0          — +8 F20 guard boundary tests
+49/970  post-067474e9          — +9 F20 scanner boundary tests
+50/971  post-856a5fe0          — +1 CASE 5b outcome test
+50/975  post-0752c6fb          — +4 F14 route- and method-level tests
+```
+
+**Post-campaign server suite:** **50 files / 975 tests, all green.**
+
+**Full-campaign delta:** **+5 files / +33 tests.** (Prior report's "+3 files / +22 tests" was the post-F15 delta only — corrected.)
 
 **Post-campaign apps/web suite:** **79 files / 1524 pass / 4 fail.** The 4 failures are the standing DST-suspicion date-boundary cluster from the open ledger (ScheduleService × 2, projectionHelper × 2) — unrelated to this campaign. **Every red on the board is a named defect** (F22 unblocked the DraftRoomV2 dark suite of 13 tests during this campaign; before F22 the suite was silently green while executing zero assertions).
 
@@ -140,7 +154,7 @@ Contract tests (unstubbed, hermetic via `.invalid` hostname per RFC 6761 §6.4):
 - **KI-018** — F17 (fixture-12 ownership-strip contract; Managers panel reads "Harness Team N")
 - **KI-019** — F18 (drop-rate not-submitted partition annotation — applied above)
 - **KI-020** — F19 (refreshTokenOnce signout on network failure)
-- **KI-021** — F20 code-closed 856a5fe0; **field-closed by tonight's seq-35 headline**
+- **KI-021** — F20 code-closed 856a5fe0; **tolerance-absorption path field-validated on the recurred trigger class (seq 35, drift -1, absorbed) via tonight's seq-35 headline.** Re-arm path (beyond-tolerance rejection) and scanner recovery path fired **zero** times in the field — the 0/0/0 census means those two layers remain **unit-proven backstops, unfired in field**. Same sentence discipline as F5's "rung 1 field-exercised; long-idle 7-hour zombie class remains unreproduced residual" applied here for consistency (Amendment 2).
 - **KI-022** — F22 (dark suite; structural fix with satisfies type check; 4th instance-of-species)
 - **KI-023** — F13 halves (NDJSON+flush proven; SIGINT test pending in mini-run)
 - **KI-024** — Cloud Run per-instance cache-coherence architecture note (enriched by F14 Amendment 3)
