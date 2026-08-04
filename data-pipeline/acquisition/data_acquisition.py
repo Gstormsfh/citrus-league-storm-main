@@ -1126,23 +1126,42 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
             
             if not player_id or shot_coord_x == 0:
                 continue
-            
-            # Flip coordinates if needed
-            if shot_coord_x < 0:
+
+            # ── 0E-XG-5 (S2): MoneyPuck-consistent adjusted coordinates ─────────
+            # Training reads MP `xCordAdjusted` / `yCordAdjusted` (signed,
+            # shooter-always-attacks-positive-x). We reproduce that convention
+            # via `homeTeamDefendingSide` + `is_home_shooter` so the flip is
+            # deterministic per shot instead of the old `x < 0` heuristic
+            # (which mis-flipped wraparound shots at small negative x and
+            # never applied the tandem flip to last_event_* coordinates).
+            _is_home_shooter = (event_owner_team_id == home_team_id) if event_owner_team_id and home_team_id else (shot_coord_x >= 0)
+            if home_team_defending_side in ('left', 'right'):
+                _shooter_attacks_positive_x = (
+                    (_is_home_shooter and home_team_defending_side == 'left')
+                    or (not _is_home_shooter and home_team_defending_side == 'right')
+                )
+            else:
+                # Fallback: old heuristic when defending-side is not published
+                _shooter_attacks_positive_x = (shot_coord_x >= 0)
+            if not _shooter_attacks_positive_x:
                 shot_coord_x = -shot_coord_x
                 shot_coord_y = -shot_coord_y
-            
+            # last_event_x/y flip happens later, at the point where those
+            # variables are first assigned (see companion block near L1350).
+
             # Calculate features (same as scrape_pbp_and_process)
             distance = math.sqrt((NET_X - shot_coord_x)**2 + (NET_Y - shot_coord_y)**2)
-            
+
+            # ── 0E-XG-5 (S1): signed angle in [-90, +90] to match MoneyPuck ─────
+            # `shotAngle` in the training corpus is signed; abs() + clamp here
+            # was introduced by dce7077c and mismatches the trained model.
             dx = abs(NET_X - shot_coord_x)
-            dy = abs(shot_coord_y - NET_Y)
+            dy = shot_coord_y - NET_Y  # signed
             if dx == 0:
-                angle = 90.0
+                angle = 90.0 if dy >= 0 else -90.0
             else:
                 angle = math.degrees(math.atan2(dy, dx))
-            angle = max(0.0, min(90.0, angle))
-            shot_angle_adjusted = abs(angle)
+            shot_angle_adjusted = abs(angle)  # DB-only, keep positive
             
             # Slot shot calculation
             if distance < 25 and abs(shot_coord_y) < 15:
@@ -1344,11 +1363,19 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
             last_event_shot_distance = None
             player_num_that_did_last_event = None
             
-            if (last_event_state['x_coord'] is not None and 
+            if (last_event_state['x_coord'] is not None and
                 last_event_state['y_coord'] is not None and
                 last_event_state['time_in_seconds'] is not None):
                 last_event_x = last_event_state['x_coord']
                 last_event_y = last_event_state['y_coord']
+                # 0E-XG-5 (S2): tandem-flip last-event coords to match
+                # the shot-coord flip above. Without this, distance_from_
+                # last_event and speed_from_last_event were inconsistent
+                # with the shot coords whenever _shooter_attacks_positive_x
+                # was False.
+                if not _shooter_attacks_positive_x:
+                    last_event_x = -last_event_x
+                    last_event_y = -last_event_y
                 last_event_time = last_event_state['time_in_seconds']
                 last_event_type_code = last_event_state['type_code']
                 last_event_period = last_event_state['period']
@@ -1580,9 +1607,13 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                 'last_event_x': last_event_x,
                 'last_event_y': last_event_y,
                 'last_event_team': last_event_team,
-                'east_west_location_of_shot': shot_coord_y,
-                'east_west_location_of_last_event': last_event_y,
-                'north_south_location_of_shot': shot_coord_x,
+                # 0E-XG-5: match training's MoneyPuck axis convention.
+                # xCordAdjusted (length-of-ice) = east_west; yCordAdjusted
+                # (width) = north_south. Previously swapped, feeding width
+                # into the length slot and vice versa.
+                'east_west_location_of_shot': shot_coord_x,
+                'east_west_location_of_last_event': last_event_x,
+                'north_south_location_of_shot': shot_coord_y,
                 'goalie_id': goalie_id,
                 'goalie_name': goalie_name,
                 'period': period,
@@ -2115,7 +2146,7 @@ def process_game_from_raw_data(game_id, raw_data, db_client):
                 )
 
     if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
-        df_shots['distance_angle_interaction'] = (df_shots['distance'] * df_shots['angle']) / 100
+        df_shots['distance_angle_interaction'] = (df_shots['distance'] * df_shots['angle'].abs()) / 100  # 0E-XG-5: parity with train_xg_v3.py:240 (uses .abs())
 
     if 'speed_from_last_event' in df_shots.columns:
         speed_series = pd.to_numeric(df_shots['speed_from_last_event'], errors='coerce').fillna(0)
@@ -2132,7 +2163,7 @@ def process_game_from_raw_data(game_id, raw_data, db_client):
                 df_shots[feature] = 0
             elif feature == 'distance_angle_interaction':
                 if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
-                    df_shots[feature] = (df_shots['distance'] * df_shots['angle']) / 100
+                    df_shots[feature] = (df_shots['distance'] * df_shots['angle'].abs()) / 100  # 0E-XG-5: parity with train_xg_v3.py:240
                 else:
                     df_shots[feature] = 0
             elif feature == 'speed_from_last_event_log':
@@ -2530,48 +2561,41 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 
                 if not player_id or shot_coord_x == 0:  # Skip if no player or invalid coordinates
                     continue
-                
-                # CRITICAL CHECK: NHL coordinates are centered. We must flip coordinates 
-                # if the team is shooting into the other net (x < 0) for consistent calculation.
-                if shot_coord_x < 0:
+
+                # ── 0E-XG-5 (S2): MoneyPuck-consistent adjusted coordinates ─────
+                # Training reads MP `xCordAdjusted` / `yCordAdjusted` (signed,
+                # shooter-always-attacks-positive-x). Reproduce via
+                # (homeTeamDefendingSide, is_home_shooter) instead of the old
+                # `x < 0` heuristic. last_event_x/y receive the SAME flip
+                # when they are assigned below (see companion block).
+                _is_home_shooter = (event_owner_team_id == home_team_id) if event_owner_team_id and home_team_id else (shot_coord_x >= 0)
+                if home_team_defending_side in ('left', 'right'):
+                    _shooter_attacks_positive_x = (
+                        (_is_home_shooter and home_team_defending_side == 'left')
+                        or (not _is_home_shooter and home_team_defending_side == 'right')
+                    )
+                else:
+                    _shooter_attacks_positive_x = (shot_coord_x >= 0)
+                if not _shooter_attacks_positive_x:
                     shot_coord_x = -shot_coord_x
                     shot_coord_y = -shot_coord_y
-                
+
                 # ============================================================
                 # FEATURE ENGINEERING: Calculate all 9 model inputs
                 # ============================================================
-                
-                # FEATURE 1: DISTANCE (Continuous, 0-100+ feet)
-                # What: Euclidean distance from shot location to center of net
-                # Why: Closer shots = higher goal probability (MOST IMPORTANT FEATURE: 33.2%)
-                # Range: Typically 10-80 feet in NHL
-                # Formula: √((89 - x)² + (0 - y)²) where (89, 0) is net center
                 distance = math.sqrt((NET_X - shot_coord_x)**2 + (NET_Y - shot_coord_y)**2)
 
-                # FEATURE 2: ANGLE (Continuous, 0-90 degrees)
-                # What: Angle from center of net to shot location
-                # Why: Shots from center (low angle) = higher goal probability (14.5% importance)
-                # Range: 0° = directly in front, 90° = from the side
-                # Formula: Calculate angle from center line, ensuring 0-90° range
-                # Use absolute value of y-coordinate to get angle from center
-                dx = abs(NET_X - shot_coord_x)  # Horizontal distance from net
-                dy = abs(shot_coord_y - NET_Y)  # Vertical distance from center
-                
+                # ── 0E-XG-5 (S1): signed angle in [-90, +90] to match MoneyPuck ─
+                # `shotAngle` in the training corpus is signed. abs() + clamp
+                # here (dce7077c) is the source of the 2025 median-31.239
+                # anomaly. Sign is taken from dy (perpendicular offset).
+                dx = abs(NET_X - shot_coord_x)
+                dy = shot_coord_y - NET_Y  # signed
                 if dx == 0:
-                    angle = 90.0  # Directly to the side
+                    angle = 90.0 if dy >= 0 else -90.0
                 else:
-                    # Calculate angle from center line (0° = straight on, 90° = from side)
                     angle = math.degrees(math.atan2(dy, dx))
-                
-                # Ensure angle is in valid range (0-90 degrees)
-                angle = max(0.0, min(90.0, angle))
-                
-                # FEATURE: SHOT_ANGLE_ADJUSTED (Absolute value of angle)
-                # What: Absolute value of shot angle (MoneyPuck uses this)
-                # Why: Removes direction bias, focuses on angle magnitude
-                # Formula: abs(angle) - but angle is already 0-90, so this is just angle
-                # Note: MoneyPuck's shotAngle can be negative, so they use abs() to get 0-90 range
-                shot_angle_adjusted = abs(angle)  # For consistency with MoneyPuck (angle is already 0-90)
+                shot_angle_adjusted = abs(angle)  # DB-only, keep positive
                 
                 # NEW FEATURE: IS_SLOT_SHOT (Scaled 0-1, continuous)
                 # High-Danger Zone Score: The Slot (distance < 25ft AND |y| < 15ft)
@@ -2965,12 +2989,20 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 
                 # Use last_event_state directly (tracks ALL events with coordinates, not just shots)
                 # CRITICAL: Check that state is initialized (not None) - allow time = 0 (period start)
-                if (last_event_state['x_coord'] is not None and 
+                if (last_event_state['x_coord'] is not None and
                     last_event_state['y_coord'] is not None and
                     last_event_state['time_in_seconds'] is not None):  # Allow time = 0 (period start)
-                    
+
                     last_event_x = last_event_state['x_coord']
                     last_event_y = last_event_state['y_coord']
+                    # 0E-XG-5 (S2): tandem-flip last-event coords in the
+                    # same convention as the shot coords (see companion block
+                    # above). Otherwise distance_from_last_event and speed_
+                    # from_last_event are computed across mixed coordinate
+                    # frames whenever _shooter_attacks_positive_x is False.
+                    if not _shooter_attacks_positive_x:
+                        last_event_x = -last_event_x
+                        last_event_y = -last_event_y
                     last_event_time = last_event_state['time_in_seconds']
                     last_event_type_code = last_event_state['type_code']
                     last_event_period = last_event_state['period']
@@ -3352,9 +3384,12 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     'last_event_shot_distance': last_event_shot_distance,
                     'player_num_that_did_last_event': player_num_that_did_last_event,
                     # MoneyPuck Location Features (Variables 6, 10, 14)
-                    'east_west_location_of_shot': shot_coord_y,  # Variable 10: East-West Location on Ice of Shot
-                    'east_west_location_of_last_event': last_event_y,  # Variable 6: East-West Location of Last Event
-                    'north_south_location_of_shot': shot_coord_x,  # Variable 14: North-South Location on Ice of Shot
+                    # 0E-XG-5: match training's MoneyPuck axis convention.
+                    # xCordAdjusted (length-of-ice) = east_west; yCordAdjusted
+                    # (width) = north_south. Previously swapped.
+                    'east_west_location_of_shot': shot_coord_x,           # xCordAdjusted (length)
+                    'east_west_location_of_last_event': last_event_x,     # lastEventxCord_adjusted
+                    'north_south_location_of_shot': shot_coord_y,         # yCordAdjusted (width)
                     # Goalie features
                     'goalie_id': goalie_id,
                     'goalie_name': goalie_name,
@@ -3622,7 +3657,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
     # Calculate derived features that the model expects (before feature check)
     # Distance × Angle interaction (important for shot quality)
     if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
-        df_shots['distance_angle_interaction'] = (df_shots['distance'] * df_shots['angle']) / 100  # Normalize
+        df_shots['distance_angle_interaction'] = (df_shots['distance'] * df_shots['angle'].abs()) / 100  # 0E-XG-5: parity with train_xg_v3.py:240 (uses .abs())  # Normalize
     
     # Log transform speed (if speed_from_last_event exists)
     if 'speed_from_last_event' in df_shots.columns:
@@ -3648,7 +3683,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
             elif feature == 'distance_angle_interaction':
                 # Calculate from distance and angle if available
                 if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
-                    df_shots[feature] = (df_shots['distance'] * df_shots['angle']) / 100
+                    df_shots[feature] = (df_shots['distance'] * df_shots['angle'].abs()) / 100  # 0E-XG-5: parity with train_xg_v3.py:240
                 else:
                     df_shots[feature] = 0
             elif feature == 'speed_from_last_event_log':
