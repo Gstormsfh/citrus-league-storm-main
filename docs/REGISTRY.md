@@ -321,6 +321,36 @@ Same demo-optics family as KI-013 (F12). Cosmetic; must not ship to Zach or inve
 | **Target phase / timeline** | Amendment 4 folded into rebase commit 20260805050000. |
 | **Verification test** | (a) Post-apply: pick a league to completion on staging, assert `SELECT event_type, payload_hash FROM draft_events WHERE league_id = <lg> ORDER BY seq DESC LIMIT 1` returns `('draft_completed', <64-hex-char string>)`. (b) Post-apply: `SELECT count(*) FROM draft_events WHERE payload_hash IS NULL` returns 0 (invariant across all event types). (c) Future: any migration adding/removing NOT NULL on `draft_events.*` columns MUST enumerate downstream `append_draft_event` callers in its header comment. |
 
+### KI-029 — F24: v2 engine has no draft-completion transition (emitter contract machine-proven)
+
+**RESOLVED (2026-08-05).** Chunk delivered across commits `c9f37a53` (initial F24 patch, subsequently rebased per F25) → `7d4c7323` (F24 rebase migration `20260805050000_v2_draft_completion_emitter_rebased.sql`) → apply commits INS-4..INS-7 (`1f7b5328` / `2aa44ae1` / `0d179263` / `ac42e4f9` / `e1377a9b`) hardening the direct-apply harness. F24 lives on staging at live md5 `0936f891d707da231446d440b452197f`. Acceptance rerun run out passed A/B/D; C was a true-negative that surfaced F26 (KI-035 below).
+
+**Emitter contract fully machine-proven.** Architect ratification (2026-08-05, post-acceptance):
+
+- **A. leagues transition.** Final pick (pick 12) landed → `draft_status='completed'`, `pick_deadline=NULL`, `draft_event_counter=13`. Flip is the RPC's own — ignition-guarded within the same transaction as the pick INSERT.
+- **B. draft_completed event.** Landed at seq 13 with payload `{total_picks:12, completed_at}`. NULL idempotency key (single-fire per D3 lock discipline). Actor inherited from final-pick caller. `correlation_id` == pick 12's correlation. Architect's independent sha256 recompute of the completion payload MATCHES `draft_events.payload_hash` (Amendment 4 hash forwarding verified end-to-end). Event census on draft_events showed 1..13 gap-free, no duplicate seqs, no orphaned events.
+- **D. Picks 1-12.** Applied + broadcast clean end-to-end; cursor dedup worked as designed; one WARNING at 18:27:03 `'clock fired but draftStatus=completed — ignored (timer should have been cancelled)'` — F20 guard absorbed and announced the residual expiry that F26 (below) failed to prevent.
+
+**Observations (non-defect, documented for the record):**
+- Completion event `event_version=1` — append_draft_event's default, matching draft_started. Pick events at version=2 (batch-2 bump) is the expected version-domain divergence.
+- Pick payload_hash is caller-domain by design (idempotency token from the caller's payload, not DB-recomputable). Only completion payload_hash is server-computed (Amendment 4 sha256 of the completion payload).
+- `draft_state='active'` still (Amendment 2 evidence-closed — see KI-034).
+
+**Emitter architecture that shipped:**
+- Structural SUM `SUM(jsonb_array_length(team_order))` filtered `deleted_at IS NULL` (D1 + Amendment 3 mirror).
+- `IF v_total_picks > 0 AND p_pick_number >= v_total_picks` guard (D2 defense-in-depth).
+- `RAISE WARNING` on impossible strict-greater case (D8 absorb-and-announce).
+- `UPDATE leagues SET draft_status='completed', pick_deadline=NULL` (Amendment 1).
+- `append_draft_event('draft_completed', ...)` with sha256-hashed payload (Amendment 4), NULL idem key, inherited actor, reused correlation.
+- Snake/linear only (D5); auction completion is a separate future chunk.
+
+**Verification test** (executed on staging 2026-08-05):
+- (a) 12-team snake acceptance run → all 12 picks committed, completion event emitted at seq 13, leagues row flipped, pick_deadline NULL. ✓
+- (b) Independent sha256 recompute of completion payload matches stored payload_hash. ✓
+- (c) Event census 1..13 gap-free with correct type/version distribution. ✓
+
+**Residual (KI-035 / F26).** External-apply LobbyManager path for `draft_completed` sets internal status but does not broadcast/cancel-timer/teardown. Gate: fix before THE TWELVE. Details in KI-035.
+
 ### KI-034 — Completed leagues retain `draft_state='active'` post-F24 (Amendment 2 evidence-closed, semantically load-bearing NOT)
 
 **Field record (2026-08-05).** During F24 design review, architect ran `SELECT draft_state FROM leagues WHERE id = <staging test league>` and psql returned `ERROR: column "draft_state" does not exist`. The v2 stack reads `draft_status` (`in_progress` / `completed` / `paused` / etc.); `draft_state` was a Phase 0–4 column that never made it to the v2 schema. F24 originally proposed setting `draft_state='completed'` alongside `draft_status='completed'` in the completion UPDATE for defense-in-depth; Amendment 2 removes that write on the empirical grounds that (a) the column doesn't exist to write to, and (b) no v2 consumer reads it. Recorded as a KI so a future refactor that adds `draft_state` back doesn't silently reinstate the write without an audit.
@@ -333,6 +363,40 @@ Same demo-optics family as KI-013 (F12). Cosmetic; must not ship to Zach or inve
 | **Why deferred** | Not deferred — deliberately not extended. The next actor on any `draft_state` re-add must confront this KI. |
 | **Target phase / timeline** | Ambient. Revisits triggered by any migration adding `draft_state` to `public.leagues`, and by PROD-PORT scoping (which will re-encounter the v1 column set). |
 | **Verification test** | Any future migration adding `draft_state` to `public.leagues` MUST reference this KI in its header comment AND either (a) extend `submit_pick_v2`'s completion branch to write it (with matching KI-034 update), or (b) document why the column should remain unwritten by the completion path. |
+
+### KI-035 — F26: external-apply `draft_completed` is applied-but-silent (LobbyManager)
+
+**Field record (2026-08-05, F24 acceptance rerun).** F24 emitter contract fully proved on the DB side (KI-029). The C-block acceptance assertion (WebSocket clients observe a `draft_completed` frame after the final pick) was a true-negative: zero `draft_completed` frames in the ndjson capture across all 12 connected clients. Investigation showed the engine had received the seq 13 event via LISTEN/NOTIFY and logged `external_event.applied broadcasted:false` at 2026-08-05T18:26:07.082Z. All 12 clients were still connected at that timestamp; their WS closes began +88 ms later (client-side timer expiries, F26-induced). At 2026-08-05T18:27:03Z, pick 12's armed pick timer fired against the completed draft — F20 guard absorbed and announced: `'clock fired but draftStatus=completed — ignored (timer should have been cancelled)'`. The F20 guard-and-warn absorbed cleanly; F26 is upstream of the guard.
+
+**Root cause.** `server/src/draft/LobbyManager.ts:2833-2835`, the external-apply switch's `case 'draft_completed'`:
+
+```typescript
+case 'draft_completed':
+  this.draftStatus = 'completed';
+  break;
+```
+
+Sets lobby-internal status only. Does NOT:
+1. Broadcast the `draft_completed` frame to connected clients (analogous to the pick broadcast in `applyPickEvent`).
+2. Cancel the currently armed pick timer (the pick 12 timer stays armed → fires → F20 guard absorbs).
+3. Initiate teardown of the lobby (leave-timer, snapshot flush, cull-schedule, etc. — analogous to the internal-path teardown at `LobbyManager.ts:1826-1832`).
+
+The internal path (`processSubmitPick` else-branch, `LobbyManager.ts:1826-1832`) does all three correctly — F24 acceptance's *DB* proof carried through *because* the internal path fires when submit_pick_v2 returns a completion-shaped RETURN. The external-apply path is what fires when the completion event arrives via LISTEN/NOTIFY on OTHER engine instances (or on the same engine after a snapshot bootstrap that missed the internal path). Field-proven behavior for internal path; external path was never exercised until acceptance because prior chunks never emitted `draft_completed` at all.
+
+| | |
+|---|---|
+| **Severity** | high — UX/wrong-signal class, not liveness. Draft completes correctly (DB is right), but clients don't see it and stay connected staring at a locked draft-room. The F20 guard absorbs the timer-expiry residual, so no data corruption; but no user in production would understand why the room went silent + the timer never fires. **Gate: fix + engine deploy before THE TWELVE.** |
+| **Surface** | `server/src/draft/LobbyManager.ts` external-apply switch, `case 'draft_completed'` (line 2833-2835). Sibling: the bootstrap-replay switch (`applyEventDuringBootstrap`, line ~2996) needs matching consideration — the bootstrap path is post-restart replay of persisted events and generally should NOT broadcast (clients haven't connected yet), but MUST tear down / not-re-arm any timer for a completed draft. Fix scope must specify per-path semantics. |
+| **Description** | F24's DB emitter fires; the internal-path receiver (submit_pick_v2 else-branch) does the right thing (broadcast + cancel + teardown); the external-path receiver (this KI) doesn't. Symptomatic on any engine that receives the completion via LISTEN/NOTIFY rather than as the writer — which will be every engine except the writer once we scale past a single node, AND on the current single-node deploy any client whose lobby was rehydrated between the pick INSERT and now. |
+| **Why deferred** | Not deferred — actively gated. F24 close-out ships without this fix; F26 fix + engine deploy must land before THE TWELVE (12-human draft on staging). |
+| **Target phase / timeline** | Next chunk after this one; scoped narrow. Extend the external-apply case to: (a) call the same broadcast mechanism `applyPickEvent` uses (probably `this.broadcastToRoom({type:'draft_completed', ...})` or equivalent — grep the pick path for the exact API), (b) call whatever timer-cancel primitive the internal path uses at 1826-1832, (c) initiate teardown symmetric with internal path. Update `applyEventDuringBootstrap` to match with the broadcast omitted (nobody's listening pre-connect). |
+| **Verification test** | (a) Fresh 12-team snake acceptance → all 12 clients receive a `draft_completed` WS frame. Pass: 12/12; fail: any client missing the frame. (b) No F20 WARNING `'clock fired but draftStatus=completed — ignored'` post-completion — the timer must be cancelled before it fires, not absorbed after. (c) Second-engine test (deploy N=2 instances, one writer, one reader; write a completion via the writer; assert the reader-engine's clients receive the frame AND the reader-engine's timer/teardown fired). |
+
+**Log evidence (recorded verbatim from acceptance rerun 2026-08-05):**
+- `2026-08-05T18:26:07.082Z external_event.applied league=<lg> seq=13 type=draft_completed broadcasted=false`
+- `2026-08-05T18:26:07.170Z` — first WS close observed (client-side timer expiry cascade begins)
+- `2026-08-05T18:27:03Z RAISE WARNING clock fired but draftStatus=completed — ignored (timer should have been cancelled)` (from the F20 guard, absorbing what F26 failed to cancel)
+- Zero `draft_completed` frames in the ndjson capture across all 12 client streams.
 
 ---
 
