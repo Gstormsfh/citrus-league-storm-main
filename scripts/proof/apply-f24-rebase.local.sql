@@ -412,24 +412,47 @@ $verify$;
 -- Verification: SHA256 of the round-tripped text is compared against
 -- SHA256 of the original bytes computed on the server after upload.
 -- Both use core pg (sha256 on bytea, digest on text via encoding).
+--
+-- INS-6 (2026-08-05, architect adjudication) — psql-space → plpgsql-space
+-- bridge via transaction-local GUC. The previous version referenced
+-- :'oid_<tag>' INSIDE dollar-quoted DO bodies; psql's client-side
+-- variable interpolation is SKIPPED inside `$tag$ ... $tag$` blocks
+-- because the parser considers the entire body as literal-until-close.
+-- The literal `:'oid_<tag>'` reached the server, and the leading `:`
+-- surfaced as a syntax error. Fix: after each \lo_import, `SELECT
+-- set_config('vars.oid_<tag>', :'LASTOID', true)` pushes the OID into
+-- a transaction-local GUC (third arg true = dies with the txn either
+-- way; no cross-session leak, no orphan on rollback). Inside the DO
+-- block, `current_setting('vars.oid_<tag>')::oid` reads it back — pure
+-- SQL, no psql interpolation needed. lo_unlink() at top level continues
+-- to use `:'oid_<tag>'::oid` because top-level psql substitution DOES
+-- happen there.
+--
+-- Mandatory 30-second rehearsal script:
+--   scripts/proof/rehearse-lo-bridge.local.sql
+-- Proves the bridge on the live connection with zero state risk
+-- (BEGIN → \lo_import → set_config → DO block with lo_get → ROLLBACK).
+-- Garrett runs the rehearsal BEFORE re-invoking apply-f24-rebase.local.sql.
 
 \echo ''
 \echo 'STEP 4a: BACKFILL history for 20260727010000_pick_event_carries_pick_deadline (July 27 direct apply)'
 
 \lo_import 'supabase/migrations/20260727010000_pick_event_carries_pick_deadline.sql'
 \set oid_10c2b2 :LASTOID
+SELECT set_config('vars.oid_10c2b2', :'oid_10c2b2', true) AS bridged_oid_10c2b2;  -- INS-6 bridge
 
 DO $backfill_10c2b2$
 DECLARE
+  v_oid oid  := current_setting('vars.oid_10c2b2')::oid;  -- INS-6: read GUC, not psql var
   v_body text;
   v_hash text;
   v_oid_from_bytea text;
 BEGIN
-  v_body := convert_from(lo_get(:'oid_10c2b2'::oid), 'UTF8');
+  v_body := convert_from(lo_get(v_oid), 'UTF8');
   v_hash := encode(sha256(convert_to(v_body, 'UTF8')), 'hex');
-  v_oid_from_bytea := encode(sha256(lo_get(:'oid_10c2b2'::oid)), 'hex');
+  v_oid_from_bytea := encode(sha256(lo_get(v_oid)), 'hex');
 
-  RAISE NOTICE '  file bytes uploaded to OID    : %', :'oid_10c2b2';
+  RAISE NOTICE '  file bytes uploaded to OID    : %', v_oid;
   RAISE NOTICE '  text length after decode      : % chars', length(v_body);
   RAISE NOTICE '  sha256 of decoded text        : %', v_hash;
   RAISE NOTICE '  sha256 of original bytes      : %', v_oid_from_bytea;
@@ -449,26 +472,28 @@ BEGIN
 END
 $backfill_10c2b2$;
 
-SELECT lo_unlink(:'oid_10c2b2'::oid);
+SELECT lo_unlink(:'oid_10c2b2'::oid);  -- top-level psql interpolation OK here
 
 \echo ''
 \echo 'STEP 4b: UPDATE history for 20260805023419_v2_draft_completion_emitter (replace placeholder with actual SQL)'
 
 \lo_import 'supabase/migrations/20260805023419_v2_draft_completion_emitter.sql'
 \set oid_f25 :LASTOID
+SELECT set_config('vars.oid_f25', :'oid_f25', true) AS bridged_oid_f25;  -- INS-6 bridge
 
 DO $update_f25$
 DECLARE
+  v_oid oid  := current_setting('vars.oid_f25')::oid;  -- INS-6: read GUC, not psql var
   v_body text;
   v_hash text;
   v_oid_from_bytea text;
   v_existing_statements_first text;
 BEGIN
-  v_body := convert_from(lo_get(:'oid_f25'::oid), 'UTF8');
+  v_body := convert_from(lo_get(v_oid), 'UTF8');
   v_hash := encode(sha256(convert_to(v_body, 'UTF8')), 'hex');
-  v_oid_from_bytea := encode(sha256(lo_get(:'oid_f25'::oid)), 'hex');
+  v_oid_from_bytea := encode(sha256(lo_get(v_oid)), 'hex');
 
-  RAISE NOTICE '  file bytes uploaded to OID    : %', :'oid_f25';
+  RAISE NOTICE '  file bytes uploaded to OID    : %', v_oid;
   RAISE NOTICE '  text length after decode      : % chars', length(v_body);
   RAISE NOTICE '  sha256 of decoded text        : %', v_hash;
   RAISE NOTICE '  sha256 of original bytes      : %', v_oid_from_bytea;
@@ -496,25 +521,27 @@ BEGIN
 END
 $update_f25$;
 
-SELECT lo_unlink(:'oid_f25'::oid);
+SELECT lo_unlink(:'oid_f25'::oid);  -- top-level psql interpolation OK here
 
 \echo ''
 \echo 'STEP 4c: INSERT history for 20260805050000_v2_draft_completion_emitter_rebased (the just-applied rebase)'
 
 \lo_import 'supabase/migrations/20260805050000_v2_draft_completion_emitter_rebased.sql'
 \set oid_f24r :LASTOID
+SELECT set_config('vars.oid_f24r', :'oid_f24r', true) AS bridged_oid_f24r;  -- INS-6 bridge
 
 DO $insert_f24r$
 DECLARE
+  v_oid oid  := current_setting('vars.oid_f24r')::oid;  -- INS-6: read GUC, not psql var
   v_body text;
   v_hash text;
   v_oid_from_bytea text;
 BEGIN
-  v_body := convert_from(lo_get(:'oid_f24r'::oid), 'UTF8');
+  v_body := convert_from(lo_get(v_oid), 'UTF8');
   v_hash := encode(sha256(convert_to(v_body, 'UTF8')), 'hex');
-  v_oid_from_bytea := encode(sha256(lo_get(:'oid_f24r'::oid)), 'hex');
+  v_oid_from_bytea := encode(sha256(lo_get(v_oid)), 'hex');
 
-  RAISE NOTICE '  file bytes uploaded to OID    : %', :'oid_f24r';
+  RAISE NOTICE '  file bytes uploaded to OID    : %', v_oid;
   RAISE NOTICE '  text length after decode      : % chars', length(v_body);
   RAISE NOTICE '  sha256 of decoded text        : %', v_hash;
   RAISE NOTICE '  sha256 of original bytes      : %', v_oid_from_bytea;
@@ -531,7 +558,7 @@ BEGIN
 END
 $insert_f24r$;
 
-SELECT lo_unlink(:'oid_f24r'::oid);
+SELECT lo_unlink(:'oid_f24r'::oid);  -- top-level psql interpolation OK here
 
 -- --------------------------------------------------------------------------
 -- STEP 5 — Final assertion: history-vs-live body equivalence

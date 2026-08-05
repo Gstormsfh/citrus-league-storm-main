@@ -176,3 +176,114 @@ against a known-good static input (source file, canned fixture, prior
 capture). If the harness can't be constructed, the check isn't ready.
 The dry-run mandate is now standing practice for any pre-execution
 sanity check.
+
+### INS-6 — STEP 4a syntax error: psql client-side interpolation skipped inside dollar-quoted DO bodies
+
+**Field record (2026-08-05, morning apply attempt).** Garrett re-ran the
+apply. STEP 0 hash pin PASS, STEP 2 migration PASS, STEP 3 all 12
+markers + negative marker PASS (INS-5 fix confirmed on live evidence).
+STEP 4a errored with `syntax error at or near ":"` and the entire
+transaction rolled back. Architect verified full rollback: live md5
+still `e849568e2f8cc35eb437c51b1732c91f`, 0 new history rows, 0 orphan
+large objects (the `\lo_import` insert into `pg_largeobject` rolled
+back with the txn — the transactional wrap earned its keep).
+
+**Root cause.** `psql`'s client-side variable interpolation (`:'name'`,
+`:name`) is SKIPPED inside dollar-quoted string literals — including
+`DO $tag$ ... $tag$` blocks. The parser treats the entire dollar-quoted
+body as literal-until-close-tag, so client-side substitution never runs
+against its contents. The literal `:'oid_10c2b2'` reached the server
+verbatim; the leading `:` surfaced as a syntax error at the first token
+of the DO body's SQL. INS-5's dry-run harness tested regex LOGIC against
+the migration file text; it did not exercise the psql → plpgsql PIPES
+that carry data between the top-level script and the DO block. **The
+plumbing was never rehearsed pre-run.**
+
+**Instrument.** `scripts/proof/apply-f24-rebase.local.sql`, STEPS 4a/4b/4c
+`DO $tag$ ... $tag$` blocks. Also — implicitly — the INS-5 dry-run
+harness, whose scope did not cover psql-server data flow.
+
+**Failure mode.** `false-green` (of the paired dry-run harness — it
+reported 14/14 PASS on regex logic while the DO-body plumbing it never
+tested was broken) → cascading `hard-error` at runtime (STEP 4a
+transaction-aborting syntax error). The rollback semantics of the
+transactional wrap prevented any side-effect leak, so the net risk was
+time only.
+
+**Fix (committed 2026-08-05).** Bridge psql-space to plpgsql-space via
+transaction-local GUC at all three import sites:
+
+```sql
+\lo_import 'supabase/migrations/<file>.sql'
+\set oid_<tag> :LASTOID
+SELECT set_config('vars.oid_<tag>', :'oid_<tag>', true) AS bridged_oid_<tag>;
+
+DO $<tag>$
+DECLARE
+  v_oid oid := current_setting('vars.oid_<tag>')::oid;
+BEGIN
+  v_body := convert_from(lo_get(v_oid), 'UTF8');
+  ...
+END
+$<tag>$;
+
+SELECT lo_unlink(:'oid_<tag>'::oid);  -- top-level: psql interpolation OK
+```
+
+`set_config(name, value, is_local)` with `is_local=true` writes a
+transaction-scoped GUC that dies at COMMIT or ROLLBACK. No cross-session
+leak. No orphan on retry. `current_setting(name)::oid` inside the DO
+block is pure SQL — no psql substitution needed, no client-server
+protocol dependency.
+
+Top-level `lo_unlink(:'oid_<tag>'::oid)` unchanged: psql interpolation
+DOES happen at top level, and the LO cleanup runs after the DO block
+succeeds (rollback path is covered by the transaction wrap).
+
+**Mandatory 30-second rehearsal (introduced with this fix).**
+`scripts/proof/rehearse-lo-bridge.local.sql` — standalone paste
+Garrett runs BEFORE re-invoking the full apply. Proves the bridge on
+the real connection with zero state risk:
+
+```
+BEGIN
+  \lo_import  <any small file>
+  set_config bridge
+  DO block: current_setting → lo_get → RAISE NOTICE 'bridge ok, N bytes'
+ROLLBACK
+```
+
+Expected terminal output: `NOTICE:  bridge ok, <N> bytes` followed by
+`ROLLBACK`. If instead `ERROR:  syntax error at or near ":"`, the
+bridge is broken and the full apply MUST NOT be re-invoked.
+
+**Credit.** The apply script's transactional wrap refused safely at the
+runtime error: full rollback, zero side effects, live state unchanged.
+That's the correct failure mode for a mutation script that hits an
+unexpected error mid-flight. The apply-script's rollback discipline is
+what let INS-6 stay a time cost, not a data cost.
+
+**Meta-lesson: test the plumbing, not just the logic.** INS-5's dry-run
+tested regex correctness against static file text — a valid check, but
+not a comprehensive one. Every future direct-apply script that carries
+data across process/protocol boundaries (psql client ↔ postgres server,
+here) MUST have a paired rehearsal that exercises the pipes at each
+boundary. Rehearsals run BEFORE any mutation and MUST be side-effect-
+free (BEGIN → operations → ROLLBACK). The dry-run mandate now has two
+tiers:
+
+1. **Logic dry-run** — regex/marker checks against static input
+   (INS-5's `dryrun-apply-f24-rebase-checks.local.mjs`).
+2. **Plumbing rehearsal** — end-to-end pipe exercise on the real
+   connection, wrapped in ROLLBACK (INS-6's `rehearse-lo-bridge.local.sql`).
+
+Both are required for any pre-execution sanity check that reaches into
+a live system.
+
+**Recurring pattern noted.** Two direct-apply mistakes on the same file
+(INS-4 evidence-window regex, INS-5 window-overflow + contiguous-pattern
+kill, INS-6 psql/plpgsql interpolation boundary) all trace to the same
+root: authoring an instrument without exercising it end-to-end against
+its real target before wiring it into a mutation path. The transactional
+wrap has caught every one so far; the wrap is doing load-bearing work
+that the instrument authoring is not.
