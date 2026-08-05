@@ -102,7 +102,100 @@ The scripts refuse pooled URL patterns; the direct primary URL should
 resolve to `db.jjgspcpvqaiitloglxbb.supabase.co:5432` (per §15.4 of
 `docs/PHASE_4_5_GCE_PLATFORM_NOTES.md`).
 
-**Clear the env at the end of the session:**
+### 2.1 PRODUCTION connection — `SUPABASE_DB_URL_PROD`
+
+**Use case.** Season-Loop repair migrations (SL-1..SL-5) and any other
+direct-apply that must run against production. Introduced 2026-08-05
+with the SL-1 apply harness (`scripts/proof/apply-sl1-auto-fix.local.sql`).
+Prior to that date only staging was documented here; prod applies
+required a separate ad-hoc loader that lived nowhere durable — the
+first SL-1 apply attempt failed because the env var was unset and
+psql defaulted to `localhost`, refusing connection with zero prod
+contact. INS-8-adjacent instrument lesson: undocumented connection
+strings are landmines. This section closes that gap.
+
+**Prerequisite check (paste first).** Does the prod DB-URL secret
+exist in Secret Manager?
+
+```powershell
+gcloud secrets list --project=citrus-fantasy-prod --filter="name~SUPABASE_DB_URL$" --format="value(name)"
+```
+
+- If it prints `SUPABASE_DB_URL`, proceed to the LOADER block below.
+- If it prints nothing, run the CREATE block first (one-time setup),
+  then the LOADER.
+
+**LOADER (secret exists).** Paste as a single block.
+
+```powershell
+$env:SUPABASE_DB_URL_PROD = (gcloud secrets versions access latest `
+  --secret=SUPABASE_DB_URL `
+  --project=citrus-fantasy-prod)
+
+# Sanity — should print the redacted prod host (db.iezwazccqqrhrjupxzvf...),
+# NOT the password, NOT localhost:
+$env:SUPABASE_DB_URL_PROD -replace ':\/\/[^:]+:[^@]+@', '://REDACTED:REDACTED@'
+
+# Assert: the URL is the DIRECT connection, NOT the pooler (KI-E010).
+# Direct : db.iezwazccqqrhrjupxzvf.supabase.co:5432
+# Pooler : aws-0-*.pooler.supabase.com:6543  ← LISTEN frames don't survive; REFUSE
+if ($env:SUPABASE_DB_URL_PROD -match 'pooler\.supabase|pgbouncer|:6543') {
+  Write-Error "SUPABASE_DB_URL_PROD is a pooler URL — direct connection required. See KI-E010."
+  Remove-Item Env:\SUPABASE_DB_URL_PROD
+}
+```
+
+**CREATE (secret does not yet exist — one-time setup).** Requires the
+prod DB password, which lives in the Supabase dashboard at
+[https://supabase.com/dashboard/project/iezwazccqqrhrjupxzvf/settings/database](https://supabase.com/dashboard/project/iezwazccqqrhrjupxzvf/settings/database)
+(Settings → Database → Connection string → URI → the direct connection,
+with the password revealed via the "Reveal" button). NEVER paste the
+password into shell history in plaintext — pipe it into gcloud via
+`Read-Host -AsSecureString` to keep it out of the buffer.
+
+```powershell
+# ONE-TIME. Reads the password from an interactive prompt (masked),
+# constructs the direct-connection URL, writes it to Secret Manager,
+# then LOADS into env. Paste in one block; the Read-Host masks input.
+
+$pw = Read-Host -Prompt "Enter prod DB password (masked)" -AsSecureString
+$pwPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+  [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
+
+$prodUrl = "postgresql://postgres:$pwPlain@db.iezwazccqqrhrjupxzvf.supabase.co:5432/postgres"
+
+# Create the secret in the prod GCP project.
+gcloud secrets create SUPABASE_DB_URL `
+  --project=citrus-fantasy-prod `
+  --replication-policy=automatic
+
+# Add the first version. Uses --data-file=- to read from stdin so the
+# password never appears in the gcloud command line / process listing.
+$prodUrl | gcloud secrets versions add SUPABASE_DB_URL `
+  --project=citrus-fantasy-prod `
+  --data-file=-
+
+# Wipe the plaintext from this session's variables.
+$pwPlain = $null; $prodUrl = $null; $pw = $null
+[System.GC]::Collect()
+
+# Now run the LOADER block above to hydrate SUPABASE_DB_URL_PROD.
+```
+
+**Clear the prod env at the end of the session:**
+
+```powershell
+Remove-Item Env:\SUPABASE_DB_URL_PROD
+```
+
+**KI-E010 reminder.** SL-1 (and any future direct-apply that uses
+`\lo_import` or LISTEN/NOTIFY) MUST connect on the direct URL, NOT the
+pooler. Symptoms of a pooler URL landing anyway: `\lo_import` fails
+silently or emits `pg_largeobject` permission errors; LISTEN frames
+never arrive at the client. The LOADER's regex-refuse block catches
+the common pooler patterns pre-flight.
+
+### 2.2 Clear the STAGING env at the end of the session
 
 ```powershell
 Remove-Item Env:\SUPABASE_DB_URL
