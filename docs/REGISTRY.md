@@ -398,6 +398,101 @@ The internal path (`processSubmitPick` else-branch, `LobbyManager.ts:1826-1832`)
 - `2026-08-05T18:27:03Z RAISE WARNING clock fired but draftStatus=completed — ignored (timer should have been cancelled)` (from the F20 guard, absorbing what F26 failed to cancel)
 - Zero `draft_completed` frames in the ndjson capture across all 12 client streams.
 
+### KI-036 — SL-1: auto_fix_integrity_issues dead 5.3 months (162 consecutive failed nightly runs, prod)
+
+**Field record (architect direct prod interrogation, 2026-08-05).**
+Function `public.auto_fix_integrity_issues()` throws every 04:00 UTC:
+
+```
+ERROR: invalid input syntax for type integer: "31ce43aa-793d-47a5-bf26-4099a387dc3b"
+SQLSTATE: 22P02
+Source: UPDATE team_lineups statement, `SELECT jsonb_agg(dp.player_id::INTEGER)` subquery
+File: supabase/migrations/20260116000003_create_integrity_checks.sql:329
+```
+
+Deterministic — same uuid nightly. Dead since **2026-02-25** (5.3 months): **162 consecutive failed runs, zero successes in retained history.** Scope correction from the pending task board: not "≥8 days" — nearly six months.
+
+**Scope correction memo.** The staging sensor pack (`scripts/proof/sl1-sensor-findings.local.sql`, committed 62596947) reported vacuous green on staging because staging has zero cron jobs scheduled and empty v1 tables (see docket 2 below). The patient is prod. The pack architecture is correct as an interrogation template; the mistake was pointing it at staging. Any future Season-Loop query MUST specify target env explicitly (`SUPABASE_DB_URL_PROD` vs `SUPABASE_DB_URL`), and the query author must confirm target-vs-symptom coherence before adjudicating "healthy."
+
+**Blast radius:** All 10 teams in league `750f4e1a-92ae-44cf-a798-2f3e06d0d5c9` ("Demo League - Citrus Storm Showcase") have empty lineups despite 21 committed `draft_picks` each. Zero real-user teams affected today. Severity: sprint-lane, not fire drill — BUT (a) store-submission-gated (Apple/Google reviewer demo surface uses this demo league), (b) structurally season-critical (next real damage cluster meets the same crash).
+
+**Detection-arm decomposition (2026-08-05 architect read of `integrity_check_results`):**
+- 232 fail / 1 pass per 6h cycle. 154,366 accumulated rows since Feb.
+- 232 = `missing_players_check` 210 + `team_lineups_vs_draft_picks_count` 10 + `fantasy_daily_rosters_sync_today` 12.
+- 210 + 10 = ONE damage cluster (10 teams × 21 picks, lineups zero).
+- 12 sync-today failures = offseason staleness class (see docket 3 below — likely reclassify).
+
+**Fix shipped (this commit):** Migration `20260805200000_sl1_auto_fix_uuid_cast.sql`. Scoped cast repair:
+
+- Six `?` operator invocations on jsonb changed from `dp.player_id` → `dp.player_id::text`. jsonb `?` operator signature is `jsonb ? text → boolean`; UUID doesn't implicitly cast to text in every operator context.
+- One `jsonb_agg(dp.player_id::INTEGER)` in the UPDATE subquery changed to `jsonb_agg(dp.player_id::text)` — the 22P02 crash site.
+- `team_lineups.bench`/`starters`/`ir` arrays store player identifiers as JSON strings going forward.
+
+**Out of scope (documented in migration header):**
+- Existing pre-UUID INTEGER-typed jsonb values in `team_lineups.bench` will false-negative the `?` check → function will re-append the UUID form (harmless for empty-lineup teams like the demo cluster). Separate migration if needed for legacy INT rows.
+- `draft_picks_v2` (v2 stack) not walked by this function. Verify data-source with schema audit if v2 migration is imminent.
+- `v_players_fixed` accounting via `GET DIAGNOSTICS ROW_COUNT` reports "1" per team (one row updated per loop iteration) rather than actual player count. Pre-existing bug; not fixed here (minimal-scope rule).
+
+**Verification test (architect acceptance criteria):**
+- (a) Invoke fixed function once (or wait for next 04:00 tick): succeeds without exception.
+- (b) Demo league `750f4e1a-...`: all 10 teams have 21 players each in `team_lineups` (starters + bench + ir combined).
+- (c) Next `check_data_integrity` run: `missing_players_check` drops from 210 to 0.
+- (d) `integrity_check_results` board goes green for the first time since 2026-02-25.
+
+**Apply mechanic:** First reuse of the F24 apply tooling — `scripts/proof/apply-f24-rebase.local.sql` pattern adapted for prod target. Rule 1 (capture-before-replace on prod's live body), Rule 2 (real SQL in history via `\lo_import`), Rule 3 (`client_encoding=UTF8` forced), STEP 0 hash pin from architect's same-day prod `md5(pg_get_functiondef(...))` capture.
+
+### KI-037 — SL-5: log_xg_integrity dark from day one (integrity_check_results status CHECK violation)
+
+**Field record (2026-08-05).** New pg_cron job `log_xg_integrity` (jobid 13) failed its maiden run on 2026-08-05 05:45 UTC. Error: the status value being inserted violates `integrity_check_results_status_check` (`status IN ('pass', 'fail', 'warning')`). xG monitoring dark from day one — never emitted a single accepted row.
+
+| | |
+|---|---|
+| **Severity** | medium — xG (expected-goals) is our foundational projection moat; monitoring it is table stakes. Not blocking any user flow today, but any silent regression in the model would go undetected. |
+| **Surface** | pg_cron jobid 13 command body (the `log_xg_integrity` insert); `integrity_check_results.status` CHECK constraint at `supabase/migrations/20260116000003_create_integrity_checks.sql:13`; the invoker function/procedure that jobid 13 runs. |
+| **Description** | The job attempts to write a status value not in the constraint's allowlist. Two possible fixes: (a) align the value in the invoker (e.g., emit `'pass'`/`'fail'`/`'warning'` instead of whatever it currently emits — most likely a semantically-adjacent word like `'ok'`, `'error'`, `'skipped'`, `'ran'`), or (b) extend the CHECK constraint deliberately to accept a broader vocabulary that xG monitoring uses. Decide DELIBERATELY — the CHECK constraint is a contract shared by every writer of that table; extending it silently widens the interface. |
+| **Why deferred** | Not deferred — pending scope decision (align value vs extend constraint). Fix ship in same lane as SL-1. |
+| **Target phase / timeline** | Same Season-Loop sprint as SL-1. First need: read the jobid-13 command body to see the intended status vocabulary. If it's an accidental typo (`'FAILED'` vs `'fail'`), align. If it represents a distinct xG-domain state, extend deliberately with matching downstream consumer updates. |
+| **Verification test** | (a) After fix: manually invoke the log_xg_integrity command; a row lands in `integrity_check_results` without exception. (b) Next scheduled 05:45 tick: row lands. (c) integrity_check_results filtered to `check_name='log_xg_integrity'` shows > 0 rows within 24h. |
+
+### KI-038 — DEF-1: monitoring surface for the defense cluster (docket 1 from SL-1 findings)
+
+**Docket (architect 2026-08-05).** SL-1 revealed the detection arm was WORKING correctly for five months — 154,366 fail rows accumulated — but nobody was reading them. A perfectly-functioning sensor that emits into a black hole is worse than a broken sensor: broken sensors get investigated, working-into-void sensors get trusted.
+
+| | |
+|---|---|
+| **Severity** | medium — no user-visible impact today, but the class is the F20-of-season-loop-scale ("the guard fires correctly into a void — nobody sees, nobody responds"). |
+| **Surface** | Detection cluster: `integrity_check_results`, `check_data_integrity`, `auto_fix_integrity_issues` (and future season-loop monitors — SL-2/3/4/5 all belong to the same family). Missing: any surface that projects failure counts to a human-readable dashboard OR routes them to AlertManager. |
+| **Description** | Even a daily one-line failure count SOMEWHERE VISIBLE would have surfaced SL-1 within 24 hours instead of five months. Two candidates: (a) extend AlertManager with a scheduled query that reads `integrity_check_results` daily and fires an alert if the 24h fail count > 0 (aligns with the existing infra per `feedback_reuse_existing_infra.md`), OR (b) a simple daily digest email using the same alert plumbing. |
+| **Why deferred** | Not deferred — new work item, not a fix. Same Season-Loop sprint. |
+| **Target phase / timeline** | Design within the SL sprint; ship separately from SL-1..SL-5 fixes so the alerter can fire against the freshly-green board and get its first non-trivial coverage window. |
+| **Verification test** | (a) Alert fires within 24h of any newly-inserted `integrity_check_results` row with `status='fail'`. (b) Test-fire mandate applies (`feedback_test_fire_mandate.md`): must be confirmed on the actual destination before marking shipped. |
+
+### KI-039 — DEF-2: staging has zero season-loop defenses scheduled (docket 2 from SL-1 findings)
+
+**Docket (architect 2026-08-05).** SL-1's staging sensor pack reported vacuous green because staging has zero pg_cron jobs for the defense cluster. Explains why staging failed to catch the 2026-02-25 regression: it wasn't watching. Decision needed: parallel schedules in staging vs prod-only defenses.
+
+| | |
+|---|---|
+| **Severity** | low — decision-record class. Not a bug, a deliberate posture question. |
+| **Surface** | `cron.job` schedule table in both staging and prod; the parallel-envs strategy in `docs/PHASE_4_5_PLAN.md`. |
+| **Description** | Tradeoff: parallel schedules give staging a matching sensor field that catches structural regressions before prod, at the cost of noise on empty tables. Prod-only defenses match today's posture with the fewest moving parts but leave staging blind to any structural bug that would only surface under real cron cadence. Should be a DELIBERATE decision, not a defaulted-into state. |
+| **Why deferred** | Blocked on PROD-PORT scoping (task #31) — the parallel-envs question is easier to answer after PROD-PORT establishes the prod-vs-staging data-fidelity contract. |
+| **Target phase / timeline** | Post-PROD-PORT scoping. Record the decision (either direction) in an ADR alongside PROD-PORT. |
+| **Verification test** | Decision documented in ADR; if parallel-envs is chosen, staging `cron.job` rows match prod's for the defense-cluster surface. |
+
+### KI-040 — DEF-3: sync-today checks have wrong offseason semantics (docket 3 from SL-1 findings)
+
+**Docket (architect 2026-08-05).** Of the 232 nightly fail rows, 12 are `fantasy_daily_rosters_sync_today` failures that architect suspects are offseason staleness — the check semantics assume in-season daily roster syncs, but the NHL is between seasons. Green must mean green, not "always failing because we're between seasons."
+
+| | |
+|---|---|
+| **Severity** | low — masks itself; adjacent to KI-038 (nobody was reading the fails anyway). |
+| **Surface** | `check_data_integrity` function (specifically the `fantasy_daily_rosters_sync_today` check branch); the sync-today definition + expected cadence. |
+| **Description** | Two candidate fixes: (a) reclassify — the check should return `pass` OR `warning` (not `fail`) during offseason, gated on a "season active" boolean derived from schedule. (b) Extend semantics — `fail` remains for in-season stale sync, `not_applicable` (new status vocab, coordinates with SL-5 status-value work) during offseason. Discuss with architect before ship. |
+| **Why deferred** | Diagnostic clarity first: (a) confirm architect's offseason hypothesis with a query of the check body, (b) then decide reclassify vs new-vocabulary. |
+| **Target phase / timeline** | Same Season-Loop sprint as SL-1..SL-5. Order-of-operations: reclassify after SL-5's status-vocabulary decision (since both touch the same allowlist). |
+| **Verification test** | (a) In offseason: `check_data_integrity` invocation for `fantasy_daily_rosters_sync_today` returns `pass` OR `warning` (not `fail`). (b) In-season simulation (canned): stale sync → `fail`. (c) Alert count (KI-038) drops by the number of currently-classified-as-fail sync-today rows. |
+
 ---
 
 ## How to add a row
