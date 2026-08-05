@@ -111,3 +111,68 @@ evidence quality, preserves the refuse-first posture.
   marker in that window reads false. Do not rely on a "region contains
   the literal" positive as "the literal is in the region" — those are
   the same statement only when the window is non-empty.
+
+### INS-5 — STEP 3 windowed diagnostics: four false-reds on primary evidence (overflow + contiguous-pattern kill)
+
+**Field record (2026-08-05).** After INS-4's STEP 0 patch, the same apply
+script's STEP 3 post-apply verification failed FOUR of its 12 marker
+checks on the correctly-applied rebase body. Architect adjudicated all
+four as instrument false-reds after reading the migration file regions
+directly. The 1200-char `completion_window` (anchored at `v_total_picks > 0`)
+proved too tight for markers that live deep in the completion branch,
+AND one marker's regex required a contiguous multi-line pattern that
+`pg_get_functiondef` splits across lines.
+
+**Per-marker mechanism** (all present, all misdetected):
+
+| Marker | Failure mechanism | Fix mechanism |
+|---|---|---|
+| `v_has_deadline_before_validate` | Windowed logic depended on `pos(validate_draft_event_payload)` for the ordering assertion, but the semantics of the check ("deadline computed before payload built") reduces to a simpler pair. | Body-wide position math: `0 < position('v_new_deadline :=') < position('v_payload := jsonb_build_object')`. DECLARE has `v_new_deadline timestamptz;` (no `:=`), so the `:=` fragment tags only the assignment. Both anchors are unique in body. |
+| `v_has_status_completed_deadline_null` | The `draft_status = 'completed', pick_deadline = NULL` UPDATE sits ~40 comment-lines past the `v_total_picks > 0` anchor. That's ~1500 chars, past the 1200-char window. Window overflow. | Body-wide, self-anchored, whitespace-tolerant: `draft_status\s*=\s*'completed'\s*,\s*pick_deadline\s*=\s*NULL`. No other UPDATE in the body has this shape; body-wide is safe. |
+| `v_has_sha256_hash` | Source is `encode(\n      sha256(convert_to(v_completion_payload::text, 'UTF8')),\n      'hex'\n    )`. Original regex included `encode(` but the newline between `encode(` and `sha256(` broke the contiguous match. Contiguous-pattern kill. | Anchor to the single-line portion: `sha256\(convert_to\(v_completion_payload`. `v_completion_payload` is unique to the completion branch; body-wide safe. |
+| `v_has_return_pick_deadline_null` | Same window overflow class as the UPDATE marker — the branch RETURN sits at the bottom of the branch, past the 1200-char window boundary. | Body-wide, self-anchored: `'pick_deadline',\s*NULL`. The other RETURN uses `v_new_deadline`, the duplicate-retry RETURN uses `v_current_dl`. Only the completion branch produces the literal `'pick_deadline', NULL` sequence. |
+
+**Instrument.** `scripts/proof/apply-f24-rebase.local.sql`, STEP 3
+`DO $verify$ ... $verify$` block. Migration file body ratified by
+architect as-read — untouched by this fix.
+
+**Failure mode.** `false-red` × 4. All four markers refused a correctly-
+applied rebase.
+
+**Fix (committed 2026-08-05).** Per-marker replacements per architect
+spec (table above). Windowing kept only where the marker string is
+inherently ambiguous (bare `'pick_deadline'`, bare `deleted_at IS NULL`,
+bare `'pick', 2,`).
+
+**Mandatory dry-run gate (introduced with this fix).** Before Garrett
+re-applies the rebase, every STEP 3 marker regex + the negative marker
+MUST be validated against the migration file's own text. Mechanism:
+`scripts/proof/dryrun-apply-f24-rebase-checks.local.mjs` reads the file,
+extracts the plpgsql body, and runs a JS-regex equivalent of each check
+in the SQL harness. Expected-vs-actual table printed; non-zero exit if
+any row disagrees. The instrument gets tested before it points at the
+database again.
+
+Dry-run result (recorded 2026-08-05): **14/14 PASS.** Positions confirmed:
+`v_payload := ...` at char 7302, `INSERT INTO draft_events` at char 8828,
+`v_total_picks > 0` at char 11009. UPDATE marker at ~char 12500 (~1500
+chars past the completion anchor — confirms window-overflow diagnosis).
+
+**Credit.** All four checks refused safely. The failure was in the
+evidence-collection technique (positional windows), not in the refuse-
+first posture. Fix improves evidence quality, preserves refusal
+discipline.
+
+**Principle established (architect 2026-08-05).** *Self-anchored unique
+strings with `\s*` tolerance beat positional windows.* Keep windows only
+where the marker string is inherently ambiguous. Never rely on a
+positional window to reach a marker deep in a branch — the window is
+brittle by design, and the marker's own uniqueness is the more durable
+constraint.
+
+**Meta-lesson: test the instrument first.** Every future guard/check
+against a runtime target MUST have a paired dry-run harness that runs
+against a known-good static input (source file, canned fixture, prior
+capture). If the harness can't be constructed, the check isn't ready.
+The dry-run mandate is now standing practice for any pre-execution
+sanity check.

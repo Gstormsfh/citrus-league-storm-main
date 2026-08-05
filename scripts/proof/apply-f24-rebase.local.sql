@@ -236,43 +236,87 @@ BEGIN
   v_completion_sum_win := CASE WHEN v_pos_completion_sum > 0 THEN substring(v_new_body, v_pos_completion_sum, 200) ELSE '' END;
 
   -- ── Batch-2 restoration markers ──────────────────────────────────────
+  --
+  -- Windowing philosophy (INS-5 architect ruling, 2026-08-05):
+  -- Self-anchored unique strings with \s* tolerance beat positional
+  -- windows every time. Windows are kept ONLY where the marker string is
+  -- inherently ambiguous — bare `'pick_deadline'` (appears 9× in body),
+  -- bare `deleted_at IS NULL` (appears twice, once per filter site),
+  -- bare `'pick', 2,` (could match comments). Everywhere else: use a
+  -- self-anchored regex that names its own boundary, and pay for the
+  -- \s* tolerance to survive pg_get_functiondef reflow across lines.
+
   -- Payload window MUST contain 'pick_deadline' — batch-2's key restored.
+  -- Bare literal is inherently ambiguous (9 occurrences body-wide);
+  -- window is load-bearing here.
   v_has_pick_deadline_in_payload := v_payload_window ~ $$'pick_deadline'$$;
-  -- Deadline computed BEFORE validate: v_new_deadline := appears at a
-  -- lower position than validate_draft_event_payload. Both are unique;
-  -- position()=0 if absent makes the arithmetic reject.
-  v_has_deadline_before_validate := v_pos_payload > 0
-                                AND position('v_new_deadline :=' IN v_new_body) > 0
-                                AND position('v_new_deadline :=' IN v_new_body)
-                                    < position('validate_draft_event_payload' IN v_new_body);
+
+  -- Deadline computed BEFORE validate: body-wide position comparison.
+  -- DECLARE has `v_new_deadline timestamptz;` (no `:=`), so
+  -- `v_new_deadline :=` uniquely tags the assignment. `validate_draft_event_payload`
+  -- appears exactly once in the body (the PERFORM call). Ordering:
+  -- 0 < pos(v_new_deadline :=) < pos(v_payload := jsonb_build_object) < pos(validate_draft_event_payload).
+  -- We only need the first two for the "deadline computed before payload build"
+  -- claim; the payload-build-before-validate order is guaranteed by the
+  -- v_payload markers landing inside the payload_window (which ends
+  -- before the validate line by construction).
+  v_has_deadline_before_validate :=
+    position('v_new_deadline :=' IN v_new_body) > 0
+    AND position('v_payload := jsonb_build_object' IN v_new_body) > 0
+    AND position('v_new_deadline :=' IN v_new_body)
+        < position('v_payload := jsonb_build_object' IN v_new_body);
+
   -- event_version=2: 'pick', 2, must appear inside the INSERT VALUES
-  -- (window), not just anywhere in the body.
+  -- window, not just anywhere in the body (comments/prose can mention
+  -- event_version=2 in flow-of-text).
   v_has_event_version_2 := v_insert_window ~ $$'pick',\s*2\s*,$$;
 
   -- ── F24 markers ──────────────────────────────────────────────────────
-  -- Step 2 on-clock filter: `AND deleted_at IS NULL` appears in the
-  -- windowed team_order SELECT region.
+  -- Step 2 on-clock filter: `deleted_at IS NULL` in the on-clock SELECT
+  -- window (the phrase appears twice body-wide, one per filter site).
   v_has_deleted_at_filter_step2 := v_step2_window ~ $$deleted_at IS NULL$$;
-  -- Completion SUM filter: same phrase but in the SUM window.
+  -- Completion SUM filter: same phrase, other window.
   v_has_deleted_at_filter_completion := v_completion_sum_win ~ $$deleted_at IS NULL$$;
-  -- Completion branch guard, D8 WARNING, status+deadline UPDATE, hash,
-  -- append_draft_event call, branch RETURN — all within the completion
-  -- window. If any is absent from THAT window, it's absent from the
-  -- branch, regardless of whether the literal appears elsewhere in a
-  -- comment or declaration.
-  v_has_completion_branch              := v_completion_window ~ $$v_total_picks > 0 AND p_pick_number >= v_total_picks$$;
-  v_has_d8_warning                     := v_completion_window ~ $$RAISE WARNING$$
-                                     AND v_completion_window ~ $$submit_pick_v2 completion branch$$;
-  v_has_status_completed_deadline_null := v_completion_window ~ $$draft_status = 'completed'$$
-                                     AND v_completion_window ~ $$pick_deadline = NULL$$;
-  v_has_sha256_hash                    := v_completion_window ~ $$sha256\(convert_to\(v_completion_payload::text, 'UTF8'\)\)$$;
-  v_has_return_pick_deadline_null      := v_completion_window ~ $$'pick_deadline', NULL$$;
-  -- Declarations sit in the DECLARE block ABOVE the payload build, so
-  -- they cannot appear in any of the above windows. Use whole-body
-  -- search for these two — but pin them with the type suffix so they
-  -- can't match a random comment. Both are unique-in-body strings.
+
+  -- Completion branch guard: unique, but co-located with the window
+  -- anchor by definition (v_completion_window starts at
+  -- `v_total_picks > 0`). Either self-anchored or windowed works;
+  -- the window costs nothing here.
+  v_has_completion_branch := v_completion_window ~ $$v_total_picks > 0 AND p_pick_number >= v_total_picks$$;
+
+  -- D8 WARNING: `RAISE WARNING` + `submit_pick_v2 completion branch` string
+  -- is unique to this call site (unique across full body). Self-anchored
+  -- either the noun phrase alone or the combo; combo is bulletproof.
+  v_has_d8_warning := v_new_body ~ $$RAISE WARNING$$
+                  AND v_new_body ~ $$submit_pick_v2 completion branch$$;
+
+  -- UPDATE marker (INS-5 fix): self-anchored, whitespace-tolerant.
+  -- pg_get_functiondef may reflow the two-line UPDATE across lines, or
+  -- render it as one long line depending on internal state. The regex
+  -- tolerates arbitrary whitespace between every token but NAILS the
+  -- token sequence and quoting: draft_status = 'completed', pick_deadline = NULL.
+  -- No other UPDATE in the body has this shape, so body-wide is safe.
+  v_has_status_completed_deadline_null :=
+    v_new_body ~ $$draft_status\s*=\s*'completed'\s*,\s*pick_deadline\s*=\s*NULL$$;
+
+  -- sha256 marker (INS-5 fix): the string that stays on one line in the
+  -- source is `sha256(convert_to(v_completion_payload...` — the outer
+  -- `encode(` starts on the previous line, so a regex including `encode(`
+  -- would need to span a newline (contiguous-pattern kill for `~`).
+  -- Anchor the single-line portion. `v_completion_payload` is unique to
+  -- the completion branch; body-wide safe.
+  v_has_sha256_hash := v_new_body ~ $$sha256\(convert_to\(v_completion_payload$$;
+
+  -- Declarations sit in the DECLARE block. Whole-body search with the
+  -- type suffix pinning distinguishes declaration from any other mention.
   v_has_v_completion_payload_declared := v_new_body ~ $$v_completion_payload\s+jsonb$$;
   v_has_v_completion_hash_declared    := v_new_body ~ $$v_completion_hash\s+text$$;
+
+  -- Branch RETURN pick_deadline=NULL (INS-5 fix): body-wide, unique to
+  -- the completion branch (the other RETURN uses `v_new_deadline`, and
+  -- the duplicate-retry RETURN uses `v_current_dl`). Only the completion
+  -- branch produces the literal `'pick_deadline', NULL` sequence.
+  v_has_return_pick_deadline_null := v_new_body ~ $$'pick_deadline',\s*NULL$$;
 
   -- ── Negative marker (Amendment 2 evidence-closed) ────────────────────
   -- Whole-body search bounded to `draft_state = ` (with `=`) — the F24
