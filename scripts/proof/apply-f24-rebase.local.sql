@@ -40,32 +40,90 @@ BEGIN;
 -- (The rebase migration assumes it is superseding 20260805023419, which
 -- assumes 20260805023419 IS what's live right now on this DB.)
 
+-- ── Patched 2026-08-05 post-first-write per architect adjudication ─────
+--
+-- The first STEP 0 gate used a whole-body regex search for the literal
+-- 'pick_deadline' string, which appears 9× in the F25-broken body (the
+-- two RETURN JSONB builders both carry 'pick_deadline' as a key of the
+-- returned envelope — regardless of what the pick event PAYLOAD carries).
+-- Result: guard false-red — refused a correct apply on wrong evidence.
+--
+-- Two-tier redesign:
+--   PRIMARY GATE  — md5(pg_get_functiondef(oid)) hash pin against the
+--                   architect's independent capture of 2026-08-05 23:00 MT.
+--                   Bit-exact identity check; cannot be fooled by literal-
+--                   substring matches anywhere in the body.
+--   DIAGNOSTICS   — the marker checks stay, but WINDOWED to the specific
+--                   syntactic region they claim to be checking. Windowed
+--                   substring of the payload build (starting at
+--                   `v_payload := jsonb_build_object`, 520 chars) cannot
+--                   match either RETURN because both RETURNs live 100s of
+--                   chars away from the payload construction. Failure of
+--                   the primary gate raises; diagnostic mismatch only
+--                   raises NOTICE.
+--
+-- Docketed as INS-4 in docs/INSTRUMENT_LEDGER.md alongside F7 (harness
+-- setter/callback confusion), F13 (NDJSON stream flush), and F18
+-- (SIGINT counter reads wrong accumulator). Credit due: the guard
+-- refused safely — a Type II error is the correct failure mode for a
+-- pre-apply sanity check. Investigate always beats "trust the check."
+
 DO $sanity$
 DECLARE
-  v_current_body text;
-  v_has_pick_deadline_in_payload boolean;
-  v_has_event_version_2 boolean;
+  v_current_body       text;
+  v_current_body_md5   text;
+  v_expected_md5       text := 'e849568e2f8cc35eb437c51b1732c91f';  -- architect capture 2026-08-05 23:00 MT
+
+  -- Diagnostic (windowed) markers — NOT gating; NOTICE only
+  v_payload_window       text;
+  v_insert_window        text;
+  v_diag_payload_has_pd  boolean;
+  v_diag_insert_has_v2   boolean;
 BEGIN
   SELECT pg_get_functiondef('public.submit_pick_v2(uuid,uuid,int,int,int,uuid,uuid,text,jsonb,uuid)'::regprocedure)
     INTO v_current_body;
 
-  -- F25-broken body is 20260512-based and OMITS pick_deadline from the payload.
-  -- Batch-2 body (correct base) INCLUDES it. If the payload has pick_deadline
-  -- already, then either the rebase already ran, or the world is not what we
-  -- think it is.
-  v_has_pick_deadline_in_payload := v_current_body ~ $$'pick_deadline',\s*v_new_deadline$$;
-  v_has_event_version_2 := v_current_body ~ $$event_version.*'pick'.*2$$;
+  v_current_body_md5 := md5(v_current_body);
 
-  RAISE NOTICE 'STEP 0 pre-apply sanity:';
-  RAISE NOTICE '  current body contains pick_deadline in payload : %', v_has_pick_deadline_in_payload;
-  RAISE NOTICE '  current body has event_version=2 on pick INSERT: %', v_has_event_version_2;
+  RAISE NOTICE '';
+  RAISE NOTICE '=== STEP 0 PRE-APPLY HASH PIN ===';
+  RAISE NOTICE '  live body md5     : %', v_current_body_md5;
+  RAISE NOTICE '  expected md5      : %', v_expected_md5;
+  RAISE NOTICE '  match             : %', (v_current_body_md5 = v_expected_md5);
 
-  IF v_has_pick_deadline_in_payload OR v_has_event_version_2 THEN
+  -- Windowed diagnostics — extract the specific syntactic region each
+  -- marker is supposed to check. If the region is missing (position
+  -- returns 0), the substring returns an empty string and the marker
+  -- reads false — accurate, not false-green.
+  v_payload_window := CASE
+    WHEN position('v_payload := jsonb_build_object' IN v_current_body) > 0
+    THEN substring(v_current_body, position('v_payload := jsonb_build_object' IN v_current_body), 520)
+    ELSE ''
+  END;
+  v_insert_window := CASE
+    WHEN position('INSERT INTO public.draft_events' IN v_current_body) > 0
+    THEN substring(v_current_body, position('INSERT INTO public.draft_events' IN v_current_body), 400)
+    ELSE ''
+  END;
+
+  v_diag_payload_has_pd := v_payload_window ~ $$'pick_deadline'$$;
+  v_diag_insert_has_v2  := v_insert_window ~ $$'pick',\s*2\s*,$$;
+
+  RAISE NOTICE '';
+  RAISE NOTICE '  DIAG payload_window contains pick_deadline : %  (batch-2/rebased marker)', v_diag_payload_has_pd;
+  RAISE NOTICE '  DIAG insert_window has ''pick'', 2, values  : %  (batch-2/rebased marker)', v_diag_insert_has_v2;
+  RAISE NOTICE '  DIAG payload_window length                 : %', length(v_payload_window);
+  RAISE NOTICE '  DIAG insert_window length                  : %', length(v_insert_window);
+  RAISE NOTICE '';
+
+  -- Primary gate — hash pin only. Diagnostics are informational.
+  IF v_current_body_md5 <> v_expected_md5 THEN
     RAISE EXCEPTION
-      'STEP 0 FAIL: live body already has batch-2 markers. Either the rebase already applied, or the base state is not the F25-broken 20260805023419. Investigate BEFORE re-running this apply.';
+      'STEP 0 FAIL: live body md5 % does not match expected % (architect capture 2026-08-05 23:00 MT). Diagnostics above show which specific windows disagree. Either the rebase already applied, or another migration touched submit_pick_v2 between the capture and now. Investigate BEFORE re-running.',
+      v_current_body_md5, v_expected_md5;
   END IF;
 
-  RAISE NOTICE 'STEP 0 PASS: live body is F25-broken 20260805023419 as expected.';
+  RAISE NOTICE 'STEP 0 PASS: live body md5 matches architect capture — F25-broken 20260805023419 exactly as expected.';
 END
 $sanity$;
 
@@ -92,58 +150,138 @@ $sanity$;
 -- STEP 3 — Post-apply verification: live body carries both batch-2 + F24 markers
 -- --------------------------------------------------------------------------
 
+-- ── Windowed, per architect adjudication of STEP 0 guard false-red ────
+--
+-- Every content check below is scoped to the syntactic region it claims
+-- to be checking. A whole-body pick_deadline search would false-green
+-- the same way STEP 0 false-redded — both RETURNs carry 'pick_deadline'
+-- as a JSONB envelope key, so a loose search would pass on either
+-- batch-2, F25-broken, or the rebased body. The windowed technique makes
+-- each marker say what it means.
+--
+-- Windows:
+--   payload_window     — from `v_payload := jsonb_build_object`, 520 chars.
+--                        Covers the pick event payload construction only.
+--   insert_window      — from `INSERT INTO public.draft_events`, 400 chars.
+--                        Covers the pick INSERT column list + VALUES.
+--   completion_window  — from `v_total_picks > 0`, 1200 chars. Covers the
+--                        F24 completion branch: guard, WARNING, UPDATE,
+--                        payload hoist + sha256 hash, append_draft_event
+--                        call, branch-terminal RETURN with NULL deadline.
+--   step2_window       — from `-- Step 2` marker (search fallback: the
+--                        team_order SELECT), 400 chars. Covers the on-
+--                        clock SELECT and its filter.
+--   completion_sum_win — from `SELECT COALESCE(SUM(jsonb_array_length`,
+--                        200 chars. Covers only the total-picks SUM.
+--
+-- If any window is empty (position() = 0), its markers read false —
+-- which is exactly what we want: a missing region is a failing check.
+
 DO $verify$
 DECLARE
   v_new_body text;
 
-  -- Batch-2 restoration markers
+  -- Windows
+  v_payload_window       text;
+  v_insert_window        text;
+  v_completion_window    text;
+  v_step2_window         text;
+  v_completion_sum_win   text;
+
+  -- Batch-2 restoration markers (windowed)
   v_has_pick_deadline_in_payload boolean;
-  v_has_deadline_before_validate boolean;  -- Approximated: pick_deadline appears in body before validate_draft_event_payload call
-  v_has_event_version_2 boolean;
+  v_has_deadline_before_validate boolean;
+  v_has_event_version_2          boolean;
 
-  -- F24 markers
-  v_has_deleted_at_filter_step2 boolean;
-  v_has_deleted_at_filter_completion boolean;
-  v_has_completion_branch boolean;
-  v_has_d8_warning boolean;
+  -- F24 markers (windowed)
+  v_has_deleted_at_filter_step2       boolean;
+  v_has_deleted_at_filter_completion  boolean;
+  v_has_completion_branch             boolean;
+  v_has_d8_warning                    boolean;
   v_has_status_completed_deadline_null boolean;
-  v_has_sha256_hash boolean;
+  v_has_sha256_hash                   boolean;
   v_has_v_completion_payload_declared boolean;
-  v_has_v_completion_hash_declared boolean;
-  v_has_return_pick_deadline_null boolean;
+  v_has_v_completion_hash_declared    boolean;
+  v_has_return_pick_deadline_null     boolean;
 
-  -- Negative marker
+  -- Negative marker (windowed to leagues-UPDATE regions, not whole body)
   v_touches_draft_state boolean;
 
   -- Function properties
   v_is_security_definer boolean;
-  v_search_path text;
-  v_overload_count int;
+  v_search_path         text;
+  v_overload_count      int;
+
+  -- Local scratch positions
+  v_pos_payload      int;
+  v_pos_insert       int;
+  v_pos_completion   int;
+  v_pos_step2        int;
+  v_pos_completion_sum int;
 BEGIN
   SELECT pg_get_functiondef('public.submit_pick_v2(uuid,uuid,int,int,int,uuid,uuid,text,jsonb,uuid)'::regprocedure)
     INTO v_new_body;
 
-  -- Batch-2 restoration markers
-  v_has_pick_deadline_in_payload := v_new_body ~ $$'pick_deadline', v_new_deadline$$;
-  v_has_deadline_before_validate := position('v_new_deadline :=' IN v_new_body) > 0
-                                AND position('v_new_deadline :=' IN v_new_body) < position('validate_draft_event_payload' IN v_new_body);
-  v_has_event_version_2 := v_new_body ~ $$'pick', 2, v_payload$$;
+  -- ── Establish windows ────────────────────────────────────────────────
+  v_pos_payload        := position('v_payload := jsonb_build_object' IN v_new_body);
+  v_pos_insert         := position('INSERT INTO public.draft_events' IN v_new_body);
+  v_pos_completion     := position('v_total_picks > 0' IN v_new_body);
+  v_pos_step2          := position('SELECT team_order INTO v_team_order' IN v_new_body);
+  v_pos_completion_sum := position('SELECT COALESCE(SUM(jsonb_array_length' IN v_new_body);
 
-  -- F24 markers
-  v_has_deleted_at_filter_step2 := v_new_body ~ $$AND round_number = p_round\s*AND deleted_at IS NULL$$;
-  v_has_deleted_at_filter_completion := v_new_body ~ $$FROM public.draft_order\s+WHERE league_id = p_league_id\s+AND deleted_at IS NULL$$;
-  v_has_completion_branch := v_new_body ~ $$v_total_picks > 0 AND p_pick_number >= v_total_picks$$;
-  v_has_d8_warning := v_new_body ~ $$RAISE WARNING\s+'submit_pick_v2 completion branch$$;
-  v_has_status_completed_deadline_null := v_new_body ~ $$draft_status = 'completed',\s*pick_deadline = NULL$$;
-  v_has_sha256_hash := v_new_body ~ $$sha256\(convert_to\(v_completion_payload::text, 'UTF8'\)\)$$;
-  v_has_v_completion_payload_declared := v_new_body ~ $$v_completion_payload jsonb$$;
-  v_has_v_completion_hash_declared := v_new_body ~ $$v_completion_hash\s+text$$;
-  v_has_return_pick_deadline_null := v_new_body ~ $$'pick_deadline', NULL$$;
+  v_payload_window     := CASE WHEN v_pos_payload > 0        THEN substring(v_new_body, v_pos_payload, 520)      ELSE '' END;
+  v_insert_window      := CASE WHEN v_pos_insert > 0         THEN substring(v_new_body, v_pos_insert, 400)       ELSE '' END;
+  v_completion_window  := CASE WHEN v_pos_completion > 0     THEN substring(v_new_body, v_pos_completion, 1200)  ELSE '' END;
+  v_step2_window       := CASE WHEN v_pos_step2 > 0          THEN substring(v_new_body, v_pos_step2, 400)        ELSE '' END;
+  v_completion_sum_win := CASE WHEN v_pos_completion_sum > 0 THEN substring(v_new_body, v_pos_completion_sum, 200) ELSE '' END;
 
-  -- Negative marker (Amendment 2 evidence-closed)
+  -- ── Batch-2 restoration markers ──────────────────────────────────────
+  -- Payload window MUST contain 'pick_deadline' — batch-2's key restored.
+  v_has_pick_deadline_in_payload := v_payload_window ~ $$'pick_deadline'$$;
+  -- Deadline computed BEFORE validate: v_new_deadline := appears at a
+  -- lower position than validate_draft_event_payload. Both are unique;
+  -- position()=0 if absent makes the arithmetic reject.
+  v_has_deadline_before_validate := v_pos_payload > 0
+                                AND position('v_new_deadline :=' IN v_new_body) > 0
+                                AND position('v_new_deadline :=' IN v_new_body)
+                                    < position('validate_draft_event_payload' IN v_new_body);
+  -- event_version=2: 'pick', 2, must appear inside the INSERT VALUES
+  -- (window), not just anywhere in the body.
+  v_has_event_version_2 := v_insert_window ~ $$'pick',\s*2\s*,$$;
+
+  -- ── F24 markers ──────────────────────────────────────────────────────
+  -- Step 2 on-clock filter: `AND deleted_at IS NULL` appears in the
+  -- windowed team_order SELECT region.
+  v_has_deleted_at_filter_step2 := v_step2_window ~ $$deleted_at IS NULL$$;
+  -- Completion SUM filter: same phrase but in the SUM window.
+  v_has_deleted_at_filter_completion := v_completion_sum_win ~ $$deleted_at IS NULL$$;
+  -- Completion branch guard, D8 WARNING, status+deadline UPDATE, hash,
+  -- append_draft_event call, branch RETURN — all within the completion
+  -- window. If any is absent from THAT window, it's absent from the
+  -- branch, regardless of whether the literal appears elsewhere in a
+  -- comment or declaration.
+  v_has_completion_branch              := v_completion_window ~ $$v_total_picks > 0 AND p_pick_number >= v_total_picks$$;
+  v_has_d8_warning                     := v_completion_window ~ $$RAISE WARNING$$
+                                     AND v_completion_window ~ $$submit_pick_v2 completion branch$$;
+  v_has_status_completed_deadline_null := v_completion_window ~ $$draft_status = 'completed'$$
+                                     AND v_completion_window ~ $$pick_deadline = NULL$$;
+  v_has_sha256_hash                    := v_completion_window ~ $$sha256\(convert_to\(v_completion_payload::text, 'UTF8'\)\)$$;
+  v_has_return_pick_deadline_null      := v_completion_window ~ $$'pick_deadline', NULL$$;
+  -- Declarations sit in the DECLARE block ABOVE the payload build, so
+  -- they cannot appear in any of the above windows. Use whole-body
+  -- search for these two — but pin them with the type suffix so they
+  -- can't match a random comment. Both are unique-in-body strings.
+  v_has_v_completion_payload_declared := v_new_body ~ $$v_completion_payload\s+jsonb$$;
+  v_has_v_completion_hash_declared    := v_new_body ~ $$v_completion_hash\s+text$$;
+
+  -- ── Negative marker (Amendment 2 evidence-closed) ────────────────────
+  -- Whole-body search bounded to `draft_state = ` (with `=`) — the F24
+  -- source uses `draft_state` in comments (as prose about the column not
+  -- existing), which we must not false-green as a write. `=` after
+  -- optional whitespace disambiguates prose from assignment.
   v_touches_draft_state := v_new_body ~ $$draft_state\s*=$$;
 
-  -- Function properties
+  -- ── Function properties ──────────────────────────────────────────────
   SELECT p.prosecdef,
          COALESCE(array_to_string(p.proconfig, ' '), ''),
          (SELECT count(*) FROM pg_proc WHERE proname = 'submit_pick_v2' AND pronamespace = 'public'::regnamespace)::int
@@ -154,31 +292,38 @@ BEGIN
    LIMIT 1;
 
   RAISE NOTICE '';
-  RAISE NOTICE '=== STEP 3 POST-APPLY VERIFICATION ===';
+  RAISE NOTICE '=== STEP 3 POST-APPLY VERIFICATION (WINDOWED) ===';
   RAISE NOTICE '';
-  RAISE NOTICE 'Batch-2 restoration markers:';
-  RAISE NOTICE '  pick_deadline in pick payload build   : %', v_has_pick_deadline_in_payload;
-  RAISE NOTICE '  deadline computed before validate     : %', v_has_deadline_before_validate;
-  RAISE NOTICE '  event_version=2 in pick INSERT        : %', v_has_event_version_2;
+  RAISE NOTICE 'Window positions (0 = missing):';
+  RAISE NOTICE '  v_payload := ...           at char : %  (window len %)', v_pos_payload,        length(v_payload_window);
+  RAISE NOTICE '  INSERT INTO draft_events   at char : %  (window len %)', v_pos_insert,         length(v_insert_window);
+  RAISE NOTICE '  v_total_picks > 0          at char : %  (window len %)', v_pos_completion,     length(v_completion_window);
+  RAISE NOTICE '  SELECT team_order          at char : %  (window len %)', v_pos_step2,          length(v_step2_window);
+  RAISE NOTICE '  SELECT COALESCE(SUM(...    at char : %  (window len %)', v_pos_completion_sum, length(v_completion_sum_win);
   RAISE NOTICE '';
-  RAISE NOTICE 'F24 markers:';
-  RAISE NOTICE '  Step 2 on-clock deleted_at filter     : %', v_has_deleted_at_filter_step2;
-  RAISE NOTICE '  Completion SUM deleted_at filter      : %', v_has_deleted_at_filter_completion;
-  RAISE NOTICE '  Completion branch guard               : %', v_has_completion_branch;
-  RAISE NOTICE '  D8 absorb-and-announce WARNING        : %', v_has_d8_warning;
+  RAISE NOTICE 'Batch-2 restoration markers (windowed):';
+  RAISE NOTICE '  pick_deadline in payload window        : %', v_has_pick_deadline_in_payload;
+  RAISE NOTICE '  deadline computed before validate      : %', v_has_deadline_before_validate;
+  RAISE NOTICE '  event_version=2 in INSERT window       : %', v_has_event_version_2;
+  RAISE NOTICE '';
+  RAISE NOTICE 'F24 markers (windowed):';
+  RAISE NOTICE '  Step 2 on-clock deleted_at filter      : %', v_has_deleted_at_filter_step2;
+  RAISE NOTICE '  Completion SUM deleted_at filter       : %', v_has_deleted_at_filter_completion;
+  RAISE NOTICE '  Completion branch guard                : %', v_has_completion_branch;
+  RAISE NOTICE '  D8 absorb-and-announce WARNING         : %', v_has_d8_warning;
   RAISE NOTICE '  UPDATE status=completed + deadline=NULL: %', v_has_status_completed_deadline_null;
-  RAISE NOTICE '  sha256 hash of completion payload     : %', v_has_sha256_hash;
-  RAISE NOTICE '  v_completion_payload declared         : %', v_has_v_completion_payload_declared;
-  RAISE NOTICE '  v_completion_hash declared            : %', v_has_v_completion_hash_declared;
-  RAISE NOTICE '  branch RETURN pick_deadline=NULL      : %', v_has_return_pick_deadline_null;
+  RAISE NOTICE '  sha256 hash of completion payload      : %', v_has_sha256_hash;
+  RAISE NOTICE '  v_completion_payload declared          : %', v_has_v_completion_payload_declared;
+  RAISE NOTICE '  v_completion_hash declared             : %', v_has_v_completion_hash_declared;
+  RAISE NOTICE '  branch RETURN pick_deadline=NULL       : %', v_has_return_pick_deadline_null;
   RAISE NOTICE '';
   RAISE NOTICE 'Negative marker (must be false):';
-  RAISE NOTICE '  writes draft_state                    : %', v_touches_draft_state;
+  RAISE NOTICE '  writes draft_state (draft_state = ...) : %', v_touches_draft_state;
   RAISE NOTICE '';
   RAISE NOTICE 'Function properties:';
-  RAISE NOTICE '  SECURITY DEFINER                      : %', v_is_security_definer;
-  RAISE NOTICE '  search_path config                    : %', v_search_path;
-  RAISE NOTICE '  overloads of submit_pick_v2           : %', v_overload_count;
+  RAISE NOTICE '  SECURITY DEFINER                       : %', v_is_security_definer;
+  RAISE NOTICE '  search_path config                     : %', v_search_path;
+  RAISE NOTICE '  overloads of submit_pick_v2            : %', v_overload_count;
   RAISE NOTICE '';
 
   IF NOT (v_has_pick_deadline_in_payload
@@ -197,10 +342,10 @@ BEGIN
       AND v_is_security_definer
       AND v_search_path = 'search_path=public'
       AND v_overload_count = 1) THEN
-    RAISE EXCEPTION 'STEP 3 FAIL: post-apply marker verification did not all pass. See notices above. Rolling back.';
+    RAISE EXCEPTION 'STEP 3 FAIL: post-apply windowed marker verification did not all pass. See notices above. Rolling back.';
   END IF;
 
-  RAISE NOTICE 'STEP 3 PASS: all batch-2 + F24 markers present, no draft_state writes, SECURITY DEFINER + search_path=public + single overload.';
+  RAISE NOTICE 'STEP 3 PASS: all batch-2 + F24 markers present in the correct syntactic regions, no draft_state writes, SECURITY DEFINER + search_path=public + single overload.';
 END
 $verify$;
 
