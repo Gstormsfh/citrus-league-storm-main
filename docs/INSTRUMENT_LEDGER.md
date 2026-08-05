@@ -287,3 +287,70 @@ root: authoring an instrument without exercising it end-to-end against
 its real target before wiring it into a mutation path. The transactional
 wrap has caught every one so far; the wrap is doing load-bearing work
 that the instrument authoring is not.
+
+### INS-7 — psql -f apply on Windows: client_encoding default mangles non-ASCII source bytes
+
+**Field record (2026-08-05, F24 rebase apply, post-INS-6 successful
+run).** After INS-6's bridge patch, the full apply completed clean.
+STEP 5 PASS, COMMIT reached. Architect's post-apply verification
+recorded a new md5 pin for the live body:
+`0936f891d707da231446d440b452197f`. History-vs-live containment
+verified TRUE after ASCII normalization — the divergence between the
+stored `statements[1]` bytes (byte-exact from `\lo_import`) and the
+live `pg_get_functiondef` output is mojibake only: 132 non-ASCII file
+chars expanded to 353 stored chars (×3 signature), located in
+comments and the D8 `RAISE WARNING` literal. Comment content and
+warning-message content are cosmetic; behavior is identical to a
+UTF-8-clean apply.
+
+**Instrument.** `psql -f` invocation itself, not any single script.
+On Windows / PowerShell environments, psql's default `client_encoding`
+resolves to `WIN1252` (or platform equivalent), which mangles UTF-8
+source bytes on the wire. The migration source file is UTF-8 clean
+(em-dashes, box-drawing, Unicode quotes all correct); the STORED
+function body is not.
+
+**Failure mode.** `dropped-signal` on the wire — bytes leave the
+client correctly and arrive at the server transformed. Cosmetic
+divergence class: no behavior changed, no data loss, no correctness
+impact. Detection required an independent md5 comparison against a
+same-day capture made under a different encoding regime.
+
+**Fix.** No remediation pass on existing mojibake (architect ruling
+2026-08-05: "mojibake endemic in corpus, no remediation pass"). Rule
+3 added to `docs/MIGRATION_SAFETY_GUIDE.md`: every future `psql -f`
+apply MUST force `client_encoding=UTF8` via connection string
+(`?client_encoding=UTF8`) or first-statement `SET client_encoding TO
+'UTF8'`. The rule makes wire encoding an explicit invariant of the
+apply protocol.
+
+**Rationale for not remediating.** A re-apply to correct the mojibake
+would change the live body, invalidating the new md5 pin and
+requiring architect re-ratification with no user-visible benefit.
+The comments are for humans reading the source file (which is clean);
+the D8 WARNING message would be less pretty in `pg_stat_activity` if
+it ever fires (unreachable in normal preflight — see D8 architect
+ruling). Cost > benefit.
+
+**Credit.** The `\lo_import` + `lo_get` + `convert_from(bytea, 'UTF8')`
+round-trip in STEP 4 preserved the SOURCE bytes correctly in the
+history rows — history-vs-live divergence exists ONLY because the
+`\i migration.sql` path re-ran the file through the wire's mangled
+client encoding while STEP 4's LO path bypassed it. The bytea LO
+path was doing the right thing all along; the diagnostic exposed
+that STEP 2's `\i` was the encoding weak point.
+
+**Meta-lesson: wire encoding is invisible until it isn't.** Every
+data channel between processes has an encoding contract. The default
+is not the specification. Explicit enforcement at every apply site
+is cheap; discovery through diff is not. Apply-site encoding joins
+`ON_ERROR_STOP` and transactional wrapping as the standing enforcement
+triad for any direct-apply script that mutates production state.
+
+**Standing pin table (updated).** The live md5 of
+`public.submit_pick_v2(uuid,uuid,int,int,int,uuid,uuid,text,jsonb,uuid)`
+is `0936f891d707da231446d440b452197f` as of 2026-08-05 post-F24-apply.
+Any future direct-apply script that supersedes this function must
+STEP 0 pin against this value (or a same-day recapture, if the world
+has moved). Previous pin `e849568e2f8cc35eb437c51b1732c91f` (F25-broken
+body, 2026-08-05 23:00 MT) is retired.

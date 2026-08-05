@@ -400,3 +400,56 @@ Two rules ship with the F24 rebase (`20260805050000_v2_draft_completion_emitter_
 - Any direct psql apply that bypasses `supabase db push`
 
 Both rules also apply to future migrations against tables where the migration body depends on the current schema (adding a column with a computed default that assumes another column's presence, etc.) — capture the target table's `pg_dump --schema-only -t <table>` same-day and treat it identically.
+
+### Rule 3 — Force `client_encoding=UTF8` on direct psql applies
+
+**Every `psql -f` invocation that applies a migration or reconciles
+history MUST force `client_encoding=UTF8`, either via the connection
+string (`?client_encoding=UTF8` appended to `SUPABASE_DB_URL`) or as
+the first statement in the applied script (`SET client_encoding TO
+'UTF8';`).**
+
+- Windows / PowerShell environments default `client_encoding` to
+  `WIN1252` (or similar), which mangles UTF-8 source bytes on the wire.
+  The mojibake surfaces in stored function bodies as multi-byte
+  sequences replaced by `?`, `??`, or box-drawing garbage — visible in
+  `pg_get_functiondef` output but invisible in the migration source
+  file. Post-apply `md5(pg_get_functiondef(oid))` diverges from any
+  same-day capture made under `client_encoding=UTF8`.
+- Effect on non-ASCII characters: `—` (em-dash), `│` (box-drawing),
+  Unicode quotes, and any other non-ASCII byte in comments, string
+  literals, or `RAISE WARNING` messages get rewritten. On the F24
+  rebase apply (2026-08-05), 132 non-ASCII file chars expanded to
+  353 stored chars — a ×3 signature — in comments + the D8 WARNING
+  literal. Behavior identical (the literal is a message string, not a
+  control flow discriminator), but the stored body no longer equals
+  the source.
+- Rule 2's byte-exact history-row requirement is compatible with
+  mojibake: what you PUT into `statements[1]` is what future rebuilds
+  RUN — if you stored mojibake, you re-apply mojibake. The `\lo_import`
+  → `lo_get` → `convert_from(bytea, 'UTF8')` round-trip in the F24
+  apply script preserves the SOURCE bytes correctly; the mojibake
+  only enters the actual function body via the `\i migration.sql`
+  execution path when client_encoding is wrong.
+- Existing mojibake in the corpus is NOT remediated (architect ruling
+  2026-08-05: "mojibake endemic in corpus, no remediation pass"). The
+  rule applies to FUTURE applies only. Post-apply hash pins compare
+  against captures made under the same encoding regime.
+
+**Rationale.** Wire encoding is invisible until it isn't. A migration
+that "worked" on a UTF-8-clean apply and then gets re-run on a
+WIN1252 client produces a subtly different stored body, breaking every
+downstream hash-pin verification. The Rule 3 requirement makes wire
+encoding an explicit invariant of the apply protocol, not an ambient
+platform accident. See `docs/INSTRUMENT_LEDGER.md` INS-7 (2026-08-05)
+for the F24 apply's mojibake divergence record.
+
+**How to apply Rule 3 to the F24-family apply scripts.** Add as the
+first two lines after `\set ON_ERROR_STOP on`:
+
+```sql
+SET client_encoding TO 'UTF8';
+SHOW client_encoding;  -- prints so operators can see the enforcement
+```
+
+Or invoke psql with `PGCLIENTENCODING=UTF8` in the environment.
