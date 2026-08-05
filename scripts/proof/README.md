@@ -387,12 +387,28 @@ gcloud compute ssh citrus-draft-engine-staging `
   --command="sudo docker restart citrus-draft-engine"
 Start-Sleep -Seconds 10
 
-# 6. Optional but recommended — confirm the restart landed cleanly
-#    (subscription healthy, watchdog armed, deployment fingerprint
-#    matches the current image).
+# 6. CLEAR-SNAPSHOTS — MANDATORY (2026-08-05 cookbook amendment, KI-031).
+#    Catches the snapshot-race orphan: the engine's 30 s snapshot writer
+#    can tick between step 4's DELETE FROM draft_snapshots and step 5's
+#    restart landing, re-upserting a snapshot with the pre-reset state
+#    (lastAppliedSeq populated). Left in place, that snapshot survives
+#    every future restart (snapshots are on disk) and the next run's
+#    engine hydrates from it — thinks it is caught up to a stale seq,
+#    skips new events as duplicates. The persisted cousin of the seq-
+#    dedup bug that has bitten twice from in-memory state alone.
+#
+#    Post-restart is the right place for this step: no in-memory lobby
+#    exists (no clients connected during cleanup), so the snapshot
+#    writer has no state to write. Any orphan from the race window is
+#    safely deleted; the writer produces nothing new.
+node scripts/proof/clear-snapshots.local.mjs --execute
+
+# 7. Confirm the restart landed cleanly AND the snapshot table is empty
+#    (snapshots=0 is the tripwire that catches the race whenever it
+#    recurs — pristine baseline verification depends on it).
 curl -s http://35.203.89.236:3001/health/subscription | ConvertFrom-Json | Format-List
 
-# Repeat 2–6 for each scenario you want to measure.
+# Repeat 2–7 for each scenario you want to measure.
 ```
 
 ### 5.4  Four scenarios

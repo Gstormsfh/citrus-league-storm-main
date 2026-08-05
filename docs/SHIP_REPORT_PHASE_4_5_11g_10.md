@@ -25,7 +25,7 @@ This is the strongest possible field confirmation of the F20 fix: the exact bug 
 | **B(i)** | Stale banner appears within ~36s of wifi kill | **PASS BY TESTIMONY** | Garrett witnessed the banner appearing. No screenshot capture was taken this run, so the 4010-watchdog-specific wording vs generic reconnecting-banner wording stays a named residual — closes for free when the Playwright fault-injection layer lands. |
 | **B(ii)** | NO `auth/v1/logout` calls; session survives | **PASS** | F15/F19 field proof: Garrett drafted pick 22 and sat pick 27's window post-restore WITHOUT ever re-authenticating. The session demonstrably survived the outage window. |
 | **B(iii)** | Auto-reconnect + resync + board rebuild COMPLETE vs DB census | **PASS** | Room recovered BY ITSELF, no manual refresh (Garrett's testimony). Combined with the DB census (36/36, no gaps, snake ordering intact) = auto-reconnect + resync + complete rebuild under real network loss, WITNESSED. This is the chunk's founding requirement met. |
-| **C** | Freshly-authenticated rejoin (sign out → sign in → rejoin live → draft) | **NOT RUN — folds into F13 SIGINT mini-run** | Scheduled as a ~10-minute follow-up |
+| **C** | Freshly-authenticated rejoin (sign out → sign in → rejoin live → draft) | **PASS** (machine-flagged) | Stragglers-run 2026-08-05T00-21-15Z: Ctrl+C harness at pick 5 → F12 → Application → Clear site data → F5 → sign in fresh → rejoined live draft → drafted pick 10 with `is_autopick=false`. Full C dance completed on the deployed URL. |
 | **D** | Draft reaches 36/36; raw log census | **PASS** | See "Field census" below. Zero interventions across the run. |
 | **E** | F5 census from docker logs BEFORE cleanup restart | **PASS** | See "F5 — first field exercise" below |
 | **F** | Managers panel reads "Harness Team 03" per KI-018 (F17) | **PASS** | Screenshot on file. "Harness Team 03 connected." |
@@ -63,13 +63,17 @@ heartbeat.ws_close_threw        = 0
 
 ---
 
-## F13 — second field survival
+## F13 — BOTH HALVES CLOSED
 
-The harness's F13 hardening (append-stream NDJSON writer, pre-connect pg 'error' handler, idempotent fault-flush on uncaughtException / unhandledRejection / SIGINT / SIGTERM) survived a second full-length run tonight without incident. Artifacts on disk:
+**Half 1 — full-run survival (proven 2026-07-31 + 2026-08-04):**
+Append-stream NDJSON writer, pre-connect pg 'error' handler, idempotent fault-flush on uncaughtException / unhandledRejection / SIGINT / SIGTERM. Survived multiple full-length runs without incident. Artifacts on disk:
 - `scripts/proof/results/S2-2026-08-04T18-10-43-804Z.ndjson`
 - `scripts/proof/results/S2-2026-08-04T18-10-43-804Z.summary.txt`
 
-**Named gap remaining:** the fault-flush path itself (SIGINT → PARTIAL SUMMARY header) still hasn't been directly exercised in a controlled test. Closes via the pending F13 SIGINT mini-run (~10 minutes, folded together with criterion C's freshly-authenticated rejoin per architect ruling).
+**Half 2 — fault-flush path directly exercised (proven 2026-08-05):**
+Stragglers-run S2-2026-08-05T00-21-15-188Z deliberately Ctrl+C'd after pick 5 per the designed choreography. Output produced `── ABORTED (SIGINT) ──` header verbatim + partial summary written to disk. Cadence break independently confirmed by DB census. The named gap — "the fault-flush path itself hasn't been directly exercised in a controlled test" — CLOSES on that header. KI-023 flips to fully RESOLVED.
+
+**F18-family observation (non-blocking, folds into KI-019):** the abort-path summary reported `Samples captured: 0` despite 5 completed picks and 60 delivered observations shown live. The SIGINT counter reads a different accumulator than the one populated during normal run. Instrument-reporting bug, NOT a fault-flush-integrity bug — the header + summary-file existence prove the flush ran correctly. Fix folds into the F18 summary-generator work.
 
 ---
 
@@ -171,9 +175,11 @@ Contract tests (unstubbed, hermetic via `.invalid` hostname per RFC 6761 §6.4):
 
 - **B(i)** — PASS by testimony (banner witnessed); no capture, so 4010-vs-generic wording stays a named residual — closes for free via Playwright fault-injection layer later
 - **B(iii)** — PASS by testimony + DB census (room recovered by itself, no refresh; 36/36 complete against DB)
-- **C** freshly-authenticated rejoin — folds into the F13 SIGINT mini-run (~10 minutes, TBD)
-- **F13** second half (fault-flush path directly exercised via SIGINT) — same mini-run
+- **C** freshly-authenticated rejoin — **PASS** (machine-flagged via stragglers-run 2026-08-05T00-21-15Z)
+- **F13** second half (fault-flush path directly exercised via SIGINT) — **CLOSED** (same stragglers-run; `── ABORTED (SIGINT) ──` header verbatim + partial summary on disk)
 - **F5** distinct-connection-id verification — 13 rung-1 lines, 13 distinct connection ids VERIFIED (no repeat-cull inflation)
+- **F18-family SIGINT counter (NEW, non-blocking, KI-019 fold-in)** — the abort-path summary reports `Samples captured: 0` despite N delivered observations shown live. SIGINT counter reads the wrong accumulator. Fix folds into the F18 summary-generator work; does not affect fault-flush integrity.
+- **Cleanup snapshot race (NEW, KI-031)** — the engine's 30 s snapshot writer can tick between the cleanup reset's DELETE and the engine restart landing, leaving an orphan snapshot with pre-reset state. Persisted cousin of the seq-dedup bug. Cookbook amended: cleanup gains a final `clear-snapshots.local.mjs --execute` step AFTER the engine restart; `snapshots=0` is now the pristine-baseline tripwire that catches the race whenever it recurs.
 - **F18** false-red observed again in the harness summary — annotated by hand for now
 - **F24 (KI-029)** — own chunk, week-2 refinement tier, Draft-Night adjacent priority
 - **KI-025 (F23)** — deferred pending F24 landing, or independent board-fullness derivation

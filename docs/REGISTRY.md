@@ -175,16 +175,16 @@ Amendment 3 note (invalidation-unreachable writers): `public.join_league_with_co
 | **Target phase / timeline** | N/A — contract lives here and in fixture-12.mjs's header. |
 | **Verification test** | Cleanup cookbook's pristine-baseline check verifies `4c742dae… owner_id = c4489220`. |
 
-### KI-019 — F18: earlier drop-rate summary miscounted its own not-submitted partition
+### KI-019 — F18: harness summary generator miscounts its own accumulators (drop-rate + SIGINT paths)
 
 | | |
 |---|---|
-| **Severity** | low — instrument reporting; ratified numbers stand once partition annotated. |
-| **Surface** | `scripts/proof/draft-harness.mjs` summary generator. |
-| **Description** | The harness's summary output counted certain not-submitted picks as drops. The corrected drop-rate story is that the "true drop rate is 0%" once the not-submitted partition is separated (per architect ruling on 2026-07-31 arithmetic reconciliation). Same-shape family as F16 (instrument gap) — instrument counted itself incorrectly. |
-| **Why deferred** | Fix folds into the harness improvement work with F16. Meanwhile, the ship report annotates the drop partition manually. |
+| **Severity** | low — instrument reporting; ratified numbers stand once partitions annotated. |
+| **Surface** | `scripts/proof/draft-harness.mjs` summary generator (both normal-exit and SIGINT-abort paths). |
+| **Description** | Two observed miscounts in the same generator: (1) the drop-rate summary counted certain not-submitted picks as drops; corrected story is "true drop rate 0%" once the not-submitted partition is separated (architect ruling 2026-07-31 arithmetic reconciliation). (2) the SIGINT-abort path reports `Samples captured: 0` despite N picks completed and M delivered observations shown live; the SIGINT counter reads a different accumulator than the one populated during normal run (observed 2026-08-05 in stragglers-run S2-2026-08-05T00-21-15-188Z after Ctrl+C at pick 5 with 60 observations shown live). Same-shape family as F16 (instrument gap) — instrument counts itself incorrectly. Neither variant affects fault-flush integrity or the ratified rail numbers. |
+| **Why deferred** | Fix folds into the harness improvement work with F16. Meanwhile, the ship report annotates partitions manually. |
 | **Target phase / timeline** | With KI-017's harness client-mode work. |
-| **Verification test** | Post-fix harness summary emits the not-submitted count as its own field, distinct from delivered/dropped. Ship-report footnote until then. |
+| **Verification test** | Post-fix harness summary emits the not-submitted count as its own field distinct from delivered/dropped, AND the SIGINT-abort path's "Samples captured" reads the SAME accumulator that populated during the run (test asserts SIGINT-mid-run captured-count == observed-count). Ship-report footnote until then. |
 
 ### KI-020 — F19: refreshTokenOnce signed the user out on network failure
 
@@ -229,16 +229,18 @@ Related but out-of-scope for KI-021: KI-025 (F23 DB-side vanished-lobby scan).
 
 ### KI-023 — F13: harness NDJSON append stream + fault-flush + pg-error survival
 
-**RESOLVED (73a587ff, 2026-07-31); named-gap CLOSED via SIGINT test in acceptance-run round.**
+**FULLY RESOLVED (73a587ff for the code; both halves proven in field by 2026-08-05).**
 
 | | |
 |---|---|
 | **Severity** | medium — instrument reliability. |
 | **Surface** | `scripts/proof/draft-harness.mjs`. |
-| **Description** | Harness now uses an append-stream NDJSON writer; a pg 'error' handler registered before connect; uncaughtException / unhandledRejection / SIGINT / SIGTERM route through an idempotent flush that writes a PARTIAL SUMMARY tagged with the reason. First half proven by the voided 2026-07-31 run (32,424-byte ndjson, 4,830-byte summary, pg-error survival). Second half (fault-flush path itself entering) pending — closed by deliberate SIGINT-mid-run test in the acceptance-run round. |
+| **Description** | Harness uses an append-stream NDJSON writer; a pg 'error' handler registered before connect; uncaughtException / unhandledRejection / SIGINT / SIGTERM route through an idempotent flush that writes a PARTIAL SUMMARY tagged with the reason. Both halves proven in field. |
 | **Why deferred** | N/A. |
-| **Target phase / timeline** | Fresh acceptance run round. |
-| **Verification test** | (a) Full-run summary + ndjson on disk with matching byte counts (proven 2026-07-31). (b) Deliberate SIGINT during a short run produces a "── PARTIAL SUMMARY (SIGINT) ──" header (F13 both halves closed). |
+| **Target phase / timeline** | Closed 2026-08-05. |
+| **Verification test** | (a) Full-run summary + ndjson on disk with matching byte counts — proven 2026-07-31 (voided run) + 2026-08-04 (S2-2026-08-04T18-10-43-804Z, 36/36 clean). (b) Deliberate SIGINT-mid-run test — proven 2026-08-05 (S2-2026-08-05T00-21-15-188Z, killed after pick 5 exactly per choreography, `── ABORTED (SIGINT) ──` header + partial summary written to disk; cadence break independently confirmed by DB census). Named gap CLOSED. |
+
+*Related NEW ledger observation (folds into KI-019 not here):* the abort-path summary reported `Samples captured: 0` despite 5 completed picks and 60 delivered observations shown live. SIGINT counter reads the wrong accumulator. Instrument reporting, not fault-flush integrity.
 
 ### KI-024 — Cloud Run per-instance in-memory caches cannot be coherently invalidated across instances
 
@@ -275,6 +277,19 @@ Related but out-of-scope for KI-021: KI-025 (F23 DB-side vanished-lobby scan).
 ### KI-028 — Ledger: History table "Drafted By" column renders raw UUID
 
 Same demo-optics family as KI-013 (F12). Cosmetic; must not ship to Zach or investors. Fix during pre-first-demo work alongside KI-013.
+
+### KI-031 — Cleanup snapshot orphan from 30 s snapshot-writer race (cookbook amendment)
+
+**RESOLVED-BY-COOKBOOK-AMENDMENT (2026-08-05).** Cleanup cookbook gains a mandatory final `clear-snapshots.local.mjs --execute` step AFTER the engine restart. The pristine baseline's `snapshots=0` field becomes the tripwire that catches the race whenever it recurs.
+
+| | |
+|---|---|
+| **Severity** | medium — persisted-state variant of the seq-dedup class. First loss observed 2026-08-05 (post-cleanup after stragglers-run showed `snapshots=1` despite the reset's `DELETE FROM draft_snapshots`). First loss in five cleanups; not caught by any single-run test. |
+| **Surface** | `scripts/proof/fixture-12.mjs` reset path (`DELETE FROM draft_snapshots`), `server/src/draft/LobbyManager.ts` snapshot writer (30 s periodic tick), pristine-baseline verification (`snapshots=0`), cleanup cookbook in `scripts/proof/README.md` step 6. |
+| **Description** | The engine's periodic snapshot writer ticks every 30 s. If the tick fires between the cleanup reset's `DELETE FROM draft_snapshots` (step 4) and the engine restart landing (step 5), the writer re-upserts a snapshot with the CURRENT in-memory state (lastAppliedSeq populated to whatever the just-finished run reached — e.g., 12). Left in place, that orphan snapshot survives every future engine restart (snapshots are persisted on disk, not in-memory). The NEXT run's engine lazy-loads the lobby, reads the orphan snapshot, thinks it's caught up to the stale seq, and skips new events as duplicates. **Persisted cousin of the in-memory seq-dedup bug** that has bitten twice from the LobbyRegistry angle alone. |
+| **Why deferred** | Not deferred — resolved by cookbook amendment 2026-08-05. Post-restart placement is correct: no in-memory lobby exists during cleanup (no clients connected), so the snapshot writer has no state to write; clear-snapshots deletes any race orphan and the writer produces nothing new. |
+| **Target phase / timeline** | Cookbook amended in commit shipping this KI. Pristine baseline verification (11-field DB read) now includes `snapshots=0` as an explicit tripwire — any recurrence is caught at the next cleanup, not silently carried into the following run. |
+| **Verification test** | (a) 2026-08-05 evidence: post-stragglers-run cleanup showed `snapshots=1` orphan with lastAppliedSeq=12 (pre-amendment). (b) After running `clear-snapshots.local.mjs --execute`, re-verified 11/11 pristine including `snapshots=0`. (c) Future cleanups: `snapshots=0` in the pristine baseline check catches any recurrence at the boundary. |
 
 ---
 
