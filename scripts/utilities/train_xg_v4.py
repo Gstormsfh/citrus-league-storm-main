@@ -162,6 +162,12 @@ ALL_PASS_ZONES = sorted([
     "blue_line_high_angle", "blue_line_low_angle", "crease", "deep",
     "high_slot_high_angle", "high_slot_low_angle", "no_pass",
     "slot_high_angle", "slot_low_angle",
+    # 0E-XG-8 (G2): distinct token for historical rows where Phase 0c did
+    # not populate pass context. NOT the same as 'no_pass' (which is a real
+    # observation of "we saw the shot and there was no meaningful pass").
+    # The model can learn from the missingness. Never emitted at inference —
+    # the live extractor always produces a real zone or 'no_pass'.
+    "unmatched",
 ])
 
 MOAT_COLS: Tuple[str, ...] = (
@@ -403,21 +409,30 @@ def regen_2025_slice(env_url: str, env_key: str) -> pd.DataFrame:
     # north_south_location_of_shot / east_west_location_of_shot etc. are populated
     # by the FIXED extractor (post-S1+S2) with the correct axis convention.
 
-    # Fill numeric NaNs on the model features
-    for col in ("distance", "angle", "arena_adjusted_shot_distance",
-                "distance_angle_interaction",
-                "east_west_location_of_shot", "north_south_location_of_shot",
-                "east_west_location_of_last_event",
-                "time_since_last_event", "distance_from_last_event",
-                "speed_from_last_event", "speed_from_last_event_log",
-                "shot_angle_plus_rebound_speed", "shot_angle_rebound_royal_road",
-                "score_differential", "period", "time_since_powerplay_started",
-                "defending_team_skaters_on_ice", "is_rebound", "is_empty_net",
-                "is_power_play", "has_pass_before_shot", "pass_lateral_distance",
-                "pass_to_net_distance", "pass_immediacy_score", "goalie_movement_score",
-                "pass_quality_score"):
+    # Fill numeric NaNs on non-moat model features. Moat cols are handled
+    # separately below — G2 mandates NaN preservation (never zero-fill).
+    NON_MOAT_NUMERIC = (
+        "distance", "angle", "arena_adjusted_shot_distance",
+        "distance_angle_interaction",
+        "east_west_location_of_shot", "north_south_location_of_shot",
+        "east_west_location_of_last_event",
+        "time_since_last_event", "distance_from_last_event",
+        "speed_from_last_event", "speed_from_last_event_log",
+        "shot_angle_plus_rebound_speed", "shot_angle_rebound_royal_road",
+        "score_differential", "period", "time_since_powerplay_started",
+        "defending_team_skaters_on_ice", "is_rebound", "is_empty_net",
+        "is_power_play",
+    )
+    for col in NON_MOAT_NUMERIC:
         if col in df25.columns:
             df25[col] = pd.to_numeric(df25[col], errors="coerce").fillna(0)
+    # Moat cols: cast to float, preserve NaN. In practice the live extractor
+    # sets these on every shot so NaN should be rare, but never zero-fill.
+    for col in ("has_pass_before_shot", "pass_lateral_distance",
+                "pass_to_net_distance", "pass_immediacy_score",
+                "goalie_movement_score", "pass_quality_score"):
+        if col in df25.columns:
+            df25[col] = pd.to_numeric(df25[col], errors="coerce").astype(float)
 
     if "distance_angle_interaction" not in df25.columns:
         df25["distance_angle_interaction"] = df25["distance"] * df25["angle"].abs() / 100.0
@@ -528,21 +543,59 @@ def join_moat_into_mp(mp: pd.DataFrame, env_url: str, env_key: str) -> Tuple[pd.
             right_on=["nhl_game_id", "player_id_join", "shot_x", "shot_y", "shot_type_code"],
             how="left",
         )
-        joined_mask = merged["has_pass_before_shot"].notna()
+        # 0E-XG-8 (G1): TRUE match rate — count merged rows where a moat value
+        # actually landed (goalie_movement_score is populated on every rs row
+        # that Phase 0c processed; it is the honest indicator of "join succeeded
+        # AND upstream extraction produced moat"). Previous version compared
+        # has_pass_before_shot.notna() *before* fill, which appears correct
+        # in theory but degenerated to "always matched" when MP had duplicate
+        # keys collapsing to a single deduped right row — the gate could never
+        # actually fail.
+        merged_gms = pd.to_numeric(merged.get("goalie_movement_score"), errors="coerce")
+        matched_mask = merged_gms.notna()
         n_mp = int(mask_season.sum())
-        n_joined = int(joined_mask.sum())
-        pct = (n_joined / n_mp * 100) if n_mp else 0.0
-        hitrate[int(season)] = {"mp_rows": n_mp, "rs_rows": int(len(rs)),
-                                "joined": n_joined, "pct_joined": round(pct, 3)}
-        print(f"  [moat-join] season {season}: mp={n_mp:,}, rs={len(rs):,}, joined={n_joined:,} ({pct:.2f}%)",
+        n_matched = int(matched_mask.sum())
+        pct_matched = (n_matched / n_mp * 100) if n_mp else 0.0
+        hitrate[int(season)] = {
+            "mp_rows": n_mp,
+            "rs_rows": int(len(rs)),
+            "matched": n_matched,
+            "pct_matched": round(pct_matched, 3),
+        }
+        print(f"  [moat-join] season {season}: mp={n_mp:,}, rs={len(rs):,}, "
+              f"matched={n_matched:,} ({pct_matched:.2f}%)  ← TRUE match rate",
               flush=True)
-        # Fill moat cols on the MP frame in place
+
+        # 0E-XG-8 (G2): fill moat cols WITHOUT zero-filling unmatched rows.
+        # has_pass_before_shot is cast to float (1.0/0.0/NaN) so XGBoost's
+        # native NaN handling kicks in — unmatched rows are honestly UNKNOWN,
+        # not "definitely had no pass". Same for the 5 numeric moat cols.
+        # pass_zone unmatched gets a dedicated 'unmatched' label so the
+        # LabelEncoder can distinguish it from 'no_pass' (a legitimate class).
         for col in MOAT_COLS:
             if col == "pass_zone":
-                mp.loc[mask_season, "pass_zone_raw"] = merged[col].fillna("no_pass").values
+                # NaN in merged['pass_zone'] → 'unmatched' distinct token
+                mp.loc[mask_season, "pass_zone_raw"] = (
+                    merged[col].where(merged[col].notna(), "unmatched").values
+                )
+            elif col == "has_pass_before_shot":
+                mp.loc[mask_season, col] = pd.to_numeric(
+                    merged[col], errors="coerce"
+                ).astype(float).values  # NaN preserved as np.nan
             else:
-                default = 0 if col == "has_pass_before_shot" else 0.0
-                mp.loc[mask_season, col] = pd.to_numeric(merged[col], errors="coerce").fillna(default).values
+                # Other 5 numeric moat cols: float with NaN where unmatched
+                mp.loc[mask_season, col] = pd.to_numeric(
+                    merged[col], errors="coerce"
+                ).astype(float).values
+
+        # Column dtype safety net: after in-place assignment on a heterogeneous
+        # frame, pandas can silently upcast the whole column to object. Force
+        # the moat columns to float64 so XGBoost sees NaN instead of 'nan'.
+        for col in MOAT_COLS:
+            if col == "pass_zone":
+                continue
+            mp[col] = pd.to_numeric(mp[col], errors="coerce").astype(float)
+
     return mp, hitrate
 
 
@@ -579,6 +632,21 @@ def train_and_eval(df_all: pd.DataFrame) -> Dict[str, Any]:
     hold  = df_all[hold_mask].copy()
     print(f"  train rows: {len(train):,}  (seasons 2017-2022)", flush=True)
     print(f"  hold  rows: {len(hold):,}   (seasons 2023-2024)", flush=True)
+
+    # 0E-XG-8 (G3): count rows entering training with NaN in each moat feature.
+    # These are the rows the model will learn from as "moat unknown" — XGBoost
+    # handles NaN natively (no imputation applied). Reported per column so the
+    # magnitude of unknown-moat exposure is auditable.
+    _NUMERIC_MOAT = ("has_pass_before_shot", "pass_lateral_distance",
+                     "pass_to_net_distance", "pass_immediacy_score",
+                     "goalie_movement_score", "pass_quality_score")
+    nan_moat_train = {
+        col: int(train[col].isna().sum()) for col in _NUMERIC_MOAT if col in train.columns
+    }
+    nan_moat_train["_any_moat_col_nan"] = int(
+        train[[c for c in _NUMERIC_MOAT if c in train.columns]].isna().any(axis=1).sum()
+    )
+    print(f"  train rows with any NaN moat column: {nan_moat_train['_any_moat_col_nan']:,}", flush=True)
 
     # Split train into train + calibration slice (90/10).
     # NOTE: train_test_split unpacks 2*N arrays for N inputs; passing X, y AND
@@ -711,15 +779,22 @@ def train_and_eval(df_all: pd.DataFrame) -> Dict[str, Any]:
         except Exception as e:
             print(f"  [warn] could not evaluate v3 on hold-out: {e}", flush=True)
 
-    # Top 15 feature importances
+    # Top 15 feature importances + G3 moat-in-top15 flag
     fi = model.get_booster().get_score(importance_type="gain")
     top_importances = sorted(fi.items(), key=lambda kv: kv[1], reverse=True)[:15]
     top_importances_named = [{"feature": k, "gain": round(v, 2)} for k, v in top_importances]
+    _moat_feat_names = {"has_pass_before_shot", "pass_lateral_distance",
+                        "pass_to_net_distance", "pass_immediacy_score",
+                        "goalie_movement_score", "pass_quality_score",
+                        "pass_zone_encoded"}
+    moat_in_top15 = [row["feature"] for row in top_importances_named
+                     if row["feature"] in _moat_feat_names]
 
     return {
         "train_rows": int(len(X_train_all)),
         "cal_rows": int(len(X_cal)),
         "hold_rows": int(len(hold)),
+        "nan_moat_train": nan_moat_train,
         "hold_uncalibrated": m_raw,
         "hold_calibrated": m_cal,
         "pearson_vs_moneypuck": {
@@ -731,6 +806,7 @@ def train_and_eval(df_all: pd.DataFrame) -> Dict[str, Any]:
         "auc_v4_calibrated_hold": m_cal["auc"],
         "auc_v3_hold": round(v3_auc, 4) if v3_auc is not None else None,
         "top_importances": top_importances_named,
+        "moat_features_in_top15": moat_in_top15,
         "_artifacts": {
             "model": model,
             "calibrators": calibrators,
@@ -765,15 +841,15 @@ def main() -> int:
 
     print("\n[2/5] Joining Phase 0c moat features from prod raw_shots ...", flush=True)
     mp, moat_hitrate = join_moat_into_mp(mp, env["url"], env["key"])
-    # F4: hard gate on moat hit-rate per season. If we're materially below the
-    # empirically-verified target rate, the join key is wrong and training on
-    # zero-filled moat columns would silently degrade v4 — abort.
+    # 0E-XG-8 (F4 + G1 corrected): hard gate on TRUE moat match rate per season.
+    # Gate on `pct_matched` (share of MP rows whose moat features actually
+    # landed after the join), NOT on left-join survival (which is always 100%).
     MIN_HIT_PCT = 90.0
-    bad = [(s, h) for s, h in moat_hitrate.items() if h["pct_joined"] < MIN_HIT_PCT]
+    bad = [(s, h) for s, h in moat_hitrate.items() if h["pct_matched"] < MIN_HIT_PCT]
     if bad:
-        print("\nABORT: moat-join hit-rate below 90% for one or more seasons.", flush=True)
+        print("\nABORT: TRUE moat match rate below 90% for one or more seasons.", flush=True)
         for s, h in sorted(bad):
-            print(f"  season {s}: joined {h['joined']:,}/{h['mp_rows']:,} = {h['pct_joined']:.2f}%",
+            print(f"  season {s}: matched {h['matched']:,}/{h['mp_rows']:,} = {h['pct_matched']:.2f}%",
                   flush=True)
         print("Do NOT proceed to training. Verify the join key first.", flush=True)
         return 3
@@ -837,10 +913,11 @@ def main() -> int:
     report = {
         "features": list(V4_FEATURES),
         "n_features": len(V4_FEATURES),
-        "moat_join_hit_rate_by_season": moat_hitrate,
+        "moat_match_rate_by_season": moat_hitrate,   # renamed for G1 correctness
         "train_rows": result["train_rows"],
         "cal_rows": result["cal_rows"],
         "hold_rows": result["hold_rows"],
+        "nan_moat_train": result["nan_moat_train"],
         "hold_uncalibrated": result["hold_uncalibrated"],
         "hold_calibrated": result["hold_calibrated"],
         "pearson_vs_moneypuck": result["pearson_vs_moneypuck"],
@@ -848,11 +925,13 @@ def main() -> int:
         "auc_v4_hold": result["auc_v4_hold"],
         "auc_v4_calibrated_hold": result["auc_v4_calibrated_hold"],
         "top_importances_gain": result["top_importances"],
+        "moat_features_in_top15": result["moat_features_in_top15"],
         "notes": {
             "is_rush": "DROPPED — inference never populates. See data_acquisition.py:3381.",
             "clipping": "NONE anywhere in this training or in prediction.",
             "calibration": "Per-shot-type isotonic on a 10% held-out slice of 2017-2022.",
             "geometry": "Signed angle + MP-consistent flip inherited from fix branch fix/0e-xg-5-inference-feature-contract.",
+            "moat_nan_handling": "NEVER zero-filled. XGBoost native NaN handling; pass_zone unmatched → 'unmatched' class.",
         },
     }
     with open(report_out, "w", encoding="utf-8") as fh:
@@ -878,12 +957,23 @@ def main() -> int:
     print()
     print("  Top 15 features by gain:")
     for row in report["top_importances_gain"]:
-        print(f"    {row['gain']:>10.1f}  {row['feature']}")
+        marker = " ← MOAT" if row["feature"] in {
+            "has_pass_before_shot", "pass_lateral_distance", "pass_to_net_distance",
+            "pass_immediacy_score", "goalie_movement_score", "pass_quality_score",
+            "pass_zone_encoded",
+        } else ""
+        print(f"    {row['gain']:>10.1f}  {row['feature']}{marker}")
     print()
-    print("  Moat-join hit rate by season:")
-    for season, h in sorted(report["moat_join_hit_rate_by_season"].items()):
+    print(f"  Moat features appearing in top-15 (G3): {report['moat_features_in_top15'] or '<NONE>'}")
+    print()
+    print("  TRUE moat match rate by season (G1 corrected):")
+    for season, h in sorted(report["moat_match_rate_by_season"].items()):
         print(f"    {season}: mp={h['mp_rows']:,}  rs={h['rs_rows']:,}  "
-              f"joined={h['joined']:,} ({h['pct_joined']:.2f}%)")
+              f"matched={h['matched']:,} ({h['pct_matched']:.2f}%)")
+    print()
+    print("  Training rows with NaN moat columns (G3):")
+    for col, cnt in report["nan_moat_train"].items():
+        print(f"    {col:<40} {cnt:,}")
     print()
     print(f"  Artifacts written:")
     for p in (model_out, feat_out, enc_shot_out, enc_event_out, enc_zone_out, calib_out, report_out):
