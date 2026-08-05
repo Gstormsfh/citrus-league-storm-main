@@ -291,6 +291,49 @@ Same demo-optics family as KI-013 (F12). Cosmetic; must not ship to Zach or inve
 | **Target phase / timeline** | Cookbook amended in commit shipping this KI. Pristine baseline verification (11-field DB read) now includes `snapshots=0` as an explicit tripwire — any recurrence is caught at the next cleanup, not silently carried into the following run. |
 | **Verification test** | (a) 2026-08-05 evidence: post-stragglers-run cleanup showed `snapshots=1` orphan with lastAppliedSeq=12 (pre-amendment). (b) After running `clear-snapshots.local.mjs --execute`, re-verified 11/11 pristine including `snapshots=0`. (c) Future cleanups: `snapshots=0` in the pristine baseline check catches any recurrence at the boundary. |
 
+### KI-032 — F25: F24 migration authored against stale live body (capture-before-replace rule ships)
+
+**Field record (2026-08-05).** F24 acceptance run on staging failed at the first pick: `PERFORM public.validate_draft_event_payload('pick', v_payload)` raised `check_violation: pick.pick_deadline missing`. Zero picks committed; the RAISE EXCEPTION rolled every transaction back cleanly. Root cause: `20260805023419_v2_draft_completion_emitter.sql` was authored against the body from `20260512000000_remove_pgmq_infrastructure.sql` and missed the chunk 10c-2 batch 2 update `20260727010000_pick_event_carries_pick_deadline.sql` (2026-07-27), which grew the 'pick' event's required payload fields to include `pick_deadline`. The CREATE OR REPLACE dropped the batch-2 changes on the floor, silently. Reproduced deterministically on every submit attempt; zero side effects to state (Fixture-12's 30 s pre-state-clean plus the transactional rollback covered it).
+
+**RESOLVED (rebase commit 20260805050000, 2026-08-05).** Supersede migration `20260805050000_v2_draft_completion_emitter_rebased.sql` grafts F24 onto the batch-2 body verbatim (both queries filter `AND deleted_at IS NULL` per Amendment 3; pick payload retains `pick_deadline`; INSERT retains `event_version=2`; F24 completion branch preserved with all D1–D8 rulings + Amendments 1–4). The stale 20260805023419 file stays in the repo as evidence — never mutated.
+
+| | |
+|---|---|
+| **Severity** | high — silent data-model drift class; would have re-occurred on every future function-modifying migration authored the same way. |
+| **Surface** | Every `CREATE OR REPLACE FUNCTION` migration in `supabase/migrations/*.sql`; the review process; the acceptance-run gate. |
+| **Description** | CREATE OR REPLACE FUNCTION replaces the function body in its entirety — there is no diff, no merge, no "port your changes on top of what's live." Any prior migration's edits to that function body are silently dropped unless the new author starts from the current live body. The Supabase migrations directory is chronological, not current-state — reading only the file that first introduced a function misses every subsequent migration that touched it. Author discipline is the only defense. |
+| **Why deferred** | Not deferred — resolved same-day by rebase migration + two standing rules (below). |
+| **Target phase / timeline** | Rules folded into the F24 rebase commit; live from 2026-08-05 forward. |
+| **Verification test** | (a) Pre-apply capture: every function-modifying migration commit MUST include `pg_get_functiondef(<target>::regprocedure)` output for the target function, captured the same day the migration is authored, committed alongside the migration file. Directory: `supabase/migrations/captures/YYYY-MM-DD_pre_<migration-slug>.sql`. If the commit lacks the capture file, the migration cannot be applied. (b) Post-apply diff: after applying the new migration, `pg_get_functiondef` of the live function MUST equal the migration file body — the apply script performs this check and fails on any diff. (c) F24 acceptance rerun on rebased body: expected clean run with 36/36 picks committed + `draft_completed` event at seq 37 + `leagues.draft_status='completed'` + `leagues.pick_deadline IS NULL`. |
+
+### KI-033 — Machine-find: `draft_events.payload_hash` NOT NULL constraint blocks NULL-hash completion appends
+
+**Field record (2026-08-05).** During F24 rebase review, architect ran the live schema and observed `payload_hash` on `draft_events` is `NOT NULL`. The F24 completion branch as originally written passed `NULL` as `p_payload_hash` into `append_draft_event`, which forwards the argument verbatim into the INSERT. That INSERT would have surfaced a `null value in column "payload_hash" violates not-null constraint` error and rolled back the ENTIRE final-pick transaction — the pick INSERT above the completion branch, the counter increment, and the leagues UPDATE would all have vanished. Would have manifested only on the final pick of every draft; every draft would appear to freeze at N-1/N picks with no completion event ever emitted, and the final pick would be gone from `draft_picks_v2` (rollback erased it). Not caught by any unit test (no test exercises the final-pick transition against a real DB with the NOT NULL constraint present).
+
+**RESOLVED (Amendment 4 in rebase commit 20260805050000, 2026-08-05).** Completion event payload hoisted into `v_completion_payload` before the `append_draft_event` call; `v_completion_hash` = `encode(sha256(convert_to(v_completion_payload::text, 'UTF8')), 'hex')` (core pg, no pgcrypto dependency); passed as `p_payload_hash`. Byte-stable JSONB text serialization keeps the hash reproducible across future audits.
+
+| | |
+|---|---|
+| **Severity** | high — catastrophic + silent + only-on-completion, i.e. the worst possible combination. |
+| **Surface** | `public.submit_pick_v2` completion branch; `public.append_draft_event` (forwards p_payload_hash verbatim); `draft_events.payload_hash NOT NULL` (live schema). Also applies to any future caller of `append_draft_event` for a non-pick event that isn't itself in the pick path (system events, chat events with hashing, etc.). |
+| **Description** | The DB-level NOT NULL constraint is the ultimate arbiter of what payloads can land. Function-level defaults (`p_payload_hash DEFAULT NULL`) do NOT override column-level constraints — the default hits, the INSERT rejects. Any code path calling `append_draft_event` must either (a) pass a real hash, or (b) live with the transaction rolling back on the final row. Adding a NOT NULL to an event-log column is one-directional; every caller downstream must be audited when it happens. |
+| **Why deferred** | Not deferred — resolved in the same commit that would have introduced the defect. First machine-found defect on this campaign ledger via architect's pre-apply schema read. |
+| **Target phase / timeline** | Amendment 4 folded into rebase commit 20260805050000. |
+| **Verification test** | (a) Post-apply: pick a league to completion on staging, assert `SELECT event_type, payload_hash FROM draft_events WHERE league_id = <lg> ORDER BY seq DESC LIMIT 1` returns `('draft_completed', <64-hex-char string>)`. (b) Post-apply: `SELECT count(*) FROM draft_events WHERE payload_hash IS NULL` returns 0 (invariant across all event types). (c) Future: any migration adding/removing NOT NULL on `draft_events.*` columns MUST enumerate downstream `append_draft_event` callers in its header comment. |
+
+### KI-034 — Completed leagues retain `draft_state='active'` post-F24 (Amendment 2 evidence-closed, semantically load-bearing NOT)
+
+**Field record (2026-08-05).** During F24 design review, architect ran `SELECT draft_state FROM leagues WHERE id = <staging test league>` and psql returned `ERROR: column "draft_state" does not exist`. The v2 stack reads `draft_status` (`in_progress` / `completed` / `paused` / etc.); `draft_state` was a Phase 0–4 column that never made it to the v2 schema. F24 originally proposed setting `draft_state='completed'` alongside `draft_status='completed'` in the completion UPDATE for defense-in-depth; Amendment 2 removes that write on the empirical grounds that (a) the column doesn't exist to write to, and (b) no v2 consumer reads it. Recorded as a KI so a future refactor that adds `draft_state` back doesn't silently reinstate the write without an audit.
+
+| | |
+|---|---|
+| **Severity** | low — semantic-only; no behavior differs today because no consumer reads `draft_state`. Would elevate to medium if a future column re-add treats `draft_state='active'` as authoritative for completed leagues (would break `WHERE draft_state='completed'` queries). |
+| **Surface** | `public.leagues` table schema; `public.submit_pick_v2` completion branch; any future consumer that reads `draft_state`. |
+| **Description** | F24 completion branch writes `draft_status='completed'` + `pick_deadline=NULL` only. No `draft_state` write, deliberately. If future work re-adds a `draft_state` column (v1 migration back-port, PROD-PORT scope, etc.), the semantics need to be settled at that time — either extend F24's completion UPDATE to write it, or bump this KI severity and document the intentional divergence. Recording the deliberate omission so it isn't discovered as a "bug" by someone who never saw the Amendment 2 decision. |
+| **Why deferred** | Not deferred — deliberately not extended. The next actor on any `draft_state` re-add must confront this KI. |
+| **Target phase / timeline** | Ambient. Revisits triggered by any migration adding `draft_state` to `public.leagues`, and by PROD-PORT scoping (which will re-encounter the v1 column set). |
+| **Verification test** | Any future migration adding `draft_state` to `public.leagues` MUST reference this KI in its header comment AND either (a) extend `submit_pick_v2`'s completion branch to write it (with matching KI-034 update), or (b) document why the column should remain unwritten by the completion path. |
+
 ---
 
 ## How to add a row

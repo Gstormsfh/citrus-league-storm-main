@@ -362,3 +362,41 @@ Changed `>=` to `>` in all DELETE statements with `CURRENT_DATE`.
 ---
 
 **Remember:** An ounce of prevention is worth a pound of cure. Always backup, always validate, always test.
+
+---
+
+## Standing rules for `CREATE OR REPLACE FUNCTION` migrations (adopted 2026-08-05, F25 rebase)
+
+Two rules ship with the F24 rebase (`20260805050000_v2_draft_completion_emitter_rebased.sql`) after F25 revealed that authoring a `CREATE OR REPLACE FUNCTION` migration against a stale live body silently drops every prior migration's edits to that function.
+
+### Rule 1 — Capture-before-replace
+
+**Before authoring any `CREATE OR REPLACE FUNCTION` migration, the commit MUST include `pg_get_functiondef` output for the target function, captured the same day the migration is authored, committed alongside the migration file.**
+
+- Path: `supabase/migrations/captures/YYYY-MM-DD_pre_<migration-slug>.sql`
+- One capture per target function per migration.
+- The capture is EVIDENCE — the *live truth* the new file is replacing. Reading a prior migration file is NOT a substitute; the file that first introduced a function is not the same as the current live body once any later migration has touched it.
+- Directory tree of captures forms an append-only historical record of the function's live shape at each rewrite boundary.
+- If the commit lacks the capture, the migration cannot be applied. The apply script enforces this by checking for the file's presence keyed to the migration slug.
+
+**Rationale.** `CREATE OR REPLACE FUNCTION` replaces the body in its entirety — no diff, no merge, no port. The Supabase migrations directory is chronological, not current-state; only `pg_get_functiondef` on the running DB knows what's actually live. See KI-032 for the F25 incident that surfaced this class.
+
+### Rule 2 — Real SQL in direct-apply history rows
+
+**When applying a migration via `psql -f` outside the Supabase CLI (bypassing `supabase db push` for hotfix speed, network reasons, or dependency-installation pain), the `supabase_migrations.schema_migrations` INSERT MUST carry the FULL migration SQL — byte-exact — in the `statements` array via dollar-quoting. Never a placeholder string, never a truncated summary, never a description of what was applied.**
+
+- Post-apply verification mechanically diffs `statements[1]` against `pg_get_functiondef(<target>::regprocedure)`. Any drift fails the check.
+- Byte-exact means: no reformatting, no whitespace normalization, no comment stripping, no line-ending translation.
+- Recommended mechanic: psql's `\lo_import` to upload the file as a large object, then `convert_from(lo_get(:oid), 'UTF8')` inside the INSERT — bypasses shell-quoting entirely.
+- If future `supabase db push` runs need to reconstruct the history, the statements array is what they execute. A placeholder there is a landmine: the next rebuild runs a comment instead of a migration.
+
+**Rationale.** History-row content is what runs on rebuild. A placeholder in `statements` is an execution-time no-op; a truncated version is worse — it runs partial SQL. Both surface as inexplicable "migration succeeded but function didn't change" moments months later. See KI-032 verification test (b) for the diff enforcement.
+
+### Both rules apply to
+
+- Any migration containing `CREATE OR REPLACE FUNCTION` (in either the public or extension schema)
+- Any migration containing `CREATE OR REPLACE PROCEDURE`
+- Any migration modifying a trigger, view, or materialized view's body via CREATE OR REPLACE
+- Any direct psql apply that bypasses `supabase db push`
+
+Both rules also apply to future migrations against tables where the migration body depends on the current schema (adding a column with a computed default that assumes another column's presence, etc.) — capture the target table's `pg_dump --schema-only -t <table>` same-day and treat it identically.
