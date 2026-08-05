@@ -257,6 +257,9 @@ def load_moneypuck_seasons(csvs: List[Path], seasons_wanted: Optional[List[int]]
     # ---- Shot context ----
     full["is_rebound"] = _safe_num(full["shotRebound"]).astype(int)
     full["is_empty_net"] = _safe_num(full["shotOnEmptyNet"]).astype(int)
+    # is_rush is dropped from v4's feature set but retained here so the v3-honest
+    # baseline in 0E-XG-9 can consume it as v3 did.
+    full["is_rush"] = _safe_num(full.get("shotRush", pd.Series(0, index=full.index))).astype(int)
 
     home_sk = _safe_num(full["homeSkatersOnIce"], 5)
     away_sk = _safe_num(full["awaySkatersOnIce"], 5)
@@ -625,13 +628,29 @@ def fit_and_encode(df_all: pd.DataFrame) -> Tuple[pd.DataFrame, LabelEncoder, La
 # ---------------------------------------------------------------------------
 # Step 5 — Train + hold-out evaluate + per-shot-type calibration
 # ---------------------------------------------------------------------------
+def _print_season_split(train: pd.DataFrame, hold: pd.DataFrame, tag: str) -> None:
+    """Print per-season row counts entering train and hold, per 0E-XG-9 A1.
+    A silently-dropped season can never happen again — this is the audit trail."""
+    print(f"  [{tag}] per-season split:", flush=True)
+    all_seasons = sorted(set(train["season"].unique()) | set(hold["season"].unique()))
+    print(f"    {'season':>6}  {'train':>10}  {'hold':>10}", flush=True)
+    for s in all_seasons:
+        s_int = int(s)
+        n_tr = int((train["season"] == s).sum())
+        n_ho = int((hold["season"] == s).sum())
+        print(f"    {s_int:>6}  {n_tr:>10,}  {n_ho:>10,}", flush=True)
+    print(f"    {'TOTAL':>6}  {len(train):>10,}  {len(hold):>10,}", flush=True)
+
+
 def train_and_eval(df_all: pd.DataFrame) -> Dict[str, Any]:
-    train_mask = df_all["season"].between(2017, 2022)
+    # 0E-XG-9 (A1): train on 2017-2022 + 2025 (densest moat season). Hold-out
+    # is untouched 2023-2024. Prior version's split silently dropped 2025 —
+    # the enclosing helper prints per-season counts so a repeat is impossible.
+    train_mask = (df_all["season"].between(2017, 2022)) | (df_all["season"] == 2025)
     hold_mask  = df_all["season"].isin([2023, 2024])
     train = df_all[train_mask].copy()
     hold  = df_all[hold_mask].copy()
-    print(f"  train rows: {len(train):,}  (seasons 2017-2022)", flush=True)
-    print(f"  hold  rows: {len(hold):,}   (seasons 2023-2024)", flush=True)
+    _print_season_split(train, hold, "v4")
 
     # 0E-XG-8 (G3): count rows entering training with NaN in each moat feature.
     # These are the rows the model will learn from as "moat unknown" — XGBoost
@@ -815,6 +834,113 @@ def train_and_eval(df_all: pd.DataFrame) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# 0E-XG-9 (A2): v3-honest baseline — 31 features (V4 + is_rush), moat forced
+# to 0.0 / 'no_pass' as v3 had it, TRAINED FRESH on 2017-2022 only (no 2025),
+# scored on the same 2023-2024 hold-out.
+# ---------------------------------------------------------------------------
+def train_v3_honest_baseline(df_all: pd.DataFrame, zone_enc: LabelEncoder) -> Dict[str, Any]:
+    print("\n[6/5] v3-HONEST baseline (train fresh on 2017-2022, score 2023-2024) ...", flush=True)
+    baseline = df_all.copy()
+
+    # v3 replay: moat features hard-coded to 0 / no_pass — the exact contract
+    # v3 was trained on. Overwrites the Phase 0c-joined values from v4's
+    # prep so this is a clean apples-to-apples comparison of "what could v3
+    # deliver honestly on the same fresh hold-out".
+    for col in ("has_pass_before_shot", "pass_lateral_distance",
+                "pass_to_net_distance", "pass_immediacy_score",
+                "goalie_movement_score", "pass_quality_score"):
+        baseline[col] = 0.0
+    # pass_zone_encoded → the integer that maps to 'no_pass'
+    baseline["pass_zone_encoded"] = int(zone_enc.transform(["no_pass"])[0])
+
+    v3_feats: Tuple[str, ...] = tuple(V4_FEATURES) + ("is_rush",)  # 31 features
+    if "is_rush" not in baseline.columns:
+        baseline["is_rush"] = 0
+    else:
+        baseline["is_rush"] = pd.to_numeric(baseline["is_rush"], errors="coerce").fillna(0).astype(int)
+
+    # A2 split: v3-honest trains on 2017-2022 only (NOT 2025). Held-out is
+    # 2023-2024, same as v4's hold — that is the one thing kept apples-to-
+    # apples between the two runs. v4 has more training data by design.
+    train_mask = baseline["season"].between(2017, 2022)
+    hold_mask  = baseline["season"].isin([2023, 2024])
+    train = baseline[train_mask].copy()
+    hold  = baseline[hold_mask].copy()
+    _print_season_split(train, hold, "v3-honest")
+
+    X_train = train[list(v3_feats)]
+    y_train = train["is_goal"].astype(int)
+    X_hold  = hold[list(v3_feats)]
+    y_hold  = hold["is_goal"].astype(int).values
+
+    print(f"  fitting XGBClassifier on {len(X_train):,} rows (v3-honest, 31 features) ...", flush=True)
+    t0 = time.time()
+    model = XGBClassifier(
+        n_estimators=800, max_depth=6, learning_rate=0.05, min_child_weight=5,
+        subsample=0.85, colsample_bytree=0.85, objective="binary:logistic",
+        eval_metric="auc", n_jobs=-1, tree_method="hist", random_state=42,
+    )
+    model.fit(X_train, y_train, verbose=False)
+    print(f"  trained in {_fmt(time.time() - t0)}", flush=True)
+
+    pred = model.predict_proba(X_hold)[:, 1]  # NO clip
+
+    goals_actual = int(y_hold.sum())
+    goals_pred = float(pred.sum())
+    calib_pct = ((goals_pred - goals_actual) / goals_actual * 100) if goals_actual else float("nan")
+    mask_g = (y_hold == 1)
+    avg_g = float(pred[mask_g].mean()) if mask_g.any() else float("nan")
+    avg_ng = float(pred[~mask_g].mean()) if (~mask_g).any() else float("nan")
+    sep = (avg_g / avg_ng) if avg_ng > 0 else float("nan")
+    nongoal_over_030 = float((pred[~mask_g] > 0.30).mean() * 100)
+    rounded = np.round(pred, 3)
+    _, counts = np.unique(rounded, return_counts=True)
+    modal_share_pct = float(counts.max() / len(pred) * 100)
+    try:
+        auc = float(roc_auc_score(y_hold, pred))
+    except Exception:
+        auc = float("nan")
+    try:
+        brier = float(brier_score_loss(y_hold, pred))
+    except Exception:
+        brier = float("nan")
+
+    # Pearson r vs MoneyPuck xGoal on the same held-out shots (where MP is
+    # available; 2025 rows carry no MP xGoal so this is over MP-only rows).
+    mp_pred = pd.to_numeric(hold.get("xGoal", pd.Series(np.nan, index=hold.index)),
+                            errors="coerce").values
+    valid = ~np.isnan(mp_pred)
+    corr = float("nan")
+    if valid.any():
+        try:
+            corr = float(pearsonr(pred[valid], mp_pred[valid])[0])
+        except Exception:
+            corr = float("nan")
+
+    return {
+        "train_rows": int(len(X_train)),
+        "hold_rows": int(len(hold)),
+        "hold": {
+            "n": int(len(pred)),
+            "goals_actual": goals_actual,
+            "sum_pred": round(goals_pred, 2),
+            "calibration_pct": round(calib_pct, 3),
+            "avg_pred_on_goals": round(avg_g, 4),
+            "avg_pred_on_nongoals": round(avg_ng, 4),
+            "separation_ratio": round(sep, 3),
+            "nongoals_over_0_30_pct": round(nongoal_over_030, 3),
+            "modal_share_pct": round(modal_share_pct, 3),
+            "auc": round(auc, 4),
+            "brier": round(brier, 5),
+        },
+        "pearson_vs_moneypuck": {
+            "n_valid": int(valid.sum()),
+            "raw": round(corr, 4) if corr == corr else None,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main() -> int:
@@ -862,9 +988,11 @@ def main() -> int:
         df25 = regen_2025_slice(env["url"], env["key"])
 
     print("\n[4/5] Combining frames + encoding + fit ...", flush=True)
-    # Ensure both frames have the same schema on the training columns
+    # Ensure both frames have the same schema on the training columns.
+    # is_rush is carried through even though it is NOT in V4_FEATURES — the
+    # v3-honest baseline (0E-XG-9 A2) needs it as its 31st feature.
     keep = [
-        "season", "is_goal", "shot_type_raw", "last_event_category_raw", "pass_zone_raw",
+        "season", "is_goal", "shot_type_raw", "last_event_category_raw", "pass_zone_raw", "is_rush",
     ] + list(V4_FEATURES)
     # For MP frame we also carry xGoal for Pearson r later
     if "xGoal" in mp.columns:
@@ -890,6 +1018,9 @@ def main() -> int:
 
     print("\n[5/5] Train + hold-out evaluate ...", flush=True)
     result = train_and_eval(df_all)
+
+    # 0E-XG-9 (A2): honest v3 baseline (train fresh on 2017-2022 only, moat=0)
+    v3_honest = train_v3_honest_baseline(df_all, zone_enc)
 
     # ── Persist artifacts locally ─────────────────────────────────────────
     artifacts = result.pop("_artifacts")
@@ -926,6 +1057,8 @@ def main() -> int:
         "auc_v4_calibrated_hold": result["auc_v4_calibrated_hold"],
         "top_importances_gain": result["top_importances"],
         "moat_features_in_top15": result["moat_features_in_top15"],
+        # 0E-XG-9 A2 — honest v3 baseline, trained fresh on 2017-2022 only
+        "v3_honest_baseline": v3_honest,
         "notes": {
             "is_rush": "DROPPED — inference never populates. See data_acquisition.py:3381.",
             "clipping": "NONE anywhere in this training or in prediction.",
@@ -974,6 +1107,43 @@ def main() -> int:
     print("  Training rows with NaN moat columns (G3):")
     for col, cnt in report["nan_moat_train"].items():
         print(f"    {col:<40} {cnt:,}")
+    print()
+
+    # 0E-XG-9 A3 — unified acceptance-band comparison, one table
+    m3 = v3_honest["hold"]
+    m4r = report["hold_uncalibrated"]
+    m4c = report["hold_calibrated"]
+    print("=" * 80)
+    print("0E-XG-9 A3 — head-to-head on 2023-2024 hold-out")
+    print("=" * 80)
+    print(f"  train sizes: v3-honest={v3_honest['train_rows']:,} rows (2017-2022)  "
+          f"v4={report['train_rows']:,} rows (2017-2022 + 2025)")
+    print(f"  hold size:   {report['hold_rows']:,} rows (2023-2024)")
+    print()
+    def _fmt_num(x):
+        return f"{x:>10}" if x is None else f"{x:>10.4f}" if isinstance(x, float) else f"{x:>10}"
+
+    def _fmt3(x):
+        return "         -" if x is None else f"{x:>10.4f}"
+
+    print(f"  {'metric':<28}  {'MP ref':>10}  {'v3-honest':>10}  {'v4 raw':>10}  {'v4 cal':>10}  band")
+    rows = [
+        ("calibration % (goals)",        -0.43, m3["calibration_pct"],       m4r["calibration_pct"],       m4c["calibration_pct"],       "|x| <= 6%"),
+        ("separation ratio",              3.38, m3["separation_ratio"],       m4r["separation_ratio"],       m4c["separation_ratio"],       "2.0 - 6.0"),
+        ("non-goals > 0.30 (%)",          1.892, m3["nongoals_over_0_30_pct"], m4r["nongoals_over_0_30_pct"], m4c["nongoals_over_0_30_pct"], "0.8 - 5.0"),
+        ("modal share (%)",               None, m3["modal_share_pct"],        m4r["modal_share_pct"],        m4c["modal_share_pct"],        "< 3.0"),
+        ("AUC",                           None, m3["auc"],                    m4r["auc"],                    m4c["auc"],                    "higher better"),
+        ("Brier score",                   None, m3["brier"],                  m4r["brier"],                  m4c["brier"],                  "lower better"),
+    ]
+    for name, mp, v3, v4r, v4c, band in rows:
+        print(f"  {name:<28}  {_fmt3(mp)}  {_fmt3(v3)}  {_fmt3(v4r)}  {_fmt3(v4c)}  {band}")
+    print()
+    print(f"  Pearson r vs MP xg_value (on MP-known rows):")
+    print(f"    v3-honest={v3_honest['pearson_vs_moneypuck'].get('raw')}  "
+          f"(n={v3_honest['pearson_vs_moneypuck'].get('n_valid')})")
+    print(f"    v4 raw   ={report['pearson_vs_moneypuck'].get('raw')}  "
+          f"v4 cal   ={report['pearson_vs_moneypuck'].get('calibrated')}  "
+          f"(n={report['pearson_vs_moneypuck'].get('n_valid')})")
     print()
     print(f"  Artifacts written:")
     for p in (model_out, feat_out, enc_shot_out, enc_event_out, enc_zone_out, calib_out, report_out):
