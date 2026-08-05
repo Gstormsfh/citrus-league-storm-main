@@ -433,30 +433,66 @@ def regen_2025_slice(env_url: str, env_key: str) -> pd.DataFrame:
 # Step 3 — moat join from prod raw_shots (2017-2024). Report hit-rate per season.
 # ---------------------------------------------------------------------------
 def _fetch_moat_for_season(db, season: int) -> pd.DataFrame:
-    """Keyset-paginate raw_shots for one season, selecting the 5 join keys + 7 moat cols."""
+    """Per-game iteration mirroring scripts/utilities/transfer_moat_to_prod.py.
+
+    Rationale for NOT id-keyset here: the previous version keyset on `id` with
+    `seen_last = season_min - 1 = 2016999999` — but `id` is the BIGSERIAL
+    primary key (range ~1..1M), not game_id. `id > 2016999999` matched zero
+    rows for every season and 8 identical empty results were silently
+    concatenated into the training frame. Fixed by walking distinct game_ids
+    within the season's band and fetching each game's rows directly (each
+    call bounded to ~85 rows, so no scan-forward statement-timeout risk
+    either — the same pattern that unblocked the moat transfer).
+    """
     from data_pipeline.utils.supabase_rest import SupabaseRest  # noqa
     season_min = season * 1_000_000
     season_max = (season + 1) * 1_000_000 - 1
-    seen_last: int = season_min - 1
-    PAGE = 1000
-    frames: List[pd.DataFrame] = []
-    select_cols = "id,game_id,player_id,shot_x,shot_y,shot_type_code," + ",".join(MOAT_COLS)
+    select_cols = "game_id,player_id,shot_x,shot_y,shot_type_code," + ",".join(MOAT_COLS)
+
+    # (a) enumerate distinct game_ids in the season by paginating game_id (not id)
+    game_ids: List[int] = []
+    last_gid: int = season_min - 1  # game_id-space cursor now, not id
+    PAGE_GAMES = 1000
     while True:
         rows = db.select(
             "raw_shots",
-            select=select_cols,
-            filters=[("id", "gt", seen_last), ("game_id", "gte", season_min), ("game_id", "lte", season_max)],
-            limit=PAGE, order="id",
+            select="game_id",
+            filters=[("game_id", "gt", last_gid)],
+            limit=PAGE_GAMES,
+            order="game_id",
         )
         if not rows:
             break
-        df = pd.DataFrame(rows)
-        if df.empty:
+        page_gids = sorted({int(r["game_id"]) for r in rows if r.get("game_id") is not None})
+        if not page_gids or page_gids[0] > season_max:
             break
-        frames.append(df)
-        seen_last = int(df["id"].iloc[-1])
-        if len(rows) < PAGE:
+        in_range = [g for g in page_gids if g <= season_max]
+        game_ids.extend(in_range)
+        if page_gids[-1] > season_max:
             break
+        last_gid = page_gids[-1]
+        if len(rows) < PAGE_GAMES:
+            break
+    game_ids = sorted(set(game_ids))
+    print(f"    [moat-fetch] season {season}: {len(game_ids)} distinct game_ids", flush=True)
+
+    # (b) per-game fetch — each call is bounded to the game's shot count (~85)
+    frames: List[pd.DataFrame] = []
+    for i, gid in enumerate(game_ids, 1):
+        try:
+            page = db.select(
+                "raw_shots",
+                select=select_cols,
+                filters=[("game_id", "eq", gid)],
+                limit=1000, order="id",
+            )
+        except Exception as e:
+            # RAISE, not swallow. This is what was hiding the id-keyset bug before.
+            raise RuntimeError(f"[moat-fetch] season {season} game {gid} select failed: {e}") from e
+        if page:
+            frames.append(pd.DataFrame(page))
+        if i % 200 == 0:
+            print(f"      [moat-fetch] season {season}: {i}/{len(game_ids)} games", flush=True)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
@@ -544,13 +580,24 @@ def train_and_eval(df_all: pd.DataFrame) -> Dict[str, Any]:
     print(f"  train rows: {len(train):,}  (seasons 2017-2022)", flush=True)
     print(f"  hold  rows: {len(hold):,}   (seasons 2023-2024)", flush=True)
 
-    # Split train into train + calibration slice (90/10)
+    # Split train into train + calibration slice (90/10).
+    # NOTE: train_test_split unpacks 2*N arrays for N inputs; passing X, y AND
+    # shot_type returns 6 values. Split into two passes with a shared random
+    # index instead (cleaner and avoids the unpack pitfall).
     X_train_all = train[list(V4_FEATURES)]
     y_train_all = train["is_goal"].astype(int)
-    X_tr, X_cal, y_tr, y_cal, cal_shot_type = train_test_split(
-        X_train_all, y_train_all, train["shot_type_raw"],
-        test_size=0.10, stratify=y_train_all, random_state=42,
+    shot_type_train_all = train["shot_type_raw"].reset_index(drop=True)
+    X_train_all = X_train_all.reset_index(drop=True)
+    y_train_all = y_train_all.reset_index(drop=True)
+    idx_tr, idx_cal = train_test_split(
+        np.arange(len(X_train_all)),
+        test_size=0.10, stratify=y_train_all.values, random_state=42,
     )
+    X_tr = X_train_all.iloc[idx_tr]
+    X_cal = X_train_all.iloc[idx_cal]
+    y_tr = y_train_all.iloc[idx_tr]
+    y_cal = y_train_all.iloc[idx_cal]
+    cal_shot_type = shot_type_train_all.iloc[idx_cal].reset_index(drop=True)
     print(f"  fitting XGBClassifier on {len(X_tr):,} rows (cal split held: {len(X_cal):,}) ...", flush=True)
     t0 = time.time()
     model = XGBClassifier(
@@ -718,6 +765,18 @@ def main() -> int:
 
     print("\n[2/5] Joining Phase 0c moat features from prod raw_shots ...", flush=True)
     mp, moat_hitrate = join_moat_into_mp(mp, env["url"], env["key"])
+    # F4: hard gate on moat hit-rate per season. If we're materially below the
+    # empirically-verified target rate, the join key is wrong and training on
+    # zero-filled moat columns would silently degrade v4 — abort.
+    MIN_HIT_PCT = 90.0
+    bad = [(s, h) for s, h in moat_hitrate.items() if h["pct_joined"] < MIN_HIT_PCT]
+    if bad:
+        print("\nABORT: moat-join hit-rate below 90% for one or more seasons.", flush=True)
+        for s, h in sorted(bad):
+            print(f"  season {s}: joined {h['joined']:,}/{h['mp_rows']:,} = {h['pct_joined']:.2f}%",
+                  flush=True)
+        print("Do NOT proceed to training. Verify the join key first.", flush=True)
+        return 3
 
     print("\n[3/5] Regenerating 2025 slice from raw_nhl_data ...", flush=True)
     if args.skip_2025:
