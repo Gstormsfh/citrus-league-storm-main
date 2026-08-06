@@ -5644,12 +5644,20 @@ export class LobbyManager {
         // **Detection**: if the applier appended a `BufferedDraftEvent`
         // for this event, the ring buffer's tail's `seq` will equal
         // `event.seq`. Applier variants without a wire representation
-        // (`draft_paused`, `draft_resumed`, `draft_completed`,
-        // `draft_cancelled`, `draft_extended`, `autopick_failed`,
-        // `generation_bumped`) mutate state without appending to the ring
-        // buffer; tail check evaluates false and no broadcast fires. Wire
-        // representations for those internal-only variants are tracked as
-        // a separate design question (see Decision Log 2026-07-21).
+        // (`draft_paused`, `draft_resumed`, `draft_cancelled`,
+        // `draft_extended`, `autopick_failed`, `generation_bumped`)
+        // mutate state without appending to the ring buffer; tail check
+        // evaluates false and no broadcast fires. Wire representations
+        // for those internal-only variants are tracked as a separate
+        // design question (see Decision Log 2026-07-21).
+        //
+        // **F26 + F27 (2026-08-06) — decision reversed for two variants.**
+        // `draft_completed` (F26 / KI-035) and `draft_started` (F27) NOW
+        // append and broadcast, because clients need to see draft
+        // ignition + completion frames (Rider 4 assert C, KI-035 evidence).
+        // The remaining lifecycle events above still stand on the
+        // 2026-07-21 default; their client-visibility can be raised in
+        // future F-family chunks if room UI expresses them.
         //
         // **Echo protection**: engine-authored actions (autopicks via
         // `processSubmitPick`, all `processNominate`/`processPlaceBid`/
