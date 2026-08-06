@@ -218,9 +218,24 @@ class SupabaseRest:
     if on_conflict:
       params["on_conflict"] = on_conflict
     if filters:
+      # Two filters on the same column (`game_date >= X AND game_date <= Y`)
+      # arrive as two tuples with the same normalized key. Prior behaviour —
+      # `params[k] = v` — silently dropped the earlier filter (dict last-
+      # wins). That is how the D-02 backfill misfired for hours: a single-
+      # date scrape resolved to `game_date=lte.<date>` and pulled every
+      # game up to and including that date. Preserve every filter by
+      # accumulating same-key values into a list; `urlencode(..., doseq=True)`
+      # emits `game_date=gte.X&game_date=lte.Y`, which PostgREST AND-composes.
       for col, op, val in filters:
         k, v = self._fmt_filter(col, op, val)
-        params[k] = v
+        if k in params:
+          existing = params[k]
+          if isinstance(existing, list):
+            existing.append(v)
+          else:
+            params[k] = [existing, v]
+        else:
+          params[k] = v
     return urlencode(params, doseq=True)
 
   def select(self, table: str, select: str = "*", filters: Optional[List[Filter]] = None, order: Optional[str] = None,
