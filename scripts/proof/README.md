@@ -114,14 +114,40 @@ psql defaulted to `localhost`, refusing connection with zero prod
 contact. INS-8-adjacent instrument lesson: undocumented connection
 strings are landmines. This section closes that gap.
 
+**Naming convention.** The prod DB-URL secret is `supabase-db-url`
+(lowercase-hyphen) — matching the default read by
+`infra/gce/draft-engine-startup.sh:117` when the VM metadata
+`secret-db-url-name` is unset. Creating the prod secret under this
+canonical name means a future prod draft-engine VM bootstraps with
+zero metadata overrides. **Do NOT create it as `SUPABASE_DB_URL`** —
+that would work for direct-apply today but silently diverge from the
+GCE convention when the prod engine deploys, forcing metadata plumbing
+that has no upside. Name reconciliation adjudicated 2026-08-06 after
+the initial README §2.1 draft used the uppercase form. (INS-9 in
+`docs/INSTRUMENT_LEDGER.md` — the runbook itself is an instrument;
+inconsistent naming across scripts + docs is a false-green class.)
+
+**Standing rule for read-only check commands.** All gcloud
+interrogation commands in this section MUST include `--quiet` (or
+`-q`) so that any interactive prompt fails-closed rather than
+proceeding with an assumed-yes. Rationale: a `gcloud <service> list`
+call against a project where the underlying API is not yet enabled
+prompts "would you like to enable...?" — if answered yes, the API
+gets enabled as a side effect of an interrogation. INS-8 (2026-08-06):
+Check D `gcloud functions list --project=citrus-fantasy-prod`
+accidentally enabled `cloudfunctions.googleapis.com` on prod through
+this prompt. `--quiet` makes the prompt abort with a clear error
+instead of silently mutating GCP state.
+
 **Prerequisite check (paste first).** Does the prod DB-URL secret
 exist in Secret Manager?
 
 ```powershell
-gcloud secrets list --project=citrus-fantasy-prod --filter="name~SUPABASE_DB_URL$" --format="value(name)"
+gcloud secrets list --project=citrus-fantasy-prod --quiet `
+  --filter="name:supabase-db-url" --format="value(name)"
 ```
 
-- If it prints `SUPABASE_DB_URL`, proceed to the LOADER block below.
+- If it prints `supabase-db-url`, proceed to the LOADER block below.
 - If it prints nothing, run the CREATE block first (one-time setup),
   then the LOADER.
 
@@ -129,8 +155,8 @@ gcloud secrets list --project=citrus-fantasy-prod --filter="name~SUPABASE_DB_URL
 
 ```powershell
 $env:SUPABASE_DB_URL_PROD = (gcloud secrets versions access latest `
-  --secret=SUPABASE_DB_URL `
-  --project=citrus-fantasy-prod)
+  --secret=supabase-db-url `
+  --project=citrus-fantasy-prod --quiet)
 
 # Sanity — should print the redacted prod host (db.iezwazccqqrhrjupxzvf...),
 # NOT the password, NOT localhost:
@@ -164,16 +190,18 @@ $pwPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
 
 $prodUrl = "postgresql://postgres:$pwPlain@db.iezwazccqqrhrjupxzvf.supabase.co:5432/postgres"
 
-# Create the secret in the prod GCP project.
-gcloud secrets create SUPABASE_DB_URL `
+# Create the secret in the prod GCP project. Name = supabase-db-url
+# (lowercase-hyphen; matches GCE startup script default per README §2.1
+# naming convention above).
+gcloud secrets create supabase-db-url `
   --project=citrus-fantasy-prod `
-  --replication-policy=automatic
+  --replication-policy=automatic --quiet
 
 # Add the first version. Uses --data-file=- to read from stdin so the
 # password never appears in the gcloud command line / process listing.
-$prodUrl | gcloud secrets versions add SUPABASE_DB_URL `
+$prodUrl | gcloud secrets versions add supabase-db-url `
   --project=citrus-fantasy-prod `
-  --data-file=-
+  --data-file=- --quiet
 
 # Wipe the plaintext from this session's variables.
 $pwPlain = $null; $prodUrl = $null; $pw = $null

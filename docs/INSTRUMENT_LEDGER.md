@@ -354,3 +354,104 @@ Any future direct-apply script that supersedes this function must
 STEP 0 pin against this value (or a same-day recapture, if the world
 has moved). Previous pin `e849568e2f8cc35eb437c51b1732c91f` (F25-broken
 body, 2026-08-05 23:00 MT) is retired.
+
+### INS-8 — Read-only gcloud interrogation prompted API-enable and got a yes; API silently activated on prod
+
+**Field record (2026-08-06, SL-1 prod-reset gate Checks A–F).** During
+the prod-reset inventory (`gcloud functions list --project=citrus-fantasy-prod`,
+Check D), the interrogation prompted "API [cloudfunctions.googleapis.com]
+not enabled on project [citrus-fantasy-prod]. Would you like to enable
+and retry? (y/N)". Garrett — reading it as an interrogation prerequisite
+rather than a state change — answered yes. The API activated on prod
+as a side effect of what was billed as a *read-only check*. Garrett
+is reversing (`gcloud services disable cloudfunctions.googleapis.com
+--project=citrus-fantasy-prod --force`); no service was ever deployed
+to the API.
+
+**Instrument.** `gcloud <service> list` family, when run against a
+project where the underlying API has not been enabled. gcloud's default
+UX is interactive-yes-friendly — the prompt reads like a prerequisite,
+not a mutation.
+
+**Failure mode.** `Type III` — instrument did what it was told, but
+the interrogation had a side effect the operator did not intend. The
+prompt was answered honestly ("yes, I want the interrogation to
+complete") without recognizing the state change hidden inside the
+prompt's phrasing. Adjacent to `dropped-signal` in reverse: the signal
+that this was a mutation, not a read, arrived too subtly.
+
+**Fix (standing cookbook rule, ships this commit).** All read-only
+gcloud interrogation commands in Season-Loop scripts and README §2.1
+MUST include `--quiet` (or `-q`). With `--quiet`, gcloud interprets
+any prompt as an aborted operation instead of assuming a yes. The
+prompt "API not enabled — enable?" would then fail with a clear
+non-zero exit rather than silently activating the API.
+
+README §2.1 revised in this commit to add `--quiet` to every gcloud
+call. Same rule applies to the Check A–F guides — any future
+regeneration of those hand-off blocks must include `--quiet` on every
+gcloud invocation that is not itself a deliberate mutation.
+
+**Credit.** Garrett noticed within seconds and initiated the reversal.
+Standing rule now makes the class impossible to hit accidentally.
+
+**Meta-lesson: instrument sanitization must include not just what the
+instrument *reads*, but what it *asks* of its operator.** A prompt
+seen by a human is part of the instrument's surface area; a prompt
+that changes state on yes is a mutation vector wearing an interrogation
+mask. Standing enforcement pattern:
+
+- Any read-only check command in a runbook or paste block: `--quiet`.
+- Any read-only check that requires enabling something to complete:
+  document the pre-enable step SEPARATELY, gated on operator
+  intention, with a paired disable-after-check.
+- Rehearsal harnesses (INS-6): must exercise read-only checks against
+  their intended target, including the "not yet enabled" case, to
+  surface the prompt at rehearsal time rather than at real-run time.
+
+### INS-9 — Prod-secret naming divergence between README §2.1 CREATE and GCE startup script default
+
+**Field record (2026-08-06, name reconciliation before Step 1b runs).**
+The README §2.1 CREATE block as originally committed (commit
+`a29fc677`) created the prod secret as `SUPABASE_DB_URL` (uppercase,
+underscore). The GCE startup script `infra/gce/draft-engine-startup.sh:117`
+reads secret name `${SECRET_DB_URL_NAME:-supabase-db-url}` (lowercase,
+hyphen) when the VM metadata `secret-db-url-name` is unset. A prod
+draft-engine VM deployed today would look for `supabase-db-url` and
+find nothing (or find whatever future secret was created under that
+canonical name), while direct-apply sessions loaded from the
+`SUPABASE_DB_URL` uppercase-form secret. **The runbook itself was the
+instrument that diverged from the running code's expectation.**
+
+**Instrument.** README §2.1 CREATE block, `scripts/proof/README.md`.
+
+**Failure mode.** `false-green` (at write time) — the block worked for
+its intended use case (loading the env var for direct-apply this
+week), which meant no failing signal on first use. Would have surfaced
+as a broken prod GCE bootstrap the first time a prod engine VM was
+spun up — potentially months later, with no obvious lineage back to
+this authorship error.
+
+**Fix (this commit).** README §2.1 CREATE + LOADER blocks use
+`supabase-db-url` throughout. Prerequisite check filter changed from
+`name~SUPABASE_DB_URL$` to `name:supabase-db-url`. New "Naming
+convention" paragraph at the top of §2.1 makes the constraint explicit
+and points at the GCE startup script line that pins the default.
+
+**Credit.** Architect caught the divergence in review of the prod-
+reset gate hand-off, before Garrett ran Step 1b against the prod
+project. Zero mutations landed under the wrong name.
+
+**Meta-lesson: authoritative naming lives in the code that reads it,
+not in the docs that describe it.** When a runbook prescribes a secret
+name / env var / URL that another component will later consume, the
+runbook is downstream of the consumer's expectation. Standing pattern
+for future runbook additions:
+
+- Any doc that prescribes a name a runtime component will read: cite
+  the exact file + line where that component reads it, and derive the
+  prescribed name from that citation.
+- Any secret/config-name divergence between doc and code is
+  reportable as an instrument bug — the doc is an instrument for
+  operator action; incorrect instructions are the same class as an
+  incorrect regex.
