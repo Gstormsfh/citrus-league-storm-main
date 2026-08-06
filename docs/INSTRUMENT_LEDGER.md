@@ -545,3 +545,85 @@ INS-8 was a Type III side effect; INS-9 was doc-vs-code naming;
 was wrong" defect in this campaign** — outside the reach of any
 transactional wrap or code-body verifier. Only data-shape assertion
 would have caught it earlier.
+
+### INS-11 — pg_cron mutation as direct DML on `cron.job` refused with permission denied (seventh consecutive atomic refusal)
+
+**Field record (2026-08-06 evening, KI-041 reply-migration apply).**
+The reply migration `20260806200000_reenable_auto_fix_after_sl1b_v2.sql`
+v1 attempted to re-enable cron job 4 via:
+
+```sql
+UPDATE cron.job SET active = true WHERE jobid = 4;
+```
+
+Refused at migration line 116 with `permission denied for table job`.
+Root cause verified against 0F-OPS-3's own statements: Supabase's
+`postgres` role has SELECT on `cron.job` but does NOT have
+UPDATE/INSERT/DELETE. The disable side (0F-OPS-3) had used
+`PERFORM cron.alter_job(job_id := <id>, active := false)` after a
+by-name lookup (jobname 'auto-fix-integrity') and post-verify SELECT
+gate. The reply migration inherited the wrong mechanic from the
+harness pattern, which pre-dates the pg_cron surface.
+
+**Instrument.** `supabase/migrations/20260806200000_reenable_auto_fix_after_sl1b_v2.sql`
+v1 (line 116); `scripts/proof/apply-reenable-auto-fix.local.sql` v1
+STEP 0/3 (which hardcoded `jobid = 4` — also incorrect for jobname-
+based conventions across environments).
+
+**Failure mode.** `hard-error` at runtime → full transactional
+rollback → seventh consecutive atomic refusal caught by the
+transactional wrap. Zero residue: STEP 0 hash pin still valid,
+auto_fix live md5 unchanged, no history row written, no cron state
+touched. Same pin valid for the re-run.
+
+**Fix (this commit).** Migration v2 mirrors 0F-OPS-3's mechanic
+exactly:
+
+- Lookup `jobid` by `jobname = 'auto-fix-integrity'` (no hardcoded jobid).
+- Guard: refuse if jobname missing OR command doesn't match auto_fix pattern.
+- `PERFORM cron.alter_job(job_id := v_jobid, active := true)` inside a DO block.
+- Post-verify SELECT active — SELECT is permitted for the postgres role.
+- Apply harness STEP 0/3 updated to jobname lookup; capture filename
+  updated to `..._pre_reenable_cron_job_auto_fix_integrity.json`.
+- Dry-run harness gains two new comment-stripped-corpus checks:
+  `no_direct_cron_dml` and `zero_sql_updates_anywhere`, both counting to zero.
+
+**Rule-writing outcome.** Added to `docs/MIGRATION_SAFETY_GUIDE.md`
+as Rule 5: all pg_cron mutations on Supabase go through the API
+(`cron.alter_job` / `cron.schedule` / `cron.unschedule`), never
+direct table DML. Full concrete pattern included in the rule text.
+
+**Credit.** Standing rule — always use the sanctioned API for
+extension-managed state on Supabase — now codified for pg_cron
+specifically. Same principle likely applies to other Supabase-
+managed schemas (`storage`, `auth`, `graphql_public`, `realtime`,
+`vault`, `pgmq`); future encounters with permission-denied on their
+tables should reach for the extension API first.
+
+**Meta-lesson: managed platforms partition their schemas into
+"readable" and "mutable-via-API." A `SELECT` that works is not
+proof that the corresponding `UPDATE` will. Test mutations against
+staging OR consult the extension's API surface before assuming
+direct DML is permitted.** Standing pattern:
+
+- When authoring a mutation on any schema owned by an installed
+  extension (`cron`, `storage`, `auth`, etc.), first check the
+  extension's documented API for the equivalent operation.
+- If none is found or the operation is genuinely intended as raw
+  DML, the migration header MUST document why — otherwise future
+  authors default to the API pattern.
+- Dry-run harnesses for pg_cron-mutating migrations MUST include a
+  `no_direct_cron_dml` counter as a standing negative marker.
+
+**Standing pin note.** STEP 0 hash pin
+`d0a54ca8925c9a8604781294a4b5631a` for `auto_fix_integrity_issues`
+remains valid across the v1→v2 patch — the reply migration touches
+cron state only, not the function body.
+
+**Refusal count.** INS-11 is the seventh consecutive atomic refusal
+caught by the transactional wrap this campaign (INS-4 STEP 0 regex,
+INS-5 STEP 3 windowing × 4, INS-6 psql/plpgsql interpolation,
+INS-11 pg_cron DML permission). Every one arrived as an eager error
+inside a rollback-safe transaction; no state leaked; each surfaced
+its own class of instrument defect for the ledger. The wrap
+continues to do load-bearing work that no other mechanism replaces.

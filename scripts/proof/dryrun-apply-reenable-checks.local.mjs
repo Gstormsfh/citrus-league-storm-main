@@ -23,14 +23,33 @@ import { readFileSync } from 'node:fs';
 const MIGRATION_PATH = 'supabase/migrations/20260806200000_reenable_auto_fix_after_sl1b_v2.sql';
 const raw = readFileSync(MIGRATION_PATH, 'utf8');
 
+// SQL-shape checks (no_direct_cron_dml, zero_sql_updates_anywhere) must
+// distinguish executable SQL from prose inside `-- ...` comments (e.g.
+// header rationale that MENTIONS the forbidden DML to explain why we
+// avoid it). Strip line comments before those checks. Block comments
+// aren't used in this file family so single-line strip is sufficient.
+const executable = raw.split('\n')
+  .map(line => {
+    const idx = line.indexOf('--');
+    return idx === -1 ? line : line.slice(0, idx);
+  })
+  .join('\n');
+
 const checks = [
-  // Structural: the single UPDATE + WHERE jobid=4 is present.
+  // Structural: the single mutation is cron.alter_job (never direct DML).
   {
-    id: 'update_cron_job_active_true',
+    id: 'uses_cron_alter_job_api',
     corpus: raw,
-    re: /UPDATE cron\.job\s+SET active = true\s+WHERE jobid = 4;/,
+    re: /PERFORM cron\.alter_job\(job_id := v_jobid, active := true\)/,
     expected: true,
-    reason: 'the single mutation: UPDATE cron.job SET active=true WHERE jobid=4',
+    reason: 'the single mutation via pg_cron API (INS-11 rule, MIGRATION_SAFETY_GUIDE Rule 5)',
+  },
+  {
+    id: 'looks_up_by_jobname',
+    corpus: raw,
+    re: /WHERE jobname = 'auto-fix-integrity'/,
+    expected: true,
+    reason: '0F-OPS-3 convention: lookup by jobname (jobid may drift)',
   },
   // Guard: pre-verify block references auto_fix_integrity_issues pattern.
   {
@@ -38,23 +57,23 @@ const checks = [
     corpus: raw,
     re: /v_command NOT ILIKE '%auto_fix_integrity_issues%'/,
     expected: true,
-    reason: 'pre-verify refuses if jobid 4 command has been repurposed away from auto_fix',
+    reason: 'pre-verify refuses if the job command has been repurposed away from auto_fix',
   },
-  // Guard: pre-verify checks jobid exists.
+  // Guard: pre-verify checks jobname exists.
   {
-    id: 'preverify_jobid_exists',
+    id: 'preverify_jobname_exists',
     corpus: raw,
-    re: /jobid 4 not found in cron\.job/,
+    re: /jobname ''auto-fix-integrity'' not found/,
     expected: true,
-    reason: 'pre-verify raises if jobid 4 does not exist',
+    reason: 'pre-verify raises if jobname does not exist',
   },
-  // Guard: post-verify checks active=true.
+  // Guard: post-verify checks active=true after alter_job.
   {
     id: 'postverify_active_true',
     corpus: raw,
-    re: /jobid 4 still not active/,
+    re: /still not active/,
     expected: true,
-    reason: 'post-verify raises if UPDATE did not stick',
+    reason: 'post-verify raises if cron.alter_job did not stick',
   },
   // Rationale block references 0F-OPS-3 counterpart.
   {
@@ -110,17 +129,21 @@ const checks = [
   },
   // Negative: no OTHER mutation lurks in the file.
   {
-    id: 'exactly_one_sql_update',
-    corpus: raw,
-    // Match SQL UPDATE statements specifically: `UPDATE <schema.>?<table> SET`
-    // (word boundary + table pattern + SET). Prose uses of the word
-    // "UPDATE" in comments/messages don't match.
-    // Count matches — must be exactly 1 (the authorized cron.job UPDATE).
-    // Using .match() with a global flag would be simpler, but the harness
-    // uses .test() for uniformity. Encode via a wrapper below.
+    id: 'no_direct_cron_dml (INS-11 rule; comment-stripped corpus)',
+    corpus: executable,
+    // No direct UPDATE/INSERT/DELETE on cron.job. Corpus has `--` comments
+    // stripped so header prose explaining WHY we avoid direct DML doesn't
+    // false-fail here.
+    matchCount: (corpus) => (corpus.match(/\b(UPDATE|INSERT INTO|DELETE FROM)\s+cron\.job\b/gi) || []).length,
+    expectedCount: 0,
+    reason: 'no direct DML on cron.job — must use cron.alter_job API',
+  },
+  {
+    id: 'zero_sql_updates_anywhere (comment-stripped corpus)',
+    corpus: executable,
     matchCount: (corpus) => (corpus.match(/\bUPDATE\s+[a-z_.]+\s+SET\b/gi) || []).length,
-    expectedCount: 1,
-    reason: 'the migration contains exactly one SQL UPDATE statement',
+    expectedCount: 0,
+    reason: 'API-only re-enable contains no SQL UPDATE statements',
   },
   {
     id: 'no_stray_deletes (must be false)',

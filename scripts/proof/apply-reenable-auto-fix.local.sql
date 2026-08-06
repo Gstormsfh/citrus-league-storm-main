@@ -22,11 +22,25 @@
 -- SCOPE:
 --   - No function replacement — auto_fix_integrity_issues is live and
 --     unchanged from SL-1b v2.
---   - Single UPDATE on cron.job (jobid=4). Reversible: `UPDATE cron.job
---     SET active=false WHERE jobid=4` reproduces 0F-OPS-3's terminal
---     state.
---   - Verified: jobid 4 command still matches auto_fix pattern (guards
---     against jobid repurposing between disable and re-enable).
+--   - Single mutation via pg_cron API:
+--       PERFORM cron.alter_job(job_id := v_jobid, active := true)
+--     where v_jobid is looked up from jobname='auto-fix-integrity'
+--     (0F-OPS-3's convention). Reversible:
+--       PERFORM cron.alter_job(job_id := <id>, active := false)
+--     reproduces 0F-OPS-3's terminal state.
+--   - Verified: jobname command still matches auto_fix pattern (guards
+--     against jobname repurposing between disable and re-enable).
+--
+-- MECHANIC NOTE (INS-11 fix, 2026-08-06 evening):
+--   v1 of this apply used direct DML — `UPDATE cron.job SET active=true
+--   WHERE jobid=4`. Refused at migration line 116 with
+--   `permission denied for table job`: Supabase's postgres role has
+--   SELECT but not UPDATE on cron.job. pg_cron's designed mutation
+--   surface is the cron.alter_job / cron.schedule / cron.unschedule
+--   API functions. Standing rule added to MIGRATION_SAFETY_GUIDE
+--   (Rule 5): all pg_cron mutations on Supabase go through the API,
+--   never direct table DML. Seventh consecutive atomic refusal caught
+--   by the transactional wrap — zero residue.
 --
 -- Property preservation: N/A here — this migration doesn't touch any
 -- function's prosecdef/proconfig. STEP 3 asserts the auto_fix function
@@ -53,7 +67,7 @@ DECLARE
   v_body_md5        text;
   v_expected_md5    text := 'd0a54ca8925c9a8604781294a4b5631a';
 
-  v_jobid_exists    boolean;
+  v_jobid           bigint;
   v_jobid_active    boolean;
   v_jobid_command   text;
 BEGIN
@@ -69,48 +83,47 @@ BEGIN
 
   IF v_body_md5 <> v_expected_md5 THEN
     RAISE EXCEPTION
-      'STEP 0 FAIL (md5): auto_fix live md5 % <> expected SL-1b v2 %. Either v2 was superseded or wrong DB. Investigate BEFORE re-enabling job 4.',
+      'STEP 0 FAIL (md5): auto_fix live md5 % <> expected SL-1b v2 %. Either v2 was superseded or wrong DB. Investigate BEFORE re-enabling.',
       v_body_md5, v_expected_md5;
   END IF;
 
-  -- Cron precondition: jobid 4 exists, currently inactive, command matches auto_fix.
-  SELECT
-    (SELECT count(*) FROM cron.job WHERE jobid = 4) > 0,
-    j.active,
-    j.command
-    INTO v_jobid_exists, v_jobid_active, v_jobid_command
-    FROM cron.job j
-   WHERE j.jobid = 4;
+  -- Cron precondition: jobname 'auto-fix-integrity' exists, currently
+  -- inactive, command matches auto_fix. Lookup by jobname mirrors
+  -- 0F-OPS-3's convention (jobid can drift).
+  SELECT jobid, active, command
+    INTO v_jobid, v_jobid_active, v_jobid_command
+    FROM cron.job
+   WHERE jobname = 'auto-fix-integrity';
 
-  RAISE NOTICE '  jobid 4 exists            : %', v_jobid_exists;
-  RAISE NOTICE '  jobid 4 currently active  : %  (expected false — 0F-OPS-3 terminal state)', v_jobid_active;
-  RAISE NOTICE '  jobid 4 command (first 80): %', COALESCE(left(v_jobid_command, 80), '<null>');
+  RAISE NOTICE '  jobname ''auto-fix-integrity'' jobid : %', COALESCE(v_jobid::text, '<not found>');
+  RAISE NOTICE '  currently active          : %  (expected false — 0F-OPS-3 terminal state)', v_jobid_active;
+  RAISE NOTICE '  command (first 80)        : %', COALESCE(left(v_jobid_command, 80), '<null>');
   RAISE NOTICE '';
 
-  IF NOT v_jobid_exists THEN
-    RAISE EXCEPTION 'STEP 0 FAIL (cron): jobid 4 not found. Aborting.';
+  IF v_jobid IS NULL THEN
+    RAISE EXCEPTION 'STEP 0 FAIL (cron): jobname ''auto-fix-integrity'' not found. Aborting.';
   END IF;
 
   IF v_jobid_command NOT ILIKE '%auto_fix_integrity_issues%' THEN
-    RAISE EXCEPTION 'STEP 0 FAIL (cron): jobid 4 command does not match auto_fix pattern. Actual: %. Refusing to re-enable a repurposed jobid.',
+    RAISE EXCEPTION 'STEP 0 FAIL (cron): jobname ''auto-fix-integrity'' command does not match auto_fix pattern. Actual: %. Refusing to re-enable a repurposed jobname.',
       v_jobid_command;
   END IF;
 
   IF v_jobid_active THEN
-    RAISE NOTICE 'STEP 0 NOTE: jobid 4 already active — apply is a no-op replay. Proceeding for history-row correctness.';
+    RAISE NOTICE 'STEP 0 NOTE: already active — apply is a no-op replay. Proceeding for history-row correctness.';
   END IF;
 
-  RAISE NOTICE 'STEP 0 PASS: auto_fix v2 pinned, jobid 4 target verified.';
+  RAISE NOTICE 'STEP 0 PASS: auto_fix v2 pinned, jobname ''auto-fix-integrity'' (jobid=%) target verified.', v_jobid;
 END
 $sanity$;
 
 -- --------------------------------------------------------------------------
 -- STEP 1 — Capture cron.job pre-state (Rule 1 analog for cron mutations)
 -- --------------------------------------------------------------------------
--- No pg_get_functiondef equivalent for cron rows; capture jobid=4's
--- full row to a file client-side.
+-- No pg_get_functiondef equivalent for cron rows; capture the
+-- jobname='auto-fix-integrity' row to a file client-side.
 
-\copy (SELECT to_json(j) FROM cron.job j WHERE j.jobid = 4) TO 'supabase/migrations/captures/2026-08-06_pre_reenable_cron_job_4.json' WITH (FORMAT text, HEADER false)
+\copy (SELECT to_json(j) FROM cron.job j WHERE j.jobname = 'auto-fix-integrity') TO 'supabase/migrations/captures/2026-08-06_pre_reenable_cron_job_auto_fix_integrity.json' WITH (FORMAT text, HEADER false)
 
 -- --------------------------------------------------------------------------
 -- STEP 2 — Apply the reply migration
@@ -127,6 +140,7 @@ DECLARE
   v_body_md5      text;
   v_expected_md5  text := 'd0a54ca8925c9a8604781294a4b5631a';
 
+  v_jobid           bigint;
   v_jobid_active    boolean;
   v_jobid_schedule  text;
   v_jobid_command   text;
@@ -140,29 +154,34 @@ BEGIN
       v_expected_md5, v_body_md5;
   END IF;
 
-  -- Cron job 4 now active + schedule intact.
-  SELECT active, schedule, command
-    INTO v_jobid_active, v_jobid_schedule, v_jobid_command
+  -- Cron job now active + schedule intact. Lookup by jobname (jobid varies).
+  SELECT jobid, active, schedule, command
+    INTO v_jobid, v_jobid_active, v_jobid_schedule, v_jobid_command
     FROM cron.job
-   WHERE jobid = 4;
+   WHERE jobname = 'auto-fix-integrity';
 
   RAISE NOTICE '';
   RAISE NOTICE '=== STEP 3 POST-APPLY VERIFICATION ===';
-  RAISE NOTICE '  auto_fix body md5 unchanged : %', (v_body_md5 = v_expected_md5);
-  RAISE NOTICE '  jobid 4 active              : %  (expected true)', v_jobid_active;
-  RAISE NOTICE '  jobid 4 schedule            : %', v_jobid_schedule;
-  RAISE NOTICE '  jobid 4 command (first 80)  : %', COALESCE(left(v_jobid_command, 80), '<null>');
+  RAISE NOTICE '  auto_fix body md5 unchanged   : %', (v_body_md5 = v_expected_md5);
+  RAISE NOTICE '  jobname ''auto-fix-integrity'' jobid : %', COALESCE(v_jobid::text, '<not found>');
+  RAISE NOTICE '  active                        : %  (expected true)', v_jobid_active;
+  RAISE NOTICE '  schedule                      : %', v_jobid_schedule;
+  RAISE NOTICE '  command (first 80)            : %', COALESCE(left(v_jobid_command, 80), '<null>');
   RAISE NOTICE '';
 
+  IF v_jobid IS NULL THEN
+    RAISE EXCEPTION 'STEP 3 FAIL: jobname ''auto-fix-integrity'' not found in cron.job after alter_job call.';
+  END IF;
+
   IF NOT v_jobid_active THEN
-    RAISE EXCEPTION 'STEP 3 FAIL: jobid 4 active is still false after UPDATE. Something wrong.';
+    RAISE EXCEPTION 'STEP 3 FAIL: cron.alter_job completed but jobname active is still false. Verify permissions or investigate.';
   END IF;
 
   IF v_jobid_command NOT ILIKE '%auto_fix_integrity_issues%' THEN
-    RAISE EXCEPTION 'STEP 3 FAIL: jobid 4 command changed during apply. Actual: %.', v_jobid_command;
+    RAISE EXCEPTION 'STEP 3 FAIL: jobname command changed during apply. Actual: %.', v_jobid_command;
   END IF;
 
-  RAISE NOTICE 'STEP 3 PASS: auto_fix body unchanged, jobid 4 active=true, schedule + command intact.';
+  RAISE NOTICE 'STEP 3 PASS: auto_fix body unchanged, jobname ''auto-fix-integrity'' (jobid=%) active=true, schedule + command intact.', v_jobid;
 END
 $verify$;
 
@@ -234,12 +253,12 @@ BEGIN
     FROM supabase_migrations.schema_migrations
    WHERE version = '20260806200000';
 
-  SELECT active INTO v_jobid_active FROM cron.job WHERE jobid = 4;
+  SELECT active INTO v_jobid_active FROM cron.job WHERE jobname = 'auto-fix-integrity';
 
   RAISE NOTICE '';
   RAISE NOTICE '=== STEP 5 FINAL ASSERTION ===';
-  RAISE NOTICE '  history rows for 20260806200000 : % (expect 1)', v_hist_row_count;
-  RAISE NOTICE '  jobid 4 active                  : %  (expect true)', v_jobid_active;
+  RAISE NOTICE '  history rows for 20260806200000       : % (expect 1)', v_hist_row_count;
+  RAISE NOTICE '  jobname ''auto-fix-integrity'' active  : %  (expect true)', v_jobid_active;
   RAISE NOTICE '';
 
   IF v_hist_row_count <> 1 THEN
@@ -247,10 +266,10 @@ BEGIN
   END IF;
 
   IF NOT v_jobid_active THEN
-    RAISE EXCEPTION 'STEP 5 FAIL: jobid 4 active is false at final check.';
+    RAISE EXCEPTION 'STEP 5 FAIL: jobname ''auto-fix-integrity'' active is false at final check.';
   END IF;
 
-  RAISE NOTICE 'STEP 5 PASS: reply migration recorded, cron job 4 re-enabled.';
+  RAISE NOTICE 'STEP 5 PASS: reply migration recorded, cron.alter_job re-enabled auto-fix-integrity.';
 END
 $final$;
 
@@ -264,8 +283,8 @@ COMMIT;
 \echo 'NEXT (per architect close):'
 \echo ''
 \echo '  1. Commit the pre-apply capture:'
-\echo '       git add supabase/migrations/captures/2026-08-06_pre_reenable_cron_job_4.json'
-\echo '       git commit -m "evidence(KI-041): pre-reenable cron.job row snapshot (jobid=4, 0F-OPS-3 terminal state)"'
+\echo '       git add supabase/migrations/captures/2026-08-06_pre_reenable_cron_job_auto_fix_integrity.json'
+\echo '       git commit -m "evidence(KI-041): pre-reenable cron.job row snapshot (jobname=auto-fix-integrity, 0F-OPS-3 terminal state)"'
 \echo ''
 \echo '  2. FINAL confirmation (tomorrow AM, first 04:00 UTC after apply):'
 \echo '       SELECT jrd.start_time, jrd.status, left(jrd.return_message, 200)'

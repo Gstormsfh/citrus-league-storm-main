@@ -78,58 +78,94 @@
 -- at 2026-08-07 04:00 UTC (or the next 04:00 following successful apply).
 -- ============================================================================
 
--- ── Pre-condition verification ────────────────────────────────────────
+-- ── MECHANIC — pg_cron API (never direct table DML) ───────────────────
+--
+-- Supabase's `postgres` role has SELECT on `cron.job` but NOT UPDATE.
+-- Direct `UPDATE cron.job SET active = ...` throws permission-denied
+-- (v1 of this migration hit exactly that at line 116 — see INS-11).
+-- pg_cron's designed mutation surface is the `cron.alter_job` /
+-- `cron.schedule` / `cron.unschedule` API functions, which run with
+-- the extension's own privileges. 0F-OPS-3 used this same mechanic
+-- on the disable side: PERFORM cron.alter_job(job_id := <id>, active := false)
+-- after a by-name lookup for jobname 'auto-fix-integrity'. This reply
+-- mirrors their mechanic exactly.
+--
+-- Standing rule (added to docs/MIGRATION_SAFETY_GUIDE.md as Rule 5 by
+-- the commit shipping this patch): all pg_cron mutations on Supabase
+-- go through cron.alter_job / cron.schedule / cron.unschedule — never
+-- direct DML on cron.job.
+
+-- ── Pre-condition verification (by jobname; jobid varies) ─────────────
 DO $verify_pre$
 DECLARE
+  v_jobid    bigint;
   v_command  text;
   v_active   boolean;
   v_schedule text;
 BEGIN
-  SELECT command, active, schedule
-    INTO v_command, v_active, v_schedule
+  SELECT jobid, command, active, schedule
+    INTO v_jobid, v_command, v_active, v_schedule
     FROM cron.job
-   WHERE jobid = 4;
+   WHERE jobname = 'auto-fix-integrity';
 
-  IF v_command IS NULL THEN
-    RAISE EXCEPTION 'REPLY MIGRATION FAIL: jobid 4 not found in cron.job. The 0F-OPS-3 disable target no longer exists; investigate before re-enabling anything else.';
+  IF v_jobid IS NULL THEN
+    RAISE EXCEPTION 'REPLY MIGRATION FAIL: jobname ''auto-fix-integrity'' not found in cron.job. The 0F-OPS-3 disable target no longer exists; investigate before re-enabling anything else.';
   END IF;
 
-  -- Job 4 is expected to invoke auto_fix_integrity_issues. If jobid 4 has
-  -- been repurposed to another command, refuse — we would be re-enabling
-  -- the wrong job.
+  -- The command is expected to invoke auto_fix_integrity_issues. If the
+  -- job has been repurposed to another command, refuse.
   IF v_command NOT ILIKE '%auto_fix_integrity_issues%' THEN
-    RAISE EXCEPTION 'REPLY MIGRATION FAIL: jobid 4 command does not match auto_fix_integrity_issues pattern. Actual command: %. Refusing to re-enable the wrong job.', v_command;
+    RAISE EXCEPTION 'REPLY MIGRATION FAIL: jobname ''auto-fix-integrity'' command does not match auto_fix_integrity_issues pattern. Actual command: %. Refusing to re-enable the wrong job.', v_command;
   END IF;
 
   IF v_active THEN
-    RAISE NOTICE 'REPLY MIGRATION NOTE: jobid 4 already active=true — this migration is a no-op idempotent replay.';
+    RAISE NOTICE 'REPLY MIGRATION NOTE: jobname ''auto-fix-integrity'' (jobid=%) already active=true — this migration is a no-op idempotent replay.', v_jobid;
   ELSE
-    RAISE NOTICE 'Pre-enable: jobid=4 command=% schedule=% active=false (as 0F-OPS-3 left it)',
-      v_command, v_schedule;
+    RAISE NOTICE 'Pre-enable: jobname=''auto-fix-integrity'' jobid=% command=% schedule=% active=false (as 0F-OPS-3 left it)',
+      v_jobid, v_command, v_schedule;
   END IF;
 END
 $verify_pre$;
 
--- ── The single mutation ───────────────────────────────────────────────
-UPDATE cron.job
-   SET active = true
- WHERE jobid = 4;
+-- ── The single mutation via pg_cron API ───────────────────────────────
+-- cron.alter_job(job_id, ..., active := ...) is the sanctioned API.
+-- We call it inside a DO block so we can look up the jobid by jobname
+-- (0F-OPS-3's convention) and then feed the looked-up id into the API.
 
--- ── Post-condition verification ───────────────────────────────────────
+DO $do_enable$
+DECLARE
+  v_jobid bigint;
+BEGIN
+  SELECT jobid INTO v_jobid FROM cron.job WHERE jobname = 'auto-fix-integrity';
+  IF v_jobid IS NULL THEN
+    RAISE EXCEPTION 'REPLY MIGRATION FAIL: jobname ''auto-fix-integrity'' vanished between pre-verify and mutation. Aborting.';
+  END IF;
+
+  PERFORM cron.alter_job(job_id := v_jobid, active := true);
+  RAISE NOTICE 'Called cron.alter_job(job_id := %, active := true)', v_jobid;
+END
+$do_enable$;
+
+-- ── Post-condition verification (SELECT is permitted for postgres role) ─
 DO $verify_post$
 DECLARE
+  v_jobid    bigint;
   v_active   boolean;
   v_schedule text;
 BEGIN
-  SELECT active, schedule
-    INTO v_active, v_schedule
+  SELECT jobid, active, schedule
+    INTO v_jobid, v_active, v_schedule
     FROM cron.job
-   WHERE jobid = 4;
+   WHERE jobname = 'auto-fix-integrity';
 
-  IF NOT v_active THEN
-    RAISE EXCEPTION 'REPLY MIGRATION FAIL: UPDATE completed but jobid 4 still not active. Something rolled back or permission-denied silently.';
+  IF v_jobid IS NULL THEN
+    RAISE EXCEPTION 'REPLY MIGRATION FAIL: jobname ''auto-fix-integrity'' not found in post-verify. Something wrong.';
   END IF;
 
-  RAISE NOTICE 'Post-enable: jobid=4 active=true schedule=%. Next scheduled run resumes at the next tick of the schedule.', v_schedule;
+  IF NOT v_active THEN
+    RAISE EXCEPTION 'REPLY MIGRATION FAIL: cron.alter_job completed but jobname ''auto-fix-integrity'' (jobid=%) still not active. Verify permissions or investigate further.', v_jobid;
+  END IF;
+
+  RAISE NOTICE 'Post-enable: jobname=''auto-fix-integrity'' jobid=% active=true schedule=%. Next scheduled run resumes at the next tick of the schedule.', v_jobid, v_schedule;
 END
 $verify_post$;

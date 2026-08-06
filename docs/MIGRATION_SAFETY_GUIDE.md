@@ -453,3 +453,84 @@ SHOW client_encoding;  -- prints so operators can see the enforcement
 ```
 
 Or invoke psql with `PGCLIENTENCODING=UTF8` in the environment.
+
+### Rule 4 — `--quiet` on read-only gcloud interrogation commands
+
+Every gcloud interrogation command in a runbook or paste block MUST
+include `--quiet` (or `-q`). Without it, gcloud interprets missing
+prerequisites (e.g. an API not yet enabled) as an interactive prompt
+"would you like to enable... (y/N)" — answering yes activates the
+resource as a side effect of what was billed as a read-only check.
+`--quiet` interprets the prompt as an aborted operation with a
+clear non-zero exit instead of silently mutating GCP state.
+
+Full rationale: see `docs/INSTRUMENT_LEDGER.md` INS-8 (the field
+incident that established the rule — `gcloud functions list` on prod
+accidentally enabled `cloudfunctions.googleapis.com`).
+
+Applies to every gcloud subcommand where the operator intent is
+"read state only" — `list`, `describe`, `get-*`, `logs read`, etc.
+For commands that ARE mutations, `--quiet` still applies to skip
+"are you sure?" prompts (deliberate mutations should be authorized
+BEFORE the command runs, not on the prompt itself).
+
+### Rule 5 — pg_cron mutations go through the API, never direct table DML
+
+**Every mutation of `cron.job` state on Supabase (enable/disable jobs,
+change schedules, unschedule, reschedule) MUST call the pg_cron API
+functions — `cron.alter_job`, `cron.schedule`, `cron.unschedule`,
+`cron.schedule_in_database` — from within a `DO` block or migration.
+Direct `UPDATE / INSERT / DELETE` on `cron.job` is forbidden.**
+
+- **Why.** Supabase's `postgres` role has `SELECT` on `cron.job` (reads
+  are permitted) but does NOT have `UPDATE/INSERT/DELETE`. Direct DML
+  throws `permission denied for table job` at execution time. The
+  pg_cron extension's API functions run with the extension's own
+  privileges and are the sanctioned mutation surface.
+- **Lookup pattern.** Jobids can drift across resets. Prefer looking
+  up the target by `jobname` (the human-readable label set at schedule
+  time), then feeding the resolved jobid into `cron.alter_job(job_id
+  := v_jobid, ...)`.
+- **Post-verify.** SELECT is permitted; use it to confirm the intended
+  state landed:
+
+  ```sql
+  SELECT active FROM cron.job WHERE jobname = '<jobname>';
+  ```
+
+**Concrete pattern (from `20260806200000_reenable_auto_fix_after_sl1b_v2.sql`):**
+
+```sql
+DO $$
+DECLARE
+  v_jobid bigint;
+BEGIN
+  SELECT jobid INTO v_jobid FROM cron.job WHERE jobname = '<name>';
+  IF v_jobid IS NULL THEN
+    RAISE EXCEPTION 'jobname <name> not found';
+  END IF;
+
+  PERFORM cron.alter_job(job_id := v_jobid, active := true);
+END
+$$;
+
+DO $$
+DECLARE
+  v_active boolean;
+BEGIN
+  SELECT active INTO v_active FROM cron.job WHERE jobname = '<name>';
+  IF NOT v_active THEN
+    RAISE EXCEPTION 'alter_job did not stick';
+  END IF;
+END
+$$;
+```
+
+**Instrument-ledger backing.** See `docs/INSTRUMENT_LEDGER.md` INS-11
+for the field incident (KI-041 reply-migration v1 used direct
+`UPDATE cron.job` → refused at migration line 116 with permission
+denied → seventh consecutive atomic refusal caught by the
+transactional wrap; zero residue, STEP 0 pin still valid). The
+dry-run harness for the reply migration now enforces this rule via
+two comment-stripped-corpus checks: `no_direct_cron_dml` and
+`zero_sql_updates_anywhere` (both must count to zero).
