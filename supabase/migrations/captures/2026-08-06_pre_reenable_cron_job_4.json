@@ -1,0 +1,1 @@
+{"jobid":4,"schedule":"0 4 * * *","command":"SELECT public.auto_fix_integrity_issues()","nodename":"localhost","nodeport":5432,"database":"postgres","username":"postgres","active":false,"jobname":"auto-fix-integrity"}
