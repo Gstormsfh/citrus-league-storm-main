@@ -53,31 +53,62 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/utilities/populate_player_directory.py
 
-      # Post-run assertion: the season the SQL joins care about TODAY must
-      # have >0 rows after the refresh. This is the workflow-level fail-
-      # loudly guard demanded by Task 0D. Even if the script itself somehow
-      # returned 0 without erroring, this step catches it — because SQL
-      # joins keyed on get_nhl_season_year(today) with a zero-row RHS is
-      # the exact failure that scores every player zero on opening night.
-      - name: Assert player_directory has rows for today's NHL season
+      # Post-run assertion — Task 0F. Imports the SAME seasons_to_populate
+      # helper the writer uses, so writer and guard cannot drift. Fails on
+      # any season in the writer's list that has zero rows (the outgoing
+      # season on stable days; both outgoing AND incoming during Aug/Sep
+      # ramp). Also enforces a ≥ 700 row floor from Sep 1 for the incoming
+      # season (32 teams × ~23 players ≈ 736): a directory with 40 rows
+      # passes a "> 0" check and still zero-scores almost everyone. The
+      # prior "> 0" only check would have first fired on 2026-10-01 for a
+      # season that had no lead time to catch up — the exact bug this
+      # assertion exists to prevent.
+      - name: Assert player_directory populated for every writer-tracked season
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           python -c "
-          import sys, datetime as dt
+          import sys, os, datetime as dt
           sys.path.insert(0, 'data-pipeline')
           import _bootstrap
           from data_pipeline.utils.supabase_rest import SupabaseRest
-          import os
+          from data_pipeline.utils.season_config import (
+              seasons_to_populate, min_directory_rows_floor,
+          )
           db = SupabaseRest(os.environ['VITE_SUPABASE_URL'], os.environ['SUPABASE_SERVICE_ROLE_KEY'])
           today = dt.date.today()
-          season = today.year if today.month >= 10 else today.year - 1
-          rows = db.select('player_directory', select='player_id', filters=[('season','eq',season)], limit=1)
-          if not rows:
-            print(f'FAIL: player_directory has zero rows for season={season} (today={today.isoformat()})')
-            sys.exit(1)
-          print(f'OK: player_directory has rows for season={season}')
+          seasons = seasons_to_populate(today)
+          print(f'today={today.isoformat()}  writer-tracked seasons={seasons}')
+          failures = []
+          for s in seasons:
+              rows = db.select('player_directory', select='player_id', filters=[('season','eq',s)], limit=1000)
+              n = len(rows) if rows else 0
+              # If we hit the 1000-row PostgREST cap we still need the real
+              # count — paginate.
+              if n >= 1000:
+                  offset = 1000
+                  while True:
+                      more = db.select('player_directory', select='player_id', filters=[('season','eq',s)], limit=1000, offset=offset)
+                      if not more:
+                          break
+                      n += len(more)
+                      if len(more) < 1000:
+                          break
+                      offset += 1000
+              floor = min_directory_rows_floor(today, s)
+              status = 'OK' if (n > 0 and n >= floor) else 'FAIL'
+              print(f'  season={s}  rows={n}  floor={floor}  {status}')
+              if n == 0:
+                  failures.append(f'season={s}: zero rows')
+              elif n < floor:
+                  failures.append(f'season={s}: {n} rows below floor {floor}')
+          if failures:
+              print('FAIL:')
+              for f in failures:
+                  print(f'  {f}')
+              sys.exit(1)
+          print('OK: all writer-tracked seasons populated above floor')
           "
 
       - name: Verify orphan count post-refresh

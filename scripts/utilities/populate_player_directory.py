@@ -50,27 +50,14 @@ if not SUPABASE_URL or not SUPABASE_KEY:
   raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
 
-def _derive_nhl_season_year(d: dt.date) -> int:
-  """
-  Python mirror of public.get_nhl_season_year (SQL). NHL seasons run
-  Oct→Jun; months 10-12 use current year, months 1-9 use previous year.
-  Any drift between this function and the SQL side re-creates the exact
-  season-rollover silent-failure we're closing here — keep them in sync.
-  """
-  return d.year if d.month >= 10 else d.year - 1
-
-
-def _seasons_to_populate(today: dt.date) -> list[int]:
-  """
-  During the offseason ramp (Aug 1 – Sep 30), populate BOTH the outgoing
-  and incoming season so opening night doesn't depend on a single first-of-
-  October cron run succeeding at populating hundreds of season-N+1 rows
-  from scratch. Otherwise write just the current season.
-  """
-  current = _derive_nhl_season_year(today)
-  if today.month in (8, 9):
-    return [current, current + 1]
-  return [current]
+# Season derivation lives in the shared helper module so the workflow
+# assertion and the boundary-parity test can import the SAME functions.
+# One source of truth — drift between writer and guard was the shape of
+# the failure we're closing here.
+from data_pipeline.utils.season_config import (
+  derive_nhl_season_year,
+  seasons_to_populate,
+)
 
 
 # Env override remains for manual backfills (e.g. rebuild season=2023 rows
@@ -78,7 +65,7 @@ def _seasons_to_populate(today: dt.date) -> list[int]:
 # from today's date — never hardcode. The prior hardcoded '2025' fallback
 # is exactly why the directory had zero season=2026 rows for months.
 _ENV_SEASON = os.getenv("CITRUS_DEFAULT_SEASON")
-DEFAULT_SEASON = int(_ENV_SEASON) if _ENV_SEASON else _derive_nhl_season_year(dt.date.today())
+DEFAULT_SEASON = int(_ENV_SEASON) if _ENV_SEASON else derive_nhl_season_year(dt.date.today())
 
 NHL_API_BASE = "https://api-web.nhle.com/v1"
 TEAMS = ["ANA", "BOS", "BUF", "CGY", "CAR", "CHI", "COL", "CBJ", "DAL", "DET", "EDM", "FLA", "LAK", "MIN", "MTL", "NSH", "NJD", "NYI", "NYR", "OTT", "PHI", "PIT", "SJS", "SEA", "STL", "TBL", "TOR", "UTA", "VAN", "VGK", "WSH", "WPG"]
@@ -415,7 +402,7 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
 
 def main() -> int:
   today = dt.date.today()
-  seasons = _seasons_to_populate(today)
+  seasons = seasons_to_populate(today)
 
   print("=" * 80)
   print("[populate_player_directory] STARTING")
