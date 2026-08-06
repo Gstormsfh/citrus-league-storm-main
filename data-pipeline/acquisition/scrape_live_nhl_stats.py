@@ -65,24 +65,67 @@ def process_game_data_citrus(game_id: int, boxscore: dict, pbp_data: Optional[di
     if not player_stats:
         return False
 
-    # 3. Resolve game date: prefer authoritative schedule date over UTC extraction
-    if game_date is None:
-        # Fallback: extract from boxscore UTC (may be wrong for evening games)
+    # 3. Resolve game date. STRICT ORDER OF PRECEDENCE — never fall back
+    #    to today's date. Prior state: both the None-branch and the
+    #    unparseable-string-branch defaulted to `dt.date.today()`, which is
+    #    where 22,082 of 54,838 rows (40.3%) got stamped with the RUN date
+    #    instead of the game's real date. Scoring joins on
+    #    player_game_stats.game_date so a wrong-date row is invisible on
+    #    the day the player actually played — the exact silent-failure
+    #    class Task D-03 exists to eliminate.
+    #
+    #    Precedence:
+    #      1. Caller-supplied ISO-format string  → parse and use.
+    #      2. Caller-supplied None → nhl_games.game_date for this game_id.
+    #      3. Boxscore startTimeUTC → convert to MT date and use.
+    #      4. RAISE. Never today.
+    def _resolve_game_date() -> dt.date:
+        # Path 1: caller passed a value.
+        if game_date is not None:
+            if isinstance(game_date, dt.date) and not isinstance(game_date, dt.datetime):
+                return game_date
+            if isinstance(game_date, str) and game_date:
+                try:
+                    return dt.date.fromisoformat(game_date)
+                except ValueError as e:
+                    logger.error(
+                        f"[game_date] caller passed unparseable string {game_date!r} "
+                        f"for game_id={game_id}; falling back to nhl_games lookup ({e})"
+                    )
+        # Path 2: nhl_games is the schedule's source of truth. Look it up.
+        try:
+            rows = db.select(
+                "nhl_games",
+                select="game_date",
+                filters=[("game_id", "eq", game_id)],
+                limit=1,
+            )
+            if rows and rows[0].get("game_date"):
+                return dt.date.fromisoformat(rows[0]["game_date"])
+        except Exception as e:
+            logger.warning(f"[game_date] nhl_games lookup for game_id={game_id} failed: {e}")
+        # Path 3: boxscore's own UTC timestamp.
         game_info = boxscore.get("gameInfo", {})
         start_time_utc = game_info.get("startTimeUTC", "")
-        try:
-            utc_dt = dt.datetime.fromisoformat(start_time_utc.replace('Z', '+00:00'))
-            # Convert to US Mountain Time (handles DST automatically: UTC-7 in winter, UTC-6 in summer)
-            from zoneinfo import ZoneInfo
-            mt_dt = utc_dt.astimezone(ZoneInfo("America/Denver"))
-            game_date = mt_dt.date()
-        except Exception:
-            game_date = dt.date.today()
-    elif isinstance(game_date, str):
-        try:
-            game_date = dt.date.fromisoformat(game_date)
-        except ValueError:
-            game_date = dt.date.today()
+        if start_time_utc:
+            try:
+                from zoneinfo import ZoneInfo
+                utc_dt = dt.datetime.fromisoformat(start_time_utc.replace('Z', '+00:00'))
+                mt_dt = utc_dt.astimezone(ZoneInfo("America/Denver"))
+                return mt_dt.date()
+            except Exception as e:
+                logger.error(
+                    f"[game_date] boxscore startTimeUTC={start_time_utc!r} unparseable "
+                    f"for game_id={game_id}: {e}"
+                )
+        # Path 4: no authoritative source. RAISE. Never dt.date.today().
+        raise RuntimeError(
+            f"[game_date] cannot resolve authoritative game_date for game_id={game_id}: "
+            f"caller passed {game_date!r}, nhl_games has no row, boxscore has no startTimeUTC. "
+            f"Refusing to fall back to today's date (would misfile player_game_stats)."
+        )
+
+    game_date = _resolve_game_date()
 
     update_player_game_stats_nhl_columns(
         db=db,
