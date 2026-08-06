@@ -548,21 +548,51 @@ Deterministic — same uuid nightly. Dead since **2026-02-25** (5.3 months): **1
 | **Target phase / timeline** | Same Season-Loop sprint as SL-1..SL-5. Order-of-operations: reclassify after SL-5's status-vocabulary decision (since both touch the same allowlist). |
 | **Verification test** | (a) In offseason: `check_data_integrity` invocation for `fantasy_daily_rosters_sync_today` returns `pass` OR `warning` (not `fail`). (b) In-season simulation (canned): stale sync → `fail`. (c) Alert count (KI-038) drops by the number of currently-classified-as-fail sync-today rows. |
 
-### KI-041 — Cron governance: two-operators-one-prod without shared ledger — SL-1b close's LEAD EXHIBIT
+### KI-041 — Cron governance: two-operators-one-prod without shared ledger — CLOSED with attribution + protocol
 
-**Field record (architect prod interrogation, 2026-08-06).** During SL-1b diagnosis, architect observed cron state on prod that this session did not perform:
+**RESOLVED (architect adjudication 2026-08-06 evening).** Attribution located: the DB-overhaul workstream, via recorded prod migration `20260805201003_disable_unsafe_auto_fix_and_repair_vacuum_job` ('0F-OPS-3', applied 2026-08-05 20:10Z, PRE-dating SL-1 v1). Rationale in 0F-OPS-3's header names three defects behind the visible 22P02 crash:
+- **Defect A** — type mismatch (repair wrote INTEGER-typed jsonb, detection compared strings)
+- **Defect B** — nested-array corruption via `jsonb_build_array(jsonb_agg())` (predicted **SL-1b verbatim** before this workstream shipped v1)
+- **Defect C** — NULL injection on empty aggregate
 
-- **Cron job 4** (auto-fix-integrity nightly 04:00 UTC) is `active=false` — disabled by an operator outside this session's ledger. Timing and operator ID unknown.
-- **`log_xg_integrity` (KI-037)** succeeded on 2026-08-06 05:45 UTC after failing its maiden run on 2026-08-05 05:45 — the fix was applied by an operator outside this session (see KI-037 provenance-pending note).
-- **`log_pipeline_coverage` and `log_xg_integrity` (jobid 15)** were ADDED to the cron table by an operator outside this session's ledger between the SL-1 diagnosis window and the SL-1b diagnosis window.
+**All three remediated in SL-1b v2** (see KI-036 close). Per-defect evidence table lives in the reply migration `20260806200000_reenable_auto_fix_after_sl1b_v2.sql`. Reply-migration convention (see `docs/PROD_CHANGE_LEDGER.md` Rule 3) codifies this response pattern for future cross-workstream events.
 
-Three (at minimum) cron mutations, zero session-visible authorship. Two-operators-one-prod without a shared change ledger is a governance class defect adjacent to F20 (the guard fires but nobody sees) at the operational-mutation layer instead of the sensor layer.
+**Field record — three cron mutations by DB-overhaul workstream (all now attributed):**
 
-**Provenance status (2026-08-06 evening).**
-- Garrett explicitly confirmed he did NOT knowingly disable cron job 4. Not this session's assistant either (Claude did not run any psql / gcloud / supabase commands against prod — standing rule per `feedback_hand_off_infra_commands.md`).
-- The other operator session's transcript is being checked for the disable + additions.
-- Job 4 stays `active=false` until provenance lands and re-enable can be attributed cleanly. Acceptable in the interim: detection runs 4×/day (on-demand `check_data_integrity` invocations) and data has been verified healthy end-to-end (see KI-036 close).
-- **Promoted to lead exhibit for this week's coexistence-governance work item.** The scope of DEF-1 (KI-038 — daily visible failure count for defense cluster) now naturally extends to cover operational-mutation visibility, not just sensor-emission visibility. Consolidation TBD.
+- **Cron job 4** (auto-fix-integrity nightly 04:00 UTC) `active=false` — by 0F-OPS-3, 2026-08-05 20:10Z, correctly precautionary.
+- **`log_xg_integrity` (KI-037)** fix — likely by same DB-overhaul workstream; reconcile once workstream confirms the fix path (align value vs extend constraint). KI-037 update pending workstream confirmation.
+- **`log_pipeline_coverage`, `log_xg_integrity` (jobid 15)** additions — by DB-overhaul workstream, sub-phase name TBD.
+
+**Interim protocol (Governance) — effective immediately per architect 2026-08-06:**
+- `docs/PROD_CHANGE_LEDGER.md` (new) codifies:
+  - Rule 1: every cross-cutting prod change lands as a recorded history row with rationale.
+  - Rule 2: read recent history before touching shared objects (extends the capture-before-replace rule from functions to cron/other-shared-surfaces).
+  - Rule 3: reply-migration convention — one workstream's response to the other's mutation cites the counterpart version + name in the header, addresses concerns point-by-point with evidence, THEN mutates.
+  - Rule 4: phase-name mapping across workstreams (SL-N / KI-NNN / INS-N / DEF-N / F-N vs 0F-OPS-N).
+  - Rule 5: audit-trail deliverables (weekly diff report, operator-identity convention, consolidation with real shared ledger by end of Q3 2026).
+
+**Governance takeaway** (Exhibit A for the coexistence work item): had 0F-OPS-3's rationale been read before SL-1 v1 authorship began, SL-1b would not have happened. The read-before-write convention now closes that class.
+
+**Re-enable status.** Reply migration `20260806200000_reenable_auto_fix_after_sl1b_v2.sql` drafted this commit. Ready for apply via `scripts/proof/apply-reenable-auto-fix.local.sql`. First scheduled success since 2026-02-25 lands at the next 04:00 UTC after apply — confirmation query in the apply script's trailer.
+
+### KI-042 — `draft_picks.player_id` is mixed-domain: numeric NHL-id strings for real teams, uuids for demo
+
+**Field record (from 0F-OPS-3 analysis, surfaced via KI-041 close 2026-08-06).** The DB-overhaul workstream's rationale for 0F-OPS-3 noted that `draft_picks.player_id` values are heterogeneous across leagues:
+- **Real leagues** (populated via NHL data pipeline): numeric NHL-id strings (e.g., `'8478402'`).
+- **Demo league** `750f4e1a-92ae-44cf-a798-2f3e06d0d5c9`: uuids (e.g., `'31ce43aa-793d-47a5-bf26-4099a387dc3b'`).
+
+Both forms are stored as `text` (or as text-castable values) in a nominally single-typed column. `?` operator semantics work identically on either form as long as the compared value is `::text`. But any code path that assumes ONE form (e.g., "player_id is always an integer" — the exact assumption that broke `auto_fix_integrity_issues` for months) will silently mishandle rows from the OTHER form's league population.
+
+| | |
+|---|---|
+| **Severity** | medium — no user-visible impact today, but every future consumer of `draft_picks.player_id` MUST handle both forms. Prior violations: original `auto_fix_integrity_issues` used `::INTEGER` cast (KI-036). Undiscovered future violations are the risk. |
+| **Surface** | `public.draft_picks.player_id` (column); every SQL that reads it; every application that maps it; PROD-PORT scoping doc; future migrations that add columns/constraints referencing player_id. |
+| **Description** | Mixed-domain values in a single column are a landmine that only fires under specific league populations. `auto_fix` failed on prod every night for 5.3 months because it processed only the demo-league uuid rows (real-league integer rows were silently ignored, since integer-cast succeeds on integer-string but throws on uuid-string). Any future function that walks draft_picks with a domain-specific cast repeats this class. |
+| **Why deferred** | Not deferred — recorded as a standing constraint. Every future lineup/pick tooling and PROD-PORT mapping MUST reference this KI in its header. |
+| **Target phase / timeline** | Ambient — checked at every function-authoring boundary. Consolidation into a unified player-id domain (single form across all leagues) is a bigger-scope decision for PROD-PORT scoping (task #31). Until then, tooling either handles both forms or documents which form it targets + rejects the other with a clear error. |
+| **Verification test** | Any migration adding new tooling that reads `draft_picks.player_id` MUST include header text referencing KI-042 and stating explicitly which form(s) it handles. Any function that would fail on one form MUST include an explicit guard + informative error. |
+
+
 
 | | |
 |---|---|
