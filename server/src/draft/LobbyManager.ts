@@ -2830,9 +2830,144 @@ export class LobbyManager {
       case 'commissioner_override':
         this.applyCommissionerOverrideEvent(event);
         break;
-      case 'draft_completed':
-        this.draftStatus = 'completed';
+      case 'draft_started': {
+        // F27 (2026-08-06) — draft ignition receiver. Paired with
+        // start_draft_v2 (migration 20260807000000). Reverses the
+        // 2026-07-21 "no wire representation" default for this event
+        // per architect Rider 4 assert C (observer must receive the
+        // frame).
+        //
+        // Three actions in this case:
+        //   1. Append a BufferedDraftEvent of kind='draft_started'
+        //      to this.events so the central broadcast path's
+        //      peekLast() tail check passes (line 5519-5531).
+        //   2. Mutate draftStatus (not_started → in_progress).
+        //   3. Arm the first pick timer from payload.first_pick_deadline
+        //      — batch-2 external-apply mechanism (2026-07-27),
+        //      mirroring draft_resumed at line 2852-2872. Presence
+        //      guard: skip re-arm if the field is missing (defense-in-
+        //      depth; validator §6.4 requires it, so unreachable-normal).
+        //
+        // NO-LOBBY-AT-IGNITION note (Rider 3 / architect condition 3):
+        // Commissioner-start with zero WS clients means no lobby exists
+        // in the registry when start_draft_v2 fires. The external-apply
+        // path (processExternalEvent's dispatcher) short-circuits BEFORE
+        // reaching this switch for leagues without an in-memory lobby —
+        // the LISTEN handler iterates active lobbies only. This case is
+        // therefore only entered when SOME client had already connected
+        // (rare pre-ignition; happens for the F27 lifecycle-acceptance
+        // observer harness which connects deliberately before start).
+        // On first WS join AFTER ignition, bootstrap replay hits
+        // applyEventDuringBootstrap for the draft_started event; the
+        // append+arm mutations fire during bootstrap-mode too. init()'s
+        // covering-fallback at line 920 also reads leagues.pick_deadline
+        // — belt AND suspenders.
+        //
+        // Idempotency (design §5 Step 0 / engine mirror). If a bootstrap
+        // replay hits draft_started for a draft that has already moved
+        // past ignition (subsequent picks have landed → draftStatus is
+        // already 'in_progress'), the guard skips the mutation to avoid
+        // double-arming a timer that's since been re-armed by pick
+        // events. The append still fires so the ring buffer's contiguity
+        // is preserved for resync-in-flight clients (Rider 4 assert F).
+        const startedPayload = event.payload as Record<string, unknown>;
+        const startedAt =
+          typeof startedPayload.started_at === 'string'
+            ? startedPayload.started_at
+            : event.created_at;
+        const firstPickDeadline =
+          typeof startedPayload.first_pick_deadline === 'string'
+            ? startedPayload.first_pick_deadline
+            : '';
+        const totalRounds =
+          typeof startedPayload.total_rounds === 'number'
+            ? startedPayload.total_rounds
+            : 0;
+        const totalTeams =
+          typeof startedPayload.total_teams === 'number'
+            ? startedPayload.total_teams
+            : 0;
+        const pickTimeLimitSeconds =
+          typeof startedPayload.pick_time_limit_seconds === 'number'
+            ? startedPayload.pick_time_limit_seconds
+            : 0;
+        const draftFormat =
+          typeof startedPayload.draft_format === 'string'
+            ? (startedPayload.draft_format as DraftFormat)
+            : 'snake';
+        const bufferedStarted: BufferedDraftEvent = {
+          kind: 'draft_started',
+          seq: event.seq,
+          timestamp: event.created_at,
+          correlationId: event.idempotency_key ?? '',
+          startedAt,
+          firstPickDeadline,
+          totalRounds,
+          totalTeams,
+          pickTimeLimitSeconds,
+          draftFormat,
+        };
+        this.events.append(bufferedStarted);
+
+        // Guarded status transition + timer arm. Only fire if we're
+        // actually at the ignition boundary (draftStatus='not_started').
+        // Skip on bootstrap-replay for already-in-progress drafts.
+        if (this.draftStatus === 'not_started' && firstPickDeadline.length > 0) {
+          const parsed = new Date(firstPickDeadline);
+          if (!Number.isNaN(parsed.getTime())) {
+            this.draftStatus = 'in_progress';
+            this.setPickDeadline(parsed, 'pick');
+          }
+        }
         break;
+      }
+      case 'draft_completed': {
+        // F26 / KI-035 (2026-08-06) — reverse the "no wire representation"
+        // default for this event. Prior behavior (pre-F26): mutate
+        // draftStatus only; central broadcast path at line 5519 fails
+        // its tail check (no append) → observers never receive the
+        // completion frame → clients stare at a locked draft-room
+        // until they infer state some other way. F24 acceptance
+        // (2026-08-05) recorded exactly this — architect adjudicated
+        // as KI-035, gated before THE TWELVE.
+        //
+        // F26 fix — three actions in this case:
+        //   1. Append a BufferedDraftEvent of kind='draft_completed'
+        //      to this.events so the central broadcast path's
+        //      peekLast() tail check passes (line 5519-5531).
+        //   2. Mutate draftStatus.
+        //   3. Cancel the armed pick timer + null the deadline —
+        //      mirrors the internal-path teardown at 1826-1832 (which
+        //      runs when processSubmitPick's completion else-branch
+        //      returns). Prevents F20 guard from absorbing a stray
+        //      "clock fired but draftStatus=completed" WARNING (Rider 4
+        //      assert E).
+        //
+        // BufferedDraftEvent carries the TRUE event seq (architect
+        // condition 2), not a synthesized value.
+        const completionPayload = event.payload as Record<string, unknown>;
+        const completedAt =
+          typeof completionPayload.completed_at === 'string'
+            ? completionPayload.completed_at
+            : event.created_at;
+        const totalPicks =
+          typeof completionPayload.total_picks === 'number'
+            ? completionPayload.total_picks
+            : 0;
+        const bufferedCompleted: BufferedDraftEvent = {
+          kind: 'draft_completed',
+          seq: event.seq,
+          timestamp: event.created_at,
+          correlationId: event.idempotency_key ?? '',
+          completedAt,
+          totalPicks,
+        };
+        this.events.append(bufferedCompleted);
+        this.draftStatus = 'completed';
+        this.cancelPickTimer();
+        this.currentTimerDeadline = null;
+        break;
+      }
       case 'draft_cancelled':
         this.draftStatus = 'cancelled';
         break;

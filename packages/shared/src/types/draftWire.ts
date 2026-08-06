@@ -415,6 +415,77 @@ export type BufferedDraftEvent =
       priorState: Record<string, unknown>;
       newState: Record<string, unknown>;
       rationale?: string;
+    }
+  | {
+      /**
+       * F27 (2026-08-07) — draft ignition. Emitted by `start_draft_v2`
+       * as `seq=1` of every draft (docs/DESIGN_F27_start_draft_v2.md,
+       * commit c8aabe32). Payload mirrors the durable event's §6.4
+       * required fields, exposed on the wire so late-connecting clients
+       * can arm their countdown UI from `firstPickDeadline` without
+       * waiting for a snapshot fetch.
+       *
+       * REVERSAL of the 2026-07-21 Decision Log's "no wire
+       * representation for lifecycle events" default. F27's Rider 4
+       * requires an observing client to receive this frame (assert C /
+       * assert F for mid-draft-join contiguity). Frame is appended to
+       * the ring buffer by `applyEventDuringBootstrap`'s `draft_started`
+       * case (F27 engine PR); central broadcast path at
+       * LobbyManager.ts:5519-5531's tail check then fires.
+       *
+       * SCOPE NOTE (v1). Seq-1 draft_started via buffer is UNREACHABLE
+       * for the observing client in v1 — discovery refuses pre-start
+       * joins, so no lobby predates ignition and no client can be
+       * listening when seq 1 lands. The frame's utility is for late-
+       * joiners whose resync window includes the seq-1 range (rare in
+       * practice; snapshot covers started state directly) AND for the
+       * F27 lifecycle-acceptance rig's observing harness client which
+       * connects before ignition specifically to prove the broadcast
+       * fires (Rider 4 assert C).
+       */
+      kind: 'draft_started';
+      seq: number;
+      timestamp: string;
+      correlationId: string;
+      startedAt: string;
+      firstPickDeadline: string;
+      totalRounds: number;
+      totalTeams: number;
+      pickTimeLimitSeconds: number;
+      draftFormat: DraftFormat;
+    }
+  | {
+      /**
+       * F26 / KI-035 (2026-08-07) — draft completion. Emitted by
+       * `submit_pick_v2`'s completion branch (F24 emitter). Signals
+       * clients to render "draft complete" UI + stop rendering the
+       * timer. Payload mirrors §6.8.
+       *
+       * F24 acceptance (2026-08-05) surfaced KI-035: this frame was
+       * invisible to observers because the external-apply case at
+       * LobbyManager.ts:2833-2835 mutated state (`this.draftStatus =
+       * 'completed'`) but did NOT append to `this.events` ring
+       * buffer. The central broadcast path at LobbyManager.ts:5519-5531
+       * conditions on `peekLast().seq === event.seq` — with no append,
+       * tail check fails silently, no frame lands on the wire. F26
+       * reverses this: the case now appends a BufferedDraftEvent of
+       * `kind: 'draft_completed'` shape (this variant), triggers the
+       * broadcast, AND cancels the armed pick timer (mirroring the
+       * internal-path teardown at LobbyManager.ts:1826-1832).
+       *
+       * Client-side handling: today's client dispatchers (deriveDraftState
+       * at line 198; store applyEvent at line 260; optimistic at line
+       * 108) are tolerant — no default clause, no assertNever, unknown
+       * kinds no-op silently. Adding this variant is safe for the
+       * currently-deployed web build (Phase 5 UI wires actual completion
+       * rendering).
+       */
+      kind: 'draft_completed';
+      seq: number;
+      timestamp: string;
+      correlationId: string;
+      completedAt: string;
+      totalPicks: number;
     };
 
 // ── Snapshot payloads ──────────────────────────────────────────────
