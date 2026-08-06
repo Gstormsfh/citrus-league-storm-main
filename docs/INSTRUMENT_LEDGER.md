@@ -347,13 +347,17 @@ is cheap; discovery through diff is not. Apply-site encoding joins
 `ON_ERROR_STOP` and transactional wrapping as the standing enforcement
 triad for any direct-apply script that mutates production state.
 
-**Standing pin table (updated).** The live md5 of
-`public.submit_pick_v2(uuid,uuid,int,int,int,uuid,uuid,text,jsonb,uuid)`
-is `0936f891d707da231446d440b452197f` as of 2026-08-05 post-F24-apply.
-Any future direct-apply script that supersedes this function must
-STEP 0 pin against this value (or a same-day recapture, if the world
-has moved). Previous pin `e849568e2f8cc35eb437c51b1732c91f` (F25-broken
-body, 2026-08-05 23:00 MT) is retired.
+**Standing pin table (updated 2026-08-06 post-SL-1b).**
+
+| Function | Live md5 | Captured | Retired pins |
+|---|---|---|---|
+| `public.submit_pick_v2(uuid,uuid,int,int,int,uuid,uuid,text,jsonb,uuid)` | `0936f891d707da231446d440b452197f` | 2026-08-05 post-F24-apply | `e849568e2f8cc35eb437c51b1732c91f` (F25-broken, 2026-08-05 23:00 MT) |
+| `public.auto_fix_integrity_issues()` | `d0a54ca8925c9a8604781294a4b5631a` | 2026-08-06 post-SL-1b v2 | `0bd6c0f8cfbc9b9b3f970b52009bfbd2` (SL-1 v1, 2026-08-05); pre-SL-1 `35802d12f8e20d97912fb9e6ced45cc7` |
+
+Any future direct-apply script that supersedes one of these functions
+must STEP 0 pin against the live value (or a same-day recapture, if
+the world has moved). Retired pins are recorded for the audit trail
+and to help diagnose future "wrong DB targeted" cases.
 
 ### INS-8 — Read-only gcloud interrogation prompted API-enable and got a yes; API silently activated on prod
 

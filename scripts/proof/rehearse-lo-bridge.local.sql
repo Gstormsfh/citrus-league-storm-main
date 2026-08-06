@@ -7,9 +7,14 @@
 -- No large-object orphan (LO insert rolls back with the txn). No history
 -- row changes. No function replacements. No side effects at all.
 --
--- USAGE (Garrett runs BEFORE re-invoking apply-f24-rebase.local.sql):
+-- USAGE (Garrett runs BEFORE any \lo_import-using apply script on that
+-- connection — the rehearsal proves the psql→plpgsql GUC bridge works
+-- BEFORE state is touched):
 --
---   psql "$env:SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/proof/rehearse-lo-bridge.local.sql
+--   psql "$env:SUPABASE_DB_URL"      -v ON_ERROR_STOP=1 -f scripts/proof/rehearse-lo-bridge.local.sql
+--   psql "$env:SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -f scripts/proof/rehearse-lo-bridge.local.sql
+--
+-- Same script; different target. Zero state written either way.
 --
 -- EXPECTED OUTPUT (final NOTICE line):
 --
@@ -23,8 +28,9 @@
 -- ...then the bridge is broken and the full apply must NOT be re-invoked.
 -- Investigate before proceeding.
 --
--- The file used for rehearsal is scripts/proof/apply-f24-rebase.local.sql
--- itself — small, present in the repo, no external dependency.
+-- The file used for rehearsal is this rehearsal script itself — small,
+-- present in the repo, no external dependency, invariant across future
+-- apply scripts.
 -- ============================================================================
 
 \set ON_ERROR_STOP on
@@ -33,7 +39,7 @@ BEGIN;
 
 \echo ''
 \echo 'REHEARSE STEP 1: upload a small file as a large object'
-\lo_import 'scripts/proof/apply-f24-rebase.local.sql'
+\lo_import 'scripts/proof/rehearse-lo-bridge.local.sql'
 \set rehearse_oid :LASTOID
 
 \echo ''
@@ -70,8 +76,9 @@ ROLLBACK;
 \echo 'If you saw:'
 \echo '  NOTICE:  bridge ok, <N> bytes'
 \echo '  ROLLBACK'
-\echo 'then the bridge is working. Proceed to the full apply:'
-\echo '  psql "$env:SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/proof/apply-f24-rebase.local.sql'
+\echo 'then the bridge is working. Proceed to the intended apply script'
+\echo '(SL-1b prod: apply-sl1b-auto-fix-v2.local.sql; staging historical:'
+\echo 'apply-f24-rebase.local.sql; future: whichever apply is on deck).'
 \echo ''
 \echo 'If you saw ERROR: syntax error, the bridge is broken. STOP.'
 \echo '=============================================================='

@@ -400,37 +400,54 @@ The internal path (`processSubmitPick` else-branch, `LobbyManager.ts:1826-1832`)
 
 ### KI-036 — SL-1: auto_fix_integrity_issues dead 5.3 months (162 consecutive failed nightly runs, prod)
 
-**PARTIAL RESOLUTION (SL-1 v1 applied 2026-08-05; SL-1b v2 shipped 2026-08-06).**
-v1 (migration `20260805200000_sl1_auto_fix_uuid_cast.sql`) eliminated the
-22P02 uuid→integer crash: STEP 3 negative markers held, function completed
-without exception. v1 REPAIR was wrong — the `jsonb_build_array(<jsonb_agg>)`
-wrapper produced a nested `[[21 uuids]]` shape in bench, so `?` operator
-stayed blind to elements, and `missing_players_check` stayed at 210 after
-v1's manual invoke. Architect read prod bench directly (2026-08-06) to
-diagnose. **v2 fix (migration `20260806100000_sl1b_auto_fix_unwrap_agg.sql`)
-concatenates the jsonb_agg array directly + adds COALESCE fallback.** Same
-apply harness (`apply-sl1b-auto-fix-v2.local.sql`), STEP 0 pin against v1 body
-md5 `0bd6c0f8cfbc9b9b3f970b52009bfbd2`. One-time data unwrap for the 10
-demo-league rows shaped by v1 ships as `unwrap-sl1b-demo-league.local.sql`.
+**RESOLVED on evidence (2026-08-06 17:21:24Z).** Full arc:
 
-**Ladder order for v2 acceptance (architect 2026-08-06):**
-1. INS-6 rehearsal on prod connection
-2. `unwrap-sl1b-demo-league.local.sql` — repairs the 10 nested rows
-3. `apply-sl1b-auto-fix-v2.local.sql` — replaces function body
-4. Manual `SELECT * FROM auto_fix_integrity_issues();` (COMMITTED — baseline no-op expected)
-4.5. `sl1b-synthetic-repair-exercise.local.sql` — architect addendum: remove one uuid from one demo team, invoke auto_fix, assert flat-repair (length + top-level ? + no-nest + no-dup). Converts "concat should work" into "watched it repair flat." Reversible by construction.
-5. Manual `SELECT * FROM check_data_integrity();` (writes fresh sensor rows)
-6. `sl1-post-heal-verify.local.sql` (SAME file as v1 — assertions are shape-agnostic)
-7. Re-enable cron job 4 (FINAL — gated on step 6 outcome + KI-041 answer)
+- **SL-1 v1** applied 2026-08-05 (migration `20260805200000_sl1_auto_fix_uuid_cast.sql`, commit `69e022e4`). Eliminated the 22P02 uuid→integer crash — STEP 3 negative markers held. **Repair itself was wrong**: the `jsonb_build_array(<jsonb_agg>)` wrapper produced a nested `[[21 uuids]]` shape in bench; `?` operator blind to elements; `missing_players_check` stayed at 210 after v1's manual invoke. Architect read prod bench directly on 2026-08-06 to diagnose.
 
-**Pre-registered acceptance (architect 2026-08-06):**
-- `missing_players_check` MUST be 0 after ladder step 5.
-- `team_lineups_vs_draft_picks_count` outcome forks:
-  - **(A) → 0**: check semantics sum array lengths; SL-1b closes outright.
-  - **(B) → still ≠0**: the check compares ROW count to PICK count, unit-broken since January (Jan 2026). New KI + check fix scheduled; NOT an SL-1b v2 failure. Fork B does not invalidate the v2 function.
-- `fantasy_daily_rosters_sync_today` unchanged at 12 (KI-040 residue).
+- **SL-1b v2** applied 2026-08-06 (migration `20260806100000_sl1b_auto_fix_unwrap_agg.sql`, commit `2302d949`). Concatenates the jsonb_agg array directly (`bench = bench || COALESCE(<jsonb_agg>, '[]'::jsonb)`) — no wrapper. Same apply harness pattern (`apply-sl1b-auto-fix-v2.local.sql`), STEP 0 pinned against v1 md5 `0bd6c0f8cfbc9b9b3f970b52009bfbd2`. Property preservation (prosecdef=false, proconfig=null) verified.
 
-**Cron job 4 posture.** `active=false` throughout the v2 landing. Re-enable is the FINAL step of the ladder, pending KI-041 answer on who originally disabled it. The disablement itself was mutating action by an operator outside this session's ledger — see KI-041 for governance implications.
+- **Data unwrap** (2026-08-06, `unwrap-sl1b-demo-league.local.sql`): repaired the 10 demo-league rows v1 shaped as `[[uuids]]` via guarded `SET bench = bench->0 WHERE jsonb_array_length=1 AND jsonb_typeof(bench->0)='array'`.
+
+- **Synthetic repair exercise** (2026-08-06, `sl1b-synthetic-repair-exercise.local.sql`, commit `c3e22ae0`): removed one uuid from one demo team → invoked auto_fix → asserted flat repair. **Architect-verified PASS live**: length=21, top-level `?` finds the removed uuid, zero nested arrays, zero duplicates. "Watched the concat arm repair flat" — INS-10 meta-lesson's data-shape verification satisfied.
+
+- **Sensor read** (2026-08-06 17:21:24Z): `missing_players_check` = pass (was 210); `team_lineups_vs_draft_picks_count` = pass (was 10). **FORK A RESOLVED**: the count-check sums array lengths — never unit-broken, no new KI opened. Fork B was pre-registered but did not fire.
+
+- **Amendment A hard assert** (sl1-post-heal-verify.local.sql Q3): PASS 10/10 teams, 21/21 players each, no dupes.
+
+**Standing pin table update** (add to `docs/INSTRUMENT_LEDGER.md` INS-7):
+
+```
+public.auto_fix_integrity_issues()  md5 = d0a54ca8925c9a8604781294a4b5631a
+                                    (2026-08-06 post-SL-1b v2 apply, NEW pin)
+Retired:
+  0bd6c0f8cfbc9b9b3f970b52009bfbd2  (SL-1 v1 body, 2026-08-05)
+```
+
+**Residue**: sync-staleness fails only (23 rows today, includes AI league + Founders under Aug-6 semantics — KI-040; expectation now tracks healed rosters). Every other check green.
+
+**Cron job 4 posture**: `active=false` throughout the v2 landing AND remains so post-close. Re-enable is the FINAL ladder step, BLOCKED pending KI-041 provenance resolution. Data is healthy in the interim — on-demand `check_data_integrity` runs 4×/day and reports green. **The KI-041 finding (unknown deactivator) is now the lead exhibit for the coexistence-governance work item, promoted for this week.**
+
+---
+
+
+
+**Ladder executed (2026-08-06, all seven steps traversed except step 7 which is blocked on KI-041):**
+1. INS-6 rehearsal on prod connection — PASS
+2. `unwrap-sl1b-demo-league.local.sql` — 10 nested rows unwrapped
+3. `apply-sl1b-auto-fix-v2.local.sql` — v2 body live, md5 = `d0a54ca8925c9a8604781294a4b5631a`
+4. Manual `auto_fix_integrity_issues()` — baseline no-op as expected
+4.5. `sl1b-synthetic-repair-exercise.local.sql` — architect-verified live PASS (length=21, top-level `?` finds the removed uuid, zero nested arrays, zero duplicates)
+5. Manual `check_data_integrity()` — writes landed
+6. `sl1-post-heal-verify.local.sql` — Amendment A hard assert PASS 10/10 (21/21 per team, no dupes); missing_players_check PASS; team_lineups_vs_draft_picks_count PASS
+7. Re-enable cron job 4 — **BLOCKED** on KI-041 provenance (job 4 stays `active=false`; data is healthy in the interim via 4×/day on-demand runs)
+
+**Historical pre-registered acceptance (recorded here for the epistemic record — architect 2026-08-06 morning, resolved by evening's sensor read):**
+- `missing_players_check` MUST be 0 after ladder step 5. → **PASSED**
+- `team_lineups_vs_draft_picks_count` fork:
+  - (A) → 0: check semantics sum array lengths; SL-1b closes outright.
+  - (B) → still ≠0: check would be ROWS vs PICKS, unit-broken since January; new KI + check fix.
+  → **FORK A RESOLVED**: check sums array lengths, never unit-broken, no new KI opened.
+- `fantasy_daily_rosters_sync_today` expected 12 (KI-040 residue). → **actual 23+ today** because the healed rosters now report under Aug-6 semantics; KI-040 expectation updates.
 
 ---
 
@@ -531,15 +548,21 @@ Deterministic — same uuid nightly. Dead since **2026-02-25** (5.3 months): **1
 | **Target phase / timeline** | Same Season-Loop sprint as SL-1..SL-5. Order-of-operations: reclassify after SL-5's status-vocabulary decision (since both touch the same allowlist). |
 | **Verification test** | (a) In offseason: `check_data_integrity` invocation for `fantasy_daily_rosters_sync_today` returns `pass` OR `warning` (not `fail`). (b) In-season simulation (canned): stale sync → `fail`. (c) Alert count (KI-038) drops by the number of currently-classified-as-fail sync-today rows. |
 
-### KI-041 — Cron governance: two-operators-one-prod without shared ledger (promote to this week)
+### KI-041 — Cron governance: two-operators-one-prod without shared ledger — SL-1b close's LEAD EXHIBIT
 
 **Field record (architect prod interrogation, 2026-08-06).** During SL-1b diagnosis, architect observed cron state on prod that this session did not perform:
 
-- **Cron job 4** (auto-fix-integrity nightly 04:00 UTC) is `active=false` — disabled by an operator outside this session's ledger. Timing and operator ID unknown; Garrett to answer.
+- **Cron job 4** (auto-fix-integrity nightly 04:00 UTC) is `active=false` — disabled by an operator outside this session's ledger. Timing and operator ID unknown.
 - **`log_xg_integrity` (KI-037)** succeeded on 2026-08-06 05:45 UTC after failing its maiden run on 2026-08-05 05:45 — the fix was applied by an operator outside this session (see KI-037 provenance-pending note).
-- **`log_xg_integrity` (jobid 15, new)** was ADDED to the cron table by an operator outside this session's ledger between the SL-1 diagnosis window and the SL-1b diagnosis window.
+- **`log_pipeline_coverage` and `log_xg_integrity` (jobid 15)** were ADDED to the cron table by an operator outside this session's ledger between the SL-1 diagnosis window and the SL-1b diagnosis window.
 
-Three cron mutations, zero session-visible authorship. Two-operators-one-prod without a shared change ledger is a governance class defect adjacent to F20 (the guard fires but nobody sees) at the operational-mutation layer instead of the sensor layer.
+Three (at minimum) cron mutations, zero session-visible authorship. Two-operators-one-prod without a shared change ledger is a governance class defect adjacent to F20 (the guard fires but nobody sees) at the operational-mutation layer instead of the sensor layer.
+
+**Provenance status (2026-08-06 evening).**
+- Garrett explicitly confirmed he did NOT knowingly disable cron job 4. Not this session's assistant either (Claude did not run any psql / gcloud / supabase commands against prod — standing rule per `feedback_hand_off_infra_commands.md`).
+- The other operator session's transcript is being checked for the disable + additions.
+- Job 4 stays `active=false` until provenance lands and re-enable can be attributed cleanly. Acceptable in the interim: detection runs 4×/day (on-demand `check_data_integrity` invocations) and data has been verified healthy end-to-end (see KI-036 close).
+- **Promoted to lead exhibit for this week's coexistence-governance work item.** The scope of DEF-1 (KI-038 — daily visible failure count for defense cluster) now naturally extends to cover operational-mutation visibility, not just sensor-emission visibility. Consolidation TBD.
 
 | | |
 |---|---|
