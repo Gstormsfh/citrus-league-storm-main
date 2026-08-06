@@ -2943,6 +2943,17 @@ export class LobbyManager {
         //      "clock fired but draftStatus=completed" WARNING (Rider 4
         //      assert E).
         //
+        // TEARDOWN — accepted as SATISFIED-BY-DESIGN via idle-reap
+        // (architect ratification 2026-08-06). Post-completion,
+        // discovery's status gate stops new joins; connected clients
+        // linger to view the final board (celebration UI in F28/
+        // P5-slice-1); the lobby reaper collects on its normal
+        // schedule. F27 lifecycle-acceptance adds a POST-RUN
+        // OBSERVATION (not a gate): the lobby is reaped on schedule
+        // post-completion, no zombie. KI-035 "initiate teardown"
+        // scope line reads as satisfied — actions (1) + (2) + (3)
+        // above + idle-reap-on-schedule = the full teardown pipeline.
+        //
         // BufferedDraftEvent carries the TRUE event seq (architect
         // condition 2), not a synthesized value.
         const completionPayload = event.payload as Record<string, unknown>;
