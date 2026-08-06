@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.citrus_request import citrus_request
+from data_pipeline.utils.season_config import current_season
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -50,7 +51,7 @@ response = citrus_request(
     headers=headers,
     params={
         'game_date': f'eq.{today}',
-        'season': 'eq.2025',
+        'season': f'eq.{current_season()}',
         'select': 'game_id,home_team,away_team'
     }
 )
@@ -73,7 +74,7 @@ response = citrus_request(
     headers=headers,
     params={
         'projection_date': f'eq.{today}',
-        'season': 'eq.2025',
+        'season': f'eq.{current_season()}',
         'select': 'player_id,game_id,total_projected_points,is_goalie',
         'limit': '1000'
     }

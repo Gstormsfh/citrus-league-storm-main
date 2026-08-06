@@ -94,7 +94,11 @@ else:
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
-DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+from data_pipeline.utils.season_config import current_season as _current_season
+# Derived from today's date at import time; env override still honored for
+# manual backfills of historical seasons. The former hardcoded '2025'
+# fallback would have silently misfiled every 2026-10-01+ projection.
+DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON")) if os.getenv("CITRUS_DEFAULT_SEASON") else _current_season()
 
 # Cache version: Bump this whenever the projection data sources or model change.
 # This invalidates all cached projections from previous versions, forcing recalculation.
