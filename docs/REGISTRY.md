@@ -400,6 +400,41 @@ The internal path (`processSubmitPick` else-branch, `LobbyManager.ts:1826-1832`)
 
 ### KI-036 — SL-1: auto_fix_integrity_issues dead 5.3 months (162 consecutive failed nightly runs, prod)
 
+**PARTIAL RESOLUTION (SL-1 v1 applied 2026-08-05; SL-1b v2 shipped 2026-08-06).**
+v1 (migration `20260805200000_sl1_auto_fix_uuid_cast.sql`) eliminated the
+22P02 uuid→integer crash: STEP 3 negative markers held, function completed
+without exception. v1 REPAIR was wrong — the `jsonb_build_array(<jsonb_agg>)`
+wrapper produced a nested `[[21 uuids]]` shape in bench, so `?` operator
+stayed blind to elements, and `missing_players_check` stayed at 210 after
+v1's manual invoke. Architect read prod bench directly (2026-08-06) to
+diagnose. **v2 fix (migration `20260806100000_sl1b_auto_fix_unwrap_agg.sql`)
+concatenates the jsonb_agg array directly + adds COALESCE fallback.** Same
+apply harness (`apply-sl1b-auto-fix-v2.local.sql`), STEP 0 pin against v1 body
+md5 `0bd6c0f8cfbc9b9b3f970b52009bfbd2`. One-time data unwrap for the 10
+demo-league rows shaped by v1 ships as `unwrap-sl1b-demo-league.local.sql`.
+
+**Ladder order for v2 acceptance (architect 2026-08-06):**
+1. INS-6 rehearsal on prod connection
+2. `unwrap-sl1b-demo-league.local.sql` — repairs the 10 nested rows
+3. `apply-sl1b-auto-fix-v2.local.sql` — replaces function body
+4. Manual `SELECT * FROM auto_fix_integrity_issues();` (COMMITTED)
+5. Manual `SELECT * FROM check_data_integrity();` (writes fresh sensor rows)
+6. `sl1-post-heal-verify.local.sql` (SAME file as v1 — assertions are shape-agnostic)
+7. Re-enable cron job 4 (FINAL — gated on step 6 outcome + KI-041 answer)
+
+**Pre-registered acceptance (architect 2026-08-06):**
+- `missing_players_check` MUST be 0 after ladder step 5.
+- `team_lineups_vs_draft_picks_count` outcome forks:
+  - **(A) → 0**: check semantics sum array lengths; SL-1b closes outright.
+  - **(B) → still ≠0**: the check compares ROW count to PICK count, unit-broken since January (Jan 2026). New KI + check fix scheduled; NOT an SL-1b v2 failure. Fork B does not invalidate the v2 function.
+- `fantasy_daily_rosters_sync_today` unchanged at 12 (KI-040 residue).
+
+**Cron job 4 posture.** `active=false` throughout the v2 landing. Re-enable is the FINAL step of the ladder, pending KI-041 answer on who originally disabled it. The disablement itself was mutating action by an operator outside this session's ledger — see KI-041 for governance implications.
+
+---
+
+
+
 **Field record (architect direct prod interrogation, 2026-08-05).**
 Function `public.auto_fix_integrity_issues()` throws every 04:00 UTC:
 
@@ -442,6 +477,8 @@ Deterministic — same uuid nightly. Dead since **2026-02-25** (5.3 months): **1
 **Apply mechanic:** First reuse of the F24 apply tooling — `scripts/proof/apply-f24-rebase.local.sql` pattern adapted for prod target. Rule 1 (capture-before-replace on prod's live body), Rule 2 (real SQL in history via `\lo_import`), Rule 3 (`client_encoding=UTF8` forced), STEP 0 hash pin from architect's same-day prod `md5(pg_get_functiondef(...))` capture.
 
 ### KI-037 — SL-5: log_xg_integrity dark from day one (integrity_check_results status CHECK violation)
+
+**PROVENANCE-PENDING UPDATE (architect 2026-08-06).** The `log_xg_integrity` job succeeded on 2026-08-06 05:45 UTC — after Aug 5 05:45's maiden-run failure. Fix was applied by an operator OUTSIDE this session's ledger (see KI-041). Reconcile the fix details once the operator + change are identified: whether the invoker's status value was aligned to the allowlist OR the `integrity_check_results_status_check` constraint was extended. Either resolution needs to be recorded here for the audit trail.
 
 **Field record (2026-08-05).** New pg_cron job `log_xg_integrity` (jobid 13) failed its maiden run on 2026-08-05 05:45 UTC. Error: the status value being inserted violates `integrity_check_results_status_check` (`status IN ('pass', 'fail', 'warning')`). xG monitoring dark from day one — never emitted a single accepted row.
 
@@ -492,6 +529,30 @@ Deterministic — same uuid nightly. Dead since **2026-02-25** (5.3 months): **1
 | **Why deferred** | Diagnostic clarity first: (a) confirm architect's offseason hypothesis with a query of the check body, (b) then decide reclassify vs new-vocabulary. |
 | **Target phase / timeline** | Same Season-Loop sprint as SL-1..SL-5. Order-of-operations: reclassify after SL-5's status-vocabulary decision (since both touch the same allowlist). |
 | **Verification test** | (a) In offseason: `check_data_integrity` invocation for `fantasy_daily_rosters_sync_today` returns `pass` OR `warning` (not `fail`). (b) In-season simulation (canned): stale sync → `fail`. (c) Alert count (KI-038) drops by the number of currently-classified-as-fail sync-today rows. |
+
+### KI-041 — Cron governance: two-operators-one-prod without shared ledger (promote to this week)
+
+**Field record (architect prod interrogation, 2026-08-06).** During SL-1b diagnosis, architect observed cron state on prod that this session did not perform:
+
+- **Cron job 4** (auto-fix-integrity nightly 04:00 UTC) is `active=false` — disabled by an operator outside this session's ledger. Timing and operator ID unknown; Garrett to answer.
+- **`log_xg_integrity` (KI-037)** succeeded on 2026-08-06 05:45 UTC after failing its maiden run on 2026-08-05 05:45 — the fix was applied by an operator outside this session (see KI-037 provenance-pending note).
+- **`log_xg_integrity` (jobid 15, new)** was ADDED to the cron table by an operator outside this session's ledger between the SL-1 diagnosis window and the SL-1b diagnosis window.
+
+Three cron mutations, zero session-visible authorship. Two-operators-one-prod without a shared change ledger is a governance class defect adjacent to F20 (the guard fires but nobody sees) at the operational-mutation layer instead of the sensor layer.
+
+| | |
+|---|---|
+| **Severity** | medium — no data loss today, but the class is the "silent operator vs silent operator" pattern that makes incident reconstruction impossible. Any post-mortem that has to reconstruct WHO changed WHAT on prod cron across two sessions becomes forensic archaeology. |
+| **Surface** | pg_cron (`cron.job`, `cron.job_run_details`) on prod; any other operator-modifiable prod surface (`gcloud`, `supabase` CLI, dashboard, etc.); no shared operator change ledger exists today. |
+| **Description** | Two operators (this session's Claude+Garrett collaboration, and at least one other unnamed operator) mutated prod cron state within a 24-hour window with no shared visibility. SL-1b's KI-036 close-out ladder step 7 requires re-enabling job 4 — but that step is currently blocked pending identification of who disabled it, because re-enabling a job someone else deliberately paused is itself a governance violation. |
+| **Why deferred** | Not deferred — actively promoted to this week per architect. The immediate blocker is Garrett's answer on who disabled job 4. |
+| **Target phase / timeline** | This week. Minimum viable governance: (a) a shared changelog file (e.g., `docs/PROD_CRON_LEDGER.md`) that every operator commits to before mutating prod cron; (b) a `cron.job` snapshot-diff script that reports adds/removes/state-flips between two points in time; (c) an operator-identity convention (git commit sha or ticket ID) attached to each mutation via `cron.job.jobname` or a comment column. |
+| **Verification test** | (a) The next prod cron mutation (any origin) leaves a trace: shared changelog entry + jobname/comment attribution. (b) A weekly cron-state diff report can be generated on-demand + shows a zero-delta week when nobody touched it. (c) Any operator can answer "who made change X to prod cron on date Y" in under 60 seconds. |
+
+**Ledger entries pending (three cron mutations to reconcile):**
+- Job 4 disable — operator + rationale + timestamp
+- KI-037 xG fix — operator + which fix path (align value vs extend constraint) + timestamp
+- Jobid 15 add — operator + job command + rationale + timestamp
 
 ---
 

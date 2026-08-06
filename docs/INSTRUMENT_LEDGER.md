@@ -455,3 +455,89 @@ for future runbook additions:
   reportable as an instrument bug — the doc is an instrument for
   operator action; incorrect instructions are the same class as an
   incorrect regex.
+
+### INS-10 — SL-1 v1: crash removed but repair authored wrong (jsonb_build_array wrapper); STEP 3 markers passed a wrong-shape post-repair
+
+**Field record (2026-08-06, SL-1 v1 acceptance).** SL-1 v1 (migration
+`20260805200000_sl1_auto_fix_uuid_cast.sql`, applied 2026-08-05)
+eliminated the 22P02 crash — STEP 3's negative markers held
+(`dp.player_id::INTEGER` absent), function invocation completed
+without exception, sensor arm re-emitted rows. But the repair itself
+was WRONG: the UPDATE wrapped the jsonb_agg subquery in
+`jsonb_build_array(...)`, producing `bench = [[21 uuids]]` (a
+single-element outer array whose element is the inner UUID array).
+Architect read live prod bench directly on 2026-08-06 to diagnose:
+all 10 demo-league teams shaped `[[uuids]]`, `jsonb_array_length=1`,
+`?` operator blind to nested elements. `missing_players_check` stayed
+at 210 after v1's manual invoke. Fix continued to KI-036 as SL-1b v2
+(migration `20260806100000`).
+
+**Instrument.** v1 apply script's STEP 3 marker set —
+`scripts/proof/apply-sl1-auto-fix.local.sql`. Also the paired
+`dryrun-apply-f24-rebase-checks.local.mjs` style dry-run (though for
+SL-1 v1 no dedicated dry-run was built — the F24-descended pattern
+was reused for the harness but no v1-specific dry-run harness gated
+authorship).
+
+**Failure mode.** `false-green` — the marker set was well-scoped to
+"crash site gone + ::text casts present" and confirmed both. It did
+not check the SHAPE of the resulting bench array, because that would
+require post-invoke data verification, not just post-apply function-
+body verification. The class boundary between "crash removed" and
+"repair correct" was invisible to the instrument.
+
+**Fix (this commit).** SL-1b v2 replaces the UPDATE's
+`bench = bench || jsonb_build_array(<jsonb_agg>)` with
+`bench = bench || COALESCE(<jsonb_agg>, '[]'::jsonb)` — direct
+concatenation. STEP 3 for v2 (in
+`scripts/proof/apply-sl1b-auto-fix-v2.local.sql`) adds two new
+positive markers (`bench = bench || COALESCE(` present in UPDATE
+window; `'[]'::jsonb` fallback present) and one new negative marker
+(`jsonb_build_array` absent from UPDATE window). Paired dry-run
+harness `scripts/proof/dryrun-apply-sl1b-checks.local.mjs` validates
+14/14 against the migration file body before the apply runs.
+
+**Credit.** Architect's independent prod read caught the v1 shape
+error within 24 hours of the apply. The `jsonb_build_array` wrapper
+compiled and ran without error; STEP 3 accepted it; sensor arm
+accepted the returned rows without exception. The wrong shape was
+invisible to every automated check until architect looked at the
+data directly. **Data-shape verification MUST be part of any repair
+that mutates data structure**, not just function-body verification.
+
+**Meta-lesson: syntactic correctness ≠ semantic correctness. A
+CREATE OR REPLACE that compiles + a repair that runs + sensors that
+re-emit ≠ a repair that WORKED.** Standing pattern for any future
+data-mutating repair function:
+
+1. **Post-apply STEP 3** verifies the function BODY (marker set).
+2. **Post-invoke assertion** verifies the DATA SHAPE the function
+   produced. Query the affected rows and assert against the intended
+   shape (jsonb_array_length ranges, jsonb_typeof of first element,
+   etc.). If a data-shape assertion is impossible without knowing
+   the exact shape in advance, treat the repair as EXPLORATORY and
+   run it against a staged copy first.
+3. **Pre-registered acceptance** — architect specified SL-1b's
+   forks (A vs B on the count-check) BEFORE the invoke ran. Fork B
+   is not a v2 failure; it's information. Design the forks up front
+   so post-invoke observations are adjudicated against a plan, not
+   improvised.
+
+For SL-1b specifically, the post-invoke assertions live in:
+- `sl1-post-heal-verify.local.sql` Q3 Amendment A hard assert (no
+  dupes + count matches per healed team). Shape-agnostic — passes
+  for both v1's [[uuids]] AND v2's [uuids] IF the count matches. v1
+  count DIDN'T match (1 vs 21) because `jsonb_array_length` returned
+  1, so Amendment A would have caught v1 too — had architect not
+  read prod first, ladder step 5 would have surfaced it.
+- `unwrap-sl1b-demo-league.local.sql` pre-scan + post-scan bracket
+  the shape check before the unwrap runs. Data-shape verification
+  moved to the front of the ladder for v2.
+
+**Recurring pattern noted.** The transactional wrap has caught
+INS-4, INS-5, INS-6 as safe rollbacks; INS-7 was cosmetic;
+INS-8 was a Type III side effect; INS-9 was doc-vs-code naming;
+**INS-10 is the first "code did what was written; what was written
+was wrong" defect in this campaign** — outside the reach of any
+transactional wrap or code-body verifier. Only data-shape assertion
+would have caught it earlier.
