@@ -28,6 +28,7 @@ import { poolRoutes } from './routes/pools';
 import { nhlPlayoffsRoutes } from './routes/nhl-playoffs';
 import { playoffPoolRoutes } from './routes/playoff-pools';
 import { authRoutes } from './routes/auth';
+import { scheduledRoutes } from './routes/scheduled';
 import { standardRateLimit, strictRateLimit, authRateLimit } from './middleware/rateLimit';
 import { requestContextMiddleware } from './middleware/requestContext';
 import { metricsMiddleware, metrics } from './middleware/metrics';
@@ -255,6 +256,9 @@ app.route('/api/pools', poolRoutes);
 app.route('/api/nhl-playoffs', nhlPlayoffsRoutes);
 app.route('/api/playoff-pools', playoffPoolRoutes);
 app.route('/api/auth', authRoutes);
+// Scheduled/cron endpoints — auth is X-Scheduled-Secret shared-secret
+// header, not user JWT. Mounted last so no other router shadows it.
+app.route('/api/scheduled', scheduledRoutes);
 
 // ── 404 handler ──────────────────────────────────────────────────────
 app.notFound((c) => {

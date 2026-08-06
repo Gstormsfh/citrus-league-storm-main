@@ -313,8 +313,25 @@ export class LineupService {
       (existingRecords || []).map((r: { roster_date: string }) => r.roster_date),
     );
 
-    // Only backfill dates that have zero records
-    const datesToFill = weekDates.filter(d => !datesWithData.has(d));
+    // Task 1B: refuse to fabricate roster rows for past dates. We do not
+    // know what the lineup was on a past date — writing anything here is
+    // guessing, and it silently locks the guess. Only backfill today and
+    // future dates that have zero records; past dates that lack rows must
+    // remain missing so scoring can treat them honestly.
+    const todayStr = getTodayMST();
+    const skippedPastDates: string[] = [];
+    const datesToFill = weekDates.filter(d => {
+      if (datesWithData.has(d)) return false;
+      if (d < todayStr) {
+        skippedPastDates.push(d);
+        return false;
+      }
+      return true;
+    });
+    if (skippedPastDates.length > 0) {
+      logger.warn('[backfillMissingDailyRosters] refused past dates:', skippedPastDates,
+        'team:', teamId, 'matchup:', matchupId);
+    }
 
     const recordsToInsert: Array<Record<string, unknown>> = [];
 
@@ -331,6 +348,10 @@ export class LineupService {
             slot_id: slotType !== 'bench' ? (slotAssignments[playerId] || null) : null,
             is_locked: true,
             locked_at: new Date().toISOString(),
+            // Task 1B: label the provenance. This writer is inferring
+            // today/future rows from the current base team_lineups; that
+            // is the definition of 'reconstructed'.
+            source: 'reconstructed',
           });
         }
       };
@@ -545,11 +566,17 @@ export class LineupService {
    * Create daily roster snapshots for current matchup week.
    * Respects game locks — never overwrites locked records.
    */
-  private async createDailyRosterSnapshots(
+  // Note: `source` is defaulted to 'user_edit' because the only path that
+  // reaches this without an explicit source override is a per-day user
+  // lineup save (LineupService.saveLineup with target_date). Every other
+  // caller (scheduled snapshot, reconstructed backfill) MUST pass its own
+  // source label.
+  public async createDailyRosterSnapshots(
     teamId: string,
     leagueId: string,
     lineup: { starters: string[]; bench: string[]; ir: string[]; slot_assignments: Record<string, string> },
     targetDate: string,
+    source: 'scheduled_snapshot' | 'user_edit' | 'reconstructed' = 'user_edit',
   ) {
     // Get current matchup for this team
     const todayStr = getTodayMST();
@@ -654,6 +681,7 @@ export class LineupService {
             slot_id: slotType !== 'bench' ? (lineup.slot_assignments[playerId] || null) : null,
             is_locked: locked,
             locked_at: locked ? new Date().toISOString() : null,
+            source,
           });
         }
       };
