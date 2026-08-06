@@ -39,12 +39,46 @@ jobs:
 
       - run: pip install -r data-pipeline/requirements.txt
 
+      # Season is intentionally NOT set in env. The script derives the
+      # target season(s) from the current date (Python mirror of the SQL
+      # get_nhl_season_year function). Aug/Sep runs populate BOTH the
+      # outgoing and incoming season so the first-of-October cron isn't
+      # the only chance to populate a brand-new season from scratch. Prior
+      # `CITRUS_DEFAULT_SEASON: '2025'` env hardcode is what kept the
+      # directory frozen at 2025 while the SQL joins pivoted to 2026 on
+      # 2026-10-01 — the silent zero-scoring failure this guard closes.
       - name: Refresh player_directory from rosters + raw_shots discovery
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          CITRUS_DEFAULT_SEASON: '2025'
         run: python scripts/utilities/populate_player_directory.py
+
+      # Post-run assertion: the season the SQL joins care about TODAY must
+      # have >0 rows after the refresh. This is the workflow-level fail-
+      # loudly guard demanded by Task 0D. Even if the script itself somehow
+      # returned 0 without erroring, this step catches it — because SQL
+      # joins keyed on get_nhl_season_year(today) with a zero-row RHS is
+      # the exact failure that scores every player zero on opening night.
+      - name: Assert player_directory has rows for today's NHL season
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python -c "
+          import sys, datetime as dt
+          sys.path.insert(0, 'data-pipeline')
+          import _bootstrap
+          from data_pipeline.utils.supabase_rest import SupabaseRest
+          import os
+          db = SupabaseRest(os.environ['VITE_SUPABASE_URL'], os.environ['SUPABASE_SERVICE_ROLE_KEY'])
+          today = dt.date.today()
+          season = today.year if today.month >= 10 else today.year - 1
+          rows = db.select('player_directory', select='player_id', filters=[('season','eq',season)], limit=1)
+          if not rows:
+            print(f'FAIL: player_directory has zero rows for season={season} (today={today.isoformat()})')
+            sys.exit(1)
+          print(f'OK: player_directory has rows for season={season}')
+          "
 
       - name: Verify orphan count post-refresh
         if: success()

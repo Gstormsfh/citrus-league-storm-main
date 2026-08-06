@@ -49,7 +49,36 @@ if not SUPABASE_URL or not SUPABASE_KEY:
   print(f"  SUPABASE_SERVICE_ROLE_KEY: {'SET' if SUPABASE_KEY else 'MISSING'}")
   raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
-DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+
+def _derive_nhl_season_year(d: dt.date) -> int:
+  """
+  Python mirror of public.get_nhl_season_year (SQL). NHL seasons run
+  Oct→Jun; months 10-12 use current year, months 1-9 use previous year.
+  Any drift between this function and the SQL side re-creates the exact
+  season-rollover silent-failure we're closing here — keep them in sync.
+  """
+  return d.year if d.month >= 10 else d.year - 1
+
+
+def _seasons_to_populate(today: dt.date) -> list[int]:
+  """
+  During the offseason ramp (Aug 1 – Sep 30), populate BOTH the outgoing
+  and incoming season so opening night doesn't depend on a single first-of-
+  October cron run succeeding at populating hundreds of season-N+1 rows
+  from scratch. Otherwise write just the current season.
+  """
+  current = _derive_nhl_season_year(today)
+  if today.month in (8, 9):
+    return [current, current + 1]
+  return [current]
+
+
+# Env override remains for manual backfills (e.g. rebuild season=2023 rows
+# from historical raw_shots discovery). Absent an override, always derive
+# from today's date — never hardcode. The prior hardcoded '2025' fallback
+# is exactly why the directory had zero season=2026 rows for months.
+_ENV_SEASON = os.getenv("CITRUS_DEFAULT_SEASON")
+DEFAULT_SEASON = int(_ENV_SEASON) if _ENV_SEASON else _derive_nhl_season_year(dt.date.today())
 
 NHL_API_BASE = "https://api-web.nhle.com/v1"
 TEAMS = ["ANA", "BOS", "BUF", "CGY", "CAR", "CHI", "COL", "CBJ", "DAL", "DET", "EDM", "FLA", "LAK", "MIN", "MTL", "NSH", "NJD", "NYI", "NYR", "OTT", "PHI", "PIT", "SJS", "SEA", "STL", "TBL", "TOR", "UTA", "VAN", "VGK", "WSH", "WPG"]
@@ -318,121 +347,138 @@ def process_player_from_api(player_id: int, season: int, team_abbrev: Optional[s
   return player_data
 
 
+def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
+  """
+  Populate player_directory for a single season. Returns
+  (total_roster_players_returned_by_nhl_api, players_upserted).
+  Raises on hard failure (API dead, upsert error).
+  """
+  seen: Dict[int, dict] = {}
+
+  print(f"[populate_player_directory][season={season}] Fetching existing player IDs...")
+  existing_ids = get_existing_player_ids(db, season)
+  print(f"[populate_player_directory][season={season}] {len(existing_ids)} rows already in directory")
+
+  print(f"[populate_player_directory][season={season}] Step 1: Discovering players from our data...")
+  discovered_ids = discover_players_from_our_data(db, season)
+  missing_ids = discovered_ids - existing_ids
+  print(f"[populate_player_directory][season={season}] {len(missing_ids)} discovered players missing from directory")
+
+  if missing_ids:
+    print(f"[populate_player_directory][season={season}] Fetching {len(missing_ids)} missing players from NHL API...")
+    processed_count = 0
+    last_progress_time = time.time()
+    for idx, player_id in enumerate(sorted(missing_ids), 1):
+      if player_id in seen:
+        continue
+      player_data = process_player_from_api(player_id, season)
+      if player_data:
+        seen[player_id] = player_data
+        processed_count += 1
+      current_time = time.time()
+      if current_time - last_progress_time >= 15:
+        print(f"  [PROGRESS] Processed {idx}/{len(missing_ids)} discovery-players ({processed_count} successful)...")
+        last_progress_time = current_time
+
+  print(f"[populate_player_directory][season={season}] Step 3: Fetching rosters for {len(TEAMS)} teams...")
+  total_roster_players = 0
+  roster_processed = 0
+  last_progress_time = time.time()
+  for team_idx, team_abbrev in enumerate(TEAMS, 1):
+    roster = fetch_team_roster(team_abbrev)
+    time.sleep(0.2)
+    for roster_player in roster:
+      total_roster_players += 1
+      player_id = _safe_int(roster_player.get("id") or roster_player.get("playerId"), 0)
+      if not player_id or player_id in seen:
+        continue
+      player_data = process_player_from_api(player_id, season, team_abbrev)
+      if player_data:
+        seen[player_id] = player_data
+        roster_processed += 1
+      current_time = time.time()
+      if current_time - last_progress_time >= 15:
+        print(f"  [PROGRESS] Processed {total_roster_players} roster players ({roster_processed} new, {len(seen)} total)...")
+        last_progress_time = current_time
+  print(f"[populate_player_directory][season={season}] Fetched {total_roster_players} roster players across {len(TEAMS)} teams")
+
+  if seen:
+    players_to_upsert = list(seen.values())
+    print(f"[populate_player_directory][season={season}] Upserting {len(players_to_upsert)} players...")
+    db.upsert("player_directory", players_to_upsert, on_conflict="season,player_id")
+    print(f"[populate_player_directory][season={season}] OK: upserted {len(seen)} players")
+  else:
+    print(f"[populate_player_directory][season={season}] No new players to upsert (all discovered/roster ids already present)")
+
+  return total_roster_players, len(seen)
+
+
 def main() -> int:
+  today = dt.date.today()
+  seasons = _seasons_to_populate(today)
+
   print("=" * 80)
   print("[populate_player_directory] STARTING")
   print("=" * 80)
-  print(f"Season: {DEFAULT_SEASON}")
+  print(f"Today: {today.isoformat()}")
+  print(f"Seasons to populate: {seasons} (derived; env override CITRUS_DEFAULT_SEASON={os.getenv('CITRUS_DEFAULT_SEASON') or 'unset'})")
   print(f"Timestamp: {_now_iso()}")
   print()
-  
+
+  # Env override forces a single-season run — preserve manual-backfill semantics.
+  if os.getenv("CITRUS_DEFAULT_SEASON"):
+    seasons = [DEFAULT_SEASON]
+    print(f"[populate_player_directory] Env override active — populating only season={DEFAULT_SEASON}")
+
   try:
     db = supabase_client()
     print("[populate_player_directory] Connected to Supabase")
   except Exception as e:
     print(f"[populate_player_directory] ERROR: Failed to connect to Supabase: {e}")
     return 1
-  
-  season = DEFAULT_SEASON
-  seen: Dict[int, dict] = {}
-  
-  # Get existing player IDs to avoid re-fetching
-  print("[populate_player_directory] Fetching existing player IDs from directory...")
-  try:
-    existing_ids = get_existing_player_ids(db, season)
-    print(f"[populate_player_directory] Found {len(existing_ids)} existing players in directory")
-  except Exception as e:
-    print(f"[populate_player_directory] ERROR: Failed to fetch existing IDs: {e}")
-    import traceback
-    traceback.print_exc()
-    return 1
-  
-  # Step 1: Discover players from our own data
-  print()
-  print("[populate_player_directory] Step 1: Discovering players from our data...")
-  try:
-    discovered_ids = discover_players_from_our_data(db, season)
-    missing_ids = discovered_ids - existing_ids
-    print(f"[populate_player_directory] Found {len(missing_ids)} players in our data not in directory")
-  except Exception as e:
-    print(f"[populate_player_directory] ERROR in discovery phase: {e}")
-    import traceback
-    traceback.print_exc()
-    return 1
-  
-  # Step 2: Fetch missing players from NHL API
-  if missing_ids:
-    print(f"[populate_player_directory] Fetching {len(missing_ids)} missing players from NHL API...")
-    processed_count = 0
-    last_progress_time = time.time()
-    for idx, player_id in enumerate(sorted(missing_ids), 1):
-      if player_id in seen:
-        continue
-      
-      player_data = process_player_from_api(player_id, season)
-      if player_data:
-        seen[player_id] = player_data
-        processed_count += 1
-      
-      # Progress every 15 seconds
-      current_time = time.time()
-      if current_time - last_progress_time >= 15:
-        print(f"  [PROGRESS] Processed {idx}/{len(missing_ids)} players ({processed_count} successful)...")
-        last_progress_time = current_time
-  
-  # Step 3: Fetch from team rosters (primary source)
-  print(f"[populate_player_directory] Fetching rosters for {len(TEAMS)} teams...")
-  
-  total_roster_players = 0
-  roster_processed = 0
-  last_progress_time = time.time()
-  
-  for team_idx, team_abbrev in enumerate(TEAMS, 1):
-    print(f"[populate_player_directory] Processing team {team_idx}/{len(TEAMS)}: {team_abbrev}...")
-    roster = fetch_team_roster(team_abbrev)
-    time.sleep(0.2)  # Rate limit
-    
-    for roster_player in roster:
-      total_roster_players += 1
-      player_id = _safe_int(roster_player.get("id") or roster_player.get("playerId"), 0)
-      if not player_id or player_id in seen:
-        continue
-      
-      player_data = process_player_from_api(player_id, season, team_abbrev)
-      if player_data:
-        seen[player_id] = player_data
-        roster_processed += 1
-      
-      # Progress every 15 seconds
-      current_time = time.time()
-      if current_time - last_progress_time >= 15:
-        print(f"  [PROGRESS] Processed {total_roster_players} roster players ({roster_processed} new, {len(seen)} total)...")
-        last_progress_time = current_time
-  
-  # Step 4: Upsert all players (selective update - only canonical fields)
-  print()
-  print("[populate_player_directory] Step 4: Upserting players to database...")
-  if seen:
+
+  # Aggregate metrics across all seasons for the final guard.
+  grand_total_roster_players = 0
+  grand_total_upserted = 0
+  per_season: list[tuple[int, int, int]] = []
+
+  for season in seasons:
     try:
-      # For upsert, we need to handle selective field updates
-      # Supabase upsert will update all provided fields, so we only include canonical fields
-      # Manual fields (bio, college, notes) are NOT included, so they're preserved
-      players_to_upsert = list(seen.values())
-      print(f"[populate_player_directory] Upserting {len(players_to_upsert)} players...")
-      db.upsert("player_directory", players_to_upsert, on_conflict="season,player_id")
-      print(f"[populate_player_directory] OK: Successfully upserted {len(seen)} players")
+      rp, up = _run_for_season(db, season)
     except Exception as e:
-      print(f"[populate_player_directory] ERROR: Failed to upsert players: {e}")
+      print(f"[populate_player_directory] ERROR while populating season={season}: {e}")
       import traceback
       traceback.print_exc()
       return 1
-  else:
-    print("[populate_player_directory] No new players to upsert")
-  
+    grand_total_roster_players += rp
+    grand_total_upserted += up
+    per_season.append((season, rp, up))
+
   print()
   print("=" * 80)
-  print("[populate_player_directory] COMPLETE")
+  print("[populate_player_directory] SUMMARY")
   print("=" * 80)
+  for s, rp, up in per_season:
+    print(f"  season={s}: roster_players={rp}  upserted={up}")
+  print(f"  TOTAL: roster_players={grand_total_roster_players}  upserted={grand_total_upserted}")
+  print()
+
+  # Guard: the NHL API must have returned SOMETHING. Zero total roster
+  # players across 32 teams and every requested season means the API is
+  # down, blocked, or offseason-blackout. That is exactly the silent-failure
+  # class this guard exists to alarm on — the workflow has been green while
+  # writing nothing for three months because there was no such check.
+  #
+  # Note: "roster_players=0 for a single season within the seasons list" is
+  # a legitimate state during the Aug/Sep ramp (the NHL API's `current`
+  # roster endpoint may not yet reflect the upcoming season). We only fail
+  # if the AGGREGATE across all requested seasons is zero.
+  if grand_total_roster_players == 0:
+    print("[populate_player_directory] FAILURE: NHL API returned zero roster players across all 32 teams.")
+    print("[populate_player_directory] This is treated as a hard failure — daily job cannot silently no-op.")
+    return 1
+
+  print("[populate_player_directory] COMPLETE")
   return 0
 
 
