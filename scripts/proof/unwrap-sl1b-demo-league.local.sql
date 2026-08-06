@@ -30,16 +30,16 @@
 -- that would match the same shape — informational; those rows are NOT
 -- touched here.
 --
--- APPLY ORDER (architect ladder step 2 — before v2 apply and before the
--- manual invoke; either order between unwrap and v2 works, but the
--- MANUAL INVOKE must come AFTER BOTH):
+-- APPLY ORDER (architect ladder, 2026-08-06):
 --   1. Rehearsal (INS-6, bridge check)
 --   2. THIS unwrap  ← YOU ARE HERE
 --   3. v2 apply (apply-sl1b-auto-fix-v2.local.sql)
---   4. Manual auto_fix invoke
+--   4. Manual auto_fix invoke (baseline no-op expected post-unwrap)
+--   4.5. Synthetic repair exercise (sl1b-synthetic-repair-exercise.local.sql)
+--        — architect addendum; converts "concat should work" into "watched it repair flat"
 --   5. Manual check_data_integrity invoke
 --   6. Post-heal verify (sl1-post-heal-verify.local.sql — same file as v1)
---   7. Re-enable cron job 4 (final step, pending cron-governance answer per KI-041)
+--   7. Re-enable cron job 4 (final step, pending KI-041 answer)
 -- ============================================================================
 
 \set ON_ERROR_STOP on

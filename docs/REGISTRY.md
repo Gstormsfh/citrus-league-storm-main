@@ -417,7 +417,8 @@ demo-league rows shaped by v1 ships as `unwrap-sl1b-demo-league.local.sql`.
 1. INS-6 rehearsal on prod connection
 2. `unwrap-sl1b-demo-league.local.sql` — repairs the 10 nested rows
 3. `apply-sl1b-auto-fix-v2.local.sql` — replaces function body
-4. Manual `SELECT * FROM auto_fix_integrity_issues();` (COMMITTED)
+4. Manual `SELECT * FROM auto_fix_integrity_issues();` (COMMITTED — baseline no-op expected)
+4.5. `sl1b-synthetic-repair-exercise.local.sql` — architect addendum: remove one uuid from one demo team, invoke auto_fix, assert flat-repair (length + top-level ? + no-nest + no-dup). Converts "concat should work" into "watched it repair flat." Reversible by construction.
 5. Manual `SELECT * FROM check_data_integrity();` (writes fresh sensor rows)
 6. `sl1-post-heal-verify.local.sql` (SAME file as v1 — assertions are shape-agnostic)
 7. Re-enable cron job 4 (FINAL — gated on step 6 outcome + KI-041 answer)
