@@ -23,7 +23,7 @@ import os
 import sys
 import time
 import datetime as dt
-from typing import Dict, Optional, Set
+from typing import Any, Dict, Optional, Set
 import requests
 
 # Bootstrap data_pipeline package so imports work after R4 reorg moved this file
@@ -234,7 +234,7 @@ def get_existing_player_ids(db: SupabaseRest, season: int) -> Set[int]:
     return set()
 
 
-def extract_rich_metadata(details: dict) -> Dict[str, Optional]:
+def extract_rich_metadata(details: dict) -> Dict[str, Any]:
   """Extract rich metadata fields from NHL API player details."""
   metadata = {}
   
