@@ -1,0 +1,54 @@
+name: Data Freshness SLA (hourly)
+
+# Task A2. Wires check_data_freshness.py to an actual scheduler.
+#
+# Prior state: data-pipeline/monitoring/freshness_sla.py declares per-
+# table SLAs and check_data_freshness.py routes breaches through
+# AlertManager (WARN → Slack, PAGE → PagerDuty + Slack). But nothing
+# invoked the script. Docs claim "runs hourly" — the cron did not exist
+# in the repo. As a result the player_directory 168h WARN did not fire
+# for twelve straight weeks. A monitor without a scheduler is a comment.
+#
+# This workflow closes that gap. Runs hourly year-round; the script
+# itself detects in-season vs offseason via nhl_games.
+#
+# Exit codes emitted by check_data_freshness.py:
+#   0 — everything passed
+#   1 — one or more WARNs
+#   2 — one or more FAILs (PAGE-tier breach)
+# Any non-zero fails the workflow so GitHub emails on breach in addition
+# to the Slack/PagerDuty routing AlertManager already performs. Two
+# redundant paths (Slack + email) is intentional — the 12-week silent
+# lapse we're closing here was itself a single-path failure.
+on:
+  schedule:
+    - cron: '0 * * * *'   # top of every hour, UTC
+  workflow_dispatch:
+
+jobs:
+  check-freshness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'data-pipeline/requirements.txt'
+
+      - run: pip install -r data-pipeline/requirements.txt
+
+      - name: Run freshness SLA matrix
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # AlertManager env — same names as every other alert-sending
+          # workflow. If unset AlertManager silently no-ops, which
+          # is the CURRENT state and precisely why we also fail the
+          # workflow on non-zero exit as a second signal path.
+          CITRUS_ALERT_SLACK_WEBHOOK: ${{ secrets.CITRUS_ALERT_SLACK_WEBHOOK }}
+          CITRUS_ALERT_PAGERDUTY_KEY: ${{ secrets.CITRUS_ALERT_PAGERDUTY_KEY }}
+          CITRUS_ALERT_EMAIL: ${{ secrets.CITRUS_ALERT_EMAIL }}
+        run: python data-pipeline/monitoring/check_data_freshness.py

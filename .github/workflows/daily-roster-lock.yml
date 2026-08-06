@@ -1,0 +1,51 @@
+name: Daily Roster Lock (fantasy_daily_rosters, completed dates)
+
+# Task A3. Runs MatchupService.lockCompletedDays via the /api/scheduled
+# router, on a FIXED DAILY TIME cadence (launch-scope decision — per-
+# player puck-drop locking is a v2 feature). Any roster_date whose NHL
+# games are all `status='final'` gets its unlocked fantasy_daily_rosters
+# rows flipped to is_locked=true. Previously reachable only from a
+# commissioner-manual button, which meant rows stayed mutable forever if
+# nobody hit the button — the exact defect a scheduled trigger closes.
+#
+# Cadence: hourly. Idempotent (the service filters .eq('is_locked', false)
+# so already-locked rows are untouched). Overnight the run catches every
+# game that turned final since the prior hour; a stale post-game 'final'
+# flip is captured within an hour.
+on:
+  schedule:
+    - cron: '0 * * * *'   # top of every hour, UTC
+  workflow_dispatch:
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/scheduled/lock-completed-days
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          SCHEDULED_TRIGGER_SECRET: ${{ secrets.SCHEDULED_TRIGGER_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE_URL:-}" ]; then
+            echo "API_BASE_URL secret not set" >&2
+            exit 1
+          fi
+          if [ -z "${SCHEDULED_TRIGGER_SECRET:-}" ]; then
+            echo "SCHEDULED_TRIGGER_SECRET secret not set" >&2
+            exit 1
+          fi
+          RESP=$(mktemp)
+          STATUS=$(curl -sS -o "$RESP" -w "%{http_code}" \
+            -X POST "${API_BASE_URL%/}/api/scheduled/lock-completed-days" \
+            -H "X-Scheduled-Secret: ${SCHEDULED_TRIGGER_SECRET}" \
+            -H "Content-Type: application/json" \
+            --max-time 120)
+          echo "HTTP $STATUS"
+          cat "$RESP"
+          echo
+          if [ "$STATUS" != "200" ]; then
+            echo "lock-completed-days failed (status $STATUS)" >&2
+            exit 1
+          fi

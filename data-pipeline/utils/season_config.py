@@ -21,14 +21,39 @@ adds seasons 2017-2024 to raw_shots) is invisible to end users. Use
 """
 
 import datetime as _dt
-from typing import List, Tuple
-
-CURRENT_SEASON: int = 2025
+from typing import List, Optional, Tuple
 
 
-def live_season_filter(season: int = CURRENT_SEASON) -> Tuple[str, str, int]:
+def _derive_from_today() -> int:
+    """Computed each call — mirrors the SQL get_nhl_season_year(today)."""
+    d = _dt.date.today()
+    return d.year if d.month >= 10 else d.year - 1
+
+
+# CURRENT_SEASON is derived at IMPORT TIME from today's date. This closes
+# the hardcoded-'2025' bug that would have made the projection pipeline
+# read zero rows from raw_shots on 2026-10-01 (raw_shots would already
+# contain season-2026 rows but the filter would still be 2025). For
+# nightly cron jobs (nightly_projection_batch.py, run_daily_projections.py)
+# this is correct — each run reimports and picks up today's value. For
+# any long-running daemon consuming this constant, add a scheduled
+# restart across Oct 1 or switch that daemon to call current_season()
+# each iteration.
+CURRENT_SEASON: int = _derive_from_today()
+
+
+def current_season() -> int:
+    """Always-fresh NHL season year derived from today. Prefer this over
+    the CURRENT_SEASON constant inside any loop, daemon, or long-lived
+    process that must pick up the Oct 1 season flip without a restart.
+    """
+    return _derive_from_today()
+
+
+def live_season_filter(season: Optional[int] = None) -> Tuple[str, str, int]:
     """SupabaseRest filter tuple for the live product path. Drop into any
-    `filters=[...]` list. Default is CURRENT_SEASON.
+    `filters=[...]` list. Defaults to today's derived NHL season year
+    (recomputed on every call — safe inside long-lived processes).
 
     Example:
         rows = db.select(
@@ -37,6 +62,8 @@ def live_season_filter(season: int = CURRENT_SEASON) -> Tuple[str, str, int]:
             filters=[live_season_filter(), ("player_id", "eq", pid)],
         )
     """
+    if season is None:
+        season = _derive_from_today()
     return ("season", "eq", int(season))
 
 

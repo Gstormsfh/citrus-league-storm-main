@@ -49,6 +49,40 @@ scheduledRoutes.use('*', async (c, next) => {
  * team-matchup counts; a mismatch raises HTTP 500 here. Silent partial
  * writes are exactly the failure class this endpoint exists to eliminate.
  */
+/**
+ * POST /api/scheduled/lock-completed-days
+ *
+ * Task A3. Locks fantasy_daily_rosters rows for every roster_date whose
+ * NHL games are all 'final'. Same logic as MatchupService.lockCompletedDays
+ * (previously reachable only from a commissioner-manual endpoint) but
+ * driven by a shared-secret cron trigger — the launch requirement is a
+ * FIXED DAILY TIME lock rather than commissioner-manual, so rows stop
+ * being mutable forever.
+ *
+ * Idempotent: already-locked rows are filtered by `.eq('is_locked', false)`
+ * inside the service, so re-running is a no-op.
+ */
+scheduledRoutes.post('/lock-completed-days', async (c) => {
+  const admin = getSupabaseAdmin();
+  const service = new MatchupService(admin);
+  try {
+    const { lockedCount, error } = await service.lockCompletedDays();
+    if (error) {
+      logger.error('[scheduled.lock-completed-days] failed:', error);
+      return fail(c, AppError.internal(
+        error instanceof Error ? error.message : String(error),
+      ));
+    }
+    logger.info('[scheduled.lock-completed-days] locked_count=', lockedCount);
+    return ok(c, { lockedCount });
+  } catch (err) {
+    logger.error('[scheduled.lock-completed-days] unexpected:', err);
+    return fail(c, AppError.internal(
+      err instanceof Error ? err.message : String(err),
+    ));
+  }
+});
+
 scheduledRoutes.post('/roster-snapshot-today', async (c) => {
   const admin = getSupabaseAdmin();
   const service = new MatchupService(admin);

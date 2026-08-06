@@ -27,7 +27,7 @@ from supabase import create_client, Client
 from datetime import datetime
 from typing import Dict, Optional
 from apply_qoc_adjustments import apply_qoc_to_projections
-from data_pipeline.utils.season_config import CURRENT_SEASON
+from data_pipeline.utils.season_config import current_season
 import logging
 
 logger = logging.getLogger(__name__)
@@ -145,7 +145,7 @@ def get_goalie_games_played() -> Dict[int, int]:
             # inflate games_played. See data_pipeline/utils/season_config.py.
             response = supabase.table('raw_shots').select(
                 'goalie_id, game_id'
-            ).eq('season', CURRENT_SEASON).range(offset, offset + batch_size - 1).execute()
+            ).eq('season', current_season()).range(offset, offset + batch_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break
@@ -241,7 +241,7 @@ def get_player_talent_adjusted_xg() -> Dict[int, float]:
             # get_goalie_games_played above).
             response = supabase.table('raw_shots').select(
                 'player_id, shooting_talent_adjusted_xg, flurry_adjusted_xg, xg_value, game_id'
-            ).eq('season', CURRENT_SEASON).range(offset, offset + batch_size - 1).execute()
+            ).eq('season', current_season()).range(offset, offset + batch_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break

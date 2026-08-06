@@ -189,6 +189,40 @@ export class LineupService {
       return { success: false, error: error.message };
     }
 
+    // Task B: propagate the base-lineup change to TODAY's unlocked
+    // fantasy_daily_rosters rows. Prior state: base-lineup saves wrote
+    // only team_lineups; the 08:00 UTC scheduled_snapshot run had already
+    // fixed today's roster rows, and `ignoreDuplicates` in that upsert
+    // prevented any subsequent same-day edit from taking effect — so a
+    // user who fixed their lineup at noon before puck drop was scored
+    // on the 08:00 version while the UI happily showed the new one.
+    //
+    // Narrow fix: refresh today ONLY, unlocked rows ONLY. The
+    // createDailyRosterSnapshots path already DELETES-non-locked-and-
+    // INSERTs, preserving is_locked=true rows verbatim. We do NOT
+    // propagate to any other date — that is precisely the behavior that
+    // produced the April 2026 fabricated-daily-rosters incident and got
+    // the auto-sync triggers dropped.
+    //
+    // source='scheduled_snapshot' per the standing convention: a base-
+    // lineup save has no explicit user-supplied date and is functionally
+    // the same shape as the 08:00 cron overwrite.
+    try {
+      await this.createDailyRosterSnapshots(
+        teamId,
+        leagueId,
+        lineup,
+        getTodayMST(),
+        'scheduled_snapshot',
+      );
+    } catch (propagateErr) {
+      // Do NOT fail the base-lineup save on propagation error — the
+      // authoritative write (team_lineups) already succeeded. Surface
+      // loudly so ops sees it, but return success to the caller.
+      logger.error('[LineupService.saveLineup] today-propagation failed (base-lineup save succeeded):',
+        propagateErr, 'team:', teamId, 'league:', leagueId);
+    }
+
     return { success: true, data };
   }
 
