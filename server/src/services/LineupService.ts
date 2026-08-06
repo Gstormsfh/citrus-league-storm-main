@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, logger, getTodayMST, getTodayMSTDate } from '@citrus/shared';
+import { COLUMNS, logger, getTodayMST, getTodayMSTDate, getTodayNhlScheduleDate } from '@citrus/shared';
 
 /**
  * LineupService — Server-side lineup management with DI Supabase client.
@@ -204,6 +204,14 @@ export class LineupService {
     // produced the April 2026 fabricated-daily-rosters incident and got
     // the auto-sync triggers dropped.
     //
+    // Task D-04: use getTodayNhlScheduleDate() (ET), not getTodayMST().
+    // fantasy_daily_rosters.roster_date JOINs against
+    // nhl_games.game_date, which is ET-based (NHL schedule convention).
+    // MT diverges from ET for ~2 hours per day (10pm-midnight MT / 12am-
+    // 2am ET); during that window a Task B write keyed on MT-today would
+    // miss the nhl_games row keyed on ET-today, i.e. a late edit for
+    // "tonight" would land on yesterday.
+    //
     // source='scheduled_snapshot' per the standing convention: a base-
     // lineup save has no explicit user-supplied date and is functionally
     // the same shape as the 08:00 cron overwrite.
@@ -212,7 +220,7 @@ export class LineupService {
         teamId,
         leagueId,
         lineup,
-        getTodayMST(),
+        getTodayNhlScheduleDate(),
         'scheduled_snapshot',
       );
     } catch (propagateErr) {
