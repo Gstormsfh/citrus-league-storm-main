@@ -503,7 +503,7 @@ const Profile = () => {
 
     setProcessingWaivers(true);
     try {
-      const result = await WaiverService.processAllPendingWaivers();
+      const result = await WaiverService.processAllPendingWaivers(selectedSettingsLeagueId);
 
       if (!result.success) {
         toast({

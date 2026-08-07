@@ -30,11 +30,10 @@ jobs:
     # Raised from 20 → 60 after the 2026-08-07 kill: the D-07 import fix
     # let the script reach real work for the first time in 90 days, and
     # the Aug/Sep dual-season ramp (2 seasons × 32 teams + per-player NHL
-    # API fetches) legitimately takes longer than 20 minutes on cold
-    # runs. With the season-scoped discovery scan + skip-existing +
-    # per-team incremental flush changes shipped in the same PR, warm
-    # runs should be well under 15 min; 60 is headroom for cold NHL API
-    # bursts and 429 retries without another kill.
+    # API fetches) legitimately takes longer than 20 minutes on cold runs.
+    # With the season-scoped discovery scan + skip-existing + per-team
+    # incremental flush changes from #290, warm runs are well under
+    # 15 min; 60 is headroom for cold NHL API bursts and 429 retries.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4

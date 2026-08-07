@@ -553,32 +553,49 @@ describe('WaiverService.processAllPendingWaivers', () => {
     vi.clearAllMocks();
   });
 
-  it('returns success with results from API', async () => {
+  it('normalises rolling-league response (league_result scalar)', async () => {
     (apiClient.post as any).mockResolvedValue({
       data: {
-        results: [
-          {
-            league_id: 'league-1',
-            league_name: 'Test League',
-            total_processed: 3,
-            successful: 2,
-            failed: 1,
-            details: [],
-          },
-        ],
+        rpc: 'process_all_pending_waivers',
+        league_result: {
+          league_id: 'league-1',
+          league_name: 'Test League',
+          total_processed: 3,
+          successful: 2,
+          failed: 1,
+          details: [],
+        },
       },
     });
 
-    const result = await WaiverService.processAllPendingWaivers();
+    const result = await WaiverService.processAllPendingWaivers('league-1');
     expect(result.success).toBe(true);
     expect(result.results).toHaveLength(1);
     expect(result.results[0].successful).toBe(2);
+    expect(apiClient.post).toHaveBeenCalledWith('/api/waivers/league/league-1/process-all');
+  });
+
+  it('normalises FAAB-league response (claims[] rows)', async () => {
+    (apiClient.post as any).mockResolvedValue({
+      data: {
+        rpc: 'process_faab_waivers_for_league',
+        claims: [
+          { team_id: 't1', status: 'successful' },
+          { team_id: 't2', status: 'failed', failure_reason: 'insufficient budget' },
+        ],
+      },
+    });
+    const result = await WaiverService.processAllPendingWaivers('league-2');
+    expect(result.success).toBe(true);
+    expect(result.results[0].total_processed).toBe(2);
+    expect(result.results[0].successful).toBe(1);
+    expect(result.results[0].failed).toBe(1);
   });
 
   it('returns error when API fails', async () => {
     (apiClient.post as any).mockRejectedValue(new Error('RPC timeout'));
 
-    const result = await WaiverService.processAllPendingWaivers();
+    const result = await WaiverService.processAllPendingWaivers('league-1');
     expect(result.success).toBe(false);
     expect(result.error).toContain('RPC timeout');
     expect(result.results).toEqual([]);
@@ -587,7 +604,7 @@ describe('WaiverService.processAllPendingWaivers', () => {
   it('handles empty results gracefully', async () => {
     (apiClient.post as any).mockResolvedValue({ data: null });
 
-    const result = await WaiverService.processAllPendingWaivers();
+    const result = await WaiverService.processAllPendingWaivers('league-1');
     expect(result.success).toBe(true);
     expect(result.results).toEqual([]);
   });

@@ -440,18 +440,41 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
     roster = fetch_team_roster(team_abbrev)
     time.sleep(0.2)
     team_pending: Dict[int, dict] = {}
+    team_refresh_pending: Dict[int, dict] = {}
     for roster_player in roster:
       total_roster_players += 1
       player_id = _safe_int(roster_player.get("id") or roster_player.get("playerId"), 0)
       if not player_id or player_id in seen:
         continue
-      # SKIP existing-in-directory players — daily re-fetch of 1,000+ bios
-      # was the primary time sink of the 2026-08-07 timeout. Mid-season
-      # trade / team-abbrev refresh is handled by the discovery-scan path
-      # (which sees new player_ids appearing in current-season raw_shots
-      # against their new team). This makes the roster phase a fast-lane
-      # for NEW player_ids only.
       if player_id in existing_ids:
+        # Task E: existing players skip the EXPENSIVE per-player NHL API
+        # bio fetch (that's what the #290 fast lane closed), but we STILL
+        # refresh the CHEAP fields the roster payload already carries —
+        # team_abbrev, position_code, jersey_number, updated_at. Without
+        # this, an October trade leaves the display stuck on the player's
+        # prior team_abbrev all season. Zero extra API calls (the roster
+        # was already fetched). Fields NOT in the roster payload (bio,
+        # headshot, physical) come from the landing endpoint and are
+        # deliberately not refreshed here.
+        raw_pos = roster_player.get("positionCode") or roster_player.get("position") or None
+        position = raw_pos
+        if position == "L":
+          position = "LW"
+        elif position == "R":
+          position = "RW"
+        jersey = roster_player.get("sweaterNumber")
+        refresh_row = {
+          "season": season,
+          "player_id": player_id,
+          "team_abbrev": team_abbrev,
+          "updated_at": _now_iso(),
+        }
+        if position:
+          refresh_row["position_code"] = position
+        if jersey is not None:
+          refresh_row["jersey_number"] = str(jersey)
+        team_refresh_pending[player_id] = refresh_row
+        seen[player_id] = refresh_row
         roster_skipped_existing += 1
         continue
       player_data = process_player_from_api(player_id, season, team_abbrev)
@@ -461,15 +484,16 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
         roster_processed += 1
       current_time = time.time()
       if current_time - last_progress_time >= 15:
-        print(f"  [PROGRESS] Processed {total_roster_players} roster players ({roster_processed} new, {roster_skipped_existing} skipped-existing, {len(seen)} total)...")
+        print(f"  [PROGRESS] Processed {total_roster_players} roster players ({roster_processed} new, {roster_skipped_existing} refreshed-existing, {len(seen)} total)...")
         last_progress_time = current_time
     # Per-team flush: land what we have for this team before moving on,
     # so a timeout mid-way through the 32-team loop leaves earlier teams
     # in the directory rather than losing everything.
-    total_upserted += _flush_batch(db, team_pending, f"roster team={team_abbrev} season={season}")
+    total_upserted += _flush_batch(db, team_pending, f"roster team={team_abbrev} season={season} NEW")
+    total_upserted += _flush_batch(db, team_refresh_pending, f"roster team={team_abbrev} season={season} REFRESH")
 
   print(f"[populate_player_directory][season={season}] Fetched {total_roster_players} roster players across {len(TEAMS)} teams "
-        f"({roster_processed} new, {roster_skipped_existing} skipped-existing)")
+        f"({roster_processed} new, {roster_skipped_existing} refreshed-existing)")
 
   if total_upserted:
     print(f"[populate_player_directory][season={season}] OK: total upserted this season = {total_upserted}")

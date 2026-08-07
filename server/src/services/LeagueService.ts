@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS } from '@citrus/shared';
+import { COLUMNS, logger } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
@@ -231,6 +231,20 @@ export class LeagueService {
   ) {
     await this.membership.requireCommissioner(leagueId, userId);
 
+    // Read prior waiver_type + faabBudget so we can detect a flip TO faab
+    // and seed budgets for existing teams. `join_league_with_code` seeds
+    // FAAB budgets for the joining team only when the league is ALREADY
+    // faab at join time — a subsequent flip via this endpoint left every
+    // team without a budget row, which is why faab_budgets is empty in
+    // prod today.
+    const { data: priorLeague } = await this.supabase
+      .from('leagues')
+      .select('waiver_type, settings')
+      .eq('id', leagueId)
+      .single();
+    const priorType = (priorLeague?.waiver_type as string) || 'rolling';
+    const priorSettings = (priorLeague?.settings as Record<string, unknown>) || {};
+
     const { error } = await this.supabase
       .from('leagues')
       .update({
@@ -243,11 +257,55 @@ export class LeagueService {
       })
       .eq('id', leagueId);
 
-    if (!error) {
-      await this.notifyLeagueMembers(leagueId, 'Waiver settings have been updated by the commissioner.');
+    if (error) {
+      return { success: false, error };
     }
 
-    return { success: !error, error };
+    // FAAB budget seeding — fires on flip to faab AND on every save while
+    // faab (idempotent via ON CONFLICT DO NOTHING). Uses admin client to
+    // bypass RLS since the "system manages updates" policy on
+    // faab_budgets requires service_role.
+    const wantsFaab = settings.waiver_type === 'faab';
+    const flipToFaab = wantsFaab && priorType !== 'faab';
+    if (wantsFaab || flipToFaab) {
+      const admin = getSupabaseAdmin();
+      const initialBudget = Number(
+        (priorSettings as { faabBudget?: number }).faabBudget ?? 100,
+      );
+      const { data: teams } = await admin
+        .from('teams')
+        .select('id')
+        .eq('league_id', leagueId);
+      const rows = ((teams || []) as Array<{ id: string }>).map(t => ({
+        league_id: leagueId,
+        team_id: t.id,
+        initial_budget: initialBudget,
+        remaining_budget: initialBudget,
+      }));
+      if (rows.length > 0) {
+        // upsert with ON CONFLICT DO NOTHING semantics — existing budgets
+        // (mid-season flip, prior season carryover) are preserved.
+        const { error: budgetErr } = await admin
+          .from('faab_budgets')
+          .upsert(rows, {
+            onConflict: 'league_id,team_id',
+            ignoreDuplicates: true,
+          });
+        if (budgetErr) {
+          logger.error('[updateWaiverSettings] faab_budgets seed failed:',
+            budgetErr, 'league:', leagueId, 'teams:', rows.length);
+          // Do NOT fail the settings save — the league record is already
+          // updated. Surface the seed failure loudly for ops.
+        } else {
+          logger.info('[updateWaiverSettings] seeded faab_budgets for',
+            rows.length, 'teams in league', leagueId, 'initialBudget=', initialBudget);
+        }
+      }
+    }
+
+    await this.notifyLeagueMembers(leagueId, 'Waiver settings have been updated by the commissioner.');
+
+    return { success: true, error: null };
   }
 
   /** Update scoring settings (commissioner only, locked after games scored) */
