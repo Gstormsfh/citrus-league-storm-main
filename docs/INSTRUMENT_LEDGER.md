@@ -872,12 +872,32 @@ because in-memory cursor was stale relative to a rewound DB (fixture
 reset dropped seqs 2-14; wrote fresh seq 1; engine memory carried
 cursor 14 from the completed run).
 
-**Why in-memory lobby survived across runs.** M1(d) confirms lobby
-idle-reap requires `connectionCount === 0`. Rig's prior observer WS
-was a Promise (INS-13 root), never actually closed → connection count
-never returned to zero → reap never fired. Lobby persisted with
-completed status + cursor 14 for 24+ hours. Fixture reset touched DB
-but not engine memory; run #2 landed into the corrupt-in-memory lobby.
+**Why in-memory lobby survived across runs (CORRECTED per architect
+addendum 2026-08-07 AM connection-ledger forensics).** ORIGINAL DRAFT
+of this section pointed at the rig's socket-cleanup bug as the root
+cause of lobby immortality. **That was WRONG.** Connection-ledger
+evidence shows:
+- **Smoke lobby WAS reaped** between 23:27Z and 00:09Z Aug 6-7. Reap
+  path proven — the smoke's 12 harness clients closed cleanly to
+  connectionCount=0 and the idle-reap scanner did its job. (Confirmed
+  inference: run #1's seq-1 applied fresh with broadcast + flip + arm,
+  which is impossible against cursor 37 from the smoke — the lobby
+  had to have been reaped and reconstructed.)
+- **The connection that kept the run #1 lobby immortal was a REAL
+  USER** (`c4489220` — browser tab connected 00:09:48Z, never closed).
+  Legitimate live client. Engine behavior CORRECT — reap-exempt while
+  connectionCount ≥ 1 is the intended semantics.
+- The rig's own observer socket DID close (observer died at assert C
+  in ~5s per rig log, BEFORE harness spawn). Rig cleanup was NOT the
+  causal chain here.
+- **Fixture reset dropped DB seqs 2-14, wrote fresh seq 1.** Run #2's
+  duplicate-skip against the real-user-preserved cursor 14 stands as
+  the mechanism.
+
+**INS-13-follow-up (rig cleanup) fix is still correct as prophylactic**
+— any future rig invocation should not depend on graceful WS closes,
+and the Amendment 2 machinery ensures rig-authored sockets close on
+every exit path. But it's not the "why the lobby survived" answer.
 
 **Fix (this session, author-only).** Rig redesign (see file header of
 `scripts/proof/lifecycle-acceptance-f27.local.mjs`):
@@ -974,6 +994,15 @@ start" evolves. The new STEP 6 scenario:
 5. Assert DB completion + `draft_completed` event + engine autopick
    log lines (verified out-of-band via docker logs over SSH).
 
+**UPGRADE per architect addendum 2026-08-07 AM.** Zero-client autopick
+capability was **observed in vivo** during run #1: observer died at
+assert C in ~5s BEFORE the harness could spawn; the 12 picks to seq
+14 that landed 00:10-00:16Z were **the engine's autopick cascade**
+(timer → handleClockExpired → autopick × 12 → F24 emitter → F26
+teardown, fully autonomous). Amendment 7's rig is now **confirmation,
+not exploration** — the mechanism is already proven; the rig
+re-witnesses it in controlled conditions with pre-registered asserts.
+
 Nobody-ever-joined case (NOTIFY arrives, no lobby exists) is F23 —
 `LobbyRegistry.ts` needs a DB-side scan for vanished lobbies. Out of
 F26/F27 scope; task #20 tracks.
@@ -983,3 +1012,41 @@ ignition first-join must arm from a possibly-past deadline (if wait
 before join exceeded pick_time). F20 identity/wallclock guards
 (`LobbyManager.ts:4179+`) own the immediate-fire case. Acceptance
 must watch for those log lines.
+
+### Findings from the connection-ledger forensics (architect addendum 2026-08-07 AM)
+
+Recorded here for the campaign record — not INS entries themselves,
+but material observations that reshape the tonight-of narrative:
+
+1. **Reap path PROVEN.** Smoke lobby got reaped between 23:27Z and
+   00:09Z. `LobbyRegistry.scanIdleLobbies` (10-min idle, 3-min scan)
+   does its job when connections truly drop to zero + status ∈
+   {not_started, completed, cancelled}. This closes an open
+   observability question — reap was documented but not previously
+   witnessed in operational logs.
+2. **F23 empirical priority strengthened.** Overnight DB verdict:
+   fixture league untouched for 9.5 hours — seq 1, in_progress,
+   expired deadline. NO sweeper exists anywhere in the system that
+   would catch this. F27 brief Q2 (which assumed scanClockLiveness
+   covered this class) is FORMALLY CORRECTED — scanner is live-
+   in-progress-lobbies only, not registry-blind stalls. F23 (task
+   #20) is now the natural inheritor with concrete evidence.
+3. **Zero-client autopick capability observed in vivo.** Run #1's
+   12-pick cascade AFTER observer death is direct evidence. F24
+   emitter + F26 teardown both fire under fully-autonomous
+   conditions. THE TWELVE has an even stronger safety net than
+   originally scoped — if all 12 human clients drop mid-draft,
+   engine still completes the draft on schedule.
+4. **F27b "socket-liveness purge" DOWNGRADED.** Original F27b
+   parked-list item envisioned a scanner that force-purges zombie
+   sockets after heartbeat-timeout × 3. Not needed absent evidence
+   of true dead-socket lingering. The one immortal connection this
+   session was a REAL user's browser tab (legitimate live client);
+   engine reap-exempt behavior for in_progress + connectionCount≥1
+   was correct. Item removed from F27b parked list.
+5. **F27b guard-refusal WARN log (freebie item 2) STAYS.** Even in
+   a REAL-user scenario where the guard would legitimately refuse
+   during bootstrap-replay against an already-in-progress lobby,
+   the WARN log is useful observability — it distinguishes
+   "expected replay skip" from "stale-status ignition failure."
+   Landed in this session's commit for next-engine-deploy ride.
