@@ -496,9 +496,13 @@ async function runLifecycleMode() {
     log('  NOTE: docker-logs-over-SSH verification required — architect adjudicates.');
     log('  Query template (Garrett runs; DO NOT use gcloud logging read — VM stdout is docker-only):');
     log(`    gcloud compute ssh citrus-draft-engine-staging \\`);
-    log(`      --zone=northamerica-northeast1-a --project=citrus-fantasy-staging --quiet \\`);
-    log(`      --command="sudo docker logs citrus-draft-engine --since 5m 2>&1 | grep -i 'clock fired'"`);
-    log('  Expected: ZERO output rows.');
+    log(`      --zone=northamerica-northeast1-a --quiet \\`);
+    log(`      --command="sudo docker logs citrus-draft-engine --since 15m 2>&1 | grep -i 'clock fired'; echo END-OF-E-CHECK"`);
+    log('  Expected: only END-OF-E-CHECK line (zero clock-fired hits).');
+    log('  (A3 template: no --project flag [uses configured default];');
+    log('   --since 15m widens absence-claim window; ; echo END-OF-E-CHECK');
+    log('   inside remote cmd rescues SSH pipeline from grep-zero-match');
+    log('   exit-1 dressing up as SSH failure — established gotcha.)');
 
     log('');
     log('── ASSERT F (degraded) — secondary observer completion coverage ──');
@@ -589,9 +593,11 @@ async function runAbandonedMidDraftMode() {
     log('  NOTE: autopick log-line verification requires docker-logs-over-SSH.');
     log('  Query template (Garrett runs):');
     log(`    gcloud compute ssh citrus-draft-engine-staging \\`);
-    log(`      --zone=northamerica-northeast1-a --project=citrus-fantasy-staging --quiet \\`);
-    log(`      --command="sudo docker logs citrus-draft-engine --since 30m 2>&1 | grep -E 'autopick|pick.processed' | wc -l"`);
-    log(`  Expected: at least ${expectedPicks} pick.processed lines with wasAutopick=true.`);
+    log(`      --zone=northamerica-northeast1-a --quiet \\`);
+    log(`      --command="sudo docker logs citrus-draft-engine --since 30m 2>&1 | grep -E 'autopick|pick.processed' | wc -l; echo END-OF-AUTOPICK-COUNT"`);
+    log(`  Expected: at least ${expectedPicks} pick.processed lines with wasAutopick=true,`);
+    log('  then END-OF-AUTOPICK-COUNT marker line.');
+    log('  (A3 template: no --project [default]; marker rescues wc-0 → SSH-1 dressup.)');
 
     log('');
     log('── ABANDONED-MID-DRAFT RIG PASS — engine self-completed to end ──');

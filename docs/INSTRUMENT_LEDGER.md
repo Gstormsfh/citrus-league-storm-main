@@ -1050,3 +1050,25 @@ but material observations that reshape the tonight-of narrative:
    the WARN log is useful observability — it distinguishes
    "expected replay skip" from "stale-status ignition failure."
    Landed in this session's commit for next-engine-deploy ride.
+
+### A4 deployment-image note (F26+F27 close certifies commit 8b7b43f6)
+
+**Today's F26+F27 close certifies DEPLOYED image `8b7b43f6` @
+`sha256:881024ba…`.** The LobbyManager `draft_started_apply.skipped_stale_status`
+WARN log (freebie item 2, committed today at `7159a982` in
+`server/src/draft/LobbyManager.ts`) is **NOT in that image** — it
+rides the next engine deploy with standard §15.14 boot verification.
+
+**Next deploy does NOT require re-running this acceptance.** The
+WARN log is pure observability with zero behavior change (guard
+still refuses; log is additive). The next deploy's boot verification
+covers the additive line via standard §15.14 checks (deployment.
+fingerprint match, hono/uws bindings, event_subscription self-test,
+watchdog started, LobbyRegistry init). No F26/F27 re-cert required.
+
+**Typecheck evidence (A4 gate, 2026-08-07 AM).** `npm run build:server`
+run against the WARN diff produced identical output to pre-diff
+baseline: 4 PRE-EXISTING errors (draftAdminRoutes tests × 2,
+draftRoutes.f14 test mock, systemFlags.ts:96 = KI-027 task #22).
+**Zero new errors from `LobbyManager.ts`.** packages/shared builds
+clean. WARN diff is compile-safe for the next deploy.
