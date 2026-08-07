@@ -25,14 +25,19 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 def fetch_raw_shots(game_id=None, player_id=None, date_from=None, date_to=None, limit=None):
     """
     Fetch raw shot data from database with optional filters.
-    
+
+    NOTE: raw_shots is MULTI-SEASON since phase 0c (seasons 2017-2024
+    backfilled alongside the current season). Callers that want a single
+    season should pass game_id or date_from/date_to; an unfiltered call
+    now returns the full historical corpus.
+
     Args:
         game_id: Filter by specific game ID (integer)
         player_id: Filter by specific player ID (integer)
         date_from: Filter shots from this date onwards (YYYY-MM-DD)
         date_to: Filter shots up to this date (YYYY-MM-DD)
         limit: Maximum number of records to return
-    
+
     Returns:
         pandas.DataFrame with shot data
     """

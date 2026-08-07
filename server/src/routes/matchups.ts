@@ -9,7 +9,7 @@ import { MatchupService } from '../services/MatchupService';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
-import { logger, COLUMNS } from '@citrus/shared';
+import { logger, COLUMNS, getCurrentSeason } from '@citrus/shared';
 
 const matchupRoutes = new Hono<Env>();
 
@@ -150,7 +150,10 @@ matchupRoutes.get('/league/:leagueId/simulations', membershipMiddleware, async (
 // GET /api/matchups/league/:leagueId/brier-score — Get Brier score for a league
 matchupRoutes.get('/league/:leagueId/brier-score', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
-  const season = parseInt(c.req.query('season') || '2025', 10);
+  // Derived — the prior '2025' literal default would have returned last
+  // season's Brier score forever after 2026-10-01 for any caller that
+  // omits the ?season= query param.
+  const season = parseInt(c.req.query('season') || String(getCurrentSeason()), 10);
   const supabase = createUserClient(c.get('userToken'));
 
   const { data, error } = await supabase

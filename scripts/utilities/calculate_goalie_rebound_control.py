@@ -19,12 +19,19 @@ AdjRP = (Total Rebound Shots After Saves) / (Total Saves - Puck Freezes)
 Lower AdjRP = Better (fewer rebounds allowed)
 """
 
+import argparse
 import pandas as pd
 import numpy as np
 from datetime import datetime
 import os
+import sys
 from dotenv import load_dotenv
 from supabase import create_client, Client
+
+# Shared season constant — one source of truth for the data-pipeline.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "data-pipeline"))
+from data_pipeline.utils.season_config import CURRENT_SEASON  # noqa: E402
 
 # Load environment variables
 load_dotenv()
@@ -40,34 +47,44 @@ if not supabase_url or not supabase_key:
 supabase: Client = create_client(supabase_url, supabase_key)
 
 
-def load_shots_with_rebound_data():
+def load_shots_with_rebound_data(seasons=None):
     """
     Load shots data with rebound tracking information.
-    
+
+    Args:
+        seasons: iterable of season start-years. Default [CURRENT_SEASON] —
+            phase 0c backfilled 2017-2024 into raw_shots; this default keeps
+            behavior unchanged. Pass multi-season list via --seasons to opt in.
+
     Returns:
         DataFrame with columns: goalie_id, game_id, period, time_remaining_seconds,
         is_goal, shot_was_on_goal, shot_goalie_froze, shot_generated_rebound,
         time_since_last_event, is_rebound, team_code, event_owner_team_id
     """
+    if seasons is None:
+        seasons = [CURRENT_SEASON]
+    seasons_list = [int(s) for s in seasons]
+
     print("=" * 80)
     print("LOADING SHOTS DATA FOR REBOUND TRACKING")
     print("=" * 80)
-    
+    print(f"  seasons filter: {seasons_list}")
+
     print("Loading from Supabase raw_shots table...")
     print("(Using pagination to fetch all records)")
-    
+
     try:
         all_shots = []
         offset = 0
         batch_size = 1000
-        
+
         while True:
             response = supabase.table('raw_shots').select(
                 'goalie_id, game_id, period, time_remaining_seconds, '
                 'is_goal, shot_was_on_goal, shot_goalie_froze, shot_generated_rebound, '
                 'time_since_last_event, is_rebound, team_code, event_owner_team_id, '
                 'is_empty_net, time_in_period, sort_order'
-            ).range(offset, offset + batch_size - 1).execute()
+            ).in_('season', seasons_list).range(offset, offset + batch_size - 1).execute()
             
             if not response.data or len(response.data) == 0:
                 break
@@ -360,14 +377,31 @@ def store_rebound_control(goalie_stats):
 
 def main():
     """Main execution function."""
+    parser = argparse.ArgumentParser(description="Calculate goalie rebound-control (AdjRP).")
+    parser.add_argument(
+        "--seasons",
+        type=str,
+        default=str(CURRENT_SEASON),
+        help=(
+            f"Comma-separated season start-years (default: {CURRENT_SEASON}). "
+            "Behavior unchanged from pre-phase-0c; opt into multi-season corpus explicitly."
+        ),
+    )
+    args = parser.parse_args()
+    try:
+        seasons = [int(s.strip()) for s in args.seasons.split(",") if s.strip()]
+    except ValueError as e:
+        raise SystemExit(f"--seasons parse error: {e}")
+
     print("=" * 80)
     print("GOALIE REBOUND CONTROL CALCULATION")
     print("=" * 80)
     print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Seasons: {seasons}")
     print("=" * 80)
-    
+
     # Load shots data
-    df = load_shots_with_rebound_data()
+    df = load_shots_with_rebound_data(seasons=seasons)
     if df is None or len(df) == 0:
         print("ERROR: Failed to load shots data")
         return

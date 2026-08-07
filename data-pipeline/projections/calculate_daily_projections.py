@@ -94,7 +94,11 @@ else:
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
-DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+from data_pipeline.utils.season_config import current_season as _current_season
+# Derived from today's date at import time; env override still honored for
+# manual backfills of historical seasons. The former hardcoded '2025'
+# fallback would have silently misfiled every 2026-10-01+ projection.
+DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON")) if os.getenv("CITRUS_DEFAULT_SEASON") else _current_season()
 
 # Cache version: Bump this whenever the projection data sources or model change.
 # This invalidates all cached projections from previous versions, forcing recalculation.
@@ -596,12 +600,15 @@ def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) ->
 
     actual_goals = float(player_stats[0].get("nhl_goals", 0))
     
-    # Get xG total from raw_shots (prefer shooting_talent_adjusted_xg)
+    # Get xG total from raw_shots (prefer shooting_talent_adjusted_xg).
+    # Live product path: filter by the caller's season. raw_shots is
+    # multi-season since phase 0c backfilled 2017-2024, so an unfiltered
+    # read would sum career xG into the current-season finishing-talent ratio.
     try:
         shots = db.select(
             "raw_shots",
             select="shooting_talent_adjusted_xg,flurry_adjusted_xg,xg_value",
-            filters=[("player_id", "eq", player_id)],
+            filters=[("player_id", "eq", player_id), ("season", "eq", season)],
             limit=10000  # Large limit to get all shots
         )
         

@@ -50,12 +50,18 @@ def load_shots_with_pagination(
 ) -> pd.DataFrame:
     """
     Load shots data from raw_shots table with pagination.
-    
+
+    NOTE: raw_shots is MULTI-SEASON since phase 0c (seasons 2017-2024
+    backfilled alongside the current season). Callers that want a single
+    season MUST pass filters={'season': <year>}; unfiltered calls now
+    return the full historical corpus.
+
     Args:
         columns: List of column names to select
-        filters: Optional dictionary of filters (e.g., {'is_empty_net': False})
+        filters: Optional dictionary of filters (e.g., {'is_empty_net': False,
+                 'season': 2025})
         batch_size: Number of records per batch
-    
+
     Returns:
         DataFrame with all matching records
     """

@@ -15,6 +15,11 @@ Exports the full `raw_shots` table from Supabase to a local CSV (batched/paginat
 Why this exists:
 - Avoids re-scraping NHL API (works entirely from Supabase)
 - Produces a stable "season snapshot" file for spreadsheets / comparisons
+
+NOTE: raw_shots is MULTI-SEASON since phase 0c (seasons 2017-2024
+backfilled alongside the current season). This exporter now emits the full
+historical corpus unless the caller adds a season filter. Consider slicing
+downstream if you specifically wanted a single-season snapshot.
 """
 
 from __future__ import annotations

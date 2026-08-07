@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, logger, getTodayMST, getTodayMSTDate } from '@citrus/shared';
+import { COLUMNS, logger, getTodayMST, getTodayMSTDate, getTodayNhlScheduleDate } from '@citrus/shared';
 
 /**
  * LineupService — Server-side lineup management with DI Supabase client.
@@ -189,6 +189,48 @@ export class LineupService {
       return { success: false, error: error.message };
     }
 
+    // Task B: propagate the base-lineup change to TODAY's unlocked
+    // fantasy_daily_rosters rows. Prior state: base-lineup saves wrote
+    // only team_lineups; the 08:00 UTC scheduled_snapshot run had already
+    // fixed today's roster rows, and `ignoreDuplicates` in that upsert
+    // prevented any subsequent same-day edit from taking effect — so a
+    // user who fixed their lineup at noon before puck drop was scored
+    // on the 08:00 version while the UI happily showed the new one.
+    //
+    // Narrow fix: refresh today ONLY, unlocked rows ONLY. The
+    // createDailyRosterSnapshots path already DELETES-non-locked-and-
+    // INSERTs, preserving is_locked=true rows verbatim. We do NOT
+    // propagate to any other date — that is precisely the behavior that
+    // produced the April 2026 fabricated-daily-rosters incident and got
+    // the auto-sync triggers dropped.
+    //
+    // Task D-04: use getTodayNhlScheduleDate() (ET), not getTodayMST().
+    // fantasy_daily_rosters.roster_date JOINs against
+    // nhl_games.game_date, which is ET-based (NHL schedule convention).
+    // MT diverges from ET for ~2 hours per day (10pm-midnight MT / 12am-
+    // 2am ET); during that window a Task B write keyed on MT-today would
+    // miss the nhl_games row keyed on ET-today, i.e. a late edit for
+    // "tonight" would land on yesterday.
+    //
+    // source='scheduled_snapshot' per the standing convention: a base-
+    // lineup save has no explicit user-supplied date and is functionally
+    // the same shape as the 08:00 cron overwrite.
+    try {
+      await this.createDailyRosterSnapshots(
+        teamId,
+        leagueId,
+        lineup,
+        getTodayNhlScheduleDate(),
+        'scheduled_snapshot',
+      );
+    } catch (propagateErr) {
+      // Do NOT fail the base-lineup save on propagation error — the
+      // authoritative write (team_lineups) already succeeded. Surface
+      // loudly so ops sees it, but return success to the caller.
+      logger.error('[LineupService.saveLineup] today-propagation failed (base-lineup save succeeded):',
+        propagateErr, 'team:', teamId, 'league:', leagueId);
+    }
+
     return { success: true, data };
   }
 
@@ -313,8 +355,25 @@ export class LineupService {
       (existingRecords || []).map((r: { roster_date: string }) => r.roster_date),
     );
 
-    // Only backfill dates that have zero records
-    const datesToFill = weekDates.filter(d => !datesWithData.has(d));
+    // Task 1B: refuse to fabricate roster rows for past dates. We do not
+    // know what the lineup was on a past date — writing anything here is
+    // guessing, and it silently locks the guess. Only backfill today and
+    // future dates that have zero records; past dates that lack rows must
+    // remain missing so scoring can treat them honestly.
+    const todayStr = getTodayMST();
+    const skippedPastDates: string[] = [];
+    const datesToFill = weekDates.filter(d => {
+      if (datesWithData.has(d)) return false;
+      if (d < todayStr) {
+        skippedPastDates.push(d);
+        return false;
+      }
+      return true;
+    });
+    if (skippedPastDates.length > 0) {
+      logger.warn('[backfillMissingDailyRosters] refused past dates:', skippedPastDates,
+        'team:', teamId, 'matchup:', matchupId);
+    }
 
     const recordsToInsert: Array<Record<string, unknown>> = [];
 
@@ -331,6 +390,10 @@ export class LineupService {
             slot_id: slotType !== 'bench' ? (slotAssignments[playerId] || null) : null,
             is_locked: true,
             locked_at: new Date().toISOString(),
+            // Task 1B: label the provenance. This writer is inferring
+            // today/future rows from the current base team_lineups; that
+            // is the definition of 'reconstructed'.
+            source: 'reconstructed',
           });
         }
       };
@@ -545,11 +608,17 @@ export class LineupService {
    * Create daily roster snapshots for current matchup week.
    * Respects game locks — never overwrites locked records.
    */
-  private async createDailyRosterSnapshots(
+  // Note: `source` is defaulted to 'user_edit' because the only path that
+  // reaches this without an explicit source override is a per-day user
+  // lineup save (LineupService.saveLineup with target_date). Every other
+  // caller (scheduled snapshot, reconstructed backfill) MUST pass its own
+  // source label.
+  public async createDailyRosterSnapshots(
     teamId: string,
     leagueId: string,
     lineup: { starters: string[]; bench: string[]; ir: string[]; slot_assignments: Record<string, string> },
     targetDate: string,
+    source: 'scheduled_snapshot' | 'user_edit' | 'reconstructed' = 'user_edit',
   ) {
     // Get current matchup for this team
     const todayStr = getTodayMST();
@@ -654,6 +723,7 @@ export class LineupService {
             slot_id: slotType !== 'bench' ? (lineup.slot_assignments[playerId] || null) : null,
             is_locked: locked,
             locked_at: locked ? new Date().toISOString() : null,
+            source,
           });
         }
       };

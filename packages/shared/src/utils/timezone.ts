@@ -4,10 +4,17 @@
  */
 
 const MOUNTAIN_TIMEZONE = 'America/Denver';
+const NHL_SCHEDULE_TIMEZONE = 'America/New_York';
 
 /**
  * Get today's date string in Mountain Time (YYYY-MM-DD)
- * This ensures consistent date comparisons regardless of user's local timezone
+ * This ensures consistent date comparisons regardless of user's local timezone.
+ *
+ * NOTE: For anything that JOINs against nhl_games.game_date /
+ * player_game_stats.game_date use `getTodayNhlScheduleDate()` instead —
+ * NHL's official schedule uses ET, and `getTodayMST()` diverges from
+ * `nhl_games.game_date` for late west-coast games during the 10pm MT /
+ * midnight-ET window.
  */
 export function getTodayMST(): string {
   const now = new Date();
@@ -18,12 +25,42 @@ export function getTodayMST(): string {
     month: '2-digit',
     day: '2-digit'
   });
-  
+
   const parts = formatter.formatToParts(now);
   const year = parts.find(p => p.type === 'year')?.value || '';
   const month = parts.find(p => p.type === 'month')?.value || '';
   const day = parts.find(p => p.type === 'day')?.value || '';
-  
+
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Get today's date string in the NHL's schedule timezone (ET).
+ *
+ * This is the correct "today" for any write that keys against
+ * nhl_games.game_date or player_game_stats.game_date. NHL's official
+ * schedule endpoint (`/v1/schedule/YYYY-MM-DD`) uses ET as the reference,
+ * and every row in nhl_games inherits that convention via the ingester
+ * (data-pipeline/acquisition/ingest_playoff_schedule.py:160 sets
+ * game_date=ds where ds is the ISO date iterated against /schedule/).
+ *
+ * `getTodayMST()` diverges from this convention for ~2 hours per day —
+ * from 10:00pm MT (=12:00am ET next day) until midnight MT — which is
+ * precisely the window in which a west-coast late edit for tonight's
+ * game would write to the wrong roster_date and miss the scoring join.
+ */
+export function getTodayNhlScheduleDate(): string {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: NHL_SCHEDULE_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = formatter.formatToParts(now);
+  const year = parts.find(p => p.type === 'year')?.value || '';
+  const month = parts.find(p => p.type === 'month')?.value || '';
+  const day = parts.find(p => p.type === 'day')?.value || '';
   return `${year}-${month}-${day}`;
 }
 

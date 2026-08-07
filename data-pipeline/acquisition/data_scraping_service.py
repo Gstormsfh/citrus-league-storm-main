@@ -505,11 +505,20 @@ def run_unified_loop() -> Tuple[str, int]:
     
     try:
         with ThreadPoolExecutor(max_workers=min(len(games), 20)) as executor:
-            # Submit all games for parallel processing
-            future_to_game = {
-                executor.submit(process_single_game, g['game_id'], g.get('game_date', today)): g
-                for g in games
-            }
+            # Submit all games for parallel processing. game_date comes from
+            # nhl_games; if a row lacks game_date SKIP it rather than fall
+            # back to today (Task D-03 — falling back to today is exactly
+            # how 22,082 rows got misdated).
+            future_to_game = {}
+            for g in games:
+                gd = g.get('game_date')
+                if not gd:
+                    logger.warning(
+                        f"[scraper] skipping game_id={g.get('game_id')} — "
+                        f"nhl_games row has no game_date; refusing to fall back to today"
+                    )
+                    continue
+                future_to_game[executor.submit(process_single_game, g['game_id'], gd)] = g
             
             # Collect results as they complete
             for future in as_completed(future_to_game):

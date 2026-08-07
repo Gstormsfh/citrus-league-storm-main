@@ -265,7 +265,7 @@ def process_single_game_json(raw_json, game_id):
         
         # Calculate derived features
         if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
-            df_shots['distance_angle_interaction'] = (df_shots['distance'] * df_shots['angle']) / 100
+            df_shots['distance_angle_interaction'] = (df_shots['distance'] * df_shots['angle'].abs()) / 100  # 0E-XG-5: parity with train_xg_v3.py:240
         
         if 'speed_from_last_event' in df_shots.columns:
             speed_series = pd.to_numeric(df_shots['speed_from_last_event'], errors='coerce').fillna(0)
@@ -283,7 +283,7 @@ def process_single_game_json(raw_json, game_id):
                     df_shots[feature] = 0
                 elif feature == 'distance_angle_interaction':
                     if 'distance' in df_shots.columns and 'angle' in df_shots.columns:
-                        df_shots[feature] = (df_shots['distance'] * df_shots['angle']) / 100
+                        df_shots[feature] = (df_shots['distance'] * df_shots['angle'].abs()) / 100  # 0E-XG-5: parity with train_xg_v3.py:240
                     else:
                         df_shots[feature] = 0
                 elif feature == 'speed_from_last_event_log':

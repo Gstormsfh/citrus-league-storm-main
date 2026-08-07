@@ -47,6 +47,7 @@ from projection_uncertainty import (
     SKATER_STATS,
     DEFAULT_SCORING_WEIGHTS,
 )
+from data_pipeline.utils.season_config import current_season
 
 np.random.seed(42)
 START = time.time()
@@ -111,7 +112,7 @@ def make_player(archetype_key, rng, noise_scale=0.08):
         "confidence_score": p["conf"],
         "finishing_multiplier": p["fin"],
         "opponent_adjustment": opp_adj,
-        "season": 2025,
+        "season": current_season(),
     }
     proj["total_projected_points"] = sum(
         proj[f"projected_{s}"] * DEFAULT_SCORING_WEIGHTS[s] for s in SKATER_STATS
