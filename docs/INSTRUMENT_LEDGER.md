@@ -699,3 +699,151 @@ future features that change scaffold-adjacent surfaces:
    preflight assertion in its rig — the rig's refusal-with-clear-
    error IS the discipline that catches the missed scaffold update.
    F27's `preflightNotStarted()` did exactly this on first-run.
+
+### INS-13 — F27 lifecycle rig assert-C matcher blind to wire envelope (shakedown iteration #2, ENGINE ACQUITTED)
+
+**Field record (2026-08-06 STEP 5 second-run attempt, post-INS-12 un-arm).**
+After INS-12's manual un-arm cleared preflight, the rig proceeded
+to `ASSERT C — observer received draft_started frame` and
+FAILED with `observer received draft_started frame within 3s`
+timing out. **Engine ACQUITTED** by architect's log-based
+verification: Cloud Logging at `2026-08-06T00:09:46.972Z` shows
+`external_event.applied seq=1 event_type=draft_started
+broadcasted=true notifyToBroadcastMs=42 lobbySize=1` — the observer
+was connected, the frame reached the wire, F26+F27's broadcast path
+worked correctly. The rig's matcher was reading the wrong shape.
+
+**Instrument.** `scripts/proof/lifecycle-acceptance-f27.local.mjs`
+assert-C matcher (both `--mode=lifecycle` and its C-mandatory
+sibling; `--mode=zero-client` had the same collection pattern but
+didn't rely on the matcher).
+
+**Failure mode.** `false-red` on the correct wire event. Rig
+mistakenly nested the matcher: assumed `observerFrames[i].frame`
+was the parsed message envelope, but per `lib/ws-client.mjs:274-280`
+the onEvent callback delivers `{ seq, frame, receivedAt }` where
+`frame = { ts, iso, raw, parsed }` and the parsed envelope is
+`{ v, type:'event', seq, timestamp, correlationId, payload:
+<BufferedDraftEvent> }`. Correct access path: `evt.frame.parsed
+.payload.kind`. The rig was reaching for `frame.payload.kind`
+one nesting-level too shallow.
+
+**Fix (this session, committed with this ledger entry).** Rig now
+normalizes into an `observerEvents` array where each entry is
+`{ receivedAt, seq, kind, parsedMsg }`. `kind` is lifted from
+`parsedMsg.payload.kind` for O(1) matching in assert-C /
+assert-C-mandatory. Same pattern applied to `lateJoinEvents` in
+`--mode=zero-client` for consistency.
+
+**Debug-dump addition.** Per architect: "while in there, add a
+debug line dumping the first 3 raw frames received so the next
+envelope mismatch self-diagnoses." Implemented via `DEBUG_FIRST_N=3`
+counter — first three frames each print `[debug frame #N] seq=X
+kind=Y envelope=<full JSON>`. Steady-state emits nothing. Next
+envelope-shape drift is diagnosed immediately from the debug line
+without needing to add ad-hoc logging mid-run.
+
+**Credit.** Engine acquitted on evidence. Rig matcher fix is a
+one-file, three-block patch — same INS-class as INS-12 (shakedown
+iteration, forecast, not F-class). Architect's pre-agreement
+called this exactly: rig-orchestration stumbles on first-run
+against a new feature surface. Standing pattern reinforced.
+
+**Meta-lesson: read the actual wire envelope, don't guess.** When
+an observing client's on-callback shape is defined in a library,
+open the library and read the exact delivery shape BEFORE authoring
+the matcher. Guessing based on the server-side broadcast shape
+misses the client-side wrapping the library adds. Standing
+prescription: any rig that consumes `lib/ws-client`'s onEvent MUST
+log its first 3 raw frames until the envelope is known-stable —
+one line of code, saves an iteration every time the envelope
+shifts.
+
+## Post-INS-13 findings docket (architect run notes, 2026-08-06 STEP 5)
+
+Three findings from the STEP 5 second-run (post-INS-12 un-arm,
+pre-INS-13 fix). Not INS entries themselves — behavioral observations
++ one KI candidate — but recorded here for the run's archaeological
+completeness.
+
+### Finding (a) — Pre-start join path VERIFIED WORKING
+
+The rig's observer connect happens BEFORE `start_draft_v2` fires
+(architect condition Q2 scoped: "commissioner-with-zero-clients"
+was the design case, but the observer-pre-ignition case had been
+documented as v1-rare). This run PROVES the pre-start join path:
+
+- Harness observer bypasses the discovery HTTP endpoint (which
+  refuses pre-start joins with 409 DRAFT_NOT_CONNECTABLE per
+  `packages/shared/league.ts:561`) by connecting directly to the
+  WS upgrade endpoint using a self-signed JWT.
+- Engine's uWS upgrade handler builds the lobby via
+  `LobbyRegistry.getOrCreate(lobbyId, leagueId)` on first WS join,
+  regardless of `draft_status`.
+- Lobby served the snapshot for a `draft_status='not_started'`
+  league (proves bootstrap-mode works for pre-ignition state).
+- Live ignition (`start_draft_v2` firing seq 1 via NOTIFY/LISTEN)
+  applied cleanly through the engine's external-apply path;
+  `broadcasted:true` at log 00:09:46.972.
+
+**Documentation update.** `docs/DESIGN_F27_start_draft_v2.md` §3
+Q2 scoping note ("v1-rare") is upgraded to "TESTED BEHAVIOR" as
+of this run. Pre-start join via harness (not via discovery) is
+demonstrated end-to-end. Discovery-gated real-browser pre-start
+joins remain refused by design (server-side guard is intact); the
+harness's bypass is a testing-only mechanism.
+
+### Finding (b) — Pre-rig ritual until INS-12 durable fix lands
+
+Until task #50 (INS-12 durable fix) ships, every rig invocation
+that follows a prior run's completion (or any completed-status
+state) MUST include the three-column un-arm:
+
+```
+UPDATE public.leagues
+   SET draft_status = 'not_started',
+       draft_state  = 'not_started',
+       pick_deadline = NULL
+ WHERE id = '993c9219-ecbf-4e4e-9fb0-e9837e1bded3';
+```
+
+Ritual sequence: reset → setup → un-arm → rig. The un-arm step
+recurs after EVERY run until fixture-12 gains --f27-native mode.
+Documented in ritual note; not a durable fix — a manual patch
+across the INS-12 gap.
+
+### Finding (c) — Stale-tab generation-mismatch resync (KI candidate)
+
+**Observed.** During the STEP 5 run window, a real browser client
+(NOT the rig harness — an unrelated stale tab from an operator's
+earlier session) reconnected 1 second post-ignition. Client
+attempted resync with `sinceSeq=12` (from its snapshot of a
+PREVIOUS draft generation). Fresh-generation draft returned
+`deltaCount=0` (no matching events for that seq range in the new
+generation), then rescued the client by delivering a fresh snapshot.
+
+**Behavior:** correct-by-fallback — snapshot serves as the recovery
+path when resync misses. But the RESYNC ATTEMPT was blind to the
+generation mismatch. `generation_bumped` event type exists in the
+event catalog (per KI-009 close notes, `20260512000000_remove_pgmq_infrastructure.sql`
+removed it from the writer paths but the event_type CHECK enum
+still lists it as of that migration's date). Unused today; would
+be the sanctioned signal for a client to invalidate its local
+cursor on generation-boundary.
+
+**Docket:** KI candidate — "client resync should carry a generation
+token, not just seq". Register when appropriate; not blocking F27
+close. See KI-042 pattern (standing constraint) for the format.
+The `generation_bumped` event type sitting in the catalog unused
+is adjacent to KI-009's simplification decision (pgmq removal
+included generation-bump removal from writer paths); revisit
+whether to re-add for client-cursor discipline or delete from the
+CHECK enum entirely.
+
+### Note on the abandoned draft
+
+Architect: "The abandoned draft is self-completing on perfect
+cadence — let it finish, free F24+F26 soak." Understood; no
+intervention. F24 completion path + F26 broadcast path both getting
+their first live-production soak on this draft. Recorded as
+positive-signal observation, not a defect.

@@ -276,7 +276,22 @@ async function runLifecycleMode() {
 
     log('');
     log('── OBSERVER CONNECT (pre-ignition) — for Rider 4 assert C ──');
-    const observerFrames = [];
+    // observerEvents: normalized event stream. Each entry is
+    //   { receivedAt, seq, kind, parsedMsg }
+    // where parsedMsg is the full server envelope
+    //   { v, type: 'event', seq, timestamp, correlationId, payload: <BufferedDraftEvent> }
+    // and kind is the BufferedDraftEvent kind (payload.kind), lifted for
+    // fast matching. INS-13 fix (2026-08-06) — prior version stored the
+    // callback arg wholesale under `.frame` and matched at the wrong
+    // nesting depth (frame.frame.parsed.payload.kind), so lifecycle
+    // frames arrived correctly but the matcher missed them. Engine was
+    // acquitted by architect's log-based verification (00:09:46.972
+    // seq 1 draft_started broadcasted:true, notifyToBroadcast 42ms).
+    // The DEBUG_FIRST_N block below dumps raw parsed messages for the
+    // first N frames so the next envelope mismatch self-diagnoses.
+    const observerEvents = [];
+    const DEBUG_FIRST_N = 3;
+    let debugFramesLogged = 0;
     const observer = connectDraftClient({
       host: HOST,
       port: WS_PORT,
@@ -286,8 +301,24 @@ async function runLifecycleMode() {
       jwtSecret: JWT_SECRET,
       clientLabel: 'observer',
       silentHeartbeat: true,
-      onEvent: (frame) => {
-        observerFrames.push({ receivedAt: Date.now(), frame });
+      onEvent: (evt) => {
+        // evt from lib/ws-client.mjs:276 is { seq, frame, receivedAt }
+        // frame is { ts, iso, raw, parsed }
+        // parsed is the server envelope { v, type, seq, timestamp, correlationId, payload }
+        const parsedMsg = evt.frame?.parsed ?? null;
+        const kind = parsedMsg?.payload?.kind ?? '<no-kind>';
+        observerEvents.push({
+          receivedAt: Date.now(),
+          seq: evt.seq,
+          kind,
+          parsedMsg,
+        });
+        // Debug dump — first N frames get their parsed envelope logged
+        // for future envelope-diagnosis. Emits nothing at steady state.
+        if (debugFramesLogged < DEBUG_FIRST_N) {
+          debugFramesLogged += 1;
+          log(`  [debug frame #${debugFramesLogged}] seq=${evt.seq} kind=${kind} envelope=${JSON.stringify(parsedMsg)}`);
+        }
       },
     });
     // Wait for the observer to receive its snapshot (proves connect + subscribe).
@@ -339,20 +370,19 @@ async function runLifecycleMode() {
     log('');
     log('── ASSERT C — observer received draft_started frame ──');
     // Wait up to 3s for the frame to arrive (broadcast is sub-second under Mandate).
+    // Matcher uses the normalized shape at observerEvents entries:
+    //   { receivedAt, seq, kind, parsedMsg }
+    // kind is the lifted BufferedDraftEvent.payload.kind.
     const cDeadline = Date.now() + 3000;
     let receivedStarted = null;
     while (Date.now() < cDeadline) {
-      const found = observerFrames.find((f) => {
-        const inner = f.frame?.payload;
-        return inner?.kind === 'draft_started' || f.frame?.type === 'event' &&
-               f.frame?.payload?.kind === 'draft_started';
-      });
+      const found = observerEvents.find((e) => e.kind === 'draft_started');
       if (found) { receivedStarted = found; break; }
       await sleep(100);
     }
     assertTruthy('observer received draft_started frame within 3s', receivedStarted !== null);
     if (receivedStarted) {
-      log(`  received at +${receivedStarted.receivedAt - igniteStart}ms; seq=${receivedStarted.frame?.seq}`);
+      log(`  received at +${receivedStarted.receivedAt - igniteStart}ms; seq=${receivedStarted.seq}`);
     }
 
     log('');
@@ -377,18 +407,18 @@ async function runLifecycleMode() {
 
     log('');
     log('── ASSERT C-mandatory — observer received draft_completed frame ──');
-    // Wait up to 3s post-driveHarnessPicks return for the completion frame.
+    // Same normalized matcher as ASSERT C (INS-13 fix).
     const cmDeadline = Date.now() + 3000;
     let receivedCompleted = null;
     while (Date.now() < cmDeadline) {
-      const found = observerFrames.find((f) => {
-        const inner = f.frame?.payload;
-        return inner?.kind === 'draft_completed';
-      });
+      const found = observerEvents.find((e) => e.kind === 'draft_completed');
       if (found) { receivedCompleted = found; break; }
       await sleep(100);
     }
     assertTruthy('observer received draft_completed frame within 3s', receivedCompleted !== null);
+    if (receivedCompleted) {
+      log(`  received seq=${receivedCompleted.seq}`);
+    }
 
     log('');
     log('── ASSERT E — zero "clock fired but completed" WARNINGs ──');
@@ -470,7 +500,9 @@ async function runZeroClientMode() {
 
     log('');
     log('── STEP 4 — first harness client connects ──');
-    const lateJoinFrames = [];
+    // Same normalized event-collection shape as lifecycle mode (INS-13).
+    const lateJoinEvents = [];
+    let ljDebugFramesLogged = 0;
     const lateJoiner = connectDraftClient({
       host: HOST,
       port: WS_PORT,
@@ -480,8 +512,19 @@ async function runZeroClientMode() {
       jwtSecret: JWT_SECRET,
       clientLabel: 'late-joiner',
       silentHeartbeat: true,
-      onEvent: (frame) => {
-        lateJoinFrames.push({ receivedAt: Date.now(), frame });
+      onEvent: (evt) => {
+        const parsedMsg = evt.frame?.parsed ?? null;
+        const kind = parsedMsg?.payload?.kind ?? '<no-kind>';
+        lateJoinEvents.push({
+          receivedAt: Date.now(),
+          seq: evt.seq,
+          kind,
+          parsedMsg,
+        });
+        if (ljDebugFramesLogged < 3) {
+          ljDebugFramesLogged += 1;
+          log(`  [debug frame #${ljDebugFramesLogged}] seq=${evt.seq} kind=${kind} envelope=${JSON.stringify(parsedMsg)}`);
+        }
       },
     });
     log('  waiting for late-joiner snapshot...');
