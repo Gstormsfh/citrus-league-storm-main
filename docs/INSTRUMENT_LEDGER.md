@@ -627,3 +627,75 @@ INS-11 pg_cron DML permission). Every one arrived as an eager error
 inside a rollback-safe transaction; no state leaked; each surfaced
 its own class of instrument defect for the ledger. The wrap
 continues to do load-bearing work that no other mechanism replaces.
+
+### INS-12 — F27 lifecycle rig preflight refused on fixture-12's flip-era vestige (shakedown iteration #1, as forecast)
+
+**Field record (2026-08-06 STEP 5 first-run attempt).** Garrett ran
+`scripts/proof/lifecycle-acceptance-f27.local.mjs --mode=lifecycle`
+per the deploy sequence. Rig's preflight raised at
+`preflightNotStarted()` because `draft_status='completed'` (residual
+from STEP 4's smoke where F24 completion path fired). Manual three-
+column un-arm applied by Garrett (`draft_status='not_started'`,
+`draft_state='not_started'`, `pick_deadline=NULL`) restored the
+honest commissioner-start pre-state; rig re-run cleared preflight.
+
+**Instrument.** `scripts/proof/fixture-12.mjs` — both `--reset` and
+`--execute` paths, plus the rig's `preflightNotStarted()` interaction
+with them.
+
+**Failure mode.** `false-red` — rig preflight refused a correct
+CONFIGURATION-authored setup because the fixture scaffold's semantics
+pre-date F27. Neither the crime nor the intent:
+
+- **fixture-12 `--reset`** doesn't touch `draft_status`. Reset was
+  authored pre-F24 (chunk 11g.10 sub-step 10c-2) when the completion
+  path didn't flip status — so reset saw no need to restore it.
+  Post-F24, status can persist as `'completed'` across cleanup and
+  the next setup misses it.
+- **fixture-12 `--execute`** pre-arms `draft_state='active'` and
+  `pick_deadline=<computed>` per flip-script-era semantics (draft
+  ignition was done by ops, not by an RPC — the fixture had to
+  synthesize the started state so the harness could start driving
+  picks immediately). Post-F27, that pre-arm CONFLICTS with the
+  honest "not_started" shape start_draft_v2 requires as pre-state.
+
+**Fix (this session, per architect).** Garrett applied the manual
+three-column un-arm as a one-off; rig proceeded. Fix documented but
+NOT applied to fixture-12.mjs in this session — architect ruled it
+DURABLE-DOCKET, post-F27-close. This session's job is F27 close, not
+scaffold retirement of the flip-era pattern.
+
+**Durable fix (task #50, post-F27-close):**
+- `fixture-12.mjs --reset`: restore `draft_status='not_started'`
+  alongside the existing column restorations.
+- `fixture-12.mjs --execute`: introduce an `--f27-native` flag that
+  does NOT pre-arm `draft_state` or `pick_deadline` — genuine
+  `not_started` shape. `start_draft_v2` performs ignition. When the
+  flag is standard-adopted, the pre-arm block retires entirely.
+- The flip-era vestige exits alongside the break-glass renaming of
+  `set-draft-status.local.mjs` (F27 §9 already staged).
+
+**Credit.** Rig preflight refused SAFELY — architect's shakedown
+pre-agreement (2026-08-06 GO expedite message) forecast this class of
+finding: "rig-orchestration stumbles are INS-class tuning, one
+iteration expected, not F-class findings." Prediction was exact:
+one iteration, INS-class, not F-class. Rig's `preflightNotStarted()`
+does its job — it refused an inconsistent pre-state that would have
+made downstream assertions ambiguous.
+
+**Meta-lesson: scaffold-vs-feature semantic drift.** Long-lived
+scaffolds (fixture-12) accrete assumptions from the era they were
+authored. When a feature (F27) changes the surface those scaffolds
+target (commissioner-start via RPC instead of ops-flip), the
+scaffold's pre-arming becomes anachronistic. Two mitigations for
+future features that change scaffold-adjacent surfaces:
+
+1. **Ship the scaffold update in the same PR as the feature.** The
+   fixture-12 retirement of pre-arm should have landed with F27,
+   not deferred to task #50. Deferring means the next rig-authoring
+   pass will trip the same class again.
+2. **Rig preflight is the safety net when #1 slips.** Every new
+   feature that changes pre-state semantics MUST include a
+   preflight assertion in its rig — the rig's refusal-with-clear-
+   error IS the discipline that catches the missed scaffold update.
+   F27's `preflightNotStarted()` did exactly this on first-run.
