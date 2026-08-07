@@ -445,7 +445,12 @@ export class LobbyManager {
   private readonly supabase: SupabaseClient;
   private readonly autopickStrategies: ReadonlyArray<AutopickStrategy> | undefined;
   private readonly pickClockMs: number;
-  private readonly initialPickDeadline: Date | null;
+  // R1 stash (F27b-1, 2026-08-07): dropped `readonly` so
+  // applyDraftStartedEventState can populate this when the
+  // construction-time leagues.pick_deadline read pre-dated ignition
+  // (dead-lobby razor race close). Only mutated in that one call
+  // site under a null-check guard.
+  private initialPickDeadline: Date | null;
   private readonly initialDraftState: string | null;
 
   /**
@@ -2832,112 +2837,35 @@ export class LobbyManager {
         break;
       case 'draft_started': {
         // F27 (2026-08-06) — draft ignition receiver. Paired with
-        // start_draft_v2 (migration 20260807000000). Reverses the
-        // 2026-07-21 "no wire representation" default for this event
-        // per architect Rider 4 assert C (observer must receive the
-        // frame).
+        // start_draft_v2 (migration 20260807000000).
         //
-        // Three actions in this case:
-        //   1. Append a BufferedDraftEvent of kind='draft_started'
-        //      to this.events so the central broadcast path's
-        //      peekLast() tail check passes (line 5519-5531).
-        //   2. Mutate draftStatus (not_started → in_progress).
-        //   3. Arm the first pick timer from payload.first_pick_deadline
-        //      — batch-2 external-apply mechanism (2026-07-27),
-        //      mirroring draft_resumed at line 2852-2872. Presence
-        //      guard: skip re-arm if the field is missing (defense-in-
-        //      depth; validator §6.4 requires it, so unreachable-normal).
+        // F27b-1 (2026-08-07): case body extracted into shared method
+        // `applyDraftStartedEventState` so bootstrapFullEventReplay's
+        // switch can invoke it (previously the switch had NO case for
+        // draft_started and dropped the event as forward-compat-skip —
+        // fresh-lobby bootstrap of ignited leagues left draftStatus
+        // 'not_started', timer never armed, scanner-invisible).
         //
-        // NO-LOBBY-AT-IGNITION note (Rider 3 / architect condition 3):
-        // Commissioner-start with zero WS clients means no lobby exists
-        // in the registry when start_draft_v2 fires. The external-apply
-        // path (processExternalEvent's dispatcher) short-circuits BEFORE
-        // reaching this switch for leagues without an in-memory lobby —
-        // the LISTEN handler iterates active lobbies only. This case is
-        // therefore only entered when SOME client had already connected
-        // (rare pre-ignition; happens for the F27 lifecycle-acceptance
-        // observer harness which connects deliberately before start).
-        // On first WS join AFTER ignition, bootstrap replay hits
-        // applyEventDuringBootstrap for the draft_started event; the
-        // append+arm mutations fire during bootstrap-mode too. init()'s
-        // covering-fallback at line 920 also reads leagues.pick_deadline
-        // — belt AND suspenders.
-        //
-        // Idempotency (design §5 Step 0 / engine mirror). If a bootstrap
-        // replay hits draft_started for a draft that has already moved
-        // past ignition (subsequent picks have landed → draftStatus is
-        // already 'in_progress'), the guard skips the mutation to avoid
-        // double-arming a timer that's since been re-armed by pick
-        // events. The append still fires so the ring buffer's contiguity
-        // is preserved for resync-in-flight clients (Rider 4 assert F).
+        // Live-path semantics preserved: shared method does append +
+        // guarded flip; live path additionally arms the timer inline
+        // if (and only if) the flip actually fired. Guard-skip due to
+        // stale in-memory status must NOT re-arm from a stale seq-1
+        // payload deadline (Bar 2 / R2 arm-exactly-once discipline).
+        // Bootstrap path calls shared method WITHOUT arming — init's
+        // post-replay catch-up at line 974 arms once from
+        // initialPickDeadline (matches applyPickEvent's no-per-event-
+        // arm-thrash convention).
         const startedPayload = event.payload as Record<string, unknown>;
-        const startedAt =
-          typeof startedPayload.started_at === 'string'
-            ? startedPayload.started_at
-            : event.created_at;
         const firstPickDeadline =
           typeof startedPayload.first_pick_deadline === 'string'
             ? startedPayload.first_pick_deadline
             : '';
-        const totalRounds =
-          typeof startedPayload.total_rounds === 'number'
-            ? startedPayload.total_rounds
-            : 0;
-        const totalTeams =
-          typeof startedPayload.total_teams === 'number'
-            ? startedPayload.total_teams
-            : 0;
-        const pickTimeLimitSeconds =
-          typeof startedPayload.pick_time_limit_seconds === 'number'
-            ? startedPayload.pick_time_limit_seconds
-            : 0;
-        const draftFormat =
-          typeof startedPayload.draft_format === 'string'
-            ? (startedPayload.draft_format as DraftFormat)
-            : 'snake';
-        const bufferedStarted: BufferedDraftEvent = {
-          kind: 'draft_started',
-          seq: event.seq,
-          timestamp: event.created_at,
-          correlationId: event.idempotency_key ?? '',
-          startedAt,
-          firstPickDeadline,
-          totalRounds,
-          totalTeams,
-          pickTimeLimitSeconds,
-          draftFormat,
-        };
-        this.events.append(bufferedStarted);
-
-        // Guarded status transition + timer arm. Only fire if we're
-        // actually at the ignition boundary (draftStatus='not_started').
-        // Skip on bootstrap-replay for already-in-progress drafts.
-        //
-        // F27b freebie (2026-08-07 architect approval, next-engine-deploy):
-        // if the guard REFUSES because in-memory status is stale
-        // (completed or in_progress carrying over from a prior run's
-        // state, as observed in run #2's stalled ignition 2026-08-07
-        // 05:36:58Z), log a WARN with the actual vs expected values so
-        // the refusal is visible instead of silent. Pure observability;
-        // no behavior change — the guard still refuses. Diagnoses future
-        // stale-status-at-ignition patterns immediately from logs.
-        if (this.draftStatus === 'not_started' && firstPickDeadline.length > 0) {
+        const didFlip = this.applyDraftStartedEventState(event);
+        if (didFlip && firstPickDeadline.length > 0) {
           const parsed = new Date(firstPickDeadline);
           if (!Number.isNaN(parsed.getTime())) {
-            this.draftStatus = 'in_progress';
             this.setPickDeadline(parsed, 'pick');
           }
-        } else {
-          structuredLogger.warn('draft_started_apply.skipped_stale_status', {
-            lobbyId: this.lobbyId,
-            leagueId: this.leagueId,
-            seq: event.seq,
-            currentDraftStatus: this.draftStatus,
-            firstPickDeadlinePresent: firstPickDeadline.length > 0,
-            reason: this.draftStatus !== 'not_started'
-              ? 'in_memory_status_not_not_started'
-              : 'missing_first_pick_deadline',
-          });
         }
         break;
       }
@@ -3124,6 +3052,7 @@ export class LobbyManager {
     let pickEventCount = 0;
     let undoneEventCount = 0;
     let overrideEventCount = 0;
+    let lifecycleEventCount = 0;
     let skippedCount = 0;
 
     for (const event of events) {
@@ -3159,18 +3088,53 @@ export class LobbyManager {
           this.applyCommissionerOverrideEvent(event);
           overrideEventCount++;
           break;
+        case 'draft_started':
+          // F27b-1 (2026-08-07): bootstrap replay of ignited leagues
+          // must apply draft_started. Previously fell to default:
+          // "forward-compat skip" WARN — draftStatus stayed 'not_started',
+          // timer never armed, scanClockLiveness skipped via its
+          // status guard (LobbyRegistry.ts:942). Fresh-lobby bootstrap
+          // of any post-ignition league stalled indefinitely.
+          // Observed 2026-08-07 STEP 5' rig failure + engine log
+          // verbatim "[lobby] bootstrap unknown event_type=draft_started
+          // seq=1 (forward-compat skip)".
+          //
+          // Bar 2 discipline (arm-exactly-once): shared state-apply
+          // method flips status but does NOT arm the timer. The arm
+          // happens exactly once at init's post-replay catch-up
+          // (line 974 for snake/linear) from initialPickDeadline
+          // (which now stashes from event payload in the R1 branch of
+          // applyDraftStartedEventState — closes the dead-lobby razor
+          // race between construction-time row read and replay-time
+          // event availability). Matches applyPickEvent's convention
+          // (line 3317+) which also does no per-event timer arm
+          // during replay.
+          this.applyDraftStartedEventState(event);
+          lifecycleEventCount++;
+          break;
         case 'draft_completed':
           // Belt-and-suspenders alongside the natural picksMade ===
           // draftOrder.length derivation in applyPickEvent. A draft
           // can be marked complete by the commissioner before all
           // slots are filled (early termination); in that case the
           // explicit event is the source of truth.
+          //
+          // Pre-existing inconsistency (ledger note L2, 2026-08-07):
+          // this case does NOT append to this.events (the live-apply
+          // path at case 'draft_completed' :2988 DOES). Ring buffer
+          // resync therefore lacks the draft_completed frame for a
+          // fresh-lobby bootstrap of a completed league. Not fixed
+          // in F27b-1 (out of scope; drafts stay reachable post-
+          // completion for celebration UI, so completion frame
+          // absence is currently benign). Distinct from F27b-1's
+          // draft_started append which IS present in both paths for
+          // buffer contiguity behind the pick sequence.
           this.draftStatus = 'completed';
-          skippedCount++;
+          lifecycleEventCount++;
           break;
         case 'draft_cancelled':
           this.draftStatus = 'cancelled';
-          skippedCount++;
+          lifecycleEventCount++;
           break;
         case 'draft_paused':
           // Step 6c: capture pause state for the in-memory timer.
@@ -3193,7 +3157,7 @@ export class LobbyManager {
             // load-bearing only for auction.
             pausedTimerKind: 'bid_window',
           };
-          skippedCount++;
+          lifecycleEventCount++;
           break;
         case 'draft_resumed':
           // Step 6c: clear pause state.
@@ -3215,7 +3179,7 @@ export class LobbyManager {
               }
             }
           }
-          skippedCount++;
+          lifecycleEventCount++;
           break;
         case 'draft_extended':
           // Deadline-extension event (commissioner adds time to the
@@ -3239,7 +3203,7 @@ export class LobbyManager {
             `[lobby] bootstrap applying draft_extended event ` +
               `seq=${event.seq} lobbyId=${this.lobbyId}`,
           );
-          skippedCount++;
+          lifecycleEventCount++;
           break;
         case 'autopick_failed':
         case 'generation_bumped':
@@ -3303,9 +3267,143 @@ export class LobbyManager {
       `[lobby] bootstrap replay complete lobbyId=${this.lobbyId} ` +
         `totalEvents=${events.length} pickEvents=${pickEventCount} ` +
         `undoneEvents=${undoneEventCount} overrideEvents=${overrideEventCount} ` +
-        `skipped=${skippedCount} picksMade=${this.picksMade} ` +
-        `status=${this.draftStatus} duration=${duration}ms`,
+        `lifecycleEvents=${lifecycleEventCount} skipped=${skippedCount} ` +
+        `picksMade=${this.picksMade} status=${this.draftStatus} ` +
+        `duration=${duration}ms`,
     );
+  }
+
+  /**
+   * Shared state-apply for `draft_started` events. Called by BOTH
+   * dispatchers:
+   *   - `applyEventDuringBootstrap` (LIVE NOTIFY, case 'draft_started'
+   *     near line 2833)
+   *   - `bootstrapFullEventReplay` (REPLAY, case 'draft_started' in
+   *     the switch above)
+   *
+   * Actions:
+   *   1. Append a `BufferedDraftEvent` of kind='draft_started' to
+   *      `this.events` — keeps the ring buffer contiguous behind the
+   *      pick sequence for late-joiner resync. Live path relies on
+   *      this append for the central broadcast path's tail check
+   *      (peekLast at line 5519-5531).
+   *   2. Stash `payload.first_pick_deadline` into
+   *      `this.initialPickDeadline` if that field is still null
+   *      (R1 dead-lobby razor race close). Construction reads
+   *      `leagues.pick_deadline`; if ignition commits BETWEEN row
+   *      read and event log read, the row was pre-ignition (null
+   *      deadline) while the log has the ignition event — without
+   *      this stash, replay flips status but post-replay catch-up at
+   *      line 974 skips on null deadline, leaving the lobby dead
+   *      with scanner edge (a) invisible-to-null-deadline. Stash is
+   *      safe by construction: mid-draft restart has non-null row
+   *      (picks maintain leagues.pick_deadline via applyPickEvent's
+   *      broadcast path); completed-league replay stashes harmlessly
+   *      (post-replay guard requires in_progress); flip-era leagues
+   *      have no draft_started event and never reach this method.
+   *   3. Guarded flip of `draftStatus` from 'not_started' to
+   *      'in_progress'. Skip if in-memory status is stale (already
+   *      in_progress from a prior lifecycle apply, or completed) —
+   *      Bar 2 discipline: the DIDflip return distinguishes true
+   *      transitions from re-plays so the live caller can gate its
+   *      inline arm on didFlip and NOT re-arm from a stale seq-1
+   *      payload deadline.
+   *
+   * **DOES NOT arm the pick timer.** The live-apply site (case
+   * 'draft_started' at :2833) arms inline AFTER this call when
+   * `didFlip === true`. The bootstrap-apply site (case 'draft_started'
+   * in the switch above) omits the inline arm; init's post-replay
+   * catch-up at line 974 arms exactly once from
+   * `this.initialPickDeadline` (potentially just stashed here by R1)
+   * on final replayed state. Matches `applyPickEvent`'s convention
+   * (line 3317+) which also does no per-event timer arm during
+   * replay — arm-exactly-once-from-final-state discipline.
+   *
+   * Observability (F27b freebie, 2026-08-07 architect approval): if
+   * the guard REFUSES because in-memory status is stale, emit a WARN
+   * with actual vs expected values so the refusal is visible instead
+   * of silent. Pure observability; no behavior change.
+   *
+   * @returns `true` iff draftStatus flipped from 'not_started' to
+   *   'in_progress' during this call. Live caller gates its inline
+   *   timer arm on this to avoid re-arming from a stale seq-1 payload
+   *   deadline when a legitimate later apply (e.g. a pick that
+   *   already advanced the deadline) has since taken over.
+   */
+  private applyDraftStartedEventState(event: DraftEventRow): boolean {
+    const startedPayload = event.payload as Record<string, unknown>;
+    const startedAt =
+      typeof startedPayload.started_at === 'string'
+        ? startedPayload.started_at
+        : event.created_at;
+    const firstPickDeadline =
+      typeof startedPayload.first_pick_deadline === 'string'
+        ? startedPayload.first_pick_deadline
+        : '';
+    const totalRounds =
+      typeof startedPayload.total_rounds === 'number'
+        ? startedPayload.total_rounds
+        : 0;
+    const totalTeams =
+      typeof startedPayload.total_teams === 'number'
+        ? startedPayload.total_teams
+        : 0;
+    const pickTimeLimitSeconds =
+      typeof startedPayload.pick_time_limit_seconds === 'number'
+        ? startedPayload.pick_time_limit_seconds
+        : 0;
+    const draftFormat =
+      typeof startedPayload.draft_format === 'string'
+        ? (startedPayload.draft_format as DraftFormat)
+        : 'snake';
+
+    // Action 1: append to ring buffer (contiguity for resync).
+    const bufferedStarted: BufferedDraftEvent = {
+      kind: 'draft_started',
+      seq: event.seq,
+      timestamp: event.created_at,
+      correlationId: event.idempotency_key ?? '',
+      startedAt,
+      firstPickDeadline,
+      totalRounds,
+      totalTeams,
+      pickTimeLimitSeconds,
+      draftFormat,
+    };
+    this.events.append(bufferedStarted);
+
+    // Action 2: R1 stash — close dead-lobby razor race between
+    // construction-time leagues.pick_deadline read and event log
+    // read. Only fires when the row was pre-ignition at construction;
+    // safe in every other lifecycle (see method-header safety note).
+    if (this.initialPickDeadline === null && firstPickDeadline.length > 0) {
+      const parsed = new Date(firstPickDeadline);
+      if (!Number.isNaN(parsed.getTime())) {
+        this.initialPickDeadline = parsed;
+      }
+    }
+
+    // Action 3: guarded status flip. Return didFlip so the live
+    // caller can gate its inline arm — Bar 2 discipline.
+    if (this.draftStatus === 'not_started' && firstPickDeadline.length > 0) {
+      const parsed = new Date(firstPickDeadline);
+      if (!Number.isNaN(parsed.getTime())) {
+        this.draftStatus = 'in_progress';
+        return true;
+      }
+    }
+
+    structuredLogger.warn('draft_started_apply.skipped_stale_status', {
+      lobbyId: this.lobbyId,
+      leagueId: this.leagueId,
+      seq: event.seq,
+      currentDraftStatus: this.draftStatus,
+      firstPickDeadlinePresent: firstPickDeadline.length > 0,
+      reason: this.draftStatus !== 'not_started'
+        ? 'in_memory_status_not_not_started'
+        : 'missing_first_pick_deadline',
+    });
+    return false;
   }
 
   /**

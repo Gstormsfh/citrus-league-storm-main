@@ -1072,3 +1072,117 @@ baseline: 4 PRE-EXISTING errors (draftAdminRoutes tests × 2,
 draftRoutes.f14 test mock, systemFlags.ts:96 = KI-027 task #22).
 **Zero new errors from `LobbyManager.ts`.** packages/shared builds
 clean. WARN diff is compile-safe for the next deploy.
+
+## F27b-1 — bootstrap replay draft_started missing case (2026-08-07)
+
+Engine defect witnessed post-F27 ratification acceptance: fresh-lobby
+bootstrap of any ignited league fell through
+`bootstrapFullEventReplay`'s default `switch` case with the WARN
+`[lobby] bootstrap unknown event_type=draft_started seq=1
+(forward-compat skip)`. Effect: `draftStatus` stayed `'not_started'`
+post-replay, init's post-replay catch-up at `LobbyManager.ts:974` (the
+snake/linear branch) skipped on its `draftStatus === 'in_progress'`
+guard, no timer ever armed, and `scanClockLiveness`
+(`LobbyRegistry.ts:942`) skipped the lobby on its own
+`draftStatus !== 'in_progress'` guard — permanently dead lobby with
+no observability. Root: the F26+F27 batch-2 external-apply extraction
+added `draft_started` to the LIVE dispatcher
+(`applyEventDuringBootstrap` case at `:2833`) but not to the REPLAY
+dispatcher (`bootstrapFullEventReplay` switch at `:3141-3298`).
+
+**Fix (this commit).** Extract case body into shared method
+`applyDraftStartedEventState(event) → boolean didFlip`:
+
+- **Action 1 — append** to `this.events` (contiguity behind pick
+  sequence for late-joiner resync).
+- **Action 2 — R1 stash** into `this.initialPickDeadline` when null
+  (closes the dead-lobby razor race between construction-time
+  `leagues.pick_deadline` read and event-log read; construction
+  reads pre-ignition row → null, event log has ignition event →
+  without stash, post-replay catch-up skips on null and lobby dies).
+- **Action 3 — guarded flip** from `'not_started'` to
+  `'in_progress'`; return `didFlip` so LIVE caller can gate its
+  inline arm on true transitions only (R2 semantic-preservation:
+  the old inline case armed IFF `status==='not_started'` AND
+  deadline present AND parse valid; new flow arms IFF `didFlip===true`
+  AND deadline present AND parse valid — identical set).
+
+**Arm-exactly-once discipline (Bar 2).** Shared method does NOT arm
+the timer. LIVE path arms inline post-call gated on `didFlip`.
+REPLAY path never arms — matches `applyPickEvent`'s convention
+(replay accumulates state, no per-event timer thrash). init's
+post-replay catch-up at `:974` arms exactly once from
+`initialPickDeadline` (which R1 has just stashed if construction
+was pre-ignition). Past deadline → negative `setPickDeadline` delay
+→ setTimeout fires next tick → F20 identity + wallclock guards
+allow it → autopick lands. Engine-restart-mid-draft recovery
+matches this path today.
+
+**Legacy safety (Bar 3).** Flip-era leagues have zero
+`draft_started` events → new REPLAY case never fires → shared
+method never called → behavior provably identical to prior. All
+other lifecycle cases (`draft_completed`, `draft_cancelled`,
+`draft_paused`, `draft_resumed`, `draft_extended`) unchanged apart
+from counter attribution (see counter honesty below).
+
+**Completed-league safety (Bar 4).** Re-bootstrap of a completed
+league walks `draft_started` (new case: shared method flips
+`not_started → in_progress` + R1 stashes) → picks (bootstrap's
+`applyPickEvent` flips `picksMade` and eventually `draftStatus →
+completed` at `:3226`) → `draft_completed` (existing REPLAY case:
+`draftStatus = 'completed'` — no-op). Post-replay init `:969-975`
+guard `draftStatus === 'in_progress'` FAILS → no arm. Final
+state: `completed` + no timer + no pending arm. Teardown-consistent.
+
+**Counter honesty (Bar 5).** New `lifecycleEventCount` distinct
+from `skippedCount`. Lifecycle cases (`draft_started`,
+`draft_completed`, `draft_cancelled`, `draft_paused`,
+`draft_resumed`, `draft_extended`) now increment
+`lifecycleEventCount`. Diagnostic-only cases (`autopick_failed`,
+`generation_bumped`) and the `default:` (genuinely unknown future
+types with forward-compat-skip WARN) keep `skippedCount`. Replay-
+complete log line at `:3266-3273` extended with
+`lifecycleEvents=${lifecycleEventCount}`.
+
+### L1 (no-code ledger note) — start_draft_v2 auction-format gap
+
+`start_draft_v2` (migration `20260807000000_start_draft_v2.sql`)
+carries **no draft_format guard**. Igniting an auction league via
+this RPC would now, with F27b-1 landed, replay a `draft_started`
+event whose payload's `draft_format = 'auction'` — bootstrap
+replay would flip status via the new REPLAY case and post-replay
+init would drop into `LobbyManager.ts:921-968`'s auction branch,
+which reads `initialDraftState` and either fires a bid-window
+timer (from `currentNomination.expiresAt`) or a nomination-window
+timer. **Untested territory for the F27 ignition path.** Out of v1
+scope (no auction leagues pre-TWELVE); note for the eventual RPC
+format-guard hardening. Suggested guard shape: `start_draft_v2`
+should refuse auction-format leagues until an auction-native
+ignition RPC lands (or explicitly gate on `format IN ('snake',
+'linear')`).
+
+### L2 (no-code ledger note) — draft_completed non-append inconsistency
+
+`bootstrapFullEventReplay`'s `draft_completed` case (`:3115-3134`)
+sets `this.draftStatus = 'completed'` **without** appending a
+`BufferedDraftEvent` to `this.events`. The LIVE dispatcher's
+`draft_completed` case (`:2988`) DOES append. Result: ring buffer
+resync for a fresh-lobby bootstrap of a completed league lacks the
+completion frame. Distinct from F27b-1's `draft_started` append
+which IS present in BOTH paths (contiguity behind the pick sequence).
+Not fixed in F27b-1 (out of scope; drafts stay reachable post-
+completion for celebration UI, so completion frame absence is
+currently benign). Corresponding gap for `draft_cancelled`,
+`draft_paused`, `draft_resumed`, `draft_extended` in the REPLAY
+dispatcher — all six lifecycle cases (except `draft_started`
+post-F27b-1) update state without appending during replay. Consider
+uniform buffer semantics if a future audit finds a UX gap dependent
+on lifecycle-frame availability post-restart.
+
+### Typecheck evidence (F27b-1 gate, 2026-08-07)
+
+`npx tsc --noEmit` in `server/` produced identical output to
+pre-diff baseline: 4 pre-existing errors (draftAdminRoutes tests
+× 2, draftRoutes.f14 test mock, systemFlags.ts:96 = KI-027 task
+#22). **Zero new errors from `LobbyManager.ts`.** F27b-1 diff is
+compile-safe for the §15.14 deploy.
