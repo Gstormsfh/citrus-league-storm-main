@@ -32,7 +32,7 @@ jobs:
     # the Aug/Sep dual-season ramp (2 seasons × 32 teams + per-player NHL
     # API fetches) legitimately takes longer than 20 minutes on cold runs.
     # With the season-scoped discovery scan + skip-existing + per-team
-    # incremental flush changes in this PR, warm runs are well under
+    # incremental flush changes from #290, warm runs are well under
     # 15 min; 60 is headroom for cold NHL API bursts and 429 retries.
     timeout-minutes: 60
     steps:
