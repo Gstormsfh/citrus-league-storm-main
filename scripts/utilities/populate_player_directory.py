@@ -26,6 +26,20 @@ import datetime as dt
 from typing import Any, Dict, Optional, Set
 import requests
 
+# LINE-BUFFERED STDOUT so progress is visible under GitHub Actions log
+# capture. Prior state (block-buffered default for non-tty) meant the
+# entire run produced only "Script starting..." in the log until the
+# process exited or the buffer filled — the exact reason the 2026-08-07
+# 20m timeout looked opaque. Belt-and-suspenders: the workflow also sets
+# PYTHONUNBUFFERED=1, but making the script robust locally too.
+try:
+  sys.stdout.reconfigure(line_buffering=True)
+  sys.stderr.reconfigure(line_buffering=True)
+except AttributeError:
+  # Python < 3.7: no reconfigure. Fall back to unbuffered wrapper.
+  sys.stdout = os.fdopen(sys.stdout.fileno(), "w", 1)
+  sys.stderr = os.fdopen(sys.stderr.fileno(), "w", 1)
+
 # Bootstrap data_pipeline package so imports work after R4 reorg moved this file
 # under scripts/utilities/ (was at repo root pre-monorepo, when bare imports worked).
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -115,29 +129,46 @@ def fetch_player_details(player_id: int) -> Optional[dict]:
 
 def discover_players_from_our_data(db: SupabaseRest, season: int) -> Set[int]:
   """
-  Discover player IDs from our own data sources (raw_shots, player_toi_by_situation).
-  Returns set of player IDs found in our data but not necessarily in player_directory.
+  Discover player IDs from our own data sources for THIS season only.
+
+  Prior behaviour scanned all of raw_shots (multi-season since phase 0c —
+  ~1M+ rows), which took 100-200s of pure pagination per _run_for_season
+  call and, for the incoming season during the Aug/Sep ramp, returned
+  thousands of historical player_ids that the downstream NHL API loop
+  would then fetch bio for one by one. That was the load-bearing chunk of
+  the 2026-08-07 20-minute timeout.
+
+  Season-scoping collapses this to:
+    - current season (mid-season): only players who've actually taken a
+      shot in the season being scored — the exact "mid-season callup"
+      case we care about.
+    - incoming season during ramp: zero rows returned (no games yet),
+      so discovery returns instantly.
   """
   discovered_ids: Set[int] = set()
-  
-  print(f"[populate_player_directory] Discovering players from our data sources...")
-  
+  season_filter = ("season", "eq", season)
+
+  print(f"[populate_player_directory] Discovering players from our data sources for season={season}...")
+
   # 1. Discover from raw_shots (player_id, passer_id, goalie_id)
   try:
-    print("  Scanning raw_shots for player_id, passer_id, goalie_id...")
+    print(f"  Scanning raw_shots WHERE season={season} for player_id, passer_id, goalie_id...")
     batch_size = 1000  # PostgREST max limit
     offset = 0
     shot_count = 0
     last_progress_time = time.time()
-    
-    # Unfiltered scan is intentional (A4 per 0C-CONSUMER-SCOPING decision):
-    # raw_shots is multi-season since phase 0c, so this now discovers
-    # historical player IDs too. Benign — the directory just gets more names.
+
     while True:
-      shots = db.select("raw_shots", select="player_id,passer_id,goalie_id", limit=batch_size, offset=offset)
+      shots = db.select(
+        "raw_shots",
+        select="player_id,passer_id,goalie_id",
+        filters=[season_filter],
+        limit=batch_size,
+        offset=offset,
+      )
       if not shots:
         break
-      
+
       for shot in shots:
         shot_count += 1
         if shot.get("player_id"):
@@ -146,53 +177,59 @@ def discover_players_from_our_data(db: SupabaseRest, season: int) -> Set[int]:
           discovered_ids.add(_safe_int(shot["passer_id"], 0))
         if shot.get("goalie_id"):
           discovered_ids.add(_safe_int(shot["goalie_id"], 0))
-        
+
         # Progress every 15 seconds during discovery
         current_time = time.time()
         if current_time - last_progress_time >= 15:
           print(f"    [PROGRESS] Scanned {shot_count:,} shots, found {len(discovered_ids)} unique player IDs...")
           last_progress_time = current_time
-      
+
       # Check if we got fewer rows than batch_size (last page)
       if len(shots) < batch_size:
         break
-      
+
       offset += batch_size
     print(f"    Found {len(discovered_ids)} unique player IDs from raw_shots ({shot_count:,} shots scanned)")
   except Exception as e:
     print(f"    Warning: Could not scan raw_shots: {e}")
     import traceback
     traceback.print_exc()
-  
+
   # 2. Discover from player_toi_by_situation (player_id)
   try:
-    print("  Scanning player_toi_by_situation for player_id...")
+    print(f"  Scanning player_toi_by_situation WHERE season={season} for player_id...")
     batch_size = 1000  # PostgREST max limit
     offset = 0
     toi_count = 0
     last_progress_time = time.time()
     toi_ids = set()
-    
+
     while True:
-      toi_players = db.select("player_toi_by_situation", select="player_id", limit=batch_size, offset=offset)
+      toi_players = db.select(
+        "player_toi_by_situation",
+        select="player_id",
+        filters=[season_filter],
+        limit=batch_size,
+        offset=offset,
+      )
       if not toi_players:
         break
-      
+
       for t in toi_players:
         toi_count += 1
         if t.get("player_id"):
           toi_ids.add(_safe_int(t.get("player_id"), 0))
-        
+
         # Progress every 15 seconds during discovery
         current_time = time.time()
         if current_time - last_progress_time >= 15:
           print(f"    [PROGRESS] Scanned {toi_count:,} TOI records, found {len(toi_ids)} unique player IDs...")
           last_progress_time = current_time
-      
+
       # Check if we got fewer rows than batch_size (last page)
       if len(toi_players) < batch_size:
         break
-      
+
       offset += batch_size
     discovered_ids.update(toi_ids)
     print(f"    Found {len(toi_ids)} unique player IDs from player_toi_by_situation ({toi_count:,} records scanned)")
@@ -334,13 +371,34 @@ def process_player_from_api(player_id: int, season: int, team_abbrev: Optional[s
   return player_data
 
 
+def _flush_batch(db: SupabaseRest, batch: Dict[int, dict], label: str) -> int:
+  """UPSERT a small batch immediately so a subsequent timeout still lands
+  the rows we already fetched. Returns the count written; empties `batch`
+  in-place. On upsert error, RAISES — a persistent write failure is a hard
+  fail we want to surface, not swallow."""
+  if not batch:
+    return 0
+  rows = list(batch.values())
+  db.upsert("player_directory", rows, on_conflict="season,player_id")
+  n = len(rows)
+  print(f"  [FLUSH {label}] upserted {n} players")
+  batch.clear()
+  return n
+
+
 def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
   """
   Populate player_directory for a single season. Returns
   (total_roster_players_returned_by_nhl_api, players_upserted).
   Raises on hard failure (API dead, upsert error).
+
+  PARTIAL-PROGRESS-SAFE. Writes are flushed per-team (roster phase) and
+  every 25 players (discovery phase) so a mid-run timeout still lands
+  every player we've already fetched. Prior state accumulated all writes
+  in-memory and flushed once at the end — a timeout meant zero rows.
   """
   seen: Dict[int, dict] = {}
+  total_upserted = 0
 
   print(f"[populate_player_directory][season={season}] Fetching existing player IDs...")
   existing_ids = get_existing_player_ids(db, season)
@@ -354,6 +412,7 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
   if missing_ids:
     print(f"[populate_player_directory][season={season}] Fetching {len(missing_ids)} missing players from NHL API...")
     processed_count = 0
+    pending: Dict[int, dict] = {}
     last_progress_time = time.time()
     for idx, player_id in enumerate(sorted(missing_ids), 1):
       if player_id in seen:
@@ -361,43 +420,87 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
       player_data = process_player_from_api(player_id, season)
       if player_data:
         seen[player_id] = player_data
+        pending[player_id] = player_data
         processed_count += 1
+      # Flush every 25 to bound the loss window on timeout.
+      if len(pending) >= 25:
+        total_upserted += _flush_batch(db, pending, f"discovery season={season}")
       current_time = time.time()
       if current_time - last_progress_time >= 15:
         print(f"  [PROGRESS] Processed {idx}/{len(missing_ids)} discovery-players ({processed_count} successful)...")
         last_progress_time = current_time
+    total_upserted += _flush_batch(db, pending, f"discovery-tail season={season}")
 
   print(f"[populate_player_directory][season={season}] Step 3: Fetching rosters for {len(TEAMS)} teams...")
   total_roster_players = 0
   roster_processed = 0
+  roster_skipped_existing = 0
   last_progress_time = time.time()
   for team_idx, team_abbrev in enumerate(TEAMS, 1):
     roster = fetch_team_roster(team_abbrev)
     time.sleep(0.2)
+    team_pending: Dict[int, dict] = {}
+    team_refresh_pending: Dict[int, dict] = {}
     for roster_player in roster:
       total_roster_players += 1
       player_id = _safe_int(roster_player.get("id") or roster_player.get("playerId"), 0)
       if not player_id or player_id in seen:
         continue
+      if player_id in existing_ids:
+        # Task E: existing players skip the EXPENSIVE per-player NHL API
+        # bio fetch (that's what the #290 fast lane closed), but we STILL
+        # refresh the CHEAP fields the roster payload already carries —
+        # team_abbrev, position_code, jersey_number, updated_at. Without
+        # this, an October trade leaves the display stuck on the player's
+        # prior team_abbrev all season. Zero extra API calls (the roster
+        # was already fetched). Fields NOT in the roster payload (bio,
+        # headshot, physical) come from the landing endpoint and are
+        # deliberately not refreshed here.
+        raw_pos = roster_player.get("positionCode") or roster_player.get("position") or None
+        position = raw_pos
+        if position == "L":
+          position = "LW"
+        elif position == "R":
+          position = "RW"
+        jersey = roster_player.get("sweaterNumber")
+        refresh_row = {
+          "season": season,
+          "player_id": player_id,
+          "team_abbrev": team_abbrev,
+          "updated_at": _now_iso(),
+        }
+        if position:
+          refresh_row["position_code"] = position
+        if jersey is not None:
+          refresh_row["jersey_number"] = str(jersey)
+        team_refresh_pending[player_id] = refresh_row
+        seen[player_id] = refresh_row
+        roster_skipped_existing += 1
+        continue
       player_data = process_player_from_api(player_id, season, team_abbrev)
       if player_data:
         seen[player_id] = player_data
+        team_pending[player_id] = player_data
         roster_processed += 1
       current_time = time.time()
       if current_time - last_progress_time >= 15:
-        print(f"  [PROGRESS] Processed {total_roster_players} roster players ({roster_processed} new, {len(seen)} total)...")
+        print(f"  [PROGRESS] Processed {total_roster_players} roster players ({roster_processed} new, {roster_skipped_existing} refreshed-existing, {len(seen)} total)...")
         last_progress_time = current_time
-  print(f"[populate_player_directory][season={season}] Fetched {total_roster_players} roster players across {len(TEAMS)} teams")
+    # Per-team flush: land what we have for this team before moving on,
+    # so a timeout mid-way through the 32-team loop leaves earlier teams
+    # in the directory rather than losing everything.
+    total_upserted += _flush_batch(db, team_pending, f"roster team={team_abbrev} season={season} NEW")
+    total_upserted += _flush_batch(db, team_refresh_pending, f"roster team={team_abbrev} season={season} REFRESH")
 
-  if seen:
-    players_to_upsert = list(seen.values())
-    print(f"[populate_player_directory][season={season}] Upserting {len(players_to_upsert)} players...")
-    db.upsert("player_directory", players_to_upsert, on_conflict="season,player_id")
-    print(f"[populate_player_directory][season={season}] OK: upserted {len(seen)} players")
+  print(f"[populate_player_directory][season={season}] Fetched {total_roster_players} roster players across {len(TEAMS)} teams "
+        f"({roster_processed} new, {roster_skipped_existing} refreshed-existing)")
+
+  if total_upserted:
+    print(f"[populate_player_directory][season={season}] OK: total upserted this season = {total_upserted}")
   else:
     print(f"[populate_player_directory][season={season}] No new players to upsert (all discovered/roster ids already present)")
 
-  return total_roster_players, len(seen)
+  return total_roster_players, total_upserted
 
 
 def main() -> int:

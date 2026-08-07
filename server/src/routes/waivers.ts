@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
-import { membershipMiddleware } from '../middleware/membership';
+import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
+import { getSupabaseAdmin } from '../lib/supabase';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
@@ -254,6 +255,77 @@ waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, validat
   audit.logRosterMove(leagueId, { dropPlayerId: String(body.playerId), teamId: String(body.teamId) });
 
   return ok(c, { success: true });
+});
+
+/**
+ * POST /api/waivers/league/:leagueId/process-all
+ *
+ * Commissioner-triggered waiver processor for a single league. Fires the
+ * appropriate RPCs based on the league's waiver_type:
+ *   - rolling / reverse_standings → process_all_pending_waivers() (global
+ *     RPC — filters to this league in the response; other leagues get
+ *     processed too but that is idempotent for anything not pending).
+ *   - faab → process_faab_waivers_for_league(leagueId) (per-league RPC).
+ *
+ * Prior state: the frontend's WaiverService.processAllPendingWaivers()
+ * POSTed to /api/waivers/process-all — a route that did not exist. Both
+ * callers (LeagueDashboard, Profile) already had leagueId in scope; this
+ * endpoint captures it via the path param and reuses the existing
+ * commissioner middleware.
+ */
+waiverRoutes.post('/league/:leagueId/process-all', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const admin = getSupabaseAdmin();
+
+  const { data: league, error: leagueErr } = await admin
+    .from('leagues')
+    .select('waiver_type')
+    .eq('id', leagueId)
+    .single();
+  if (leagueErr) {
+    logger.error('[waivers.process-all] failed to read league:', leagueErr);
+    return handleError(c, leagueErr, 'Failed to read league waiver_type');
+  }
+  const waiverType = (league?.waiver_type as string) || 'rolling';
+
+  const responseBody: Record<string, unknown> = { leagueId, waiverType };
+
+  if (waiverType === 'faab') {
+    // Per-league FAAB processor. Returns per-claim rows.
+    const { data, error } = await admin.rpc('process_faab_waivers_for_league', {
+      p_league_id: leagueId,
+    });
+    if (error) {
+      logger.error('[waivers.process-all][faab] rpc failed:', error);
+      return handleError(c, error, 'Failed to process FAAB waivers');
+    }
+    responseBody.rpc = 'process_faab_waivers_for_league';
+    responseBody.claims = data || [];
+    responseBody.processed = Array.isArray(data) ? data.length : 0;
+  } else {
+    // Global rolling processor — RPC has no per-league entry point today.
+    // We filter to this league in the response; other leagues that also
+    // had pending claims incidentally get processed, which is a no-op on
+    // any that don't have work. Follow-up: process_pending_waivers_for_
+    // league(uuid) migration (SQL handed to Claude in the PR body).
+    const { data, error } = await admin.rpc('process_all_pending_waivers');
+    if (error) {
+      logger.error('[waivers.process-all][rolling] rpc failed:', error);
+      return handleError(c, error, 'Failed to process waivers');
+    }
+    const allResults = Array.isArray(data) ? data : [];
+    const leagueResult = allResults.find(
+      (r: { league_id?: string }) => r?.league_id === leagueId,
+    ) || null;
+    responseBody.rpc = 'process_all_pending_waivers';
+    responseBody.league_result = leagueResult;
+    responseBody.other_leagues_touched = allResults.filter(
+      (r: { league_id?: string }) => r?.league_id !== leagueId,
+    ).length;
+  }
+
+  logger.info('[waivers.process-all] complete:', responseBody);
+  return ok(c, responseBody);
 });
 
 // POST /api/waivers/league/:leagueId/initialize-priority — Initialize waiver priority

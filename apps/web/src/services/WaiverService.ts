@@ -375,10 +375,17 @@ export class WaiverService {
   }
 
   /**
-   * Process all pending waiver claims across all leagues.
-   * Uses apiClient directly — needs admin endpoint on the server.
+   * Process all pending waiver claims for a specific league. Commissioner-
+   * gated on the server. Rolling and reverse-standings leagues run through
+   * process_all_pending_waivers() (global RPC — response is filtered to
+   * this league); FAAB leagues run through process_faab_waivers_for_league.
+   *
+   * Prior state: this method POSTed to /api/waivers/process-all, a route
+   * that did not exist server-side. The new endpoint is
+   * /api/waivers/league/:leagueId/process-all (commissioner-gated via
+   * existing middleware).
    */
-  static async processAllPendingWaivers(): Promise<{
+  static async processAllPendingWaivers(leagueId: string): Promise<{
     success: boolean;
     results: Array<{
       league_id: string;
@@ -391,12 +398,52 @@ export class WaiverService {
     error?: string;
   }> {
     try {
-      const { data } = await apiClient.post('/api/waivers/process-all');
+      const { data } = await apiClient.post(`/api/waivers/league/${leagueId}/process-all`);
+      const payload = data as {
+        rpc?: string;
+        claims?: Array<{ team_id?: string; status?: string; failure_reason?: string }>;
+        league_result?: {
+          league_id: string;
+          league_name: string;
+          total_processed: number;
+          successful: number;
+          failed: number;
+          details: { team_id: string; success: boolean; error?: string }[];
+        };
+      } | null;
 
-      return {
-        success: true,
-        results: data?.results || []
-      };
+      // Normalize both response shapes (rolling vs FAAB) to the callers'
+      // expected `results[]` array. Rolling returns `league_result` scalar;
+      // FAAB returns `claims[]` per-claim rows.
+      const results: Array<{
+        league_id: string;
+        league_name: string;
+        total_processed: number;
+        successful: number;
+        failed: number;
+        details: { team_id: string; success: boolean; error?: string }[];
+      }> = [];
+      if (payload?.rpc === 'process_faab_waivers_for_league') {
+        const claims = Array.isArray(payload.claims) ? payload.claims : [];
+        const successful = claims.filter(c => c?.status === 'successful').length;
+        const failed = claims.filter(c => c?.status === 'failed').length;
+        results.push({
+          league_id: leagueId,
+          league_name: '',
+          total_processed: claims.length,
+          successful,
+          failed,
+          details: claims.map(c => ({
+            team_id: String(c.team_id ?? ''),
+            success: c.status === 'successful',
+            error: c.failure_reason,
+          })),
+        });
+      } else if (payload?.league_result) {
+        results.push(payload.league_result);
+      }
+
+      return { success: true, results };
     } catch (error: unknown) {
       logger.error('[WaiverService] Error processing waivers:', error);
       return {

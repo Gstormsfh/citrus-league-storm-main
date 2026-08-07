@@ -27,7 +27,14 @@ on:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Raised from 20 → 60 after the 2026-08-07 kill: the D-07 import fix
+    # let the script reach real work for the first time in 90 days, and
+    # the Aug/Sep dual-season ramp (2 seasons × 32 teams + per-player NHL
+    # API fetches) legitimately takes longer than 20 minutes on cold runs.
+    # With the season-scoped discovery scan + skip-existing + per-team
+    # incremental flush changes in this PR, warm runs are well under
+    # 15 min; 60 is headroom for cold NHL API bursts and 429 retries.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -47,11 +54,19 @@ jobs:
       # `CITRUS_DEFAULT_SEASON: '2025'` env hardcode is what kept the
       # directory frozen at 2025 while the SQL joins pivoted to 2026 on
       # 2026-10-01 — the silent zero-scoring failure this guard closes.
+      #
+      # PYTHONUNBUFFERED=1 + `python -u` force line-flushed stdout under
+      # GitHub Actions' non-tty log capture. Without them Python
+      # block-buffers 8 KiB before any print reaches the log — precisely
+      # why the 2026-08-07 kill showed only "Script starting..." across a
+      # 19m43s hang. Belt-and-suspenders: the script also calls
+      # sys.stdout.reconfigure(line_buffering=True) at module top.
       - name: Refresh player_directory from rosters + raw_shots discovery
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: python scripts/utilities/populate_player_directory.py
+          PYTHONUNBUFFERED: '1'
+        run: python -u scripts/utilities/populate_player_directory.py
 
       # Post-run assertion — Task 0F. Imports the SAME seasons_to_populate
       # helper the writer uses, so writer and guard cannot drift. Fails on
