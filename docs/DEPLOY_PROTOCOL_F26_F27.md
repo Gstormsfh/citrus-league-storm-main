@@ -20,19 +20,27 @@ Reference deploy record:
 - 9-item boot verification passed at `2026-08-04T15:51:55Z`
 - `deployment.fingerprint` observability payload confirmed `imageSha == push digest` AND `commitSha == HEAD`
 
-### 9-item boot verification (from 527ceb38 record)
+### 9-item boot verification (CORRECTED 2026-08-07 per INS-16)
 
-Per `server/src/draft/index.ts` startup log emissions. Each item logs at INFO with a structured field; boot fails loud if any assertion fails.
+**Prior emissions of this list were FICTION** — patterns like `hono.server.bound`, `uws.server.bound`, `secrets.loaded`, `NODE_ENV`, `gce.metadata.resolved`, `db_url.direct_connection_ok`, `LobbyRegistry init`, and `startup.shared_types_version` do **not** exist in the engine's log vocabulary and could never match a healthy boot. F27b-1 deploy 2026-08-07 booted clean in 18ms but the checklist "failed" against every single item, correctly not triggering rollback but revealing the checklist as compose-from-memory rather than harvest-from-real-output. See INS-16.
 
-1. Process env — `NODE_ENV` and `PROJECT_ID` extracted and logged.
-2. GCE metadata read — `project-id`, `image-tag`, `secret-*-name` metadata resolved (see `infra/gce/draft-engine-startup.sh`).
-3. Secrets loaded — `SUPABASE_JWT_SECRET`, `SUPABASE_DB_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` all fetched from Secret Manager (project-scoped per `PROJECT_ID`); non-empty lengths logged.
-4. `SUPABASE_DB_URL` direct-connection assert — refuses `pooler.supabase.com` / `pgbouncer` / `:6543` per KI-E010.
-5. `deployment.fingerprint` structured log — `imageSha`, `commitSha`, `imageTag`, `bootAt` (compare all four to expected values).
-6. Hono HTTP server bound — port + upgrade route registered.
-7. uWS server bound — WS port + upgrade handler registered.
-8. Postgres LISTEN client connected — chunk 11g.7 sub-step 7e cross-process signal path live; `event_subscription.connected` log emitted.
-9. LobbyRegistry initialized — snapshot loader ready, idle-reap scanner scheduled.
+**Canonical vocabulary — harvested from live source** (`grep -rn` in `server/src/draft/`):
+
+| # | Pattern | Emitted by (file:line) | Signal |
+|---|---------|------------------------|--------|
+| 1 | `deployment.fingerprint` | `index.ts:192` | `imageSha` + `commitSha` + `imageTag` + `bootAt` + `envFingerprint` map |
+| 2 | (nested in #1) `envFingerprint` fields all `present` | `index.ts:188-190` | Every required env var populated |
+| 3 | `hono.listening` | `index.ts:158` | Hono HTTP server bound, port emitted |
+| 4 | `uws.listening` | `uws-server.ts:674` | uWS server bound, port emitted |
+| 5 | `event_subscription.started` | `eventSubscription.ts:728` | LISTEN client connected (chunk 11g.7 sub-step 7e) |
+| 6 | `event_subscription.self_test_succeeded` | `eventSubscription.ts:379` | LISTEN/NOTIFY round-trip verified |
+| 7 | `registry.idle_eviction_timer_started` | `LobbyRegistry.ts:725` | Idle-reap scanner scheduled |
+| 8 | `registry.clock_liveness_scanner_started` | `LobbyRegistry.ts:866` | Clock-liveness scanner scheduled |
+| 9 | `heartbeat.timer_started` | `uws-server.ts:651` | App-level WS ping/pong watchdog scheduled |
+
+Each item logs at INFO with a structured payload. Verification is exact-name grep, not free-text pattern match.
+
+**Removed:** the `startup.shared_types_version` guard (§4a below) was fiction — no such log line exists. Guard is REMOVED until an actual emission is added. Docket task if the boot-time assert is wanted; otherwise the shared-types diff is covered transitively via the `deployment.fingerprint` `imageSha` digest chain (the build ordering §4a still stands; only the log-line assertion is removed).
 
 ## §2 Standing rules (all apply to this deploy)
 

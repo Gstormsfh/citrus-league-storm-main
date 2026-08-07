@@ -1186,3 +1186,103 @@ pre-diff baseline: 4 pre-existing errors (draftAdminRoutes tests
 × 2, draftRoutes.f14 test mock, systemFlags.ts:96 = KI-027 task
 #22). **Zero new errors from `LobbyManager.ts`.** F27b-1 diff is
 compile-safe for the §15.14 deploy.
+
+## INS-16 — Verification patterns MUST be harvested, never composed (2026-08-07)
+
+**Trigger.** F27b-1 §15.14 deploy 2026-08-07 booted clean in 18ms
+(fingerprint commitSha `0ecbe605`, all env present,
+event_subscription self-test passed). Terminal-authored Phase 5
+9-item verification block "failed" against every single item AND
+the §4a shared-types assertion — correctly not triggering rollback
+via P2 sleep-30-refetch, but revealing the block as compose-from-
+memory rather than harvest-from-real-output. Rollback pin sat
+armed against a healthy image the whole verification window.
+
+**Fictional patterns emitted by prior terminal message
+(none exist in engine log vocabulary):**
+
+| Fictional pattern | Should have been |
+|---|---|
+| `NODE_ENV` | (nested inside `deployment.fingerprint.envFingerprint` map) |
+| `gce.metadata.resolved` | (no separate log; captured in `envFingerprint`) |
+| `secrets.loaded` | (captured in `envFingerprint` present-check per key) |
+| `db_url.direct_connection_ok` | (KI-E010 guard is at bootstrap time; failure is FATAL, no INFO signal) |
+| `hono.server.bound` | `hono.listening` (`index.ts:158`) |
+| `uws.server.bound` | `uws.listening` (`uws-server.ts:674`) |
+| `event_subscription.connected` | `event_subscription.started` + `event_subscription.self_test_succeeded` (`eventSubscription.ts:728`, `:379`) |
+| `LobbyRegistry.*initialized\|init.complete` | `registry.idle_eviction_timer_started` + `registry.clock_liveness_scanner_started` (`LobbyRegistry.ts:725`, `:866`) |
+| `startup.shared_types_version.*hasDraftStartedKind.*true` | (log line does not exist — DOCKET adding one or accept transitive fingerprint coverage) |
+
+**Root.** Terminal composed the checklist from
+`docs/DEPLOY_PROTOCOL_F26_F27.md:27-35` (which itself was composed
+from memory during protocol authorship, never verified against a
+grep of the source). Chain of composed-not-harvested authorship
+survived 527ceb38's deploy because no one ran the checklist — the
+prior deploy verification was "paste the fingerprint log to
+architect, done."
+
+**Rule (INS-16).** Verification patterns MUST be harvested from
+certified real output — either a grep of the source
+(`server/src/draft/` for `structuredLogger.info\|.warn` emissions)
+or a paste of an actual healthy-boot log — never composed from
+memory or from protocol documents.
+
+**Applied in this session.**
+- `docs/DEPLOY_PROTOCOL_F26_F27.md:23-42` §1 9-item table
+  rewritten with grep-verified names (this commit).
+- Shared-types assertion (§4a) removed; docket item added if a
+  boot-time log line is wanted, otherwise transitive fingerprint
+  digest coverage is the sole guarantor.
+- Future §15.14 deploy blocks emit verification against the
+  corrected vocabulary; terminal cross-checks each pattern via
+  Grep before emission.
+
+**Second-order guard.** For any future protocol doc that ships
+patterns intended for later machine-consumption (verification
+scripts, alerts, dashboards), reviewer must `grep -rn <pattern>
+server/src/` (or the equivalent) BEFORE approving. Compose-from-
+memory patterns propagate — the 527ceb38 protocol shipped this
+defect and it survived multiple deploy walk-throughs.
+
+### Bonus evidence (2026-08-07 image swap) — cross-image mid-draft handoff
+
+During the F27b-1 image swap, retired league `993c9219`
+(previously reap-eligible per M4 analysis 2026-08-07 morning) was
+RECOVERED AND COMPLETED across the swap boundary:
+
+1. VM reboot resurrected the OLD container (`8b7b43f6-draft`)
+   pre-swap.
+2. Snapshot+delta bootstrap path armed timer from the 14-hour-
+   expired deadline.
+3. Seq 2 autopicked 19:46:52Z on OLD image.
+4. NEW container (`0ecbe605-draft`) then bootstrapped mid-draft
+   via snapshot+delta:
+   ```
+   snapshot.bootstrap.applied
+     snapshotSeq=1 deltaEvents=1
+     → picksMade=1, in_progress, timerScheduled=true
+   ```
+5. Seqs 3-14 completed on a perfect 31s ladder,
+   `driftFromDeadlineMs` in [0, 2ms].
+6. `draft_completed` broadcast; observer's `resync.responded`
+   served 13 deltas on reconnect (live resync evidence).
+
+**Zero gap. Zero duplicate. Cross-image mid-draft handoff proven
+in vivo.**
+
+**Dispatcher citation** (architect follow-up Q): the snapshot+delta
+path calls **`this.applyEventDuringBootstrap(event)`** at
+**`server/src/draft/LobbyManager.ts:2717`** for each delta event
+after `applySnapshot(snapshotRecord)`. This is the LIVE NOTIFY
+dispatcher (case body at `:2833`) which HAS `case 'draft_started'`
+already (landed with F27 commit `2c81a2ff` and refactored to
+`applyDraftStartedEventState` by F27b-1 commit `0ecbe605`).
+
+**Implication for F27b-1 coverage.** The bonus recovery worked on
+BOTH images because BOTH had the LIVE-dispatcher case; the
+snapshot+delta path was never broken. **F27b-1's unique coverage
+is the NO-SNAPSHOT full-replay path** (`bootstrapFullEventReplay`
+at `:3109`) — exactly what STEP 5' tests when a fresh league is
+bootstrapped without a prior snapshot record. F27b-1 is NOT yet
+proven by this bonus evidence; STEP 5' rerun on the fresh league
+is the actual gate.
