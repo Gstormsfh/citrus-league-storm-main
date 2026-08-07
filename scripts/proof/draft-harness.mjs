@@ -44,7 +44,7 @@ import { existsSync, createWriteStream, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  WHITELISTED_LEAGUE_ID,
+  WHITELISTED_LEAGUE_ID as LEGACY_LEAGUE_ID,
   HARNESS_TEAM_IDS,
   HARNESS_USER_IDS,
   HARNESS_PLAYER_IDS,
@@ -54,6 +54,19 @@ import {
 } from './fixture-12.mjs';
 import { connectDraftClient } from './lib/ws-client.mjs';
 import { formatSummary } from './lib/percentiles.mjs';
+
+// F27 (2026-08-07): 993c9219 is RETIRED PERMANENTLY per architect ruling.
+// Rig runs use fresh F27-native leagues via env override; legacy S1-S4 perf
+// runs against 993c9219 emit a loud warning + still work for now (backward
+// compat window). Follow-up task: retire the legacy fallback entirely once
+// perf scenarios are re-run against F27-native leagues.
+const F27_NATIVE_LEAGUE_ID = process.env.F27_NATIVE_LEAGUE_ID;
+const WHITELISTED_LEAGUE_ID = F27_NATIVE_LEAGUE_ID ?? LEGACY_LEAGUE_ID;
+if (!F27_NATIVE_LEAGUE_ID) {
+  console.warn(
+    `⚠ draft-harness: F27_NATIVE_LEAGUE_ID not set; falling back to LEGACY league ${LEGACY_LEAGUE_ID} — this league is RETIRED per architect ruling 2026-08-07 00:05. Set F27_NATIVE_LEAGUE_ID env for F27-native rigs.`,
+  );
+}
 
 // Silence lint on unused HARNESS_SESSION_ID / harnessUserId — they're
 // re-exported for external callers even if this file doesn't use them.

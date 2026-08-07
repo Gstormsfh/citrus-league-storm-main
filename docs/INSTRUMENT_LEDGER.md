@@ -847,3 +847,139 @@ cadence — let it finish, free F24+F26 soak." Understood; no
 intervention. F24 completion path + F26 broadcast path both getting
 their first live-production soak on this draft. Recorded as
 positive-signal observation, not a defect.
+
+### INS-14 — Run #2 stale-cursor duplicate-skip (in-memory lobby immortality + rewound DB)
+
+**Field record (2026-08-07 05:36:58.106Z, log adjudicated by architect ~23:48 MT).**
+Rig run #2 attempted ignition on the same 993c9219 league that run #1
+had completed on. Engine log:
+```
+external_event.duplicate_skipped seq:1 lastAppliedSeq:14 reason:seq_at_or_below_cursor
+```
+Fresh seq=1 draft_started NOTIFY arrived; in-memory cursor was still 14
+from run #1's completion; guard at `LobbyManager.ts:5541` treated the
+event as duplicate → dropped without apply. No broadcast, no status
+flip, no timer arm. Explains run #2's assert-C silence AND the 27-min
+stall (top-of-file docket entry from architect run notes 2026-08-06
+STEP 5 covered this observationally; INS-14 codifies mechanism).
+
+**Instrument.** `server/src/draft/LobbyManager.ts:5541-5549` —
+`processExternalEvent`'s duplicate-skip guard. Pure in-memory check
+(no DB cross-check).
+
+**Failure mode.** `dropped-signal` — legitimate NOTIFY silently skipped
+because in-memory cursor was stale relative to a rewound DB (fixture
+reset dropped seqs 2-14; wrote fresh seq 1; engine memory carried
+cursor 14 from the completed run).
+
+**Why in-memory lobby survived across runs.** M1(d) confirms lobby
+idle-reap requires `connectionCount === 0`. Rig's prior observer WS
+was a Promise (INS-13 root), never actually closed → connection count
+never returned to zero → reap never fired. Lobby persisted with
+completed status + cursor 14 for 24+ hours. Fixture reset touched DB
+but not engine memory; run #2 landed into the corrupt-in-memory lobby.
+
+**Fix (this session, author-only).** Rig redesign (see file header of
+`scripts/proof/lifecycle-acceptance-f27.local.mjs`):
+- Amendment 1: fresh-league-per-run via `fixture-12-f27-native.local.mjs`
+  (new file, task #50 durable fix ratified BLOCKING by architect).
+  Every rig invocation targets a NEW league UUID with cursor 0.
+- Amendment 2: `await connectDraftClient(...)`; observer IS the handle;
+  real `handle.close()` in cleanup finally + on every assert-failure
+  exit path (global `openObservers` set + `cleanupObservers()` helper).
+  Kills the lingering-socket source of lobby immortality.
+
+**Engine fix — DEFERRED (F27b parked, not authorized).** Architect
+safety caution recorded 2026-08-07 00:05: naive stale-cursor
+reconciliation (`seq===1 && cursor>0 → wipe`) is REDELIVERY-UNSAFE —
+a redelivered old seq-1 NOTIFY would wipe a live lobby. Any future
+engine self-heal must cross-check DB max(seq) or event_id/payload_hash
+before honoring a reset. Ledgered here as a documented no-fly zone
+for future authors.
+
+**Meta-lesson.** In-memory cursor + DB rewind is a foot-gun class:
+- If tests / rigs / operators can reset the DB while the engine holds
+  in-memory state, any stateful in-memory index (cursor, snapshot,
+  ring buffer) can silently diverge from the DB and drop legitimate
+  traffic.
+- The fix is either (a) test isolation via fresh identifiers so the
+  in-memory state never carries over (this session's choice) or (b)
+  engine-side reset detection with a safety cross-check (deferred).
+
+### INS-15 — Persistence-writer chimera (lastAppliedSeq from DB + draftStatus from memory)
+
+**Field record (2026-08-07 05:37:16Z).** `snapshot.persistence.written`
+log for league 993c9219 recorded `{lastAppliedSeq: 14 → 1, draftStatus:
+'completed'}` — an impossible pair, persisted as fact. Any future
+bootstrap from this snapshot would resurrect status=completed with
+cursor=1; subsequent seq ≤14 events hit the same seq_at_or_below_cursor
+duplicate-skip guard as INS-14.
+
+**Instrument.** `server/src/draft/LobbyManager.ts:2499-2578` —
+`processSnapshot()`. Line 2526: `lastAppliedSeq` sourced from DB via
+`findMaxEventSeq()`. Line 2567: `draftStatus` sourced from
+`this.draftStatus` (engine memory). No cross-validation before
+`writeSnapshot()` at line 2562.
+
+**Failure mode.** `chimera-write` — two fields from two sources of
+truth, no consistency check. Under normal operation the sources agree
+(engine state converges to DB via NOTIFY+apply). Under corrupted
+in-memory state (INS-14 root), sources diverge and the chimera lands.
+
+**Fix.** Not authorized (F27b parked). Recorded as a companion to
+INS-14. When engine hardening ships:
+- `processSnapshot` should ASSERT `this.lastAppliedSeq === findMaxEventSeq()`
+  before writing; on mismatch, EMIT WARN + REFUSE the write.
+- Alternative: source `draftStatus` from DB alongside `lastAppliedSeq`
+  (both from the same read snapshot).
+
+**Retired league 993c9219** carries the poisoned snapshot row as
+evidence per architect ruling. Never reuse. Any future engine
+hardening PR that adds bootstrap validation should treat 993c9219's
+snapshot as a canary — the code SHOULD refuse to bootstrap from it.
+
+### INS-13-follow-up — Rig-cleanup socket-leak (root of INS-14's lobby immortality)
+
+**Field record.** Prior rig had `const observer = connectDraftClient(...)`
+(no await) at line 295. `observer` was a Promise, not a handle.
+`observer.close?.()` at line 449 was undefined-then-noop. WS never
+closed on rig exit.
+
+**Fix (this session, author-only).** New rig (Amendment 2):
+- `const primaryObs = await openObserver(...)` — awaits the handle
+  through a wrapper `openObserver()` helper.
+- Global `openObservers` Set + `cleanupObservers()` helper.
+- Real `handle.close()` in `finally` block + on every assert-failure
+  exit via `fail()` helper (which calls `cleanupObservers()` before
+  `process.exit(1)`).
+- Documented in file header + Amendment 2 comment blocks.
+
+**Docketed here** as a follow-up to INS-13 because the same day-of
+recovery (2026-08-06) surfaced two related rig bugs (matcher shape +
+socket cleanup) but only the matcher was patched in that iteration.
+The cleanup fix rides this session's redesign.
+
+### Amendment 7 rig — STEP 6 REDEFINED (abandoned-mid-draft)
+
+**Architect ruling 2026-08-07 00:05.** Rider 2's original "zero-client
+start" evolves. The new STEP 6 scenario:
+1. Ignite via `start_draft_v2`.
+2. One harness client connects → lobby created via
+   `LobbyRegistry.getOrCreate` → bootstrap applies `draft_started` →
+   arm timer.
+3. Client disconnects CLEANLY (rig calls `handle.close()`).
+4. Engine autopicks the entire draft ALONE — in_progress lobbies are
+   reap-exempt (M1d: `LobbyRegistry.ts:788-794`), so the lobby
+   survives post-disconnect. Autopick cascade drives to completion.
+5. Assert DB completion + `draft_completed` event + engine autopick
+   log lines (verified out-of-band via docker logs over SSH).
+
+Nobody-ever-joined case (NOTIFY arrives, no lobby exists) is F23 —
+`LobbyRegistry.ts` needs a DB-side scan for vanished lobbies. Out of
+F26/F27 scope; task #20 tracks.
+
+**Note: bootstrap-arming is load-bearing in this design.** Post-
+ignition first-join must arm from a possibly-past deadline (if wait
+before join exceeded pick_time). F20 identity/wallclock guards
+(`LobbyManager.ts:4179+`) own the immediate-fire case. Acceptance
+must watch for those log lines.

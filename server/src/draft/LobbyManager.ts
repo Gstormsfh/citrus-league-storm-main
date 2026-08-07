@@ -2912,12 +2912,32 @@ export class LobbyManager {
         // Guarded status transition + timer arm. Only fire if we're
         // actually at the ignition boundary (draftStatus='not_started').
         // Skip on bootstrap-replay for already-in-progress drafts.
+        //
+        // F27b freebie (2026-08-07 architect approval, next-engine-deploy):
+        // if the guard REFUSES because in-memory status is stale
+        // (completed or in_progress carrying over from a prior run's
+        // state, as observed in run #2's stalled ignition 2026-08-07
+        // 05:36:58Z), log a WARN with the actual vs expected values so
+        // the refusal is visible instead of silent. Pure observability;
+        // no behavior change — the guard still refuses. Diagnoses future
+        // stale-status-at-ignition patterns immediately from logs.
         if (this.draftStatus === 'not_started' && firstPickDeadline.length > 0) {
           const parsed = new Date(firstPickDeadline);
           if (!Number.isNaN(parsed.getTime())) {
             this.draftStatus = 'in_progress';
             this.setPickDeadline(parsed, 'pick');
           }
+        } else {
+          structuredLogger.warn('draft_started_apply.skipped_stale_status', {
+            lobbyId: this.lobbyId,
+            leagueId: this.leagueId,
+            seq: event.seq,
+            currentDraftStatus: this.draftStatus,
+            firstPickDeadlinePresent: firstPickDeadline.length > 0,
+            reason: this.draftStatus !== 'not_started'
+              ? 'in_memory_status_not_not_started'
+              : 'missing_first_pick_deadline',
+          });
         }
         break;
       }
