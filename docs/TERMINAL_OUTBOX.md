@@ -533,3 +533,102 @@ Per S6 + T9 audits, the following sites also have KI-042 exposure but were NOT t
 **All ready to apply — utility landed, tests green, autopickStrategy demonstrates the pattern.** Post-close cleanup: task #61 remains open with utility now available.
 
 **MOVING TO END-OF-THIRD-SHIFT FINAL SUMMARY after committing.**
+
+---
+
+## R18 — 2026-08-08 ~21:05Z — END-OF-THIRD-SHIFT FINAL SUMMARY
+
+**Directive completion status.** Per Garrett kickoff Entry 2: "Work it CONTINUOUSLY in a single run: finish an item → write its completion notice to the outbox → re-read the inbox → next item... Only when EVERYTHING is exhausted: final outbox summary, then stand by."
+
+**Status.** ALL T-items completed OR STOPPED-with-report per architect condition. Inbox drained (Entries 1-6 all addressed). Standing by for further inbox entries or overnight rest per architect direction.
+
+### T-queue final status
+
+| T-item | Status | Sha | Notes |
+|---|---|---|---|
+| T1 CLEAN THE SUITE | ✓ COMPLETE | `ae2d6096` | 4 pre-existing failures fixed (timezone off-by-one, test-only). Full web 1555/1555 ✓. |
+| T6 SITE SEASON-PHASE URGENT | ✓ COMPLETE (fix applied on prod by architect) | `cf9e70a7` | Mechanism report R5 + fix script authored. Architect executed OPTION B on The Beta League: playoffTeams 6→0. Site OFFSEASON. |
+| T7 COMMISSIONER BUTTON URGENT | ⏸ STOPPED per architect condition | `e13a94a2`, `69dc3d3e` | R6 initial + hook + server route + 12 tests landed. R13 entanglement analysis surfaced 2 GAPS (draft-order init prerequisite + audit log). Awaiting architect ratification of Option (a) two-step wire-up. |
+| T9 ROSTER MOVEMENTS AUDIT | ✓ COMPLETE | `b91416e0` | 13 movement paths audited. 8 PROPER / 4 UNVERIFIABLE-OFFLINE / 0 DEFECT-needing-fix. KI-042 exposure noted (same class as S6/T5). |
+| T10 + Entry5 NEW-LOOK + ART | ✓ COMPLETE | `19161274` | Every RS/offseason page ALREADY NEW-LOOK (imports citrus2). Caricature inventory 16 assets. ART_GENERATION_QUEUE.md scaffold with empty queue (no new art needed today). |
+| T2 INTEGRATION FUZZER | ✓ COMPLETE | `e0436d6b` | 5 invariants × 10K sequences = 50K exercised at store integration level. Zero violations. |
+| T3 CAPACITOR SPIKE + T8 APP STORE | ✓ COMPLETE | `3e346506` | CAPACITOR_SPIKE_PLAN.md 10 sections. Day-by-day Aug 15-17. WS bg/fg behavior covered. Signing prereqs list. Merged T8 as §8 readiness checklist. |
+| T4 F23 DESIGN DOC | ✓ COMPLETE | `d6f6ef5f` | DESIGN_F23_registry_blind_stall_recovery.md. 3 options evaluated → Option B recommended (engine-side DB poll). 8 ratification bars. |
+| T5 KI-042 #61 | ✓ COMPLETE (utility + demo fix; remaining 3 sites docketed) | `2ab6314d` | Shared playerIdDomain utility + 25 tests + autopickStrategy fix demonstrating pattern. |
+
+### Third-shift commits (11 total, from `73877ec6` through `2ab6314d`)
+
+| # | Sha | Item |
+|---|---|---|
+| 1 | `73877ec6` | ACK Entry 1 (channel open) |
+| 2 | `ae2d6096` | T1 clean-the-suite |
+| 3 | `cf9e70a7` | T6 URGENT mechanism + fix |
+| 4 | `e13a94a2` | T7 URGENT wire-up (client + server + tests) |
+| 5 | `b91416e0` | T9 roster movements audit |
+| 6 | `19161274` | T10+Entry5 new-look sweep + caricature |
+| 7 | `69dc3d3e` | Entry 6 response (T6 prod-ledger + INS-16 addendum + T7 entanglement STOP) |
+| 8 | `e0436d6b` | T2 integration fuzzer |
+| 9 | `3e346506` | T3+T8 Capacitor spike + App Store |
+| 10 | `d6f6ef5f` | T4 F23 design doc |
+| 11 | `2ab6314d` | T5 KI-042 utility + autopickStrategy fix |
+
+### Full-day commits (28 total: 12 first-shift + 5 second-shift + 11 third-shift)
+
+Complete chronological list in `docs/HANDOFF_2026-08-08_v2.md` §Commits + this outbox's chronological trail (R1 → R18).
+
+### Open architect ratification items (blocking = ❌, non-blocking = ⏸)
+
+| Item | Status | Requires |
+|---|---|---|
+| T7 wire-up gap resolution (GAP-1 draft_order init + GAP-2 audit log) | ⏸ STOP | Architect re-rule on Option a/b/c |
+| N-2 backfill migration application | ⏸ Pending Garrett-exec | Post-THE-TWELVE per Q4 |
+| F27b-2 fix engine deploy | ⏸ Pending Garrett-exec | Pre-freeze Aug 17 |
+| N-1 harness fix production verify | ⏸ Pending Garrett-exec | Next STEP 5' run |
+| F27 CLOSE deploy (F26+F27+F27b-1) already certified | ✓ | — (rollback pin advanced 2026-08-08) |
+| KI-034 (draft_state) resolution | ⏸ Post-close per Q4 | Post-twelve backfill migration |
+| F23 registry-blind-stall implementation | ⏸ Post-close | Architect ratifies design |
+| Task #61 remaining sites (DraftService, MatchupService, WaiverService, waiver routes) | ⏸ Post-close | Utility available; audit + apply |
+
+### Open architect questions (all NON-BLOCKING for THE TWELVE)
+
+1. T7: which option for GAP-1 draft-order init? (a) two-step client wire-up, (b) extend RPC, (c) separate v2 init endpoint. My recommendation: **(a)**.
+2. T7: GAP-2 audit log addition to `draftV2Start.ts` — ACK to proceed?
+3. Task #52: switch `--mode=lifecycle` default to true-Assert-F, OR keep opt-in mode indefinitely?
+4. F28-L3 (docketed): explicit `draft_paused` / `draft_cancelled` reducer cases in `deriveDraftState`?
+5. F28-L4 (docketed): dedup `snapshot.recentEvents` at `draftClientStore.applyEvent`?
+6. F23 design ratification per §5 bars.
+7. Task #61: architect greenlight for the recommended fix pattern (server-side `assertNumericPlayerId` in waiver routes)?
+
+### Blocking checklist for THE TWELVE (from HANDOFF v2, updated)
+
+- [ ] **T7 wire-up** — GAPS resolved + wire-up authored + deployed. **CANNOT DRAFT WITHOUT.** (post-Garrett-return)
+- [ ] Group A: F27b-2 engine deploy + STEP 5' green (post-Garrett-return)
+- [ ] Group B: N-2 migration applied (post-Garrett-return; not strictly THE-TWELVE-blocking but architect-ratified for hygiene)
+- [ ] Group C: F28 web build deployed + browser-verified (post-Garrett-return)
+- [ ] Pre-THE-TWELVE dry-run passed (post-Garrett-return + volunteers)
+
+### What's NOT blocking THE TWELVE
+
+- F23 registry-blind-stall recovery (post-close hardening)
+- KI-042 #61 remaining sites (post-PROD-PORT scoping)
+- Capacitor spike (Aug 16 target; not gate to THE TWELVE which is web-only)
+- MIXED audit per-page walk (post-close polish)
+- All docketed tasks #52-#68
+
+### Standing rules honored
+
+- **AUTHOR-ONLY**: no prod writes, no rig runs, no gcloud/docker/psql, no npm scripts touching network/DB
+- **Offline unit tests only**: 25 new playerIdDomain tests + 12 new useStartDraftV2 tests + 5 new draftClientStore fuzzer tests + timezone-fix on 46 existing web tests → all pass
+- **Never guess architect decisions**: T7 STOP + report is the explicit exemplar
+- **Time-box + docket**: no item stalled > 90min; T7 STOP + move-on
+- **Diff safety arguments**: every commit includes ratification-bar-style rationale
+- **INS-16 discipline**: repeat offense on T6 diagnostic SQL captured with reinforcement in ledger
+
+### Standing by
+
+Reading inbox on any new entry per protocol. Next action:
+- If architect Entry 7+ lands: ACK immediately + execute per direction + reply
+- If Garrett returns: hand-off is docs/HANDOFF_2026-08-08_v2.md (first shift) + outbox trail R1-R18 (subsequent shifts) + this final summary
+- Otherwise: idle, no self-queued work
+
+**End of third-shift authoring.**
