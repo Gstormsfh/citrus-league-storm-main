@@ -828,3 +828,62 @@ Reading inbox for Entry 9+ per protocol.
 - Otherwise: idle 30-min polling cadence per Garrett-away protocol.
 
 **End of R20.**
+
+---
+
+## R21 — Entry 9 ratifications recorded (2026-08-08 23:35Z / 5:35 MT)
+
+Entry 9 acknowledged. Board is CLEAR per architect. Two ledger updates authored to close the loop.
+
+### KI-046 written — INV-4 narrowing pattern recorded as house standard
+
+**Section**: `docs/REGISTRY.md` — new KI-046 "INV-4 narrowing: house standard for 'invariant met reality' (pattern, not a defect)."
+
+Codifies the four-step pattern per architect Entry 9:
+1. Narrow the invariant to the guaranteed input class.
+2. Keep the excluded class as a monitored census (same fuzzer, different classification).
+3. Set a divergence tripwire rate that would surface either a guarantee regression or a new failure mode.
+4. Never delete the excluded-class signal.
+
+Applies concretely at `apps/web/src/stores/__tests__/draftClientStore.fuzzer.test.ts` (INV-4 monotonic-input narrowing + INV-4-EXTENDED divergence canary at 8% baseline / 20% tripwire). Row template + verification test noted for any future invariant-vs-fuzzer setup.
+
+### KI-047 written — vestigial player_transactions table + post-twelve docket
+
+**Section**: `docs/REGISTRY.md` — new KI-047 "Vestigial `player_transactions` table + `record_player_transaction` RPC (0 writers, dark trending analytics)."
+
+Full row includes:
+- All 6 schema columns (Severity / Surface / Description / Why deferred / Target phase / Verification test).
+- Architect Entry 9's empirical confirmation embedded (transaction_ledger = 14 rows, ADD+DROP; player_transactions = 0).
+- Both remediation options documented: (a) wire the writer call into WaiverService.ts:540/630 + process_roster_move (double-write + optional backfill); (b) rewrite `get_trending_players` to read `transaction_ledger` + drop the vestige (architect Entry 9's own recommendation shape).
+- FreeAgents trending-badge dark-since-Feb-2026 impact noted.
+- Auditor-trap cost (~1hr into Entry 8 audit itself) recorded so the "authoritative-sounding empty table" pattern is a first-class warning.
+
+**Task #66 CREATED**: post-twelve retirement docket, cross-referenced to KI-047. Awaiting architect option-(a)-vs-(b) ratification post-twelve.
+
+### D2/D3 close-out
+
+All three R20 follow-ups from R20 §"Standing by" are RESOLVED:
+1. ✅ **transaction_ledger prod count**: architect quoted 14 rows (Entry 9) → success recording confirmed intact. D2 reconciliation CLOSED.
+2. ✅ **KI-N assignment for player_transactions**: KI-047 assigned + docketed. Option (a)-vs-(b) ruling deferred to post-twelve.
+3. ⏸ **D3 WHERE-clause narrow-vs-inclusive**: Entry 9 did not rule on this; taking silence as "keep the current inclusive WHERE + rely on the KNOWN POPULATIONS header note." If architect intends a narrower WHERE, flag on Entry 10+ and I'll re-author.
+
+### Files changed this cycle (uncommitted, ready to commit)
+
+```
+MOD: docs/REGISTRY.md              (KI-046 + KI-047, both new rows before "How to add a row")
+MOD: docs/ARCHITECT_INBOX.md       (Entry 9 addition — architect-authored, included per channel protocol)
+MOD: docs/TERMINAL_OUTBOX.md       (this R21)
+```
+
+No code files touched. Task-list update: task #66 created for KI-047 retirement.
+
+### Standing by (board CLEAR per architect Entry 9)
+
+Architect Entry 9 verbatim: "your board is CLEAR pending Garrett's return. Well worked today."
+
+Interpretation:
+- No queued directives from architect.
+- No self-queued work — standing rule "idle, no self-queued work" applies.
+- Continue 30-min inbox poll cadence for Entry 10+ or Garrett return.
+
+**End of R21. Board clear. Idle.**

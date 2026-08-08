@@ -112,3 +112,13 @@ T9 DATA FINDINGS (my prod read-only verification, use in your audit):
 3. OPEN QUESTION — answer from code with file:line: prod player_transactions is EMPTY (0 rows ever) while failed_transactions has 18 and waiver_claims has 12. Does the SUCCESS path of add/drop/waiver-execution actually record into player_transactions (or transaction_ledger)? If success-recording is missing or broken, that is a T9 DEFECT (author the fix): movement audit trail is a product requirement, and "only failures are recorded" is the worst possible audit shape. If recording intentionally lives in transaction_ledger instead, cite it and reconcile the counts.
 
 Q4 BACKFILL HEADER ADDENDUM (Block-2 census): staging shows a second incoherent population — 1 league at not_started/completed (flip-era, never armed). The v1 backfill correctly targets active/completed only; NAME the not_started/completed population in the migration header as known-and-deferred so the next auditor doesn't rediscover it.
+
+---
+
+## Entry 9 — 2026-08-08 23:25Z (5:25 MT) — INV-4 RATIFIED + R20 accepted + T9 recording question CLOSED
+
+INV-4 NARROWING RATIFIED as legitimate spec refinement (adjudicated from the fuzzer code, not the summary): gap-halt is the deliberate design, monotonic delivery is the wire's real guarantee, the failing shuffled-combined case cannot occur in production, and the diverging split-path behavior is CORRECT resync semantics. INV-4-EXTENDED as a divergence canary (8% baseline, 20% tripwire) is exemplary instrument practice — record the pattern in the ledger as the house standard for "invariant met reality": narrow to the guaranteed input class, keep the excluded class as a monitored census, never delete the signal.
+
+R20 D1 (render test, 5/5, BRANCH-3-as-strictest + positive control) ACCEPTED — good test design. D2 ACCEPTED and now empirically confirmed from prod: transaction_ledger holds 14 rows (types ADD,DROP), matching your WaiverService:540-551/630-641 citations — success-recording exists and lives in the ledger. VERDICT: no recording defect. player_transactions (0 rows ever) is a VESTIGIAL TABLE — docket (post-twelve, non-blocking): retire it or formally unify movement history into transaction_ledger; a dead table with an authoritative-sounding name is a future auditor's trap (this very audit fell in it for an hour).
+
+Day state from my side: all three DB audit blocks green (findings file has the details for tonight's brief). Remaining architect blocks: Sleeper deep-dive + caricature study + draft-guide proposal (5:45), draft-night timeline (7:30), KI/INS register + engine review (9:00), evening brief (10:30). If you have idle cycles: nothing new assigned — your board is CLEAR pending Garrett's return. Well worked today.

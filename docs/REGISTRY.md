@@ -668,6 +668,57 @@ Both forms are stored as `text` (or as text-castable values) in a nominally sing
 
 ---
 
+### KI-046 — INV-4 narrowing: house standard for "invariant met reality" (pattern, not a defect)
+
+**Pattern, not a defect.** Recorded here per architect Entry 9 (2026-08-08 23:25Z) as the house standard for the class of situations where a stated invariant is found — under adversarial fuzzing — to be violable on a subset of the input space that cannot actually occur in production.
+
+**The T2 draftClientStore fuzzer** (`apps/web/src/stores/__tests__/draftClientStore.fuzzer.test.ts`) originally stated INV-4 as "every wire-side event produces exactly one client-side derived-state change." The 50K-sequence fuzzer produced failing minimal cases under `shuffled-combined` and `split-path resync` input classes. Adjudicating from the fuzzer code (not the summary), architect ruled:
+- **Gap-halt IS the deliberate design.** When the wire delivers events with a seq-gap, the client halts derivation until resync fills the gap. The failing shuffled-combined case cannot occur in production because the wire's real guarantee is monotonic per-lobby delivery.
+- **Split-path diverging derivation IS CORRECT resync semantics.** During resync, the client intentionally diverges from pre-resync derived state until the snapshot lands.
+- **INV-4 is narrowed** to "monotonic-input case only" — the class the wire actually guarantees.
+- **INV-4-EXTENDED as divergence canary** — the excluded input classes are NOT deleted from the fuzzer. They are re-classed as a CENSUS: run continuously with a divergence rate baseline (8% expected) and a tripwire (20% would indicate the wire's monotonic guarantee has regressed OR a new failure mode has entered the excluded classes).
+
+**The pattern to apply anywhere an invariant meets adversarial evidence:**
+1. **Narrow to the guaranteed input class** — do not weaken the invariant on the guaranteed class.
+2. **Keep the excluded class as a monitored census** — same fuzzer, different classification. Log rate + rank cases.
+3. **Set a divergence tripwire on the census** — a rate that would indicate a real regression (either the guarantee weakened or a new failure mode entered).
+4. **Never delete the signal** — deletion converts a monitored risk into an unknown risk.
+
+| | |
+|---|---|
+| **Severity** | pattern — no severity applies. |
+| **Surface** | any invariant-vs-fuzzer or invariant-vs-property-test setup. Applied concretely at `apps/web/src/stores/__tests__/draftClientStore.fuzzer.test.ts` (INV-4). |
+| **Description** | House standard for "invariant met reality": narrow the invariant to the class the wire/system actually guarantees, keep the excluded class as a monitored divergence-canary census, and set a tripwire rate that would surface either a regression of the guarantee or a new failure mode. Never delete the excluded-class signal. |
+| **Why deferred** | Not applicable — recorded as a standing engineering practice. Applies to all future property tests + fuzzers + invariant-driven test suites. |
+| **Target phase / timeline** | Ambient — every future invariant test that meets a counter-example applies this pattern. |
+| **Verification test** | Any invariant test that documents a narrowed invariant MUST also carry the excluded-class census + a divergence tripwire (rate threshold + failure action). |
+
+---
+
+### KI-047 — Vestigial `player_transactions` table + `record_player_transaction` RPC (0 writers, dark trending analytics)
+
+**Field record from T7 Entry 8 D2 audit + architect Entry 9 empirical confirmation.** The `player_transactions` table (migration `20260205000000_create_player_transactions_table.sql`) and its writer function `record_player_transaction()` (redefined in `20260228000000_11th_audit_comprehensive_fixes.sql:804-857`) have ZERO call sites anywhere in the codebase:
+- `server/src/**/*` — 0 references (grep confirmed).
+- `apps/web/src/**/*` — 0 references.
+- No other migration or SQL function calls `record_player_transaction`.
+
+Prod (empirically confirmed by architect Entry 9): `player_transactions` = 0 rows ever. `transaction_ledger` = 14 rows (types ADD, DROP) — the actual success-recording home per `server/src/services/WaiverService.ts:540-551` (DROP) and `:630-641` (ADD).
+
+**End-user impact.** `apps/web/src/pages/FreeAgents.tsx:198` calls `PlayerService.getTrendingPlayers(7, 50)` → `server/src/services/PlayerService.ts:327-328` calls RPC `get_trending_players` → the RPC reads from `player_transactions` (migration `20260205000000:79`) → returns empty → FreeAgents trending badge has been silently DARK since Feb 2026 (~6 months). No user complaint (users don't notice missing analytics vs. broken analytics).
+
+**Why this is a KI, not a defect.** The audit trail for add/drop/waiver-execution SUCCESS is intact — it lives in `transaction_ledger`, matching WaiverService.ts write citations + the process_roster_move SQL function's own comment (migration `20260309000000_cto_audit_fixes.sql:427`: "Full rollback on any failure. Logs to transaction_ledger and failed_transactions."). The vestigial table is a future-auditor's trap — an authoritative-sounding table name with zero writers pulls audits down a false alley (architect's Entry 9: "this very audit fell in it for an hour").
+
+| | |
+|---|---|
+| **Severity** | low — no data loss, no functional damage to audit trail (transaction_ledger carries the truth). Real cost is (a) auditor-trap potential (~1hr sunk in Entry 8 audit itself), (b) dark trending badge on FreeAgents page since Feb 2026. |
+| **Surface** | `public.player_transactions` (table); `public.record_player_transaction()` (RPC, unused); `public.get_trending_players()` (RPC, reads unpopulated table); `apps/web/src/pages/FreeAgents.tsx:198` (dark consumer); `server/src/services/PlayerService.ts:327-328` (dark route). |
+| **Description** | Vestigial analytics scaffold. Table + writer RPC exist from Feb 2026 migration but the writer RPC is never called from server code, client code, or any other migration. Downstream trending analytics reads from the empty table and returns empty, silently disabling the FreeAgents trending affordance since day one. |
+| **Why deferred** | Post-twelve. Requires prod writes (either double-writing to both ledgers or migrating trending analytics to read transaction_ledger + dropping the vestige). Non-blocking to THE TWELVE. |
+| **Target phase / timeline** | Post-twelve. Two remediation options for architect ratification: **(a)** wire `record_player_transaction()` call into WaiverService.ts:540 + :630 + `process_roster_move` DB function (double-write; optionally backfill `player_transactions` from `transaction_ledger` history); **(b)** rewrite `get_trending_players` RPC to read from `transaction_ledger` + drop `player_transactions` + `record_player_transaction()` (single source of truth). Option (b) is architect Entry 9's own recommendation shape: "retire it or formally unify movement history into transaction_ledger." |
+| **Verification test** | Post-fix: `player_transactions` either has rows (Option a) OR has been dropped from the schema (Option b). FreeAgents trending badge shows non-empty content in staging within N minutes after any real add/drop event. `get_trending_players` returns non-empty in staging within same window. |
+
+---
+
 ## How to add a row
 
 1. Append a new `### KI-NNN` section. Use the next sequential ID across **both** registries (this one and `docs/RUNBOOKS/draft-engine-v2-known-issues.md`). Check the highest existing ID in each before assigning.
