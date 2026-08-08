@@ -117,8 +117,8 @@ const DRY_RUN    = args.includes('--dry-run');
 const PICK_TIME  = Number(flag('pick-time', '30'));
 const ROUNDS     = Number(flag('rounds', '1'));
 
-if (!['lifecycle', 'abandoned-mid-draft'].includes(MODE)) {
-  console.error(`FATAL: --mode=lifecycle | abandoned-mid-draft (got ${MODE})`);
+if (!['lifecycle', 'abandoned-mid-draft', 'lifecycle-true-assert-f'].includes(MODE)) {
+  console.error(`FATAL: --mode=lifecycle | abandoned-mid-draft | lifecycle-true-assert-f (got ${MODE})`);
   process.exit(2);
 }
 
@@ -702,11 +702,97 @@ async function runAbandonedMidDraftMode() {
   }
 }
 
+// ── S7-Q2 (2026-08-08 evening ARCHITECT ruling) — opt-in true-Assert-F mode ──
+// Q2 ruling: "Opt-in mode first. The proven lifecycle default does not
+// change the same day its replacement is authored. Flag-gated until
+// true assert F passes once under my eyes."
+//
+// This mode uses driveHarnessPicksWithPause({pauseAfter: 5, ...}) so
+// the second observer connects at pick 6 (mid-draft), verifies
+// snapshot covers picks 1-5 via recentEvents, then live picks 6-12 +
+// completion. When architect ratifies after N green runs, switch
+// --mode=lifecycle's default to this path.
+async function runLifecycleTrueAssertFMode() {
+  log('MODE = lifecycle-true-assert-f (S7-Q2 opt-in — mid-drive-join at pick 6)');
+  log(`Target: staging (HOST=${HOST}, WS_PORT=${WS_PORT}, SCHEME=${SCHEME})`);
+  const leagueId = await getCurrentLeagueId();
+  log(`Fresh F27-native league: ${leagueId}`);
+  log(`pickTimeLimit override: ${PICK_TIME}s`);
+  log(`Rounds: ${ROUNDS} → ${ROUNDS * 12} picks total`);
+  if (DRY_RUN) { log('DRY RUN — printing plan only'); return; }
+
+  const client = newPgClient();
+  await client.connect();
+
+  try {
+    log('');
+    log('── PREFLIGHT ──');
+    await preflightNotStarted(client, leagueId);
+    await setPickTimeLimit(client, leagueId, PICK_TIME);
+
+    log('');
+    log('── STEP 1 — start_draft_v2 (still no clients) ──');
+    const idem = randomUUID();
+    const startResult = await invokeStartDraftV2(client, leagueId, { idempotencyKey: idem });
+    log(`  ✓ ignition:`, JSON.stringify(startResult));
+
+    log('');
+    log('── STEP 2 — PRIMARY observer connects (post-ignition, pre-picks) ──');
+    const primary = await openObserver('primary-observer', leagueId, 1);
+    log(`  ✓ primary connected; snapshot draftStatus=${primary.snapshotReceived?.frame?.parsed?.payload?.stateSnapshot?.draftStatus}`);
+
+    log('');
+    log('── STEP 3 — DRIVE picks 1-5, PAUSE, connect secondary, VERIFY snapshot, RESUME ──');
+    const driveResult = await driveHarnessPicksWithPause({
+      pauseAfter: 5,
+      leagueId,
+      onPaused: async () => {
+        log('  [onPaused] harness paused at pick 5 — connecting secondary observer');
+        const secondary = await openObserver('secondary-observer-mid-drive', leagueId, 1);
+        const snap = secondary.snapshotReceived?.frame?.parsed?.payload;
+        const recentEvents = snap?.recentEvents ?? [];
+        // Assert G-true: snapshot covers picks 1-5 via recentEvents.
+        // Recent events should include the draft_started event at
+        // seq 1 + pick_submitted events at seqs 2-6 (= picks 1-5).
+        const pickEventsInSnapshot = recentEvents.filter((e) => e.kind === 'pick_submitted');
+        log(`  [onPaused] secondary snapshot recentEvents count=${recentEvents.length}`);
+        log(`  [onPaused] secondary snapshot pick_submitted count=${pickEventsInSnapshot.length}`);
+        if (pickEventsInSnapshot.length < 5) {
+          log(`  [onPaused] FAIL: snapshot missing pick coverage (${pickEventsInSnapshot.length}/5)`);
+          throw new Error(`Assert G-true failed: secondary snapshot has ${pickEventsInSnapshot.length} pick_submitted events, expected >= 5`);
+        }
+        log('  [onPaused] ✓ Assert G-true PASS: secondary snapshot covers picks 1-5');
+        // Do NOT close secondary here — we want to observe live picks 6-12.
+      },
+    });
+    log(`  drive complete: code=${driveResult.code}`);
+    if (driveResult.code !== 0) {
+      fail(`harness exited with code ${driveResult.code}; stderr:\n${driveResult.stderr.slice(-2000)}`);
+    }
+
+    log('');
+    log('── STEP 4 — assert DB completion ──');
+    const cols = await queryLeagueColumns(client, leagueId);
+    assertEqual('final draft_status', cols.draft_status, 'completed');
+    assertEqual('final pick_deadline', cols.pick_deadline, null);
+
+    log('');
+    log('── LIFECYCLE-TRUE-ASSERT-F PASS ──');
+    log('  Snapshot-covers-1-5 verified via secondary observer at mid-drive-join.');
+    log('  Full 12-pick drive + completion verified via harness exit + DB assert.');
+    log('  Post-close: architect ratifies after N green runs → switch --mode=lifecycle default.');
+  } finally {
+    cleanupObservers();
+    await client.end();
+  }
+}
+
 // ── Entry ────────────────────────────────────────────────────────────
 (async () => {
   try {
-    if (MODE === 'lifecycle')             await runLifecycleMode();
-    else if (MODE === 'abandoned-mid-draft') await runAbandonedMidDraftMode();
+    if (MODE === 'lifecycle')                    await runLifecycleMode();
+    else if (MODE === 'abandoned-mid-draft')     await runAbandonedMidDraftMode();
+    else if (MODE === 'lifecycle-true-assert-f') await runLifecycleTrueAssertFMode();
     log('');
     log('=== RIG COMPLETE ===');
     process.exit(0);

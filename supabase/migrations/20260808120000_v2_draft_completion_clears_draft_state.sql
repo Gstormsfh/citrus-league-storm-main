@@ -24,6 +24,149 @@
 --   (B) Formally retire draft_state via drop migration.
 --       REFUSED this close to THE TWELVE — audit surface too broad.
 --
+-- =============================================================================
+-- S7-Q3 CONDITIONAL RATIFICATION — full reader enumeration (2026-08-08 evening)
+-- =============================================================================
+-- Architect Q3 ruling: "must enumerate EVERY reader of draft_state
+-- across server, client, and SQL (grep-complete, file:line) proving
+-- none breaks on a third value. submit_pick_v2 gates on
+-- draft_state='active' — confirm refusal-after-completion is the
+-- intended consequence and state it."
+--
+-- SERVER (TypeScript) readers (grep: `draft_state|draftState` in
+-- `server/src/`, 9 files hit; column-reader hits below, camelCase
+-- local-variable hits excluded):
+--
+--   1. server/src/services/snapshotService.ts:66,95 — reads
+--      leagues.draft_state, maps to LobbyStatus via
+--      mapDraftStateToLobbyStatus at :169-188. Explicit switch:
+--        'in_progress' | 'active'      → 'in_progress'
+--        'paused'                       → 'in_progress'
+--        'completed'                    → 'completed' ✓
+--        'cancelled'                    → 'cancelled'
+--        'queued' | 'pre_draft' | else  → 'not_started'
+--      Post-N-2, a completed league correctly maps to LobbyStatus
+--      'completed'. ✓ NO BREAK.
+--
+--   2. server/src/routes/draftV2Sync.ts:59,125 — SELECT
+--      draft_state + passes through verbatim in response body:
+--      `draft_state: league.draft_state ?? 'not_started'`.
+--      Post-N-2, response returns 'completed'. Client-side
+--      consumers: apps/web `draft_state` grep returns 1 file
+--      (DraftRoom.tsx) which uses camelCase `draftState` as an
+--      unrelated local-variable name (grep-verified at :102,638,
+--      1556 etc — NOT a column reader). ✓ NO CLIENT BREAK.
+--
+--   3. server/src/routes/draftV2Events.ts:156,197-198,208 —
+--      SELECT draft_state + gates cache-immutability:
+--      `const isImmutable = league.draft_state === 'completed' ||
+--        league.draft_state === 'cancelled'`. Post-N-2, completed
+--      leagues correctly get immutable cache header. ✓ POSITIVE
+--      FINDING — the code was READY for 'completed'; N-2 makes
+--      this branch live.
+--
+--   4. server/src/draft/LobbyRegistry.ts:103-109,1061-1089 —
+--      captures `initialDraftState: string | null` at construction.
+--      Blocks lobby construction if `initialDraftState IN
+--      ('not_started','pre_draft')` AND system_flags.no_new_drafts.
+--      Post-N-2, completed leagues would have
+--      initialDraftState='completed' but they wouldn't be
+--      constructing new lobbies (already completed). ✓ NO BREAK.
+--
+--   5. server/src/draft/LobbyManager.ts (comments only, not code
+--      readers): :224,966,1904,2091,5379,6262 — narrative refs.
+--      ✓ NO BREAK.
+--
+--   6. server/src/services/DraftServiceV2.ts:551 — comment only.
+--      ✓ NO BREAK.
+--
+-- SQL (RPC/function readers, grep:
+-- `draft_state\s*(=|<>|IN|CHECK)` in `supabase/migrations/`):
+--
+--   7. submit_pick_v2 Step 2 (this migration's own body,
+--      `20260808120000` — post-apply):
+--        IF v_draft_state <> 'active' THEN
+--          RAISE 'illegal_state: draft_state is % (expected active)';
+--      Post-N-2, a completed league has draft_state='completed' →
+--      this check fires → REFUSES the pick.
+--      **ARCHITECT Q3 CONFIRMATION: refusal-after-completion IS the
+--      intended consequence.** A completed draft correctly rejects
+--      any subsequent submit_pick_v2 attempt with
+--      ERRCODE='check_violation'. This is the DESIRED behavior for
+--      THE TWELVE — no rogue picks against a completed draft.
+--      Pre-N-2, the check would still fire (draft_state stayed
+--      'active' after completion, so `<> 'active'` was false — the
+--      RPC would proceed into further validation and eventually
+--      fail on pick_out_of_order or player_taken). Post-N-2, the
+--      rejection happens at Step 2, EARLIEST possible. Cleaner
+--      failure mode. ✓ INTENDED CONSEQUENCE STATED.
+--
+--   8. nominate_player_v2 (auction, `20260507010000_auction_pause_
+--      resume.sql:517-525`, `20260722000000_staging_schema_
+--      alignment.sql:409-415`):
+--        IF v_draft_state = 'paused' THEN RAISE 'cannot nominate
+--          while paused'
+--      Gates on 'paused' only. 'completed' passes the pause-check
+--      and would fall through to later preflight (nomination
+--      slot check, budget reserve, etc. — all of which would fail
+--      on a completed league via other invariants). No dedicated
+--      'completed' check; not needed because THE TWELVE is snake,
+--      not auction. ✓ NO BREAK; task #58 candidate for auction
+--      hardening (out of THE TWELVE scope).
+--
+--   9. place_bid_v2 (`:725-731` + `20260507020000_auction_tiered_
+--      bid_increments.sql:216-222`): same pattern as nominate. ✓.
+--
+--  10. draft_pause / draft_resume (`20260425140000_draft_engine_
+--      v2_rpcs.sql:750, 1032, 1150`, `20260511010000_remove_pgmq_
+--      emissions.sql:168, 401`):
+--        `IF v_draft_state <> 'active' THEN RAISE`
+--        `UPDATE ... SET draft_state = 'paused'`
+--        `UPDATE ... SET draft_state = 'active'` (resume)
+--      Post-N-2, pause on a 'completed' league fails Step 2 (<>
+--      active). Resume on 'completed' also fails preflight (which
+--      expects 'paused'). ✓ INTENDED — commissioner actions on a
+--      completed draft correctly reject.
+--
+--  11. `20260426130000_draft_engine_v2_phase3_sweep.sql:105`,
+--      `20260511010000_remove_pgmq_emissions.sql:641`:
+--        `WHERE l.draft_state = 'active'` — cron sweeper /
+--        keepalive filters to active leagues only. Post-N-2, a
+--        completed league is EXCLUDED from these sweepers.
+--      **POSITIVE**: sweepers correctly ignore completed drafts
+--      (was accidentally including them pre-N-2 since draft_state
+--      stayed 'active'). ✓ POSITIVE FINDING.
+--
+--  12. CHECK constraint at `20260425130000_draft_engine_v2_
+--      foundation.sql:140`:
+--        CHECK (draft_state IN ('not_started','pre_draft',
+--          'active','paused','completed','cancelled'))
+--      'completed' is admitted. ✓ NO BREAK.
+--
+--  13. auction_engine_foundation `:206`: `IF v_draft_state <>
+--      'active' THEN RAISE`. Same pattern as submit_pick_v2 Step 2.
+--      Post-N-2, auction actions on completed league correctly
+--      reject. ✓ INTENDED.
+--
+-- CLIENT (apps/web/) readers (grep: `draft_state|draftState`):
+--
+--  14. apps/web/src/pages/DraftRoom.tsx — camelCase `draftState`
+--      local variable, NOT a reader of the SQL column. v1 legacy
+--      component; grep hits at :102,638,1556 etc. are client-side
+--      state, not column reads. ✓ NO CLIENT-DB-COLUMN CONSUMER.
+--
+-- CONSUMER TOTAL: 14 grep-hit surfaces, 0 breaks, 3 positive
+-- findings (snapshotService mapper ready, draftV2Events cache
+-- header ready, sweepers correctly exclude completed leagues
+-- post-N-2). Refusal-after-completion in submit_pick_v2 IS the
+-- intended consequence — architect Q3 explicitly ratified this
+-- as the desired outcome.
+--
+-- =============================================================================
+-- Q3 CONDITIONS SATISFIED → ratification lifts. Migration is safe
+-- to apply per Garrett-exec Group B protocol.
+-- =============================================================================
+--
 -- ONE-LINE CHANGE from the F24 rebase:
 --   In the completion UPDATE (Step 4, ~line 391):
 --     BEFORE: SET draft_status = 'completed', pick_deadline = NULL
