@@ -442,13 +442,46 @@ async function runPickDriver(initialPgClient, wsClients, onSample = () => {}) {
   // receive-waiter callback so it can be re-installed after each
   // human-slot resolution branch.
   const installDefaultReceiveHandler = (c) => {
-    c.onEvent(({ seq, receivedAt }) => {
-      // Ordering violation check.
-      const last = perClientLastSeq.get(c.clientLabel) ?? -1;
-      if (seq <= last) {
-        console.warn(`  ⚠ ordering violation: ${c.clientLabel} received seq=${seq} after last=${last}`);
+    c.onEvent(({ frame, seq, receivedAt }) => {
+      // Task #53 fix (2026-08-08 architect ratification post-N-1):
+      // gate the perClientLastSeq update AND the WARN on the wire
+      // kind being 'pick_submitted'. Pre-fix: any incoming wire
+      // event (including lifecycle draft_started at seq 1 and
+      // draft_completed at seq N) updated the per-client cursor,
+      // which then made the sample-flag check at :779-780
+      // (`if (i === 0 && seq <= perClient - 1)`) fire as a
+      // false-positive when a later-seq lifecycle frame landed on
+      // c01 between Promise.all resolution and the sample-record
+      // loop. Observed twice: S2-2026-08-06T23-25-16 and
+      // S2-2026-08-08T06-38-30 (STEP 5' on c3615619). Both were
+      // 1 violation each, benign — the draft_completed at seq 14
+      // arrived on c01 during the race window; check saw
+      // perClient=14 vs pick 12's seq=13 → false-positive flag.
+      //
+      // Post-fix: perClientLastSeq tracks pick_submitted seqs
+      // ONLY. Lifecycle wire kinds (draft_started, draft_completed,
+      // draft_paused, draft_resumed, draft_extended, all auction_*
+      // variants, commissioner_override, pick_undone) do not
+      // advance the cursor. The check at :779-780 now flags only
+      // TRUE pick-ordering violations. INS-13 mandate preserved:
+      // real ordering fault hiding behind known-benign label is
+      // exactly what INS-13 exists to prevent — the fix keeps the
+      // check honest.
+      //
+      // Waiter resolution (`receiveWaiters.get(...).get(seq)` at
+      // :454-458) still runs UNCONDITIONALLY per event because
+      // waiters are keyed on the RPC-returned pick seq; lifecycle
+      // seqs won't match any waiter key, so the get returns
+      // undefined and the block no-ops harmlessly.
+      const kind = frame?.parsed?.payload?.kind;
+      if (kind === 'pick_submitted') {
+        // Ordering violation WARN + cursor advance — pick-only.
+        const last = perClientLastSeq.get(c.clientLabel) ?? -1;
+        if (seq <= last) {
+          console.warn(`  ⚠ ordering violation: ${c.clientLabel} received seq=${seq} after last=${last}`);
+        }
+        perClientLastSeq.set(c.clientLabel, seq);
       }
-      perClientLastSeq.set(c.clientLabel, seq);
       const waiters = receiveWaiters.get(c.clientLabel);
       const w = waiters.get(seq);
       if (w) {
