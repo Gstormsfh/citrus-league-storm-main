@@ -19,7 +19,7 @@
 // any of those without an entry-point refactor.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { structuredLogger } from '@citrus/shared';
+import { structuredLogger, coerceToNumericPlayerId } from '@citrus/shared';
 
 /** Input to every autopick strategy. */
 export interface AutopickInput {
@@ -109,9 +109,19 @@ export const projectionsStrategy: AutopickStrategy = async ({
     );
     return { ok: false, reason: 'no_eligible_players' };
   }
-  const draftedSet = new Set<number>(
-    (draftedRows ?? []).map((r: { player_id: number }) => r.player_id),
-  );
+  // KI-042 / task #61 (2026-08-08 T5): draft_picks.player_id is
+  // mixed-domain (numeric NHL-id strings for real leagues, uuid
+  // strings for demo leagues). Real-league autopick pathway
+  // requires numeric-domain player_ids; demo-domain rows are
+  // silently dropped from the drafted-set (never hits real-league
+  // projections join). Uses shared coerceToNumericPlayerId
+  // (packages/shared/src/utils/playerIdDomain.ts) — returns null
+  // for uuid/invalid, real number for numeric.
+  const draftedSet = new Set<number>();
+  for (const r of (draftedRows ?? []) as Array<{ player_id: number | string }>) {
+    const coerced = coerceToNumericPlayerId(r.player_id);
+    if (coerced !== null) draftedSet.add(coerced);
+  }
 
   // Step 2: load projections sorted desc; walk until we find an
   // undrafted player.

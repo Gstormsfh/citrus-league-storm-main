@@ -492,3 +492,44 @@ v1 fires `AuditService.logDraftEvent('DRAFT_START', leagueId, {teamsCount, round
 **Not a THE TWELVE blocker.** F23 is prod-hardening for the registry-blind residual class. Awaits architect ratification post-close.
 
 **Moving to T5 (KI-042 #61 int-assumption fixes) after committing.**
+
+---
+
+## R17 — 2026-08-08 ~20:55Z — T5 COMPLETE (KI-042 shared utility + autopickStrategy fix + 25 tests)
+
+**Files (new + edited):**
+- **NEW** `packages/shared/src/utils/playerIdDomain.ts` — 4 exports:
+  - `classifyPlayerId(raw): 'numeric' | 'uuid' | 'invalid'` — regex-based domain classification. Handles null/undefined/empty/negative/NaN/decimal edge cases.
+  - `coerceToNumericPlayerId(raw): number | null` — never throws; returns int OR null for silent-drop.
+  - `assertNumericPlayerId(raw, context): number` — throws `[KI-042] ${context}: ...` on non-numeric; truncates long inputs defensively.
+  - `partitionPlayerIds(raws): {numeric, uuid, invalid}` — batch classifier for row-set processing.
+- **NEW** `packages/shared/src/utils/__tests__/playerIdDomain.test.ts` — **25 offline unit tests, all pass**:
+  - classifyPlayerId (10): int/numeric-string/uuid (case-insensitive)/null/undefined/empty/whitespace/zero/negative/NaN/Infinity/non-numeric-string/decimals-are-invalid/trims-whitespace
+  - coerceToNumericPlayerId (6): int/numeric-string/uuid/null/invalid/never-throws
+  - assertNumericPlayerId (6): int/numeric-string/uuid-throws/null-throws/invalid-throws/long-input-truncated
+  - partitionPlayerIds (4): mixed-domain/empty/all-numeric/all-uuid
+- **EDITED** `packages/shared/src/utils/index.ts` — exports `playerIdDomain` module
+- **EDITED** `server/src/draft/autopickStrategy.ts:99-116` — draftedSet construction now uses `coerceToNumericPlayerId` per row; demo-domain uuid rows silently dropped (real-league autopick path unaffected)
+
+**Verification:**
+- `npx vitest run playerIdDomain` in `packages/shared/`: 25/25 ✓
+- `npx vitest run autopickStrategy` in `server/`: 5/5 ✓ (no regression)
+- Server typecheck: clean (no new errors from autopickStrategy edit)
+- Shared package build: clean (`npm run build` in `packages/shared/`)
+
+**Sites still to author (docketed as follow-up, deliberately deferred):**
+
+Per S6 + T9 audits, the following sites also have KI-042 exposure but were NOT touched in this cycle to keep the shift scope bounded:
+- `apps/web/src/services/DraftService.ts:238` — property passthrough only; type assumption in interface (audit needed to determine assertion vs coerce)
+- `apps/web/src/services/MatchupService.ts` — similar audit needed
+- `server/src/services/WaiverService.ts:145,178,196,233` — `Number(playerId)` casts throughout
+- `server/src/routes/waivers.ts:127-128,158-161,192-193,248` — 4 route handlers
+
+**Recommendation for remaining sites (post-close task):**
+- **Server-side waiver routes** (submitWaiverClaim, submitFAABBid, addFreeAgent, dropPlayer) — use `assertNumericPlayerId(body.playerId, 'submitWaiverClaim.playerId')` at route entry. Client gets 400 with `[KI-042] ...` message for demo-domain input. Real leagues unaffected.
+- **WaiverService** — service methods accept `number` already; route-level assertion is sufficient.
+- **Client DraftService / MatchupService** — audit + wrap with `coerceToNumericPlayerId` at row-processing sites (silent-drop pattern for demo-domain).
+
+**All ready to apply — utility landed, tests green, autopickStrategy demonstrates the pattern.** Post-close cleanup: task #61 remains open with utility now available.
+
+**MOVING TO END-OF-THIRD-SHIFT FINAL SUMMARY after committing.**
