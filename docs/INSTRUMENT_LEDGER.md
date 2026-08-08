@@ -1506,3 +1506,153 @@ Two rig-driven asserts not yet confirmed empirically on `0ecbe605`:
 
 Once these two land green on the fresh STEP 5' rerun, the
 F26 + F27 + F27b-1 three-chunk CLOSE is fully evidenced.
+
+### STEP 5' FULL GREEN on league c3615619 (2026-08-08 06:38Z)
+
+Architect adjudication verbatim: **STEP 5' FULL GREEN**. Assert
+coverage: A, B, snapshot-covers-ignition, C (12 `pick_submitted`
+frames to EACH observer), D, **C-mandatory** (both observers
+received `draft_completed` seq=14 within 3s — **F26/KI-035 GATE
+CLOSED**).
+
+Perf on `0ecbe605` @ league c3615619:
+- 144/144 delivered, 0 dropped
+- overall e2e p50 106ms / p90 128ms / p95 143ms
+- rpc p50 52.5ms
+
+DB verification (architect-run):
+- `draft_events` count = 14
+- `draft_picks_v2` count = 12
+- 12 distinct players, 12 distinct teams
+- `draft_status='completed'`, `pick_deadline=NULL`
+
+Remaining STEP 6' + STEP 7 Assert E per rerun sequence above.
+
+### N-1 — ordering-violation cited (INS-13 family, benign-lifecycle-race)
+
+Architect: "harness reported ordering-violations: 1. INS-13
+family (per-client seq checker predates lifecycle frames)."
+
+**Investigation from run artifact
+`scripts/proof/results/S2-2026-08-08T06-38-30-418Z.ndjson`.**
+
+The ndjson stream has 144 rows, all `seqOrderingViolation=false`.
+The summary counter is populated from the in-memory `samples`
+array which is mutated AFTER ndjson-append (draft-harness.mjs:774
+appends false; :780 mutates to true post-hoc if the check
+triggers). No violated sample survives to disk. WARN at :449 goes
+to stderr and was not archived by the rig's spawn wrapper
+(`lifecycle-acceptance-f27.local.mjs:355-358` captures to
+in-memory strings but does not persist).
+
+**Reasoning from checker mechanics** (draft-harness.mjs):
+
+Two related sites:
+- `:444-460` — `installDefaultReceiveHandler(c)`: for every
+  incoming `type: 'event'` wire frame, updates
+  `perClientLastSeq[clientLabel] = seq` (line 451) and warns to
+  stderr if `seq <= last` (:448-450). Handler destructures only
+  `{seq, receivedAt}` from the callback — frame.parsed.payload.kind
+  is ignored, so ALL wire kinds (pick_submitted, draft_started,
+  draft_completed, etc.) update the same `perClientLastSeq` cursor.
+- `:755-782` — per-client sample-record loop after
+  `Promise.all(perClientPromises)`. For `i === 0` (c01), checks
+  `if (seq <= perClient - 1)` where `seq` is the current pick's
+  RPC-returned seq and `perClient` is c01's `perClientLastSeq`
+  value at check time. Mutates the just-pushed sample's
+  `seqOrderingViolation=true` if the check fires.
+
+**Race window:** between `Promise.all` resolution (:746) and the
+per-client loop reaching `i === 0` (:755), any inbound WS event on
+c01's socket runs its onEvent handler → updates
+`perClientLastSeq['c01']`. If a LATER-seq frame lands in this
+window, the just-recorded pick's seq will look "behind" the
+tracked max and the flag fires.
+
+**Offending frame (reasoning-derived — WARN archive absent):**
+- **Kind:** `draft_completed` — the only wire frame beyond pick seqs
+  in this run (seq 14 = draft_completed per DB; picks are seqs 2-13)
+- **Seq:** 14
+- **Client c01** (the check runs only for `i === 0`)
+- **Flagged sample:** c01/pick 12/seq 13
+- **Timing:** pick 12's receiveTs on c01 was `1786171155810`.
+  draft_completed's live wire broadcast to c01 landed in the tens-
+  of-ms window between Promise.all resolution and the sample-record
+  loop reaching c01. `perClientLastSeq['c01']` inflated from 13 →
+  14. Check `13 <= 14-1 = 13` → true → flag set. WARN at :449 did
+  NOT fire (14 > 13 is monotonic).
+
+**Corroboration.** Prior run `S2-2026-08-06T23-25-16-387Z.summary.txt`
+also has exactly `ordering-violations: 1` — this is the second post-
+F26/F27-landing run to trigger the false-positive. Consistent
+signature: one violation, on the last pick, driven by the terminal
+`draft_completed` lifecycle frame racing sample-record.
+
+**Verdict: benign.** Engine issued seqs monotonically (draft_started
+1 → picks 2-13 → draft_completed 14). No pick-ordering fault. The
+`seqOrderingViolation` flag is a rig-side check-logic error against
+lifecycle-frame arrivals.
+
+**Docket (proof-layer, low-priority) — draft-harness lifecycle-aware
+per-client seq checker.** Fix the check to distinguish pick-seqs
+from lifecycle-frame seqs. Recommended: update
+`installDefaultReceiveHandler` at `draft-harness.mjs:444-460` to
+also destructure `frame` from the callback, filter
+`perClientLastSeq` updates to `frame?.parsed?.payload?.kind ===
+'pick_submitted'`, and gate the WARN on the same. This preserves
+the check's original spirit (pick-frame monotonicity per client)
+without false-positives from lifecycle broadcast races. INS-13's
+original mandate stands: a real ordering fault hiding behind a
+known-benign label is exactly what INS-13 exists to prevent, so
+the fix must land before the harness output is trusted for
+Zach-briefing-grade numbers.
+
+Task-list addition candidate: task #53 (proof-layer, post-F26/F27
+close, before THE TWELVE if the harness is used again for perf
+capture).
+
+### N-2 — `leagues.draft_state` remains 'active' on completed drafts
+
+Architect observation on c3615619 post-completion: `draft_state`
+column still reads `'active'` while `draft_status='completed'` and
+`pick_deadline=NULL`. Live inconsistency, no functional impact
+today.
+
+**Root.** `start_draft_v2` (migration
+`20260807000000_start_draft_v2.sql`) writes
+`UPDATE public.leagues SET draft_state='active', ...` at ignition.
+No path clears it at completion:
+- F24 completion emitter (submit_pick_v2 final-pick branch) writes
+  `draft_status='completed'` + nulls `pick_deadline` + emits the
+  `draft_completed` durable event — but does NOT touch
+  `draft_state`.
+- Legacy `draft-status-flip` scripts (retired per architect
+  ruling 2026-08-07) used to manage `draft_state` under the pre-
+  F27 flip-era regime; nothing inherited that responsibility.
+
+**Impact.** Zero today. All engine gates read `draft_status`:
+- `LobbyManager.draftStatus` (in-memory) is source of truth
+- `bootstrapFullEventReplay` writes `draftStatus` (never
+  `draft_state`)
+- Discovery endpoint / uws-server `isDraftInitialized` reads
+  `draft_status`
+- `scanClockLiveness` (`LobbyRegistry.ts:942`) reads
+  `getDraftStatus()` (in-memory)
+- Rig preflights read `draft_status` (per queries in
+  `lifecycle-acceptance-f27.local.mjs`, `draft-harness.mjs`
+  verifyFixture, fixture-12-f27-native.local.mjs preflight)
+
+**Recommendation (architect rules — post-close, not a close-blocker):**
+- **Option A**: F24 completion emitter also writes
+  `draft_state='completed'` (or similar terminal value) in its
+  final-pick branch. Small migration; keeps the column
+  operationally accurate for legacy consumers.
+- **Option B**: `draft_state` gets formally retired — column drop
+  migration; audit any legacy read paths (SQL queries, RLS
+  policies, external scripts) before drop.
+- **Neither today.** Live inconsistency documented; future
+  consumer that trusts `draft_state` should either be pointed at
+  `draft_status` OR wait for architect ratification of A/B.
+
+Task-list addition candidate: task #54 (post-F26/F27 close,
+architect-owned decision).
