@@ -1427,3 +1427,82 @@ work item — not accepted as satisfied by accident-of-fail-path.
    `bootstrap replay complete ... lifecycleEvents=1 status=in_progress`
    on each fresh lobby)
 6. **F26 + F27 + F27b-1 CLOSE** (three-chunk close entry to REGISTRY.md)
+
+### Empirical confirmations from `0ecbe605` engine log (2026-08-08)
+
+Architect log-sweep post-8661d3d4 self-completion. All three confirm
+what the fix aimed to prove — no code re-litigation needed.
+
+**(1) F27b-1 REAL absence-assertion — Bar 5 counter honesty in prod output.**
+
+Log line verbatim:
+```
+bootstrap replay complete ... lifecycleEvents=1 skipped=0
+picksMade=0 status=in_progress duration=36ms
+```
+
+Contrast the pre-fix line captured this morning on league `844ebff9`:
+```
+skipped=1 status=not_started
+```
+
+The `lifecycleEvents=1` counter (introduced in F27b-1's shared-method
+extraction) fires exactly once per fresh-lobby bootstrap — proves the
+new REPLAY case for `draft_started` executed. `skipped=0` confirms
+NO forward-compat-skip WARN fired. `status=in_progress` confirms the
+guarded flip executed (`applyDraftStartedEventState` Action 3
+returned didFlip=true). `picksMade=0` confirms the pre-pick baseline
+was intact at bootstrap-complete.
+
+**Bar 5 counter honesty confirmed operationally**, not just in code.
+
+**(2) Amendment 2 rig cleanup — empirically proven.**
+
+Both observers closed at `02:29:16.967Z` with **WS close code 1005**
+(no status received / clean application close), taking
+`remainingConnections → 0` on the engine side. The **1006 signature**
+(abnormal closure / abort) which would indicate a leaked socket
+being torn down by TCP timeout is **NOT present**.
+
+Amendment 2's `cleanupObservers()` mandate proven empirically: the
+rig's fail path called `.close?.()` on every registered observer,
+each WebSocket sent a proper close frame, engine processed the
+close gracefully. **Zero lingering sockets.** First real test of
+amendment 2 passes both by code inspection (prior ledger note) AND
+empirically via engine log signature.
+
+**(3) Assert E — zero-warn cascade across 12 unattended autopicks.**
+
+Full 12-pick autopick cascade (8661d3d4) drove to completion with
+**zero** of the following in engine logs:
+
+- `clock fired but draftStatus=completed` (F20 stale-clock guard trigger)
+- `autopick_failed` (autopick strategy exception / retry exhaustion)
+- `draft_started_apply.skipped_stale_status` (F27b freebie WARN —
+  guard-refusal observability)
+- `bootstrap unknown event_type` (F27b-1 root cause; forward-compat-
+  skip default case)
+
+Zero-warn empirical proof that the engine drove a full 12-pick
+autopick cascade unattended without triggering ANY defensive-log
+class we track. F20 guards clean, autopick strategy clean, F27b
+freebie clean, F27b-1 dispatch clean.
+
+### Remaining to collect (STEP 5' rerun on Garrett's next execution)
+
+Two rig-driven asserts not yet confirmed empirically on `0ecbe605`:
+
+- **Assert C** — live pick frames delivered to connected observers
+  during a normal driven-picks run. 8661d3d4 self-completed with
+  no observers present (`abandoned-mid-draft` semantics accidentally
+  realized), so Assert C had no witnesses. STEP 5' rerun with
+  primary + secondary observers connected + `driveHarnessPicks(12,
+  leagueId)` will exercise this.
+- **Assert C-mandatory** — the `draft_completed` frame delivered to
+  connected observers within 3s of DB write. This is the true
+  **F26 / KI-035 gate** — external-apply broadcast semantics for
+  completion, previously silent pre-F26. STEP 5' rerun captures
+  observers-still-connected-at-completion.
+
+Once these two land green on the fresh STEP 5' rerun, the
+F26 + F27 + F27b-1 three-chunk CLOSE is fully evidenced.
