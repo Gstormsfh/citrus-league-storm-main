@@ -5392,9 +5392,9 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     const draftOrder: DraftOrderSlot[] = generateDraftOrder(teamIds, 3, 'snake');
     const firstSlot = draftOrder[0];
     const externalEvent: DraftEventRow = {
-      id: 5,
+      id: 1,
       league_id: 'league-1',
-      seq: 5,
+      seq: 1,
       event_type: 'pick',
       payload: {
         team_id: firstSlot.teamId,
@@ -5408,12 +5408,27 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
       correlation_id: null,
       created_at: new Date().toISOString(),
     } as DraftEventRow;
+    // Post-F27b-2 (2026-08-08 architect ruling, commit c2f2ac91):
+    // bootstrapFullEventReplay advances lastAppliedSeq to the highest
+    // replayed seq. If the bootstrap mock had returned [externalEvent],
+    // the cursor would advance to seq 1 post-bootstrap, and the
+    // subsequent enqueueExternalEvent(1) would dedup-skip at
+    // processExternalEvent's :5659 guard (`1 <= 1` true) — no second
+    // listDraftEvents call, test would falsely fail.
+    //
+    // Correct fixture setup post-F27b-2: bootstrap sees ZERO events
+    // (cursor stays 0); external NOTIFY arrives with seq=1;
+    // processExternalEvent fetches via listDraftEvents('league-1', 0)
+    // — SECOND call — and applies. Uses vi.fn.mockReturnValueOnce
+    // for the bootstrap call, then default returns [externalEvent]
+    // for subsequent external-apply calls.
     const listDraftEvents = vi.fn(async () => [externalEvent]);
+    listDraftEvents.mockReturnValueOnce(Promise.resolve([]));
     const lobby = await makeLobby({ listDraftEvents, draftOrder });
-    // Lobby starts with lastAppliedSeq=0; external seq=5 should pass
-    // dedup gate, trigger listDraftEvents(sinceSeq=0), apply the
-    // pick event.
-    await lobby.enqueueExternalEvent(5);
+    // After bootstrap (empty log), lastAppliedSeq=0. External seq=1
+    // passes dedup gate, triggers listDraftEvents(sinceSeq=0),
+    // applies the pick event.
+    await lobby.enqueueExternalEvent(1);
     expect(listDraftEvents).toHaveBeenCalledWith('league-1', 0);
     expect(lobby.getCurrentState().picksMade).toBe(1);
   });
