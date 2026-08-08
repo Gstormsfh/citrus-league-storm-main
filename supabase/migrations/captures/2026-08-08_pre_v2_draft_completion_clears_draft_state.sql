@@ -1,0 +1,40 @@
+-- =============================================================================
+-- CAPTURE PLACEHOLDER — N-2 / KI-034 pre-apply live body capture
+-- =============================================================================
+--
+-- MIGRATION_SAFETY_GUIDE Rule 1 (capture-before-replace) mandates that the
+-- commit shipping any CREATE OR REPLACE FUNCTION migration includes
+-- `pg_get_functiondef` output for the target function, captured the SAME
+-- DAY the migration is authored, committed alongside the migration file.
+--
+-- **AUTHOR-ONLY MODE 2026-08-08**: this file is a PLACEHOLDER. The actual
+-- live-body capture MUST be run by Garrett before the migration applies.
+-- The apply-harness (`scripts/proof/apply-n2-draft-state.local.sql`) has a
+-- STEP 0 that will REJECT the apply if this capture file still contains
+-- the "PLACEHOLDER — REPLACE BEFORE APPLY" sentinel below.
+--
+-- HOW TO POPULATE (Garrett-exec, same day as apply):
+--
+--   1. SSH into your workstation with SUPABASE_DB_URL for staging in env.
+--   2. Set client_encoding to UTF8 (per Rule 3):
+--        export PGCLIENTENCODING=UTF8
+--   3. Capture the current live body — one line, redirected:
+--        psql "$SUPABASE_DB_URL?client_encoding=UTF8" \
+--          -Atc "SELECT pg_get_functiondef('public.submit_pick_v2(uuid,uuid,int,int,int,uuid,uuid,text,jsonb,uuid)'::regprocedure);" \
+--          > supabase/migrations/captures/2026-08-08_pre_v2_draft_completion_clears_draft_state.sql
+--   4. Verify the file no longer contains the "PLACEHOLDER — REPLACE
+--      BEFORE APPLY" sentinel string.
+--   5. Commit the capture file (`git add ... && git commit`).
+--   6. Then run the apply-harness.
+--
+-- EXPECTED live body PROVENANCE: the F24 rebase applied 2026-08-05 (per
+-- KI-029 close-out). No migration between then and now should have
+-- touched submit_pick_v2's body. Therefore the captured live body
+-- SHOULD equal `supabase/migrations/20260805050000_v2_draft_completion_emitter_rebased.sql`
+-- byte-for-byte (accounting for Rule 3 mojibake tolerance — INS-7).
+-- If the capture DIFFERS from that file, HALT — investigate before
+-- applying. Some other operator may have hotfixed the function.
+--
+-- =============================================================================
+-- PLACEHOLDER — REPLACE BEFORE APPLY
+-- =============================================================================
