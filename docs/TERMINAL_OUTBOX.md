@@ -142,3 +142,51 @@ SELECT l.id, l.name, l.season,
 **Fully-authored migration + apply-harness incoming** (T6-fix-a) — will land in same commit as this outbox entry. Architect specifies `<LEAGUE_ID>` in inbox reply OR applies via ad-hoc psql per Garrett's paste-block.
 
 **Moving to T7 (URGENT commissioner button linkage) after committing.**
+
+---
+
+## R6 — 2026-08-08 ~19:35Z — T7 COMPLETE (commissioner button F27 linkage AUTHORED)
+
+**HOP MAP AUDIT (pre-T7 state).** F27 UI touchpoint was MISSING as suspected. Existing paths ALL flip-era:
+
+1. **UI button** in `apps/web/src/components/draft/DraftLobby.tsx:911-1010` — "Start Draft Now" buttons at lines 913/922/953/1010 (4 render points, one per lobby-state variant).
+2. **Handler** at `DraftLobby.tsx:256-271` `handleStartDraft` → calls `onStartDraft` prop with `DraftSettings`.
+3. **Parent handler** in `apps/web/src/pages/DraftRoom.tsx:2867-3095` `handleStartDraft` — v1 legacy component.
+4. **API path taken** at `DraftRoom.tsx:3010-3018`: `leagueApi.updateSettings(leagueId, {draft_status: 'in_progress', ...})` — **FLIP-ERA UPDATE, bypasses F27 entirely**.
+5. **Alternative API** at `apps/web/src/api/draft.ts:48-50`: `startDraft(leagueId)` → `POST /api/draft/league/:leagueId/start` → `server/src/routes/draft.ts:220-239` → `DraftService.startDraft` at `server/src/services/DraftService.ts:302-314` → **ALSO flip-era**: `UPDATE leagues SET draft_status = 'in_progress'`.
+
+**No hop calls `start_draft_v2` RPC. Confirmed via grep.**
+
+**T7 AUTHORED (additive; F27 contract; client-side + thin server wrapper).**
+
+**Files (4 new + 2 edited):**
+- **NEW** `server/src/routes/draftV2Start.ts` — POST `/api/draft/v2/league/:leagueId/start`. Wraps `supabase.rpc('start_draft_v2', {p_league_id, p_actor, p_idempotency_key})`. Maps Rider 1 preflight taxonomy to `AppError.badRequest('illegal_state reason:<discriminator>')`.
+- **EDITED** `server/src/app.ts:12` (import) + `:247` (mount `/api/draft/v2` + `draftV2StartRoutes`). Additive; existing v1 `/api/draft/*` routes unchanged.
+- **NEW** `apps/web/src/api/draftV2.ts` — client wrapper `draftV2Api.startDraftV2(leagueId, idempotencyKey)` calling `POST /api/draft/v2/league/:leagueId/start`. Types `StartDraftV2Success` + `StartDraftV2Failure` + `StartDraftV2Reason` exported.
+- **NEW** `apps/web/src/hooks/useStartDraftV2.ts` — React hook. Handles crypto.randomUUID idempotency-key generation, loading state (`isPending`), error state (`lastError`), Rider 1 discriminator parsing from `error.response.data.error.message` (`/reason:(\w+)/`), user-facing message map `RIDER_1_USER_MESSAGES`. Returns `{start(leagueId): Promise<{ok:true|false, ...}>, isPending, lastError}`.
+- **NEW** `apps/web/src/hooks/__tests__/useStartDraftV2.test.ts` — **12 offline unit tests, all pass**:
+  - Success path (3): unwrapped data, wrapped data shape, idempotency-key thread
+  - Rider 1 taxonomy (5): each of 5 reasons maps to correct user message
+  - Fallback (2): missing discriminator → 'unexpected', network error → 'unexpected'
+  - State discipline (2): lastError cleared on next success, isPending toggles cleanly
+
+**Typecheck:** server clean; client clean (matches existing pre-existing errors baseline elsewhere).
+
+**Test count:** 12/12 hook tests pass.
+
+**F27 contract compliance (per architect T7 mandate):**
+- ✓ `p_league_id` — URL param → RPC arg
+- ✓ `p_actor` — `{kind: 'user', id: userId}` constructed server-side from authMiddleware context
+- ✓ `p_idempotency_key` — client-generated crypto.randomUUID, threaded server-side
+- ✓ Rider-1 refusal taxonomy → user-facing messages (5 discriminators → 5 user-friendly strings via `RIDER_1_USER_MESSAGES` map)
+- ✓ Success returns `{event_id, seq, first_pick_deadline, was_duplicate}` — passed through to caller
+- ✓ **Navigation on success is CALLER'S RESPONSIBILITY** — hook returns `{ok:true, data}` so consumer can `navigate(`/draft-v2/${leagueId}`)` after checking `result.ok`. Hook is navigation-library-agnostic per additive-only mandate.
+
+**WIRE-UP is REMAINING WORK (deliberately deferred, calls Garrett-exec).** The hook + API + route are authored, tested, and ready. The final wire-up — swapping DraftLobby's `handleStartDraft` OR adding a NEW commissioner-only button — is a UI decision Garrett will make (existing v1 handler is entangled with a lot of DraftRoom state). Recommended: add a small new "Start (v2)" button next to the existing "Start Draft Now" button in DraftLobby (temporary toggle for THE TWELVE), OR replace the existing handler once ratified. See wire-up example in `useStartDraftV2.ts` header comment.
+
+**Docket for followup / architect ratification:**
+- Which lobby button wires to `useStartDraftV2` (side-by-side vs replace)?
+- Should v1 `handleStartDraft` in DraftRoom.tsx be MARKED deprecated?
+- After THE TWELVE, delete v1 startDraft path (server route + service method + client API method) — codify in a post-close cleanup task.
+
+**Moving to T2 (integration fuzzer) after committing.**

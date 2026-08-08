@@ -9,6 +9,7 @@ import { matchupRoutes } from './routes/matchups';
 import { draftRoutes } from './routes/draft';
 import { draftsRoutes } from './routes/drafts';
 import { draftV2Routes } from './routes/draftV2Sync';
+import { draftV2StartRoutes } from './routes/draftV2Start';
 import { draftV2PickRoutes } from './routes/draftV2Pick';
 import { draftV2EventsRoutes } from './routes/draftV2Events';
 import { rosterRoutes } from './routes/rosters';
@@ -243,6 +244,7 @@ app.route('/api/drafts', draftsRoutes);
 app.route('/api/draft/v2', draftV2Routes);        // §7.2 GET /sync
 app.route('/api/draft/v2', draftV2PickRoutes);    // §7.3 POST /pick
 app.route('/api/draft/v2', draftV2EventsRoutes);  // §7.4 GET /events
+app.route('/api/draft/v2', draftV2StartRoutes);   // T7 POST /league/:leagueId/start (F27 commissioner ignition)
 app.route('/api/rosters', rosterRoutes);
 app.route('/api/trades', tradeRoutes);
 app.route('/api/waivers', waiverRoutes);
