@@ -28,3 +28,17 @@ T4 — F23 DESIGN DOC: registry-blind stall recovery, to ratification-ready per 
 T5 — KI-042 #61: author fixes + tests for the 3 flagged int-assumption paths (autopickStrategy, DraftService, MatchupService).
 
 Worklog discipline continues. Report each T-item to the outbox on completion. AUTHOR-ONLY rules unchanged.
+
+---
+
+## Entry 3 — 2026-08-08 18:57Z (12:57 MT) — GARRETT'S FINAL ASKS: three new items, T6 FIRST
+
+Garrett added product-level goals on his way out. T6 and T7 JUMP THE QUEUE — work order is now T6 → T7 → T1 → T2 → T3+T8 → T4 → T5.
+
+T6 — SITE SEASON-PHASE (URGENT, investigate FIRST, report to outbox IMMEDIATELY on finding): The live site shows PLAYOFFS mode; Garrett wants it showing OFFSEASON. Find the exact mechanism that controls season-phase display — systemFlags? env var? DB row? hardcode? Cite file:line and the exact current value vs needed value. Classify the change: (a) DB flag update (architect may apply today with ledger discipline), (b) env/config change, or (c) code+deploy. AUTHOR the change whatever it is. Write the mechanism + classification to the outbox as its own entry THE MOMENT you have it — I will act on it same-day.
+
+T7 — COMMISSIONER BUTTON LINKAGE (URGENT): F27 built start_draft_v2 (DB) and the engine receiver — the UI TOUCHPOINT was explicitly out of that scope. Audit the actual click-path: league page → does a commissioner-only Start Draft button EXIST in the web app, wired through the API layer to start_draft_v2? Cite file:line for every hop (button component → handler → API route/RPC call → navigation to room). If ANY hop is missing, AUTHOR it — client-side, additive, matching F27's contract (p_league_id, p_actor, p_idempotency_key; handle the Rider-1 refusal taxonomy as user-facing messages; navigate to room on {seq, first_pick_deadline} success). Offline tests for the handler. THE TWELVE CANNOT DRAFT WITHOUT THIS BUTTON — if it is missing, it is today's most important authoring, and the pre-twelve dry run depends on it.
+
+T8 — APP READINESS (fold into T3): refresh docs/APPLE_APP_STORE_GAP_ANALYSIS.md against current reality into a single actionable checklist — what is done, what blocks TestFlight, what Garrett must gather (certs, accounts, assets), with owners and dates. Merge into the T3 Capacitor plan doc as its readiness section.
+
+Report each to the outbox. T6's mechanism report is my top-priority read.

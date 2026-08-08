@@ -111,8 +111,8 @@ describe('ScheduleService', () => {
       mockGetGames.mockResolvedValue({ data: games });
 
       const result = await ScheduleService.getGamesForDateRange(
-        new Date('2026-01-15'),
-        new Date('2026-01-20')
+        new Date(2026, 0, 15),
+        new Date(2026, 0, 20)
       );
 
       expect(result.games).toHaveLength(2);
@@ -124,8 +124,8 @@ describe('ScheduleService', () => {
       mockGetGames.mockResolvedValue({ data: null });
 
       const result = await ScheduleService.getGamesForDateRange(
-        new Date('2026-01-15'),
-        new Date('2026-01-20')
+        new Date(2026, 0, 15),
+        new Date(2026, 0, 20)
       );
 
       expect(result.games).toEqual([]);
@@ -136,8 +136,8 @@ describe('ScheduleService', () => {
       mockGetGames.mockRejectedValue(new Error('Connection failed'));
 
       const result = await ScheduleService.getGamesForDateRange(
-        new Date('2026-01-15'),
-        new Date('2026-01-20')
+        new Date(2026, 0, 15),
+        new Date(2026, 0, 20)
       );
 
       expect(result.games).toEqual([]);
@@ -165,8 +165,8 @@ describe('ScheduleService', () => {
 
       const result = await ScheduleService.getGamesForTeam(
         'EDM',
-        new Date('2026-01-10'),
-        new Date('2026-01-20')
+        new Date(2026, 0, 10),
+        new Date(2026, 0, 20)
       );
 
       expect(result.games).toEqual([]);

@@ -55,14 +55,14 @@ beforeEach(() => {
 
 describe('getWeeklyProjections', () => {
   it('returns empty map when playerIds is empty', async () => {
-    const result = await getWeeklyProjections([], new Date('2026-03-01'), new Date('2026-03-07'));
+    const result = await getWeeklyProjections([], new Date(2026, 2, 1), new Date(2026, 2, 7));
 
     expect(result.size).toBe(0);
     expect(mockApiGet).not.toHaveBeenCalled();
   });
 
   it('returns empty map when playerIds is null/undefined', async () => {
-    const result = await getWeeklyProjections(null as any, new Date('2026-03-01'), new Date('2026-03-07'));
+    const result = await getWeeklyProjections(null as any, new Date(2026, 2, 1), new Date(2026, 2, 7));
 
     expect(result.size).toBe(0);
   });
@@ -78,8 +78,8 @@ describe('getWeeklyProjections', () => {
 
     const result = await getWeeklyProjections(
       [101, 102],
-      new Date('2026-03-01'),
-      new Date('2026-03-03')
+      new Date(2026, 2, 1),
+      new Date(2026, 2, 3)
     );
 
     expect(result.get(101)).toBeCloseTo(7.7); // 3.5 + 4.2
@@ -105,8 +105,8 @@ describe('getWeeklyProjections', () => {
 
     const result = await getWeeklyProjections(
       [101],
-      new Date('2026-03-01'),
-      new Date('2026-03-03')
+      new Date(2026, 2, 1),
+      new Date(2026, 2, 3)
     );
 
     expect(result.get(101)).toBe(6.0); // 1 + 2 + 3
@@ -117,8 +117,8 @@ describe('getWeeklyProjections', () => {
 
     const result = await getWeeklyProjections(
       [101],
-      new Date('2026-03-01'),
-      new Date('2026-03-07')
+      new Date(2026, 2, 1),
+      new Date(2026, 2, 7)
     );
 
     expect(result.size).toBe(0);
@@ -129,8 +129,8 @@ describe('getWeeklyProjections', () => {
 
     const result = await getWeeklyProjections(
       [101],
-      new Date('2026-03-01'),
-      new Date('2026-03-01')
+      new Date(2026, 2, 1),
+      new Date(2026, 2, 1)
     );
 
     expect(result.size).toBe(0);
@@ -146,8 +146,8 @@ describe('getWeeklyProjections', () => {
 
     const result = await getWeeklyProjections(
       [101, 102],
-      new Date('2026-03-01'),
-      new Date('2026-03-01')
+      new Date(2026, 2, 1),
+      new Date(2026, 2, 1)
     );
 
     expect(result.get(101)).toBe(0);
@@ -157,7 +157,7 @@ describe('getWeeklyProjections', () => {
   it('generates correct date strings for single day', async () => {
     mockApiGet.mockResolvedValue({ data: [] });
 
-    await getWeeklyProjections([101], new Date('2026-03-15'), new Date('2026-03-15'));
+    await getWeeklyProjections([101], new Date(2026, 2, 15), new Date(2026, 2, 15));
 
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.stringContaining('startDate=2026-03-15&endDate=2026-03-15')
@@ -175,8 +175,8 @@ describe('getLeagueAverageProjections', () => {
 
     const result = await getLeagueAverageProjections(
       'league-1',
-      new Date('2026-03-01'),
-      new Date('2026-03-07')
+      new Date(2026, 2, 1),
+      new Date(2026, 2, 7)
     );
 
     expect(result.size).toBe(0);
@@ -187,8 +187,8 @@ describe('getLeagueAverageProjections', () => {
 
     const result = await getLeagueAverageProjections(
       'league-1',
-      new Date('2026-03-01'),
-      new Date('2026-03-07')
+      new Date(2026, 2, 1),
+      new Date(2026, 2, 7)
     );
 
     expect(result.size).toBe(0);
@@ -200,8 +200,8 @@ describe('getLeagueAverageProjections', () => {
 
     const result = await getLeagueAverageProjections(
       'league-1',
-      new Date('2026-03-01'),
-      new Date('2026-03-07')
+      new Date(2026, 2, 1),
+      new Date(2026, 2, 7)
     );
 
     expect(result.size).toBe(0);
@@ -214,8 +214,8 @@ describe('getLeagueAverageProjections', () => {
 
     const result = await getLeagueAverageProjections(
       'league-1',
-      new Date('2026-03-01'),
-      new Date('2026-03-07')
+      new Date(2026, 2, 1),
+      new Date(2026, 2, 7)
     );
 
     expect(result.size).toBe(0);
@@ -248,8 +248,8 @@ describe('getLeagueAverageProjections', () => {
 
     const result = await getLeagueAverageProjections(
       'league-1',
-      new Date('2026-03-01'),
-      new Date('2026-03-01')
+      new Date(2026, 2, 1),
+      new Date(2026, 2, 1)
     );
 
     // C: (10 + 8) / 2 = 9, D: 6 / 1 = 6
@@ -265,8 +265,8 @@ describe('getLeagueAverageProjections', () => {
 
     const result = await getLeagueAverageProjections(
       'league-1',
-      new Date('2026-03-01'),
-      new Date('2026-03-01')
+      new Date(2026, 2, 1),
+      new Date(2026, 2, 1)
     );
 
     // No players collected -> empty map
