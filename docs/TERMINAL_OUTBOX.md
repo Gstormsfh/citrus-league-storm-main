@@ -439,3 +439,37 @@ v1 fires `AuditService.logDraftEvent('DRAFT_START', leagueId, {teamsCount, round
 **Perf.** 50k sequences run in ~13s total (2.6ms/sequence avg). Confirms integration fuzz is CI-viable.
 
 **Moving to T3+T8 (Capacitor spike plan + Apple App Store gap) after committing.**
+
+---
+
+## R15 — 2026-08-08 ~20:35Z — T3 + T8 COMPLETE (Capacitor spike plan + App Store readiness merged)
+
+**File:** `docs/RUNBOOKS/CAPACITOR_SPIKE_PLAN.md` (new, ~350 lines) — merges T3 + T8 per architect directive.
+
+**10 sections:**
+1. **Scope + non-scope** — TestFlight-internal target for spike; full submission deferred.
+2. **Prerequisites Garrett must gather BEFORE Aug 15** — 8-item checklist (Apple Dev enrollment, Bundle ID, Xcode 15+, Mac, test device, icons, launch screen, tester group). **Hard blocker if any missing.**
+3. **Day-by-day plan (Aug 15-17)**:
+   - Aug 15 Fri: prereq verification day
+   - Aug 16 Sat: SPIKE DAY step-by-step (Garrett executes) — morning cap-init, midday Xcode signing, afternoon TestFlight upload+distribute+smoke
+   - Aug 17 Sun: freeze day, no code changes
+4. **Code slots to author BEFORE spike** (author-only today):
+   - `capacitor.config.ts.template` — rename on spike day
+   - `.gitignore` additions for iOS/Android
+   - `package.json` script additions (cap:sync, cap:open:ios, cap:build:ios)
+5. **WS behavior on iOS webview (THE TWELVE-critical)** — iOS suspends JS on background/screen-off; WS held by OS network stack; snapshot-resync on resume covers all cases. Verification steps for spike Aug 16 afternoon. Docket: push notifications on on-clock event (APNs setup post-launch).
+6. **Signing prerequisites** — Apple Developer membership, certs, provisioning profiles, App Store Connect record, TestFlight tester groups.
+7. **Risks + mitigations** — 8-item risk table. Top blockers: no Mac access (rent Scaleway), Apple Dev Org enrollment slow (use Individual first), Bundle ID taken (try alt suffix).
+8. **App Store readiness checklist (T8 merged content)** — 4-way classification: DONE / BLOCKS TestFlight / BLOCKS App-Store submission / MUST GATHER (Garrett) / DOCKETED POST-SPIKE. Consolidates gap-doc's Jan 2026 findings into single actionable dashboard.
+9. **Post-spike report template** — for Garrett to fill in Aug 16.
+10. **Related docs** — cross-refs to gap-doc, runbook, project plan.
+
+**Key findings:**
+- **Zero code changes** need to reach the web client for the spike — Capacitor wraps the existing Vite build as-is.
+- **WS behavior on background/lock** is the THE-TWELVE-critical risk. Existing snapshot-resync architecture (`runner.ts` backoff + `LobbyManager.addConnection` snapshot delivery + `deriveDraftState.foldEvents` + F27b-1 bootstrap) covers all cases. Docket for push-notification enhancement post-launch.
+- **Hard blocker if Garrett lacks Mac** — Xcode is macOS-only. Rent Scaleway or borrow if not already available.
+- **Apple Dev enrollment can be slow** — start today (Aug 8-10) if not already enrolled.
+
+**Code slots NOT yet authored** — waiting for Aug 16 (per author-only today; slots are documented in §4 for Garrett/architect to add on spike day).
+
+**Moving to T4 (F23 design doc) after committing.**
