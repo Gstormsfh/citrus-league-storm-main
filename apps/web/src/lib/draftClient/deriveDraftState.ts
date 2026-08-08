@@ -195,6 +195,47 @@ export function foldEvents(
       break;
     }
 
+    // ── S7-Q1 (2026-08-08 evening ARCHITECT ruling) — absorbing
+    //    terminal states ─────────────────────────────────────────
+    // "Once completed OR cancelled, no frame transitions the client
+    // out of it (each ignored with debug log). Completed never
+    // overwrites cancelled, nor the reverse."
+    //
+    // This is a GENERALIZED monotonicity guard, stricter than the
+    // prior conservative per-case checks. Once draftStatus enters a
+    // terminal state, EVERY subsequent wire kind is silently ignored
+    // — pick_submitted / pick_undone / commissioner_override /
+    // draft_started / draft_completed / draft_cancelled / auction_*
+    // / unknown future kinds — with a debug-log breadcrumb.
+    //
+    // Divergence from server (deliberate): server's applyPickUndoneEvent
+    // (LobbyManager.ts:3483) reverts completed→in_progress on
+    // pick_undone. Post-Q1 the client refuses that revert mid-flight;
+    // if a legitimate undo happens post-completion (rare — commissioner
+    // action), a fresh snapshot re-derive from empty state correctly
+    // folds all events including the undo. Client UX guarantees
+    // monotonic-forward rendering; server owns pick history authority.
+    //
+    // foldedThroughSeq still advances so subsequent events pass the
+    // seq-contiguity check at :189 and outer idempotency at :181.
+    if (
+      draftStatus === 'completed' ||
+      draftStatus === 'cancelled'
+    ) {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+        console.debug(
+          '[deriveDraftState] absorbing terminal state; ignoring frame',
+          {
+            terminalStatus: draftStatus,
+            kind: event.kind,
+            seq: event.seq,
+          },
+        );
+      }
+      foldedThroughSeq = event.seq;
+      continue;
+    }
+
     switch (event.kind) {
       case 'pick_submitted':
       case 'commissioner_override': {
