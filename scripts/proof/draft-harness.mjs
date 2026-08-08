@@ -109,6 +109,23 @@ const RUN_ID = opt('run-id', new Date().toISOString().replace(/[:.]/g, '-'));
 // out with a false-negative). The startup assert below fails fast if
 // the effective timeout is <= the tolerance upper bound.
 const EXPECTED_PICK_CLOCK_SEC = opt('expected-pick-clock', null);
+
+// task #52 (2026-08-08): --pause-after=N — for the F27 rig's Assert F
+// mid-drive-join scenario. After N picks land, harness emits a
+// PAUSED_AT=<n> marker line to stdout and BLOCKS on stdin until it
+// reads a "RESUME\n" line, then continues with pick N+1. Null =
+// disabled (default). See lifecycle-acceptance-f27.local.mjs's
+// runLifecycleMode for the consuming pattern (rig-side second-observer
+// setup happens between the PAUSED_AT marker and the RESUME signal).
+const PAUSE_AFTER = (() => {
+  const raw = opt('pause-after', null);
+  if (raw === null) return null;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 0) {
+    throw new Error(`--pause-after=${raw} invalid (expected non-negative integer)`);
+  }
+  return n;
+})();
 const AUTOPICK_TIMEOUT_MS = (() => {
   const explicit = opt('autopick-timeout-ms', null);
   if (explicit !== null) return parseInt(explicit, 10);
@@ -820,6 +837,36 @@ async function runPickDriver(initialPgClient, wsClients, onSample = () => {}) {
       `delivered=${receiveTimes.filter((t) => t !== null).length}/${wsClients.length}  ` +
       `dropped=${receiveTimes.filter((t) => t === null).length}`,
     );
+
+    // task #52 (2026-08-08): --pause-after=N handling. After the Nth
+    // pick lands, emit a stdout marker + block on stdin until "RESUME\n"
+    // is received. Rig-side consumer (lifecycle-acceptance-f27's Assert F
+    // path) uses this window to connect a second observer + verify its
+    // snapshot covers picks 1..N via the engine's ring buffer, THEN
+    // signals RESUME so the harness drives N+1..TOTAL_PICKS as live wire
+    // frames (which the second observer receives + gaps against the
+    // snapshot cleanly).
+    //
+    // Fire ONCE (guarded by PAUSE_AFTER check). Blocks the async loop
+    // via a Promise that resolves on stdin data event matching /^RESUME/.
+    if (PAUSE_AFTER !== null && pickNumber === PAUSE_AFTER) {
+      console.log(`PAUSED_AT=${pickNumber}`);
+      await new Promise((resolve) => {
+        const onData = (chunk) => {
+          const text = chunk.toString('utf8');
+          // Match RESUME at start of any line (rig may buffer whitespace).
+          if (/^\s*RESUME/m.test(text)) {
+            process.stdin.off('data', onData);
+            // Pause stdin so subsequent input doesn't accumulate.
+            try { process.stdin.pause(); } catch { /* ignore */ }
+            resolve();
+          }
+        };
+        process.stdin.on('data', onData);
+        try { process.stdin.resume(); } catch { /* ignore */ }
+      });
+      console.log(`RESUMED_AT=${pickNumber}`);
+    }
 
     // Inter-pick pace, unless we're at the last pick.
     if (pickNumber < TOTAL_PICKS) {

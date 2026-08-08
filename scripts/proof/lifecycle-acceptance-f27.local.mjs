@@ -323,6 +323,89 @@ async function waitForEvent(observer, predicate, timeoutMs, label) {
   return null;
 }
 
+// task #52 (2026-08-08): drive-with-pause helper for the TRUE Assert F
+// mid-drive-join path. Spawns draft-harness with --pause-after=<n>,
+// waits for the harness's "PAUSED_AT=<n>" stdout marker, invokes the
+// `onPaused` callback (rig-side second-observer setup happens inside),
+// then writes "RESUME\n" to the harness stdin. Awaits final close and
+// returns the standard {code, stdout, stderr} envelope.
+//
+// Consumer pattern (Assert F true-mid-drive):
+//   const result = await driveHarnessPicksWithPause({
+//     pauseAfter: 5,
+//     leagueId,
+//     onPaused: async () => {
+//       // Second observer connects HERE, mid-draft.
+//       // Verify its snapshot covers picks 1-5 via recentEvents.
+//     },
+//   });
+//   // Post-resume: harness drove picks 6-12 to completion.
+//   // Second observer received live frames for 6-12 + completion.
+//
+// Not yet wired into runLifecycleMode by default — the current
+// lifecycle mode retains its degraded Assert F (second observer
+// connects BEFORE picks) for backward compat with green STEP 5' runs.
+// Architect-owned decision: docket switching --mode=lifecycle default
+// to use this helper (delivers true Assert F) OR add a new
+// --mode=lifecycle-true-assert-f for opt-in. See worklog P3 open
+// question.
+async function driveHarnessPicksWithPause({ pauseAfter, leagueId, onPaused }) {
+  log(`  spawning draft-harness (pause-after=${pauseAfter}) against league ${leagueId}...`);
+  return new Promise((resolve, reject) => {
+    const childEnv = { ...process.env, F27_NATIVE_LEAGUE_ID: leagueId };
+    const child = spawn('node', [
+      'scripts/proof/draft-harness.mjs',
+      '--scenario=S2',
+      '--rounds=1',
+      `--pause-after=${pauseAfter}`,
+    ], {
+      env: childEnv,
+      stdio: ['pipe', 'pipe', 'pipe'], // pipe stdin so we can send RESUME
+    });
+    let stdout = '';
+    let stderr = '';
+    let pausedFired = false;
+    let onPausedError = null;
+    const pauseMarker = new RegExp(`^PAUSED_AT=${pauseAfter}\\s*$`, 'm');
+
+    child.stdout.on('data', (d) => {
+      const chunk = d.toString();
+      stdout += chunk;
+      process.stdout.write(d);
+      // Detect the harness's pause marker; fire the callback once.
+      if (!pausedFired && pauseMarker.test(chunk)) {
+        pausedFired = true;
+        log(`  harness paused at pick ${pauseAfter} — running onPaused callback`);
+        Promise.resolve()
+          .then(() => onPaused())
+          .then(() => {
+            log(`  onPaused complete — sending RESUME to harness stdin`);
+            try {
+              child.stdin.write('RESUME\n');
+            } catch (err) {
+              onPausedError = new Error(`stdin.write(RESUME) failed: ${err.message}`);
+              try { child.kill('SIGTERM'); } catch { /* ignore */ }
+            }
+          })
+          .catch((err) => {
+            onPausedError = err;
+            log(`  onPaused callback threw: ${err.message ?? err} — killing harness`);
+            try { child.kill('SIGTERM'); } catch { /* ignore */ }
+          });
+      }
+    });
+    child.stderr.on('data', (d) => { stderr += d.toString(); process.stderr.write(d); });
+    child.on('close', (code) => {
+      if (onPausedError) {
+        reject(onPausedError);
+        return;
+      }
+      resolve({ code, stdout, stderr });
+    });
+    child.on('error', (err) => reject(err));
+  });
+}
+
 // Spawn draft-harness to drive N picks. Passes env through + reads
 // current league_id from the F27-native state file.
 async function driveHarnessPicks(picks, leagueId) {
