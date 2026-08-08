@@ -1369,3 +1369,61 @@ for `ws.close_absent` / `connection.abandoned` post-fail window.
 host and wrong image name (see INS-16 note); already flagged in
 this session's F27b-1 §15.14 hand-off block. Cosmetic doc PR
 docket for later; runtime path uses harvest-verified values.
+
+### CERTIFICATION EVIDENCE — 8661d3d4 self-completed (2026-08-08)
+
+Following the STEP 5' partial adjudication, league `8661d3d4`
+completed on its own with **zero clients connected** on image
+`0ecbe605`. Final state (per DB post-run):
+
+- `draft_events` count = 14 (1 draft_started + 12 pick + 1 draft_completed)
+- `draft_picks_v2` count = 12
+- `draft_events` at seq 14: `event_type='draft_completed'`
+- `leagues.draft_status = 'completed'`
+- `leagues.pick_deadline = NULL`
+
+**Full F27b-1 chain proven end-to-end on `0ecbe605`:**
+
+1. Fresh-league FULL REPLAY bootstrap (no persisted snapshot).
+2. `applyDraftStartedEventState` invoked from the REPLAY dispatcher
+   (`bootstrapFullEventReplay :3091`) — R1 stashed
+   `initialPickDeadline` from payload, guarded flip
+   `not_started → in_progress` fired.
+3. Post-replay catch-up at `LobbyManager.ts:974` armed the pick
+   timer exactly once from R1-stashed `initialPickDeadline`
+   (arm-exactly-once discipline, Bar 2).
+4. 12 autopicks landed on a **31s ladder** — each
+   `handleClockExpired` cleared F20 identity+wallclock guards,
+   selected via candidate pool + strategy, wrote `pick` event,
+   broadcast, applyPickEvent live-arm fired for next slot.
+5. Final `applyPickEvent` at slot 12 flipped
+   `draftStatus='completed'` via the `picksMade >= draftOrder.length`
+   derivation at `:3226`.
+6. **F24 emitter** wrote seq=14 `draft_completed` event (chunk
+   11g.7 sub-step 7e completion emitter).
+7. **F26 teardown** cleared pick timer + nulled
+   `currentTimerDeadline` in the LIVE `draft_completed` case at
+   `:2988-2999` (external-apply broadcast path).
+
+Cross-workstream chain closed: **F27b-1 → F27 → F26 → F24** all
+proven simultaneously by this run on the certification image.
+
+### STEP 6' satisfied-in-substance-by-accident
+
+Amendment 2's `cleanupObservers()` + observer socket drop during
+the rig's H-1 fail path effectively simulated the STEP 6'
+scenario (abandoned mid-draft): observers connected → all clients
+vanished → engine drove the draft to completion **alone**.
+Architect note: risk is now retired empirically, but STEP 6'
+still needs a deliberate run with its own asserts to CLOSE the
+work item — not accepted as satisfied by accident-of-fail-path.
+
+**Rerun sequence** (architect-ratified 2026-08-08):
+1. `fixture --reset --execute` (retire `8661d3d4`, fresh league A)
+2. `fixture --execute` (fresh league B — re-ignites to bind rig state)
+3. STEP 5' — `--mode=lifecycle --pick-time=30`
+4. STEP 6' — `--mode=abandoned-mid-draft --pick-time=15`
+5. STEP 7 Assert E (out-of-band docker-log check for
+   `bootstrap replay complete ... lifecycleEvents=1 status=in_progress`
+   on each fresh lobby)
+6. **F26 + F27 + F27b-1 CLOSE** (three-chunk close entry to REGISTRY.md)
