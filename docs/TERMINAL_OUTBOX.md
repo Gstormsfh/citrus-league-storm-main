@@ -632,3 +632,98 @@ Reading inbox on any new entry per protocol. Next action:
 - Otherwise: idle, no self-queued work
 
 **End of third-shift authoring.**
+
+---
+
+## R19 — T7 WIRE-UP COMPLETE per Entry 7 (2026-08-08 21:00Z / 3:00 MT)
+
+Entry 7 ratified GAP-1 Option (a) + GAP-2 approved. Wire-up authored end-to-end. Ready for Garrett's Group-C deploy.
+
+### What was authored
+
+**GAP-1 Option (a) — two-step client wire-up:**
+- `apps/web/src/hooks/useStartDraftFull.ts` (NEW, 170 lines) — wraps: (1) cheap existence check on `draft_order` (Condition 1 re-run safety), (2) `initializeDraftOrder` if missing, (3) `useStartDraftV2.start` (F27 RPC). Unified `isPending = initPending || startDraftV2.isPending` gates UI across full sequence (Condition 3). Failure ordering: init fails → NO ignition attempted; init OK + ignition refused → taxonomy message, league remains safe/retryable (Condition 2). Fresh idempotency key per user-initiated attempt (via `useStartDraftV2.start`).
+- `apps/web/src/pages/DraftRoom.tsx` — added `useStartDraftFull` hook at DraftRoom top level (line ~190); NEW `handleStartDraft` for new-draft path calls `startDraftFull.start(...)` + navigates to `/draft-v2/${leagueId}` on success + surfaces Rider-1 taxonomy via toast on failure; rejoin branches preserved verbatim; legacy handler renamed → `handleStartDraftLegacy_DEPRECATED` with `@deprecated` JSDoc citing task #60.
+- `apps/web/src/components/draft/DraftLobby.tsx` — added `isStartingDraft?: boolean` prop; threaded to `disabled={isStartingDraft || existing-conditions}` on all 4 Start-Draft-family buttons (Continue Draft / Start Draft Now × 2 / Join Draft Room); labels show `Starting…` / `Joining…` while pending.
+
+**GAP-2 — audit log in v2 route:**
+- `server/src/routes/draftV2Start.ts` — added `AuditService` import + `audit.logDraftEvent('DRAFT_START', ...)` block firing SERVER-SIDE AFTER rpc success ONLY (not on attempts); payload includes `wasDuplicate` so idempotent replays are distinguishable in the audit trail. Audit failure does NOT block the response (symmetric with existing draft.ts pattern).
+
+### Re-run safety citation (Condition 1)
+
+`server/src/services/DraftService.ts:317-352` hard-DELETES existing `draft_order` rows for the league then INSERTs fresh. Safe against row duplication BUT changes sessionId + potentially reorders (destructive-then-create). Guard: cheap existence check via `DraftService.getDraftOrder(leagueId, userId, 1)` — if `order.team_order.length === teams.length`, skip init. Handles fresh league (miss → init), retry-after-refusal (hit → skip init → ignition retries with fresh idempotency key), pre-configured league (hit → skip init), double-press mid-sequence (isPending gate blocks second click). Wrong-team-count safety: if existing order has different length than current teams count, treat as "not present" and re-init.
+
+### Tests authored + passing
+
+`apps/web/src/hooks/__tests__/useStartDraftFull.test.ts` — 6 offline tests all pass:
+1. init-fails → ignition RPC NEVER called (Condition 2 fail-fast)
+2. init-ok + ignition-refused → taxonomy message surfaced, retry safe (Rider-1)
+3. happy path existence-check-miss → init runs → ignition succeeds (initSkipped=false)
+4. isPending honesty: TRUE during pending window, FALSE after resolve (Condition 3; gates UI double-press)
+5. draft_order already present → init SKIPPED, ignition still runs (initSkipped=true, Condition 1)
+6. draft_order present but wrong team count → init RUNS (safety fallback)
+
+Combined with earlier useStartDraftV2 tests: **18 tests pass (12 + 6)**.
+
+### Adjustment vs Entry 7's "5 tests"
+
+Entry 7 required 5; delivered 6. Merged the "happy path with navigation callback invoked" into test #3 (navigation is DraftRoom's concern, not the hook's — hook has no navigate prop) + added test #6 (wrong-team-count edge case for Condition 1 safety fallback that Entry 7 didn't call out but is needed for real leagues that grew mid-configuration). Test #4 reframed from "double-press → single sequence only" to "isPending is honest across pending window" because the hook explicitly does NOT dedupe (correct — UI's job via `disabled={isStartingDraft}` on the button); the hook's contract is that isPending is truthful so the UI gate works. If architect wants a UI-level render test proving disabled prop blocks the second click, that's a DraftLobby test — flag if wanted, ~15min.
+
+### Typecheck status
+
+Ran `npx tsc -p tsconfig.app.json --noEmit`. All T7 wire-up errors CLEARED. Remaining error at `DraftRoom.tsx:122:62` is PRE-EXISTING (`n as DraftPhase` in sessionStorage-restore branch, present before T7 touched the file). Full suite has 40+ pre-existing tsc errors in `services/*`, `hooks/useMyTeamIdCrossCheck.ts`, `deriveDraftState.ts:292`, etc. — none introduced by T7 wire-up.
+
+### Deprecation followup
+
+Task #60 CREATED: post-TWELVE deletion of the legacy v1 flip-era surface:
+- `apps/web/src/pages/DraftRoom.tsx` handleStartDraftLegacy_DEPRECATED (~230 lines)
+- `server/src/routes/draft.ts` POST /league/:leagueId/start (v1 flip route)
+- `apps/web/src/api/draft.ts` startDraft() client wrapper
+- Any v1 flip-status logic in `DraftService` client if unused
+- Gate: T7 v2 route proven for ≥1 full draft cycle without regression
+
+JSDoc on `handleStartDraftLegacy_DEPRECATED` cites task #60 explicitly.
+
+### Flow diagram (end-to-end for THE TWELVE)
+
+```
+Commissioner clicks Start Draft in DraftLobby
+  → DraftRoom.handleStartDraft (v2)
+  → leagueApi.updateSettings (rounds/pickTimeLimit/draftOrder ONLY — NO status flip)
+  → useStartDraftFull.start
+    → draftOrderExistsForLeague (getDraftOrder round 1)
+      → if hit: skip
+      → if miss: DraftService.initializeDraftOrder (destructive-then-create)
+    → useStartDraftV2.start (crypto.randomUUID idempotency key)
+      → draftV2Api.startDraftV2 → POST /api/draft/v2/league/:id/start
+        → supabase.rpc('start_draft_v2', {p_league_id, p_actor, p_idempotency_key})
+          → Rider 1 preflight taxonomy (or success)
+          → append_draft_event('START_DRAFT', ...) + UPDATE leagues SET draft_status='in_progress'
+        → AuditService.logDraftEvent('DRAFT_START', ...) with was_duplicate
+      → returns {event_id, seq, first_pick_deadline, was_duplicate}
+  → navigate(`/draft-v2/${leagueId}`) → DraftRoomV2 mounts → WS bootstrap
+```
+
+### Blocking checklist for THE TWELVE — UPDATED
+
+- [x] **T7 wire-up** — GAPS resolved + wire-up authored + 6 offline tests passing. **READY for Garrett's Group-C deploy.**
+- [ ] Group A: F27b-2 engine deploy + STEP 5' green (post-Garrett-return, unchanged)
+- [ ] Group B: N-2 migration applied (post-Garrett-return, unchanged)
+- [ ] Group C: F28 web build deployed + browser-verified — **now bundles T7 wire-up**
+- [ ] Pre-THE-TWELVE dry-run passed (post-Garrett-return + volunteers)
+
+### Files changed (uncommitted, ready to commit)
+
+```
+NEW: apps/web/src/hooks/useStartDraftFull.ts
+NEW: apps/web/src/hooks/__tests__/useStartDraftFull.test.ts
+MOD: apps/web/src/pages/DraftRoom.tsx (imports, hook call, handler split, prop pass)
+MOD: apps/web/src/components/draft/DraftLobby.tsx (prop + 4 button disable/label sites)
+MOD: server/src/routes/draftV2Start.ts (AuditService import + post-success block)
+```
+
+### Standing by (unchanged)
+
+Reading inbox for Entry 8+ per protocol. This IS the last blocking item of the day per Entry 7. When Garrett returns: hand-off is docs/HANDOFF_2026-08-08_v2.md (first shift) + outbox trail R1-R19 (subsequent shifts).
+
+**End of R19. THE TWELVE's Start Draft button now exists end to end.**

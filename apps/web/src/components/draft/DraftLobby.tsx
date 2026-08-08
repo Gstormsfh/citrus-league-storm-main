@@ -77,6 +77,13 @@ interface DraftLobbyProps {
   scheduledDraftTime?: string | null; // Scheduled draft time (ISO string)
   onScheduleDraft?: (scheduledTime: string | null) => void; // Callback to set/clear scheduled draft time
   onTeamsCountChange?: (count: number) => void; // Callback to change max teams (commissioner only)
+  /**
+   * T7 (2026-08-08 architect Entry 7): true while a Start-Draft
+   * sequence is in flight (init + ignition combined). When true,
+   * Start-Draft buttons disable to prevent double-fire mid-sequence.
+   * Threaded from parent's useStartDraftFull().isPending.
+   */
+  isStartingDraft?: boolean;
 }
 
 export const DraftLobby = ({
@@ -88,6 +95,7 @@ export const DraftLobby = ({
   isDraftQueued = false,
   currentPick = 0,
   totalPicks = 0,
+  isStartingDraft = false,
   onDeleteTeam,
   onRandomizeOrder,
   randomizedOrder,
@@ -912,9 +920,10 @@ Your Commissioner`);
                   <Button
                     onClick={handleStartDraft}
                     className="w-full"
+                    disabled={isStartingDraft}
                   >
                     <Play className="h-4 w-4 mr-2" />
-                    Continue Draft
+                    {isStartingDraft ? 'Starting…' : 'Continue Draft'}
                   </Button>
                 ) : isDraftQueued ? (
                   <>
@@ -922,9 +931,10 @@ Your Commissioner`);
                       onClick={handleStartDraft}
                       className="w-full bg-primary hover:bg-primary/90"
                       size="lg"
+                      disabled={isStartingDraft}
                     >
                       <Play className="h-5 w-5 mr-2" />
-                      Start Draft Now
+                      {isStartingDraft ? 'Starting…' : 'Start Draft Now'}
                     </Button>
                     <p className="text-xs text-muted-foreground text-center">
                       Draft is prepared. Click to begin!
@@ -943,7 +953,7 @@ Your Commissioner`);
                           });
                         }}
                         className="w-full"
-                        disabled={teams.length < 4}
+                        disabled={teams.length < 4 || isStartingDraft}
                       >
                         <Hourglass className="h-4 w-4 mr-2" />
                         Prepare Draft
@@ -952,11 +962,11 @@ Your Commissioner`);
                     <Button
                       onClick={handleStartDraft}
                       className="w-full"
-                      disabled={teams.length < 4}
+                      disabled={teams.length < 4 || isStartingDraft}
                       variant={onPrepareDraft ? "outline" : "default"}
                     >
                       <Play className="h-4 w-4 mr-2" />
-                      Start Draft Now
+                      {isStartingDraft ? 'Starting…' : 'Start Draft Now'}
                     </Button>
 
                     {/* Schedule Draft - Set a future time */}
@@ -1010,9 +1020,10 @@ Your Commissioner`);
                       onClick={handleStartDraft}
                       className="w-full bg-primary hover:bg-primary/90"
                       size="lg"
+                      disabled={isStartingDraft}
                     >
                       <Play className="h-5 w-5 mr-2" />
-                      Join Draft Room
+                      {isStartingDraft ? 'Joining…' : 'Join Draft Room'}
                     </Button>
                   </CardContent>
                 </Card>

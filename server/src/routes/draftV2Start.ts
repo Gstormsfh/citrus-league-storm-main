@@ -45,6 +45,7 @@ import { membershipMiddleware } from '../middleware/membership';
 import { createUserClient } from '../lib/supabase';
 import { ok, fail, handleError } from '../lib/responses';
 import { AppError } from '../lib/errors';
+import { AuditService } from '../services/AuditService';
 
 const draftV2StartRoutes = new Hono<Env>();
 
@@ -120,6 +121,33 @@ draftV2StartRoutes.post(
       // Success shape from start_draft_v2 RPC (per migration §6.4 return):
       // { event_id, seq, first_pick_deadline, was_duplicate }
       // The RPC returns a JSONB object; supabase-js unwraps to `data`.
+
+      // GAP-2 (2026-08-08 architect Entry 7 ruling): audit log fires
+      // SERVER-SIDE after RPC success ONLY (log truth, not attempts).
+      // Include was_duplicate so idempotent replays are distinguishable
+      // in the audit trail (double-press with same idempotency-key
+      // returns the original event's shape with was_duplicate=true).
+      try {
+        const audit = new AuditService(supabase);
+        const rpcResult = (data ?? {}) as {
+          event_id?: number;
+          seq?: number;
+          first_pick_deadline?: string;
+          was_duplicate?: boolean;
+        };
+        audit.logDraftEvent('DRAFT_START', leagueId, {
+          startedBy: userId,
+          eventId: rpcResult.event_id ?? null,
+          seq: rpcResult.seq ?? null,
+          firstPickDeadline: rpcResult.first_pick_deadline ?? null,
+          wasDuplicate: rpcResult.was_duplicate ?? false,
+        });
+      } catch (auditErr) {
+        // Audit failure MUST NOT block the response. Log + continue.
+        // (Symmetric with existing draft.ts:220-239 pattern.)
+        void auditErr;
+      }
+
       return ok(c, data);
     } catch (err) {
       return handleError(c, err, 'Failed to start draft (v2)');

@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
+import { useStartDraftFull } from '@/hooks/useStartDraftFull';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { ScoringCalculator, type ScoringSettings } from '@/utils/scoringUtils';
@@ -181,6 +182,14 @@ const DraftRoom = () => {
   // Calculate loading state for minimum loading time hook
   const actualLoading = loading || authLoading || (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league');
   const displayLoading = useMinimumLoadingTime(actualLoading, 400);
+
+  // T7 architect Entry 7 (2026-08-08): commissioner Start Draft button now
+  // wires through F27 start_draft_v2 via useStartDraftFull hook. isPending
+  // gates the DraftLobby buttons across both init + ignition steps
+  // (Condition 3). Legacy handleStartDraft renamed
+  // handleStartDraftLegacy_DEPRECATED below and slated for deletion once
+  // THE TWELVE ships and the v2 route is proven in prod (task #60).
+  const startDraftFull = useStartDraftFull();
 
   // ── Lookup Maps (O(1) instead of O(n) for .find()) ──────────────
   const teamsById = useMemo(() => {
@@ -2864,6 +2873,26 @@ const DraftRoom = () => {
 
   // Actually start the draft - begins the draft instance
   // Also used by non-commissioners to rejoin an in-progress draft
+  /**
+   * NEW v2 handler (T7 architect Entry 7, 2026-08-08).
+   *
+   * Commissioner Start Draft button routes here. For NEW starts, this
+   * wires through F27 `start_draft_v2` via `useStartDraftFull`. Rejoin
+   * branches (non-commissioner in_progress rejoin, commissioner
+   * in_progress rejoin) are preserved verbatim from the legacy path
+   * — those flows do not touch the ignition RPC, only re-hydrate the
+   * client from server state.
+   *
+   * Flow for new starts:
+   *   1. Guest/no-league bailouts.
+   *   2. Non-commissioner: rejoin only, no start.
+   *   3. Commissioner: if in_progress, rejoin; else new-start path:
+   *      a. Persist league settings (rounds/pickTimeLimit/draftOrder)
+   *         WITHOUT flipping draft_status — start_draft_v2 owns the flip.
+   *      b. Call startDraftFull.start (init draft_order → ignition RPC).
+   *      c. On success, navigate to /draft-v2/${leagueId} (v2 room).
+   *      d. On failure, surface Rider-1 taxonomy message via toast.
+   */
   const handleStartDraft = async (settings: DraftSettings) => {
     // ⚠️ DEMO STATE: Disable all draft actions
     if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
@@ -2874,9 +2903,194 @@ const DraftRoom = () => {
       }
       return;
     }
-    
+
     if (!leagueId) return;
-    
+
+    // Non-commissioners can rejoin an in-progress draft (but not start a new one)
+    if (!isCommissioner) {
+      if (league?.draft_status === 'in_progress') {
+        logger.log('Non-commissioner rejoining in-progress draft');
+        setDraftPhase(DraftPhase.ACTIVE);
+        try {
+          const [stateRes, orderRes, picksRes] = await Promise.all([
+            DraftService.getDraftState(leagueId, teams, league.draft_rounds || 21, user?.id),
+            DraftService.getDraftOrder(leagueId, user?.id || '', 1),
+            DraftService.getDraftPicks(leagueId, user?.id || ''),
+          ]);
+          if (stateRes.state) setDraftState(stateRes.state);
+          if (orderRes.order?.team_order?.length) {
+            const orderedTeams = resolveTeamOrder(orderRes.order.team_order);
+            if (orderedTeams.length === teams.length) setOrderedTeamsForBoard(orderedTeams);
+          }
+          const activeRejoinPicks = picksRes.picks.filter((p: DraftPick) => !p.deleted_at);
+          if (activeRejoinPicks.length > 0) {
+            setDraftHistory(activeRejoinPicks);
+            setDraftedPlayerIds(new Set(activeRejoinPicks.map(p => p.player_id)));
+            setDraftTimerStarted(true);
+            draftTimerStartedRef.current = true;
+          }
+        } catch (rejoinErr) {
+          logger.error('Non-commissioner rejoin: error loading draft data:', rejoinErr);
+        }
+      }
+      return;
+    }
+
+    // Commissioner rejoining an in-progress draft (not starting a new one)
+    if (league?.draft_status === 'in_progress') {
+      logger.log('Commissioner rejoining in-progress draft');
+      setDraftPhase(DraftPhase.ACTIVE);
+      try {
+        const [stateRes, orderRes, picksRes] = await Promise.all([
+          DraftService.getDraftState(leagueId, teams, league.draft_rounds || 21, user?.id),
+          DraftService.getDraftOrder(leagueId, user?.id || '', 1),
+          DraftService.getDraftPicks(leagueId, user?.id || ''),
+        ]);
+        if (stateRes.state) setDraftState(stateRes.state);
+        if (orderRes.order?.team_order?.length) {
+          const orderedTeams = resolveTeamOrder(orderRes.order.team_order);
+          if (orderedTeams.length === teams.length) setOrderedTeamsForBoard(orderedTeams);
+        }
+        const activeRejoinPicks = picksRes.picks.filter((p: DraftPick) => !p.deleted_at);
+        if (activeRejoinPicks.length > 0) {
+          setDraftHistory(activeRejoinPicks);
+          setDraftedPlayerIds(new Set(activeRejoinPicks.map(p => p.player_id)));
+          setDraftTimerStarted(true);
+          draftTimerStartedRef.current = true;
+        }
+      } catch (rejoinErr) {
+        logger.error('Commissioner rejoin: error loading draft data:', rejoinErr);
+      }
+      return;
+    }
+
+    // NEW-DRAFT PATH — F27 v2 ignition via useStartDraftFull.
+    if (!user) return;
+    try {
+      logger.log('handleStartDraft (v2): starting draft', {
+        leagueId,
+        settings,
+        teamsCount: teams.length,
+      });
+
+      setDraftSettings(settings);
+      setTimeRemaining(settings.pickTimeLimit);
+
+      // Step A: persist league settings BEFORE ignition. start_draft_v2
+      // reads (v_settings ->> 'pickTimeLimit')::int and league.draft_rounds
+      // during its Rider-1 preflight + first_pick_deadline computation
+      // (migration 20260807000000_start_draft_v2.sql:264). draft_status
+      // flip is INTENTIONALLY absent here — start_draft_v2 owns it.
+      try {
+        await leagueApi.updateSettings(leagueId, {
+          draft_rounds: settings.rounds,
+          settings: {
+            ...(league?.settings || {}),
+            pickTimeLimit: settings.pickTimeLimit,
+            draftOrder: settings.draftOrder,
+          },
+        } as Record<string, unknown>);
+      } catch (settingsErr) {
+        const msg = settingsErr instanceof Error ? settingsErr.message : 'Unknown error';
+        toast({
+          title: 'Error',
+          description: `Failed to save draft settings: ${msg}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Step B: init draft order (via hook, cheap existence-check gates
+      // re-init per Condition 1) → start_draft_v2 ignition (via hook,
+      // fresh idempotency key per attempt per Condition 2). Unified
+      // isPending gates all Start Draft buttons in DraftLobby (Condition
+      // 3, threaded via isStartingDraft prop below).
+      const draftRounds = settings.rounds || league?.draft_rounds || 21;
+      const orderToUse = settings.effectiveOrder
+        || (settings.draftOrder === 'custom' && settings.customOrder ? settings.customOrder : undefined)
+        || customDraftOrder
+        || randomizedTeamOrder
+        || undefined;
+      const startDraftType = (league?.settings as LeagueSettings)?.draftType || 'snake';
+
+      const result = await startDraftFull.start({
+        leagueId,
+        userId: user.id,
+        teams,
+        totalRounds: draftRounds,
+        customTeamOrder: orderToUse,
+        draftType: startDraftType,
+      });
+
+      if (result.ok !== true) {
+        // Init or ignition failure — Rider-1 taxonomy already unpacked
+        // by useStartDraftV2 into result.message. League remains in
+        // configured-not-started state; retry is safe (existence-check
+        // will skip re-init on Condition 1, fresh idempotency key on
+        // Condition 2). Explicit variable assignment forces branch
+        // narrowing across the discriminated union boundary.
+        const step: 'init' | 'ignition' = result.step;
+        const message: string = result.message;
+        toast({
+          title: step === 'init' ? 'Failed to initialize draft' : 'Cannot start draft',
+          description: message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const { data, initSkipped } = result;
+      logger.log('handleStartDraft (v2): ignition success', {
+        eventId: data.event_id,
+        seq: data.seq,
+        firstPickDeadline: data.first_pick_deadline,
+        wasDuplicate: data.was_duplicate,
+        initSkipped,
+      });
+
+      // Navigate to v2 draft room. F27 has committed START_DRAFT event
+      // + set league.draft_status=in_progress; DraftRoomV2 will bootstrap
+      // via WS on mount.
+      navigate(`/draft-v2/${leagueId}`);
+    } catch (error: unknown) {
+      logger.error('handleStartDraft (v2): unexpected error', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast({
+        title: 'Error',
+        description: `Failed to start draft: ${errorMessage}`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  /**
+   * @deprecated LEGACY v1 flip-era start-draft handler. RENAMED
+   * (2026-08-08 T7 architect Entry 7 wire-up) and no longer wired to
+   * DraftLobby. Retained temporarily as a safety net during THE TWELVE
+   * (Aug 8-15) in case a rollback is required. Scheduled for deletion
+   * post-TWELVE per task #60 alongside:
+   *   - server/src/routes/draft.ts POST /league/:leagueId/start (v1)
+   *   - apps/web/src/api/draft.ts startDraft() client wrapper
+   *   - server/src/services/DraftService.ts start-draft flip logic (if any)
+   *
+   * The legacy flow used `leagueApi.updateSettings({draft_status:'in_progress'})`
+   * to flip status without going through start_draft_v2 — bypassing F27's
+   * preflight taxonomy, idempotency, event-log ignition, and audit trail.
+   * Anti-pattern per Phase 4.5 architecture (event-sourcing principle).
+   */
+  const handleStartDraftLegacy_DEPRECATED = async (settings: DraftSettings) => {
+    // ⚠️ DEMO STATE: Disable all draft actions
+    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+      if (userLeagueState === 'guest') {
+        navigate('/auth');
+      } else {
+        navigate('/create-league');
+      }
+      return;
+    }
+
+    if (!leagueId) return;
+
     // Non-commissioners can rejoin an in-progress draft (but not start a new one)
     if (!isCommissioner) {
       if (league?.draft_status === 'in_progress') {
@@ -3666,6 +3880,7 @@ const DraftRoom = () => {
               <DraftLobby
                 teams={lobbyTeams}
                 onStartDraft={handleStartDraft}
+                isStartingDraft={startDraftFull.isPending}
                 onPrepareDraft={handlePrepareDraft}
                 isCommissioner={isCommissioner}
                 isDraftQueued={league?.draft_status === 'queued'}
