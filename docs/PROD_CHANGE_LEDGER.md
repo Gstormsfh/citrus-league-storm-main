@@ -154,3 +154,29 @@ boot verification + rig acceptance + architect ratification. Not
 after a mere push (the push alone is not certification — only
 the boot-clean + rig-clean + architect-ratified state qualifies
 the image as a rollback target).
+
+## Rule 1 recorded change: T6 site season-phase (2026-08-08 19:31Z)
+
+**What.** Flip site season-phase display from PLAYOFFS → OFFSEASON for the single league that qualified.
+
+**Why.** Garrett requested OFFSEASON display. Mechanism grep-verified at `apps/web/src/contexts/LeagueContext.tsx:459-479`: `showPlayoffs=true` iff `settings.playoffTeams > 0` AND `playoff_brackets` row exists for the active league. Consumers: `Navbar.tsx:42`, `MobileMenuButton.tsx:38`.
+
+**Executed by.** Architect via MCP under Garrett's explicit same-day grant.
+
+**Before.** The Beta League (`d907a77c-425f-4b52-83ac-8f5c281682e8`):
+- `settings.playoffTeams` = 6
+- `playoff_brackets` row `0fdae469`, season 2025, status completed, created 2026-04-04
+
+**After.** Same league:
+- `settings.playoffTeams` = 0
+- `playoff_brackets` row `0fdae469` PRESERVED
+
+**Effect.** Next `LeagueContext` re-eval (page load / route change / activeLeagueId change) → `showPlayoffs=false` → Navbar Playoffs tab hidden → site reads OFFSEASON.
+
+**Reversal.** Set `settings.playoffTeams` back to 6. Bracket row is intact — playoffs view returns instantly, no regen.
+
+**Mechanism / classification report.** Terminal outbox R5 (2026-08-08 ~19:20Z). Diagnostic + fix script at `scripts/proof/t6-site-season-phase-fix.local.sql` (commit `cf9e70a7`).
+
+**INS-16-family note.** Terminal's diagnostic SQL at `scripts/proof/t6-site-season-phase-fix.local.sql:78-84` referenced `l.season` and `l.league_type` — neither exists on prod `leagues`. Prod has `league_size`; `season` lives on `playoff_brackets`. Composed-not-harvested schema assumptions — architect adapted live at execution time. Ledger cross-ref: `docs/INSTRUMENT_LEDGER.md` INS-16 (harvest-from-real-output rule).
+
+**Docket task #65 candidate:** Beta League `playoffTeams` must be reconfigured (was 6) at 2026 season setup. The zero must not surprise anyone next spring. Add to Q3 2026 season-config checklist.

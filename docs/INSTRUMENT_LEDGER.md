@@ -1825,3 +1825,17 @@ cursor-advance fix eliminates.
 **Recommended: (a).** Task #55 created with the exact 2-line patch
 proposal. Pre-freeze Aug 17 landing target per architect's F27b-2
 "NOT a close blocker" ruling.
+
+## INS-16 addendum (2026-08-08 second-shift T6): schema composed-not-harvested — repeat offense
+
+Architect executed T6 fix on prod 2026-08-08 19:31Z (see PROD_CHANGE_LEDGER "Rule 1 recorded change: T6 site season-phase"). Terminal's diagnostic SQL at `scripts/proof/t6-site-season-phase-fix.local.sql:78-84` referenced two columns that DO NOT EXIST on prod `leagues`:
+- `l.season` — column does not exist on `leagues` (season lives on `playoff_brackets`)
+- `l.league_type` — column does not exist on `leagues` (prod has `league_size`)
+
+Architect adapted live at execution time. **Same class as the original INS-16 fictional 9-item boot checklist**: patterns composed from memory / assumption rather than harvested from live source or actual schema. **Repeat offense — second occurrence in 24 hours.**
+
+**Reinforcement.** For any prod-facing SQL diagnostic authored by terminal:
+- Column references MUST be grep-verified against `supabase/migrations/*.sql` OR (preferable) against a live `\d public.<table>` output pasted into the diagnostic file's header.
+- Alternative: use `SELECT column_name FROM information_schema.columns WHERE table_name='<table>' AND table_schema='public'` as STEP 0 pre-check in the diagnostic itself, before any query that assumes the schema.
+
+**Task #66 candidate:** pre-flight `\d`-check as a scaffold requirement for `scripts/proof/*.local.sql` diagnostic authoring going forward.

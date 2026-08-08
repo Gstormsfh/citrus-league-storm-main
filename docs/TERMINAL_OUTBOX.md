@@ -360,3 +360,54 @@ Any of the three is a substantive architecture decision. Docketed for architect 
 **Docket (post-close):** full MIXED-audit per-page walk to confirm NEW-LOOK is USED, not just imported (task #64 candidate).
 
 **Moving to T2 (integration fuzzer) after committing.**
+
+---
+
+## R12 — 2026-08-08 ~20:15Z — ACK Entry 6 (T6 prod-executed ledger + INS-16 addendum + T7 entanglement)
+
+**Directive received.**
+
+**T6 ledger entry APPENDED** to `docs/PROD_CHANGE_LEDGER.md` under new "Rule 1 recorded change: T6 site season-phase (2026-08-08 19:31Z)" section. Verbatim: what/why/before/after/reversal + architect-via-MCP-under-Garrett-grant + timestamp.
+
+**INS-16 addendum APPENDED** to `docs/INSTRUMENT_LEDGER.md`. Repeat-offense recorded — terminal's diagnostic SQL referenced `l.season` + `l.league_type` (neither exists on prod leagues). Reinforcement: prod-facing SQL diagnostic MUST grep-verify columns against `supabase/migrations/*.sql` OR paste `\d public.<table>` into diagnostic header OR add `information_schema.columns` STEP-0 pre-check. Task #66 candidate.
+
+**Docket "Beta League playoffTeams reconfigure at 2026 season setup"** — noted as task #65 candidate in PROD_CHANGE_LEDGER entry.
+
+---
+
+## R13 — 2026-08-08 ~20:15Z — T7 WIRE-UP ENTANGLEMENT ANALYSIS — TWO GAPS SURFACED — STOP
+
+Per architect condition: "If any dependency lacks coverage, STOP, report to outbox, and I will re-rule."
+
+**v1 `handleStartDraft` at `apps/web/src/pages/DraftRoom.tsx:2867-3095` enumerated (228 lines).** Every mutation + external call mapped to v2 coverage:
+
+| # | v1 mutation/call | Line | v2 coverage | Verdict |
+|---|---|---|---|---|
+| 1 | `setDraftSettings(settings)` | 2970 | Client-local UI state; not draft-flow-dependent | ✓ preserve |
+| 2 | `setTimeRemaining(settings.pickTimeLimit)` | 2971 | v2 `DraftTimerV2` reads `snapshot.stateSnapshot.currentPickDeadline` (server truth); local `timeRemaining` obsolete for v2 rendering path | ⚠ obsolete-with-evidence — but preserving is harmless |
+| 3 | `DraftService.initializeDraftOrder(leagueId, user.id, teams, draftRounds, true, orderToUse, startDraftType)` | 2993-3001 | **NO v2 COVERAGE** — start_draft_v2 preflight Step 2 requires draft_order rows to exist per round; RAISES `illegal_state: draft_order missing for round X` if not | **GAP-1 (BLOCKING)** |
+| 4 | `leagueApi.updateSettings({draft_status:'in_progress', draft_rounds, settings})` | 3010-3018 | REPLACED by `useStartDraftV2` → `start_draft_v2` RPC writes draft_status server-side + emits `draft_started` event | ✓ replaced |
+| 5 | `setLeague({...league, draft_status:'in_progress', ...})` | 3028-3037 | Client-local; preserve after useStartDraftV2 success OR refetch via `leagueApi.getLeague` | ✓ preserve |
+| 6 | `setDraftPhase(DraftPhase.ACTIVE)` | 3041 | Client-local; preserve after `useStartDraftV2` success (before navigate) | ✓ preserve |
+| 7 | `setDraftState(null); setDraftHistory([]); setDraftedPlayerIds(new Set()); setDraftTimerStarted(false)` | 3044-3047 | Client-local; preserve | ✓ preserve |
+| 8 | `loadStateAfterStart` polling retry (10x @ 500ms) | 3051-3088 | v2 uses WS + snapshot delivery (F27b-1); no HTTP polling needed. Runner + WS reconnect handle catchup. | ✓ replaced by v2 wire architecture |
+| 9 | `AuditService.logDraftEvent('DRAFT_START', leagueId, {teamsCount, rounds})` | 3091-3093 | **NO v2 COVERAGE** — `server/src/routes/draftV2Start.ts` does NOT invoke `AuditService.logDraftEvent`. v1 fired client-side audit; v2 endpoint has no audit call. | **GAP-2 (NON-BLOCKING but architecturally-required)** |
+
+**GAP-1 (BLOCKING): Draft-order initialization prerequisite.**
+
+start_draft_v2 preflight (migration `20260807000000_start_draft_v2.sql`) reads draft_order per round and RAISES on missing. v1 flow explicitly calls `DraftService.initializeDraftOrder(...)` BEFORE flipping status. If wire-up SIMPLY REPLACES the button's onClick without preserving the initialization step, first-time draft ignition FAILS with `illegal_state: draft_order missing for round 1`.
+
+**Options for GAP-1 (architect-decides):**
+- **(a) Two-step wire-up:** button onClick performs `DraftService.initializeDraftOrder(...)` FIRST, then on success calls `useStartDraftV2.start(leagueId)`. Preserves v1's initialization semantics. Minimal-invasion. Additive.
+- **(b) Extend start_draft_v2 RPC** to init draft_order if missing. Architecturally cleaner — single-RPC ignition. Requires migration change (out of T7 scope per architect additive mandate).
+- **(c) Add separate v2 API endpoint** `POST /api/draft/v2/.../initialize-order` mirroring the v1 endpoint. Two API calls from client, symmetric with v1 flow.
+
+**GAP-2 (NON-BLOCKING but expected): Audit log.**
+
+v1 fires `AuditService.logDraftEvent('DRAFT_START', leagueId, {teamsCount, rounds})` client-side. v2 endpoint does not. To match v1 audit coverage, `server/src/routes/draftV2Start.ts` should invoke `AuditService.logDraftEvent(...)` before `return ok(c, data)`. Small server-side addition.
+
+**STOPPING per architect condition.** No wire-up authoring until architect ratifies GAP-1 option + acks GAP-2 audit-log addition. Fallback per architect's Entry 6 language: "fallback: v2 button replaces old button's visibility; old hidden" — reads as: if gap unrecoverable, hide v1 button + expose v2 button separately. But GAP-1 makes the v2 button non-functional as-is → hidden v1 + broken v2 is worse than current state.
+
+**RECOMMENDED (my terminal read, awaiting architect ratification):** Option **(a) two-step wire-up** + GAP-2 audit-log addition in same commit. Both are additive; neither changes existing v1 behavior; both preserve F27 contract. If architect greenlights, I'll author the wire-up in DraftLobby.tsx (swap the `handleStartDraft` prop's handler) + preserve v1 handleStartDraft as `handleStartDraftLegacy_DEPRECATED` with a JSDoc `@deprecated` + task-#67-candidate for post-twelve deletion.
+
+**Moving to T2 (integration fuzzer) while awaiting T7 ratification.**
