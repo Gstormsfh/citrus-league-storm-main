@@ -84,13 +84,41 @@ gcloud logging read --project=citrus-fantasy-staging --limit=1 --format='value(j
 Terminal records both values in the deploy notice + commits to `docs/DEPLOY_PROTOCOL_F26_F27.md` §5 "Deploy log" (this doc) BEFORE the deploy runs.
 
 **Rollback command (kept ready throughout the deploy window):**
+
+**AR path CORRECTED per INS-16 doc-defect flag** — actual infra uses `northamerica-northeast1-docker.pkg.dev/citrus-fantasy-staging/citrus-draft-engine/draft-engine` (per `infra/gce/draft-engine-startup.sh:114-119`).
+
 ```powershell
-# <RECORDED_DIGEST> = the pinned pre-deploy value from above.
-gcloud artifacts docker tags add \
-  us-central1-docker.pkg.dev/citrus-fantasy-staging/citrus-draft-engine/citrus-draft-engine@<RECORDED_DIGEST> \
-  us-central1-docker.pkg.dev/citrus-fantasy-staging/citrus-draft-engine/citrus-draft-engine:latest --quiet
-gcloud compute instances reset <vm-name> --project=citrus-fantasy-staging --zone=<zone> --quiet
+# Rollback shape (tag-based, per architect P1 ruling — full 64-hex digest
+# in the tag command is redundant when we retag by tag).
+# THREE commands: retag → metadata revert → reset.
+
+# (1) Retag PRIOR_TAG → :latest so startup script re-pulls the old image
+gcloud artifacts docker tags add `
+  northamerica-northeast1-docker.pkg.dev/citrus-fantasy-staging/citrus-draft-engine/draft-engine:<PRIOR_TAG> `
+  northamerica-northeast1-docker.pkg.dev/citrus-fantasy-staging/citrus-draft-engine/draft-engine:latest `
+  --quiet
+
+# (2) Metadata revert BEFORE reset (otherwise VM boots old image while
+#     fingerprint metadata claims new one, poisoning post-rollback verification)
+gcloud compute instances add-metadata citrus-draft-engine-staging `
+  --project=citrus-fantasy-staging --zone=northamerica-northeast1-a `
+  --metadata="image-tag=<PRIOR_TAG>,commit-sha=<PRIOR_COMMIT>" `
+  --quiet
+gcloud compute instances remove-metadata citrus-draft-engine-staging `
+  --project=citrus-fantasy-staging --zone=northamerica-northeast1-a `
+  --keys=image-sha --quiet
+
+# (3) Reset the VM — startup script re-pulls :latest (now old image)
+gcloud compute instances reset citrus-draft-engine-staging `
+  --project=citrus-fantasy-staging --zone=northamerica-northeast1-a --quiet
 ```
+
+### Current rollback pin (advanced 2026-08-08 per F26+F27+F27b-1 certification)
+
+- **Rollback pin (previous-good, tape-to-monitor):** `0ecbe605-draft @ sha256:152b79912cea9d80cf5c3147beeba48957973f5d201d54bdc9a3d6c429768a32`
+  - `<PRIOR_TAG>` = `0ecbe605-draft`
+  - `<PRIOR_COMMIT>` = `0ecbe605`
+- **Retired (was previous-good pre-2026-08-08):** `8b7b43f6-draft @ sha256:881024ba…` (pre-F26/F27 image; do not roll back this far)
 
 `--quiet` per Rule 4. Rollback is instant — no diagnosis of what went wrong required; that happens after the room is safe.
 

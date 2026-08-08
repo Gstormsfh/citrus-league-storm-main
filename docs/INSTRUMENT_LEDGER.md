@@ -1656,3 +1656,172 @@ No path clears it at completion:
 
 Task-list addition candidate: task #54 (post-F26/F27 close,
 architect-owned decision).
+
+**Note:** existing KI-034 (REGISTRY.md:354) already tracks this
+under the F24 close era. This N-2 observation reconfirms the same
+class post-F27; architect ruling on Option A/B rides through
+KI-034's disposition rather than a duplicate KI.
+
+### F27b-2 — draft_started re-application via post-bootstrap NOTIFY (2026-08-08)
+
+Architect discovery post-STEP-5': one
+`draft_started_apply.skipped_stale_status` WARN on c3615619 at
+`06:38:35.899Z` — 4.7s AFTER bootstrap completed at
+`06:38:31.211Z`. Absent from both abandoned-run lobbies (which had
+no post-ignition client-driven activity beyond auto-cascade).
+
+**F27b freebie WARN — instrument-value evidence (INS-16 corollary).**
+The `draft_started_apply.skipped_stale_status` WARN was authored
+as belt-and-suspenders observability in F27 (2026-08-06 architect
+approval) with zero behavior change. **Its first field trigger
+directly surfaced F27b-2** — without it, the re-application would
+have been silent, the ring buffer would have quietly held duplicate
+seq 1, and the defect would only have been discoverable via
+`resync.responded` byte-count anomaly at some future stress-test.
+Concrete evidence that observability instruments authored "just to
+distinguish future stale patterns" earn their keep on the first
+run. Companion to INS-16's harvest-from-real-output rule: authored
+WARN patterns exist to make silent post-defect states LOUD; that is
+the entire pattern's job.
+
+**Four architect questions answered with file:line:**
+
+**Q1 — does `bootstrapFullEventReplay` advance `lastAppliedSeq`?**
+
+**No, for any case.** Cursor sites in `LobbyManager.ts` (grep-verified):
+- `:814` — `private lastAppliedSeq = 0` (initial)
+- `:2436-2437` — advance inside `appendEventAndCount` (runtime
+  emissions from `processSubmitPick` / `processNominate` / etc.)
+- `:2531` — snapshot WRITE path (`processSnapshot`) uses
+  `findMaxEventSeq` for the snapshot record's `lastAppliedSeq`
+  field, NOT for the in-memory cursor
+- `:2798` — snapshot BOOTSTRAP path (`applySnapshot`) sets
+  `this.lastAppliedSeq = record.lastAppliedSeq` from snapshot record
+- `:2825-2826` — advance inside `applyEventDuringBootstrap`
+  (LIVE NOTIFY dispatcher via `processExternalEvent`, AND
+  snapshot+delta bootstrap's delta iteration at `:2717`)
+
+`bootstrapFullEventReplay` (`:3109`) directly dispatches per-case
+handlers (`applyPickEvent`, `applyPickUndoneEvent`,
+`applyCommissionerOverrideEvent`, `applyDraftStartedEventState`) —
+**none touch `lastAppliedSeq`.** Cursor stays 0 post-full-replay.
+
+Latent scope beyond F27b-2: any post-bootstrap-full-replay NOTIFY
+(for any seq > 0) passes the guard at `:5659`, fetches ALL events
+via `listDraftEvents(leagueId, sinceSeq=0)`, and iterates through
+`applyEventDuringBootstrap`. For F27b-1's fresh-lifecycle-only
+case, this re-applies seq 1 draft_started (F27b-2's exact trigger).
+For a hypothetical in-progress-league-with-no-snapshot case, re-
+apply of pick events would fail the slot check at `:3416-3422`
+(picksMade already advanced from initial replay) and throw.
+Snapshot+delta path is the common bootstrap route for post-pick
+drafts, so this latent case rarely surfaces — but F27b-2 fix
+closes it as a side effect.
+
+**Q2 — what path delivered seq 1 at `06:38:35.899Z`?**
+
+NOTIFY (via LISTEN client → dispatcher at `index.ts:727` →
+`lobby.enqueueExternalEvent` at `:744` → single-writer queue →
+`processExternalEvent` at `LobbyManager.ts:5643`).
+
+**It routes through the duplicate guard at `:5659`** (`if (seq <=
+this.lastAppliedSeq)`). With `lastAppliedSeq=0` (Q1 answer), the
+guard is bypassed for any seq >= 1. Then `listDraftEvents(leagueId,
+sinceSeq=0)` at `:5671-5674` fetches ALL events for the league,
+and the loop at `:5698-5715` iterates and applies each via
+`applyEventDuringBootstrap(event)`.
+
+**Exact trigger NOTIFY (reasoning-derived from timeline, stderr
+not archived):** the first post-bootstrap event write (pick 1's
+seq 2 at ~06:38:34.633Z per ndjson). Timeline:
+- `06:38:31.211Z` — bootstrap complete (cursor stays 0)
+- `06:38:34.633Z` — harness pick 1 RPC fires → seq 2 written to
+  `draft_events`
+- `06:38:34.761Z` — primary observer receives normal broadcast for
+  seq 2 (via `processSubmitPick`'s inline broadcast + own
+  `appendEventAndCount` at :2436, which advances cursor to 2)
+- **NOTIFY echo for seq 2 fires from the pg trigger.** LISTEN
+  client receives it, dispatch enqueues.
+- Race: `processSubmitPick` had already advanced cursor to 2. The
+  echo `processExternalEvent(seq=2)` guard-check `2 <= 2` → true →
+  duplicate_skipped (this SHOULD have suppressed the re-apply).
+- **BUT** if the echo NOTIFY arrived BEFORE `processSubmitPick`
+  completed its `appendEventAndCount` — which is a live race
+  because both run through the single-writer queue but with
+  independent await points — then processExternalEvent's guard
+  sees cursor=0, fetches [seq 1, seq 2], and iterates.
+
+Or (simpler hypothesis): the seq 2 NOTIFY arrived AFTER
+`processSubmitPick` finished (cursor=2, echo skipped), but a
+different NOTIFY class arrived — e.g., the LISTEN client's
+watchdog self-probe (`eventSubscription.ts:200-210`, default
+`watchdogIntervalMs=60000` and `watchdogTimeoutMs=5000` — probe
+timing doesn't cleanly explain 4.7s but the probe channel could
+carry sentinel payloads that hit the dispatcher's dead path).
+
+Without stderr archive, exact class of the triggering NOTIFY
+remains ambiguous. **Regardless of which NOTIFY, the mechanism
+(cursor=0 → guard bypass → fetch all → re-apply seq 1) is
+identical**, and the fix (Q4) closes all such classes.
+
+**Q3 — does the ring buffer hold seq 1 twice? What does
+resync-from-0 serve?**
+
+**Yes, seq 1 held twice.** `applyDraftStartedEventState` at
+`:3373` calls `this.events.append(bufferedStarted)`
+**unconditionally, BEFORE the didFlip return** at `:3406`. Both
+invocations (bootstrap-path at :3091 and NOTIFY-re-apply-path via
+:5715 → :2838 → applyDraftStartedEventState) execute the append.
+
+`RingBuffer.getEventsSinceSeq(0)` returns all buffer entries with
+`seq > 0` — **both seq 1 entries are served.**
+
+Wire client tolerance: NO explicit dedup. `ws-client.mjs:274-276`
+fires `onEventCb({seq, frame, receivedAt})` per wire frame; no
+seq-cursor dedup at the wire client layer. Application-level
+consumers (harness's INS-13 checker at `draft-harness.mjs:445-451`,
+DraftRoomV2 in the web app) would see two seq=1 frames — the INS-13
+checker would fire `⚠ ordering violation` for the second (`1 <= 1`
+triggers `seq <= last`).
+
+**Resync mechanism SPECIFIC:** `resync.responded` at
+`LobbyManager.ts:1597` fires per client resync request; the
+architect log noted "tab's resync-from-0 served 13 deltas" earlier
+in this session — that count would be 14 with F27b-2's duplicate
+(seq 1 twice + seqs 2..13). Whether the client's ordering-fault
+detection would fire depends on its impl.
+
+**Q4 — minimal fix (three candidates evaluated):**
+
+**(a) Advance cursor at end of `bootstrapFullEventReplay`** —
+RECOMMENDED. Add after the "replay complete" log line at `:3273`:
+```typescript
+if (prevSeq !== null) {
+  this.lastAppliedSeq = prevSeq;
+}
+```
+`prevSeq` is the highest replayed seq (line 3139 sets it per-event).
+Closes:
+- F27b-2 (draft_started re-apply)
+- Latent bootstrap-full-replay + pick-re-apply throw (hypothetical
+  in-progress-no-snapshot case)
+- Any future lifecycle-event re-apply of the same class
+Minimal (2 lines), no semantic change beyond cursor discipline.
+
+**(b) Move the append inside the `didFlip` path** — CLOSES BUFFER
+DUP ONLY. Fixes ring buffer duplicate but WARN still fires (guard-
+skip logic unchanged) and cursor-latent scope remains open. Also
+breaks the append/broadcast pairing invariant that
+`processExternalEvent :5791` relies on (`peekLast()` tail check
+for broadcast trigger) — post-fix, guard-skip re-apply would NOT
+broadcast, but that's not the primary defect.
+
+**(c) Dedupe ring buffer by seq on append** — TREATS SYMPTOM, NOT
+CAUSE. Would prevent buffer duplication but leaves the re-application
+happening (WARN still fires, cursor-latent still open). Adds
+ambient cost to every append (buffer scan) for a scenario the
+cursor-advance fix eliminates.
+
+**Recommended: (a).** Task #55 created with the exact 2-line patch
+proposal. Pre-freeze Aug 17 landing target per architect's F27b-2
+"NOT a close blocker" ruling.

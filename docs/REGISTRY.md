@@ -398,6 +398,8 @@ The internal path (`processSubmitPick` else-branch, `LobbyManager.ts:1826-1832`)
 - `2026-08-05T18:27:03Z RAISE WARNING clock fired but draftStatus=completed — ignored (timer should have been cancelled)` (from the F20 guard, absorbing what F26 failed to cancel)
 - Zero `draft_completed` frames in the ndjson capture across all 12 client streams.
 
+**RESOLVED (2026-08-08).** Fix rides in the same engine deploy as F27 + F27b-1 (see KI-043 + KI-044 below). Certification image `0ecbe605-draft @ sha256:152b79912cea9d80cf5c3147beeba48957973f5d201d54bdc9a3d6c429768a32` (this is the new rollback pin; retires `8b7b43f6-draft`). Live-apply `case 'draft_completed'` at `LobbyManager.ts:2872-2914` now (a) appends a `BufferedDraftEvent` of kind='draft_completed' so the central broadcast tail-check at `:5791` fires, (b) mutates `draftStatus='completed'`, (c) calls `cancelPickTimer()` + nulls `currentTimerDeadline` (teardown symmetric with internal path at `:1826-1832`). **Wire proof (STEP 5' 2026-08-08T06:38Z on league c3615619):** BOTH observers received `draft_completed` seq=14 within 3s of the DB write — 12/12 pick frames + completion frame delivered clean. **Broader chain proof (8661d3d4 self-completion 2026-08-08 pre-STEP-5):** engine drove 12 autopicks + emitted seq 14 + broadcast + torn down cleanly with zero clients connected (F26+F24+F27 three-way integration). Zero F20 WARNs `'clock fired but draftStatus=completed'` across both STEP 5' + STEP 6' runs. Teardown accepted-by-design as satisfied via idle-reap on schedule (architect ratification 2026-08-06) — completed lobbies survive connection window for celebration UI, then reap on the normal idle-eviction pass. Ledger note L2 (bootstrap-replay `case 'draft_completed'` does NOT append) is a pre-existing distinct inconsistency, benign today; docketed for future uniformity.
+
 ### KI-036 — SL-1: auto_fix_integrity_issues dead 5.3 months (162 consecutive failed nightly runs, prod)
 
 **RESOLVED on evidence (2026-08-06 17:21:24Z).** Full arc:
@@ -607,6 +609,62 @@ Both forms are stored as `text` (or as text-castable values) in a nominally sing
 - Job 4 disable — operator + rationale + timestamp
 - KI-037 xG fix — operator + which fix path (align value vs extend constraint) + timestamp
 - Jobid 15 add — operator + job command + rationale + timestamp
+
+### KI-043 — F27: Commissioner Start / start_draft_v2 (draft ignition RPC, replacing set-draft-status.local.mjs flip-script)
+
+**RESOLVED (2026-08-08).** Chunk shipped as engine-side `applyEventDuringBootstrap` case at `LobbyManager.ts:2838` (F27 initial, commit `2c81a2ff` — inline case body) plus DB-side migration `supabase/migrations/20260807000000_start_draft_v2.sql` (start_draft_v2 RPC — SECURITY DEFINER + search_path=public, hash-key idempotency short-circuit, Rider 1 preflight taxonomy, all four architect Riders folded in). Engine deploy `0ecbe605-draft @ sha256:152b79912cea9d80cf5c3147beeba48957973f5d201d54bdc9a3d6c429768a32` (2026-08-08). Wire proof (STEP 5' 2026-08-08T06:38Z on league c3615619): observer SNAPSHOT reports `draftStatus='in_progress'` + valid `pickDeadline` + `recentEvents[]` carrying buffered `draft_started` with all six wire fields (`startedAt`, `firstPickDeadline`, `totalRounds`, `totalTeams`, `pickTimeLimitSeconds`, `draftFormat`). DB proof: `draft_events` seq=1 `event_type='draft_started'`; `leagues.draft_state='active'` + `draft_status='in_progress'` post-ignition. Legacy `scripts/proof/set-draft-status.local.mjs` retired (flip-era). Design doc: `docs/DESIGN_F27_start_draft_v2.md`. Deploy protocol: `docs/DEPLOY_PROTOCOL_F26_F27.md` (§1 boot-item vocabulary corrected per INS-16 — see `docs/INSTRUMENT_LEDGER.md` INS-16 section). L1 open (no-code): start_draft_v2 lacks draft_format guard; auction-format ignition would drop into untested auction-branch territory — out of v1 scope, docketed for eventual RPC hardening.
+
+| | |
+|---|---|
+| **Severity** | high — precondition for F28 client-side completion moment and THE TWELVE (12-human draft on staging). |
+| **Surface** | `supabase/migrations/20260807000000_start_draft_v2.sql`, `server/src/draft/LobbyManager.ts:2838-2871` (LIVE dispatcher), `packages/shared/src/types/draftWire.ts` (BufferedDraftEvent 'draft_started' variant), `scripts/proof/fixture-12-f27-native.local.mjs` (F27-native fixture), `scripts/proof/lifecycle-acceptance-f27.local.mjs` (acceptance rig). |
+| **Description** | Commissioner Start ignition RPC that transitions a league from `not_started` to `in_progress`, writes seq=1 `draft_started` event to `draft_events`, sets `leagues.pick_deadline` from server-computed first-pick clock, and (per Rider 4) makes the frame observably present on the wire. Replaces the flip-era `set-draft-status.local.mjs` script for staging + THE TWELVE + prod. |
+| **Why deferred** | Not deferred — actively gated. Combined engine deploy with F26 + F27b-1 for a single §15.14 pipeline invocation on the daylight rule. |
+| **Target phase / timeline** | Delivered 2026-08-08 on `0ecbe605`. |
+| **Verification test** | STEP 5' lifecycle rig (`lifecycle-acceptance-f27.local.mjs --mode=lifecycle`) — observer snapshot covers ignition. STEP 6' abandoned-mid-draft rig (`--mode=abandoned-mid-draft`) — engine autopicks alone post-ignition to completion. Both passed 2026-08-08 on `0ecbe605` — STEP 5' on c3615619, STEP 6' twice on 804f4d68 + 38b3fd66. See KI-035 + KI-044 for the wider three-chunk chain evidence. |
+
+### KI-044 — F27b-1: bootstrap replay draft_started dispatch gap (fresh-lobby full-replay stall)
+
+**RESOLVED (2026-08-08).** Chunk shipped as engine-side `applyDraftStartedEventState` shared method extraction at `LobbyManager.ts:3333-3407` (commit `0ecbe605`). Ratified with architect R1/R2/R3 + Bars 1-5. **Root:** post-F27 initial landing (`2c81a2ff`), `bootstrapFullEventReplay`'s switch at `:3141-3298` had NO case for `draft_started` — fresh-lobby bootstrap of any ignited league fell through the default `forward-compat-skip` WARN, `draftStatus` stayed `'not_started'`, `init` post-replay catch-up at `:974` skipped its status guard, timer never armed, `scanClockLiveness` (`LobbyRegistry.ts:942`) skipped its own status guard — permanently dead lobby with no observability. Observed 2026-08-07 STEP 5' rig failure + engine log verbatim `[lobby] bootstrap unknown event_type=draft_started seq=1 (forward-compat skip)`. **Fix architecture:** shared method `applyDraftStartedEventState(event) → boolean didFlip` called by BOTH dispatchers (LIVE-apply at `:2838` gates inline arm on didFlip; REPLAY at `:3091` calls without arm — Bar 2 arm-exactly-once discipline). R1 stash populates `initialPickDeadline` from event payload when null (closes dead-lobby razor race between construction-time `leagues.pick_deadline` read and event log read). R2 didFlip return preserves live semantics identical to pre-refactor. Counter honesty (Bar 5): new `lifecycleEventCount` distinct from `skippedCount`, replay-complete log line at `:3266-3273` extended.
+
+**Wire proof (STEP 5' 2026-08-08T06:38Z on c3615619):**
+- Fresh-league FULL REPLAY bootstrap → replay-complete log line reads verbatim `lifecycleEvents=1 skipped=0 picksMade=0 status=in_progress duration=36ms`. Bar 5 counter honesty confirmed in prod output. Contrast pre-fix line on `844ebff9`: `skipped=1 status=not_started`.
+- Observer snapshot reports `draftStatus='in_progress'` + `recentEvents[]` carrying buffered `draft_started` — F27b-1's REPLAY dispatcher shared-method append (Action 1) served the observer directly.
+- **Certification-by-accident (2026-08-08 pre-STEP-5', league 8661d3d4):** self-completed with zero clients — 14 events / 12 picks / 12 distinct players / 12 distinct teams / `completed` / `pick_deadline=NULL`. Full F27b-1 chain end-to-end: FULL REPLAY → applyDraftStartedEventState flip → post-replay catch-up arm from R1-stashed initialPickDeadline → 12 autopicks on 31s ladder → F24 emitter → F26 teardown.
+- Bonus cross-image evidence (2026-08-07): retired league 993c9219 recovered + completed across the F27b-1 image swap via snapshot+delta path (`LobbyManager.ts:2717` → `applyEventDuringBootstrap`) — F27b-1's UNIQUE coverage is the no-snapshot full-replay path (`bootstrapFullEventReplay:3109`), which the STEP 5' fresh league exercised.
+
+| | |
+|---|---|
+| **Severity** | high — direct block on F27 fresh-league behavior. F27 + F27b-1 gated together for one engine deploy. |
+| **Surface** | `server/src/draft/LobbyManager.ts` (shared method + REPLAY case + LIVE case refactor + `initialPickDeadline` readonly → private drop for R1 stash); `docs/INSTRUMENT_LEDGER.md` (F27b-1 investigation + ratification bar coverage + INS-16). |
+| **Description** | Bootstrap replay of any fresh-ignited league without a persisted snapshot (post-F27, pre-F27b-1) stalled indefinitely because the REPLAY dispatcher lacked `case 'draft_started'`. Discovered via 2026-08-07 STEP 5' rig failure; fixed same day; certified via three consecutive engine-alone completions (c3615619 STEP 5' + 804f4d68 STEP 6' + 38b3fd66 STEP 6'). |
+| **Why deferred** | Not deferred — direct block on F27 close, fixed within 24 hours of discovery. |
+| **Target phase / timeline** | Delivered 2026-08-08 on `0ecbe605`. |
+| **Verification test** | The `lifecycleEvents=1 skipped=0 status=in_progress` line in `bootstrap replay complete` for every fresh-lobby full-replay bootstrap on the deployed image. Grep-verifiable per lobby via `docker logs citrus-draft-engine` over SSH. |
+
+**Follow-ups from F27b-1 investigation:**
+- **F27b-2** (KI-045 below): draft_started re-apply via post-bootstrap NOTIFY. Not close-blocker per architect; task #55 docketed for pre-freeze Aug 17.
+- **L1** (KI-043 note): start_draft_v2 lacks draft_format guard; auction ignition untested.
+- **L2**: bootstrap-replay `case 'draft_completed'` doesn't append to ring buffer (pre-existing inconsistency); benign today.
+
+### KI-045 — F27b-2: draft_started re-application via post-bootstrap NOTIFY (not close-blocker, pre-freeze Aug 17)
+
+**OPEN — investigation-only.** Discovered by the F27b freebie WARN (`draft_started_apply.skipped_stale_status`) firing on `c3615619` at `06:38:35.899Z`, 4.7s AFTER bootstrap completed at `06:38:31.211Z`. Absent from both abandoned-mid-draft runs (which had no post-ignition external activity). Instrument-value evidence: the WARN was authored as belt-and-suspenders observability in F27 with zero behavior change; its FIRST field trigger surfaced this defect directly — without it, the re-application would have been silent, the ring buffer would have quietly held duplicate seq 1, and the defect would only have been discoverable via `resync.responded` byte-count anomaly at some future stress-test.
+
+**Root** (full four-question investigation in `docs/INSTRUMENT_LEDGER.md` F27b-2 section):
+- `bootstrapFullEventReplay` (`LobbyManager.ts:3109`) does NOT advance `lastAppliedSeq` — the direct-dispatch handlers (`applyPickEvent`, `applyDraftStartedEventState`, etc.) never touch the cursor. Only `appendEventAndCount` (`:2436-2437`), `applySnapshot` (`:2798`), and `applyEventDuringBootstrap` (`:2825-2826`) advance it.
+- Post-full-replay cursor stays at initial value `0`.
+- Any subsequent NOTIFY (`processExternalEvent` at `:5643`) passes the duplicate guard at `:5659` (`0 < any seq`), fetches ALL events via `listDraftEvents(leagueId, sinceSeq=0)`, and iterates each via `applyEventDuringBootstrap` — re-applying seq 1 draft_started, appending to ring buffer AGAIN (unconditional append at `:3373` inside the shared method), and firing the guard-skip WARN because `draftStatus` is already `in_progress`.
+- Ring buffer holds seq 1 twice; resync-from-0 serves both; wire-client has no explicit dedup; harness INS-13 checker (`draft-harness.mjs:445-451`) would flag it.
+
+| | |
+|---|---|
+| **Severity** | medium — no functional damage today (WARN observable, guard correctly refuses the re-flip, buffer duplication currently benign). Pre-freeze must-fix for THE TWELVE to keep prod logs clean and prevent client-side ordering-violation false-positives on resync-from-0. |
+| **Surface** | `server/src/draft/LobbyManager.ts:3109-3273` (`bootstrapFullEventReplay` missing cursor advance) + downstream `processExternalEvent:5643` (guard bypass on cursor=0). |
+| **Description** | Fresh-lobby full-replay bootstrap leaves `lastAppliedSeq=0`; first post-bootstrap NOTIFY re-fetches and re-applies all events since seq 0, triggering `draft_started_apply.skipped_stale_status` WARN and duplicating the draft_started entry in the ring buffer. |
+| **Why deferred** | Not close-blocker per architect ruling (WARN correctly refuses re-flip, buffer duplication benign today, cursor-advance fix is 2 lines but wants dedicated STEP 5' rerun coverage). Task #55 docketed for pre-freeze Aug 17. |
+| **Target phase / timeline** | Pre-freeze Aug 17. Recommended fix (task #55): 2-line advance-cursor patch at end of `bootstrapFullEventReplay`. |
+| **Verification test** | Post-fix STEP 5' run shows zero `draft_started_apply.skipped_stale_status` WARN, `resync.responded` byte counts stable across fresh-lobby bootstrap + post-bootstrap NOTIFY window. |
 
 ---
 
