@@ -53,3 +53,92 @@
 - Docketed for future work: consider adding a vitest global setup that pins TZ via `process.env.TZ = 'UTC'` OR add a lint rule against ISO-string `new Date` in tests. Both are hardening; not required for correctness.
 
 **Moving to T2 next.**
+
+---
+
+## R4 — 2026-08-08 ~19:15Z — ACK Entry 3 (T6/T7 jump the queue; T1 already done)
+
+**Directive received.** New work order: T6 URGENT → T7 URGENT → T1 (DONE per R3) → T2 → T3+T8 → T4 → T5.
+
+**T1 status vs new order.** T1 completed pre-Entry-3 (R3 above, commit `ae2d6096`). No rework needed.
+
+**Starting T6 immediately.** Grep-hunting the season-phase mechanism now. Mechanism report + classification incoming as its own outbox entry (R5) the moment I have it.
+
+---
+
+## R5 — 2026-08-08 ~19:20Z — T6 MECHANISM REPORT (URGENT — architect top-priority read)
+
+**MECHANISM.** Site's PLAYOFFS-vs-OFFSEASON display is gated by `showPlayoffs: boolean` in the React league context. **File:line: `apps/web/src/contexts/LeagueContext.tsx:459-479`.**
+
+```tsx
+useEffect(() => {
+  setShowPlayoffs(false);
+  if (!activeLeagueId || !user) return;
+
+  const playoffTeams = (activeLeague?.settings as Record<string, unknown>)?.playoffTeams;
+  if (!playoffTeams || Number(playoffTeams) === 0) return;
+
+  let cancelled = false;
+  playoffApi.getBracket(activeLeagueId).then((res) => {
+    if (cancelled) return;
+    setShowPlayoffs(!!((res.data as Record<string, unknown>)?.bracket));
+  }).catch(() => {
+    if (!cancelled) setShowPlayoffs(false);
+  });
+
+  return () => { cancelled = true; };
+}, [activeLeagueId, activeLeague, user]);
+```
+
+**Truth table:**
+| Condition | showPlayoffs |
+|---|---|
+| No user OR no activeLeagueId | false (OFFSEASON) |
+| `settings.playoffTeams` falsy or `=== 0` | false (OFFSEASON) |
+| `playoffApi.getBracket(leagueId).data.bracket` truthy | **true (PLAYOFFS)** |
+| Bracket query fails or bracket absent | false (OFFSEASON) |
+
+**Consumers (grep-verified):**
+- `apps/web/src/components/Navbar.tsx:42` — gates Playoffs nav tab
+- `apps/web/src/components/MobileMenuButton.tsx:38` — same for mobile menu
+
+**Current value vs needed value.** The site shows PLAYOFFS because for the active league:
+- `settings.playoffTeams > 0` (some positive number — commissioner-configured), AND
+- `playoff_brackets` row EXISTS for the league in the DB.
+
+Needed: at least ONE of those conditions must go false. Options ranked by minimal-invasion:
+
+**Classification: (a) DB flag update.** Architect can apply today with ledger discipline.
+
+**Recommended fix (targeted, single-league scope):**
+```sql
+-- Delete the playoff_brackets row for the target league.
+-- Effect: next page load / context re-eval, showPlayoffs → false → OFFSEASON.
+-- Idempotent: zero-row delete on subsequent runs.
+DELETE FROM public.playoff_brackets WHERE league_id = '<LEAGUE_ID>';
+```
+
+**Alternative fix (if you want playoffs disabled ambient regardless of bracket existence):**
+```sql
+UPDATE public.leagues
+   SET settings = COALESCE(settings, '{}'::jsonb) || jsonb_build_object('playoffTeams', 0)
+ WHERE id = '<LEAGUE_ID>';
+```
+
+Both are pure DB writes — no engine deploy, no web build. Effect: on next `LeagueContext` re-eval (page load / route change / activeLeagueId change), showPlayoffs recomputes to `false`. Navbar + MobileMenu re-render without the Playoffs tab.
+
+**Which league ID(s)?** Not derivable from grep — depends on whichever league Garrett was viewing. Diagnostic SQL to enumerate candidates:
+```sql
+-- List all leagues that would show PLAYOFFS right now (have a bracket + playoffTeams > 0):
+SELECT l.id, l.name, l.season,
+       (l.settings->>'playoffTeams')::int as playoff_teams,
+       pb.id as bracket_id, pb.status as bracket_status, pb.created_at as bracket_created
+  FROM public.leagues l
+  JOIN public.playoff_brackets pb ON pb.league_id = l.id
+ WHERE COALESCE((l.settings->>'playoffTeams')::int, 0) > 0
+ ORDER BY pb.created_at DESC;
+```
+
+**Fully-authored migration + apply-harness incoming** (T6-fix-a) — will land in same commit as this outbox entry. Architect specifies `<LEAGUE_ID>` in inbox reply OR applies via ad-hoc psql per Garrett's paste-block.
+
+**Moving to T7 (URGENT commissioner button linkage) after committing.**
