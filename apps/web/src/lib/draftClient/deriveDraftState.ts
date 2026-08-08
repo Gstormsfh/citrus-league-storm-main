@@ -257,6 +257,73 @@ export function foldEvents(
         break;
       }
 
+      // ── F28 (2026-08-08) — lifecycle event handlers ──────────────
+      // Ratified brief: deriveDraftState handles draft_started /
+      // draft_completed, IDEMPOTENT + MONOTONIC (completed never
+      // reverts to in_progress; a stray pick frame after completion
+      // must not un-complete the room).
+      //
+      // Idempotency is inherited from the outer seq-skip guard at
+      // line 181 (`if (event.seq <= foldedThroughSeq) continue`).
+      // F27b-2 defect (bootstrapFullEventReplay leaves lastAppliedSeq
+      // at 0; first post-bootstrap NOTIFY re-fetches + re-applies seq 1)
+      // means a client can plausibly receive the same draft_started
+      // twice. First apply advances foldedThroughSeq to 1; second
+      // apply short-circuits at the outer guard. Handler body below
+      // is idempotent by construction — pure conditional set.
+      //
+      // Monotonicity for draft_completed: 'completed' is a terminal
+      // status in this reducer. A stray pick_submitted arriving at
+      // seq > completion's seq (impossible per server invariants but
+      // defensive) falls into the pick_submitted case above whose
+      // `if (draftStatus === 'not_started')` guard does NOT touch
+      // 'completed'; the `picksMade >= totalPicks` re-assertion
+      // keeps status at 'completed'. Legitimate pick_undone still
+      // reverts (server-mirror semantic; see :251-256).
+      case 'draft_started': {
+        // Server mirror: LobbyManager.applyDraftStartedEventState
+        // (:3333) transitions 'not_started' → 'in_progress' + arms
+        // the first pick timer. Client mirror: transition status only.
+        // Deadline surface lives OUT of DerivedDraftState (the timer
+        // reads `snapshot.stateSnapshot.currentPickDeadline`); this
+        // reducer manages status + picksMade + rosters + on-clock.
+        //
+        // Monotonicity: only advance not_started → in_progress. If
+        // status is already 'in_progress' / 'paused' / 'completed' /
+        // 'cancelled' (stale or reordered event), leave unchanged.
+        // The `if` guard is doing both the idempotency-on-repeat and
+        // the monotonicity check in one condition.
+        if (draftStatus === 'not_started') {
+          draftStatus = 'in_progress';
+        }
+        break;
+      }
+
+      case 'draft_completed': {
+        // Server mirror: LobbyManager `case 'draft_completed'` at
+        // :2872 sets `draftStatus='completed'`, cancels the pick
+        // timer, nulls `currentTimerDeadline`. Client mirror: set
+        // status. Timer clears automatically because DraftTimerV2
+        // (:118) hides when `draftStatus !== 'in_progress' &&
+        // draftStatus !== 'paused'`. On-clock team clears via the
+        // matrix-recompute below (`if (draftStatus === 'in_progress'
+        // && ...)` at :289).
+        //
+        // Unconditional overwrite (consistent with the `if (picksMade
+        // >= totalPicks) draftStatus = 'completed'` pattern at :222
+        // that also overwrites any non-cancelled prior status). Repeat
+        // frames are skipped at the outer seq guard, so the terminal
+        // set fires at most once per unique seq.
+        //
+        // MONOTONICITY GUARANTEE: after this fires, the only path
+        // that can revert to a non-'completed' status is pick_undone
+        // (server-mirror semantic — user explicitly undoes a pick).
+        // Stray pick_submitted post-completion cannot un-complete
+        // (see pick_submitted case guards + trailing totals check).
+        draftStatus = 'completed';
+        break;
+      }
+
       // Auction variants — chunk 11g.6 territory. LobbyManager has
       // separate handlers per event.kind (auction_nomination_started
       // etc. at LobbyManager.ts:3247+); those events do not affect
@@ -268,11 +335,42 @@ export function foldEvents(
       case 'auction_nomination_expired':
       case 'auction_nomination_closed':
       case 'auction_auto_nominated':
+      case 'auction_nomination_skipped':
       case 'auction_paused':
       case 'auction_resumed':
       case 'auction_commissioner_override':
         // No-op — snake/linear derivation ignores auction events.
+        // F28 (2026-08-08): added `auction_nomination_skipped` to
+        // this group (previously missing; had fallen through to
+        // implicit no-op with foldedThroughSeq advance — same
+        // effective behavior but now explicit for reviewer clarity
+        // and to keep the F28-added `default` clause below reserved
+        // for truly-unknown forward-compat kinds).
         break;
+
+      default: {
+        // F28 (2026-08-08) — forward-compat default. Unknown wire
+        // `kind` values are silently ignored (never throw) with a
+        // debug-log breadcrumb so future engine additions don't break
+        // old client bundles. INS-16 pattern: pave the safe path,
+        // surface via observability, never block on unknown types.
+        //
+        // At compile time `event` is typed `never` here (all union
+        // variants above are handled); the cast is only for the log
+        // payload. If a new variant is added to BufferedDraftEvent
+        // and NOT wired into the switch above, this default catches
+        // it silently — TypeScript will not flag the omission
+        // (which is deliberate: additive union changes stay backward-
+        // compatible with old client bundles).
+        const unknown = event as { kind: string; seq: number };
+        if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+          console.debug(
+            '[deriveDraftState] unknown event kind ignored',
+            { kind: unknown.kind, seq: unknown.seq },
+          );
+        }
+        break;
+      }
     }
 
     foldedThroughSeq = event.seq;

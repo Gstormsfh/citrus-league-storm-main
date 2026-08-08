@@ -488,3 +488,233 @@ describe('deriveFromSnapshot — F4 (2026-07-28 Decision Log)', () => {
     expect(seed.format).toBe('snake');
   });
 });
+
+// ── F28 (2026-08-08) — lifecycle event handlers ────────────────────
+//
+// Four acceptance cases from the ratified brief:
+//   1. Apply draft_started twice → identical state (idempotency).
+//   2. Snapshot in_progress + live draft_completed → completed.
+//   3. draft_completed then stray pick frame → stays completed
+//      (monotonicity).
+//   4. Unknown kind → no throw, state unchanged.
+//
+// All tests are offline (pure function calls, no network, no DOM).
+
+function makeDraftStartedEvent(seq: number): BufferedDraftEvent {
+  return {
+    kind: 'draft_started',
+    seq,
+    timestamp: `2026-08-08T00:00:${String(seq).padStart(2, '0')}.000Z`,
+    correlationId: `started-${seq}`,
+    startedAt: `2026-08-08T00:00:${String(seq).padStart(2, '0')}.000Z`,
+    firstPickDeadline: `2026-08-08T00:00:${String(seq + 30).padStart(2, '0')}.000Z`,
+    totalRounds: 3,
+    totalTeams: 12,
+    pickTimeLimitSeconds: 30,
+    draftFormat: 'snake',
+  };
+}
+
+function makeDraftCompletedEvent(seq: number, totalPicks: number): BufferedDraftEvent {
+  return {
+    kind: 'draft_completed',
+    seq,
+    timestamp: `2026-08-08T00:00:${String(seq).padStart(2, '0')}.000Z`,
+    correlationId: `completed-${seq}`,
+    completedAt: `2026-08-08T00:00:${String(seq).padStart(2, '0')}.000Z`,
+    totalPicks,
+  };
+}
+
+describe('foldEvents — F28 draft_started handler', () => {
+  it('acceptance 1: apply draft_started twice → identical state (idempotency via outer seq skip)', () => {
+    // First apply: seq=1 draft_started → in_progress (from not_started).
+    const events1 = [makeDraftStartedEvent(1)];
+    const { state: s1 } = foldEvents(emptyDerivedState(SEED_12x3), events1, MATRIX_12x3);
+    expect(s1.draftStatus).toBe('in_progress');
+    expect(s1.picksMade).toBe(0);
+    expect(s1.foldedThroughSeq).toBe(1);
+
+    // Second apply of the same seq=1 draft_started: outer guard at
+    // line 181 short-circuits (`seq(1) <= foldedThroughSeq(1)`).
+    // State object must be byte-identical (up to Map identity —
+    // teamRosters is a new Map on each fold, so compare via
+    // Array.from + JSON to check content equality).
+    const { state: s2, gaps } = foldEvents(s1, events1, MATRIX_12x3);
+    expect(gaps).toEqual([]);
+    expect(s2.draftStatus).toBe(s1.draftStatus);
+    expect(s2.picksMade).toBe(s1.picksMade);
+    expect(s2.foldedThroughSeq).toBe(s1.foldedThroughSeq);
+    expect(s2.onClockTeamId).toBe(s1.onClockTeamId);
+    expect(JSON.stringify(Array.from(s2.teamRosters.entries()))).toEqual(
+      JSON.stringify(Array.from(s1.teamRosters.entries())),
+    );
+  });
+
+  it('draft_started transitions not_started → in_progress', () => {
+    const events = [makeDraftStartedEvent(1)];
+    const { state } = foldEvents(emptyDerivedState(SEED_12x3), events, MATRIX_12x3);
+    expect(state.draftStatus).toBe('in_progress');
+    // No pick yet — on-clock resolves via matrix recompute
+    // (`picksMade=0` → `matrix[0]` = team-1, round 1, pick 1).
+    expect(state.onClockTeamId).toBe('team-1');
+    expect(state.currentPickNumber).toBe(1);
+    expect(state.currentRoundNumber).toBe(1);
+    expect(state.picksMade).toBe(0);
+  });
+
+  it('draft_started against already-in_progress does not revert or duplicate progress', () => {
+    // Prime state with one pick → in_progress + picksMade=1.
+    const primer = foldEvents(
+      emptyDerivedState(SEED_12x3),
+      [makePickEvent(1, MATRIX_12x3[0], 8478000)],
+      MATRIX_12x3,
+    );
+    expect(primer.state.draftStatus).toBe('in_progress');
+    expect(primer.state.picksMade).toBe(1);
+
+    // Live draft_started arrives OUT OF ORDER at seq=2 (impossible
+    // in practice — server never emits draft_started after picks —
+    // but defensive test for monotonic-status guarantee).
+    const evLater = makeDraftStartedEvent(2);
+    const { state } = foldEvents(primer.state, [evLater], MATRIX_12x3);
+    // Status unchanged (guard requires 'not_started' to fire).
+    expect(state.draftStatus).toBe('in_progress');
+    // picksMade unchanged (handler doesn't touch it).
+    expect(state.picksMade).toBe(1);
+    // Cursor advanced (event was folded).
+    expect(state.foldedThroughSeq).toBe(2);
+  });
+});
+
+describe('foldEvents — F28 draft_completed handler', () => {
+  it('acceptance 2: snapshot in_progress + live draft_completed → completed', () => {
+    // Snapshot delivered 12/12 picks (folded to 12 → auto-completed
+    // via picksMade === totalPicks). But test the "authoritative
+    // completion" path: prime with 11/12 picks so status is
+    // in_progress, then apply draft_completed at seq=12 as the
+    // authoritative signal (edge case: server autopicked the 12th
+    // but only the completion frame reaches this client).
+    const events = MATRIX_12x3.slice(0, 11).map((slot, i) =>
+      makePickEvent(i + 1, slot, 8478000 + i),
+    );
+    const primer = foldEvents(emptyDerivedState(SEED_12x3), events, MATRIX_12x3);
+    expect(primer.state.draftStatus).toBe('in_progress');
+    expect(primer.state.picksMade).toBe(11);
+
+    // Live draft_completed at seq=12 (skipping the 12th pick_submitted).
+    // In production this shape is unlikely because server always emits
+    // pick_submitted before draft_completed, but tests the handler
+    // path that reaches 'completed' via the lifecycle frame.
+    const done = makeDraftCompletedEvent(12, 36);
+    const { state, gaps } = foldEvents(primer.state, [done], MATRIX_12x3);
+    expect(gaps).toEqual([]);
+    expect(state.draftStatus).toBe('completed');
+    // On-clock clears because matrix recompute guard
+    // `draftStatus === 'in_progress'` fails.
+    expect(state.onClockTeamId).toBeNull();
+    expect(state.currentPickNumber).toBeNull();
+    expect(state.currentRoundNumber).toBeNull();
+  });
+
+  it('acceptance 3: draft_completed then stray pick frame → stays completed (monotonicity)', () => {
+    // Fold all 36 picks → auto-completed via picksMade check.
+    const allPicks = MATRIX_12x3.map((slot, i) =>
+      makePickEvent(i + 1, slot, 8478000 + i),
+    );
+    const done = makeDraftCompletedEvent(37, 36);
+    const primer = foldEvents(
+      emptyDerivedState(SEED_12x3),
+      [...allPicks, done],
+      MATRIX_12x3,
+    );
+    expect(primer.state.draftStatus).toBe('completed');
+    expect(primer.state.foldedThroughSeq).toBe(37);
+
+    // Stray pick_submitted arrives at seq 38 (impossible per server
+    // invariants — no picks after draft_completed — but this test
+    // covers the defensive monotonicity guarantee from the F28 brief:
+    // "a stray pick frame after completion must not un-complete
+    // the room").
+    const stray = makePickEvent(
+      38,
+      { round: 4, pickNumber: 37, teamId: 'team-1' },
+      9999999,
+    );
+    const { state } = foldEvents(primer.state, [stray], MATRIX_12x3);
+    // Status stays 'completed'. pick_submitted handler's status
+    // updates: `if (draftStatus === 'not_started')` doesn't fire
+    // (we're 'completed'); `if (picksMade >= totalPicks)` re-fires
+    // and sets 'completed' (no change). Monotonicity preserved.
+    expect(state.draftStatus).toBe('completed');
+  });
+
+  it('draft_completed is idempotent (repeat seq is skipped by outer guard)', () => {
+    const done = makeDraftCompletedEvent(1, 0);
+    const { state: s1 } = foldEvents(emptyDerivedState(SEED_12x3), [done], MATRIX_12x3);
+    expect(s1.draftStatus).toBe('completed');
+    expect(s1.foldedThroughSeq).toBe(1);
+    // Second apply of same seq → outer guard skips.
+    const { state: s2, gaps } = foldEvents(s1, [done], MATRIX_12x3);
+    expect(gaps).toEqual([]);
+    expect(s2.draftStatus).toBe('completed');
+    expect(s2.foldedThroughSeq).toBe(1);
+  });
+});
+
+describe('foldEvents — F28 default clause for unknown kinds', () => {
+  it('acceptance 4: unknown wire kind → no throw, state unchanged (forward-compat)', () => {
+    // Simulate a future engine emitting a wire kind this client
+    // bundle does not know. Handler must not throw; state must
+    // remain byte-identical to the pre-fold state.
+    const unknownEvent = {
+      kind: 'some_future_engine_variant',
+      seq: 1,
+      timestamp: '2026-08-08T00:00:01.000Z',
+    } as unknown as BufferedDraftEvent;
+    const priorState = emptyDerivedState(SEED_12x3);
+    // Suppress the expected debug log during test run to keep output
+    // clean. vitest doesn't fail on console.debug by default; this
+    // is stylistic.
+    const originalDebug = console.debug;
+    console.debug = () => undefined;
+    try {
+      const result = foldEvents(priorState, [unknownEvent], MATRIX_12x3);
+      expect(result.gaps).toEqual([]);
+      expect(result.state.draftStatus).toBe(priorState.draftStatus);
+      expect(result.state.picksMade).toBe(priorState.picksMade);
+      // foldedThroughSeq DID advance — the event was processed
+      // (defaulted through the switch) even though no state mutation
+      // occurred. This matches the auction-no-op pattern and is
+      // required for the outer seq-contiguity check to keep working.
+      expect(result.state.foldedThroughSeq).toBe(1);
+    } finally {
+      console.debug = originalDebug;
+    }
+  });
+
+  it('unknown kind does not throw even with subsequent contiguous events', () => {
+    const unknown = {
+      kind: 'future_variant',
+      seq: 1,
+      timestamp: '2026-08-08T00:00:01.000Z',
+    } as unknown as BufferedDraftEvent;
+    const pick = makePickEvent(2, MATRIX_12x3[0], 8478000);
+    const originalDebug = console.debug;
+    console.debug = () => undefined;
+    try {
+      const { state, gaps } = foldEvents(
+        emptyDerivedState(SEED_12x3),
+        [unknown, pick],
+        MATRIX_12x3,
+      );
+      expect(gaps).toEqual([]);
+      // Unknown at seq 1 no-ops. Pick at seq 2 folds normally.
+      expect(state.picksMade).toBe(1);
+      expect(state.draftStatus).toBe('in_progress');
+      expect(state.foldedThroughSeq).toBe(2);
+    } finally {
+      console.debug = originalDebug;
+    }
+  });
+});
