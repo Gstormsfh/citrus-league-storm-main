@@ -64,3 +64,17 @@ ART SYSTEM RULES (absolute):
 4. Consistency: same art treatment rules on every page (sizing, framing, placement) — derive from the best existing usage and apply uniformly.
 
 You are mid-run — absorb Entries 3, 4, 5 at your next item boundary; they reorder your queue (T6 → T7 → T9 → T10+this → T1 → T2 → T3+T8 → T4 → T5).
+
+---
+
+## Entry 6 — 2026-08-08 19:32Z (1:32 MT) — T6 EXECUTED ON PROD (by architect) + T7 WIRE-UP RULING
+
+T6 — DONE. Mechanism report ratified, class (a) confirmed. Diagnostic ran on prod: exactly ONE league qualified — The Beta League (d907a77c-425f-4b52-83ac-8f5c281682e8), playoffTeams=6, bracket 0fdae469 (season 2025, status completed, created 2026-04-04). Applied OPTION B for reversibility + history preservation: settings.playoffTeams 6 → 0. Verified after: playoff_teams=0, bracket row PRESERVED. Site shows OFFSEASON on next context eval. Reversal if ever needed: set playoffTeams back to 6 (bracket intact, playoffs view returns instantly).
+YOUR ACTIONS:
+1. Append the PROD_CHANGE_LEDGER entry (Rule 1) with the above evidence verbatim: what/why/before/after/reversal, executed-by architect via MCP under Garrett's explicit same-day grant, 2026-08-08 19:31Z.
+2. Ledger note (INS-16-family): your diagnostic SQL referenced l.season and l.league_type — neither exists on prod leagues (prod has league_size; season lives on playoff_brackets). Composed-not-harvested schema assumptions again; I adapted live, but record the lesson.
+3. Docket (new task): "Beta League playoffTeams must be reconfigured (was 6) at 2026 season setup" — the zero must not surprise anyone next spring.
+
+T7 — RULING on wire-up: SINGLE BUTTON, REPLACE THE ACTION. Wire the existing Start Draft button(s) in DraftLobby to useStartDraftV2 + navigate on success; v1 handleStartDraft becomes deprecated and UNREACHABLE from the UI (code retained until the post-twelve cleanup task — create it). NEVER two visible start buttons, and the flip-era path must not be clickable on draft night. CONDITION before authoring the swap: entanglement analysis — enumerate every local state mutation v1 handleStartDraft performs (DraftRoom.tsx:2867-3095), and map EACH to its v2-world coverage (engine snapshot/frame, or obsolete-with-evidence). If any dependency lacks coverage, STOP, report to outbox, and I will re-rule (fallback: v2 button replaces old button's visibility; old hidden). Offline tests for the wired path. Your docket answers: v1 marked deprecated YES; v1 server route + DraftService.startDraft + client api deletion = post-twelve cleanup task YES, create it.
+
+Pace acknowledged — T6✓ T7✓ T1✓ before 1:30. Garrett's parting orders (already in Entry 5): Sleeper is the bar, world class. Keep going.

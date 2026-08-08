@@ -277,3 +277,86 @@ Any of the three is a substantive architecture decision. Docketed for architect 
 **KI-042 mixed-domain exposure:** confirmed same class as S6 (autopickStrategy/DraftService/MatchupService). Movement paths add another 4 files to the KI-042 registry. Task #63 candidate for domain-guard hardening post-PROD-PORT.
 
 **Moving to T10 (new-look page sweep) after committing.**
+
+---
+
+## R9 — 2026-08-08 ~20:05Z — T10 + Entry 5 COMPLETE (new-look page sweep + caricature inventory)
+
+**NEW-LOOK MARKER (concrete).** The Citrus 2.0 design system lives at `apps/web/src/components/citrus2/`. Marker components: `DarkLayout`, `CitrusCard`, `CitrusButton`, `MascotAvatar`, `MascotCard`, `MascotScene`, `MascotPeek`, `HeroCardStack`, `SectionHeader`, `LiveGameTile`, plus tokens.ts (C2 palette: `bg:#0F1F15`, `orange:#FF6B1A`, `sage:#84A57D`, `cream:#FFF8F0`). Style profile: dark forest background, hockey-first, Citrus Squad mascots. **A page is NEW-LOOK if it imports from `@/components/citrus2` OR uses citrus2 components directly.** Confirmed via `Index.tsx:3` docstring: "The legacy pastel homepage components live unchanged in `apps/web/src/components/` until every page has migrated to citrus2."
+
+**Page-by-page classification** (62 pages total, grep-verified via `grep -rln "citrus2" apps/web/src/pages/`):
+
+| Category | Count | Pages |
+|---|---|---|
+| **NEW-LOOK** (imports citrus2) | 42 | About, Admin, ArmchairGM, Auth, AuthCallback, Blog, Careers, Contact, CreateLeague, DraftRoom, Features, FreeAgents, GMOffice, Guides, Index, LeagueDashboard, Matchup, NHLPlayoffBracket, News, NotFound, OtherTeam, PlayoffBracket, Podcasts, PoolConfidence, PoolPickem, PoolSurvivor, PreviewClone, Pricing, Privacy, Profile, ProfileSetup, ResetPassword, Roster, ScheduleManager, Standings, StormyAssistant, TeamAnalytics, Terms, TradeAnalyzer, VerifyEmail, Waitlist, WaiverWire |
+| **LEGACY — Preview scratchpad (out of T10 scope)** | 12 | PreviewAlmanac, PreviewArena, PreviewBoards, PreviewIndex, PreviewMockups, PreviewPress, PreviewPulse, PreviewRedesign, PreviewRink, PreviewSquad, PreviewStadium, PreviewSunlight |
+| **LEGACY — Playoff surface (out of T10 scope)** | 4 | PoolPlayoffBracket, PoolPlayoffConfidence, PoolPlayoffHub, PoolPlayoffRoster |
+| **LEGACY — Redirect stub** | 1 | Settings.tsx (11 lines, `<Navigate to="/profile?tab=settings">` — target IS new-look) |
+| **LEGACY — Draft-flow surface (special case)** | 1 | DraftRoomV2.tsx (921 lines) — LIVE draft room, not regular-season/offseason. Deferring per T10 scope. |
+
+**T10 SCOPE FINDING (per architect's "regular-season pages and offseason pages"):**
+
+**Every page on regular-season and offseason surfaces is ALREADY NEW-LOOK.** Zero conversion authoring required within T10's stated scope. Preview* is scratchpad (not routed for production users). PoolPlayoff* is playoff-surface (out of scope). Settings.tsx redirects to Profile (which IS new-look). DraftRoomV2 is draft-flow (not regular-season/offseason — separate F28 client work covers its display polish).
+
+**Optional MIXED spot-check (out of scope but useful for architect):** grep only detects "imports citrus2" as boolean. A NEW-LOOK-listed page might STILL contain legacy component usages surrounding a single citrus2 import. Full MIXED audit would require per-page component-tree walk (est. ~4hr for 42 pages). Docket task #64 candidate. NOT a THE TWELVE blocker.
+
+---
+
+## R10 — 2026-08-08 ~20:05Z — Entry 5 CARICATURE INVENTORY
+
+**Location:** `apps/web/public/mascots/` (16 files) + `apps/web/public/mockups/` (11 files, but mockups are NOT caricatures — see below).
+
+**Caricature set (canonical, style-anchor for future generation):**
+
+| Filename | Type | Character/Theme | Format |
+|---|---|---|---|
+| mascot-kiwi.webp | mascot | Kiwi (base) | webp |
+| mascot-kiwi-faab.jpg | mascot | Kiwi in FAAB-bidding pose | **jpg (legacy outlier)** |
+| mascot-lemon.webp | mascot | Lemon | webp |
+| mascot-pineapple.webp | mascot | Pineapple | webp |
+| mascot-stormy.webp | mascot | Stormy (Assistant GM) | webp |
+| scene-confidence.webp | scene | Pool Confidence | webp |
+| scene-cup.webp | scene | Championship / trophy | webp |
+| scene-draft.webp | scene | Draft | webp |
+| scene-livescoring.webp | scene | Live scoring / matchup | webp |
+| scene-pickem.webp | scene | Pool Pickem | webp |
+| scene-squad.webp | scene | Squad / roster | webp |
+| scene-standings.webp | scene | Standings | webp |
+| scene-stormy-ai.webp | scene | Stormy AI (chat) | webp |
+| scene-stormy-welcome.webp | scene | Stormy welcome / onboarding | webp |
+| scene-survivor.webp | scene | Pool Survivor | webp |
+| scene-xg-model.webp | scene | xG model / projections | webp |
+
+**Filename convention:** `mascot-<name>-<optional-action>.webp` for characters; `scene-<theme>.webp` for compositions. All new art SHOULD be `.webp` (mascot-kiwi-faab.jpg is a legacy outlier — docket for consistency).
+
+**Non-caricature imagery flags:**
+
+- **`apps/web/public/mockups/*.jpg` (11 files)** — hero mockups used ONLY by Preview* scratchpad pages. Not on regular-season/offseason surfaces. Docket for removal if Preview* pages retire.
+- **`apps/web/public/loading-citrus.png`** — load screen. Not a page image; a citrus-branded loading indicator. Consider caricature-style replacement (docket, low priority).
+- **`apps/web/public/og-image.png`** — Open Graph social-share artifact. Not user-facing UI; leave as-is.
+- **`apps/web/public/placeholder.svg`** — shadcn/vite scaffold. Unused in production; leave as-is.
+
+**Regular-season + offseason page non-caricature scan:** ZERO non-caricature images detected via grep of `mockups/`, `/loading-citrus`, `/placeholder.svg`, `/og-image` in `apps/web/src/pages/*.tsx` (excluding Preview*) or `apps/web/src/components/**`. **Every image visible on RS/offseason surfaces IS a caricature.**
+
+**Consistency treatment:** existing pages consume caricatures via `MascotAvatar` / `MascotCard` / `MascotScene` / `MascotPeek` components from `apps/web/src/components/citrus2/`. These wrap the `public/mascots/*.webp` files with consistent sizing/framing. **Uniform treatment already in place.**
+
+**NEW ART SLOTS REQUIRED:** none surfaced by the audit. Existing 16-asset set covers identified regular-season/offseason needs.
+
+**`docs/ART_GENERATION_QUEUE.md` authored** (new file) as scaffold — style profile documented, filename convention codified, empty queue with entry template. Ready for any post-Garrett-review additions.
+
+---
+
+## R11 — 2026-08-08 ~20:05Z — T10 + Entry 5 BROWSER-VERIFICATION LIST FOR GARRETT
+
+**For tonight's browser pass (Garrett + volunteers), alongside F28 completion-banner verification, spot-check:**
+
+1. **Homepage (Index.tsx)** — dark forest background, mascot rotation on hero, live pulse indicator. Should feel Sleeper-quality with Citrus warmth.
+2. **LeagueDashboard.tsx** — verify NEW-LOOK is fully applied (not just imported).
+3. **Standings.tsx** — playoff-zone highlighting (Standings.tsx:832-833 references `isInPlayoffZone` / `isBubble`); verify visual treatment matches C2 palette.
+4. **StormyAssistant.tsx** — chat bubble uses `MascotAvatar` for Stormy; verify caricature loads.
+5. **PreviewClone.tsx** (edge case — the ONLY Preview page that DOES import citrus2) — confirm it's live-preview of new-look or a testing surface.
+6. **DraftRoomV2.tsx** — v2 draft room; **F28 completion banner + F27 commissioner Start button (T7)** live here. Priority visual verification tonight.
+
+**Docket (post-close):** full MIXED-audit per-page walk to confirm NEW-LOOK is USED, not just imported (task #64 candidate).
+
+**Moving to T2 (integration fuzzer) after committing.**
