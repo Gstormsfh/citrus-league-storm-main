@@ -3262,6 +3262,31 @@ export class LobbyManager {
       }
     }
 
+    // F27b-2 (2026-08-08 architect ratification): advance lastAppliedSeq
+    // to the highest replayed seq (prevSeq at loop exit). Prior omission
+    // left the cursor at 0 post-full-replay; any subsequent NOTIFY passed
+    // the guard at :5659 (0 < any seq), re-fetched ALL events via
+    // listDraftEvents(sinceSeq=0), and iterated through
+    // applyEventDuringBootstrap — re-applying seq 1 draft_started (the
+    // observed WARN "draft_started_apply.skipped_stale_status" on
+    // c3615619 at 2026-08-08T06:38:35.899Z), appending a duplicate seq-1
+    // buffered event to the ring buffer (unconditional append inside
+    // applyDraftStartedEventState at :3373), and potentially re-broadcasting
+    // via the peekLast() tail-check at :5791. Latent scope beyond F27b-2:
+    // hypothetical in-progress-league-no-snapshot bootstrap would also
+    // re-apply pick events on first post-bootstrap NOTIFY, throwing at
+    // applyPickEvent's slot-check (:3416-3422) because picksMade already
+    // advanced during bootstrap. Snapshot+delta path is the common route
+    // for post-pick drafts, so this latent case rarely surfaces, but the
+    // fix closes it as a side effect.
+    //
+    // The advance mirrors applyEventDuringBootstrap's cursor discipline
+    // at :2825-2826 (single source of truth for cursor advancement is
+    // "any event applied to state"; bootstrap-full-replay was the one
+    // path that violated this).
+    if (prevSeq !== null) {
+      this.lastAppliedSeq = prevSeq;
+    }
     const duration = Date.now() - startTime;
     structuredLogger.info(
       `[lobby] bootstrap replay complete lobbyId=${this.lobbyId} ` +
@@ -3269,6 +3294,7 @@ export class LobbyManager {
         `undoneEvents=${undoneEventCount} overrideEvents=${overrideEventCount} ` +
         `lifecycleEvents=${lifecycleEventCount} skipped=${skippedCount} ` +
         `picksMade=${this.picksMade} status=${this.draftStatus} ` +
+        `lastAppliedSeq=${this.lastAppliedSeq} ` +
         `duration=${duration}ms`,
     );
   }

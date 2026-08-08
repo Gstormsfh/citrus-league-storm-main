@@ -1704,6 +1704,46 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
     }
   });
 
+  it('F27b-2: bootstrapFullEventReplay advances lastAppliedSeq to highest replayed seq (regression lock)', async () => {
+    // Pre-fix: bootstrap-full-replay never touched lastAppliedSeq; the
+    // cursor stayed at 0 post-replay. Any subsequent NOTIFY for any seq
+    // passed the duplicate guard at LobbyManager.ts:5659, re-fetched
+    // ALL events via listDraftEvents(sinceSeq=0), and re-applied them.
+    // Observed 2026-08-08T06:38:35.899Z on league c3615619 as
+    // "draft_started_apply.skipped_stale_status" WARN 4.7s after
+    // bootstrap complete.
+    //
+    // Fix (LobbyManager.ts:3273 area): advance
+    // `this.lastAppliedSeq = prevSeq` at end of bootstrap-full-replay
+    // when at least one event was applied.
+    //
+    // This test regression-locks the cursor advance. It also serves as
+    // the offline unit-test proof for KI-045 close-out; end-to-end
+    // proof requires a fresh-lobby bootstrap in staging (Garrett-exec).
+    const lobby = await makeLobby({
+      listDraftEvents: vi.fn(async () => [
+        makePickRow({ seq: 1, teamId: 'team-1', pickNumber: 1, round: 1 }),
+        makePickRow({ seq: 2, teamId: 'team-2', pickNumber: 2, round: 1 }),
+        makePickRow({ seq: 3, teamId: 'team-3', pickNumber: 3, round: 1 }),
+      ]),
+    });
+    expect(lobby.getDiagnosticInfo().lastAppliedSeq).toBe(3);
+  });
+
+  it('F27b-2: bootstrapFullEventReplay with zero events leaves lastAppliedSeq at 0 (empty-log safety)', async () => {
+    // The cursor-advance guards on `if (prevSeq !== null)`. An empty
+    // event log leaves prevSeq null → no advance → cursor stays at
+    // initial 0. This is correct: an empty log means no events have
+    // ever landed for the league; a subsequent NOTIFY for seq 1 would
+    // correctly fetch [seq 1] and apply cleanly. This test locks the
+    // guard against a future refactor that might unconditionally
+    // assign prevSeq (which could crash on `null`).
+    const lobby = await makeLobby({
+      listDraftEvents: vi.fn(async () => []),
+    });
+    expect(lobby.getDiagnosticInfo().lastAppliedSeq).toBe(0);
+  });
+
   it('bootstrap with all 9 pick events for the default snake order yields completed state', async () => {
     const fullSnake3x3 = [
       { teamId: 'team-1', pickNumber: 1, round: 1 },
