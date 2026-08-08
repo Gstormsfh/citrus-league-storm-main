@@ -718,3 +718,87 @@ describe('foldEvents — F28 default clause for unknown kinds', () => {
     }
   });
 });
+
+// ── F28 hardening (P11 unattended-day 2026-08-08) — edge cases beyond
+//    the 4 core acceptance cases ────────────────────────────────────
+describe('foldEvents — F28 hardening: monotonicity under adversarial event orderings', () => {
+  it('draft_completed with zero prior events → status=completed, picksMade unchanged (defensive)', () => {
+    // Edge: client somehow receives ONLY the draft_completed event
+    // (e.g., resync-from-late-seq that skipped past all picks). Handler
+    // must set completed unconditionally — this IS an authoritative
+    // completion signal, even if picksMade doesn't equal totalPicks.
+    // UI can still show "Draft complete" banner correctly.
+    const events = [makeDraftCompletedEvent(1, 36)];
+    const { state } = foldEvents(emptyDerivedState(SEED_12x3), events, MATRIX_12x3);
+    expect(state.draftStatus).toBe('completed');
+    expect(state.picksMade).toBe(0); // no picks folded, but status is authoritative
+    expect(state.onClockTeamId).toBeNull(); // matrix recompute skips on non-in_progress
+  });
+
+  it('draft_started arriving AFTER completion is monotonic no-op (would be a server bug but defensive)', () => {
+    // Fold complete draft to 'completed', then a stray draft_started
+    // arrives at seq > foldedThroughSeq. Impossible per server invariants
+    // (never emits draft_started twice, never after completion), but
+    // defense-in-depth: monotonicity must hold.
+    const allPicks = MATRIX_12x3.map((slot, i) =>
+      makePickEvent(i + 1, slot, 8478000 + i),
+    );
+    const done = makeDraftCompletedEvent(37, 36);
+    const primer = foldEvents(
+      emptyDerivedState(SEED_12x3),
+      [...allPicks, done],
+      MATRIX_12x3,
+    );
+    expect(primer.state.draftStatus).toBe('completed');
+
+    const strayStart = makeDraftStartedEvent(38);
+    const { state } = foldEvents(primer.state, [strayStart], MATRIX_12x3);
+    // draft_started handler guards on 'not_started'; 'completed' is
+    // not touched. Status stays completed. Monotonicity preserved.
+    expect(state.draftStatus).toBe('completed');
+    expect(state.foldedThroughSeq).toBe(38);
+  });
+
+  it('draft_completed after pick_undone that rewound to not_started stays completed', () => {
+    // Sequence: pick (in_progress) → pick_undone (not_started) → draft_completed (completed).
+    // Server-mirror pick_undone rewinds status; then a lifecycle
+    // completion should still set completed authoritatively.
+    const p1 = makePickEvent(1, MATRIX_12x3[0], 8478000);
+    const undo = makeUndoneEvent(2, {
+      kind: 'pick_submitted',
+      ...p1,
+    } as Extract<BufferedDraftEvent, { kind: 'pick_submitted' }>);
+    const done = makeDraftCompletedEvent(3, 36);
+
+    const { state } = foldEvents(
+      emptyDerivedState(SEED_12x3),
+      [p1, undo, done],
+      MATRIX_12x3,
+    );
+    // Post-undo: not_started + picksMade=0. Then draft_completed forces
+    // completed regardless (authoritative signal).
+    expect(state.draftStatus).toBe('completed');
+    expect(state.picksMade).toBe(0);
+  });
+
+  it('multiple lifecycle events in one fold batch (draft_started + draft_completed) yield final=completed', () => {
+    // Compressed lifecycle: fresh league gets both frames in one wire batch
+    // (unusual but possible via resync-from-0 on a completed league).
+    const events = [
+      makeDraftStartedEvent(1),
+      // Some picks omitted (missing picks would gap-halt, but for THIS
+      // test we simulate a snapshot re-derive that lands both lifecycle
+      // events with no picks between).
+      makeDraftCompletedEvent(2, 0), // totalPicks=0 in event payload; irrelevant since draft_completed sets status directly
+    ];
+    const { state, gaps } = foldEvents(
+      emptyDerivedState(SEED_12x3),
+      events,
+      MATRIX_12x3,
+    );
+    // No gap since seqs are 1, 2 contiguous. Both apply.
+    expect(gaps).toEqual([]);
+    expect(state.draftStatus).toBe('completed');
+    expect(state.foldedThroughSeq).toBe(2);
+  });
+});
