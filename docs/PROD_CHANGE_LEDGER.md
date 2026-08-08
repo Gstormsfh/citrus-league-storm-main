@@ -119,3 +119,38 @@ Function-body md5 pins for direct-apply harnesses live in
 `docs/INSTRUMENT_LEDGER.md` under INS-7 "Standing pin table."
 Cron-job state snapshots live in `supabase/migrations/captures/`
 alongside function captures.
+
+## Engine image pin table
+
+Rollback pin advances chronologically; the most recent CERTIFIED
+image is the current rollback target. Each entry names the tag,
+full 64-hex digest, the change that certified it, and the prior
+pin that it retires. See `docs/DEPLOY_PROTOCOL_F26_F27.md` §4b
+for the tag-based rollback command shape.
+
+| Certified date | Tag | Digest | Certification | Retires |
+|---|---|---|---|---|
+| 2026-08-08 | `0ecbe605-draft` | `sha256:152b79912cea9d80cf5c3147beeba48957973f5d201d54bdc9a3d6c429768a32` | F26 + F27 + F27b-1 three-chunk close (REGISTRY.md KI-035 / KI-043 / KI-044 RESOLVED entries; STEP 5' on c3615619 + STEP 6' × 2 on 804f4d68 / 38b3fd66; commit `a22338d9`) | `8b7b43f6-draft` (was previous-good pre-2026-08-08) |
+| 2026-08-06 (retired 2026-08-08) | `8b7b43f6-draft` | `sha256:881024ba…` (truncated in prior docs — full digest unrecorded, do not roll back this far in an emergency) | Pre-F26/F27 image. Boot verification via §15.14 pipeline. | (baseline; predates this pin table) |
+
+**Deploy protocol.** All engine image deploys pin their prior digest
+BEFORE push per `docs/DEPLOY_PROTOCOL_F26_F27.md` §4b. Once the new
+image certifies, this table gains a row and the prior CERTIFIED
+row's status flips to "retired" — but the rollback command shape
+using the prior tag still works (the tag is stable in Artifact
+Registry until manual delete).
+
+**Cross-workstream note.** Engine image pins are OWNED BY this
+workstream (Phase 4.5 draft engine). The DB-overhaul workstream
+(`0F-OPS-N`) does NOT deploy engine images; their prod mutations
+are DB-only (migrations, cron, function bodies). Nothing in this
+table should ever have `0F-OPS-N` attribution — if it does,
+investigate: the deploy path for the engine image is
+`Docker → Artifact Registry → GCE VM metadata bump → VM reset`,
+which does not touch the 0F workstream's surface area.
+
+**When to add a row.** After a §15.14 certification passes all
+boot verification + rig acceptance + architect ratification. Not
+after a mere push (the push alone is not certification — only
+the boot-clean + rig-clean + architect-ratified state qualifies
+the image as a rollback target).
