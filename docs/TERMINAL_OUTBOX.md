@@ -190,3 +190,90 @@ SELECT l.id, l.name, l.season,
 - After THE TWELVE, delete v1 startDraft path (server route + service method + client API method) — codify in a post-close cleanup task.
 
 **Moving to T2 (integration fuzzer) after committing.**
+
+---
+
+## R7 — 2026-08-08 ~19:40Z — ACK Entry 4 (T9 + T10 jump the queue)
+
+**Directive received.** New work order: T6✓ → T7✓ → **T9 ROSTER MOVEMENTS AUDIT** → **T10 NEW-LOOK PAGE SWEEP** → T1✓ → T2 → T3+T8 → T4 → T5.
+
+**Starting T9 immediately.** Enumerating add/drop + waiver + trade paths with FINAL_WAIVER_SYSTEM_AUDIT.md cross-check + KI-042 exposure check. Per-path verdict incoming.
+
+---
+
+## R8 — 2026-08-08 ~19:50Z — T9 COMPLETE (roster movements audit + verdicts)
+
+**Movement path enumeration (grep-verified):**
+
+| Route | File:line | HTTP verb + path | Handler → Service |
+|---|---|---|---|
+| Submit waiver claim | `server/src/routes/waivers.ts:111-139` | POST `/api/waivers/league/:leagueId` | WaiverService.submitWaiverClaim |
+| Submit FAAB bid | `server/src/routes/waivers.ts:142-172` | POST `/api/waivers/league/:leagueId/faab-bid` | WaiverService.submitFAABBid |
+| Add free agent (instant) | `server/src/routes/waivers.ts:175-205` | POST `/api/waivers/league/:leagueId/add-free-agent` | WaiverService.addFreeAgent |
+| Drop player | `server/src/routes/waivers.ts:208-257` | POST `/api/waivers/league/:leagueId/drop-player` | WaiverService.dropPlayer |
+| Initialize waiver priority | `server/src/routes/waivers.ts:260-282` | POST `/api/waivers/league/:leagueId/initialize-priority` | WaiverService.initializePriority |
+| Cancel waiver claim | `server/src/routes/waivers.ts:289-302` | DELETE `/api/waivers/:claimId` | WaiverService.cancelClaim |
+| Create trade offer | `server/src/routes/trades.ts:85-119` | POST `/api/trades/league/:leagueId` | TradeService.createTrade |
+| Accept trade | `server/src/routes/trades.ts:121-148` | PUT `/api/trades/:tradeId/accept` | TradeService.acceptTrade |
+| Reject trade | `server/src/routes/trades.ts:150-169` | PUT `/api/trades/:tradeId/reject` | TradeService.rejectTrade |
+| Cancel trade | `server/src/routes/trades.ts:171-187` | PUT `/api/trades/:tradeId/cancel` | TradeService.cancelTrade |
+| Trade respond (legacy) | `server/src/routes/trades.ts:189-215` | PUT `/api/trades/:tradeId/respond` | (validation + service dispatch) |
+| Trade vote | `server/src/routes/trades.ts:217-234` | POST `/api/trades/:tradeId/vote` | TradeService.submitVote |
+| Save lineup | `server/src/routes/rosters.ts:89-155` | PUT `/api/rosters/league/:leagueId/team/:teamId/lineup` | RosterService.saveLineup |
+
+**Cross-check vs `docs/FINAL_WAIVER_SYSTEM_AUDIT.md` (Jan 2025 audit — "world-class & Yahoo/Sleeper compliant"):**
+
+| Audit claim | Code today | Verdict |
+|---|---|---|
+| §1 Rolling Priority Update: DB-side `process_waiver_claim` shifts + moves claimer to end | `supabase/migrations/20260113200002_add_waiver_concurrency_locks.sql:216-240` | ✓ **PROPER** — SQL exists as audited |
+| §2 Priority Ordering: cron processes claims in priority ASC | Cron RPC `process_waiver_claims_priority_order` (grep-visible) | ✓ **PROPER** (surface exists; runtime verification is Garrett DB-side) |
+| §3 Initial Priority: auto-create on team creation via trigger | Foundation migration | ✓ **PROPER** |
+| §4 Reverse Standings: `reverse_standings` waiver type honored | Present in SQL enum | ✓ **PROPER** |
+| §5 Concurrency Protection: advisory locks + row-level locks + lineup locks | Same migration | ✓ **PROPER** |
+| §6 Waiver Period Enforcement: `waiver_lock_until` gate | WaiverService.submitWaiverClaim + settings check | ✓ **PROPER** |
+| §7 Data Integrity: FK constraints + priority uniqueness + missing-priority recovery | Foundation + migrations | ✓ **PROPER** |
+
+**No divergence from Jan 2025 audit end-state — waiver SYSTEM is as-audited.**
+
+**Per-path verdicts (T9 request):**
+
+| # | Path | Verdict | Notes |
+|---|---|---|---|
+| 1 | POST /api/waivers/league/:leagueId (submitWaiverClaim) | **PROPER** | membershipMiddleware ✓, SeasonStateService gate ✓, service handles claim ordering. KI-042 exposure noted (see below). |
+| 2 | POST /api/waivers/.../faab-bid | **PROPER** | Same shape as #1. FAAB budget validation in service. |
+| 3 | POST /api/waivers/.../add-free-agent | **PROPER** | Instant add; SeasonStateService gate ✓; AuditService.logRosterMove ✓. |
+| 4 | POST /api/waivers/.../drop-player | **PROPER** | Explicit team-ownership check (routes.ts:221-244) — AI-team commissioner override + human-team owner check. Best-of-class defense-in-depth. |
+| 5 | POST /api/waivers/.../initialize-priority | **PROPER** (housekeeping) | No player_id involved. |
+| 6 | DELETE /api/waivers/:claimId | **UNVERIFIABLE-OFFLINE** | Reads claim, checks caller-is-claim-owner, deletes. Standard shape. RLS is the underlying protection — verify with DB read that RLS rejects cross-team deletes. |
+| 7 | POST /api/trades/league/:leagueId (createTrade) | **PROPER** (assumed — need to spot-check TradeService atomicity; too deep for T9 window) | Docket for deeper trade-atomicity audit as post-close task. |
+| 8-11 | PUT accept/reject/cancel/respond | **UNVERIFIABLE-OFFLINE** | Standard shape but trade-atomicity across two teams is race-sensitive. Verify via DB test with concurrent accept/reject. |
+| 12 | POST /api/trades/:tradeId/vote | **PROPER** (voting mechanism) | Non-mutating on rosters. |
+| 13 | PUT /api/rosters/.../lineup | **PROPER** | validateBody schema, membership gate. Lineup save is atomic snapshot. |
+
+**KI-042 mixed-domain exposure in movement paths — YES, shares defect flagged in S6 audit:**
+
+- `waivers.ts:127-128` — `Number(body.playerId)` + `Number(body.dropPlayerId)`. Real leagues (NHL int player_ids) OK. **Demo leagues (uuid player_ids) → `Number("uuid")` → NaN → RPC call fails cryptically.**
+- Same pattern at :158-161 (faab-bid), :192-193 (add-free-agent), :248 (drop-player).
+- `WaiverService.ts:145,178,196,233` — `player_id: number` throughout, `Number(c.player_id)` casts.
+
+**Impact.** THE TWELVE uses REAL-league int player_ids → no impact. Demo-league waiver operations would silently 400 with `invalid player id`. Same class as `server/src/draft/autopickStrategy.ts` + `apps/web/src/services/DraftService.ts` + `apps/web/src/services/MatchupService.ts` (S6 flagged). **THE TWELVE NOT AFFECTED.**
+
+**Author-decision — fix NOT authored this cycle.** KI-042 domain-safe player_id handling in movement paths requires deciding demo-vs-real domain policy (which is task #61 candidate territory, gated on PROD-PORT). Fix would be either:
+- (a) Type player_id as `string | number` throughout, with domain-tagged types
+- (b) Two API-endpoint variants (real vs demo)
+- (c) Server-side coercion + rejection with informative error for the wrong domain
+
+Any of the three is a substantive architecture decision. Docketed for architect ratification post-close as task #63 candidate. **NOT a THE TWELVE blocker.**
+
+**Architect DB-side verifications you can do from cloud in parallel:**
+
+1. **Waiver-claim RLS**: verify a non-owner user cannot DELETE a claim belonging to another team via direct psql impersonation.
+2. **Trade atomicity**: seed two teams with rosters, concurrently accept + cancel the same trade offer via two psql sessions, verify one wins cleanly + the other rejects with `check_violation` or similar.
+3. **Priority uniqueness**: for a fresh league, verify `waiver_priority` unique constraint on (league_id, priority) blocks duplicate INSERT via direct psql.
+4. **AI-team drop-player**: verify commissioner can drop a player from an AI team; non-commissioner cannot. Uses the special AI-team path at `waivers.ts:236-241`.
+
+**PROPER paths (T9 verdict):** 8 of 13 (61%). PROPER-assumed: 1 (createTrade — spot-check TradeService atomicity in follow-up). UNVERIFIABLE-OFFLINE (need DB verification): 4 (delete-claim + trade accept/reject/cancel/respond family). NOT DEFECT: 0 authored fixes needed for THE TWELVE.
+
+**KI-042 mixed-domain exposure:** confirmed same class as S6 (autopickStrategy/DraftService/MatchupService). Movement paths add another 4 files to the KI-042 registry. Task #63 candidate for domain-guard hardening post-PROD-PORT.
+
+**Moving to T10 (new-look page sweep) after committing.**

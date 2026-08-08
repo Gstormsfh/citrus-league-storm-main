@@ -50,3 +50,17 @@ Report each to the outbox. T6's mechanism report is my top-priority read.
 T9 — ROSTER MOVEMENTS AUDIT (product-critical): Garrett wants confirmation roster movements are "now proper." Audit every movement path — add/drop, waiver claim/priority, trade if present: cite file:line for each endpoint/RPC and its validation chain. Cross-check against docs/FINAL_WAIVER_SYSTEM_AUDIT.md — is that audit's end-state what the code does TODAY? Enumerate any known-broken or suspicious paths (including KI-042 mixed-domain exposure in movement code — your S6 audit flagged DraftService/MatchupService int assumptions; do movement paths share the defect?). Author fixes for anything genuinely broken (offline-testable). Report per-path verdict to the outbox: PROPER / DEFECT(authored fix) / UNVERIFIABLE-OFFLINE(what execution is needed tonight). I am verifying the DATA side (staging + prod demo league rosters, read-only) from the cloud in parallel — flag anything you want me to check in the DB.
 
 T10 — NEW-LOOK PAGE SWEEP (product-critical): The site has a "new look"; Garrett wants EVERY regular-season page and offseason page on it. First identify the new-look system's concrete markers (design tokens / layout components / css modules — cite what distinguishes new from legacy). Then enumerate ALL routes/pages and classify each: NEW-LOOK / LEGACY / MIXED, with file:line evidence. Author conversions for every LEGACY/MIXED page in regular-season and offseason surfaces (match existing new-look patterns exactly — no invention). Table of page-by-page status to the outbox. Note which converted pages need visual verification by Garrett tonight (list them for the browser pass alongside F28).
+
+---
+
+## Entry 5 — 2026-08-08 19:14Z (1:14 MT) — DESIGN DIRECTION FOR T10 + ART SYSTEM RULES (from Garrett, final)
+
+BENCHMARK: Sleeper is the primary quality bar for all T10 work — Yahoo/ESPN secondary. We are not cloning Sleeper; we are meeting its bar with OUR new-look system: their information density, polish, and confidence, expressed through our existing design tokens. Where our new-look system already decides something (colors, type, components), OURS WINS; where a page lacks a pattern, derive it Sleeper-informed and note the derivation.
+
+ART SYSTEM RULES (absolute):
+1. The caricature set we created is the ONLY imagery. First: full asset inventory — locate every caricature asset in the repo (public/, assets/, src), catalog filename → style → where used. Report the inventory to the outbox.
+2. Flag every NON-caricature image on regular-season + offseason pages (stock art, old graphics, placeholder imagery) → author its removal or replacement-slot.
+3. Pages needing NEW customized art: do NOT generate — create the asset slot in code (dimensions, filename convention matching the existing set) AND write a generation brief per asset in a NEW file docs/ART_GENERATION_QUEUE.md: exact nano-banana prompt (style-matched to the existing caricature set — study the existing files and describe their shared style precisely in the prompt), dimensions, filename, target page/slot. Garrett batch-generates tonight in minutes; the code is already wired to receive them.
+4. Consistency: same art treatment rules on every page (sizing, framing, placement) — derive from the best existing usage and apply uniformly.
+
+You are mid-run — absorb Entries 3, 4, 5 at your next item boundary; they reorder your queue (T6 → T7 → T9 → T10+this → T1 → T2 → T3+T8 → T4 → T5).
