@@ -473,3 +473,22 @@ v1 fires `AuditService.logDraftEvent('DRAFT_START', leagueId, {teamsCount, round
 **Code slots NOT yet authored** — waiting for Aug 16 (per author-only today; slots are documented in §4 for Garrett/architect to add on spike day).
 
 **Moving to T4 (F23 design doc) after committing.**
+
+---
+
+## R16 — 2026-08-08 ~20:45Z — T4 COMPLETE (F23 design doc ratification-ready)
+
+**File:** `docs/DESIGN_F23_registry_blind_stall_recovery.md` (new, ~200 lines).
+
+**Content:**
+- §1 Problem — scanClockLiveness registry-blindness enumerated; 3 states (never-created, idle-evicted, never-hydrated-post-restart). Empirical evidence: 9.5h stalled fixture league 2026-08-06.
+- §2 Non-goals — not replacement for scanClockLiveness; not real-time; not fix for legitimate abandoned-mid-draft class (Rider 2 already covered).
+- §3 Three design options evaluated (A: DB pg_cron + NOTIFY; B: engine-side DB poll; C: snapshot-freshness heartbeat). **Recommendation: Option B** (single-workstream, reuses recovery path, bounded exposure, 60s cadence).
+- §4 Detailed design — LobbyRegistry additions (constant, state field, 4 new methods, boot signal, config env vars, idempotency safety, failure modes, 5 observability log lines, 6 offline test cases).
+- §5 8 ratification bars.
+- §6 Rollout — author → ratify → implement → deploy → verify → prod-monitor.
+- §7 Related work — F20 / F27b-1 / F27b-2 / INS-16 / KI-041 / PROD_CHANGE_LEDGER cross-refs.
+
+**Not a THE TWELVE blocker.** F23 is prod-hardening for the registry-blind residual class. Awaits architect ratification post-close.
+
+**Moving to T5 (KI-042 #61 int-assumption fixes) after committing.**
