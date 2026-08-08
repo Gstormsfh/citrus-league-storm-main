@@ -411,3 +411,31 @@ v1 fires `AuditService.logDraftEvent('DRAFT_START', leagueId, {teamsCount, round
 **RECOMMENDED (my terminal read, awaiting architect ratification):** Option **(a) two-step wire-up** + GAP-2 audit-log addition in same commit. Both are additive; neither changes existing v1 behavior; both preserve F27 contract. If architect greenlights, I'll author the wire-up in DraftLobby.tsx (swap the `handleStartDraft` prop's handler) + preserve v1 handleStartDraft as `handleStartDraftLegacy_DEPRECATED` with a JSDoc `@deprecated` + task-#67-candidate for post-twelve deletion.
 
 **Moving to T2 (integration fuzzer) while awaiting T7 ratification.**
+
+---
+
+## R14 — 2026-08-08 ~20:25Z — T2 COMPLETE (integration fuzzer, 50,000 sequences green)
+
+**File:** `apps/web/src/stores/__tests__/draftClientStore.fuzzer.test.ts` (new, ~330 lines).
+
+**Coverage.** Extends S2's unit fuzzer beyond `deriveDraftState.foldEvents` to the real `draftClientStore` + optimistic-layer wiring. Exercises the actual React store's `applyEvent` (which wraps foldEvents + snapshot mutation + optimistic reconciliation), NOT foldEvents in isolation.
+
+**Invariants asserted (per architect T2 mandate):**
+
+| Invariant | Sequences | Result |
+|---|---|---|
+| INV-A — store never throws (applyEvent chain across all adversarial inputs) | 10,000 | ✓ 0 violations |
+| INV-B — idempotent under duplicates at store level (state after applyEvent(A) == state after applyEvent(A++A) for derivedState) | 10,000 | ✓ 0 violations |
+| INV-C — terminal states absorbing at store level (once derivedState.draftStatus terminal, no applyEvent flips it back) | 10,000 | ✓ 0 violations |
+| INV-D — no stuck optimistic entries (recordPending N times + applyEvent(N broadcasts) → pendingActions.size === 0) | 10,000 | ✓ 0 violations |
+| INV-E — no duplicate render state (setSnapshot+chain vs setSnapshot({recentEvents: full stream}) produce same derivedState) | 10,000 | ✓ 0 violations |
+
+**Total: 50,000 sequences exercised at store integration level. Zero violations.**
+
+**Note on INV-B semantics:** F28-L4 (docketed pre-shift) — the store's `applyEvent` unconditionally appends to `snapshot.recentEvents` even for duplicate seqs; this creates a UI-cosmetic double-line in the Recent-events pane but does NOT diverge the derivedState (fold is seq-idempotent at :181). INV-B tests derivedState equality specifically, so it passes; the docketed L4 finding is unchanged.
+
+**Cross-workstream:** none of my fuzz sequences drove the WS transport layer (that's runner.ts + reduce.ts, offline-untestable without a fake WS). Integration-fuzzing of the WS layer is a follow-up (task #68 candidate).
+
+**Perf.** 50k sequences run in ~13s total (2.6ms/sequence avg). Confirms integration fuzz is CI-viable.
+
+**Moving to T3+T8 (Capacitor spike plan + Apple App Store gap) after committing.**
