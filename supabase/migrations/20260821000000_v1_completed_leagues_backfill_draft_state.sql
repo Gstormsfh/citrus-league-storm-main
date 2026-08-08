@@ -30,6 +30,38 @@
 --   `draft_status='completed'` AND draft_state IS DISTINCT FROM
 --   'completed'. Idempotent: re-running is a zero-row UPDATE.
 --
+-- KNOWN POPULATIONS (Block-2 census, staging read 2026-08-08 T7 Entry 8):
+--   Two incoherent populations exist against v1 semantics. Both are
+--   swept into `draft_state='completed'` by the WHERE clause below —
+--   the intended target is the FIRST; the SECOND is a known-and-
+--   deferred flip-era artifact recorded here so a future auditor
+--   doesn't rediscover it as anomaly:
+--
+--     1. ACTIVE / COMPLETED (primary target, ~all rows):
+--        `draft_state='active'` AND `draft_status='completed'`.
+--        Result of v1's `complete_draft_and_sync` (migration
+--        20260321000000) writing only `draft_status='completed'` while
+--        leaving `draft_state` at its running value. This is the class
+--        the backfill was authored for.
+--
+--     2. NOT_STARTED / COMPLETED (deferred, 1 league on staging as
+--        of 2026-08-08): `draft_state='not_started'` AND
+--        `draft_status='completed'`. Flip-era artifact — a league
+--        whose `draft_status` was flipped to `completed` (likely via
+--        an admin path or a legacy code path) without the draft ever
+--        being armed (`draft_state` never left initial `not_started`).
+--        This backfill WILL sweep this population into
+--        `draft_state='completed'` alongside class (1), because the
+--        WHERE clause is `draft_state IS DISTINCT FROM 'completed'`
+--        (which includes `not_started`). That is intentional-for-
+--        now: unifying draft_state=completed for all draft_status=
+--        completed rows is a self-consistent postcondition, even if
+--        the true semantic (a never-armed league arguably deserves
+--        `draft_state='cancelled'` or a new terminal like
+--        `draft_state='never_started'`) is not perfectly captured.
+--        Semantic reclassification for class (2) is DEFERRED to a
+--        post-twelve architect ratification.
+--
 -- NON-GOALS:
 --   - Cancelled leagues: NOT backfilled. `draft_state='cancelled'` is
 --     already set by v1 cancel path (`cancel_draft` migration ...).

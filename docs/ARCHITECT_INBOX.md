@@ -78,3 +78,37 @@ YOUR ACTIONS:
 T7 — RULING on wire-up: SINGLE BUTTON, REPLACE THE ACTION. Wire the existing Start Draft button(s) in DraftLobby to useStartDraftV2 + navigate on success; v1 handleStartDraft becomes deprecated and UNREACHABLE from the UI (code retained until the post-twelve cleanup task — create it). NEVER two visible start buttons, and the flip-era path must not be clickable on draft night. CONDITION before authoring the swap: entanglement analysis — enumerate every local state mutation v1 handleStartDraft performs (DraftRoom.tsx:2867-3095), and map EACH to its v2-world coverage (engine snapshot/frame, or obsolete-with-evidence). If any dependency lacks coverage, STOP, report to outbox, and I will re-rule (fallback: v2 button replaces old button's visibility; old hidden). Offline tests for the wired path. Your docket answers: v1 marked deprecated YES; v1 server route + DraftService.startDraft + client api deletion = post-twelve cleanup task YES, create it.
 
 Pace acknowledged — T6✓ T7✓ T1✓ before 1:30. Garrett's parting orders (already in Entry 5): Sleeper is the bar, world class. Keep going.
+
+---
+
+## Entry 7 — 2026-08-08 20:40Z (2:40 MT) — T7 RE-RULING: GAP-1 option (a), GAP-2 approved. AUTHOR THE WIRE-UP NOW.
+
+R13's STOP was the protocol working — hidden-v1 + broken-v2 would indeed have been worse than the status quo. Rulings:
+
+GAP-1 — OPTION (a) RATIFIED: two-step wire-up (initializeDraftOrder → on success → useStartDraftV2.start). Option (b) REFUSED for now (migration change to a certified contract days before the twelve; docket "single-RPC ignition" as post-twelve improvement). Option (c) refused (new surface, zero semantic gain). CONDITIONS on (a):
+1. RE-RUN SAFETY (the razor edge): cite initializeDraftOrder's behavior when draft_order rows ALREADY exist (retry-after-refusal, double-press, pre-configured league). If it duplicates rows or errors on re-run, guard it — skip init when order rows are already present for all rounds (cheap existence check). Cite file:line for whichever branch you take.
+2. FAILURE ORDERING: init fails → user-facing error, ignition NEVER attempted. Init succeeds + ignition refused (Rider-1) → taxonomy message shown, league remains in configured-not-started state (safe, retryable — idempotency key regenerates per attempt... confirm: NEW idempotency key per user-initiated attempt, not reused across distinct presses; reuse only within the same attempt's retries if any).
+3. isPending must gate the button across BOTH steps (no double-fire mid-sequence).
+
+GAP-2 — APPROVED as specified with two adjustments: AuditService.logDraftEvent fires server-side in draftV2Start.ts AFTER rpc success only (log truth, not attempts), and include was_duplicate in the audit payload so idempotent replays are distinguishable in the audit trail.
+
+Deprecation plan APPROVED: handleStartDraftLegacy_DEPRECATED + @deprecated JSDoc + post-twelve deletion task (create it).
+
+OFFLINE TESTS REQUIRED with the wire-up: (1) init-fails → no ignition call made; (2) init-ok + ignition-refused → correct taxonomy message, no crash, retry possible; (3) happy path init→start→ok:true with navigation callback invoked; (4) double-press during pending → single sequence only; (5) the re-run guard behavior per condition 1.
+
+AUTHOR NOW, commit, report to outbox. This is the last blocking item of the day — after this commit, the twelve's button exists end to end: UI → v2 route → start_draft_v2 → engine. Garrett deploys it tonight in Group C.
+
+---
+
+## Entry 8 — 2026-08-08 21:55Z (3:55 MT) — R19 RATIFIED + one test addition + T9 data findings
+
+R19 (T7 wire-up) RATIFIED IN FULL. The Condition-1 citation earned its keep — destructive-then-create init behind an existence check is exactly the guard the twelve needed; the wrong-team-count re-init fallback is a thoughtful addition; your test-deviation arguments (navigation is the page's concern, dedup is the UI gate's job, isPending honesty as the hook contract) are all accepted.
+
+ONE ADDITION (your ~15min offer — take it): author the DraftLobby render test proving disabled={isStartingDraft} actually blocks a second click on every Start-family button. The double-press protection now lives entirely in that one prop; a silent refactor could drop it — lock it with a test. Report when done.
+
+T9 DATA FINDINGS (my prod read-only verification, use in your audit):
+1. Real prod movement/roster tables: team_lineups(starters,bench) — NOT "rosters"; movement set = player_transactions, waiver_claims, waiver_priority, trade_offers, trade_history, trade_votes, transaction_ledger, failed_transactions. If your T9 audit referenced other names, correct against these (INS-16).
+2. Demo League heal HOLDING: 10 lineups × bench exactly 21, zero nested arrays. Beta League organic and coherent (12 lineups, bench 5-7, starters 11-13, zero nested).
+3. OPEN QUESTION — answer from code with file:line: prod player_transactions is EMPTY (0 rows ever) while failed_transactions has 18 and waiver_claims has 12. Does the SUCCESS path of add/drop/waiver-execution actually record into player_transactions (or transaction_ledger)? If success-recording is missing or broken, that is a T9 DEFECT (author the fix): movement audit trail is a product requirement, and "only failures are recorded" is the worst possible audit shape. If recording intentionally lives in transaction_ledger instead, cite it and reconcile the counts.
+
+Q4 BACKFILL HEADER ADDENDUM (Block-2 census): staging shows a second incoherent population — 1 league at not_started/completed (flip-era, never armed). The v1 backfill correctly targets active/completed only; NAME the not_started/completed population in the migration header as known-and-deferred so the next auditor doesn't rediscover it.

@@ -727,3 +727,104 @@ MOD: server/src/routes/draftV2Start.ts (AuditService import + post-success block
 Reading inbox for Entry 8+ per protocol. This IS the last blocking item of the day per Entry 7. When Garrett returns: hand-off is docs/HANDOFF_2026-08-08_v2.md (first shift) + outbox trail R1-R19 (subsequent shifts).
 
 **End of R19. THE TWELVE's Start Draft button now exists end to end.**
+
+---
+
+## R20 — Entry 8 executed (2026-08-08 22:10Z / 4:10 MT)
+
+Entry 8 acknowledged. R19 ratification received (thanks for accepting the three test-deviation arguments — navigation is DraftRoom's concern, dedup is UI-gate's job, isPending honesty as hook contract). Three deliverables authored per Entry 8:
+
+### D1 — DraftLobby render test (the ~15min offer, taken)
+
+**File**: `apps/web/src/components/draft/__tests__/DraftLobby.doublePress.test.tsx` (NEW).
+
+Covers all 4 Start-Draft-family buttons rendered by DraftLobby (identified by the actual JSX branches):
+1. **BRANCH 1** — `hasExistingDraft + isCommissioner=true` → "Continue Draft" button (`DraftLobby.tsx:921`).
+2. **BRANCH 2** — `isDraftQueued + isCommissioner=true` → "Start Draft Now" (queued) button (`DraftLobby.tsx:931`).
+3. **BRANCH 3** — default (new) + `isCommissioner=true` → "Start Draft Now" (impromptu) button (`DraftLobby.tsx:963`). This branch is the strictest test — with 12 teams, `teams.length < 4` is FALSE, so the ONLY thing disabling the button is `isStartingDraft`. If a silent refactor drops the `isStartingDraft` term from the disabled expression here, the test fails.
+4. **BRANCH 4** — `hasExistingDraft + isCommissioner=false` → "Join Draft Room" button (`DraftLobby.tsx:1020`).
+
+Each test: `isStartingDraft=true` → assert `.toBeDisabled()` on the button + `fireEvent.click` fires + `expect(onStartDraft).not.toHaveBeenCalled()`. Positive control at the end verifies BRANCH 3 with `isStartingDraft=false` DOES fire `onStartDraft` (proves the assertion isn't just watching a permanently-disabled button).
+
+Uses `fireEvent` from `@testing-library/react` (already installed); NO new npm dependencies. **5/5 tests pass.**
+
+### D2 — player_transactions success-recording audit (with file:line citations)
+
+**Answer**: SUCCESS recording lives in `transaction_ledger`, NOT `player_transactions`. Direct citations:
+
+**Server-side success writes to `transaction_ledger`:**
+- `server/src/services/WaiverService.ts:540-551` — AI DROP path inserts `{league_id, user_id:null, team_id, type:'DROP', player_id, source, created_at}` into `transaction_ledger`.
+- `server/src/services/WaiverService.ts:630-641` — AI ADD path inserts `{league_id, user_id:null, team_id, type:'ADD', player_id, source, created_at}` into `transaction_ledger`.
+- `TradeService.ts` and `LeagueService.ts` also reference `transaction_ledger` (grep-confirmed).
+
+**DB-side success also writes to `transaction_ledger`:**
+- Migration `20260309000000_cto_audit_fixes.sql:427` comment on the SQL function: `'Full rollback on any failure. Logs to transaction_ledger and failed_transactions.'` — process_roster_move writes ledger on success, failed_transactions on rollback.
+
+**Failure path writes to `failed_transactions`:** confirmed in migrations `20260117000001_create_process_roster_move.sql:288/318`, `20260208500000_fix_roster_sync_and_roster_size.sql:275/291`, `20260309000000_cto_audit_fixes.sql:411/415`, `20260310000000_cto_audit_round2_fixes.sql:170/174`, `20260407200000_relax_goalie_limit.sql:143/147`, `20260407300000_waiver_on_drop.sql:152/156`. All rollback branches. Matches prod's 18 failed rows.
+
+**Reconciliation of prod row counts:**
+- `player_transactions = 0` → EXPECTED given the audit finding below (no writer wired up).
+- `failed_transactions = 18` → consistent with 18 real-user rollback events over time.
+- `waiver_claims = 12` → orthogonal (waiver claim entries, not successful executions).
+- `transaction_ledger` (not quoted by architect) → should carry the success row count. Would reconcile against total successful ADD/DROP events. **Ask: architect can quote the current prod count?** If ≥ (waiver_claims_that_succeeded + AI_drops + user_moves), the success-recording story is intact.
+
+**NOT a T9 DEFECT for the audit trail.** The audit trail for user-facing add/drop/waiver-execution is captured — just under `transaction_ledger`, not `player_transactions`. "Only failures are recorded" is FALSE — successes are recorded in `transaction_ledger`.
+
+### D2 — SECONDARY DEFECT DISCOVERED (worth surfacing separately, not part of Entry 8's ask)
+
+`player_transactions` has ZERO writers anywhere in the codebase:
+- `server/src/**/*` — 0 references to `player_transactions` (grep confirmed).
+- `apps/web/src/**/*` — 0 references.
+- Only writer: SQL function `record_player_transaction()` defined in migrations `20260205000000_create_player_transactions_table.sql:92-141` and re-defined in `20260228000000_11th_audit_comprehensive_fixes.sql:804-857`.
+- CALL SITES for `record_player_transaction`: ZERO (grep across whole repo confirms). Dead code.
+
+**End-user impact**: `apps/web/src/pages/FreeAgents.tsx:198` calls `PlayerService.getTrendingPlayers(7, 50)` → `server/src/services/PlayerService.ts:327-328` calls RPC `get_trending_players` → RPC reads from `player_transactions` (migration `20260205000000:79`) → returns empty → FreeAgents trending badge has been silently DARK since Feb 2026 (~6 months in prod, presumably no user complaint since users don't notice missing analytics vs. broken analytics).
+
+**Two remediation options (BOTH require prod writes; DEFERRED past THE TWELVE):**
+- **Option A (analytics-preserving)**: wire `record_player_transaction()` call into the success write paths (WaiverService.ts:540 + :630 + process_roster_move SQL function). Optionally backfill `player_transactions` from `transaction_ledger` history. Trending starts working immediately.
+- **Option B (schema-consolidating)**: rewrite `get_trending_players` RPC to read from `transaction_ledger` instead of `player_transactions`; drop `player_transactions` table + `record_player_transaction` RPC as dead scaffold. Single source of truth for transactions.
+
+**Docket recommendation**: create KI candidate + docket for post-twelve. Not a T9 DEFECT-as-defined (no missing audit trail); it's a KI (dark analytics view since Feb 2026). Awaiting architect ratification for KI-N assignment + option A-vs-B ruling.
+
+### D3 — Q4 backfill migration header addendum
+
+**File**: `supabase/migrations/20260821000000_v1_completed_leagues_backfill_draft_state.sql` — inserted new `KNOWN POPULATIONS` section between SCOPE and NON-GOALS (lines 33+).
+
+Contents:
+- Names class (1): ACTIVE / COMPLETED (primary target).
+- Names class (2): NOT_STARTED / COMPLETED (deferred, 1 league on staging as of 2026-08-08). Discloses that the WHERE clause sweeps this population into `draft_state='completed'` alongside class (1), because `draft_state IS DISTINCT FROM 'completed'` includes `not_started`. Flags this as intentional-for-now (self-consistent postcondition) even though the true semantic (a never-armed league arguably deserves `draft_state='cancelled'` or a new terminal like `draft_state='never_started'`) is not perfectly captured. Semantic reclassification for class (2) is DEFERRED to post-twelve architect ratification.
+
+**Explicit acknowledgement** to architect: I read Entry 8's phrase "The v1 backfill correctly targets active/completed only" and observed that the current WHERE clause actually DOES also sweep not_started/completed into draft_state=completed. Documented this fact in the header rather than silently narrowing the WHERE to exclude it. If architect prefers the WHERE be narrowed to `draft_state IN ('active','paused')` explicitly (which would leave the 1 not_started/completed staging row untouched, deferring it to a separate migration), that's a ~5min edit — flag if wanted.
+
+### Test / typecheck status
+
+- Ran `npx vitest run src/components/draft/__tests__/DraftLobby.doublePress.test.tsx` → 5/5 pass in ~2.35s.
+- Ran `npx vitest run src/hooks/__tests__/useStartDraftFull.test.ts src/hooks/__tests__/useStartDraftV2.test.ts` (from R19 wire-up) → 18/18 still pass.
+- No new npm dependencies added (used `fireEvent` from `@testing-library/react` which was already installed; declined `@testing-library/user-event` for the same reason).
+
+### INS-16 discipline for T9 (architect finding correction)
+
+Entry 8's T9 corrections applied: real prod movement/roster tables are `team_lineups(starters,bench)` — NOT "rosters". Movement set = `player_transactions, waiver_claims, waiver_priority, trade_offers, trade_history, trade_votes, transaction_ledger, failed_transactions`. My earlier T9 audit did NOT reference wrong names (was scoped to the movement pipeline in server code, not to a table census), so no INS-16 correction needed against the earlier T9 report. Duly noted for any future T9 census work.
+
+### Files changed (uncommitted, ready to commit)
+
+```
+NEW: apps/web/src/components/draft/__tests__/DraftLobby.doublePress.test.tsx  (D1)
+MOD: supabase/migrations/20260821000000_v1_completed_leagues_backfill_draft_state.sql  (D3)
+MOD: docs/ARCHITECT_INBOX.md   (Entry 8 addition — architect-authored, included per channel protocol)
+MOD: docs/TERMINAL_OUTBOX.md   (this R20)
+```
+
+D2 is a *report*, not a code change — no files touched for it.
+
+### Standing by
+
+Reading inbox for Entry 9+ per protocol.
+- If architect Entry 9 lands: ACK immediately + execute + reply.
+- Open follow-ups for architect at Entry 9 (or Garrett's return):
+  1. transaction_ledger prod row count so D2 reconciliation closes cleanly.
+  2. D2 secondary defect: KI-N assignment + Option A-vs-B ruling for the dead-`player_transactions` scaffold (post-twelve; not urgent).
+  3. D3: does architect want the WHERE clause narrowed to exclude not_started/completed (a semantic-preservation edit) or leave it inclusive (a self-consistency edit) — either way documented.
+- Otherwise: idle 30-min polling cadence per Garrett-away protocol.
+
+**End of R20.**
