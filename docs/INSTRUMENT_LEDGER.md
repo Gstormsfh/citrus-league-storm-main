@@ -1286,3 +1286,86 @@ at `:3109`) — exactly what STEP 5' tests when a fresh league is
 bootstrapped without a prior snapshot record. F27b-1 is NOT yet
 proven by this bonus evidence; STEP 5' rerun on the fresh league
 is the actual gate.
+
+## F27b-1 CORE PROOF LANDED (2026-08-07, STEP 5' partial)
+
+**Adjudication:** architect ratified partial pass on STEP 5' — the
+morning's failing assert flipped to PASS on the certification
+image (commit `0ecbe605`).
+
+**Direct evidence.** On a FRESH F27-native league (no persisted
+snapshot record, so bootstrap took the full-replay path — F27b-1's
+unique coverage per the dispatcher-citation section above), the
+primary observer's snapshot reported:
+- `draftStatus='in_progress'`
+- `pickDeadline` present and valid
+- `recentEvents` carrying the buffered `draft_started` frame with
+  all six wire fields populated (`startedAt`, `firstPickDeadline`,
+  `totalRounds`, `totalTeams`, `pickTimeLimitSeconds`, `draftFormat`)
+
+This is precisely the state the F27b-1 shared-method
+`applyDraftStartedEventState` was extracted to guarantee via the
+REPLAY dispatcher: R1 stash populated `initialPickDeadline`, the
+guarded flip fired (`didFlip=true` semantically), Action 1 append
+served the observer via `snapshot.recentEvents`. The no-snapshot
+full-replay path is proven.
+
+**Live corroboration.** League `8661d3d4` was mid-autopick-cascade
+during the ratification window — seq 3 landed 02:30:22Z on a
+perfect 31s cadence from the replay-armed timer. Engine driving a
+draft solo on the certification image = end-to-end proof that the
+init post-replay catch-up (`LobbyManager.ts:974`) armed exactly
+once from `initialPickDeadline` (populated by R1 stash), setPickDeadline
+scheduled setTimeout, handleClockExpired's F20 identity+wallclock
+guards allowed the fire, autopick landed, next pick's timer armed
+naturally via applyPickEvent's live-broadcast setPickDeadline path.
+**8661d3d4 will be completed-by-autopick and thus spent** — next
+rerun sequence is reset+execute → execute → STEP 5'.
+
+### Assert-run failure — rig-side only (H-1, H-2)
+
+Run exited non-zero due to two proof-layer defects (no engine
+motion). Both fixed in the same commit as this ledger note.
+
+**H-1: `draft-harness.mjs:308-323` verifyFixture flip-era vestige.**
+Hard-required `draft_event_counter=0` AND zero events — correct
+for legacy flip-era leagues (no draft_started event) but wrong
+for F27-native fresh leagues (counter=1, seq=1 draft_started,
+zero picks). Fix: env-conditional baseline. Legacy path (no
+`F27_NATIVE_LEAGUE_ID` env) keeps the zero-check verbatim; F27-
+native path accepts counter>=1 AND exactly-one seq=1
+draft_started AND zero picks.
+
+**H-2: rig's harness spawn inherited S2 defaults.** `driveHarness
+Picks` at `lifecycle-acceptance-f27.local.mjs:338-342` passed a
+fake `--picks=12` flag (no such flag on the harness — grep
+confirmed) plus `--scenario=S2`, so harness defaulted `--rounds=3`
+and computed `TOTAL_PICKS = 12 * 3 = 36` picks against a 12-slot
+F27-native league. Over-shot the draft. Fix: pass `--rounds=1`
+explicitly; remove the fake `--picks=` flag. Pacing defaults
+(2-5s jitter, well under the 30s pick clock) unchanged.
+
+Neither defect touched engine code; the F27b-1 CORE PROOF above
+stands on its own via the observer snapshot state + live 8661d3d4
+autopick cascade (both witnessed on `0ecbe605`).
+
+### Amendment 2 first-real-test (2026-08-07)
+
+Rig `fail()` at `lifecycle-acceptance-f27.local.mjs:164-167` calls
+`cleanupObservers()` before `process.exit(1)`. On this run's H-1
+throw, the harness exited non-zero → `driveHarnessPicks` returned
+non-zero code → rig `fail()` at `:454`. Both primary observer
+(registered pre-drive) and secondary observer (Assert-F setup,
+registered at `:448` before drive) were already in the `openObservers`
+Set; cleanup iterated both and called `.close?.()`. Expect no
+engine-side lingering-socket WARNs from this run — first real
+test of amendment 2's mandate confirmed operational by code
+inspection; architect can verify empirically via docker log grep
+for `ws.close_absent` / `connection.abandoned` post-fail window.
+
+### Two-workstream note
+
+`docs/DEPLOY_PROTOCOL_F26_F27.md:82-83` still has the wrong AR
+host and wrong image name (see INS-16 note); already flagged in
+this session's F27b-1 §15.14 hand-off block. Cosmetic doc PR
+docket for later; runtime path uses harvest-verified values.

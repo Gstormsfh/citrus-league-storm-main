@@ -305,10 +305,15 @@ async function verifyFixture(client) {
   console.log(`  leagues: draft_state=${l.draft_state} league_size=${l.league_size} draft_event_counter=${l.draft_event_counter}`);
   if (l.draft_state !== 'active') throw new Error(`draft_state=${l.draft_state} (expected active)`);
   if (l.league_size !== TEAM_COUNT) throw new Error(`league_size=${l.league_size} (expected ${TEAM_COUNT})`);
-  if (l.draft_event_counter !== 0 && l.draft_event_counter !== '0') {
-    throw new Error(`draft_event_counter=${l.draft_event_counter} (expected 0 — reset before running)`);
-  }
-
+  // H-1 fix (2026-08-07 architect ratification): baseline check is
+  // env-conditional. Legacy path (F27_NATIVE_LEAGUE_ID unset) keeps
+  // the flip-era zero-baseline verbatim (draft_event_counter=0, zero
+  // events, zero picks). F27-native path (F27_NATIVE_LEAGUE_ID set)
+  // accepts the ignited-fresh baseline: draft_event_counter>=1 AND
+  // seq=1 event_type='draft_started' AND zero picks. Fresh F27-native
+  // leagues are ignited via start_draft_v2 during fixture-12-f27-
+  // native.local.mjs --execute, which writes seq=1 draft_started
+  // BEFORE any pick lands (counter=1).
   const eventsCount = (await client.query(
     `SELECT count(*)::int AS c FROM public.draft_events WHERE league_id = $1`,
     [WHITELISTED_LEAGUE_ID],
@@ -318,8 +323,52 @@ async function verifyFixture(client) {
     [WHITELISTED_LEAGUE_ID],
   )).rows[0].c;
   console.log(`  draft_events count=${eventsCount}   draft_picks_v2 count=${picksCount}`);
-  if (eventsCount > 0 || picksCount > 0) {
-    throw new Error(`league has existing events (${eventsCount}) or picks (${picksCount}); reset first`);
+
+  if (F27_NATIVE_LEAGUE_ID) {
+    // F27-native baseline: exactly one event (draft_started at seq 1),
+    // zero picks, counter>=1.
+    const counter = typeof l.draft_event_counter === 'string'
+      ? parseInt(l.draft_event_counter, 10)
+      : l.draft_event_counter;
+    if (counter < 1) {
+      throw new Error(
+        `F27-native: draft_event_counter=${l.draft_event_counter} ` +
+        `(expected >= 1 — draft_started should be present)`,
+      );
+    }
+    if (eventsCount !== 1) {
+      throw new Error(
+        `F27-native: draft_events count=${eventsCount} ` +
+        `(expected exactly 1 — only the draft_started event)`,
+      );
+    }
+    if (picksCount > 0) {
+      throw new Error(
+        `F27-native: draft_picks_v2 count=${picksCount} ` +
+        `(expected 0 — reset before running)`,
+      );
+    }
+    const seq1 = await client.query(
+      `SELECT event_type FROM public.draft_events
+         WHERE league_id = $1 AND seq = 1`,
+      [WHITELISTED_LEAGUE_ID],
+    );
+    if (seq1.rows.length !== 1 || seq1.rows[0].event_type !== 'draft_started') {
+      throw new Error(
+        `F27-native: seq=1 event_type is ` +
+        `${seq1.rows[0]?.event_type ?? '(missing)'} ` +
+        `(expected 'draft_started')`,
+      );
+    }
+    console.log(`  ✓ F27-native baseline: counter=${counter}, seq=1 draft_started, 0 picks`);
+  } else {
+    // Legacy path: flip-era zero-baseline unchanged.
+    if (l.draft_event_counter !== 0 && l.draft_event_counter !== '0') {
+      throw new Error(`draft_event_counter=${l.draft_event_counter} (expected 0 — reset before running)`);
+    }
+    if (eventsCount > 0 || picksCount > 0) {
+      throw new Error(`league has existing events (${eventsCount}) or picks (${picksCount}); reset first`);
+    }
   }
 
   const teams = (await client.query(

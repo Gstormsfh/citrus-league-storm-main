@@ -335,10 +335,19 @@ async function driveHarnessPicks(picks, leagueId) {
     // up task #52 to teach it — this may be a shakedown iteration
     // finding on first run.)
     const childEnv = { ...process.env, F27_NATIVE_LEAGUE_ID: leagueId };
+    // H-2 fix (2026-08-07 architect ratification): draft-harness has no
+    // --picks flag; it drives TOTAL_PICKS = TEAM_COUNT * ROUNDS. The prior
+    // --picks=${picks} was a fake flag silently ignored → harness inherited
+    // S2 default --rounds=3 and drove 36 picks against a 12-slot F27-native
+    // league, over-shooting the draft. F27-native lifecycle league is 1
+    // round × 12 teams = 12 picks; pass --rounds=1 explicitly. Pacing
+    // defaults (2-5s jitter, well under the 30s pick clock) unchanged.
+    // Follow-up (task #52 pin): true mid-drive-join needs --pause-after=N;
+    // this fix does not address that.
     const child = spawn('node', [
       'scripts/proof/draft-harness.mjs',
-      `--picks=${picks}`,
       '--scenario=S2',
+      '--rounds=1',
     ], {
       env: childEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
