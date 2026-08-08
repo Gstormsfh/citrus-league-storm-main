@@ -367,6 +367,97 @@ gcloud compute ssh citrus-draft-engine-staging `
 
 Reconnect activity is normal; PERSISTENT reconnect loops mean the DB connection is unhealthy. Escalate to Supabase status page + docs/RUNBOOKS/draft-engine-v2-known-issues.md KI-E010.
 
+### 6g. Commissioner double-press on Start Draft button
+
+**Symptom.** Garrett clicks "Start Draft" twice (finger slip, or first click didn't register visually).
+
+**Expected engine behavior (start_draft_v2 idempotency).** The RPC has an idempotency short-circuit at Step 0 (migration `20260807000000_start_draft_v2.sql`, key-only compare because payload has now()-derived fields). Second press with the same session's idempotency_key returns the first press's result — NO second draft_started event, NO second timer arm.
+
+**If second press uses a DIFFERENT idempotency_key** (browser tab reload between clicks): Step 1 preflight taxonomy fires — `draft_state='active'` already → returns error "illegal combo (already in_progress)" per Rider 1 taxonomy. Commissioner UI displays a toast; no state corruption.
+
+**Action.** Verify seq 1 draft_started event count via `psql "$env:SUPABASE_DB_URL" -c "SELECT count(*) FROM public.draft_events WHERE league_id = '<LEAGUE_ID>' AND event_type = 'draft_started';"` — expected: EXACTLY 1. If > 1, engine idempotency broke and this is a bug worth escalating post-draft.
+
+### 6h. Late joiner (user arrives after Phase 3)
+
+**Symptom.** User connects to the draft room after ignition + several picks have landed.
+
+**Expected client behavior.** New WS connection → snapshot delivered with `recentEvents` (up to 200 most recent events per RingBuffer capacity). Client's deriveDraftState re-derives from snapshot → correct in_progress state + on-clock team.
+
+**Action.** No commissioner action needed. Confirm the user's UI shows the correct current pick number matches the DB via:
+```powershell
+psql "$env:SUPABASE_DB_URL?client_encoding=UTF8" `
+  -c "SELECT count(*) FROM public.draft_picks_v2 WHERE league_id = '<LEAGUE_ID>';"
+```
+Ask user "what pick are you seeing?" — should match count + 1 (the next pick).
+
+**Failure mode: snapshot missing 200+ events back.** If draft has advanced past the ring buffer's oldest event, the late joiner's fold could gap-halt. Runner's `requestResyncForGap` fires, fetches missing events via HTTP, resumes fold. Should self-heal within ~2 seconds. If NOT self-healing, hard-refresh browser.
+
+### 6i. F27b-2 duplicate frame (pre-fix; documented for post-close awareness)
+
+**Symptom (pre-F27b-2 deploy).** UI's Recent-events pane shows duplicate "Draft started" line entries.
+
+**Expected client-derivation behavior.** deriveDraftState's outer seq-idempotency guard at `:181` skips duplicate seq → status correct, no double-flip. Only the Recent-events pane display is affected (F28-L4 cosmetic docketed).
+
+**Action.** Cosmetic only, no operational impact. Verify draft is otherwise proceeding correctly.
+
+**Post-F27b-2 deploy (task #55):** this class shouldn't happen. Engine's `bootstrapFullEventReplay` advances cursor to prevent re-fetch of already-applied events.
+
+### 6j. Autopick storm (multiple picks in rapid succession)
+
+**Symptom.** Multiple team clocks expire in quick succession (e.g., all humans miss their picks for a stretch); engine autopicks land back-to-back at ~1s intervals or faster.
+
+**Expected engine behavior.** F20 identity+wallclock guards on `handleClockExpired` prevent double-firing. Each autopick fires cleanly with `driftFromDeadlineMs` bounded. Wire fanout at ≤200ms broadcast to all clients per Performance Mandate.
+
+**Action.** No commissioner action. Observability check:
+```powershell
+gcloud compute ssh citrus-draft-engine-staging `
+  --zone=northamerica-northeast1-a --quiet `
+  --command="sudo docker logs citrus-draft-engine --since 30s 2>&1 | grep -E 'handleClockExpired|F20|autopick' | tail -20"
+```
+
+Any `F20 WARNING clock fired but draftStatus=X` lines? Expect zero — if any, log for post-mortem but do NOT interrupt the draft (F20 guard absorbs cleanly by design).
+
+### 6k. Player pool empty / stale mid-draft
+
+**Symptom.** Autopick fires but engine logs `autopick_failed: no candidates`.
+
+**Root cause (rare).** `player_directory` for current season is empty OR every remaining player was already picked (impossible in a normal draft; suggests data-corruption OR the pool was miscalibrated).
+
+**Action.**
+```powershell
+psql "$env:SUPABASE_DB_URL?client_encoding=UTF8" `
+  -c "SELECT count(*) FROM public.player_directory WHERE season = '2025-26' AND player_id NOT IN (SELECT player_id::text::int FROM public.draft_picks_v2 WHERE league_id = '<LEAGUE_ID>');"
+```
+
+If < number of remaining picks: pool is exhausted. **PAUSE the draft (6d) immediately.** Escalate to data-pipeline owner.
+
+### 6l. TLS / cert failure (Caddy)
+
+**Symptom.** All clients show "connection refused" or SSL/TLS errors on browser page load. HTTP works, HTTPS doesn't.
+
+**Diagnosis.**
+```powershell
+gcloud compute ssh citrus-draft-engine-staging `
+  --zone=northamerica-northeast1-a --quiet `
+  --command="sudo docker logs citrus-caddy --tail=100 2>&1 | grep -iE 'error|fail|renew'"
+```
+
+Look for Let's Encrypt renewal failures. Rate limit exceeded → cert can't renew → connections fail.
+
+**Action.**
+- If renewal failed due to rate limit: the previous cert is still valid (usually 90 days from issue). Confirm cert expiry via `curl -Iv https://<draft-domain>` — check `expire date` in cert output.
+- If renewal failed for other reasons: `sudo docker restart citrus-caddy` on the VM (via SSH). Caddy retries on start.
+
+**Escalation if cert genuinely expired mid-draft.** PAUSE the draft (6d), issue temporary cert via `certbot` from another VM, swap it into Caddy's volume, restart Caddy. Beyond the scope of THE TWELVE runbook — needs Caddy operator familiarity.
+
+### 6m. Phone dies mid-pick (single user)
+
+**Symptom.** User's phone / laptop dies while they're on the clock.
+
+**Expected engine behavior.** Their clock expires → engine autopicks their slot with the best-available player per autopickStrategy. Draft continues.
+
+**Action.** None needed. Post-draft, apologize to the user and consider offering a commissioner-override to reallocate. Do NOT interrupt the draft mid-flight.
+
 ---
 
 ## Section 7 — post-draft (T+~2 hrs)
