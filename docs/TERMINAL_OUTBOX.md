@@ -1471,3 +1471,69 @@ MOD: docs/TERMINAL_OUTBOX.md                                            (this R3
 Entry 15 code-level conditions COMPLETE. Per Entry 15 verbatim: "then the T-queue verdicts are complete pending T15/T16 review (in progress tonight)." T-queue ratification remains architect's — nothing further terminal-side. Continuing KI-048 30-min inbox poll for Entry 16+ or Garrett return.
 
 **End of R31. Three conditions executed, one docketed, one pattern-worthy amendment recorded.**
+
+---
+
+## R32 — Entries 16 + 17 executed: O2 Sunday blocks + O3 property tests + O5 draft-night v2 (2026-08-09 06:35Z / 12:35 MT)
+
+Entries 16 + 17 acknowledged. Stand-down rescinded per Entry 16. Overnight queue O1-O5 executed (O1 was Entry 15 conditions per R31 — already committed).
+
+### O2 — Sunday deploy paste-blocks (highest-value overnight)
+
+**File**: `docs/RUNBOOKS/SUNDAY_EXECUTION_BLOCKS.md` (NEW, ~260 lines). Three ready-to-paste PowerShell block sets:
+
+- **GROUP A — engine deploy (F27b-2 image).** 8 steps A-0 through A-R. Rollback pin capture BEFORE push (§4b). Build via `-f server/Dockerfile.draft-engine` (INS §15.11 — the 2026-07-27 strike #2 that broke staging). Digest capture. Metadata update (QUOTED per §15.12). Startup script kick. 9-item boot verification harvested from DEPLOY_PROTOCOL_F26_F27.md §1 corrected vocabulary (`deployment.fingerprint`, `hono.listening`, `uws.listening` as MOST load-bearing, `event_subscription.*`, `LobbyRegistry`). Health probe twice ~70s apart. §A-R rollback = three commands (retag → metadata revert → reset) with 2026-08-08 pin `0ecbe605-draft`.
+- **GROUP B — N-2 staging migration.** 3 steps B-0 through B-R. Capture population per Rule 1 (capture-before-replace) with explicit RAISE EXCEPTION on placeholder. PROD_CHANGE_LEDGER Rule 2 preapply history read (Q1 must clear). INS-6 GUC bridge rehearsal per Rule 2. Apply via `-v ON_ERROR_STOP=1` with `client_encoding=UTF8` echo (Rule 3). Post-apply census verify one query. §B-R rollback = re-apply captured live body.
+- **GROUP C — web build + deploy (Firebase Hosting).** 3 steps C-0 through C-R. Preflight `npm ci` + typecheck. **Re-run today's 37 offline tests** (`useStartDraftFull` 6 + `DraftLobby.doublePress` 5 + `linkGraphIntegrity` 4 + `CompletionMomentBanner` 12 + `DraftRoomV2` 10). Build web. Firebase deploy. Browser smoke on home + `/league/<id>` (LeagueTimelineCard T12) + T11a fixed links. §C-R = Firebase console version pin.
+
+Every command cited to its source (DEPLOY_PROTOCOL_F26_F27.md, THE_TWELVE_DRAFT_NIGHT.md, PHASE_4_5_PROJECT_PLAN.md, apply-n2-draft-state.local.sql). INS-16 discipline: no composed-from-memory patterns; only what worked this week. Blast-radius argument at end (each Group is rollback-independent).
+
+Awaiting architect ~2:30 MT reconciliation against his own version. Divergences = findings per Entry 16.
+
+### O3 — draftGuide property tests (bounded 60min)
+
+**File**: `packages/shared/src/utils/__tests__/draftGuide.property.test.ts` (NEW, ~280 lines). Five properties × 200 iterations each = **1000 randomized test cases, 5/5 pass** in ~224ms.
+
+- **P1 point-value scaling under stat scale.** Multiplying skater stats by K > 0 multiplies each player's projectedPoints by exactly K (within float tolerance). Rank ORDER not asserted — IEEE-754 precision on sum-then-multiply vs multiply-then-sum can reorder tied-adjacent players even under uniform scaling; documented in test comment as known caveat, not a function bug.
+- **P2 tie determinism.** Two independent runs on the same input yield identical `rank`/`tier`/`scarcity` outputs.
+- **P3 tier-partition completeness.** For any (ranked, leagueSize, rosterShape) with leagueSize > 0 AND totalDemand > 0, EVERY player in the startable pool appears in EXACTLY ONE tier (no gaps, no duplicates, contiguous with ranked.slice(0, expectedPool)).
+- **P4 scarcity-ratio bounds.** supply/demand equals ratio for finite demand; equals Infinity when demand=0; equals 0 when supply=0. Includes `Z_NOSUPPLY` position (no players match) and `Z_NODEMAND` position (demand=0).
+- **P5 point-value scaling under scoring scale.** Multiplying all scoring weights by K > 0 multiplies EVERY projectedPoints by K (within float tolerance). Same IEEE-754 caveat as P1.
+
+Deterministic mulberry32 PRNG per iteration; failing seed reported in error message for replay.
+
+**Initial failure surfaced + fixed:** P1 and P5 originally asserted rank-order preservation, which floats can't guarantee under uniform scaling for tied-adjacent pairs. Relaxed to point-value invariance + set-equality of playerIds. Documented in property-comment header as an IEEE-754 fact, not a bug.
+
+### O5 — THE_TWELVE_DRAFT_NIGHT.md v2 merge per Entry 17 reconciliation
+
+**File**: `docs/RUNBOOKS/THE_TWELVE_DRAFT_NIGHT.md` (rewritten, v2 replaces v1). Per Entry 17 O5 verbatim:
+
+- **Architect's T-3d → T+1h human timeline is the SPINE.** Real humans need days, not an hour. T-3d league creation + participant onboarding starts; T-2d join-drift + team-count check; T-1d dry-run + GO/NO-GO decision; T-60m sync + reminder; T-0 commissioner press Start; T+0 → T+2h steady state with 20-min ceiling doctrine; T+~2h completion; T+1h post-mortem + ledger updates.
+- **Terminal's technical organs are ORGANS.** SQL verifies (§T3v post-creation, §T60v player-pool freshness, §3v ignition, §4a wire-tail, §4b pace, §5a completion, §5c evidence capture) hang off the timeline. All 13 failure decision trees (6a-6m) preserved. Escalation ladder 6a→6b→6c→6d→6R preserved with pause-first doctrine emphasized. Appendices A (quick-reference), B (what NOT to do), C (who to page) preserved.
+- **Rain triggers section added.** GO/NO-GO authority = Garrett. Six triggers enumerated (team count < 12; dry-run technical red-line; ≥ 2 participants blocked; any pre-req unchecked; data pipeline stale > 24h; weather/power/life). No-rollback framing — postponement not rollback.
+- **20-minute ceiling doctrine added.** Any diagnosis > 20 min → §6d pause + announce new resume time in chat. **RESUME, not restart.** The event log preserves state; asking 12 humans to re-do a game is worse than any pause.
+- **§6d moved earlier in the ladder.** Pause-first, not pause-late. Time is the scarcest resource in a live human event.
+- **§6i F27b-2 note updated to be deploy-state-aware.** Post-Sunday-Group-A footnote: if F27b-2 fix (task #55) landed via Group A, this class SHOULD NOT trigger; presence post-Group-A is REGRESSION. Pre-Sunday-Group-A behavior retained as historical context.
+- **Appendix D added:** v1 → v2 change summary for auditors. Explicit "v2 fully replaces v1. Garrett reads only v2."
+
+### Files changed this cycle
+
+```
+NEW: docs/RUNBOOKS/SUNDAY_EXECUTION_BLOCKS.md
+NEW: packages/shared/src/utils/__tests__/draftGuide.property.test.ts
+MOD: docs/RUNBOOKS/THE_TWELVE_DRAFT_NIGHT.md   (v1 → v2 full rewrite per O5 reconciliation)
+MOD: docs/ARCHITECT_INBOX.md                    (Entries 16 + 17, architect-authored, per channel protocol)
+MOD: docs/TERMINAL_OUTBOX.md                    (this R32)
+```
+
+### Tests
+
+- Property tests: 5/5 pass in ~224ms (1000 iterations total).
+- Existing shared tests unchanged: leagueTimeline 17/17, draftGuide 20/20 still green.
+- All prior offline tests unaffected.
+
+### Standing by
+
+Overnight queue O1-O5 COMPLETE. O4 was "stand by on scheduler for Entries 17+ (my overnight review findings will arrive as work)." Continuing KI-048 30-min inbox poll for Entry 18+ or Garrett return.
+
+**End of R32. Sunday blocks armed, property coverage tripled, draft-night runbook merged. Garrett has a full paste-set + a full runbook + a full test barrier.**

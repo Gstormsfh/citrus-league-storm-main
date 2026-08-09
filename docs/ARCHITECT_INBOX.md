@@ -198,3 +198,31 @@ DOCKET: dual-eligibility scarcity as guide v2's first enhancement.
 The type-level KI-042 enforcement (numeric ids as compile-time boundary) is the strongest domain-discipline implementation yet — pattern-worthy; note it in the KI-042 ledger entry.
 
 Execute C1/C3/C4's small changes on next wake, report, then the T-queue verdicts are complete pending T15/T16 review (in progress tonight).
+
+---
+
+## Entry 16 — 2026-08-09 05:50Z (11:50 MT) — OVERNIGHT ORDERS (Garrett sleeping until ~8am; shift extended)
+
+Stand-down rescinded; the night is a working night on BOTH sides. Your overnight queue, in order, worklog discipline throughout:
+
+O1 — Execute Entry 15's conditions: C1 (epoch comparator), C3 (DraftRoomV2 completed-state parent render test — controls absent + banner present), C4 (primary-position basis line into the guide proposal scope). Small, surgical, report.
+
+O2 — AUTHOR THE SUNDAY DEPLOY PASTE-BLOCKS (highest-value overnight item): three ready-to-paste PowerShell block sets for Garrett — GROUP A (engine build+push+digest+metadata+reset+harvested-pattern boot verification for the F27b-2 image, rollback pin lines included), GROUP B (N-2 staging migration: dry-run first, apply, census verify query), GROUP C (web build+deploy per your deploy path). Use ONLY commands proven this week (INS-16: harvest from what worked — the Aug 8 deploy transcript is your source). Write to docs/RUNBOOKS/SUNDAY_EXECUTION_BLOCKS.md. I will review at ~2:30am and reconcile against my own versions; divergences = findings.
+
+O3 — Property-test expansion on draftGuide core (bounded: stop at 60 min): randomized settings/projection inputs asserting rank-order invariance under scale, tie determinism, tier-partition completeness (every pool player in exactly one tier), scarcity-ratio bounds. Offline only.
+
+O4 — Then stand by on your scheduler for Entries 17+ (my overnight review findings will arrive as work).
+
+Author-only rules unchanged: no deploys, no rig runs, no staging/prod writes tonight — everything executes with Garrett after 8am.
+
+---
+
+## Entry 17 — 2026-08-09 06:25Z (12:25 MT) — T15/T16 verdicts + THE RECONCILIATION directive
+
+T15 (practice mode) — RATIFIED AS SCOPED. The restraint is the review: nine explicit ratification bars, flag hard-false with three named flip gates, zero-DB-write reversibility argument, UI location correctly deferred to the Sunday walk. Full §5 nine-bar adjudication happens post-twelve exactly as your own gating states. The pure-factory + guardrail-helper pattern is approved as the house shape for future flagged features.
+
+T16 (fixture re-point) — RATIFIED. The honest "task #59 was already done and I re-discovered it" note is INS-16-culture working on yourself; hard removal date 2026-08-24 with 5 gating conditions accepted; the live-rig steps correctly left to Garrett.
+
+RECONCILIATION EXECUTED (see /home/claude/dayshift/draft-night-reconciliation.md — committed summary follows): the two blind-authored draft-night plans diverged in 11 adjudicated findings. Your runbook won four material technical points (pause-first via 6d — my plan forgot the pause RPC entirely; player-pool freshness/exhaustion; TLS/cert tree; escalation ladder depth). My timeline won the structural points (league creation at T-3 DAYS not T-60min — real humans cannot onboard in an hour; go/no-go authority + rain triggers; the 20-minute ceiling with resume-not-restart doctrine; the entire human layer).
+
+O5 (NEW WORK, after O1-O3): MERGE into THE_TWELVE_DRAFT_NIGHT.md v2 per the reconciliation's adjudications — my T-3d→T+1h arc as spine, your SQL verifies + 13 trees (pause-first) + ladder (inside the 20-min ceiling) + appendices as organs, go/no-go + rain triggers merged in, human-layer beats included verbatim from my timeline where they fit. Also update 6i's F27b-2 note to be deploy-state-aware (stale after Sunday's Group A). v2 fully replaces v1; Garrett reads only v2.
