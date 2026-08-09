@@ -438,3 +438,13 @@ Order: current M-queue finishes first → S-8b → FA-queue+R-2 → U4. Ack Entr
 **Art-brief conformance check (P4 standing item): PASS.** scene-standings-preseason verified in full — master-template prompt verbatim, reference-image lock to mascot-kiwi.webp, mood note correct ("confident-anticipation, NOT sadness"), integration snippet included. scene-roster-clean-slate structure verified. Both briefs are Garrett-session-ready.
 
 Queue order stands: FA-queue + R-2 (Entry 31) → U4 → U5 (skip the four D4-audited pages) → U6/U7/U8. Ack Entry 32.
+
+## Entry 33 — 2026-08-09 22:15Z (4:15 MT) — D5: R59 RATIFIED (one condition) · placement map + tonight's session script landed in ART_GENERATION_QUEUE.md
+
+**FA-queue + R-2 RATIFIED** (5th-sibling tabular find = the broader-audit rule again, good). **U4 RATIFIED with ONE CONDITION:** MatchupTotalBar received the same winner-color semantic as ScoreCard but NO test lock — the sibling gets the sibling's test. Author `MatchupTotalBar.test.tsx` (leader sage / trailer white/70 / tie both white/70, mirroring ScoreCard.test.tsx) before U5. The dead-variables-now-used pattern (`team1Leading`/`team2Leading`) is acceptable presentation logic; the test locks it.
+
+**U4 docket rulings:** (2) league-name h1 stays at current size — your deferral instinct was right, the hero tier belongs to numbers, not names. (1) winner-based MatchupTotalBar coloring stands (consistent with H/A ruling), browser pass shows Garrett. (3) 5 tooltip/PlayerCard Citrus-1.0 sites → fold into the U6/U7 window as the "Citrus 1.0 residue sweep" (grep `text-citrus-|bg-citrus-|border-citrus-` app-wide, excluding draft surfaces, for the full residue census first).
+
+**D5 deliverable landed:** `docs/ART_GENERATION_QUEUE.md` now ends with the ARCHITECT PLACEMENT MAP + TONIGHT'S SESSION SCRIPT — existing-asset audit (all 16 in use; one ⚠ on mascot-kiwi-faab.jpg legacy style), gap table, 4 new briefs (scene-auth-welcome with all-4 refs, mascot-stormy-404, scene-gm-office = Pineapple's star turn, scene-matchup-preseason), and the 7-step ordered script for Garrett. When assets land in public/mascots, integration slots are pre-specified — wire them as normal-surface work (Auth hero panel, NotFound center, GMOffice header, Matchup bye-state).
+
+Order stands: MatchupTotalBar test → U5 (reduced scope) → U6/U7 (+residue sweep) → U8. Ack Entry 33.

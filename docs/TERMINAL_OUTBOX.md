@@ -3093,3 +3093,73 @@ Three hero stat tiles (Teams, Roster Size, Draft Rounds) were at `text-3xl` (30p
 **U5 (mobile deep pass)** next per Entry 25/31 order. Scope per Entry 31: Home/Matchup/Standings mobile at 360px + ~200 inline-button focus audit deferred from U3 + nav/tab surfaces. **SKIP Roster/FreeAgents/GMOffice/OtherTeam** (D4-audited).
 
 **End of R59. Entries 31/32 ACKed. FA-queue + R-2 committed as one. U4 delivered on MatchupTotalBar (winner-color signal semantic upgrade) + LeagueDashboard stat tile size bump. Zero Citrus-1.0 tokens in MatchupTotalBar; 5 tooltip/card sites docketed for later sweep.**
+
+---
+
+## R60 — Entry 33 ACK + MatchupTotalBar test lock + U5 (2026-08-09 22:18Z / 4:18 MT)
+
+### Entry 33 ACK
+
+- **FA-queue + R-2 RATIFIED** — broader-audit find (5th tabular table sibling) noted as pattern reinforcement.
+- **U4 RATIFIED with condition** — MatchupTotalBar test lock authored (see below).
+- **U4 docket rulings applied**: (2) league-name h1 stays; (1) winner-based MatchupTotalBar stands; (3) 5 tooltip/PlayerCard Citrus-1.0 sites → fold into U6/U7 as **"Citrus 1.0 residue sweep"** (grep `text-citrus-|bg-citrus-|border-citrus-` app-wide, excluding draft, for full residue census FIRST).
+- **D5 deliverable noted** — ART_GENERATION_QUEUE.md now carries PLACEMENT MAP + TONIGHT'S SESSION SCRIPT + 4 new briefs (scene-auth-welcome, mascot-stormy-404, scene-gm-office, scene-matchup-preseason). Integration slots pre-specified; wire as normal-surface work when assets land in `public/mascots/`.
+
+### MatchupTotalBar test lock committed (9b4277de)
+
+Per Entry 33 condition. Mirrors ScoreCard.test.tsx pattern on the sibling. 6 tests locking:
+- team1 leading → team1 sage, team2 white/70
+- team2 leading → inverted accent
+- tied → both white/70
+- tabular-nums on both score nodes
+- TIED indicator on score parity
+- Team name fallback + prop override
+
+**6/6 pass.** No implementation change; test-only commit.
+
+### U5 executed (e910f854) — mobile deep pass, reduced scope per Entry 31
+
+**Mobile audit findings — target pages structurally clean at 360px:**
+- LeagueDashboard: 1 fixed width (sm:max-w-[700px] dialog with sm: prefix — safe), 11 overflow handlings
+- Matchup: 3 overflow-x-auto (correct idiom for wide content)
+- Standings: 11 overflow handlings; 2 size="sm" Buttons (architect confirmed CONFORMANT prior)
+- Zero mobile-breaking fixed pixel widths
+
+**Focus audit + fix — nav bespoke buttons**:
+Grepped `<button` (raw HTML, not shadcn Button primitive) across target scope:
+- LeagueDashboard: 0 bespoke
+- Matchup: 0 bespoke
+- Standings: 1 bespoke
+- Navbar: 9 bespoke ← ALL missing focus-visible ring
+- MobileMenuButton: 6 bespoke ← ALL missing focus-visible ring
+
+**NEW `.focus-citrus` utility** authored in `apps/web/src/index.css`. Encodes rule 4 (peach family, 2px offset 2, never suppressed) as a single class for bespoke elements bypassing shadcn primitives. Uses box-shadow trick (2px page-bg offset + 2px pastel-peach-deep #FFB591 ring) so the utility works on any parent surface color.
+
+**Applied to 15 nav bespoke buttons**:
+- Navbar.tsx (9): create-league CTA (desktop + mobile), active-league dropdown trigger (desktop + mobile), notifications bell (desktop + mobile), user avatar dropdown trigger, mobile-menu toggle, sign-out
+- MobileMenuButton.tsx (6): menu-toggle, close-menu, active-league dropdown, league-list items, create-league CTA, sign-out
+
+Every keyboard-focused nav element now emits the peach ring consistent with CitrusButton + shadcn Button primitives + shadcn CSS-var ring-ring inputs. Nav is now fully focus-conformant.
+
+### Docketed for U6/U7
+
+1. **~200+ inline `<button>` elements across pages** — actually much narrower than U3's rough estimate: FA-queue R-2 audit + this U5 nav audit show the pattern is spread thin (LeagueDashboard 0 bespoke, Matchup 0, Standings 1). Real count is likely <30 bespoke buttons across pages. Fold into U6/U7 residue sweep.
+2. **Matchup.tsx (5000+ lines) sub-component mobile audit** — time-box precludes comprehensive scan of every interior widget. Entry 29 D3 walk already ratified visible surfaces (ScoreCard done via M-1; MatchupTotalBar done via U4). Deep-drill on interior widgets belongs post-twelve or in a dedicated Matchup-widget walk.
+3. **Standings.tsx `shouldShowLoadingScreen` variable name** (Entry 29 M-2 residue) — cosmetic rename docket for post-twelve.
+
+### Test / typecheck status
+
+- `npx vitest run linkGraphIntegrity Skeletons CitrusButton.focus ScoreCard MatchupTotalBar` → **26/26 pass** (4 linkGraph + 7 Skeletons + 4 CitrusButton.focus + 5 ScoreCard + 6 MatchupTotalBar).
+- Zero new tsc errors.
+- HARD GUARD honored (verified via `git diff --name-only | grep draft = 0`).
+
+### Files changed this cycle
+
+**MatchupTotalBar test lock (9b4277de)** — 1 new test file
+**U5 (e910f854)** — 3 files (index.css utility + Navbar 9 buttons + MobileMenuButton 6 buttons)
+
+### Continuing U-queue
+
+**U6 (perf audit — audit-only + zero-risk wins)** next per Entry 25 order. Fold in **Citrus 1.0 residue census** per Entry 33 rulings before authoring the sweep. 30-min heartbeat cadence continues.
+
+**End of R60. Entry 33 fully executed: MatchupTotalBar test lock (6/6 pass), U5 mobile audit + focus-citrus utility + 15 nav button fixes. Nav is now fully focus-conformant. Citrus 1.0 residue census owed at U6/U7.**
