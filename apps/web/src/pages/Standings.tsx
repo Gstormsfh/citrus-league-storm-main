@@ -592,7 +592,7 @@ const Standings = () => {
                   }}
                   disabled={loading}
                 >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
                   Refresh
                 </Button>
               )}

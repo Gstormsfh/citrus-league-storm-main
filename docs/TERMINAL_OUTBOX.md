@@ -2225,3 +2225,66 @@ S-6 complete (22 a11y touches; zero remaining /playoffs/${} dead links; 3 docket
 Next up per Entry 21 section order: **S-7 Standings**. Time-box: 90min. Will begin immediately.
 
 **End of R41. 22 a11y touches; class of /playoffs/${} dead links VERIFIED closed campaign-wide; 3 dockets.**
+
+---
+
+## R42 — Entry 21 S-7 (Standings) perfection report (2026-08-09 13:50Z / 7:50 MT)
+
+Entry 21 S-7 executed. Time-box ~5min (small file, minimal touch).
+
+### Files audited
+
+- `apps/web/src/pages/Standings.tsx` (967 lines) — the league standings page.
+
+### States matrix (P-a flow audit)
+
+| Section | Loading | Empty | Error | Success | Notes |
+|---|---|---|---|---|---|
+| Standings.tsx | ✅ inline via `loading` state | ✅ standings-empty branch | ✅ inline via error toast | ✅ team rows + playoff-picture card | Compact page; simple state model |
+| Playoff-picture card | N/A | ✅ "Top Contenders" fallback | N/A | ✅ "Playoff Picture" w/ View Bracket CTA | View Bracket link uses activeLeagueId + T11a-fixed `/league/${activeLeagueId}/playoffs` |
+| Refresh button | ✅ RefreshCw animate-spin | N/A | ✅ error toast | ✅ triggers refetch | |
+
+All 4 async states covered on every S-7 surface.
+
+### Fixes authored — aria-hidden ONLY (1 total)
+
+**`apps/web/src/pages/Standings.tsx:595`** — `<RefreshCw className={\`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}\`} />` → added `aria-hidden="true"`.
+
+Only lucide-import + only icon usage in the file (Loader2 imported at line 21 but unused; dead-import cleanup out of scope per polish-only P-d).
+
+Pre-existing `aria-hidden="true"` at line 512 is a decorative gradient-overlay div (not an icon) — already correct.
+
+### VERIFIED — no additional icons, no dead links
+
+- Grep across full file for lucide icon JSX (Trophy, Award, Users, TrendingUp, etc.) — zero additional matches beyond RefreshCw.
+- Grep for custom hockey icons (ScoreboardIcon, CupIcon, etc.) — zero matches; Standings.tsx uses only text + shadcn card layout.
+- Grep for `/playoffs/${` — zero (T11a class already closed).
+- The playoff-picture card's "View Bracket" nav (line 810 + 894) navigates to `/league/${activeLeagueId}/playoffs` — the CORRECT route pattern; verified working post-T11a fix.
+
+### Judgment calls DOCKETED
+
+Per P-e:
+
+1. **Line 21 dead import `Loader2`** — imported but never used in JSX. Cleanup is a code-hygiene touch (~1 line), not P-d polish. Docket for next-cycle lint-clean pass.
+2. **Line 810 + 894 silent-no-op onClick guard** — `onClick={() => activeLeagueId && navigate(\`/league/${activeLeagueId}/playoffs\`)}` follows the pattern flagged in T11c for Navbar Matchups. Same UX judgment call. Already docketed for Sunday walk.
+3. **Playoff-picture / Top-Contenders card copy** — the title flips between "Playoff Picture" and "Top Contenders" based on `hasMatchups`. Sub-line could explain WHICH is being shown ("Top-6 by points" vs "Current playoff standings"). Sunday UX walk.
+
+### Tests / typecheck status
+
+- No new tsc errors introduced.
+- linkGraphIntegrity: not re-run this cycle (no nav additions; only aria-hidden touch).
+
+### Files changed this cycle
+
+```
+MOD: apps/web/src/pages/Standings.tsx   (1 aria-hidden on RefreshCw)
+MOD: docs/TERMINAL_OUTBOX.md            (this R42)
+```
+
+### Standing by / next up
+
+S-7 complete (1 aria-hidden touch; 3 judgment calls docketed).
+
+Next up per Entry 21 section order: **S-8 Pools (pickem / survivor / confidence)**. Time-box: 90min. Will begin immediately.
+
+**End of R42. Minimal file, minimal touch; 3 dockets.**
