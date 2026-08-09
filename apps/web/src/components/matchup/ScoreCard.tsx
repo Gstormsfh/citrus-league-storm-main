@@ -50,7 +50,7 @@ export const ScoreCard = ({
   const isTied = Math.abs(myPointsNum - oppPointsNum) < 0.01;
   
   return (
-    <div className="mb-4 md:mb-6 rounded-xl md:rounded-[2rem] bg-[#E8EED9]/50 backdrop-blur-sm corduroy-texture border-2 md:border-4 border-citrus-forest shadow-[0_4px_0_rgba(27,48,34,0.15)] md:shadow-[0_8px_0_rgba(27,48,34,0.2)] overflow-hidden relative">
+    <div className="mb-4 md:mb-6 rounded-xl md:rounded-[2rem] bg-[#1A2A20] ring-1 ring-white/10 md:ring-2 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.4)] overflow-hidden relative">
       {/* Floating Citrus Decorations - Hidden on mobile */}
       <CitrusSlice className="hidden md:block absolute top-3 right-3 w-8 h-8 text-citrus-sage/10 rotate-12" />
       <CitrusBurst className="hidden md:block absolute bottom-3 left-3 w-10 h-10 text-citrus-sage/10" />
@@ -71,9 +71,9 @@ export const ScoreCard = ({
           
           {/* Scores - Compact */}
           <div className="flex items-center gap-2">
-            <div className={`font-varsity text-2xl ${isWinning ? 'text-citrus-sage' : 'text-citrus-forest'}`}>{myTeamPoints}</div>
-            <span className="text-xs text-citrus-forest font-bold">vs</span>
-            <div className={`font-varsity text-2xl ${isLosing ? 'text-citrus-green-medium' : 'text-citrus-forest'}`}>{opponentTeamPoints}</div>
+            <div className={`font-varsity text-2xl tabular-nums ${isWinning ? 'text-pastel-sage' : 'text-white/70'}`}>{myTeamPoints}</div>
+            <span className="text-xs text-white/55 font-bold">vs</span>
+            <div className={`font-varsity text-2xl tabular-nums ${isLosing ? 'text-pastel-sage' : 'text-white/70'}`}>{opponentTeamPoints}</div>
           </div>
           
           {/* Team 2 - Compact */}
@@ -131,11 +131,11 @@ export const ScoreCard = ({
               vs
             </div>
             <div className="text-center">
-              <div className={`font-varsity text-6xl ${isWinning ? 'text-citrus-sage' : 'text-citrus-forest'}`}>{myTeamPoints}</div>
+              <div className={`font-varsity text-6xl tabular-nums ${isWinning ? 'text-pastel-sage' : 'text-white/70'}`}>{myTeamPoints}</div>
             </div>
-            <div className="w-1 h-20 border-l-2 border-dashed border-citrus-forest/30"></div>
+            <div className="w-1 h-20 border-l-2 border-dashed border-white/10"></div>
             <div className="text-center">
-              <div className={`font-varsity text-6xl ${isLosing ? 'text-citrus-green-medium' : 'text-citrus-forest'}`}>{opponentTeamPoints}</div>
+              <div className={`font-varsity text-6xl tabular-nums ${isLosing ? 'text-pastel-sage' : 'text-white/70'}`}>{opponentTeamPoints}</div>
             </div>
           </div>
           
