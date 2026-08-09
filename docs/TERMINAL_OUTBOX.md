@@ -3022,3 +3022,74 @@ Tailwind drops unparseable classes silently, so these sites rendered with NO alp
 **U4 (information hierarchy)** next per Entry 30 order. 30-min heartbeat cadence continues per KI-048.
 
 **End of R58. Entry 30 fully executed. Section-Perfection Campaign CLOSED. M-1 done in 3 phased commits with test lock on the score signal. HOME/AWAY color-signal docket surfaced for architect review.**
+
+---
+
+## R59 — Entry 31 + Entry 32 ACK + FA-queue + R-2 + U4 (2026-08-09 21:52Z / 3:52 MT)
+
+### ACK Entries 31 + 32
+
+**Entry 31**: D4 walkthrough part 2 findings received. Idiom taxonomy noted canonical (solid laser = CTA/active-state; alpha wash = ambient; `data-[state=active]:bg-pastel-orange` tabs = state markers, NOT laser-rule violations). FA-queue + R-2 executed (see below). U5 scope reduction noted: SKIP Roster/FreeAgents/GMOffice/OtherTeam when U5 runs.
+
+**Entry 32**: P4 ratifications received.
+- **S-8b RATIFIED with commendation** — broader-audit find (7 unparseable class sites) noted for tonight's brief.
+- **M-1a/b/c RATIFIED** — score signal + varsity charm preserved. Mid-edit color inversion catch noted as INS-14 pattern in action.
+- **H/A ruling: uniform sage STANDS** — no away tint. At-a-glance ridden by H/A letters + name-label position + my-team-left orientation. Yahoo/ESPN/Sleeper precedent cited. **Applied to MatchupTotalBar U4 pass** (see below).
+- **Art briefs conformance PASS** — scene-standings-preseason + scene-roster-clean-slate verified session-ready.
+
+### FA-queue + R-2 executed (a99200f2)
+
+Single commit per Entry 31.
+
+**FA-1 (tap targets)** — 5 primary-action Buttons bumped h-7 → h-9 w-9 + touch-manipulation at :1797/:1800/:2083/:2342/:2345. Full-44px ideal remains docketed for Sunday walk.
+
+**FA-2 (tabular-nums Table sweep)** — architect flagged 4 sites (:1392/:1604/:1867/:2147). Broader grep found a **5th sibling** at :1513 with identical className shape (mobile/desktop pair of trending table at :1392). All 5 upgraded with `[&_td]:tabular-nums`. Feedback rule "audit broader after user-reported bug" applied.
+
+**FA-3 (medal relic)** — :1980 `bg-gray-400 text-white` → `bg-white/45 text-[#0F1F15]`. Silver rank semantic preserved.
+
+**R-2 (Roster.tsx text-foreground)** — :2942 root div + :3486 stat value span → `text-pastel-cream`.
+
+**Docketed for U5**: 4 remaining h-7 sites in FreeAgents (watchlist Star × 3 + drop-swap button) are also sub-44px but out of FA-1's primary-action scope. Star + drop buttons also use Citrus-1.0 tokens (border-emerald-700 / hover:bg-emerald-50 / text-yellow-500). Roll into U5 mobile pass.
+
+### U4 executed (0e456e8a)
+
+**MatchupTotalBar (was silent M-1 sibling — full recolor)**:
+This 107-line component is the OTHER light-theme scoreboard (used above ScoreCard on Matchup page). Same class of problem M-1 addressed on ScoreCard. Full palette migration to citrus2 with the score-signal semantic upgrade:
+
+Key before/after:
+- Outer: `border-4 border-citrus-forest shadow-[0_6px_0_…]` → `bg-[#1A2A20] ring-1 ring-white/10 shadow-[…dark…]`
+- Header: `bg-[#E8EED9]/50 corduroy-texture border-b-4 border-citrus-forest` → `border-b border-white/10`
+- Team patches (asymmetric sage vs peach before → symmetric per rule 2): both `bg-pastel-sage/15 ring-1 ring-pastel-sage/40`
+- Team names: `text-citrus-sage / text-citrus-peach` → `text-pastel-cream` (QUIET — accent moves to score)
+- **Score color semantic change**: was TEAM-based (team1 always sage, team2 always peach). Now WINNER-BASED (leader `text-pastel-sage`, trailer `text-white/70`, tied → both white/70) matching ScoreCard's established pattern per Entry 32 H/A ruling ("winner accent is the meaningful information"). The dead variables `team1Leading` + `team2Leading` (declared but unused pre-U4) now do real work.
+- Scores: `font-varsity text-5xl` size preserved + added `tabular-nums`.
+- "vs" divider: `text-citrus-orange` → `text-pastel-orange`.
+- Games-remaining chips: full palette swap matching ScoreCard M-1c treatment.
+- Progress bar: was two-segment sage-then-peach. Now `bg-pastel-sage` (winner segment) + `bg-pastel-orange/60` (trailer segment) — orange draws eye to the opponent's share while sage marks the leader. ONE laser accent per rule 2 "one accent doing the alerting."
+- TIED indicator: dark surface + white/20 ring.
+- Zero Citrus-1.0 tokens remain (grep verified).
+
+**LeagueDashboard stat tiles (rule 1: 44 stat / 28 card scale)**:
+Three hero stat tiles (Teams, Roster Size, Draft Rounds) were at `text-3xl` (30px) — sat between "stat" (44) and "card" (28) tiers. Bumped to `text-4xl md:text-5xl` (36-48px) to hit stat-tier confidently. Teams tile "/" divider bumped proportionally `text-xl` → `text-2xl md:text-3xl`. Labels + laser accent already correct — no change.
+
+**Docketed**:
+1. MatchupTotalBar TEAM-color-coding removal — visual delta on browser pass. Winner-based coloring is architect's preferred pattern (per H/A ruling); if Garrett prefers team-based colors, one revert restores.
+2. LeagueDashboard hero h1 (:659) league name at `text-3xl sm:text-4xl` — could go to `text-4xl sm:text-5xl md:text-6xl` for true hero-tier per rule 1's "72 hero" tier. Deferred — the "72 hero" is really the draft clock; league name is more contextual. Docket for architect ratification.
+3. GoalieProjectionTooltip.tsx / ProjectionTooltip.tsx / PlayerCard.tsx still use `text-citrus-orange` / `text-citrus-sage` tokens (5 sites). Not scoreboard heroes; deferred for a dedicated Citrus 1.0 cleanup sweep (U6 or U7 candidate).
+
+### Test / typecheck status
+
+- `npx vitest run linkGraphIntegrity Skeletons CitrusButton.focus ScoreCard` → **20/20 pass** after both commits.
+- Zero new tsc errors.
+- HARD GUARD honored (verified via `git diff --name-only | grep draft = 0` after each commit).
+
+### Files changed this cycle
+
+**FA-queue + R-2 (a99200f2)** — 2 files (FreeAgents.tsx + Roster.tsx)
+**U4 (0e456e8a)** — 2 files (MatchupTotalBar.tsx + LeagueDashboard.tsx)
+
+### Continuing U-queue
+
+**U5 (mobile deep pass)** next per Entry 25/31 order. Scope per Entry 31: Home/Matchup/Standings mobile at 360px + ~200 inline-button focus audit deferred from U3 + nav/tab surfaces. **SKIP Roster/FreeAgents/GMOffice/OtherTeam** (D4-audited).
+
+**End of R59. Entries 31/32 ACKed. FA-queue + R-2 committed as one. U4 delivered on MatchupTotalBar (winner-color signal semantic upgrade) + LeagueDashboard stat tile size bump. Zero Citrus-1.0 tokens in MatchupTotalBar; 5 tooltip/card sites docketed for later sweep.**

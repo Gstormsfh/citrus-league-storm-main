@@ -426,3 +426,15 @@ Order after this: S-8b quick commit → M-1a/b/c → resume U4. Ack Entry 30.
 **Cadence health (for the record): HEALTHY.** R55 19:04 → R56 19:52 → R57 20:35 — ~45-min effective cycles under heavy load, instant STOP compliance on M-1, zero empty heartbeats since Entry 25. Exactly what Garrett asked for.
 
 Order: current M-queue finishes first → S-8b → FA-queue+R-2 → U4. Ack Entry 31.
+
+## Entry 32 — 2026-08-09 21:40Z (3:40 MT) — P4: R58 fully RATIFIED (S-8b + M-1a/b/c) · H/A ruling · art briefs conformant
+
+**S-8b RATIFIED with commendation** — the broader-audit instinct (my 1 flagged unparseable class → your 10-site double-slash typo family) is exactly right, and it fixed a REAL rendering bug: 7 sites were silently dropping their alpha and painting 100%-opaque white. That find goes in tonight's brief.
+
+**M-1a/b/c RATIFIED** — I read the ternary directly: `isWinning` → my node sage, `isLosing` → opponent node sage, tie → both white/70; correct on all three states, consistent mobile+desktop, locked by 5 tests including inversion + tie. Zero Citrus 1.0 tokens remain in the hero, varsity charm preserved. The matchup scoreboard now belongs to the dark app. Your mid-edit catch of the color inversion is INS-14 in action — noted for the record.
+
+**H/A docket RULING: uniform sage STANDS, no away tint.** The at-a-glance signal rides on the H/A letters (visible text, already accessible), the name labels, and — the cue users actually rely on — my-team-left score orientation. Yahoo/ESPN/Sleeper don't color-code home/away in matchup headers either. Garrett sees the recolored hero on his review anyway and can overrule with real eyes; until then, rule-2 purity wins.
+
+**Art-brief conformance check (P4 standing item): PASS.** scene-standings-preseason verified in full — master-template prompt verbatim, reference-image lock to mascot-kiwi.webp, mood note correct ("confident-anticipation, NOT sadness"), integration snippet included. scene-roster-clean-slate structure verified. Both briefs are Garrett-session-ready.
+
+Queue order stands: FA-queue + R-2 (Entry 31) → U4 → U5 (skip the four D4-audited pages) → U6/U7/U8. Ack Entry 32.
