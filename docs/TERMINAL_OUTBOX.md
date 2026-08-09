@@ -2620,3 +2620,47 @@ Inbox latest is Entry 22. No Entry 23+. Standing by for P2 window (11:30 MT).
 ## R52 — heartbeat (2026-08-09 17:48Z / 11:48 MT)
 
 Inbox latest is Entry 22. No Entry 23+. P2 window (11:30 MT) passed with no ratifications posted; standing by per KI-048.
+
+---
+
+## R53 — Entry 23 P2 ratifications ACK + T11b known-blind-spot header (2026-08-09 17:54Z / 11:54 MT)
+
+Entry 23 P2 ratifications received and actioned:
+
+- **S-3 (league home)** — RATIFIED.
+- **S-4 (roster)** — RATIFIED. 3992-line page fully covered.
+- **S-5 (GM Office)** — RATIFIED WITH DISTINCTION. Two live 404s (GMOffice.tsx:201 + :219) spot-verified against App.tsx:192. T11b multiline-form docket ACCEPTED as next-cycle work.
+- **S-6 (matchup)** — RATIFIED. Architect independently re-verified the /playoffs/${…} class-closure grep (zero repo-wide). Class closed, not just instances.
+
+### Live directive executed — T11b header updated TODAY
+
+Per Entry 23 exact instruction ("Add one line to the test file header TODAY naming the known multiline blind spot until the fix lands — a guard that silently misses is INS-16's whole lesson"):
+
+**File**: `apps/web/src/__tests__/linkGraphIntegrity.test.ts` (header comment section)
+
+**Change**: Added new `KNOWN BLIND SPOT — MULTILINE <Link>…to={\`…\`}> FORMS` section (13-line block) between the `DELIBERATE NON-GOALS` and `See docs/REGISTRY.md KI-048` blocks. The block:
+
+1. Names the exact form that escapes the regex (multi-line `<Link>\n  to={\`…\`}>`).
+2. Cites the incident (GMOffice.tsx:201/:219 dead links, entire T11b cycle silently missed).
+3. Documents that the LINKS were fixed in S-5 commit 3b82cdcd, but the guard's SILENT MISS is docketed for repair.
+4. Names the two candidate fixes (enable multiline matching on the two Link/Navigate template-literal patterns, OR migrate to AST walker).
+5. Closes with the operational reality: "**Until that fix lands, this comment IS the guard: any new `<Link>\n  to={\`…\`}>` form is invisible to CI and must be caught by review.**"
+
+Docket task created locally (task #104) for the actual regex-or-AST fix; comment is the interim guard.
+
+### Test verification
+
+Ran `npx vitest run linkGraphIntegrity.test.ts` — **4/4 pass** (extraction ≥40 routes, ≥60 nav targets, no dead links, orphan-routes informational log). Header-comment-only edit; zero runtime change.
+
+### Files changed this cycle
+
+```
+MOD: apps/web/src/__tests__/linkGraphIntegrity.test.ts    (header comment: KNOWN BLIND SPOT section added, ~13 lines)
+MOD: docs/TERMINAL_OUTBOX.md                              (this R53)
+```
+
+### Running tally
+
+**6 of 10 sections ratified.** P3 (1:30 MT) is architect's next window for S-7 through S-10 + fresh-eyes drift check. Continuing 30-min heartbeat.
+
+**End of R53. Silent-miss guard now visible in the test itself; fix docketed for regex-or-AST next cycle.**

@@ -48,6 +48,24 @@
 //   - Nav via imperative Router APIs from useNavigate options
 //     (state, replace, etc.) — options are opaque here.
 //
+// KNOWN BLIND SPOT — MULTILINE <Link>…to={`…`}> FORMS  (Entry 21 S-5 →
+// Entry 23 ratification, 2026-08-09; architect: "a guard that silently
+// misses is INS-16's whole lesson"). The NAV_PATTERNS below use
+// single-line regex without the `s` flag. A JSX element such as
+//     <Link
+//       to={`/league/${id}/playoffs`}
+//     >
+// is NOT matched by the `Link to={`…`}` pattern, and its target
+// escapes the integrity check. Two live user-facing 404s (GMOffice.tsx
+// :201 + :219 → nonexistent /playoffs/:id) shipped and stayed shipped
+// through the entire T11b cycle because of this exact gap. The dead
+// LINKS were fixed in S-5 (commit 3b82cdcd); the guard's SILENT MISS
+// on that form is docketed for repair — either enable multiline
+// matching on the two Link/Navigate template-literal patterns, or
+// migrate the extractor to an AST walk. Until that fix lands, this
+// comment IS the guard: any new <Link>\n  to={`…`}> form is
+// invisible to CI and must be caught by review.
+//
 // See docs/REGISTRY.md KI-048 (channel protocol) for why this test
 // exists as a CI invariant instead of a manual-audit habit.
 

@@ -297,3 +297,14 @@ S-1 (auth/join) — RATIFIED. Spot-verified at code: the ResetPassword light-fla
 S-2 (draft surfaces) — RATIFIED WITH COMMENDATION. The hard guard was honored to the letter: 42 aria-hidden additions and nothing else, states matrix confirmed complete without new authoring (the week's prior work paying rent), 15-minute time-box. This is exactly what ultra-conservative means.
 
 P2 (11:30) takes S-3 through S-6. Keep heartbeating.
+
+---
+
+## Entry 23 — 2026-08-09 17:40Z (11:40 MT) — P2 ratifications: S-3 through S-6
+
+S-3 (league home) — RATIFIED. Timeline card's T12 polish held; 35 a11y additions; states complete.
+S-4 (roster) — RATIFIED. A 3992-line page with zero prior aria-hidden now fully covered; states complete.
+S-5 (GM Office) — RATIFIED WITH DISTINCTION + one docket accepted. The two dead "View Bracket" links (GMOffice.tsx:201/:219 → nonexistent /playoffs/:id) were LIVE user-facing 404s on a league dashboard — spot-verified fixed against App.tsx:192. AND the honest escalation that these escaped the T11b integrity test is exactly right: your docket (multiline-form regression assertion + AST-walker consideration) is ACCEPTED as next-cycle test work — an integrity test with a known blind spot must either see or say it can't. Add one line to the test file header TODAY naming the known multiline blind spot until the fix lands (a guard that silently misses is INS-16's whole lesson).
+S-6 (matchup) — RATIFIED. Class-closure grep for the /playoffs/${...} pattern independently re-verified by me: zero instances repo-wide. The dead-link CLASS is closed, not just its instances.
+
+Running tally: 6 of 10 sections ratified. P3 (1:30) takes S-7 through S-10 + the fresh-eyes drift check. Keep heartbeating.
