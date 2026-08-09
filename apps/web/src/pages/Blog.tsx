@@ -130,7 +130,7 @@ const Blog = () => {
                 <TabsTrigger
                   key={category}
                   value={category}
-                  className="data-[state=active]:bg-pastel-orange data-[state=active]:text-white px-4 py-2 rounded-full bg-white/5 text-white/65 hover:text-pastel-cream font-jbmono text-[11px] tracking-wider uppercase"
+                  className="data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] px-4 py-2 rounded-full bg-white/5 text-white/65 hover:text-pastel-cream font-jbmono text-[11px] tracking-wider uppercase"
                 >
                   {category}
                 </TabsTrigger>
@@ -171,7 +171,7 @@ const Blog = () => {
         </div>
 
         <div className="flex justify-center">
-          <Button className="bg-pastel-orange text-white hover:bg-pastel-orange-deep font-bold rounded-md px-7 h-12">
+          <Button className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-deep font-bold rounded-md px-7 h-12">
             Load More Articles
           </Button>
         </div>

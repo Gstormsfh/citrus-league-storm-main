@@ -72,7 +72,7 @@ export default function PreviewPress() {
         </nav>
         <Link
           to="/auth"
-          className="rounded-full px-5 h-10 inline-flex items-center font-medium text-[13px] bg-pastel-orange text-white hover:bg-pastel-orange-deep transition-colors shadow-[0_3px_0_0_rgba(192,74,14,0.3)]"
+          className="rounded-full px-5 h-10 inline-flex items-center font-medium text-[13px] bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-deep transition-colors shadow-[0_3px_0_0_rgba(192,74,14,0.3)]"
         >
           Sign in
         </Link>
@@ -114,7 +114,7 @@ export default function PreviewPress() {
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
             <Link
               to="/create-league"
-              className="group inline-flex items-center gap-2 bg-pastel-orange text-white text-[15px] font-semibold pl-6 pr-5 h-12 rounded-full shadow-[0_4px_0_0_rgba(192,74,14,0.4)] hover:shadow-[0_6px_0_0_rgba(192,74,14,0.4)] hover:-translate-y-0.5 transition-all duration-200"
+              className="group inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[15px] font-semibold pl-6 pr-5 h-12 rounded-full shadow-[0_4px_0_0_rgba(192,74,14,0.4)] hover:shadow-[0_6px_0_0_rgba(192,74,14,0.4)] hover:-translate-y-0.5 transition-all duration-200"
             >
               <span>Start a Test League</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" strokeWidth={2.5} />

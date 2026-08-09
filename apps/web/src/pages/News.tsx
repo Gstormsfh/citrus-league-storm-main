@@ -99,7 +99,7 @@ const News = () => {
               className={cn(
                 'rounded-full whitespace-nowrap flex-shrink-0 font-jbmono text-[11px] tracking-wider uppercase font-bold',
                 activeCategory === cat.key
-                  ? 'bg-pastel-orange text-white hover:bg-pastel-orange-deep'
+                  ? 'bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-deep'
                   : 'bg-white/5 text-white/65 hover:bg-white/10 hover:text-pastel-cream ring-1 ring-white/10',
               )}
             >
@@ -135,7 +135,7 @@ const News = () => {
                 <button
                   type="button"
                   onClick={() => setSearchTerm('')}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pastel-orange text-white text-sm font-bold hover:bg-pastel-orange-soft transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pastel-orange text-[#581E00] text-sm font-bold hover:bg-pastel-orange-soft transition-colors"
                 >
                   Clear search →
                 </button>

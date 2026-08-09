@@ -34,7 +34,7 @@ const SIZE: Record<Size, string> = {
 
 const VARIANT: Record<Variant, string> = {
   primary: cn(
-    'bg-pastel-orange text-white shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)]',
+    'bg-pastel-orange text-[#581E00] shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)]',
     'hover:bg-pastel-orange-deep hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-6px_rgba(255,107,26,0.6)]',
   ),
   secondary: cn(

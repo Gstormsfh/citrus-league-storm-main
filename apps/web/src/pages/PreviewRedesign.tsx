@@ -297,7 +297,7 @@ export default function PreviewRedesign() {
             <div className="flex flex-wrap items-center gap-x-7 gap-y-4 mb-12">
               <Link
                 to="/create-league"
-                className="group inline-flex items-center gap-2 bg-pastel-orange text-white text-[15px] font-semibold pl-6 pr-5 h-12 rounded-full shadow-[0_8px_24px_-8px_rgba(255,107,26,0.6)] hover:shadow-[0_12px_28px_-6px_rgba(255,107,26,0.7)] hover:-translate-y-0.5 transition-all duration-200"
+                className="group inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[15px] font-semibold pl-6 pr-5 h-12 rounded-full shadow-[0_8px_24px_-8px_rgba(255,107,26,0.6)] hover:shadow-[0_12px_28px_-6px_rgba(255,107,26,0.7)] hover:-translate-y-0.5 transition-all duration-200"
               >
                 <span>Start a Test League</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" strokeWidth={2.5} />

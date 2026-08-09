@@ -83,7 +83,7 @@ export default function Pricing() {
               <div className="relative w-full aspect-[16/9] overflow-hidden">
                 <img src="/mascots/scene-squad.webp" alt="The Citrus Squad on the bench" className="w-full h-full object-cover scale-105 group-hover:scale-110 transition-transform duration-500" loading="lazy" />
                 <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-16 pointer-events-none" style={{ background: 'linear-gradient(to bottom, transparent 0%, #1A2A20 100%)' }} />
-                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-pastel-orange text-white font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold ring-1 ring-pastel-orange/40 backdrop-blur-md">
+                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-pastel-orange text-[#581E00] font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold ring-1 ring-pastel-orange/40 backdrop-blur-md">
                   Available Now
                 </div>
               </div>
@@ -111,7 +111,7 @@ export default function Pricing() {
               </ul>
               <Link
                 to="/create-league"
-                className="w-full inline-flex items-center justify-center gap-2 bg-pastel-orange text-white text-[14px] font-bold px-5 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 active:scale-95 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)] relative z-10"
+                className="w-full inline-flex items-center justify-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-5 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 active:scale-95 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)] relative z-10"
                 style={{ height: '48px' }}
               >
                 Drop the Puck <ArrowRight className="w-4 h-4" strokeWidth={2.5} />

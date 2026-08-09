@@ -80,7 +80,7 @@ const Podcasts = () => {
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0F1F15] via-[#0F1F15]/70 to-transparent flex flex-col justify-end p-6">
-                  <span className="bg-pastel-orange text-white text-[10px] font-jbmono font-bold uppercase tracking-widest px-2.5 py-1 rounded-md mb-3 inline-block w-fit ring-1 ring-pastel-orange/40">
+                  <span className="bg-pastel-orange text-[#581E00] text-[10px] font-jbmono font-bold uppercase tracking-widest px-2.5 py-1 rounded-md mb-3 inline-block w-fit ring-1 ring-pastel-orange/40">
                     Featured Episode
                   </span>
                   <h2 className="font-sans font-black text-[1.5rem] md:text-[2rem] tracking-[-0.025em] text-pastel-cream mb-2 leading-tight">

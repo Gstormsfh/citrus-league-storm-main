@@ -664,7 +664,7 @@ const Standings = () => {
                       >
                         <td className="px-3 sm:px-6 py-3 sm:py-4 font-medium">
                           <div className="flex items-center gap-2">
-                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold tabular-nums ${(hasMatchups && index < leagueFormat.playoffTeams) ? 'bg-pastel-orange text-white' : 'text-white/45 bg-white/5'}`}>
+                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold tabular-nums ${(hasMatchups && index < leagueFormat.playoffTeams) ? 'bg-pastel-orange text-[#581E00]' : 'text-white/45 bg-white/5'}`}>
                               {index + 1}
                             </span>
                             {hasMatchups && index < leagueFormat.playoffTeams && (() => {
@@ -855,7 +855,7 @@ const Standings = () => {
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <div className={cn(
                             'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 tabular-nums',
-                            isInPlayoffZone ? 'bg-pastel-orange text-white' : 'text-white/55 bg-white/10',
+                            isInPlayoffZone ? 'bg-pastel-orange text-[#581E00]' : 'text-white/55 bg-white/10',
                           )}>
                             {i + 1}
                           </div>

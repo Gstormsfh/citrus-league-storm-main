@@ -77,7 +77,7 @@ export function HockeyNav({
             )}
             <Link
               to={ctaHref}
-              className="text-[13px] font-bold px-5 h-10 inline-flex items-center bg-pastel-orange text-white hover:bg-pastel-orange-deep rounded-md transition-colors"
+              className="text-[13px] font-bold px-5 h-10 inline-flex items-center bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-deep rounded-md transition-colors"
             >
               {ctaLabel}
             </Link>

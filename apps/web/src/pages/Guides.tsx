@@ -60,9 +60,9 @@ const Guides = () => {
         <Tabs defaultValue="beginner" className="mb-12">
           <div className="flex justify-center mb-8">
             <TabsList className="bg-[#1A2A20] h-10 ring-1 ring-white/10">
-              <TabsTrigger value="beginner" className="px-6 text-[13px] font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Beginner</TabsTrigger>
-              <TabsTrigger value="intermediate" className="px-6 text-[13px] font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Intermediate</TabsTrigger>
-              <TabsTrigger value="advanced" className="px-6 text-[13px] font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Advanced</TabsTrigger>
+              <TabsTrigger value="beginner" className="px-6 text-[13px] font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">Beginner</TabsTrigger>
+              <TabsTrigger value="intermediate" className="px-6 text-[13px] font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">Intermediate</TabsTrigger>
+              <TabsTrigger value="advanced" className="px-6 text-[13px] font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">Advanced</TabsTrigger>
             </TabsList>
           </div>
 
@@ -93,7 +93,7 @@ const Guides = () => {
               </p>
               <Link
                 to="/contact"
-                className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[14px] font-bold px-6 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 active:scale-95 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)] relative z-10"
+                className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-6 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 active:scale-95 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)] relative z-10"
                 style={{ height: '48px' }}
               >
                 Book a Coaching Session <ArrowRight className="w-4 h-4" strokeWidth={2.5} />

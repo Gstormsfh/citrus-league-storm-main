@@ -169,7 +169,7 @@ export default function NHLPlayoffBracket() {
           <div className="relative z-10 flex items-center gap-2">
             <Link
               to="/create-league?type=playoff"
-              className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[14px] font-bold px-5 h-11 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 active:scale-95 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.4)]"
+              className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-5 h-11 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 active:scale-95 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.4)]"
             >
               Create Pool <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
             </Link>

@@ -163,10 +163,10 @@ const PoolSurvivor = () => {
               )}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
                 <TabsList className="bg-[#1A2A20] h-9 ring-1 ring-white/10">
-                  <TabsTrigger value="pick" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">My Pick</TabsTrigger>
-                  <TabsTrigger value="standings" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">Standings</TabsTrigger>
-                  <TabsTrigger value="history" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">History</TabsTrigger>
-                  <TabsTrigger value="league" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-white text-white/70">League</TabsTrigger>
+                  <TabsTrigger value="pick" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">My Pick</TabsTrigger>
+                  <TabsTrigger value="standings" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">Standings</TabsTrigger>
+                  <TabsTrigger value="history" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">History</TabsTrigger>
+                  <TabsTrigger value="league" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">League</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -362,7 +362,7 @@ const PoolSurvivor = () => {
                     <button
                       type="button"
                       onClick={() => setActiveTab('picks')}
-                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pastel-orange text-white text-sm font-bold hover:bg-pastel-orange-soft transition-colors"
+                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pastel-orange text-[#581E00] text-sm font-bold hover:bg-pastel-orange-soft transition-colors"
                     >
                       Make your pick →
                     </button>

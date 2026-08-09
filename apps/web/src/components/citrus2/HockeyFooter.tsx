@@ -83,7 +83,7 @@ export function HockeyFooter({
             </p>
             <Link
               to="/create-league"
-              className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[13px] font-bold px-5 h-10 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)] active:scale-95"
+              className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[13px] font-bold px-5 h-10 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)] active:scale-95"
             >
               Create a league <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
             </Link>

@@ -54,7 +54,7 @@ export default function PreviewSquad() {
           </nav>
           <Link
             to="/create-league"
-            className="text-[13px] font-semibold px-4 h-10 inline-flex items-center bg-pastel-orange text-white hover:bg-pastel-orange-deep rounded-full transition-colors shadow-[0_4px_0_0_rgba(192,74,14,0.25)]"
+            className="text-[13px] font-semibold px-4 h-10 inline-flex items-center bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-deep rounded-full transition-colors shadow-[0_4px_0_0_rgba(192,74,14,0.25)]"
           >
             Start a Squad
           </Link>
@@ -292,7 +292,7 @@ export default function PreviewSquad() {
             </p>
             <Link
               to="/create-league"
-              className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[15px] font-semibold pl-7 pr-6 rounded-full hover:bg-pastel-forest transition-colors shadow-[0_8px_24px_-8px_rgba(255,107,26,0.5)]"
+              className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[15px] font-semibold pl-7 pr-6 rounded-full hover:bg-pastel-forest transition-colors shadow-[0_8px_24px_-8px_rgba(255,107,26,0.5)]"
               style={{ height: '52px' }}
             >
               <span>Start your squad</span>

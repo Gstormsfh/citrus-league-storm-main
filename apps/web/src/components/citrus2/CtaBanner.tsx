@@ -67,7 +67,7 @@ export function CtaBanner({
           )}
           <Link
             to={ctaHref}
-            className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[15px] font-bold px-8 rounded-md hover:bg-white hover:text-[#0F1F15] transition-all duration-200 shadow-[0_8px_32px_-8px_rgba(255,107,26,0.5)] hover:shadow-[0_16px_48px_-8px_rgba(255,107,26,0.6)] hover:-translate-y-0.5 active:scale-95"
+            className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[15px] font-bold px-8 rounded-md hover:bg-white hover:text-[#0F1F15] transition-all duration-200 shadow-[0_8px_32px_-8px_rgba(255,107,26,0.5)] hover:shadow-[0_16px_48px_-8px_rgba(255,107,26,0.6)] hover:-translate-y-0.5 active:scale-95"
             style={{ height: '54px' }}
           >
             <span>{ctaLabel}</span>

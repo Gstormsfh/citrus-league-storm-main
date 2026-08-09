@@ -522,7 +522,7 @@ const Navbar = () => {
                   </div>
                 </div>
               ) : (
-                <Button className="w-full h-11 font-bold rounded-md bg-pastel-orange text-white hover:bg-pastel-orange-deep" asChild>
+                <Button className="w-full h-11 font-bold rounded-md bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-deep" asChild>
                   <Link to="/auth" onClick={closeMobileMenu}>Sign In</Link>
                 </Button>
               )}

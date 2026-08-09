@@ -32,7 +32,7 @@ const NotFound = () => {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={() => navigate('/')}
-              className="inline-flex items-center justify-center gap-2 bg-pastel-orange text-white text-[14px] font-bold px-6 h-11 rounded-md hover:bg-pastel-orange-deep transition-colors"
+              className="inline-flex items-center justify-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-6 h-11 rounded-md hover:bg-pastel-orange-deep transition-colors"
             >
               Back to home <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
             </button>

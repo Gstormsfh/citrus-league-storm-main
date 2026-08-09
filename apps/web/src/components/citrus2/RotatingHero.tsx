@@ -66,7 +66,7 @@ export function RotatingHero({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
             <Link
               to={slide.primary.to}
-              className="group inline-flex items-center gap-2 bg-pastel-orange text-white text-[14px] sm:text-[15px] font-bold px-6 sm:px-7 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 shadow-[0_8px_24px_-8px_rgba(255,107,26,0.5)] hover:shadow-[0_16px_40px_-8px_rgba(255,107,26,0.6)] active:scale-95"
+              className="group inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] sm:text-[15px] font-bold px-6 sm:px-7 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 shadow-[0_8px_24px_-8px_rgba(255,107,26,0.5)] hover:shadow-[0_16px_40px_-8px_rgba(255,107,26,0.6)] active:scale-95"
               style={{ height: '48px' }}
             >
               <span>{slide.primary.label}</span>

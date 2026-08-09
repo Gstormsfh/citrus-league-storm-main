@@ -143,7 +143,7 @@ export default function Features() {
           </p>
           <Link
             to="/create-league"
-            className="group inline-flex items-center gap-2 bg-pastel-orange text-white text-[15px] font-bold px-7 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 shadow-[0_8px_24px_-8px_rgba(255,107,26,0.5)]"
+            className="group inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[15px] font-bold px-7 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 shadow-[0_8px_24px_-8px_rgba(255,107,26,0.5)]"
             style={{ height: '52px' }}
           >
             <span>Drop the Puck</span>
@@ -201,7 +201,7 @@ export default function Features() {
               </p>
               <Link
                 to="/gm-office/stormy"
-                className="inline-flex items-center gap-2 bg-pastel-orange text-white text-[14px] font-bold px-5 h-11 rounded-md hover:bg-pastel-orange-deep transition-colors"
+                className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-5 h-11 rounded-md hover:bg-pastel-orange-deep transition-colors"
               >
                 Try Stormy <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
               </Link>
