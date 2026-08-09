@@ -109,7 +109,7 @@ export const StatsOverviewCards = () => {
         <CardContent className="p-6 relative z-10">
           <div className="flex flex-col">
             <div className="flex items-center gap-2 mb-3">
-              <Trophy className="w-5 h-5 text-citrus-orange" />
+              <Trophy className="w-5 h-5 text-citrus-orange" aria-hidden="true" />
               <div className="text-sm font-display font-semibold text-citrus-charcoal">League Rank</div>
             </div>
             <div className="text-4xl font-varsity font-black text-citrus-forest">
@@ -126,7 +126,7 @@ export const StatsOverviewCards = () => {
         <CardContent className="p-6 relative z-10">
           <div className="flex flex-col">
             <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="w-5 h-5 text-citrus-sage" />
+              <TrendingUp className="w-5 h-5 text-citrus-sage" aria-hidden="true" />
               <div className="text-sm font-display font-semibold text-citrus-charcoal">Points For</div>
             </div>
             <div className="text-4xl font-varsity font-black text-citrus-forest">
@@ -145,7 +145,7 @@ export const StatsOverviewCards = () => {
         <CardContent className="p-6 relative z-10">
           <div className="flex flex-col">
             <div className="flex items-center gap-2 mb-3">
-              <Shield className="w-5 h-5 text-citrus-peach" />
+              <Shield className="w-5 h-5 text-citrus-peach" aria-hidden="true" />
               <div className="text-sm font-display font-semibold text-citrus-charcoal">Points Against</div>
             </div>
             <div className="text-4xl font-varsity font-black text-citrus-forest">

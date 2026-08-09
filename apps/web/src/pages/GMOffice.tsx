@@ -198,11 +198,12 @@ const GMOffice = () => {
               {playoffChampion.status === 'completed' && activeLeagueId && (
                 <div className="max-w-3xl mx-auto mb-4">
                   <Link
-                    to={`/playoffs/${activeLeagueId}`}
+                    /* S-5 Entry 21 P-a fix (2026-08-09): `/playoffs/:leagueId` is not a route; correct is `/league/:leagueId/playoffs` (App.tsx:192). Same defect class as T11a Matchup.tsx fixes. */
+                    to={`/league/${activeLeagueId}/playoffs`}
                     className="flex items-center justify-between gap-3 rounded-2xl ring-1 ring-amber-400/50 bg-gradient-to-r from-amber-500/15 to-yellow-500/10 px-4 py-3 hover:ring-amber-400/70 hover:bg-amber-500/15 transition-all shadow-[0_8px_24px_-12px_rgba(251,191,36,0.3)]"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <Trophy className="w-5 h-5 text-amber-400 shrink-0" />
+                      <Trophy className="w-5 h-5 text-amber-400 shrink-0" aria-hidden="true" />
                       <span className="font-bold text-pastel-cream truncate">
                         {playoffChampion.championTeamName} — League Champion
                       </span>
@@ -216,7 +217,8 @@ const GMOffice = () => {
               {playoffChampion.status === 'in_progress' && activeLeagueId && (
                 <div className="max-w-3xl mx-auto mb-4">
                   <Link
-                    to={`/playoffs/${activeLeagueId}`}
+                    /* S-5 Entry 21 P-a fix (2026-08-09): `/playoffs/:leagueId` is not a route; correct is `/league/:leagueId/playoffs` (App.tsx:192). Same defect class as T11a Matchup.tsx fixes. */
+                    to={`/league/${activeLeagueId}/playoffs`}
                     className="flex items-center justify-between px-3 py-2 rounded-xl ring-1 ring-white/10 bg-white/5 text-sm hover:bg-white/10 transition-colors"
                   >
                     <span className="text-white/55">Playoffs in Progress</span>
@@ -233,7 +235,7 @@ const GMOffice = () => {
                     className="flex items-center justify-between gap-3 rounded-2xl ring-1 ring-pastel-orange/40 bg-[#1A2A20] px-4 py-3 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <Trophy className="w-5 h-5 text-pastel-orange shrink-0" />
+                      <Trophy className="w-5 h-5 text-pastel-orange shrink-0" aria-hidden="true" />
                       <span className="font-bold text-pastel-cream truncate">
                         Season Complete — Rosters Locked
                       </span>

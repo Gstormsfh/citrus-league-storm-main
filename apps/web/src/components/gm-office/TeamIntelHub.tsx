@@ -544,7 +544,7 @@ export const TeamIntelHub = () => {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
           </div>
         </CardContent>
       </Card>
@@ -587,7 +587,7 @@ export const TeamIntelHub = () => {
       <Card className="border-border/50">
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground">
-            <Zap className="h-4 w-4 text-citrus-orange" />
+            <Zap className="h-4 w-4 text-citrus-orange" aria-hidden="true" />
             Team Intel
           </CardTitle>
         </CardHeader>
@@ -596,7 +596,7 @@ export const TeamIntelHub = () => {
           {calendarDays && calendarDays.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Calendar className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <h3 className="text-sm font-semibold text-foreground">Games This Week</h3>
               </div>
               <div className="grid grid-cols-7 gap-1">
@@ -645,7 +645,7 @@ export const TeamIntelHub = () => {
           {actionableInsights.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-citrus-orange" />
+                <AlertCircle className="h-4 w-4 text-citrus-orange" aria-hidden="true" />
                 Actionable Insights
               </h3>
               <div className="space-y-1.5">
@@ -680,7 +680,7 @@ export const TeamIntelHub = () => {
             <div className="space-y-2 p-3 bg-citrus-sage/10 rounded-lg border-2 border-citrus-sage/30">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-citrus-orange" />
+                  <Trophy className="h-4 w-4 text-citrus-orange" aria-hidden="true" />
                   Waiver Priority
                 </h3>
               </div>
@@ -728,12 +728,12 @@ export const TeamIntelHub = () => {
             >
               {loadingStreamers ? (
                 <>
-                  <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                  <Loader2 className="h-3 w-3 animate-spin mr-2" aria-hidden="true" />
                   Loading...
                 </>
               ) : (
                 <>
-                  <Users className="h-3 w-3 mr-2" />
+                  <Users className="h-3 w-3 mr-2" aria-hidden="true" />
                   Find Streamer
                 </>
               )}
@@ -783,7 +783,7 @@ export const TeamIntelHub = () => {
               className="flex-1 text-xs"
               onClick={() => navigate('/waiver-wire')}
             >
-              <Trophy className="h-3 w-3 mr-1" />
+              <Trophy className="h-3 w-3 mr-1" aria-hidden="true" />
               Waivers
             </Button>
             <Button
@@ -792,7 +792,7 @@ export const TeamIntelHub = () => {
               className="flex-1 text-xs"
               onClick={() => navigate('/trade-analyzer')}
             >
-              <ArrowRight className="h-3 w-3 mr-1" />
+              <ArrowRight className="h-3 w-3 mr-1" aria-hidden="true" />
               Trades
             </Button>
           </div>

@@ -210,15 +210,15 @@ export const HeadlinesBanner = () => {
   const getIcon = () => {
     switch (headline.type) {
       case 'waiver':
-        return <Clock className="h-4 w-4" />;
+        return <Clock className="h-4 w-4" aria-hidden="true" />;
       case 'matchup':
-        return <AlertCircle className="h-4 w-4" />;
+        return <AlertCircle className="h-4 w-4" aria-hidden="true" />;
       case 'streak':
-        return headline.message.includes('Hot') ? 
-          <TrendingUp className="h-4 w-4" /> : 
-          <TrendingDown className="h-4 w-4" />;
+        return headline.message.includes('Hot') ?
+          <TrendingUp className="h-4 w-4" aria-hidden="true" /> :
+          <TrendingDown className="h-4 w-4" aria-hidden="true" />;
       default:
-        return <AlertCircle className="h-4 w-4" />;
+        return <AlertCircle className="h-4 w-4" aria-hidden="true" />;
     }
   };
 

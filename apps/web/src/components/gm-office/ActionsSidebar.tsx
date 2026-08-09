@@ -21,19 +21,19 @@ export const ActionsSidebar = () => {
       <CardContent className="space-y-4 relative z-10">
         <Link to="/roster" className="w-full">
           <Button className="w-full bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest rounded-varsity shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)] hover:-translate-y-0.5 transition-all text-[#E8EED9] font-varsity font-bold uppercase tracking-wide group">
-            <Users className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
+            <Users className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" aria-hidden="true" />
             Manage Team
           </Button>
         </Link>
         <Link to="/trade-analyzer" className="w-full">
           <Button className="w-full bg-gradient-to-br from-citrus-peach to-citrus-orange border-4 border-citrus-forest rounded-varsity shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)] hover:-translate-y-0.5 transition-all text-[#E8EED9] font-varsity font-bold uppercase tracking-wide group">
-            <Briefcase className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
+            <Briefcase className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" aria-hidden="true" />
             Trade Center
           </Button>
         </Link>
         <Link to="/profile" className="w-full">
           <Button variant="outline" className="w-full border-2 border-citrus-sage/60 bg-[#E8EED9]/50 backdrop-blur-sm/50 hover:bg-citrus-sage/20 text-citrus-forest font-display font-semibold rounded-xl group">
-            <Settings className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
+            <Settings className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" aria-hidden="true" />
             Team Settings
           </Button>
         </Link>
