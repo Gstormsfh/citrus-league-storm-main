@@ -186,19 +186,19 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {
       case 'ADD':
-        return <UserPlus className="w-4 h-4 text-citrus-sage" />;
+        return <UserPlus className="w-4 h-4 text-citrus-sage" aria-hidden="true" />;
       case 'DROP':
-        return <UserMinus className="w-4 h-4 text-citrus-orange" />;
+        return <UserMinus className="w-4 h-4 text-citrus-orange" aria-hidden="true" />;
       case 'WAIVER':
-        return <AlertCircle className="w-4 h-4 text-citrus-peach" />;
+        return <AlertCircle className="w-4 h-4 text-citrus-peach" aria-hidden="true" />;
       case 'CHAT':
-        return <MessageSquare className="w-4 h-4 text-citrus-sage" />;
+        return <MessageSquare className="w-4 h-4 text-citrus-sage" aria-hidden="true" />;
       case 'TRADE':
-        return <AlertCircle className="w-4 h-4 text-citrus-orange" />;
+        return <AlertCircle className="w-4 h-4 text-citrus-orange" aria-hidden="true" />;
       case 'SYSTEM':
-        return <AlertCircle className="w-4 h-4 text-citrus-sage" />;
+        return <AlertCircle className="w-4 h-4 text-citrus-sage" aria-hidden="true" />;
       default:
-        return <Clock className="w-4 h-4 text-citrus-charcoal" />;
+        return <Clock className="w-4 h-4 text-citrus-charcoal" aria-hidden="true" />;
     }
   };
 
@@ -233,7 +233,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <Loader2 className="w-6 h-6 animate-spin text-primary" aria-hidden="true" />
       </div>
     );
   }
@@ -241,7 +241,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
   if (error) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-4">
-        <AlertCircle className="w-8 h-8 text-destructive mb-2" />
+        <AlertCircle className="w-8 h-8 text-destructive mb-2" aria-hidden="true" />
         <p className="text-sm font-medium text-destructive text-center mb-1">{error}</p>
         <button
           onClick={() => {
@@ -277,7 +277,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
               className="text-xs font-display font-semibold text-citrus-forest hover:text-citrus-orange flex items-center gap-1 transition-colors bg-[#E8EED9]/50 backdrop-blur-sm/60 px-2 py-1 rounded-lg border border-citrus-sage/30"
               title="Mark all as read"
             >
-              <CheckCheck className="w-3.5 h-3.5" />
+              <CheckCheck className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Mark all</span>
             </button>
           )}
@@ -299,7 +299,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
         {leagueNotifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4 relative">
             <CitrusLeaf className="w-20 h-20 text-citrus-sage opacity-20 mb-4" />
-            <Clock className="w-8 h-8 text-citrus-charcoal/50 mb-2" />
+            <Clock className="w-8 h-8 text-citrus-charcoal/50 mb-2" aria-hidden="true" />
             <p className="text-sm font-varsity font-bold text-citrus-forest uppercase tracking-wide">No activity yet</p>
             <p className="text-xs font-display text-citrus-charcoal/70 mt-1">
               Transactions will appear here
@@ -348,7 +348,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
                           {notification.message}
                         </div>
                         <div className={`flex items-center gap-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-                          <Clock className="w-2.5 h-2.5 text-citrus-charcoal/50" />
+                          <Clock className="w-2.5 h-2.5 text-citrus-charcoal/50" aria-hidden="true" />
                           <span className="text-[9px] font-display text-citrus-charcoal/70">
                             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                           </span>
@@ -389,7 +389,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
                           {notification.message}
                         </p>
                         <div className="flex items-center gap-1.5 mt-1.5">
-                          <Clock className="w-3 h-3 text-citrus-charcoal/50" />
+                          <Clock className="w-3 h-3 text-citrus-charcoal/50" aria-hidden="true" />
                           <span className="text-xs font-display text-citrus-charcoal/70">
                             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                           </span>
@@ -422,9 +422,9 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
             title="Send message"
           >
             {sendingMessage ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
             ) : (
-              <Send className="w-4 h-4" />
+              <Send className="w-4 h-4" aria-hidden="true" />
             )}
           </button>
         </form>

@@ -84,7 +84,7 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
         
         <CardHeader className="pb-3 relative z-10 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-cream border-b-3 border-citrus-sage/30">
           <CardTitle className="text-sm font-varsity font-black text-citrus-forest uppercase tracking-tight flex items-center gap-2">
-            <Flame className="w-4 h-4 text-citrus-orange" />
+            <Flame className="w-4 h-4 text-citrus-orange" aria-hidden="true" />
             Top Performers
             <CitrusSparkle className="w-3 h-3 text-citrus-orange ml-auto" />
           </CardTitle>

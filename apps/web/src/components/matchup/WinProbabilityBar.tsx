@@ -214,7 +214,7 @@ export const WinProbabilityBar = ({
             </div>
             <div className="flex items-center gap-1">
               {simulation.marginMean > 0 ? (
-                <TrendingUp className="w-3 h-3 text-citrus-sage" />
+                <TrendingUp className="w-3 h-3 text-citrus-sage" aria-hidden="true" />
               ) : (
                 <TrendingDown className="w-3 h-3 text-citrus-peach" />
               )}

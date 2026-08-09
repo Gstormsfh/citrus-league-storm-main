@@ -49,7 +49,7 @@ export const MatchupScheduleSelector: React.FC<MatchupScheduleSelectorProps> = (
         disabled={isFirstWeek}
         className="relative z-10 h-9 w-9 p-0 rounded-lg bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-sage hover:bg-citrus-sage hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
       >
-        <ChevronLeft className="h-5 w-5 text-citrus-forest" />
+        <ChevronLeft className="h-5 w-5 text-citrus-forest" aria-hidden="true" />
       </Button>
 
       {/* Week Display and Selector - Championship Style */}
@@ -88,7 +88,7 @@ export const MatchupScheduleSelector: React.FC<MatchupScheduleSelectorProps> = (
         disabled={isLastWeek}
         className="relative z-10 h-9 w-9 p-0 rounded-lg bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-sage hover:bg-citrus-sage hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
       >
-        <ChevronRight className="h-5 w-5 text-citrus-forest" />
+        <ChevronRight className="h-5 w-5 text-citrus-forest" aria-hidden="true" />
       </Button>
     </div>
   );

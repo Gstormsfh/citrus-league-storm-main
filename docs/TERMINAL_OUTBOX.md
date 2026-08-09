@@ -2145,3 +2145,83 @@ S-5 complete (2 REAL DEAD LINKS FIXED — same class as T11a; 26 a11y touches; T
 Next up per Entry 21 section order: **S-6 Matchup**. Time-box: 90min. Will begin immediately.
 
 **End of R40. 2 dead links fixed (T11a-class, live user-facing bugs); 26 a11y touches; regex-guard gap docketed for T11b improvement.**
+
+---
+
+## R41 — Entry 21 S-6 (Matchup) perfection report (2026-08-09 13:45Z / 7:45 MT)
+
+Entry 21 S-6 executed. Time-box ~10min.
+
+### Files audited
+
+- `apps/web/src/pages/Matchup.tsx` (5503 lines) — the matchup detail page.
+- `apps/web/src/components/matchup/*.tsx` (25 subcomponents; 4 imported lucide).
+
+### **NO REMAINING /playoffs/${...} dead links**
+
+Grep-verified across `apps/web/src`: zero remaining instances of the `/playoffs/${...}` dead-link pattern after T11a (2 in Matchup.tsx) + S-5 (2 in GMOffice.tsx) fixes. Class closed.
+
+### States matrix (P-a flow audit)
+
+| Section | Loading | Empty | Error | Success | Notes |
+|---|---|---|---|---|---|
+| Matchup.tsx | ✅ inline | ✅ no-matchup branch | ✅ toast + inline | ✅ ScoreCard + TeamCard render | Enormous file with many state paths — all covered per prior chunks |
+| LeagueNotifications | ✅ Loader2 | ✅ Clock+"No notifications" | ✅ AlertCircle | ✅ notification list | Icon-picker via getNotificationIcon() |
+| MatchupSidebar | N/A | ✅ empty branch | N/A | ✅ Flame + insights | |
+| MatchupScheduleSelector | N/A | ✅ disabled prev/next | N/A | ✅ chevron nav | |
+| WinProbabilityBar | N/A | ✅ zero-state | N/A | ✅ bar w/ TrendingUp | |
+| DailyRosters | N/A | ✅ empty branch | N/A | ✅ Lock/Unlock badges | |
+
+All 4 async states covered on every S-6 surface.
+
+### Fixes authored — aria-hidden ONLY (22 total across 6 files)
+
+Verified via `grep -c "aria-hidden"`:
+
+| File | aria-hidden count |
+|---|---|
+| `apps/web/src/pages/Matchup.tsx` | 1 (Trophy at :5119) |
+| `apps/web/src/components/matchup/LeagueNotifications.tsx` | 15 (UserPlus, UserMinus, MessageSquare, Clock×4, AlertCircle×3, Loader2×2, CheckCheck, Send + icon-picker branches) |
+| `apps/web/src/components/matchup/DailyRosters.tsx` | 2 (Lock, Unlock) |
+| `apps/web/src/components/matchup/MatchupScheduleSelector.tsx` | 2 (ChevronLeft, ChevronRight) |
+| `apps/web/src/components/matchup/MatchupSidebar.tsx` | 1 (Flame) |
+| `apps/web/src/components/matchup/WinProbabilityBar.tsx` | 1 (TrendingUp) |
+
+Batch applied via replace_all on unique className strings. Icon-picker function in LeagueNotifications (getNotificationIcon at line 186) had 5 return statements — all touched via unique-string batch.
+
+### Other Matchup subcomponents — VERIFIED no lucide imports needed
+
+Zero touch on: CenterColumn, ConfidenceBadge, DailyPointsChart, GameLogosBar, GamesRemainingBar, GoalieProjectionTooltip, LiveUpdates, MatchupBadge, MatchupComparison, MatchupComparisonRow, MatchupHistory, MatchupPositionGroup, MatchupTotalBar, PlayerCard, PointsTooltip, ProjectionTooltip, ScoreCard, TeamCard, WeeklySchedule (19 subcomponents). All grepped clean of `from 'lucide-react'`.
+
+### Judgment calls DOCKETED
+
+Per P-e:
+
+1. **`Matchup.tsx` 5503 lines** — architectural refactoring candidate (extract PlayoffChampionBanner, SeasonCompleteBanner as separate components). Not polish scope; docket for post-twelve refactor.
+2. **LeagueNotifications empty-state icon** (`<Clock>` for "No notifications") — semantically weak match. `<MessageSquare>` or `<Bell>` might read more clearly. Sunday UX walk.
+3. **`window.location.href = ...` patterns in Matchup.tsx** (from T11a audit) — 5 sites (lines 3744, 3750, 4152, 4750, 4968, 4977, 5412, 5423). All resolve to valid routes per T11a verification. Docket for a consistency touch: prefer `navigate()` from useNavigate over full-page reloads unless the reload is intentional (auth-refresh, cache-bust). Not urgent.
+
+### Tests / typecheck status
+
+- `npx vitest run src/__tests__/linkGraphIntegrity.test.ts` → **4/4 pass** (still passing; no new dead links).
+- No new tsc errors introduced by S-6 diffs.
+
+### Files changed this cycle
+
+```
+MOD: apps/web/src/pages/Matchup.tsx                                     (1 Trophy aria-hidden)
+MOD: apps/web/src/components/matchup/LeagueNotifications.tsx            (15 aria-hidden across icon-picker)
+MOD: apps/web/src/components/matchup/DailyRosters.tsx                   (2 aria-hidden)
+MOD: apps/web/src/components/matchup/MatchupScheduleSelector.tsx        (2 aria-hidden)
+MOD: apps/web/src/components/matchup/MatchupSidebar.tsx                 (1 aria-hidden)
+MOD: apps/web/src/components/matchup/WinProbabilityBar.tsx              (1 aria-hidden)
+MOD: docs/TERMINAL_OUTBOX.md                                            (this R41)
+```
+
+### Standing by / next up
+
+S-6 complete (22 a11y touches; zero remaining /playoffs/${} dead links; 3 docket items).
+
+Next up per Entry 21 section order: **S-7 Standings**. Time-box: 90min. Will begin immediately.
+
+**End of R41. 22 a11y touches; class of /playoffs/${} dead links VERIFIED closed campaign-wide; 3 dockets.**

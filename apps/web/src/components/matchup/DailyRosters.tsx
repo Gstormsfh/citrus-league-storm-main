@@ -256,12 +256,12 @@ export const DailyRosters = ({
                   {formatDate(date)}
                   {dayState.isLocked || isPast ? (
                     <Badge variant="outline" className="text-xs">
-                      <Lock className="h-3 w-3 mr-1" />
+                      <Lock className="h-3 w-3 mr-1" aria-hidden="true" />
                       {isPast ? 'Frozen' : 'Locked'}
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="text-xs text-muted-foreground">
-                      <Unlock className="h-3 w-3 mr-1" />
+                      <Unlock className="h-3 w-3 mr-1" aria-hidden="true" />
                       Unlocked
                     </Badge>
                   )}
