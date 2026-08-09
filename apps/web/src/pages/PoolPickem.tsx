@@ -136,11 +136,11 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         {isLive && <span className="font-bold text-lg shrink-0 text-pastel-orange tabular-nums">{game.away_score}</span>}
         {pickedAway && !isFinal && !isLive && (
           <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: away.primaryColor }}>
-            <Check className="w-2.5 h-2.5 text-white" />
+            <Check className="w-2.5 h-2.5 text-white" aria-hidden="true" />
           </div>
         )}
-        {existingPick?.picked_team === game.away_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-pastel-sage shrink-0" />}
-        {existingPick?.picked_team === game.away_team && existingPick.is_correct === false && <XCircle className="w-4 h-4 text-red-400 shrink-0" />}
+        {existingPick?.picked_team === game.away_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-pastel-sage shrink-0" aria-hidden="true" />}
+        {existingPick?.picked_team === game.away_team && existingPick.is_correct === false && <XCircle className="w-4 h-4 text-red-400 shrink-0" aria-hidden="true" />}
       </button>
 
       {/* ═══ COLUMN 2: CENTER STATS ═══ */}
@@ -154,7 +154,7 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
               <LivePulse size="xs" /> Live
             </span>
           ) : locked ? (
-            <span className="flex items-center gap-0.5 text-[10px] font-jbmono text-white/45"><Lock className="w-2.5 h-2.5" /> Locked</span>
+            <span className="flex items-center gap-0.5 text-[10px] font-jbmono text-white/45"><Lock className="w-2.5 h-2.5" aria-hidden="true" /> Locked</span>
           ) : (
             <span className="text-xs font-jbmono font-bold text-pastel-cream tabular-nums">{fmtTime(game)}</span>
           )}
@@ -227,11 +227,11 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         {isLive && <span className="font-bold text-lg shrink-0 text-pastel-orange tabular-nums">{game.home_score}</span>}
         {pickedHome && !isFinal && !isLive && (
           <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: home.primaryColor }}>
-            <Check className="w-2.5 h-2.5 text-white" />
+            <Check className="w-2.5 h-2.5 text-white" aria-hidden="true" />
           </div>
         )}
-        {existingPick?.picked_team === game.home_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-pastel-sage shrink-0" />}
-        {existingPick?.picked_team === game.home_team && existingPick.is_correct === false && <XCircle className="w-4 h-4 text-red-400 shrink-0" />}
+        {existingPick?.picked_team === game.home_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-pastel-sage shrink-0" aria-hidden="true" />}
+        {existingPick?.picked_team === game.home_team && existingPick.is_correct === false && <XCircle className="w-4 h-4 text-red-400 shrink-0" aria-hidden="true" />}
       </button>
     </div>
   );
@@ -362,14 +362,14 @@ const PoolPickem = () => {
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
                 <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </Button>
                 <div className="px-2 sm:px-3 text-center border-x border-white/10">
                   <div className="text-[8px] sm:text-[9px] font-jbmono text-white/45 uppercase tracking-widest leading-none">Week</div>
                   <div className="text-base sm:text-lg font-bold text-pastel-cream leading-none tabular-nums">{currentWeek}</div>
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-4 h-4" aria-hidden="true" />
                 </Button>
               </div>
 
@@ -414,7 +414,7 @@ const PoolPickem = () => {
                     <div key={dateKey}>
                       {/* Date header */}
                       <div className="flex items-center gap-2 mb-2 px-1">
-                        <Calendar className="w-3.5 h-3.5 text-pastel-orange-soft" />
+                        <Calendar className="w-3.5 h-3.5 text-pastel-orange-soft" aria-hidden="true" />
                         <span className="text-xs font-jbmono font-bold text-pastel-orange-soft uppercase tracking-[0.22em]">
                           {fmtDate(dateKey)}
                         </span>
@@ -450,7 +450,7 @@ const PoolPickem = () => {
                       </span>
                     </div>
                     <Button onClick={handleSubmit} disabled={picks.size === 0 || submitting} size="lg" className="font-bold uppercase tracking-wider bg-pastel-orange hover:bg-pastel-orange-deep text-white border-0 active:scale-95 transition-all">
-                      {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
                       Submit
                     </Button>
                   </div>

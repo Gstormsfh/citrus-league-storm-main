@@ -141,19 +141,19 @@ const PoolSurvivor = () => {
             <div className="flex items-center gap-2">
               <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </Button>
                 <div className="px-3 text-center border-x border-white/10">
                   <div className="text-[9px] font-jbmono text-white/45 uppercase tracking-widest leading-none">Week</div>
                   <div className="text-base font-bold text-pastel-cream leading-none tabular-nums">{currentWeek}</div>
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-4 h-4" aria-hidden="true" />
                 </Button>
               </div>
               {isEliminated && (
                 <Badge className="ml-2 bg-red-500/20 text-red-300 border border-red-500/40 font-jbmono text-[10px] uppercase tracking-wider">
-                  <Skull className="w-3 h-3 mr-1" /> Eliminated
+                  <Skull className="w-3 h-3 mr-1" aria-hidden="true" /> Eliminated
                 </Badge>
               )}
             </div>
@@ -178,7 +178,7 @@ const PoolSurvivor = () => {
               {isEliminated ? (
                 <GlowCard accent="orange" className="max-w-xl mx-auto">
                   <div className="py-16 text-center">
-                    <Skull className="w-16 h-16 mx-auto mb-4 text-red-400/60" />
+                    <Skull className="w-16 h-16 mx-auto mb-4 text-red-400/60" aria-hidden="true" />
                     <h3 className="font-sans font-black text-[1.75rem] tracking-[-0.025em] text-pastel-cream mb-2">
                       You've been <span className="text-pastel-orange">eliminated</span>.
                     </h3>
@@ -234,8 +234,8 @@ const PoolSurvivor = () => {
                               {records[team].w}-{records[team].l}-{records[team].otl}
                             </span>
                           )}
-                          {isLocked && !isUsed && <Lock className="w-3 h-3 absolute top-1 right-1 text-red-400" />}
-                          {isSelected && <Check className="w-3.5 h-3.5 absolute top-1 right-1 text-white" />}
+                          {isLocked && !isUsed && <Lock className="w-3 h-3 absolute top-1 right-1 text-red-400" aria-hidden="true" />}
+                          {isSelected && <Check className="w-3.5 h-3.5 absolute top-1 right-1 text-white" aria-hidden="true" />}
                         </button>
                       );
                     })}
@@ -271,7 +271,7 @@ const PoolSurvivor = () => {
                       ) : <span className="text-white/55">Tap a team to make your pick</span>}
                     </span>
                     <Button onClick={handleSubmitPick} disabled={!selectedTeam || submitting} className="font-bold uppercase tracking-wider bg-pastel-orange hover:bg-pastel-orange-deep text-white border-0 active:scale-95 transition-all">
-                      {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
                       Lock In Pick
                     </Button>
                   </div>
@@ -317,8 +317,8 @@ const PoolSurvivor = () => {
                             </TableCell>
                             <TableCell className="text-center">
                               {s.is_eliminated
-                                ? <Badge className="text-[10px] bg-red-500/20 text-red-300 border border-red-500/40 font-jbmono uppercase tracking-wider"><Skull className="w-3 h-3 mr-0.5" /> Out</Badge>
-                                : <Badge className="text-[10px] bg-pastel-sage/20 text-pastel-sage-soft border border-pastel-sage/40 font-jbmono uppercase tracking-wider"><Heart className="w-3 h-3 mr-0.5" /> Alive</Badge>}
+                                ? <Badge className="text-[10px] bg-red-500/20 text-red-300 border border-red-500/40 font-jbmono uppercase tracking-wider"><Skull className="w-3 h-3 mr-0.5" aria-hidden="true" /> Out</Badge>
+                                : <Badge className="text-[10px] bg-pastel-sage/20 text-pastel-sage-soft border border-pastel-sage/40 font-jbmono uppercase tracking-wider"><Heart className="w-3 h-3 mr-0.5" aria-hidden="true" /> Alive</Badge>}
                             </TableCell>
                             <TableCell className="text-center hidden sm:table-cell">
                               {Array.from({ length: s.lives_remaining }).map((_, j) => (
@@ -368,8 +368,8 @@ const PoolSurvivor = () => {
                           {pick.team}
                         </div>
                         <span className="font-bold text-sm text-pastel-cream flex-1">{info.fullName}</span>
-                        {pick.is_correct === true && <CheckCircle2 className="w-5 h-5 text-pastel-sage shrink-0" />}
-                        {pick.is_correct === false && <XCircle className="w-5 h-5 text-red-400 shrink-0" />}
+                        {pick.is_correct === true && <CheckCircle2 className="w-5 h-5 text-pastel-sage shrink-0" aria-hidden="true" />}
+                        {pick.is_correct === false && <XCircle className="w-5 h-5 text-red-400 shrink-0" aria-hidden="true" />}
                         {pick.is_correct === null && <span className="font-jbmono text-[10px] uppercase tracking-wider text-white/45 shrink-0">Pending</span>}
                       </div>
                     );

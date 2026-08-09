@@ -195,14 +195,14 @@ const PoolConfidence = () => {
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </Button>
                 <div className="px-3 text-center border-x border-white/10">
                   <div className="text-[9px] font-jbmono text-white/45 uppercase tracking-widest leading-none">Week</div>
                   <div className="text-base font-bold text-pastel-cream leading-none tabular-nums">{currentWeek}</div>
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-4 h-4" aria-hidden="true" />
                 </Button>
               </div>
               <Badge className="text-[10px] bg-white/5 ring-1 ring-white/10 text-pastel-cream font-jbmono uppercase tracking-wider tabular-nums">{picks.size}/{games.length} picked</Badge>
@@ -240,7 +240,7 @@ const PoolConfidence = () => {
                   {Array.from(gamesByDate.entries()).map(([dateKey, dateGames]) => (
                     <div key={dateKey}>
                       <div className="flex items-center gap-3 mb-3 px-1">
-                        <Calendar className="w-3.5 h-3.5 text-pastel-orange-soft" />
+                        <Calendar className="w-3.5 h-3.5 text-pastel-orange-soft" aria-hidden="true" />
                         <span className="text-xs font-jbmono font-bold text-pastel-orange-soft uppercase tracking-[0.22em]">{formatDateHeader(dateKey)}</span>
                         <div className="flex-1 h-px bg-white/10" />
                         <span className="text-[10px] font-jbmono text-white/35 tabular-nums">{dateGames.length} games</span>
@@ -273,7 +273,7 @@ const PoolConfidence = () => {
                                   {isFinal ? 'Final' : isLive ? (
                                     <span className="flex items-center gap-1.5"><LivePulse size="xs" />Live</span>
                                   ) : locked ? (
-                                    <span className="flex items-center gap-1"><Lock className="w-3 h-3" />Locked</span>
+                                    <span className="flex items-center gap-1"><Lock className="w-3 h-3" aria-hidden="true" />Locked</span>
                                   ) : formatTime(game)}
                                 </span>
                                 {/* Confidence badge */}
@@ -317,10 +317,10 @@ const PoolConfidence = () => {
                                   )}
                                   {isFinal && <span className="text-lg font-bold text-pastel-cream tabular-nums">{game.away_score}</span>}
                                   {pick?.picked_team === game.away_team && !isFinal && (
-                                    <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-pastel-orange flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white" /></div>
+                                    <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-pastel-orange flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white" aria-hidden="true" /></div>
                                   )}
-                                  {ep?.is_correct === true && ep.picked_team === game.away_team && <CheckCircle2 className="w-4 h-4 text-pastel-sage absolute top-1.5 right-1.5" />}
-                                  {ep?.is_correct === false && ep.picked_team === game.away_team && <XCircle className="w-4 h-4 text-red-400 absolute top-1.5 right-1.5" />}
+                                  {ep?.is_correct === true && ep.picked_team === game.away_team && <CheckCircle2 className="w-4 h-4 text-pastel-sage absolute top-1.5 right-1.5" aria-hidden="true" />}
+                                  {ep?.is_correct === false && ep.picked_team === game.away_team && <XCircle className="w-4 h-4 text-red-400 absolute top-1.5 right-1.5" aria-hidden="true" />}
                                   {pick && pick.picked_team !== game.away_team && !isFinal && <div className="absolute inset-0 bg-black/40 pointer-events-none" />}
                                 </button>
 
@@ -340,10 +340,10 @@ const PoolConfidence = () => {
                                   )}
                                   {isFinal && <span className="text-lg font-bold text-pastel-cream tabular-nums">{game.home_score}</span>}
                                   {pick?.picked_team === game.home_team && !isFinal && (
-                                    <div className="absolute top-1.5 left-1.5 w-4 h-4 rounded-full bg-pastel-orange flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white" /></div>
+                                    <div className="absolute top-1.5 left-1.5 w-4 h-4 rounded-full bg-pastel-orange flex items-center justify-center"><Check className="w-2.5 h-2.5 text-white" aria-hidden="true" /></div>
                                   )}
-                                  {ep?.is_correct === true && ep.picked_team === game.home_team && <CheckCircle2 className="w-4 h-4 text-pastel-sage absolute top-1.5 left-1.5" />}
-                                  {ep?.is_correct === false && ep.picked_team === game.home_team && <XCircle className="w-4 h-4 text-red-400 absolute top-1.5 left-1.5" />}
+                                  {ep?.is_correct === true && ep.picked_team === game.home_team && <CheckCircle2 className="w-4 h-4 text-pastel-sage absolute top-1.5 left-1.5" aria-hidden="true" />}
+                                  {ep?.is_correct === false && ep.picked_team === game.home_team && <XCircle className="w-4 h-4 text-red-400 absolute top-1.5 left-1.5" aria-hidden="true" />}
                                   {pick && pick.picked_team !== game.home_team && !isFinal && <div className="absolute inset-0 bg-black/40 pointer-events-none" />}
                                 </button>
                               </div>
@@ -360,7 +360,7 @@ const PoolConfidence = () => {
                       {picks.size === 0 ? <span className="text-white/55">Pick a team, then assign confidence</span> : <><span className="font-bold tabular-nums">{picks.size}</span> of <span className="tabular-nums">{games.length}</span> picked</>}
                     </span>
                     <Button onClick={handleSubmitPicks} disabled={picks.size === 0 || submitting} className="font-bold uppercase tracking-wider bg-pastel-orange hover:bg-pastel-orange-deep text-white border-0 active:scale-95 transition-all">
-                      {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
                       Submit Picks
                     </Button>
                   </div>
