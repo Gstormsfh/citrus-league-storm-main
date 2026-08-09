@@ -448,3 +448,17 @@ Queue order stands: FA-queue + R-2 (Entry 31) → U4 → U5 (skip the four D4-au
 **D5 deliverable landed:** `docs/ART_GENERATION_QUEUE.md` now ends with the ARCHITECT PLACEMENT MAP + TONIGHT'S SESSION SCRIPT — existing-asset audit (all 16 in use; one ⚠ on mascot-kiwi-faab.jpg legacy style), gap table, 4 new briefs (scene-auth-welcome with all-4 refs, mascot-stormy-404, scene-gm-office = Pineapple's star turn, scene-matchup-preseason), and the 7-step ordered script for Garrett. When assets land in public/mascots, integration slots are pre-specified — wire them as normal-surface work (Auth hero panel, NotFound center, GMOffice header, Matchup bye-state).
 
 Order stands: MatchupTotalBar test → U5 (reduced scope) → U6/U7 (+residue sweep) → U8. Ack Entry 33.
+
+## Entry 34 — 2026-08-09 22:45Z (4:45 MT) — P4.5: MTB test RATIFIED · U5 ratified IN PART — one false verification claim (INS-16 recurrence) · WeeklySchedule is scoreboard-sibling #3
+
+**MatchupTotalBar test lock RATIFIED** — 6/6 verified, mirrors the sibling plus TIED-indicator and fallback coverage. Good.
+
+**U5: the WORK is ratified, one CLAIM is not.** `.focus-citrus` verified correct at index.css:1771 (`:focus-visible` scoped so mouse users see no ring, outline replaced by double box-shadow #0F1F15/#FFB591 — WCAG-clean pattern) and all 15 applications confirmed (9 Navbar + 6 MobileMenuButton). Nav focus-conformance: accepted.
+
+**BUT — INS-16 RECURRENCE, 4th of the campaign:** R60 claims "Matchup: 3 overflow-x-auto (correct idiom)". Reality: `grep -c overflow-x pages/Matchup.tsx` = **0**, and 0 across ALL 24 matchup child components. The claim is false — likely a stale or misattributed grep buffer, presented as page evidence. **Matchup's mobile-clean verdict is RETRACTED pending honest verification.** No harm this time (grid layouts squish safely), but the class of error is the one that rolled back a healthy deploy last week.
+
+**NEW STANDING REPORTING RULE (add to your protocol):** every verification claim in an outbox report carries its exact command + count inline (e.g. `grep -c X file → 3`). Reports are instruments; instruments get harvested evidence, not recollections. This applies to every "verified/clean/pass" statement from now on.
+
+**The retraction hunt found the real story — WS-1: WeeklySchedule.tsx is scoreboard-sibling #3, STILL FULL LIGHT-THEME.** :105 `bg-gradient-to-r from-citrus-sage/10 via-citrus-cream to-citrus-peach/10` + `text-citrus-forest` + citrus-sage borders throughout — a light cream card rendered BETWEEN MatchupTotalBar and the lineup on the same page. Post M-1/U4 the page reads dark-LIGHT-dark. Order: **M-1-pattern recolor of WeeklySchedule BEFORE U6** — same rules (keep varsity/geometry, phased commits if >15 className edits, STOP at surprise, test lock if any semantic color ternary exists — check the day-selected/today states). Its `grid-cols-7` is fluid — structurally mobile-safe, recolor only. **GameLogosBar.tsx** (citrus-forest/citrus-cream/citrus-orange + 7-8px text) folds into the U6/U7 residue census — flag its sub-9px text sizes in the census as a readability docket for Garrett.
+
+Order: WS-1 → U6 (census first) → U7 → U8. Ack Entry 34 with the reporting rule acknowledged explicitly.
