@@ -76,10 +76,16 @@ export interface CitrusAnchorButtonProps extends CommonProps, Omit<AnchorHTMLAtt
 const baseClasses = cn(
   'inline-flex items-center justify-center gap-2',
   'font-bold tracking-tight rounded-md',
-  'transition-all duration-200 ease-out',
+  // Entry 25 U3 (2026-08-09) — transition-duration standardized to
+  // the "citrus-normal" tier (200ms) for state transitions per
+  // DESIGN_DIRECTION.md interaction tiers.
+  'transition-all duration-citrus-normal ease-out',
   'active:scale-[0.97] active:translate-y-0',
   'disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 disabled:translate-y-0',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pastel-orange/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F1F15]',
+  // Focus ring per DESIGN_DIRECTION.md rule 4: peach family, 2px
+  // offset 2, never suppressed. Warm peach-deep reads on both light
+  // and dark surfaces; #0F1F15 offset matches the citrus2 page bg.
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pastel-peach-deep focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F1F15]',
   'whitespace-nowrap',
 );
 

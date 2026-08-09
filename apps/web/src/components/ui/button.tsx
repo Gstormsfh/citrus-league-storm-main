@@ -5,7 +5,11 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-base font-varsity uppercase tracking-tighter border-4 border-solid transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-citrus-sage focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0",
+  // Entry 25 U3 (2026-08-09) — focus ring aligned with DESIGN_DIRECTION.md
+  // rule 4: peach family, 2px offset 2, never suppressed. Previously
+  // ring-citrus-sage (Citrus 1.0 hardcoded token); now pastel-peach-deep
+  // matches CitrusButton primitive + shadcn ring-ring for consistency.
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-base font-varsity uppercase tracking-tighter border-4 border-solid transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pastel-peach-deep focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0",
   {
     variants: {
       variant: {

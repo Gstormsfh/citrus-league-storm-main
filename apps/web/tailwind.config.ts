@@ -241,6 +241,16 @@ export default {
         "live-pulse": "live-pulse 1.6s ease-in-out infinite",
         "citrus-shimmer": "citrus-shimmer 1.6s ease-in-out infinite"
 			},
+			transitionDuration: {
+				// Entry 25 U3 (2026-08-09) — DESIGN_DIRECTION.md interaction
+				// tiers: fast for hover/press micro-feedback, normal for
+				// state transitions, entrance for reveals/mounts. Additive
+				// aliases; the tailwind default 75/100/150/200/300/500ms
+				// scale remains available for existing code.
+				'citrus-fast': '150ms',
+				'citrus-normal': '200ms',
+				'citrus-entrance': '300ms',
+			},
 			fontFamily: {
 				sans: ['Inter', 'Montserrat', 'sans-serif'],         // Clean body text
 				display: ['Montserrat', 'sans-serif'],               // Secondary headers

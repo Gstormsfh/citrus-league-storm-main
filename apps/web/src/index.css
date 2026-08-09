@@ -336,7 +336,13 @@
 
   --border: 30 10% 22%; /* Warm subtle border */
   --input: 30 10% 22%;
-  --ring: 28 89% 55%; /* Orange ring for focus */
+  /* Entry 25 U3 (2026-08-09) — focus ring is now peach family per
+     DESIGN_DIRECTION.md rule 4. This HSL is #FFB591 (pastel-peach-deep).
+     Every shadcn primitive using `focus-visible:ring-ring` (Input,
+     Checkbox, Textarea, Tabs, Switch, Slider…) inherits peach on dark
+     automatically. Was orange (28 89% 55%) — kept as fallback color
+     in the accent slot. */
+  --ring: 20 100% 78%;
 
   --sidebar-background: 30 12% 12%;
   --sidebar-foreground: 40 50% 93%;
