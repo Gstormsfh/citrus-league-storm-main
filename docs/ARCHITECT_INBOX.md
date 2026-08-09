@@ -373,3 +373,25 @@ Discipline unchanged: author-only, offline tests, hard guard on draft surfaces, 
 5. **This commit does NOT merge into the "obvious deploy" pile** — flag it in your handoff as GARRETT-GATED: he approves the look on the specimen board first (the board's §03 buttons are the preview).
 
 Ack Entries 26/27/28 in next report. Continue U2 first — U9 queues behind it.
+
+## Entry 29 — 2026-08-09 20:25Z (2:25 MT) — D3 walkthrough part 1 (Home/Matchup/Standings): U2+U9 RATIFIED · U9b hover ruling · the Matchup findings (M-queue)
+
+**Ratifications:** **U2 RATIFIED** (spot-checked Standings:641, News:119-141, tailwind citrus2 block — all conformant; CTA onClicks verified to call pre-existing state setters only, within rule-7 scope). **U9 RATIFIED as authored, gate unchanged** (CitrusButton:37 + News CTA verified dark-on-orange; stays out of deploy pile until Garrett approves the board). Channel-race diagnosis accepted — point-in-time snapshot, no protocol change.
+
+**U9b — hover ruling (adjudicating your docket):** hover goes **LIGHTER, not darker**. You already shipped the precedent at News.tsx:139 — `hover:bg-pastel-orange-soft` (#FF9F66) keeps `text-[#581E00]` at **6.5:1**. Replace `hover:bg-pastel-orange-deep` → `hover:bg-pastel-orange-soft` at all 40 sites (CitrusButton.tsx:38 first). On the dark forest, brightening reads as "the laser glows" — better metaphor AND passes AA. Same Garrett-gated lane as U9, same separate-commit rule (stack it: U9b).
+
+**L-1 (fold into U9b):** two pre-existing dark-on-orange sites use `text-[#0F1F15]` (LeagueDashboard.tsx:626, :1609) while U9 standardized `#581E00` — normalize both to `#581E00` so exactly ONE on-orange color exists. Grep for any other `bg-pastel-orange text-[#0F1F15]` stragglers.
+
+**The M-queue (Matchup surface — worked in priority order after U3):**
+
+**M-2 (high visibility, mechanical): LoadingScreen ships RETIRED ART.** `components/LoadingScreen.tsx:5-8` imports four `Gemini_Generated_Image_*.png` (pre-low-poly era) + `:104 text-gray-600` light-theme text. Used on SIX routes: Matchup, Standings, Roster, FreeAgents, PlayoffBracket + **DraftRoom (HARD GUARD — do NOT touch)**. Swap the five unguarded usages to `StormyLoading` (message prop per page, e.g. "Loading the matchup…"). DraftRoom's stays until post-twelve. Honesty note for the record: T10's "zero off-brand imagery" audit was route-static — it missed transient loading states; audits must cover transients (INS-16-adjacent).
+
+**M-1 (the meaty one, 90-min box): ScoreCard.tsx is the old LIGHT-THEME varsity card inside the dark app.** `components/matchup/ScoreCard.tsx` — the matchup hero — uses citrus-era tokens throughout: `text-citrus-forest` (#4A5F4D, near-invisible on dark), `text-citrus-charcoal/70` (:119 — light-theme text), light patch styling. The scores (:74/:76 mobile, :134/:138 desktop, `font-varsity text-2xl/text-6xl`) are our ONE truly confident number and they're wearing last season's jersey. Conformance order (tokens-only, KEEP the varsity/stitched-patch charm — a scoreboard IS a varsity moment per DESIGN_DIRECTION fonts note): dark surface (citrus2.card + white/10 ring), winning score `text-pastel-sage`, losing score `text-white/70` (both legible, leader accented — rule 1+2), records/labels to pastel vocabulary, "H"/"A"/"vs" patches to pastel-cream on sage/20, add `tabular-nums` to both score nodes (harmless if Graduate lacks the feature — note it either way). Judgment calls → docket per standing rule; if the recolor cascades beyond ~15 className edits, STOP and report scope instead.
+
+**M-3 (one line):** Matchup.tsx:5124 `text-foreground` → `text-pastel-cream`.
+
+**M-4 (docket, not now):** WeeklySchedule day totals + Matchup inline numerals lack `tabular-nums` (2 occurrences in 5,503 lines) — fold into U4 hierarchy pass where shapes are judged.
+
+**Standings: CONFORMANT — no orders.** Your alpha-wash orange idiom (`/10-/20` accents, solid laser only on playoff-zone badge) is correct and is now the named pattern: solid laser = action/state, alpha wash = ambient. One no-touch curiosity docketed: `style={{ visibility: 'visible', opacity: 1 }}` inline relics (Standings:640-643) — pre-existing, presumably an old bug fight; leave alone unattended, investigate post-twelve.
+
+Ack this entry; order after current U3: U9b+L-1 → M-2 → M-3 → M-1 → resume U-queue.

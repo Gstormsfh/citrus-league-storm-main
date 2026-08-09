@@ -2861,3 +2861,89 @@ MOD: apps/web/src/pages/*.tsx                            (22 pages)
 U3 (interaction consistency: focus-visible rings, hover/active states, transition duration tokens) is next per Entry 25 order. 30-min heartbeat cadence continues per KI-048.
 
 **End of R56. Entries 24/25/26/27/28 all acknowledged. U2 + U9 shipped as two separately-revertable commits. U9 is GARRETT-GATED — hold until specimen-board approval before including in deploy pile.**
+
+---
+
+## R57 — Entry 29 ACK + U3 + U9b + L-1 + M-2 + M-3 + M-1 STOP-report (2026-08-09 20:35Z / 2:35 MT)
+
+### Entry 29 ACK
+
+- **U2 RATIFIED** — spot-checks verified (Standings:641, News:119-141, tailwind citrus2 block). CTA onClicks confirmed to only call pre-existing state setters (rule-7 scope honored).
+- **U9 RATIFIED as authored** — CitrusButton:37 + News CTA verified dark-on-orange. Stays out of deploy pile until Garrett approves the specimen board.
+- **Channel-race diagnosis accepted** — no protocol change needed.
+
+### U3 committed (a0155339)
+
+Focus rings standardized to peach family per DESIGN_DIRECTION.md rule 4. Duration tokens added. Coverage ripples through CSS var to all shadcn primitives (Input/Checkbox/Textarea/Tabs/Switch/Slider/RadioGroup/Toggle/Sidebar) on dark.
+
+- **Tailwind additions**: `duration-citrus-fast` (150ms), `duration-citrus-normal` (200ms), `duration-citrus-entrance` (300ms) — additive; default scale retained.
+- **CitrusButton primitive**: `ring-pastel-orange/60` → `ring-pastel-peach-deep` + `duration-200` → `duration-citrus-normal`.
+- **shadcn Button primitive** (`ui/button.tsx:8`): hardcoded `ring-citrus-sage` → `ring-pastel-peach-deep`. Every shadcn Button emits peach focus now.
+- **.dark `--ring` HSL**: orange (28 89% 55%) → peach-deep (20 100% 78% = #FFB591). Every primitive using `focus-visible:ring-ring` inherits peach on dark.
+- **Render tests**: `CitrusButton.focus.test.tsx` (4 tests, 4/4 pass) — asserts focus classes present on default, react-router Link, and external anchor variants + verifies `duration-citrus-normal` emission.
+
+**U3 deferrals docketed**:
+- ~200+ inline `<button>` elements without explicit `focus-visible:*` classes — most inherit browser defaults. Systematic audit belongs in U5 (mobile pass) where interactive targets are being judged holistically.
+- shadcn primitive migration from `ring-ring` CSS var to named `pastel-peach-deep` — the CSS var swap achieves the same effect with one-line surface; individual primitive migration is redundant polish for post-twelve.
+
+### U9b + L-1 committed (83e811a3) — same GARRETT-GATED lane as U9
+
+- **U9b hover ruling**: `hover:bg-pastel-orange-deep` → `hover:bg-pastel-orange-soft` swept across **40 sites** (CitrusButton primitive first, then all inline). Contrast: text-[#581E00] on pastel-orange-soft (#FF9F66) = **6.5:1** (passes AA). Previously hover:orange-deep gave 2.83:1 which failed AA.
+- **L-1 normalization**: found **17 sites** using `text-[#0F1F15]` on `bg-pastel-orange` (architect flagged 2 stragglers; full grep revealed the class). All normalized to `text-[#581E00]`. Exactly ONE dark-on-orange value now exists.
+- Zero draft-surface files touched (verified via `git diff --name-only | grep draft` = 0).
+
+### M-2 + M-3 committed (c18a5f29)
+
+**M-2 (LoadingScreen swap on 5 unguarded routes)**:
+
+| Route | Old | New |
+|---|---|---|
+| FreeAgents.tsx:1349 | `<LoadingScreen character="pineapple">` | `<StormyLoading message="Loading free agents…">` |
+| Matchup.tsx:5049 | `<LoadingScreen character="kiwi">` | `<StormyLoading message="Loading the matchup…">` on min-h-screen wrapper |
+| Roster.tsx:3176 | `<LoadingScreen character="lemon">` | `<StormyLoading message="Loading your roster…">` |
+| Standings.tsx:459 | `<LoadingScreen character="narwhal">` | `<StormyLoading message="Loading the standings…">` on min-h-screen wrapper |
+| PlayoffBracket.tsx:643 | `<LoadingScreen character="lemon">` | `<StormyLoading message="Loading the playoff bracket…">` on min-h-screen wrapper |
+
+Dead `import LoadingScreen from '@/components/LoadingScreen'` removed from all 5. `StormyLoading` added to each file's citrus2 barrel import. DraftRoom.tsx still uses LoadingScreen — HARD GUARD honored, Gemini_Generated_Image_*.png assets retained on disk.
+
+**M-3 (one-liner)**: Matchup.tsx `text-foreground` → `text-pastel-cream` at playoff-champion banner (line shifted :5124 → :5122 by M-2's edit above).
+
+**INS-16 honesty note** (per Entry 29): T10's route-static audit missed transient loading states. Audit pattern updated in workmind — transient states (loading, error, empty) need equal audit weight as steady state.
+
+### M-1 STOP-and-report (per Entry 29 explicit scope rule)
+
+Audited `apps/web/src/components/matchup/ScoreCard.tsx` (179 lines). Counted the minimum-conforming className edits needed to meet Entry 29's spec (dark surface, winning score pastel-sage, losing score white/70, records/labels pastel vocab, H/A/vs patches pastel-cream on sage/20, tabular-nums on scores):
+
+**~28 className edits** would be required — nearly double the 15-edit STOP threshold Entry 29 named.
+
+The cascade: outer card surface + backdrop (1), Citrus decorations (2), mobile H-badge and score cluster (5 edits: badge bg, badge text, name, record, scores), mobile A-badge cluster (4), mobile "vs" (1), desktop H-badge cluster (4), desktop games-remaining chip (4 tokens in nested light-theme classes), desktop vs-patch (1), desktop scores (2 including divider), desktop A-badge cluster (4), desktop games-remaining chip opponent (4). Every className is currently rooted in the Citrus 1.0 palette (`citrus-forest`, `citrus-sage`, `citrus-peach`, `citrus-green-light`, `[#E8EED9]` hardcoded cream) — the card was authored for the pastel-cream light theme and never migrated when the dark forest theme shipped.
+
+**STOP taken per architect standing rule.** Reporting rather than proceeding.
+
+**Architect decision requested (docket for D3 continuation)**:
+- **(a)** Approve the full ~28-edit sweep as one M-1a commit — I'll execute mechanical class swap keeping every varsity/patch/font choice intact, just the palette. Preserves current geometry + typography exactly.
+- **(b)** Split into phases: M-1a = outer surface + scores only (4 edits, ~1/3 the impact for 1/7 the churn); M-1b = badge + record cluster (10 edits); M-1c = games-remaining chip cluster (10 edits). Three commits, each independently revertable.
+- **(c)** Rewrite ScoreCard.citrus2.tsx as a new component authored from scratch with citrus2 vocabulary and mount it via a feature flag — larger job, cleaner outcome. Would blow past the 90-min M-1 box but is the "right" job if we're keeping this card long-term.
+
+I would take (b) if forced to choose (incremental, revert-friendly, honors the STOP-rule intent) — but architect adjudicates.
+
+**Additional M-1 observation**: `font-varsity` (Graduate) does NOT have `tabular-nums` OpenType feature per architect's own note. Applying `tabular-nums` class is harmless (no-op for that font) but marks intent — future font choice can honor it. Documented as a passing observation, not a blocker.
+
+### Test / typecheck status
+
+- `npx vitest run linkGraphIntegrity Skeletons CitrusButton.focus` → **15/15 pass** after all commits this cycle.
+- Zero new tsc errors introduced.
+- HARD GUARD honored throughout (verified via `git diff --name-only | grep draft = 0` after each commit).
+
+### Files changed this cycle across all commits
+
+**U3 (a0155339)** — 5 files
+**U9b + L-1 (83e811a3)** — 46 files (0 draft)
+**M-2 + M-3 (c18a5f29)** — 5 files
+**M-1** — 0 files (STOP taken)
+
+### Continuing U-queue
+
+Post-M-queue per Entry 29 order: resume U-queue = **U4 (information hierarchy)** next, unless architect adjudicates M-1 first. Continuing 30-min heartbeat.
+
+**End of R57. Entry 29 fully executed except M-1, which STOPPED at scope. Architect adjudication requested on M-1a vs b vs c path.**
