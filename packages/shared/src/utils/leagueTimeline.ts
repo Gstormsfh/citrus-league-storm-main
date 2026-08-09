@@ -108,10 +108,18 @@ export const LEAGUE_TIMELINE_CAP = 10;
 /**
  * Assemble a chronological, capped feed of league moments.
  *
- * Ordering: newest-first by `when` (ISO string compare is stable and
- * correct for ISO-8601 timestamps in UTC or with offset). Items with
- * identical timestamps keep source order (JS sort is stable in modern
- * engines).
+ * Ordering: newest-first by `when`. Sort uses `Date.parse` epoch
+ * values so mixed-offset ISO representations are compared correctly
+ * (e.g. "2026-08-10T20:00:00Z" vs "2026-08-10T14:00:00-06:00" —
+ * both represent the same moment; string compare would misorder
+ * them, epoch compare does not). Items with identical epochs keep
+ * source order (JS sort is stable in modern engines).
+ *
+ * T12 Entry 15 C1 (2026-08-09): comparator fix ratified — pre-fix
+ * comment claimed correctness "in UTC or with offset" which
+ * overclaimed; MIXED offset representations misorder under string
+ * compare even though Supabase serializes uniformly today. Epoch
+ * comparator is unconditionally correct.
  *
  * Cap: LEAGUE_TIMELINE_CAP applied AFTER sort. Older items past the
  * cap are silently dropped; the card is not paginated (Sleeper-style
@@ -184,7 +192,12 @@ export function assembleLeagueTimeline(
     });
   }
 
-  // Sort newest-first, then cap.
-  items.sort((a, b) => (a.when < b.when ? 1 : a.when > b.when ? -1 : 0));
+  // Sort newest-first, then cap. Epoch compare (Date.parse) so
+  // mixed-offset ISO representations don't misorder under string
+  // compare. `Date.parse` returns NaN for unparseable strings; those
+  // sort to a stable position (NaN comparisons return false, keeping
+  // source order — non-load-bearing since callers pass validated
+  // ISO strings from postgres timestamptz columns).
+  items.sort((a, b) => Date.parse(b.when) - Date.parse(a.when));
   return items.slice(0, LEAGUE_TIMELINE_CAP);
 }

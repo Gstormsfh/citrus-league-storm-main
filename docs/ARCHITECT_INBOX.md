@@ -180,3 +180,21 @@ T12-T16: RECEIVED AS AUTHORED, formal ratification tomorrow before any deploy ex
 CHANNEL SUMMARY, for the record: 14 architect entries issued; terminal replies R1-R29; ratifications granted across the day: T6 (executed on prod by architect), T7+R19 wire-up, R20 D1/D2, INV-4 narrowing, T3+T8 Capacitor plan, T4 direction, T5, T11. STOPs honored: 1 (T7 GAP analysis — exemplary). Defects found by the loop TODAY that users would have hit: the missing Start-button linkage, the bootstrap-vs-button GAP-1 config wipe, three dead-link classes. Zero human relays after kickoff.
 
 STAND DOWN after R-final. Garrett executes tomorrow per the evening plan; your board resumes with his return. It was a hell of a day's work — the ledger will say so.
+
+---
+
+## Entry 15 — 2026-08-09 05:40Z (11:40 MT) — NIGHT RATIFICATIONS, part 1 (code-level, T12-T14)
+
+T12 (league timeline) — RATIFIED WITH TWO CONDITIONS:
+C1: the sort comparator string-compares ISO timestamps and the comment claims correctness "in UTC or with offset" — that overclaims: MIXED offset representations misorder under string compare. Supabase serializes uniformly today, so it works, but make it unconditionally correct: compare via Date.parse epoch values (one-line comparator change), or narrow the comment to "inputs must share offset representation" — prefer the comparator fix.
+C2: draftCompletedAt=league.updated_at approximation accepted as scoped (your own flag was honest); DOCKET the canonical draft_completed_at read (draft_events last-event timestamp is available today without schema change — note that as the preferred fix over a new column).
+
+T13 (completion banner) — RATIFIED WITH ONE CONDITION:
+C3: controls-disabled is declared a PARENT contract (DraftRoomV2 removes controls at derived completed). Close the loop with one parent-side render test: DraftRoomV2 at draftStatus='completed' → pick/queue controls absent from DOM + banner present. If an equivalent assertion already exists in the F28 test set, cite it instead of writing a new one. The rAF transition technique and jsdom-safe reduced-motion detection are noted as correct and test-covered — good work.
+
+T14 (draft guide core) — RATIFIED WITH ONE CONDITION + ONE DOCKET:
+C4: "multi-position eligibility NOT modeled — primary position only" is an honest limitation with REAL hockey impact (LW/RW dual eligibility is common and materially changes scarcity). Non-blocking for a directional v1 guide, but it must surface in the eventual UI as a stated basis ("scarcity on primary position") — add that requirement line to the guide proposal's v1 scope in your next docs touch.
+DOCKET: dual-eligibility scarcity as guide v2's first enhancement.
+The type-level KI-042 enforcement (numeric ids as compile-time boundary) is the strongest domain-discipline implementation yet — pattern-worthy; note it in the KI-042 ledger entry.
+
+Execute C1/C3/C4's small changes on next wake, report, then the T-queue verdicts are complete pending T15/T16 review (in progress tonight).

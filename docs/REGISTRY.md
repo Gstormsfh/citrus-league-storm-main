@@ -596,6 +596,8 @@ Both forms are stored as `text` (or as text-castable values) in a nominally sing
 
 **Residual (T5 close-out, architect Entry 12, 2026-08-09):** `server/src/draft/autopickStrategy.ts:120-124` uses `coerceToNumericPlayerId` on each `draft_picks.player_id` row to build the drafted-set; uuid rows are silently dropped (return `null` from coerce, not added to set). Consequence: in a DEMO league (all-uuid player_ids), the drafted-set is EMPTY after the walk, so autopick's "already drafted" check would fail to exclude any player. Harmless today because (a) the demo league is completed and never re-drafts, and (b) staging v2 is integer-typed so no uuid rows enter this path. But if a future demo-league re-draft is initiated, autopick could pick a player already on someone's roster. Stated here so no future auditor rediscovers it as a bug — the silent-drop is a KI-042-discipline choice, not a defect.
 
+**Pattern-worthy amendment (T14 Entry 15 ratification, 2026-08-09):** architect named T14's approach — typing `PlayerProjection.playerId: number` at the input boundary of `packages/shared/src/utils/draftGuide.ts` — as "the strongest domain-discipline implementation yet" for KI-042. The pattern: **enforce the id domain at the compile-time boundary**, not at runtime. Uuid-domain rows must be filtered upstream because passing them is a TypeScript error at the function boundary. Cannot be silently mishandled downstream (unlike a runtime `if (typeof v === 'number')` guard that might be forgotten in later refactors). Recommended for all future draft-adjacent pure functions in `@citrus/shared`: type the id fields as `number`, document the KI-042 discipline in the file header, and force upstream callers to filter uuids at the boundary.
+
 
 
 | | |

@@ -1412,3 +1412,62 @@ R30 IS the post-R-final acknowledgment. Board is CLEAR pending:
 No new commits until an entry lands or Garrett assigns. If polls continue to return no changes, no report needed beyond the ScheduleWakeup reason field.
 
 **End of R30. Stand-down confirmed. It was a hell of a day's work — the ledger says so.**
+
+---
+
+## R31 — Entry 15 C1/C3/C4 executed + C2 docketed + KI-042 amendment (2026-08-09 05:45Z / 11:45 MT)
+
+Entry 15 acknowledged. Three code-level conditions executed offline; one docket + one KI-042 amendment authored per architect ratifications.
+
+### C1 (T12) — Sort comparator switched to Date.parse epoch
+
+- **`packages/shared/src/utils/leagueTimeline.ts`** — comparator changed from `a.when < b.when ? 1 : ...` (ISO string compare, overclaimed correctness "in UTC or with offset") to `Date.parse(b.when) - Date.parse(a.when)` (epoch compare, unconditionally correct for mixed-offset ISO representations). Header comment rewritten to disclose the pre-fix overclaim + name architect Entry 15 C1 as the ratification.
+- **`packages/shared/src/utils/__tests__/leagueTimeline.test.ts`** — added `handles MIXED offset representations correctly (Entry 15 C1 fix)` regression test. Constructs two entries with the same UTC-real time expressed as `-06:00` and `Z`, asserts the epoch-compare orders them correctly (Later-UTC before Earlier-UTC), where string-compare would misorder because `"-"(0x2D) < "0"…"9" < "Z"(0x5A)`.
+- **Test result**: **17/17 pass** (was 16 pre-C1).
+
+### C2 (T12) — Docketed as task #85
+
+Canonical `draft_completed_at` read from `draft_events` last-event timestamp (no schema change needed) — task **#85** created for post-T7-close. `league.updated_at` approximation accepted for current shipping (scoped-honest flag). No urgency; will fold with F28 or the next natural touch on completion-payload work.
+
+### C3 (T13) — Parent-side controls-absent test authored
+
+- **`apps/web/src/pages/__tests__/DraftRoomV2.test.tsx`** — new `describe('T13 — completed-state parent contract (Entry 15 C3)')` block with the assertion Entry 15 asked for:
+  - `at draftStatus=completed: completion banner PRESENT + on-clock action bar ABSENT`.
+  - Simulates `markConnected()` + `onSnapshot()` with a `draft_completed` event (recentEvents entry) — necessary because deriveDraftState always seeds from `emptyDerivedState` (`draftStatus:'not_started'`) and folds events forward; the snapshot's `stateSnapshot.draftStatus` field is NOT authoritative for the client's derived state. Documented in the test's comment for future auditors.
+  - Asserts `findByTestId('completed-draft-banner')` → present.
+  - Asserts `banner.getAttribute('data-completion-controls-disabled') === 'true'`.
+  - Asserts `queryByTestId('on-clock-action-bar')` → absent (OnClockActionBar returns null when `amIOnClock=false`, which holds at draftStatus=completed since no team is on the clock).
+- **Test result**: **10/10 pass** in ~2.14s (was 9/9 pre-C3).
+
+### C4 (T14) — Primary-position scarcity note authored + dual-eligibility v2 docketed
+
+- **`packages/shared/src/utils/draftGuide.ts`** — added `V1 SCOPE — PRIMARY-POSITION SCARCITY` block to file header. Names architect Entry 15 C4 as the source; declares that the eventual guide UI MUST surface "Scarcity is measured on primary position" as a basis note so users read the numbers correctly; docket-references guide v2 dual-eligibility enhancement.
+- **Task #84 created**: `GUIDE v2: dual-eligibility scarcity (Entry 15 C4 docket)` — enhancement to scarcityByPosition + related computations to model multi-position eligibility (LW/RW dual, C/W, D/F swing). Real-hockey material change to scarcity numbers.
+
+### KI-042 amendment — pattern-worthy type-level enforcement
+
+- **`docs/REGISTRY.md`** — KI-042 row extended with a **Pattern-worthy amendment (T14 Entry 15 ratification, 2026-08-09)** block. Architect quoted verbatim: "the strongest domain-discipline implementation yet." Pattern: enforce id domain at the compile-time boundary (type `playerId: number`), NOT at runtime. Uuid rows must be filtered upstream because passing them is a TS error at the boundary — cannot be silently mishandled downstream. Recommended for all future draft-adjacent pure functions in `@citrus/shared`.
+
+### Test / typecheck status
+
+- `npx vitest run src/utils/__tests__/leagueTimeline.test.ts src/utils/__tests__/draftGuide.test.ts` (shared) → **37/37 pass** (17 + 20).
+- `npx vitest run src/pages/__tests__/DraftRoomV2.test.tsx` (web) → **10/10 pass**.
+- No new tsc errors introduced by any of C1/C3/C4 diffs.
+
+### Files changed this cycle
+
+```
+MOD: packages/shared/src/utils/leagueTimeline.ts                        (C1 comparator + header)
+MOD: packages/shared/src/utils/__tests__/leagueTimeline.test.ts         (C1 mixed-offset regression test)
+MOD: packages/shared/src/utils/draftGuide.ts                            (C4 V1 SCOPE header block)
+MOD: apps/web/src/pages/__tests__/DraftRoomV2.test.tsx                  (C3 completed-state parent-contract describe block)
+MOD: docs/REGISTRY.md                                                   (KI-042 pattern-worthy amendment)
+MOD: docs/ARCHITECT_INBOX.md                                            (Entry 15 addition, architect-authored, per channel protocol)
+MOD: docs/TERMINAL_OUTBOX.md                                            (this R31)
+```
+
+### Standing by / next up
+
+Entry 15 code-level conditions COMPLETE. Per Entry 15 verbatim: "then the T-queue verdicts are complete pending T15/T16 review (in progress tonight)." T-queue ratification remains architect's — nothing further terminal-side. Continuing KI-048 30-min inbox poll for Entry 16+ or Garrett return.
+
+**End of R31. Three conditions executed, one docketed, one pattern-worthy amendment recorded.**

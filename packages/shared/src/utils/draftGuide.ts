@@ -17,6 +17,14 @@
 //   - No opinion on category-league vs points-league math beyond
 //     honoring the ScoringSettings shape from @citrus/shared.
 //
+// V1 SCOPE — PRIMARY-POSITION SCARCITY (T14 Entry 15 C4, 2026-08-09)
+//   Architect ruling: multi-position eligibility (LW/RW dual, C/W,
+//   D/F swing, etc.) is NOT modeled in v1. The eventual guide UI
+//   MUST surface this explicitly with a "Scarcity is measured on
+//   primary position" basis note so users read the numbers correctly.
+//   Dual-eligibility scarcity is DOCKETED as guide v2's first
+//   enhancement (see task list).
+//
 // KI-042 DISCIPLINE
 //   All player_id fields on the input types are typed `number`
 //   (canonical numeric NHL-id). Uuid-domain rows (demo leagues)

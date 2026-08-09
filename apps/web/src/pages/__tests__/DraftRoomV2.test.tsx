@@ -420,4 +420,84 @@ describe('DraftRoomV2 (chunk 11g.5b)', () => {
       expect(requestResyncForGapMock).toHaveBeenCalledWith(1);
     });
   });
+
+  // ── T13 Entry 15 C3 (2026-08-09) — completed-state parent contract.
+  //
+  // Architect Entry 15 asks: at draftStatus='completed', pick/queue
+  // controls MUST be absent from the DOM + the completion banner MUST
+  // be present. This closes the loop on CompletionMomentBanner's
+  // controls-disabled-is-a-PARENT-contract note (per that file's
+  // header). Confirms the parent's render tree removes the on-clock
+  // action bar when the draft has completed.
+  describe('T13 — completed-state parent contract (Entry 15 C3)', () => {
+    function callbacks() {
+      const [, cbs] = connectMock.mock.calls[connectMock.mock.calls.length - 1];
+      return cbs as {
+        onSnapshot: (s: DraftSnapshot) => void;
+        onEvent: (e: BufferedDraftEvent) => void;
+        onEvents: (evs: ReadonlyArray<BufferedDraftEvent>) => void;
+        onPresence: (p: unknown) => void;
+        onError: (e: unknown) => void;
+      };
+    }
+    function markConnected() {
+      const subs = subscribeMock.mock.calls.map(([cb]) => cb as (s: unknown) => void);
+      for (const sub of subs) {
+        act(() => {
+          sub({ kind: 'connected' });
+        });
+      }
+    }
+
+    it('at draftStatus=completed: completion banner PRESENT + on-clock action bar ABSENT', async () => {
+      renderRoute('/draft-v2/league-abc/draft-xyz');
+      markConnected();
+      // deriveDraftState's client-side model always starts from
+      // emptyDerivedState (`draftStatus:'not_started'`) and folds
+      // events forward — the snapshot's stateSnapshot.draftStatus is
+      // NOT authoritative for the client. To land the derived state
+      // in 'completed', include a `draft_completed` event in
+      // recentEvents (mirroring F24's server emit — LobbyManager
+      // :2872).
+      const completedEvent: BufferedDraftEvent = {
+        kind: 'draft_completed',
+        seq: 1,
+        timestamp: '2026-07-28T00:00:01.000Z',
+        correlationId: 'corr-completed',
+      };
+      const completedSnapshot: DraftSnapshot = {
+        lobbyId: 'lobby-completed',
+        format: 'snake',
+        recentEvents: [completedEvent],
+        stateSnapshot: {
+          currentPickNumber: null,
+          currentRoundNumber: null,
+          onClockTeamId: null,
+          picksMade: 36,
+          totalPicks: 36,
+          draftStatus: 'completed',
+          currentPickDeadline: null,
+        },
+      };
+      await act(async () => {
+        callbacks().onSnapshot(completedSnapshot);
+        // Yield microtasks so the matrix-fetch promise resolves and
+        // the re-derive lands.
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // Banner PRESENT — DR-4 data-testid preserved through T13 rewrite.
+      const banner = await screen.findByTestId('completed-draft-banner');
+      expect(banner).toBeInTheDocument();
+      // Explicit controls-disabled contract emitted per T13 design.
+      expect(banner.getAttribute('data-completion-controls-disabled')).toBe('true');
+
+      // OnClockActionBar (pick/queue controls parent) ABSENT — when
+      // draftStatus=completed, no team is on clock, so amIOnClock is
+      // false and OnClockActionBar renders null. The bar's data-testid
+      // is 'on-clock-action-bar' per its component definition.
+      expect(screen.queryByTestId('on-clock-action-bar')).not.toBeInTheDocument();
+    });
+  });
 });

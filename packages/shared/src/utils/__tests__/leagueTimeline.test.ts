@@ -160,7 +160,52 @@ describe('assembleLeagueTimeline — matchup results', () => {
   });
 });
 
-describe('assembleLeagueTimeline — ordering (newest-first)', () => {
+describe('assembleLeagueTimeline — ordering (newest-first, epoch compare per Entry 15 C1)', () => {
+  it('handles MIXED offset representations correctly (Entry 15 C1 fix)', () => {
+    // Same moment in wall-clock — but represented with different
+    // offsets. String-compare would misorder these; epoch-compare
+    // correctly identifies them as identical (fall through to
+    // stable source order).
+    //   "2026-08-10T20:00:00.000Z"      = 1786161600000
+    //   "2026-08-10T14:00:00.000-06:00" = 1786161600000 (same!)
+    //   "2026-08-10T22:00:00.000+02:00" = 1786161600000 (same!)
+    // But under string sort: -06:00 > +02:00 > Z, which would
+    // scramble any downstream "newest first" claim across mixed
+    // sources.
+    //
+    // Also test the ACTUAL ordering property: a Z-suffixed string
+    // that represents an EARLIER moment than a -06:00 string must
+    // sort AFTER (older). Under string compare, "Z" > "-" so the
+    // Z entry would sort BEFORE the -06:00 entry regardless of
+    // which represents a later moment.
+    const input: AssembleTimelineInput = {
+      draft: null,
+      transactions: [
+        {
+          type: 'ADD',
+          playerName: 'Later',
+          teamName: 'X',
+          // 2026-08-10T20:00:00Z = 20:00 UTC (LATER moment)
+          createdAt: '2026-08-10T20:00:00.000Z',
+        },
+        {
+          type: 'ADD',
+          playerName: 'Earlier',
+          teamName: 'X',
+          // 2026-08-10T13:00:00-06:00 = 19:00 UTC (EARLIER moment)
+          createdAt: '2026-08-10T13:00:00.000-06:00',
+        },
+      ],
+      matchups: [],
+    };
+    const out = assembleLeagueTimeline(input);
+    // Correct ordering: Later (20:00 UTC) first, Earlier (19:00 UTC) second.
+    expect(out.map((i) => i.headline)).toEqual([
+      'X added Later',
+      'X added Earlier',
+    ]);
+  });
+
   it('sorts items by `when` descending across source types', () => {
     const input: AssembleTimelineInput = {
       draft: {
