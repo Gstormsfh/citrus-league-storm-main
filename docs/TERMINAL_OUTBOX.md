@@ -1282,3 +1282,39 @@ MOD: docs/TERMINAL_OUTBOX.md                                   (this R27)
 Entry 13 night queue: T11 ✓ · T12 ✓ · T13 ✓ · T14 ✓ · T15 ✓ (design + core + tests; UI stub deferred). Next: **T16 (S1-S4 PERF SCENARIO RE-POINT — instrument hygiene per P10 plan)**. Migrate perf scenarios onto F27-native fixtures. When green offline, mark draft-harness legacy fallback deprecated with removal date.
 
 **End of R27. Practice mode designed + costed + ratifiable.**
+
+---
+
+## R28 — T16 S1-S4 PERF SCENARIO RE-POINT executed (2026-08-09 04:30Z / 10:30 MT)
+
+Instrument hygiene per P10's plan doc. Two things closed offline; the fallback-deletion diff remains Garrett's call at ratification + post-freeze.
+
+### Two DONEs offline
+
+1. **`--rounds=N` support in `fixture-12-f27-native.local.mjs` — verified already implemented** (lines 83-84, defaults to 1 for lifecycle-rig backward-compat, accepts N for S1-S4 scale). The plan doc named this as "task #59 candidate — CODE CHANGE NEEDED"; on re-inspection today, it was already implemented (likely in an earlier session I forgot about). Task #59 candidate CLOSED (superseded by discovery it's already done). Plan doc updated to reflect status.
+
+2. **Legacy fallback in `draft-harness.mjs` carries a HARD REMOVAL DATE** — `LEGACY_FALLBACK_REMOVAL_DATE = '2026-08-24'`. The WARN message rewritten to name the date + the 5 gating conditions (from `docs/RUNBOOKS/S1_S4_FIXTURE_MIGRATION_PLAN.md §3`) + the T16 architect provenance. Deletion diff shape is documented in the plan doc's §3.
+
+### What remains for Garrett (post-ratification + post-freeze)
+
+- Per-launch-script edit to set `F27_NATIVE_LEAGUE_ID` before spawning the harness (Step 2 of the plan doc).
+- Post-migration re-run of S1-S4 (Step 4 of the plan doc; requires the live rig — off-limits for terminal).
+- On/after 2026-08-24, IF all 5 §3 conditions clear: delete the fallback + LEGACY_LEAGUE_ID import + legacy `fixture-12.mjs` + `set-draft-status.local.mjs`.
+
+### Files changed this cycle
+
+```
+MOD: scripts/proof/draft-harness.mjs                                (WARN adds hard removal date + 5-condition citation)
+MOD: docs/RUNBOOKS/S1_S4_FIXTURE_MIGRATION_PLAN.md                  (status header updated: PLAN + PARTIAL EXECUTION; two DONEs, one DEFERRED)
+MOD: docs/ARCHITECT_INBOX.md                                        (unchanged in this cycle; included per protocol if committed alongside outbox)
+MOD: docs/TERMINAL_OUTBOX.md                                        (this R28)
+```
+
+No new files. No new tests (the WARN branch is a runtime-only side effect on missing env; not a unit-testable pure function). No architectural risk.
+
+### Entry 13 night queue — COMPLETE
+
+- T11 ✓ · T12 ✓ · T13 ✓ · T14 ✓ · T15 ✓ · T16 ✓
+- Per Entry 12 day-close: "After T11: write the final outbox summary (R-final) covering the full day R1→end, update HANDOFF v2 → v3 if material changed since (T7 wire-up, T11 results), and stand down." → **R-final is next**. Since T11 was position #1 of the night queue and T12-T16 were subsequent chunks per Entry 13, the R-final belongs after ALL of T11-T16 complete. Writing that now as R29.
+
+**End of R28. Perf-scenario re-point closed at the offline layer.**

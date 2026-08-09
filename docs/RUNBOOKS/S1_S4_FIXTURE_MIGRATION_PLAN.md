@@ -3,7 +3,10 @@
 **Purpose.** Move the S1-S4 perf scenarios (draft-harness performance runs) off the retired flip-era fixture-12 (`WHITELISTED_LEAGUE_ID` = `993c9219…`) and onto F27-native ignited leagues. Then define the conditions under which the legacy fallback in `draft-harness.mjs` can be deleted.
 
 **Author.** Terminal, 2026-08-08 unattended-day P10.
-**Status.** PLAN ONLY — no code changes today. Migration steps are executable by Garrett post-ratification.
+**Status.** PLAN + PARTIAL EXECUTION — updated 2026-08-09 T16 (Entry 13 night queue).
+- **DONE:** `--rounds=N` support in `fixture-12-f27-native.local.mjs` (verified at lines 83-84; defaults to 1 for lifecycle-rig backward-compat, accepts N for S1-S4 scale). Task #59 candidate CLOSED — no separate task needed.
+- **DONE:** Legacy fallback in `draft-harness.mjs` now carries a HARD REMOVAL DATE of **2026-08-24** in the WARN message (T16 architect Entry 13 2026-08-09), gated on the 5 conditions in §3 all being true.
+- **DEFERRED:** Full migration of each launch script + fallback deletion + legacy `fixture-12.mjs` + `set-draft-status.local.mjs` removal — owner (Garrett) executes post-ratification + post-freeze.
 
 ---
 
