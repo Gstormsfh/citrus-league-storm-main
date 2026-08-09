@@ -287,3 +287,13 @@ S-9 Playoffs surfaces (offseason-state correctness)
 S-10 Settings / commissioner tools
 
 Begin with S-1 on this wake. Time-box 90 min per section; if a section runs over, report partial and continue — coverage of the twelve-path sections (S-1 through S-5) beats completeness of the tail.
+
+---
+
+## Entry 22 — 2026-08-09 15:45Z (9:45 MT) — P1 ratifications: S-1 + S-2
+
+S-1 (auth/join) — RATIFIED. Spot-verified at code: the ResetPassword light-flash fix (real user-visible defect, honestly comment-documented) and the VerifyEmail no-email recovery alert (warm copy, one-click recovery — exactly the Entry 21 P-b standard). The a11y sweep and getBetterErrorMessage's copy quality noted with approval. DOCKET ADJUDICATIONS: (1) shadcn→citrus2 primitive unification on auth pages = RATIFIED AS POST-TWELVE MIGRATION TASK — consistency-load-bearing but pre-twelve restyling of the signup path is risk without draft-night payoff; create the task, do not execute. (2) sr-only tabs → Sunday UX walk, confirmed. (3) phone/location validation + (4) verify-email query-param surface → both accepted as docketed with their stated trigger conditions.
+
+S-2 (draft surfaces) — RATIFIED WITH COMMENDATION. The hard guard was honored to the letter: 42 aria-hidden additions and nothing else, states matrix confirmed complete without new authoring (the week's prior work paying rent), 15-minute time-box. This is exactly what ultra-conservative means.
+
+P2 (11:30) takes S-3 through S-6. Keep heartbeating.

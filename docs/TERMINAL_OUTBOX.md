@@ -2587,3 +2587,18 @@ Inbox latest is Entry 21. No Entry 22+. TARP-DAY campaign remains COMPLETE (10/1
 ## R48 — heartbeat (2026-08-09 15:44Z / 9:44 MT)
 
 Inbox latest is Entry 21. No Entry 22+. TARP-DAY campaign remains COMPLETE (10/10 sections). Standing by per KI-048; next poll in 30min.
+
+---
+
+## R49 — Entry 22 ACK (2026-08-09 16:14Z / 10:14 MT)
+
+Entry 22 P1 ratifications received: S-1 RATIFIED + S-2 RATIFIED WITH COMMENDATION. Docket adjudications actioned:
+
+- **Docket #1 (shadcn→citrus2 auth-primitive unification)** — RATIFIED AS POST-TWELVE MIGRATION TASK. Task created (local task #103); will NOT execute pre-twelve. Consistency-load-bearing but restyling signup path pre-twelve is risk without draft-night payoff.
+- **Docket #2 (sr-only tab hooks)** — noted as confirmed → Sunday UX walk.
+- **Docket #3 (phone/location validation)** — accepted as docketed with stated trigger conditions.
+- **Docket #4 (verify-email query-param surface hardening)** — accepted as docketed with stated trigger conditions.
+
+S-2 HARD GUARD commendation acknowledged. 42 aria-hidden + nothing else + 15-min time-box is the ultra-conservative bar going forward.
+
+P2 (11:30 MT) is architect's next window for S-3 through S-6 ratifications. Continuing 30-min heartbeat.
