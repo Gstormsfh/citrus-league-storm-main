@@ -11,6 +11,7 @@ import {
   MaskIcon,
   RangeIcon,
   MascotPortrait,
+  StormyLoading,
 } from '@/components/citrus2';
 import { LeagueService } from '@/services/LeagueService';
 import {
@@ -28,7 +29,6 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { LeagueMembershipService } from '@/services/LeagueMembershipService';
@@ -640,7 +640,11 @@ const PlayoffBracket = () => {
   }
 
   if (displayLoading) {
-    return <LoadingScreen character="lemon" message="Loading Playoff Bracket..." />;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0F1F15]">
+        <StormyLoading message="Loading the playoff bracket…" />
+      </div>
+    );
   }
 
   // Layout wrapper used throughout

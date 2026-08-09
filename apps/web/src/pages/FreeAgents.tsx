@@ -11,6 +11,7 @@ import {
   MaskIcon,
   RangeIcon,
   MascotPortrait,
+  StormyLoading,
 } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -25,7 +26,6 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Loader2 } from 'lucide-react';
-import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, League } from '@/services/LeagueService';
@@ -1345,12 +1345,7 @@ const FreeAgents = () => {
 
             {(() => {
               if (displayLoading) {
-                return (
-                  <LoadingScreen
-                    character="pineapple"
-                    message="Loading Free Agents..."
-                  />
-                );
+                return <StormyLoading message="Loading free agents…" />;
               }
               return (
                 <>

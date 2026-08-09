@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useSearchParams, useLocation, Navigate } from 'react-router-dom';
-import { HockeyFooter } from '@/components/citrus2';
+import { HockeyFooter, StormyLoading } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague, isDemoLeague } from '@/contexts/LeagueContext';
@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart, Lock, Clock, AlertCircle } from 'lucide-react';
-import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
@@ -3173,12 +3172,7 @@ const Roster = () => {
                 {(() => {
                   // Apply minimum display time to prevent flash
                   if (rosterDisplayLoading) {
-                    return (
-                      <LoadingScreen
-                        character="lemon"
-                        message="Loading Your Roster..."
-                      />
-                    );
+                    return <StormyLoading message="Loading your roster…" />;
                   }
                   
                   if (userLeagueState === 'logged-in-no-league') {

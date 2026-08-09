@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { HockeyFooter } from '@/components/citrus2';
+import { HockeyFooter, StormyLoading } from '@/components/citrus2';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -30,7 +30,6 @@ import {
 } from '@/types/leagueTypes';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 
 import { PlayoffService, type PlayoffPictureTeam, type PlayoffBracket as BracketType } from '@/services/PlayoffService';
@@ -457,10 +456,9 @@ const Standings = () => {
   
   if (displayLoading) {
     return (
-      <LoadingScreen
-        character="narwhal"
-        message="Loading Standings..."
-      />
+      <div className="min-h-screen flex items-center justify-center bg-[#0F1F15]">
+        <StormyLoading message="Loading the standings…" />
+      </div>
     );
   }
   

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate, Navigate, Link } from "react-router-dom";
-import { HockeyFooter } from '@/components/citrus2';
+import { HockeyFooter, StormyLoading } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -29,7 +29,6 @@ import { MatchupService, Matchup as MatchupType } from '@/services/MatchupServic
 import { PlayerService, Player } from '@/services/PlayerService';
 import { ScheduleService } from '@/services/ScheduleService';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
-import LoadingScreen from '@/components/LoadingScreen';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { DemoMatchupCacheService, type DemoMatchupPayload } from '@/services/DemoMatchupCacheService';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
@@ -5047,10 +5046,9 @@ const Matchup = () => {
   // Early return for loading - must be after all hooks are declared
   if (shouldShowLoading) {
     return (
-      <LoadingScreen
-        character="kiwi"
-        message="Loading matchup..."
-      />
+      <div className="min-h-screen flex items-center justify-center bg-[#0F1F15]">
+        <StormyLoading message="Loading the matchup…" />
+      </div>
     );
   }
 
@@ -5121,7 +5119,7 @@ const Matchup = () => {
                         <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
                           Season Complete
                         </div>
-                        <div className="text-base font-bold text-foreground">
+                        <div className="text-base font-bold text-pastel-cream">
                           Champion: {playoffChampion.championTeamName}
                         </div>
                       </div>
