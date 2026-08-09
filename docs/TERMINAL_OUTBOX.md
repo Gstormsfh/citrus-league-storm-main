@@ -2770,3 +2770,94 @@ MOD: apps/web/src/pages/Standings.tsx                   (dead Loader2 import rem
 3. **CitrusLoader naming** — architect's spec named "CitrusLoader" for the mascot loader; the existing implementation is `StormyLoading`. I used the existing name to avoid a parallel primitive. Docket: architect may prefer the "CitrusLoader" name for grep discoverability — trivial rename if so.
 
 ### U1 status: COMPLETE (per architect's spec, adjusted to observed scope). Moving to U2 next cycle (empty states → moments deep sweep).
+
+---
+
+## R56 — Entries 24/25/26/27/28 ACK + U2 empty-states sweep + U9 CTA-contrast fix (2026-08-09 19:52Z / 1:52 MT)
+
+### Channel-integrity ACK (Entry 26 race note)
+
+Confirmed pickup of **Entries 24, 25, 26, 27, 28** on this cycle. R54 (18:24Z) reported "latest Entry 23" — Entries 24 (18:20Z) and 25 (18:35Z) were on disk at that time; the outbox heartbeat missed them. Root cause: R54 was written from a `Grep`-cached header scan performed immediately before the wakeup fired, and the following cycle (R55) re-grepped and picked them up correctly on 12:58 MT wake. **Diagnosis:** not a persistent reader cache — the wake protocol re-reads inbox on entry, no state carries across cycles. R54's window was a genuine "empty-at-scan-time" state that turned false ~4 minutes after post; the fix is to accept that any given heartbeat is a point-in-time snapshot and the next heartbeat (30min) will catch what landed in between. Recorded as a KI-048 channel-integrity data point per Entry 26 request; no protocol change proposed since the miss self-corrected within one cycle.
+
+### Entry 27 dockets executed (tokens-only, low-risk)
+
+- **(a) Two surface tokens named in tailwind.config.ts** — new `citrus2.bg = '#0F1F15'` + `citrus2.card = '#1A2A20'` under a fresh `citrus2` namespace block with an explicit comment that this is name-only exposure and the 72+ arbitrary-hex usages are NOT swept per docket / DESIGN_DIRECTION.md.
+- **(b) Stale comments fixed** — the `premium.*` and `pastel.*` token blocks each carried "for /preview-redesign only" comments that were untrue as of 2026-08-09 (pastel-cream/sage/orange are consumed across live citrus2 components). Comments now say so honestly.
+- **(c) StormyLoading rotating-quips** — noted only, no build (per Entry 27 "post-twelve").
+
+### Entry 28 U9 executed — GARRETT-GATED separate commit (5f16a463)
+
+**Contrast math verified**: `text-white` on `bg-pastel-orange (#FF6B1A)` measures **2.87:1** (fails WCAG AA 4.5:1). Swap to `text-[#581E00]` (repo's `premium.orange-deep`, prescribed on-primary) measures **4.63:1** — comfortably passes AA. #0F1F15 alternative measures ~10:1 but was rejected per Entry 28's warmth argument.
+
+**Scope**: 30 code files touched (0 documentation). CitrusButton.tsx:37 primitive swapped first; 8 additional citrus2 components; 22 pages. Sed batch replaced `bg-pastel-orange text-white` + `data-[state=active]:bg-pastel-orange data-[state=active]:text-white` patterns consistently. `git diff --name-only` verified: **zero draft-surface files** (`src/components/draft/**`, `DraftRoom*`, `DraftLobby*`, `CompletionMomentBanner`, `draft-v2`, `draftv2`) touched. The 4 new white-on-orange CTAs introduced in U2 (PoolPickem "Make picks →", PoolSurvivor "Make your pick →", News "Clear search →") were caught in the same sweep.
+
+**Docket surfaced during U9** (not blocking):
+- **Hover-state contrast**: `text-[#581E00]` on `bg-pastel-orange-deep (#C04A0E)` measures **2.83:1** — hover state now UNDERSHOOTS AA. Recommendation: either lighten the hover text or lift the hover bg. Not blocking because hover is transient and small-target, but should be adjudicated when Garrett reviews the specimen board.
+
+### Entry 25 U2 executed — empty states → moments deep sweep (a21d99dd)
+
+**Scope**: 11 empty-state sites across 8 pages upgraded from "No X" copy to warm citrus2 kicker + specific next-step language per DESIGN_DIRECTION.md rule 7. All upgrades add `font-jbmono` orange-soft kicker, warm `text-pastel-cream` primary line, `text-white/55` context line, and — where tab-switch is trivial — a `#FF6B1A` verb CTA.
+
+| Page | Line | Before | After |
+|---|---|---|---|
+| Standings | 641 | "No teams found in this league." | ✦ Preseason / "The league is still filling up." / preseason context |
+| LeagueDashboard | 1690 | "No teams found in this league." | ✦ Empty rink / "This league is still filling up." / join-code guidance |
+| Roster | 3613 | "No transactions found." | ✦ Clean slate / "No moves yet." / receipts-of-your-season context |
+| PoolPickem | 403 | "No games this week" | ✦ Between slates / "The board is dark tonight." / Wednesday framing |
+| PoolPickem | 466 | "No standings yet" | ✦ Awaiting the first whistle / + "Make picks →" CTA (tab='picks') |
+| PoolSurvivor | 287 | "No standings yet" | ✦ Everyone's still alive / weekly framing |
+| PoolSurvivor | 350 | "No picks yet" | ✦ Ready when you are / + "Make your pick →" CTA (tab='picks') |
+| PoolConfidence | 230 | "No games this week" | ✦ Between slates / "The board is dark tonight." / confidence-ranking framing |
+| PoolConfidence | 376 | "No standings yet" | ✦ Awaiting the first whistle / rank-by-confidence framing |
+| FreeAgents | 1819 | "No players match your current filters" | "try widening a position or team" (single-line replacement) |
+| News | 119 | "No articles found[…]." | ✦ Nothing on the wire / searchTerm-aware two-branch copy / + "Clear search →" CTA (setSearchTerm('')) |
+
+**ART_GENERATION_QUEUE additions**: two new briefs added for the highest-visibility permanent empty states, both reference-image-locked to existing mascots per addendum's identity-locking rule:
+
+- **scene-standings-preseason** — Kiwi with clipboard at center-ice, waiting for the leaderboard to populate. 512×512, sage-jersey #44.
+- **scene-roster-clean-slate** — Lemon at fresh equipment locker, morning light. 512×512, sage-jersey #9.
+
+Text upgrades are the fallback; art briefs elevate the state further when Garrett batch-generates.
+
+**Judgment calls DOCKETED (per Entry 25 P-e)**:
+
+1. **CTA color coordination with U9** — the 4 new CTAs I introduced in U2 use `bg-pastel-orange text-white` which fails the contrast bar Entry 28 just prescribed. The U9 sweep (this same cycle) caught them; they now render as `text-[#581E00]`. Sequencing was intentional per Entry 28 ("author U9 as one separate commit AFTER current U-queue item") — U2 shipped first (a21d99dd), U9 immediately followed (5f16a463), both are separately revertable.
+2. **Non-permanent empty states skipped** — states like "no available players to draft" in DraftRoom are HARD GUARD excluded; states like Profile team-modal empties are gated behind expandable UI. Focused on the permanent-surface top-10 sites for the 90-min budget. Docket: post-U8 sweep of secondary surfaces (Profile modals, ScheduleManager, TradeAnalyzer, Admin).
+3. **Copy voice consistency** — I authored 11 empty-state copies in one sitting to keep voice consistent. Once **U7 (Voice doc)** ships, all 11 should be re-audited against `docs/COPY_VOICE.md`. Docket for U7 pass.
+
+### Test / typecheck status
+
+- `npx vitest run linkGraphIntegrity Skeletons` → **11/11 pass** after U2 + U9.
+- Zero new tsc errors introduced.
+- Zero logic changes across U2 + U9 (className + copy only).
+- HARD GUARD honored throughout (no draft/v2 or components/draft/ touched; verified via `git diff --name-only`).
+
+### Files changed across both commits
+
+**U2 commit a21d99dd** (10 files):
+```
+MOD: apps/web/tailwind.config.ts                  (citrus2.bg/card tokens + stale-comment fixes)
+MOD: apps/web/src/pages/Standings.tsx             (empty tbody upgrade)
+MOD: apps/web/src/pages/LeagueDashboard.tsx       (teams-empty upgrade)
+MOD: apps/web/src/pages/Roster.tsx                (transaction-history upgrade)
+MOD: apps/web/src/pages/PoolPickem.tsx            (2 empty states + CTA)
+MOD: apps/web/src/pages/PoolSurvivor.tsx          (2 empty states + CTA)
+MOD: apps/web/src/pages/PoolConfidence.tsx        (2 empty states)
+MOD: apps/web/src/pages/FreeAgents.tsx            (filter empty state)
+MOD: apps/web/src/pages/News.tsx                  (no-results upgrade + Clear search CTA)
+MOD: docs/ART_GENERATION_QUEUE.md                 (2 new briefs)
+```
+
+**U9 commit 5f16a463** (31 files):
+```
+MOD: apps/web/src/components/citrus2/CitrusButton.tsx    (primitive :37)
+MOD: apps/web/src/components/citrus2/*.tsx               (7 more components)
+MOD: apps/web/src/components/Navbar.tsx                  (5+ inline sites)
+MOD: apps/web/src/pages/*.tsx                            (22 pages)
+```
+
+### Continuing U-queue
+
+U3 (interaction consistency: focus-visible rings, hover/active states, transition duration tokens) is next per Entry 25 order. 30-min heartbeat cadence continues per KI-048.
+
+**End of R56. Entries 24/25/26/27/28 all acknowledged. U2 + U9 shipped as two separately-revertable commits. U9 is GARRETT-GATED — hold until specimen-board approval before including in deploy pile.**

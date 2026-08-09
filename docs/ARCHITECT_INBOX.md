@@ -343,3 +343,33 @@ Discipline unchanged: author-only, offline tests, hard guard on draft surfaces, 
 2. **Race note:** your R54 (18:24Z) read the inbox as "latest Entry 23" — Entries 24 (18:20Z) and 25 (18:35Z) are on disk and confirmed present at 18:56Z. **In your next report, explicitly ack Entry 24 + 25 pickup.** If your reader is caching, note it — this is a KI-048 channel-integrity data point.
 3. **Cadence:** Garrett has ordered maximum tempo ("even more often if you can"). Architect firings now run ~every 30 minutes (P-blocks at :30, new D-blocks at :00). Your 30-min self-wake stands; with U1–U8 queued you should never heartbeat-empty again today. If you exhaust U8, self-assign from DESIGN_DIRECTION.md conformance sweeps (tokens-only) and report.
 4. Standing rules unchanged: AUTHOR-ONLY, HARD GUARD on draft surfaces, STOP-and-docket on ambiguity, safety arguments per diff.
+
+## Entry 27 — 2026-08-09 19:15Z (1:15 MT) — U1 RATIFIED · R55 docket rulings · token reconciliation complete (DESIGN_DIRECTION.md now v2 code-canonical)
+
+**U1: RATIFIED at code level.** Read via bridge: `Skeletons.tsx` (SHIMMER_BASE tokens-only white-alpha; role="status"/aria-label/sr-only correct on all three composites; ariaHidden pattern on SkeletonBlock correct), `StormyLoading.tsx`, tailwind `citrus-shimmer` keyframe, the LeagueDashboard swap, both dead-import removals. Your 11/11 + tsc report accepted. HARD GUARD honored. Runtime look remains on Garrett's F28 browser pass — ratification covers code + tests, per standing honesty rule.
+
+**Rulings on your three dockets (R55):**
+1. **StormyLoading name STANDS** — existing import graph wins, and the character IS the brand; "CitrusLoader" was my spec's vocabulary error, now corrected in DESIGN_DIRECTION.md + the board. No rename.
+2. **shadcn skeleton retention: agreed** — coexist now, deprecation decision post-twelve.
+3. **Per-page skeleton adoption: agreed** — fold into U4/U5 where content shapes are already being judged; not a systematic retrofit.
+
+**Token reconciliation (D2):** the board and DESIGN_DIRECTION.md v1 rendered art-observed hex; both now carry the code-canonical values (#FFF8F0 / #84A57D / #C8DCC4 / #FF6B1A / #FF9F66 / #FFB591 / surfaces #0F1F15 + #1A2A20 / white-alpha borders / shimmer 1.6s / loader = shipped StormyLoading). Re-read `docs/DESIGN_DIRECTION.md` (v2) before U2+ work — the deltas are marked.
+
+**Three NEW dockets for you (tokens-only, slot naturally into U-queue or after):** (a) additive tailwind names for the two unnamed surfaces — config entry + comment only, NO usage sweep; (b) fix stale "for /preview-redesign only" comments on the pastel/premium blocks (live citrus2 consumes pastel-*) — comment-only; (c) StormyLoading rotating-quips: post-twelve docket, do not build now.
+
+**Ack request:** confirm Entry 26 + this entry in your next report. Continue U2.
+
+## Entry 28 — 2026-08-09 19:40Z (1:40 MT) — P3 fresh-eyes finding: U9 (CTA text contrast) — author as separate gated commit
+
+**Mid-campaign quality check (P3, mobile-width lens on S-1): the polish bar is NOT drifting** — S-1 conforms to canonical surfaces (#1A2A20, white/10 ring, max-w-md + p-4 at 360px, no overflow). But the pass surfaced a systemic pre-existing defect:
+
+**U9 — white-on-laser CTA text fails contrast.** `bg-pastel-orange` (#FF6B1A) + `text-white` = **~2.9:1** (WCAG AA needs 4.5:1 normal / 3.0:1 large — our 13–15px bold CTAs need 4.5). **107 occurrences** across ~20 files including the `CitrusButton.tsx` primitive (:37). The repo already knows the answer: the premium block's own `'orange-deep': '#581E00' // on-primary — text on orange` (4.6:1). Forest-950 #0A150E measures 6.3:1. The v2 specimen board renders dark-on-orange — Garrett can SEE the proposal tonight.
+
+**Order (author-only, execute-gated):**
+1. AFTER current U-queue item completes: author U9 as **one separate commit** so Garrett can drop it wholesale if he hates the look. Primitive first (`CitrusButton.tsx` :37), then the inline `bg-pastel-orange … text-white` sites. Tokens-only className changes.
+2. **EXCLUDE entirely:** anything under `components/draft/` (incl. `CompletionMomentBanner.tsx`) and any draft/v2 surface — Group C ships tonight; freeze argument beats polish. Docket those sites for post-Group-C.
+3. Pick ONE dark value and use it everywhere: recommend `#581E00` (it's the repo's own prescribed on-primary; warmer against the laser). Note in the commit message that #0A150E was the alternative and why you chose what you chose.
+4. Safety argument must include the contrast math + the exclusion list + zero-logic-change assertion.
+5. **This commit does NOT merge into the "obvious deploy" pile** — flag it in your handoff as GARRETT-GATED: he approves the look on the specimen board first (the board's §03 buttons are the preview).
+
+Ack Entries 26/27/28 in next report. Continue U2 first — U9 queues behind it.
