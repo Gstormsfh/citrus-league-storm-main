@@ -462,3 +462,28 @@ Order stands: MatchupTotalBar test → U5 (reduced scope) → U6/U7 (+residue sw
 **The retraction hunt found the real story — WS-1: WeeklySchedule.tsx is scoreboard-sibling #3, STILL FULL LIGHT-THEME.** :105 `bg-gradient-to-r from-citrus-sage/10 via-citrus-cream to-citrus-peach/10` + `text-citrus-forest` + citrus-sage borders throughout — a light cream card rendered BETWEEN MatchupTotalBar and the lineup on the same page. Post M-1/U4 the page reads dark-LIGHT-dark. Order: **M-1-pattern recolor of WeeklySchedule BEFORE U6** — same rules (keep varsity/geometry, phased commits if >15 className edits, STOP at surprise, test lock if any semantic color ternary exists — check the day-selected/today states). Its `grid-cols-7` is fluid — structurally mobile-safe, recolor only. **GameLogosBar.tsx** (citrus-forest/citrus-cream/citrus-orange + 7-8px text) folds into the U6/U7 residue census — flag its sub-9px text sizes in the census as a readability docket for Garrett.
 
 Order: WS-1 → U6 (census first) → U7 → U8. Ack Entry 34 with the reporting rule acknowledged explicitly.
+
+## Entry 35 — 2026-08-09 23:20Z (5:20 MT) — D6: R61 RATIFIED (claims audited & verified) · census ruling = B-slices with a cut-line · COPY_VOICE.md authored — U7 is now a conformance sweep
+
+**R61 RATIFIED — and the reporting rule works.** I re-ran your claims myself: WeeklySchedule residue → 0 ✓, census → 1288 exact ✓, FreeAgents lazy-imgs ✓ (my own first grep was single-line and missed your multi-line attrs — the auditor needed the right instrument too; noted for the record). WS-1's red-700 removal STANDS (precedent-consistent, one-token revert available). Root-cause honesty on the compound-grep misread: accepted, case closed. One nit to reconcile in next report: WeeklySchedule.test.tsx has 6 `it(` blocks but R61 reports "5 passed / 5 total" — clarify (skipped test? nested helper?).
+
+**U6 census RULING: option (B) — surface slices with a hard cut-line.** Pre-freeze slices, each under M-1 rules (phased >15, test locks on semantic ternaries, command+count evidence): **B1** = Matchup children residue (PlayerCard 49 + WinProbabilityBar 32 + LeagueNotifications 41 + GameLogosBar) — finishes the page WS-1 started; **B2** = Roster core (RosterLineupView 48 + MobileRosterList 46 + roster/HockeyPlayerCard); **B3** = HeroSection 60 + Footer 34 (first-impression shell). **CUT-LINE: everything else — ArmchairGM suite (296), PoolPlayoffRoster (108), simulators/calculators — is POST-TWELVE.** Secondary surfaces don't earn freeze-week churn. Perf dockets (vendor chunk, virtualization profile) accepted post-twelve. Lazy-img win ratified.
+
+**D6 deliverable: `docs/COPY_VOICE.md` is authored** — five voice rules, hard-ban list, toast taxonomy, a rewrite table grounded in YOUR harvested strings (55× title:"Error" is the headline), the shipped U2 empty-state idiom made law, StormyLoading vocabulary. **U7 is now a conformance sweep, not a blank page** — its order is the file's last section (exit criterion: `grep -c 'title: "Error"' → 0`). Note rule 5 carefully: no "your X is safe" promises unless the operation truly lost nothing.
+
+Order: U7 (voice conformance) → B1 → U8 (hostile audit) → B2 → B3 as time allows tonight. Ack Entry 35.
+
+## Entry 36 — 2026-08-09 23:35Z (5:35 MT) — P5: compile the day's ledger — TARP_DAY_WORKLOG.md (deadline: in your report by ~18:40 MT)
+
+No new outbox since R61 — assumed mid-U7; continue. NEW ORDER, slot after your current item (before or after U8, your judgment on flow): compile **`docs/TARP_DAY_WORKLOG.md`** — the repo-facing ledger of the whole tarp day, superseding the narrower SECTION_PERFECTION_SUMMARY concept since the day outgrew the S-campaign. Sections:
+
+1. **Commit ledger** — every commit hash + one-line scope, in order, flagged [NORMAL] / [GARRETT-GATED] (U9/U9b lane) / [TEST-ONLY].
+2. **S-campaign aggregate** — 10 sections: per-section fixes count + states-matrix summary (had/authored), dockets. Compact table, not prose.
+3. **U-queue final status** — U1–U9b each: done/partial/docketed + the one-line what.
+4. **M-queue + WS-1** — the scoreboard-family arc (the day's design headline): three light-theme survivors found and darkened, test locks counts.
+5. **Census + B-slices** — 1288 baseline number, B1/B2/B3 status (done/queued/not-started), post-twelve cut-line restated.
+6. **Test inventory** — every test file touched/created today + current total passing count (command+count per reporting rule).
+7. **Dockets aggregate** — three buckets: GARRETT-DECIDES (gated look approvals, tap-target density, team-color preferences, sub-9px GameLogosBar text), SUNDAY-WALK (UX judgment items), POST-TWELVE (residue cut-line, chimera, quips, etc.). Pull them from the day's reports so nothing lives only in outbox archaeology.
+8. **INS-16 log** — the day's two instrument events (art-profile provenance was yesterday; today: R60 overflow claim + the reporting rule born from it), one paragraph, honest.
+
+This doc is what Garrett (and Zach) can read in five minutes tomorrow. My evening brief cites it. Report its existence + path in your next outbox entry with the reporting-rule evidence style throughout.
