@@ -60,12 +60,12 @@ export const ScoreCard = ({
         <div className="flex items-center justify-between gap-2">
           {/* Team 1 - Compact */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-8 h-8 rounded-full bg-citrus-sage border-2 border-citrus-forest flex items-center justify-center flex-shrink-0">
-              <span className="font-varsity text-xs text-[#E8EED9]">H</span>
+            <div className="w-8 h-8 rounded-full bg-pastel-sage/20 ring-1 ring-pastel-sage/40 flex items-center justify-center flex-shrink-0">
+              <span className="font-varsity text-xs text-pastel-cream">H</span>
             </div>
             <div className="min-w-0">
-              <div className="font-varsity text-[10px] text-citrus-sage uppercase truncate">{myTeamName}</div>
-              <div className="font-mono text-[9px] text-citrus-forest">{myTeamRecord.wins}-{myTeamRecord.losses}</div>
+              <div className="font-varsity text-[10px] text-pastel-cream uppercase truncate">{myTeamName}</div>
+              <div className="font-mono text-[9px] text-white/55">{myTeamRecord.wins}-{myTeamRecord.losses}</div>
             </div>
           </div>
           
@@ -79,11 +79,11 @@ export const ScoreCard = ({
           {/* Team 2 - Compact */}
           <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
             <div className="min-w-0 text-right">
-              <div className="font-varsity text-[10px] text-citrus-sage uppercase truncate">{opponentTeamName}</div>
-              <div className="font-mono text-[9px] text-citrus-forest">{opponentTeamRecord.wins}-{opponentTeamRecord.losses}</div>
+              <div className="font-varsity text-[10px] text-pastel-cream uppercase truncate">{opponentTeamName}</div>
+              <div className="font-mono text-[9px] text-white/55">{opponentTeamRecord.wins}-{opponentTeamRecord.losses}</div>
             </div>
-            <div className="w-8 h-8 rounded-full bg-citrus-peach border-2 border-citrus-forest flex items-center justify-center flex-shrink-0">
-              <span className="font-varsity text-xs text-[#E8EED9]">A</span>
+            <div className="w-8 h-8 rounded-full bg-pastel-sage/20 ring-1 ring-pastel-sage/40 flex items-center justify-center flex-shrink-0">
+              <span className="font-varsity text-xs text-pastel-cream">A</span>
             </div>
           </div>
         </div>
@@ -99,16 +99,16 @@ export const ScoreCard = ({
       </div>
       
       {/* Desktop: Full layout */}
-      <div className="hidden md:block relative px-4 py-4 md:px-6 md:py-5 bg-[#E8EED9]/50 backdrop-blur-sm border-b-4 border-citrus-forest">
+      <div className="hidden md:block relative px-4 py-4 md:px-6 md:py-5 border-b border-white/10">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Team 1 Badge - Embroidered patch */}
-          <div className="flex items-center gap-3 p-3 bg-citrus-sage/15 rounded-2xl border-3 border-citrus-sage">
-            <div className="w-12 h-12 rounded-full bg-citrus-sage border-4 border-citrus-forest flex items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)]">
-              <span className="font-varsity text-xl text-[#E8EED9]">H</span>
+          <div className="flex items-center gap-3 p-3 bg-pastel-sage/15 rounded-2xl ring-1 ring-pastel-sage/40">
+            <div className="w-12 h-12 rounded-full bg-pastel-sage/20 ring-2 ring-pastel-sage/40 flex items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)]">
+              <span className="font-varsity text-xl text-pastel-cream">H</span>
             </div>
             <div>
-              <div className="font-varsity text-sm text-citrus-sage uppercase">{myTeamName}</div>
-              <div className="font-mono text-xs text-citrus-forest">{myTeamRecord.wins}-{myTeamRecord.losses}</div>
+              <div className="font-varsity text-sm text-pastel-cream uppercase">{myTeamName}</div>
+              <div className="font-mono text-xs text-white/55">{myTeamRecord.wins}-{myTeamRecord.losses}</div>
               <div className="flex flex-col gap-0.5 mt-1">
                 {/* Games Remaining */}
                 <div className="flex items-center gap-1 bg-[#E8EED9]/50 backdrop-blur-sm/60 px-2 py-0.5 rounded-md border border-citrus-sage/40">
@@ -127,7 +127,7 @@ export const ScoreCard = ({
           
           {/* Center scores with stitched divider */}
           <div className="flex items-center gap-6 relative">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-citrus-sage/80 border-2 border-citrus-sage text-[#E8EED9] font-script text-xl px-3 py-1 rounded-varsity shadow-patch">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-cream font-script text-xl px-3 py-1 rounded-varsity shadow-patch">
               vs
             </div>
             <div className="text-center">
@@ -140,10 +140,10 @@ export const ScoreCard = ({
           </div>
           
           {/* Team 2 Badge */}
-          <div className="flex items-center gap-3 p-3 bg-citrus-green-light/15 rounded-2xl border-3 border-citrus-green-light">
+          <div className="flex items-center gap-3 p-3 bg-pastel-sage/15 rounded-2xl ring-1 ring-pastel-sage/40">
             <div>
-              <div className="font-varsity text-sm text-citrus-sage uppercase text-right">{opponentTeamName}</div>
-              <div className="font-mono text-xs text-citrus-forest text-right">{opponentTeamRecord.wins}-{opponentTeamRecord.losses}</div>
+              <div className="font-varsity text-sm text-pastel-cream uppercase text-right">{opponentTeamName}</div>
+              <div className="font-mono text-xs text-white/55 text-right">{opponentTeamRecord.wins}-{opponentTeamRecord.losses}</div>
               <div className="flex flex-col gap-0.5 mt-1 items-end">
                 {/* Games Remaining */}
                 <div className="flex items-center gap-1 bg-[#E8EED9]/50 backdrop-blur-sm/60 px-2 py-0.5 rounded-md border border-citrus-peach/40">
@@ -158,8 +158,8 @@ export const ScoreCard = ({
                 </div>
               </div>
             </div>
-            <div className="w-12 h-12 rounded-full bg-citrus-peach border-4 border-citrus-forest flex items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)]">
-              <span className="font-varsity text-xl text-[#E8EED9]">A</span>
+            <div className="w-12 h-12 rounded-full bg-pastel-sage/20 ring-2 ring-pastel-sage/40 flex items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)]">
+              <span className="font-varsity text-xl text-pastel-cream">A</span>
             </div>
           </div>
         </div>
