@@ -3037,7 +3037,7 @@ const Roster = () => {
                     variant="outline"
                     className="flex gap-2 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold"
                   >
-                    <Wand2 className="w-4 h-4" />
+                    <Wand2 className="w-4 h-4" aria-hidden="true" />
                     Auto Lineup
                   </Button>
                 )}
@@ -3080,7 +3080,7 @@ const Roster = () => {
                 {(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' || (userTeam && isDemoLeague(userTeam.league_id))) && (
                   <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                     <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
-                      <Shield className="w-4 h-4" />
+                      <Shield className="w-4 h-4" aria-hidden="true" />
                       <span className="text-sm font-medium">Demo Mode - Read Only</span>
                     </div>
                     <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
@@ -3131,7 +3131,7 @@ const Roster = () => {
                             })()}
                             {selectedDate < getTodayMST() && (
                               <Badge variant="outline" className="ml-2">
-                                <Lock className="w-3 h-3 mr-1" />
+                                <Lock className="w-3 h-3 mr-1" aria-hidden="true" />
                                 Read Only
                               </Badge>
                             )}
@@ -3152,7 +3152,7 @@ const Roster = () => {
                 {lockedPlayerIds.size > 0 && (userLeagueState === 'active-user' && !(userTeam && isDemoLeague(userTeam.league_id))) && (
                   <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                     <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                      <Lock className="w-4 h-4" />
+                      <Lock className="w-4 h-4" aria-hidden="true" />
                       <span className="text-sm font-medium">
                         {lockedPlayerIds.size} player{lockedPlayerIds.size !== 1 ? 's' : ''} locked
                       </span>
@@ -3195,7 +3195,7 @@ const Roster = () => {
                   if (!userTeamId && userLeagueState === 'active-user') {
                     return (
                       <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <Trophy className="w-16 h-16 text-white/55 mb-4 opacity-50" />
+                        <Trophy className="w-16 h-16 text-white/55 mb-4 opacity-50" aria-hidden="true" />
                         <h3 className="text-xl font-semibold mb-2">No Team Yet</h3>
                         <p className="text-white/55 mb-4">Join or create a league to start building your roster.</p>
                         <Button asChild>
@@ -3210,7 +3210,7 @@ const Roster = () => {
                     const isPreDraft = userTeam && userTeam.league_id;
                     return (
                       <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <Users className="w-16 h-16 text-white/55 mb-4 opacity-50" />
+                        <Users className="w-16 h-16 text-white/55 mb-4 opacity-50" aria-hidden="true" />
                         <h3 className="text-xl font-semibold mb-2">Empty Roster</h3>
                         <p className="text-white/55 mb-4">
                           {isPreDraft 
@@ -3350,7 +3350,7 @@ const Roster = () => {
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-white/55">Season Points</span>
-                        <Trophy className="h-4 w-4 text-yellow-500" />
+                        <Trophy className="h-4 w-4 text-yellow-500" aria-hidden="true" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.totalPoints}</div>
                       <p className="text-xs text-white/55 mt-1">Rank: {teamStats.rank}</p>
@@ -3360,7 +3360,7 @@ const Roster = () => {
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-white/55">Avg. Weekly</span>
-                        <Activity className="h-4 w-4 text-blue-500" />
+                        <Activity className="h-4 w-4 text-blue-500" aria-hidden="true" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.avgPoints}</div>
                       <p className="text-xs text-white/55 mt-1">pts / week</p>
@@ -3370,7 +3370,7 @@ const Roster = () => {
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-white/55">Highest Score</span>
-                        <ArrowUpRight className="h-4 w-4 text-green-500" />
+                        <ArrowUpRight className="h-4 w-4 text-green-500" aria-hidden="true" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.highScore}</div>
                       <p className="text-xs text-white/55 mt-1">Week 2</p>
@@ -3380,7 +3380,7 @@ const Roster = () => {
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-white/55">Moves Made</span>
-                        <Users className="h-4 w-4 text-purple-500" />
+                        <Users className="h-4 w-4 text-purple-500" aria-hidden="true" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.waiverMoves}</div>
                       <p className="text-xs text-white/55 mt-1">Waiver/Trades</p>
@@ -3397,7 +3397,7 @@ const Roster = () => {
                       <CardContent className="p-6">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                            <div className="flex items-center gap-2">
-                             <Target className="h-5 w-5 text-primary" />
+                             <Target className="h-5 w-5 text-primary" aria-hidden="true" />
                              <div>
                                <h3 className="font-bold text-lg">Category Balance</h3>
                                <p className="text-sm text-white/55">Positional Breakdown</p>
@@ -3447,7 +3447,7 @@ const Roster = () => {
                     <Card>
                       <CardContent className="p-6">
                          <div className="flex items-center gap-2 mb-4">
-                            <Zap className="h-5 w-5 text-yellow-500" />
+                            <Zap className="h-5 w-5 text-yellow-500" aria-hidden="true" />
                             <h3 className="font-bold text-lg">Power Rankings</h3>
                          </div>
                          <div className="space-y-3">
@@ -3477,7 +3477,7 @@ const Roster = () => {
                 <Card className="mt-6">
                    <CardContent className="p-6">
                       <div className="flex items-center gap-2 mb-4">
-                         <BarChart3 className="h-5 w-5 text-white/55" />
+                         <BarChart3 className="h-5 w-5 text-white/55" aria-hidden="true" />
                          <h3 className="font-bold text-lg">Projected Season Totals</h3>
                       </div>
                       
@@ -3519,7 +3519,7 @@ const Roster = () => {
                         {pendingWaivers.length > 0 && (
                           <div>
                             <div className="mb-3 flex items-center gap-2">
-                              <AlertCircle className="w-4 h-4 text-orange-600" />
+                              <AlertCircle className="w-4 h-4 text-orange-600" aria-hidden="true" />
                               <h3 className="text-lg font-bold">Active Waiver Claims</h3>
                               <Badge variant="secondary" className="text-xs">{pendingWaivers.length}</Badge>
                             </div>
@@ -3576,7 +3576,7 @@ const Roster = () => {
                                       <div className="mt-3 grid gap-2 sm:grid-cols-2 text-xs">
                                         {clearsAtFormatted && (
                                           <div className="flex items-start gap-2 rounded-md bg-white/70 border border-amber-500/40 p-2">
-                                            <Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                                            <Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />
                                             <div>
                                               <div className="uppercase tracking-wide text-[10px] text-amber-700 font-bold">
                                                 Waiver window clears
@@ -3587,7 +3587,7 @@ const Roster = () => {
                                         )}
                                         {nextProcessFormatted && (
                                           <div className="flex items-start gap-2 rounded-md bg-white/70 border border-green-600/40 p-2">
-                                            <Zap className="w-4 h-4 text-green-700 mt-0.5 shrink-0" />
+                                            <Zap className="w-4 h-4 text-green-700 mt-0.5 shrink-0" aria-hidden="true" />
                                             <div>
                                               <div className="uppercase tracking-wide text-[10px] text-green-700 font-bold">
                                                 Claim processes
@@ -3929,7 +3929,7 @@ const Roster = () => {
                     placeholder with real team-pulse stats. */}
                 <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="flex items-center gap-2 mb-3">
-                    <Activity className="w-4 h-4 text-pastel-orange-soft" strokeWidth={2} />
+                    <Activity className="w-4 h-4 text-pastel-orange-soft" strokeWidth={2} aria-hidden="true" />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Team pulse</div>
                   </div>
                   <div className="space-y-3">
@@ -3958,7 +3958,7 @@ const Roster = () => {
                 {/* Quicklinks tile — replaces second legacy AdSpace */}
                 <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="flex items-center gap-2 mb-2">
-                    <Target className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
+                    <Target className="w-4 h-4 text-pastel-orange" strokeWidth={2} aria-hidden="true" />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Lineup tips</div>
                   </div>
                   <ul className="text-[11px] text-white/70 space-y-1.5 leading-relaxed">

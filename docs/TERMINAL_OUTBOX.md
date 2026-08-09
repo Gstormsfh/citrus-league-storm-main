@@ -1975,3 +1975,76 @@ S-3 complete (35 a11y touches on LeagueDashboard; timeline card verified already
 Next up per Entry 21 section order: **S-4 Roster / Squad**. Time-box: 90min. Will begin immediately.
 
 **End of R38. 35 a11y touches; timeline verified already-clean; 4 dockets.**
+
+---
+
+## R39 — Entry 21 S-4 (Roster / Squad) perfection report (2026-08-09 13:25Z / 7:25 MT)
+
+Entry 21 S-4 executed. Time-box ~10min (efficient thanks to unique-className batch fix pattern).
+
+### Files audited
+
+- `apps/web/src/pages/Roster.tsx` (3992 lines) — the roster/lineup page.
+
+### States matrix (P-a flow audit)
+
+| Section | Loading | Empty | Error | Success | Notes |
+|---|---|---|---|---|---|
+| Roster page (main) | ✅ Loader2 spinners inline | ✅ "No players" + Trophy/Users placeholder art | ✅ league-context branches | ✅ lineup + bench rendering | Extensive state management for lineup, projections, weekly schedule |
+| Auto Lineup button | N/A | N/A | ✅ inline toast | ✅ inline toast | Wand2 icon (aria-hidden added) |
+| Free Agents modal | ✅ inline | ✅ empty branch | ✅ error surface | ✅ list | Behavior owned by parent state, not S-4 scope |
+
+All four states covered on every S-4 surface. No missing state authoring needed.
+
+### Fixes authored — aria-hidden ONLY
+
+**Roster.tsx: 18 aria-hidden additions.** Before: **zero** aria-hidden in a 3992-line file with 18 lucide icons. After: **18 aria-hidden** — every decorative icon.
+
+Icons covered (via `replace_all=true` on unique className strings):
+
+- `<Wand2>` × 1 (Auto Lineup button)
+- `<Shield>` × 1 (position/team block)
+- `<Lock>` × 2 (h-3/mr-1 and h-4 — locked-position indicators)
+- `<Trophy>` × 2 (h-16 placeholder + h-4/yellow-500 achievement)
+- `<Users>` × 2 (h-16 placeholder + h-4/purple-500 team-context)
+- `<Activity>` × 2 (h-4/blue-500 + w-4/pastel-orange-soft)
+- `<ArrowUpRight>` × 1
+- `<Target>` × 2 (h-5/primary + w-4/pastel-orange)
+- `<Zap>` × 2 (h-5/yellow + w-4/green-700)
+- `<BarChart3>` × 1
+- `<AlertCircle>` × 1
+- `<Clock>` × 1
+
+**Verified via `grep -c "aria-hidden"`**: 18 total post-fix (was 0).
+
+### Judgment calls DOCKETED
+
+Per P-e discipline — the following surfaced but were NOT authored:
+
+1. **Pre-existing tsc errors** (unchanged, per HANDOFF v3 §"What's NOT done"):
+   - `Roster.tsx:3110` — WeeklyScheduleProps missing `myStarters` type field (component prop mismatch).
+   - `Roster.tsx:3839` — `err.message` on `unknown` type without narrowing (parity with the ProfileSetup fix I did in S-1 — could apply the same pattern here).
+   Both are pre-existing; **not caused by aria-hidden additions**. Fix is a code-standards touch (~5 lines each), architect-adjudicable during a next-cycle polish pass if desired.
+2. **Roster empty-state "No players" copy** — currently shows Trophy or Users placeholder art + short line. Warm but generic. Could be "Draft complete — head to the roster and set your Week 1 lineup." (state-aware) if we know the draft is done vs. not-yet-drafted. Not a defect; docket for Sunday UX walk.
+3. **Auto Lineup button** — copy "Auto Lineup" is honest but could show a preview of what it would do before committing. That's an authored feature, not polish; outside scope.
+4. **Mobile-width sanity** — all `max-w-*` / `w-*` are responsive tokens; scanned for fixed pixel widths — passes.
+
+### Tests / typecheck status
+
+- `npx tsc -p tsconfig.app.json --noEmit` filtered for Roster.tsx: **2 pre-existing errors** (from HANDOFF v3 known issues at 3110 + 3839); **zero errors introduced by S-4 aria-hidden additions**.
+- No new tests needed.
+
+### Files changed this cycle
+
+```
+MOD: apps/web/src/pages/Roster.tsx    (18 aria-hidden additions on decorative icons)
+MOD: docs/TERMINAL_OUTBOX.md          (this R39)
+```
+
+### Standing by / next up
+
+S-4 complete (18 a11y touches on Roster; 4 judgment calls docketed).
+
+Next up per Entry 21 section order: **S-5 GM Office**. Time-box: 90min. Will begin immediately.
+
+**End of R39. 18 a11y touches on a 3992-line file with zero pre-fix aria-hidden coverage; 4 dockets.**
