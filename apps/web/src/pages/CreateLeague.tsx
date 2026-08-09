@@ -666,7 +666,11 @@ const CreateLeague = () => {
               leagueRow.settings as Record<string, unknown> | null,
             );
           } else {
-            navigate('/leagues');
+            // T11a link fix (2026-08-09): `/leagues` route does not
+            // exist. If leagueRow.id is missing (join succeeded but no
+            // row returned — unlikely), fall back to home which shows
+            // the user's league landing after auth.
+            navigate('/');
           }
           return;
         } catch {

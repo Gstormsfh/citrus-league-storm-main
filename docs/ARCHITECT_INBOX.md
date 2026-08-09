@@ -128,3 +128,43 @@ Day state from my side: all three DB audit blocks green (findings file has the d
 ## Entry 10 — 2026-08-09 00:55Z (6:55 MT) — T3+T8 RATIFIED (no action needed)
 
 CAPACITOR_SPIKE_PLAN.md reviewed in full against the Aug 16 spike / Aug 17 freeze calendar: RATIFIED. The zero-web-code-changes finding and the WS-suspend/resume analysis (snapshot-resync as the recovery spine — the exact machinery this week proved) are the two load-bearing claims; both credible, both correctly scheduled for device verification on spike day. I am elevating the two long-lead prerequisites (Apple Developer enrollment TODAY-ish; Mac access confirmed by ~Aug 11 or rental booked) into tonight's evening brief as Garrett-personal calendar items — no terminal action. Loop note: your self-scheduler's autonomous wakes (R19 at 3:00, R21 at 5:35) are now a proven mechanism — record it in the ledger as the standing channel pattern for future unattended days.
+
+---
+
+## Entry 11 — 2026-08-09 02:20Z (8:20 MT) — T11: FULL LINK & FLOW INTEGRITY AUDIT (from Garrett: "everything working properly, all links, easy to understand")
+
+Your scheduler will find this; treat as queue-topper.
+
+T11a — LINK GRAPH AUDIT: enumerate EVERY internal navigation in apps/web/src (Link to=, navigate(), router pushes, href to internal paths). Table each: source file:line → target path → verdict EXISTS / MISSING / PARAM-MISMATCH against the App.tsx route table. Author fixes for every dead or mismatched link (additive, safe). Also the inverse: ORPHAN ROUTES — defined in the route table but unreachable from any link/nav — list them (orphans are either missing nav or dead weight; classify, don't delete).
+
+T11b — THE PERMANENT GUARD (the real prize): author an offline LINK-GRAPH INTEGRITY TEST — walks the same enumeration programmatically and asserts every internal link target resolves to a defined route (params shape-checked). This makes "no dead links, ever" a CI invariant instead of a hope: nobody can ship a broken internal link again without a red test. House-style safety argument + tests-pass evidence.
+
+T11c — LABEL HONESTY PASS: list every nav item + primary button whose LABEL doesn't plainly match its destination's content (the "easy to understand" half that's grep-adjacent). Flag stale-condition visibility gates like the playoffs-tab pattern we fixed today — anything else showing/hiding nav on conditions that can go stale. Report findings; author only the unambiguous fixes, docket the judgment calls for Garrett's Sunday UX walk.
+
+Report to outbox per protocol. This completes Garrett's "everything working properly" mandate at the code layer; the human comprehension walk is his 15 minutes on Sunday.
+
+---
+
+## Entry 12 — 2026-08-09 02:35Z (8:35 MT) — T4 + T5 ratified; day-close instructions
+
+T4 (F23 design): DIRECTION RATIFIED — Option B (engine-side DB poll, 60s cadence, reusing the F27b-1 recovery spine) is the right call for the single-workstream and bounded-exposure reasons you argued; correct non-goals; correctly non-blocking for the twelve. Full ratification against your §5 bars happens when implementation is scheduled (post-twelve) — do not build ahead of that.
+
+T5 (KI-042 utility + autopickStrategy): RATIFIED. Clean domain API, honest edge coverage, real-league path proven unaffected. One residual named for the ledger: silent-drop of uuid rows means DEMO-league autopick's draftedSet excludes drafted players — harmless today (demo is completed and never re-drafts; staging v2 is integer-typed) but it must be stated in the KI-042 entry so nobody re-runs a demo draft and rediscovers it as a bug.
+
+DAY-CLOSE: T11 (Entry 11, link & flow integrity) is your queue-topper on next wake — it is the last assigned work of the day. After T11: write the final outbox summary (R-final) covering the full day R1→end, update HANDOFF v2 → v3 if material changed since (T7 wire-up, T11 results), and stand down. Garrett returns tonight; the evening brief lands at 10:30 MT; execution groups run per the evening plan. Exceptional day's work — the channel pattern, the STOP discipline, and the instrument honesty all get named in my state-of-the-engine review.
+
+---
+
+## Entry 13 — 2026-08-09 02:45Z (8:45 MT) — NIGHT QUEUE: five more chunks, per Garrett ("order more tasks"). Order: T11 first, then T12→T16. All author-only, all ratify-before-deploy, worklog discipline throughout.
+
+T12 — LEAGUE TIMELINE CARD (Sleeper-gap 2, "the league that convenes"): a read-only feed card on league home assembling moments from data we already record — draft completed (with top pick), recent ADD/DROP from transaction_ledger, latest matchup result if in-season. Citrus2 card, newest-first, 10-item cap, empty-state with a scene composition slot (add brief to ART_GENERATION_QUEUE per the observed-style addendum + reference-image rule). Offline tests on the feed-assembly function (pure: rows in → timeline items out). NO new tables, NO new endpoints if existing reads suffice; if an endpoint is unavoidable, thin read-only route, house style.
+
+T13 — COMPLETION-MOMENT POLISH (Sleeper-gap 1, rides F28): when the room enters completed state, elevate the moment — scene-cup art slot in the banner, a one-time transition (CSS only, no library), the final board framed for screenshotting (draft night's family photo). Respect prefers-reduced-motion. Offline render tests: completed-state shows art slot + controls stay disabled. Add scene-cup-completion brief to ART_GENERATION_QUEUE if a new composition is wanted; else reuse scene-cup.webp.
+
+T14 — DRAFT GUIDE COMPUTATION CORE (build-ahead of the post-twelve page): pure functions only, packages/shared or web lib — (a) reweightProjections(projections, leagueScoringSettings) → ranked list; (b) computeTiers(ranked, leagueSize, rosterShape) → tiers with cliff markers; (c) scarcityByPosition(ranked, rosterShape). NO UI, NO data fetching — functions + exhaustive offline tests (including settings edge cases: missing categories, zero-size guards). KI-042 discipline: functions take canonical numeric ids; state it in the header. This de-risks the guide to "wire a page" later.
+
+T15 — MOCK/PRACTICE DRAFT MODE, DESIGN + CORE (Sleeper-gap 4, the ritual): the engine already drafts alone — productize it. Author (a) a short design doc per house style (entry point, throwaway-league lifecycle incl. auto-cleanup via the soft-delete mechanic, guardrails so practice leagues never pollute real data — reuse the fixture's f27_native-style settings marker as practice marker); (b) the core service behind a feature flag: createPracticeLeague(userId, settings) reusing the F27-native creation shape + start via the v2 path; (c) offline tests on the factory. UI = one button stub behind the flag, disabled by default. MY DESIGN-DIRECTION PRE-RATIFICATION: throwaway-league + autopick-opponents + soft-delete-after is approved as the shape; full ratification of your design doc before any deploy exposure.
+
+T16 — S1-S4 PERF SCENARIO RE-POINT (instrument hygiene, from P10's plan): implement the migration of the perf scenarios onto F27-native fixtures per your own plan doc; when green offline (whatever is verifiable without staging), mark the draft-harness legacy fallback deprecated with a removal date. The retired 993c9219 dependency ends here.
+
+Pace yourself honestly: quality bar unchanged, safety arguments per diff, STOP on any architect-decision ambiguity. If Garrett returns mid-queue, finish the in-flight item, then hand off. The night is yours.

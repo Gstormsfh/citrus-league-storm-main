@@ -594,6 +594,8 @@ Both forms are stored as `text` (or as text-castable values) in a nominally sing
 | **Target phase / timeline** | Ambient — checked at every function-authoring boundary. Consolidation into a unified player-id domain (single form across all leagues) is a bigger-scope decision for PROD-PORT scoping (task #31). Until then, tooling either handles both forms or documents which form it targets + rejects the other with a clear error. |
 | **Verification test** | Any migration adding new tooling that reads `draft_picks.player_id` MUST include header text referencing KI-042 and stating explicitly which form(s) it handles. Any function that would fail on one form MUST include an explicit guard + informative error. |
 
+**Residual (T5 close-out, architect Entry 12, 2026-08-09):** `server/src/draft/autopickStrategy.ts:120-124` uses `coerceToNumericPlayerId` on each `draft_picks.player_id` row to build the drafted-set; uuid rows are silently dropped (return `null` from coerce, not added to set). Consequence: in a DEMO league (all-uuid player_ids), the drafted-set is EMPTY after the walk, so autopick's "already drafted" check would fail to exclude any player. Harmless today because (a) the demo league is completed and never re-drafts, and (b) staging v2 is integer-typed so no uuid rows enter this path. But if a future demo-league re-draft is initiated, autopick could pick a player already on someone's roster. Stated here so no future auditor rediscovers it as a bug — the silent-drop is a KI-042-discipline choice, not a defect.
+
 
 
 | | |

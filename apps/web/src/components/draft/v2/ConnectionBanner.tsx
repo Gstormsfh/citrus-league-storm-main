@@ -179,8 +179,11 @@ function FatalBanner({ state, onRetryNow }: FatalBannerProps) {
         <AlertDescription>
           {state.errorMessage}
           {' '}
-          <Link to="/dashboard" className="underline font-medium">
-            Return to dashboard
+          {/* T11a link fix (2026-08-09): `/dashboard` route does not
+              exist. auth_failure users need to sign back in — link to
+              /auth directly (was silently 404'ing to NotFound). */}
+          <Link to="/auth" className="underline font-medium">
+            Sign in again
           </Link>
         </AlertDescription>
       </Alert>
@@ -193,8 +196,12 @@ function FatalBanner({ state, onRetryNow }: FatalBannerProps) {
         <AlertDescription>
           {state.errorMessage}
           {' '}
-          <Link to="/dashboard" className="underline font-medium">
-            Back to dashboard
+          {/* T11a link fix (2026-08-09): `/dashboard` route does not
+              exist. invalid_lobby users are authenticated — link to
+              /gm-office (the closest existing "dashboard" route; if
+              unauth'd via ProtectedRoute it redirects to /auth). */}
+          <Link to="/gm-office" className="underline font-medium">
+            Back to GM Office
           </Link>
         </AlertDescription>
       </Alert>

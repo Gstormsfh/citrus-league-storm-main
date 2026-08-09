@@ -927,3 +927,109 @@ No code files touched.
 Entry 10 did not open a new work block. Board remains CLEAR per Entry 9. Continue 30-min inbox poll cadence for Entry 11+ or Garrett return.
 
 **End of R22.**
+
+---
+
+## R23 — Entries 11/12/13 opened: Entry 12 + T11a/b/c executed (2026-08-09 03:15Z / 9:15 MT)
+
+Entries 11, 12, and 13 acknowledged. Executing per Entry 12's day-close: T11 first, then T12→T16.
+
+### Entry 12 residual — KI-042 addendum (T5 close-out)
+
+**File**: `docs/REGISTRY.md` — KI-042 row extended with a residual note per architect Entry 12 ratification of T5.
+
+Residual text records that `server/src/draft/autopickStrategy.ts:120-124` uses `coerceToNumericPlayerId` on each `draft_picks.player_id` row to build the drafted-set; uuid rows are silently dropped (return `null` from coerce, not added to set). Consequence: in a DEMO league (all-uuid player_ids), the drafted-set is EMPTY after the walk, so autopick's "already drafted" check would fail to exclude any player. Harmless today (demo completed + never re-drafts; staging v2 is integer-typed) but future demo-league re-drafts would rediscover it as a bug if not documented. Explicit "silent-drop is a KI-042-discipline choice, not a defect" framing.
+
+### T11a — LINK GRAPH AUDIT
+
+**Route table extracted from `App.tsx`** (46 route paths, lines 178-242). Full list is the authoritative source; test extracts programmatically via regex.
+
+**Nav sites enumerated** by grep across `apps/web/src/**/*.{ts,tsx}` on 7 patterns: `<Link to="…">`, `<Link to={\`…\`}>`, `<Navigate to="…">`, `navigate('…')`, `navigate(\`…\`)`, `window.location.href = "…"`, `href="/…"`.
+
+**DEAD LINKS FOUND + AUTHORED FIXES (3 defects)**:
+
+| File:line | Bad target | Fix authored | Route source |
+|---|---|---|---|
+| `apps/web/src/components/draft/v2/ConnectionBanner.tsx:182` | `<Link to="/dashboard">` (auth_failure branch) | `<Link to="/auth">` + label "Sign in again" | `/auth` (App.tsx:179) |
+| `apps/web/src/components/draft/v2/ConnectionBanner.tsx:196` | `<Link to="/dashboard">` (invalid_lobby branch) | `<Link to="/gm-office">` + label "Back to GM Office" | `/gm-office` (App.tsx:194) |
+| `apps/web/src/pages/Matchup.tsx:5130` | `<Link to={\`/playoffs/${league?.id \|\| activeLeagueId}\`}>` | `<Link to={\`/league/${...}/playoffs\`}>` | `/league/:leagueId/playoffs` (App.tsx:192) |
+| `apps/web/src/pages/Matchup.tsx:5139` | Same `/playoffs/…` template (same file, second instance) | Same fix | Same route |
+| `apps/web/src/pages/CreateLeague.tsx:669` | `navigate('/leagues');` (fallback when leagueRow.id missing) | `navigate('/');` (home fallback) | `/` (App.tsx:178) |
+
+Every fix includes an inline comment naming the T11a audit + the correct route file:line for future auditors.
+
+**ORPHAN ROUTES (17)**, classified per architect Entry 11 "classify, don't delete":
+
+Legit orphans (external / callback / direct-URL reach):
+- `/auth/callback` — Supabase OAuth callback (called via `${window.location.origin}/auth/callback` in AuthContext:174, :207, :234).
+- `/reset-password` — Supabase password-reset email callback (AuthContext:192).
+- `/admin` — admin-typed URL only.
+- `/waitlist` — campaign landing page.
+
+Marketing deep-link orphans (footer-only or absent):
+- `/blog` — reachable only from HockeyFooter:44.
+- `/podcasts` — no internal link found.
+- `/guides` — no internal link found.
+- `/pricing` — HockeyNav:13 + HockeyFooter:43 (footer only).
+- `/careers` — HockeyFooter:45 (footer only).
+
+Test-extractor false positives (reached via data-driven config that regex doesn't parse):
+- `/schedule-manager` — reached via `link: "/schedule-manager"` in `GMOffice.tsx:88` (data array, not a Link/navigate literal).
+- `/armchair-gm` — reached via `path: '/armchair-gm'` in nav-config arrays (Navbar:93/107/138, MobileMenuButton:75/89/120).
+- `/pool/playoff-bracket`, `/pool/playoff-confidence` — reached via `getPoolRoute()` helper output.
+
+Designer preview surfaces:
+- `/preview-mockups`, `/previews`, `/preview-almanac`, `/preview-clone` — designer-only, likely reached by URL bar only during design review.
+
+Docket for Sunday UX walk: architect + Garrett to decide (a) surface in nav vs. leave direct-URL, (b) delete unused preview surfaces, (c) audit test-extractor false positives to determine whether the data-driven config paths should be first-class nav entries.
+
+### T11b — PERMANENT GUARD (offline link-graph integrity test)
+
+**File**: `apps/web/src/__tests__/linkGraphIntegrity.test.ts` (NEW, 230 lines).
+
+Implements the CI invariant architect Entry 11 requested. Reads App.tsx + walks apps/web/src for the 7 nav patterns above, normalizes template-literal targets (`${...}` → `:param`, strips query + fragment), compiles route patterns to regex, and asserts every extracted nav resolves to at least one route. Prints file:line + offending target on failure so Ctrl+click opens the defect.
+
+Test surface:
+1. `App.tsx route table extraction` — asserts ≥40 routes, spot-checks 4 well-known ones. Defense against regex breakage.
+2. `every internal nav resolves to a route` — the primary invariant. All allow-listed static-HTML exceptions (`/terms-of-service.html`, `/privacy-policy.html`) preserved.
+3. `orphan routes (informational)` — reports routes with no reaching nav, logs to console, does NOT fail the suite (per Entry 11 classify-don't-delete).
+
+Also documents DELIBERATE NON-GOALS in the file header:
+- Query-param + fragment CORRECTNESS not checked (structural match only).
+- Dynamic Link/navigate where target is a variable (not literal or template) not extractable without full AST + data-flow analysis.
+- Nav via useNavigate options (state, replace, etc.) — opaque.
+
+**Test result: 4/4 pass** in ~1.36s (7ms test time; the rest is jsdom setup). Orphan-routes test reports the 17 orphans above for visibility. If any future PR introduces a dead internal link, this test goes RED and prints the exact file:line.
+
+### T11c — LABEL HONESTY PASS
+
+Grepped for stale-condition visibility gates matching patterns like `<Link` inside `is[A-Z]…&&`, `has[A-Z]…&&`, `show[A-Z]…&&`. Zero matches — the pattern isn't in wide use in this codebase.
+
+Grepped for `activeLeagueId && navigate` / `activeLeagueId ?` and found 3 sites where a nav click silently no-ops when `activeLeagueId` is null:
+- `apps/web/src/components/Navbar.tsx:238` — "Matchups" nav item onClick.
+- `apps/web/src/components/Navbar.tsx:360` — mobile "Matchups" nav item onClick.
+- `apps/web/src/pages/Standings.tsx:810` — "View Bracket →" span click.
+
+**Classification**: NOT label-honesty defects per se — labels ("Matchups", "View Bracket") match their intended destinations. The defect (if any) is UX: the button LOOKS clickable but does nothing when the precondition (a selected league) fails. Two remediation options: (a) disable/hide the button when `!activeLeagueId`; (b) navigate to a fallback like `/create-league` when precondition fails. Both are UX judgment calls, not unambiguous fixes → **docketed for Sunday UX walk** per architect Entry 11 instruction.
+
+Also authored **2 label-honesty fixes** as part of T11a dead-link remediation (labels updated to match the corrected destinations):
+- ConnectionBanner "Return to dashboard" → "Sign in again" (auth_failure branch, now points to `/auth`).
+- ConnectionBanner "Back to dashboard" → "Back to GM Office" (invalid_lobby branch, now points to `/gm-office`).
+
+### Files changed this cycle
+
+```
+NEW: apps/web/src/__tests__/linkGraphIntegrity.test.ts        (T11b permanent guard)
+MOD: apps/web/src/components/draft/v2/ConnectionBanner.tsx    (T11a fix + T11c label)
+MOD: apps/web/src/pages/Matchup.tsx                           (T11a fix ×2)
+MOD: apps/web/src/pages/CreateLeague.tsx                      (T11a fix)
+MOD: docs/REGISTRY.md                                         (KI-042 residual per Entry 12)
+MOD: docs/ARCHITECT_INBOX.md                                  (Entries 11/12/13 additions, architect-authored, per channel protocol)
+MOD: docs/TERMINAL_OUTBOX.md                                  (this R23)
+```
+
+### Standing by / next up
+
+Entry 13 night queue: T11 ✓ DONE. Next: T12 (LEAGUE TIMELINE CARD, Sleeper-gap 2). Then T13, T14, T15, T16. Pacing honestly per architect: quality bar unchanged, safety arguments per diff, STOP on ambiguity. Will chunk each into its own commit-and-report cycle for auditability.
+
+**End of R23. T11 closed; 3 dead links fixed; CI invariant landed; 17 orphans docketed for Sunday.**

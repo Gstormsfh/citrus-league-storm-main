@@ -5127,7 +5127,10 @@ const Matchup = () => {
                       </div>
                     </div>
                     <Button asChild size="sm" variant="default">
-                      <Link to={`/playoffs/${league?.id || activeLeagueId}`}>View Bracket</Link>
+                      {/* T11a link fix (2026-08-09): route is
+                          /league/:leagueId/playoffs (App.tsx:192), not
+                          /playoffs/:leagueId. Was silently 404'ing. */}
+                      <Link to={`/league/${league?.id || activeLeagueId}/playoffs`}>View Bracket</Link>
                     </Button>
                   </CardContent>
                 </Card>
@@ -5135,8 +5138,10 @@ const Matchup = () => {
               {(league?.id || activeLeagueId) && playoffChampion.status === 'in_progress' && (
                 <div className="mb-4 flex items-center justify-between px-3 py-2 rounded-md border border-white/10 bg-white/5 text-sm">
                   <span className="text-white/55">Playoffs in Progress</span>
+                  {/* T11a link fix (2026-08-09): same as above —
+                      /league/:leagueId/playoffs, not /playoffs/:leagueId. */}
                   <Link
-                    to={`/playoffs/${league?.id || activeLeagueId}`}
+                    to={`/league/${league?.id || activeLeagueId}/playoffs`}
                     className="font-medium text-primary hover:underline"
                   >
                     View Bracket
