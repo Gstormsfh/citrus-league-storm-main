@@ -1537,3 +1537,36 @@ MOD: docs/TERMINAL_OUTBOX.md                    (this R32)
 Overnight queue O1-O5 COMPLETE. O4 was "stand by on scheduler for Entries 17+ (my overnight review findings will arrive as work)." Continuing KI-048 30-min inbox poll for Entry 18+ or Garrett return.
 
 **End of R32. Sunday blocks armed, property coverage tripled, draft-night runbook merged. Garrett has a full paste-set + a full runbook + a full test barrier.**
+
+---
+
+## R33 — Entry 18 F27b-2 RATIFIED WITHOUT CONDITIONS + Group A gate OPEN (2026-08-09 08:05Z / 2:05 MT)
+
+Entry 18 acknowledged. Housekeeping-only cycle — no new code work.
+
+### Ratifications received
+
+- **F27b-2 fix RATIFIED WITHOUT CONDITIONS.** Read at code level (fix + comment block + both regression-lock tests at `LobbyManager.test.ts:1707` and `:1733` + `:5411` fixture correction). Architect verdict: correct at both layers (a) post-ignition NOTIFY, (b) snapshot+delta path (untouched), (c) mid-draft full replay coverage. Bonus: comment's LATENT-SECOND-BUG documentation (in-progress-no-snapshot bootstrap would have thrown at the pick slot-check on first post-bootstrap NOTIFY catch-up) accepted as "exactly the depth these comments should carry."
+- **GROUP A GATE: OPEN.** Sunday's SUNDAY_EXECUTION_BLOCKS.md Group A engine deploy proceeds tomorrow as planned (F27b-2 image).
+- **R29 + HANDOFF v3 accepted as accurate records.** No discrepancies against architect's own day log.
+
+### Detail from Entry 18 to preserve for the F27b-2 close (ledger quote when Group A certifies)
+
+Architect explicitly named the frame for the F27b-2 REGISTRY close: **"cursor advances with applied state — full replay was the one violator."** This is the single-source-of-truth restoration argument in one line. When Group A ships tomorrow and the F27b-2 KI is closed, this frame should be quoted in the close-out entry.
+
+Also captured: the REAL pre-fix mechanism (architect Entry 18 line 237) — my comment nailed a detail his own Entry-8 hypothesis under-specified — the pre-fix mechanism was **seq-2's NOTIFY passing the 0-cursor guard and triggering a catch-up fetch from sinceSeq=0 that re-applied seq 1**. Not a redelivered seq-1; a downstream seq-2 that pulled seq 1 back in. This matters for the ledger close because it distinguishes the "duplicate skip" case from the "0-cursor catch-up" case (the latter was the load-bearing bug).
+
+### Files changed this cycle
+
+```
+MOD: docs/ARCHITECT_INBOX.md    (Entry 18, architect-authored, per channel protocol)
+MOD: docs/TERMINAL_OUTBOX.md    (this R33)
+```
+
+No code files touched. No new tests. No new tasks — the actionable work (Group A deploy) belongs to Garrett per SUNDAY_EXECUTION_BLOCKS.md.
+
+### Standing by
+
+Continuing KI-048 30-min inbox poll for Entry 19+ or Garrett return. Architect's ~2:30 MT SUNDAY_EXECUTION_BLOCKS.md reconciliation review is presumably still coming (Entry 18 confirmed the F27b-2 side but didn't touch the Sunday blocks yet).
+
+**End of R33. F27b-2 ratified; Group A green-lit for Sunday.**

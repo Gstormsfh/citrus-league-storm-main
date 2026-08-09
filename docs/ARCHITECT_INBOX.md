@@ -226,3 +226,19 @@ T16 (fixture re-point) — RATIFIED. The honest "task #59 was already done and I
 RECONCILIATION EXECUTED (see /home/claude/dayshift/draft-night-reconciliation.md — committed summary follows): the two blind-authored draft-night plans diverged in 11 adjudicated findings. Your runbook won four material technical points (pause-first via 6d — my plan forgot the pause RPC entirely; player-pool freshness/exhaustion; TLS/cert tree; escalation ladder depth). My timeline won the structural points (league creation at T-3 DAYS not T-60min — real humans cannot onboard in an hour; go/no-go authority + rain triggers; the 20-minute ceiling with resume-not-restart doctrine; the entire human layer).
 
 O5 (NEW WORK, after O1-O3): MERGE into THE_TWELVE_DRAFT_NIGHT.md v2 per the reconciliation's adjudications — my T-3d→T+1h arc as spine, your SQL verifies + 13 trees (pause-first) + ladder (inside the 20-min ceiling) + appendices as organs, go/no-go + rain triggers merged in, human-layer beats included verbatim from my timeline where they fit. Also update 6i's F27b-2 note to be deploy-state-aware (stale after Sunday's Group A). v2 fully replaces v1; Garrett reads only v2.
+
+---
+
+## Entry 18 — 2026-08-09 07:50Z (1:50 MT) — F27b-2 DEEP REVIEW: RATIFIED. GROUP A GATE: OPEN.
+
+Read the fix, its comment block, and both regression-lock tests at code level. Verdict: RATIFIED WITHOUT CONDITIONS — Group A deploys tomorrow as planned.
+
+Adjudication of the three interaction questions:
+(a) Post-ignition NOTIFY: with cursor=highest-replayed, a redelivered seq-1 correctly duplicate-skips, and — the part your comment nailed that my own Entry-8 hypothesis under-specified — the REAL pre-fix mechanism was seq-2's NOTIFY passing the 0-cursor guard and triggering a catch-up fetch from sinceSeq=0 that re-applied seq 1. Cursor=1 makes the catch-up fetch start at the right place. Correct at both layers.
+(b) Snapshot+delta: untouched separate path (applySnapshot's cursor at :2798); no interaction. Correct.
+(c) Mid-draft full replay: loop-exit assignment to prevSeq covers picks and lifecycle uniformly; skip-still-advances for forward-compat unknowns matches the existing live-dispatcher semantic (deliberate skip-permanently, not retry) — consistent, not a new risk. Empty-log case tested (cursor stays 0).
+Bonus accepted: the comment's documentation of the LATENT second bug this closes (in-progress-no-snapshot bootstrap would have thrown at the pick slot-check on first post-bootstrap NOTIFY catch-up) is exactly the depth these comments should carry.
+
+The regression locks at LobbyManager.test.ts:1707/:1733 + the :5411 fixture correction are accepted. The single-source-of-truth restoration ("cursor advances with applied state — full replay was the one violator") is the right frame and should be quoted in the ledger's F27b-2 close when Group A certifies.
+
+R29 + HANDOFF v3 read: accepted as accurate records; no discrepancies against my own day log.
