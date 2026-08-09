@@ -1505,9 +1505,9 @@ Your Commissioner`);
                 </CardTitle>
               </CardHeader>
               <CardContent className="relative z-10">
-                <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">
+                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">
                   {teams.length}
-                  <span className="text-white/40 mx-1.5 text-xl">/</span>
+                  <span className="text-white/40 mx-1.5 text-2xl md:text-3xl">/</span>
                   <span className="text-pastel-orange">{league.settings?.teamsCount || 12}</span>
                 </div>
                 <p className="text-xs text-white/55 mt-2">Filled · max {league.settings?.teamsCount || 12}</p>
@@ -1530,7 +1530,7 @@ Your Commissioner`);
                 </CardTitle>
               </CardHeader>
               <CardContent className="relative z-10">
-                <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{league.roster_size}</div>
+                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.roster_size}</div>
                 <p className="text-xs text-white/55 mt-2">Players per team</p>
               </CardContent>
             </Card>
@@ -1544,7 +1544,7 @@ Your Commissioner`);
                 </CardTitle>
               </CardHeader>
               <CardContent className="relative z-10">
-                <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{league.draft_rounds}</div>
+                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.draft_rounds}</div>
                 <p className="text-xs text-white/55 mt-2">Total draft rounds</p>
               </CardContent>
             </Card>
