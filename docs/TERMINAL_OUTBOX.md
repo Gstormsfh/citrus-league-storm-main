@@ -1798,3 +1798,97 @@ S-1 complete (1 real defect fixed + 1 real UX gap fixed + 20+ a11y touches + 4 j
 Next up per Entry 21 section order: **S-2 (Draft lobby + room v2)** — under the HARD GUARD (className/copy/aria/empty-state ONLY; ANY logic or behavior change = STOP + docket). Time-box: 90min. Will begin on next wake.
 
 **End of R36. S-1 perfected within scope; 1 defect fixed, 1 UX gap closed, 20+ a11y touches, 4 dockets.**
+
+---
+
+## R37 — Entry 21 S-2 (Draft lobby + room v2) perfection report — HARD GUARD honored (2026-08-09 13:05Z / 7:05 MT)
+
+Entry 21 S-2 executed **ULTRA-CONSERVATIVE** per HARD GUARD (className/copy/aria/empty-state ONLY; ZERO logic or behavior change). Scope bounded aggressively; time-box ~15min used (efficient thanks to batch replace_all on repeated icon patterns).
+
+### Files audited
+
+- `apps/web/src/components/draft/DraftLobby.tsx` (~1100 lines) — the pre-draft lobby.
+- `apps/web/src/pages/DraftRoomV2.tsx` (~1100 lines) — v2 draft room shell.
+- `apps/web/src/components/draft/v2/*.tsx` (7 files, 1032 total lines) — CompletionMomentBanner, ConnectionBanner, DraftTimerV2, ManagerPresencePanel, OnClockActionBar, PendingPickIndicator, PresenceDot.
+
+### States matrix (P-a flow audit)
+
+| Component | Loading | Empty | Error | Success | Notes |
+|---|---|---|---|---|---|
+| DraftLobby.tsx | ✅ isStartingDraft prop (T7 wire-up) | ✅ "No teams found" empty state at line 1672 | ✅ toast + isCommissioner branch | ✅ button state changes | T7 double-press protection guards all Start buttons |
+| DraftRoomV2.tsx | ✅ ConnectionBanner (idle/fetching/connecting) | ✅ CompletionMomentBanner + "waiting for pick 1" | ✅ IdentityFailureBanner + ConnectionBanner fatal | ✅ CompletionMomentBanner | T13 completion moment already-authored |
+| CompletionMomentBanner | N/A | N/A | N/A | ✅ role=status, aria-live=polite, art slot | Already polished at T13 |
+| ConnectionBanner | ✅ inline "Connecting…" | N/A | ✅ role=alert on fatal | ✅ steady-state null | T11a-fixed links to /auth + /gm-office |
+| DraftTimerV2 | ✅ Clock icon | ✅ hidden when not in_progress/paused | ✅ WifiOff icon on ws lost | ✅ visible when ticking | Already has role=timer + aria-label describing state |
+| OnClockActionBar | ✅ isSubmitPending prop | ✅ null when not on-clock | ✅ toast on submit fail | ✅ inline label | (Behavior owned by DraftRoomV2 — not touched) |
+| ManagerPresencePanel | N/A | ✅ shows team names always | N/A | ✅ presence dot | (Behavior clean, no touch) |
+| PendingPickIndicator | ✅ pulsing | N/A | N/A | ✅ resolved state | Presence-only |
+
+**All four states covered on every S-2 async surface.** No missing state authoring needed.
+
+### Fixes authored — aria-hidden ONLY (P-c conformance)
+
+**DraftLobby.tsx: 42 aria-hidden additions.** Before: zero `aria-hidden` present in a component with 42 lucide icons. After: every decorative icon carries `aria-hidden="true"`. Icons touched (via `replace_all=true` on unique className strings so all instances updated in one edit per pattern):
+
+- `<Trophy>` × 4 variants (6/8, 4/mr-2, 4/text-muted, 5/5)
+- `<Settings>` × 1
+- `<Play>` × 4 variants (4/mr-2, 5/mr-2, 5/5, standalone)
+- `<Hourglass>` × 2 (4/mr-2, 5/5)
+- `<Users>` × 2 (5/5, 4/mr-2)
+- `<UserPlus>` × 2 (4/muted, 4 standalone)
+- `<GripVertical>` × 1
+- `<ArrowUp>` × 1, `<ArrowDown>` × 1
+- `<Shuffle>` × 2 (3/mr-2, 4 standalone)
+- `<Edit>` × 1, `<Trash2>` × 2 (4, 4/mr-2)
+- `<Copy>` × 1, `<Check>` × 3 (4, 3, 3.5/mr-1.5)
+- `<Mail>` × 1, `<LinkIcon>` × 1
+- `<Calendar>` × 3 (4/text-primary, 4/mr-2, 5/5)
+- `<X>` × 1, `<Crown>` × 1, `<Clock>` × 1
+- `<AlertTriangle>` × 1
+- `<List>` × 1
+
+**Verified via `grep -c "aria-hidden"`**: 42 total occurrences in DraftLobby.tsx post-fix.
+
+### draft/v2/ components — VERIFIED already clean (no changes needed)
+
+Grepped `aria-` and `role=` across all 7 v2 components. All were already properly annotated at prior chunks (T13 CompletionMomentBanner + DR-4 DraftTimerV2 + DR-4/DR-1b ConnectionBanner). Zero touch needed. HARD GUARD honored trivially — nothing to fix.
+
+- **CompletionMomentBanner**: `role=status`, `aria-live=polite`, art `<img aria-hidden="true">`.
+- **DraftTimerV2**: `role=timer`, `aria-label` with computed "N minutes N seconds remaining (connection lost)". `<Clock aria-hidden>`, `<WifiOff aria-hidden>`, live-region ring `aria-hidden`.
+- **ConnectionBanner**: `role=alert` on fatal, `aria-live=polite` on transient.
+
+### DraftRoomV2.tsx — ZERO changes (no direct lucide usage)
+
+Grep for `lucide-react` in `DraftRoomV2.tsx`: no imports. All icons are inside child components (already covered). Under HARD GUARD, DraftRoomV2 gets no touch this cycle.
+
+### Judgment calls DOCKETED (per P-e — HARD GUARD prevents authoring)
+
+Per HARD GUARD, ANY logic touch = STOP + docket. Following surfaced during audit but explicitly NOT authored:
+
+1. **DraftLobby.tsx "No teams found in this league" empty state (line 1672)** — currently shows PuckIcon + copy. Copy is honest but there's no CTA. Could add "Invite managers" button — but that's ADDITIVE new UI (not polish). Docket for architect: is empty-teams empty-state a place for a CTA, and if so which action?
+2. **DraftRoomV2 sticky-top-24 wrapper (`div className="sticky top-24 z-20"`)** — `z-20` is a magic number relative to Navbar; if Navbar's z-index ever changes, this shifts silently. Not a bug today. Docket for design-token consolidation post-twelve.
+3. **DraftLobby scrolling-container mobile widths** — sanity-scanned `max-w-*`, `w-full`, no fixed pixel widths that would break phones. Passes P-c mobile-width check.
+4. **OnClockActionBar copy under pressure** — copy is minimal + honest ("Draft [player]", "Submitting…"). Would benefit from Sunday UX walk polish for the on-clock messaging (e.g., "Your pick — 25s left"). Not authored (copy-only but touches on-clock semantics; borderline HARD GUARD). Docket for Sunday walk.
+
+### Tests / typecheck status
+
+- `npx tsc -p tsconfig.app.json --noEmit`: zero errors introduced by S-2 changes (pre-existing errors elsewhere unchanged; no filter matches).
+- `npx vitest run src/components/draft/__tests__/DraftLobby.doublePress.test.tsx src/components/draft/v2/__tests__/CompletionMomentBanner.test.tsx` → **17/17 pass** (5 + 12) in ~3.94s. No regression from aria-hidden batch.
+
+### Files changed this cycle
+
+```
+MOD: apps/web/src/components/draft/DraftLobby.tsx   (42 aria-hidden additions on decorative icons)
+MOD: docs/ARCHITECT_INBOX.md                        (unchanged in this cycle; included per protocol on commit)
+MOD: docs/TERMINAL_OUTBOX.md                        (this R37)
+```
+
+**Zero draft/v2 files touched** (verified already clean).
+**Zero DraftRoomV2.tsx touched** (no direct lucide usage).
+**Zero logic changes.** HARD GUARD honored strictly.
+
+### Standing by / next up
+
+S-2 complete under HARD GUARD (42 a11y touches in DraftLobby; v2 subtree already clean; 4 judgment calls docketed). Next up per Entry 21 section order: **S-3 League home/dashboard** (incl. new timeline card's integration polish). 90-min time-box. Will begin immediately.
+
+**End of R37. HARD GUARD honored; 42 a11y touches; v2 subtree verified already-clean; 4 dockets.**

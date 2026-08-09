@@ -283,7 +283,7 @@ export const DraftLobby = ({
       {/* Draft Header */}
       <div className="text-center space-y-2 sm:space-y-4">
         <div className="flex items-center justify-center gap-2">
-          <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+          <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-primary" aria-hidden="true" />
           <h1 className="text-xl sm:text-3xl font-bold">Draft Lobby</h1>
         </div>
         <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto px-4">
@@ -301,7 +301,7 @@ export const DraftLobby = ({
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
+                <Settings className="h-5 w-5" aria-hidden="true" />
                 Draft Settings
                 {!isCommissioner && <Badge variant="secondary" className="ml-2">Read Only</Badge>}
               </CardTitle>
@@ -410,7 +410,7 @@ export const DraftLobby = ({
                             className="flex items-center gap-2 p-2 bg-background border rounded-md"
                           >
                             <div className="flex items-center gap-2 flex-1">
-                              <GripVertical className="h-4 w-4 text-muted-foreground" />
+                              <GripVertical className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                               <span className="text-sm font-medium w-8">#{index + 1}</span>
                               <span className="text-sm flex-1">{team.name}</span>
                               <Badge variant="outline" className="text-xs">
@@ -426,7 +426,7 @@ export const DraftLobby = ({
                                 onClick={() => moveTeamUp(index)}
                                 disabled={index === 0}
                               >
-                                <ArrowUp className="h-3 w-3" />
+                                <ArrowUp className="h-3 w-3" aria-hidden="true" />
                               </Button>
                               <Button
                                 type="button"
@@ -436,7 +436,7 @@ export const DraftLobby = ({
                                 onClick={() => moveTeamDown(index)}
                                 disabled={index === customOrder.length - 1}
                               >
-                                <ArrowDown className="h-3 w-3" />
+                                <ArrowDown className="h-3 w-3" aria-hidden="true" />
                               </Button>
                             </div>
                           </div>
@@ -453,7 +453,7 @@ export const DraftLobby = ({
                         setCustomOrder(teams.map(t => t.id));
                       }}
                     >
-                      <Shuffle className="h-3 w-3 mr-2" />
+                      <Shuffle className="h-3 w-3 mr-2" aria-hidden="true" />
                       Reset to Default Order
                     </Button>
                   </div>
@@ -507,7 +507,7 @@ export const DraftLobby = ({
             <CardHeader>
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2">
-                  <List className="h-5 w-5" />
+                  <List className="h-5 w-5" aria-hidden="true" />
                   Draft Order
                 </CardTitle>
                 {isCommissioner && !hasExistingDraft && (
@@ -519,7 +519,7 @@ export const DraftLobby = ({
                         onClick={onRandomizeOrder}
                         className="gap-2"
                       >
-                        <Shuffle className="h-4 w-4" />
+                        <Shuffle className="h-4 w-4" aria-hidden="true" />
                         <span className="hidden xs:inline">Randomize</span>
                         <span className="xs:hidden">Rand.</span> Order
                       </Button>
@@ -530,7 +530,7 @@ export const DraftLobby = ({
                       onClick={() => setShowCustomOrderDialog(true)}
                       className="gap-2"
                     >
-                      <Edit className="h-4 w-4" />
+                      <Edit className="h-4 w-4" aria-hidden="true" />
                       Custom Order
                     </Button>
                   </div>
@@ -556,7 +556,7 @@ export const DraftLobby = ({
                         <div className="font-medium truncate">{team.name}</div>
                         <div className="text-sm text-muted-foreground truncate">{team.owner}</div>
                       </div>
-                      {index === 0 && <Crown className="h-4 w-4 text-yellow-500 shrink-0" />}
+                      {index === 0 && <Crown className="h-4 w-4 text-yellow-500 shrink-0" aria-hidden="true" />}
                     </div>
                   );
                 })}
@@ -564,7 +564,7 @@ export const DraftLobby = ({
               {(customDraftOrder || randomizedOrder || settings.draftOrder === 'custom') && (
                 <div className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary/20">
                   <p className="text-sm text-primary font-medium flex items-center gap-2">
-                    <Check className="h-4 w-4" />
+                    <Check className="h-4 w-4" aria-hidden="true" />
                     {settings.draftOrder === 'custom' 
                       ? 'Custom draft order (from settings) has been set and will be used when you start the draft.'
                       : customDraftOrder
@@ -581,7 +581,7 @@ export const DraftLobby = ({
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
+                  <Users className="h-5 w-5" aria-hidden="true" />
                   All Teams ({teams.length}/{maxTeams})
                 </CardTitle>
                 {isCommissioner && teams.length < maxTeams && onAddAITeams && (
@@ -594,7 +594,7 @@ export const DraftLobby = ({
                       }
                     }}
                   >
-                    <Users className="h-4 w-4 mr-2" />
+                    <Users className="h-4 w-4 mr-2" aria-hidden="true" />
                     Add AI Teams
                   </Button>
                 )}
@@ -643,7 +643,7 @@ export const DraftLobby = ({
                         className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
                         onClick={() => setTeamToDelete(team)}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
                       </Button>
                     )}
                   </div>
@@ -654,7 +654,7 @@ export const DraftLobby = ({
                   <>
                     {Array.from({ length: Math.min(3, maxTeams - teams.length) }).map((_, index) => (
                       <div key={`empty-${index}`} className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-muted">
-                        <UserPlus className="h-4 w-4 text-muted-foreground" />
+                        <UserPlus className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                         <div className="text-muted-foreground">Waiting for manager...</div>
                       </div>
                     ))}
@@ -690,7 +690,7 @@ export const DraftLobby = ({
                     className="flex items-center gap-2 p-3 bg-background border rounded-md"
                   >
                     <div className="flex items-center gap-2 flex-1">
-                      <GripVertical className="h-4 w-4 text-muted-foreground" />
+                      <GripVertical className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       <span className="text-sm font-medium w-8">#{index + 1}</span>
                       <span className="text-sm flex-1">{team.name}</span>
                       <Badge variant="outline" className="text-xs">
@@ -706,7 +706,7 @@ export const DraftLobby = ({
                         onClick={() => moveDraftOrderTeamUp(index)}
                         disabled={index === 0}
                       >
-                        <ArrowUp className="h-3 w-3" />
+                        <ArrowUp className="h-3 w-3" aria-hidden="true" />
                       </Button>
                       <Button
                         type="button"
@@ -716,7 +716,7 @@ export const DraftLobby = ({
                         onClick={() => moveDraftOrderTeamDown(index)}
                         disabled={index === draftOrderCustomOrder.length - 1}
                       >
-                        <ArrowDown className="h-3 w-3" />
+                        <ArrowDown className="h-3 w-3" aria-hidden="true" />
                       </Button>
                     </div>
                   </div>
@@ -732,7 +732,7 @@ export const DraftLobby = ({
                   }
                 }}
               >
-                <Shuffle className="h-3 w-3 mr-2" />
+                <Shuffle className="h-3 w-3 mr-2" aria-hidden="true" />
                 Reset to Default
               </Button>
               <Button onClick={handleSaveCustomDraftOrder}>
@@ -749,7 +749,7 @@ export const DraftLobby = ({
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <UserPlus className="h-4 w-4" />
+                  <UserPlus className="h-4 w-4" aria-hidden="true" />
                   Invite Managers
                 </CardTitle>
               </CardHeader>
@@ -775,7 +775,7 @@ export const DraftLobby = ({
                       }
                     }}
                   >
-                    {copiedCode ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copiedCode ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
                   </Button>
                 </div>
 
@@ -808,7 +808,7 @@ Your Commissioner`);
                       }
                     }}
                   >
-                    <Mail className="h-3.5 w-3.5 mr-1.5" />
+                    <Mail className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
                     Email
                   </Button>
                   <Button
@@ -830,12 +830,12 @@ Your Commissioner`);
                   >
                     {copiedLink ? (
                       <>
-                        <Check className="h-3.5 w-3.5 mr-1.5" />
+                        <Check className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
                         Copied
                       </>
                     ) : (
                       <>
-                        <LinkIcon className="h-3.5 w-3.5 mr-1.5" />
+                        <LinkIcon className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
                         Link
                       </>
                     )}
@@ -850,7 +850,7 @@ Your Commissioner`);
             <Card className="border-primary/20 bg-primary/5">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-primary" />
+                  <Calendar className="h-4 w-4 text-primary" aria-hidden="true" />
                   Scheduled Draft
                 </CardTitle>
               </CardHeader>
@@ -881,7 +881,7 @@ Your Commissioner`);
                       className="text-xs"
                       onClick={() => onScheduleDraft(null)}
                     >
-                      <X className="h-3 w-3 mr-1" />
+                      <X className="h-3 w-3 mr-1" aria-hidden="true" />
                       Clear Schedule
                     </Button>
                   )}
@@ -909,7 +909,7 @@ Your Commissioner`);
                   {isDraftQueued && (
                     <div className="mt-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
                       <p className="text-xs text-primary font-medium flex items-center gap-2">
-                        <Check className="h-3 w-3" />
+                        <Check className="h-3 w-3" aria-hidden="true" />
                         Draft is queued and ready to start
                       </p>
                     </div>
@@ -922,7 +922,7 @@ Your Commissioner`);
                     className="w-full"
                     disabled={isStartingDraft}
                   >
-                    <Play className="h-4 w-4 mr-2" />
+                    <Play className="h-4 w-4 mr-2" aria-hidden="true" />
                     {isStartingDraft ? 'Starting…' : 'Continue Draft'}
                   </Button>
                 ) : isDraftQueued ? (
@@ -933,7 +933,7 @@ Your Commissioner`);
                       size="lg"
                       disabled={isStartingDraft}
                     >
-                      <Play className="h-5 w-5 mr-2" />
+                      <Play className="h-5 w-5 mr-2" aria-hidden="true" />
                       {isStartingDraft ? 'Starting…' : 'Start Draft Now'}
                     </Button>
                     <p className="text-xs text-muted-foreground text-center">
@@ -955,7 +955,7 @@ Your Commissioner`);
                         className="w-full"
                         disabled={teams.length < 4 || isStartingDraft}
                       >
-                        <Hourglass className="h-4 w-4 mr-2" />
+                        <Hourglass className="h-4 w-4 mr-2" aria-hidden="true" />
                         Prepare Draft
                       </Button>
                     )}
@@ -965,7 +965,7 @@ Your Commissioner`);
                       disabled={teams.length < 4 || isStartingDraft}
                       variant={onPrepareDraft ? "outline" : "default"}
                     >
-                      <Play className="h-4 w-4 mr-2" />
+                      <Play className="h-4 w-4 mr-2" aria-hidden="true" />
                       {isStartingDraft ? 'Starting…' : 'Start Draft Now'}
                     </Button>
 
@@ -985,7 +985,7 @@ Your Commissioner`);
                           setShowScheduleDialog(true);
                         }}
                       >
-                        <Calendar className="h-4 w-4 mr-2" />
+                        <Calendar className="h-4 w-4 mr-2" aria-hidden="true" />
                         Schedule Draft Time
                       </Button>
                     )}
@@ -1005,7 +1005,7 @@ Your Commissioner`);
                 <Card className="border-primary/20 bg-primary/5">
                   <CardHeader>
                     <CardTitle className="text-primary flex items-center gap-2">
-                      <Play className="h-5 w-5" />
+                      <Play className="h-5 w-5" aria-hidden="true" />
                       Draft In Progress
                     </CardTitle>
                   </CardHeader>
@@ -1022,7 +1022,7 @@ Your Commissioner`);
                       size="lg"
                       disabled={isStartingDraft}
                     >
-                      <Play className="h-5 w-5 mr-2" />
+                      <Play className="h-5 w-5 mr-2" aria-hidden="true" />
                       {isStartingDraft ? 'Joining…' : 'Join Draft Room'}
                     </Button>
                   </CardContent>
@@ -1031,7 +1031,7 @@ Your Commissioner`);
                 <Card className="border-primary/20 bg-primary/5">
                   <CardHeader>
                     <CardTitle className="text-primary flex items-center gap-2">
-                      <Hourglass className="h-5 w-5" />
+                      <Hourglass className="h-5 w-5" aria-hidden="true" />
                       {scheduledDraftTime ? 'Draft Scheduled' : 'Waiting for Draft'}
                     </CardTitle>
                   </CardHeader>
@@ -1058,7 +1058,7 @@ Your Commissioner`);
                 </CardHeader>
                 <CardContent>
                   <Button variant="outline" className="w-full" onClick={() => navigate('/create-league')}>
-                    <Trophy className="h-4 w-4 mr-2" />
+                    <Trophy className="h-4 w-4 mr-2" aria-hidden="true" />
                     Create New League
                   </Button>
                 </CardContent>
@@ -1070,13 +1070,13 @@ Your Commissioner`);
           <Card>
             <CardContent className="pt-6 space-y-3">
               <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4 text-muted-foreground" />
+                <Clock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <span className="text-muted-foreground">
                   Estimated time: {Math.ceil((teams.length * settings.rounds * settings.pickTimeLimit) / 60)} minutes
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <Trophy className="h-4 w-4 text-muted-foreground" />
+                <Trophy className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <span className="text-muted-foreground">
                   {settings.draftOrder === 'serpentine' ? 'Serpentine' : 'Standard'} draft order
                 </span>
@@ -1091,7 +1091,7 @@ Your Commissioner`);
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" />
+              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
               Remove Team
             </DialogTitle>
             <DialogDescription>
@@ -1104,7 +1104,7 @@ Your Commissioner`);
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDeleteTeam}>
-              <Trash2 className="h-4 w-4 mr-2" />
+              <Trash2 className="h-4 w-4 mr-2" aria-hidden="true" />
               Remove Team
             </Button>
           </DialogFooter>
@@ -1116,7 +1116,7 @@ Your Commissioner`);
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+              <Calendar className="h-5 w-5" aria-hidden="true" />
               Schedule Draft Time
             </DialogTitle>
             <DialogDescription>
@@ -1175,7 +1175,7 @@ Your Commissioner`);
                 });
               }}
             >
-              <Calendar className="h-4 w-4 mr-2" />
+              <Calendar className="h-4 w-4 mr-2" aria-hidden="true" />
               Schedule Draft
             </Button>
           </DialogFooter>
