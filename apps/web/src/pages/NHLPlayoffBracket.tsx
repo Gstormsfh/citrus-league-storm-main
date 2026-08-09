@@ -275,7 +275,7 @@ export default function NHLPlayoffBracket() {
                         {/* Game count */}
                         {s.games_played > 0 && (
                           <div className="font-jbmono text-[10px] text-white/45 mt-2 text-center flex items-center justify-center gap-1">
-                            <Clock className="w-3 h-3" />
+                            <Clock className="w-3 h-3" aria-hidden="true" />
                             {s.games_played} of 7 games played
                           </div>
                         )}
@@ -290,7 +290,7 @@ export default function NHLPlayoffBracket() {
 
         {series.length === 0 && (
           <div className="text-center py-16">
-            <Trophy className="w-12 h-12 text-white/20 mx-auto mb-3" />
+            <Trophy className="w-12 h-12 text-white/20 mx-auto mb-3" aria-hidden="true" />
             <p className="font-jbmono text-[12px] uppercase tracking-wider text-white/45">
               Bracket not yet finalized. Check back when seeds are set.
             </p>

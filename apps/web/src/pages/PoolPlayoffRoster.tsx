@@ -609,7 +609,7 @@ export default function PoolPlayoffRosterEntry() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <h1 className="text-lg font-varsity font-black uppercase text-citrus-forest flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-citrus-orange" />
+                <Trophy className="h-5 w-5 text-citrus-orange" aria-hidden="true" />
                 {isViewMode ? `${viewOwnerName || 'Teammate'}'s Roster` : (league?.name || 'Playoff Roster Pool')}
               </h1>
               <div className="flex items-center gap-3 mt-1 text-xs text-citrus-charcoal/70">
@@ -1144,7 +1144,7 @@ export default function PoolPlayoffRosterEntry() {
                           </td>
                           <td className="px-2 py-1.5">
                             <div className="flex items-center gap-1.5">
-                              {onRoster && <Check className="h-3.5 w-3.5 text-citrus-sage flex-shrink-0" />}
+                              {onRoster && <Check className="h-3.5 w-3.5 text-citrus-sage flex-shrink-0" aria-hidden="true" />}
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); setStatsModalPlayer(player); }}

@@ -196,7 +196,7 @@ const RoundColumn: React.FC<RoundColumnProps> = ({
           'text-sm font-bold uppercase tracking-wider',
           isChampionship ? 'text-amber-300' : 'text-pastel-orange',
         )}>
-          {isChampionship && <Trophy className="w-4 h-4 inline-block mr-1 -mt-0.5" />}
+          {isChampionship && <Trophy className="w-4 h-4 inline-block mr-1 -mt-0.5" aria-hidden="true" />}
           {roundName}
         </h3>
       </div>
@@ -261,7 +261,7 @@ const ChampionBanner: React.FC<{
       <CardContent className="relative p-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-3">
           <Crown className="w-8 h-8 text-amber-500" />
-          <Trophy className="w-10 h-10 text-amber-300" />
+          <Trophy className="w-10 h-10 text-amber-300" aria-hidden="true" />
           <Crown className="w-8 h-8 text-amber-500" />
         </div>
         <h2 className="font-calistoga text-2xl lg:text-3xl text-amber-300 mb-1">
@@ -380,7 +380,7 @@ const CommissionerControls: React.FC<CommissionerControlsProps> = ({
             ) : (
               <div className="space-y-2">
                 <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTriangle className="h-4 w-4" aria-hidden="true" />
                   <AlertDescription className="text-xs">
                     This will permanently delete the bracket and all playoff matchups.
                   </AlertDescription>
@@ -433,7 +433,7 @@ const SeedList: React.FC<{
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-bold flex items-center gap-2">
-          <Trophy className="w-4 h-4 text-amber-500" />
+          <Trophy className="w-4 h-4 text-amber-500" aria-hidden="true" />
           Playoff Seeds ({bracketSize} Teams)
         </CardTitle>
       </CardHeader>
@@ -822,7 +822,7 @@ const PlayoffBracket = () => {
                     'text-sm font-bold uppercase tracking-wider mb-3 pb-1 border-b',
                     isChampionship ? 'text-amber-300 ring-1 ring-amber-400/40 bg-amber-400/10' : 'text-pastel-orange ring-1 ring-pastel-orange/30 bg-pastel-orange/10',
                   )}>
-                    {isChampionship && <Trophy className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" />}
+                    {isChampionship && <Trophy className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" aria-hidden="true" />}
                     {roundName}
                   </h3>
                   <div className="space-y-3">

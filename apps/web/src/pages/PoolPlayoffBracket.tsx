@@ -252,7 +252,7 @@ export default function PoolPlayoffBracket() {
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div>
             <div className="flex items-center gap-2">
-              <Trophy className="h-6 w-6 text-pastel-orange" />
+              <Trophy className="h-6 w-6 text-pastel-orange" aria-hidden="true" />
               <h1 className="text-xl sm:text-2xl font-calistoga text-pastel-cream">Bracket Challenge</h1>
               {pickMode === 'full-bracket' && (
                 <Badge className={cn(
@@ -365,7 +365,7 @@ export default function PoolPlayoffBracket() {
                             </div>
                             {picked && (
                               <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={info ? { background: info.primaryColor } : { background: '#7A9B7A' }}>
-                                <Check className="w-3 h-3 text-white" />
+                                <Check className="w-3 h-3 text-white" aria-hidden="true" />
                               </div>
                             )}
                             {(isActive || locked) && wins !== undefined && (
@@ -471,7 +471,7 @@ export default function PoolPlayoffBracket() {
                         {myPick?.picked_team_id && (locked || myPick.predicted_games) && (
                           <div className="flex items-center justify-between text-xs pt-1 border-t border-fantasy-border/30">
                             <div className="flex items-center gap-1.5 text-white/70">
-                              <Check className="h-3 w-3 text-pastel-sage-soft" />
+                              <Check className="h-3 w-3 text-pastel-sage-soft" aria-hidden="true" />
                               <span className="font-display font-semibold">
                                 {(() => {
                                   const pickedSeed = teamById.get(myPick.picked_team_id);
@@ -499,7 +499,7 @@ export default function PoolPlayoffBracket() {
 
         {series.length === 0 && (
           <Card className="p-8 text-center">
-            <AlertTriangle className="h-8 w-8 text-white/70/30 mx-auto mb-2" />
+            <AlertTriangle className="h-8 w-8 text-white/70/30 mx-auto mb-2" aria-hidden="true" />
             <p className="text-white/55 text-sm">Bracket not yet set. Picks open once seeds are finalized.</p>
           </Card>
         )}

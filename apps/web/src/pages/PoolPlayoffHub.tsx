@@ -438,7 +438,7 @@ export default function PoolPlayoffHub() {
           <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Trophy className="h-6 w-6 text-pastel-orange" />
+                <Trophy className="h-6 w-6 text-pastel-orange" aria-hidden="true" />
                 <h1 className="text-2xl sm:text-3xl font-calistoga text-pastel-cream tracking-tight">{league.name}</h1>
               </div>
               <div className="flex items-center gap-2 text-sm text-white/70">
@@ -455,7 +455,7 @@ export default function PoolPlayoffHub() {
                   'text-base font-bold flex items-center gap-1 justify-end',
                   lockCountdown.locked ? 'text-red-500' : 'text-pastel-orange'
                 )}>
-                  {lockCountdown.locked ? <Lock className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                  {lockCountdown.locked ? <Lock className="h-4 w-4" aria-hidden="true" /> : <Clock className="h-4 w-4" aria-hidden="true" />}
                   {lockCountdown.label}
                 </div>
               </div>
@@ -527,7 +527,7 @@ export default function PoolPlayoffHub() {
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-center justify-between gap-2">
                         <span className="flex items-center gap-2">
-                          <Calendar className="h-5 w-5 text-pastel-orange" />
+                          <Calendar className="h-5 w-5 text-pastel-orange" aria-hidden="true" />
                           Today&apos;s Games — Your Players
                         </span>
                         <span className="text-xl font-calistoga font-black text-pastel-cream">
@@ -699,7 +699,7 @@ export default function PoolPlayoffHub() {
                   <Card className="bg-[#1A2A20] border-0 ring-2 ring-pastel-orange/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.2)]">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-pastel-orange" />
+                        <Calendar className="h-4 w-4 text-pastel-orange" aria-hidden="true" />
                         Today&apos;s Playoff Games
                       </CardTitle>
                     </CardHeader>
@@ -828,7 +828,7 @@ export default function PoolPlayoffHub() {
                                     {leagueType === 'playoff-bracket-pickem' && pick.predicted_games && `in ${pick.predicted_games}`}
                                   </div>
                                 </div>
-                                {isCorrect && <Check className="h-4 w-4 text-green-500 flex-shrink-0" />}
+                                {isCorrect && <Check className="h-4 w-4 text-green-500 flex-shrink-0" aria-hidden="true" />}
                                 {isFinal && pick.points_earned != null && (
                                   <span className={cn('text-xs font-bold flex-shrink-0', isCorrect ? 'text-green-600' : 'text-white/70/40')}>
                                     +{pick.points_earned}
@@ -850,7 +850,7 @@ export default function PoolPlayoffHub() {
               <Card className="border-pastel-sage/40/30">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Trophy className="h-4 w-4 text-pastel-orange" />
+                    <Trophy className="h-4 w-4 text-pastel-orange" aria-hidden="true" />
                     Leaderboard
                     <span className="text-[10px] text-white/70/50 font-normal ml-auto">
                       {teams.length} {teams.length === 1 ? 'member' : 'members'} · updates every 60s
@@ -944,7 +944,7 @@ export default function PoolPlayoffHub() {
                     className="w-full flex items-center justify-between p-2 rounded ring-1 ring-pastel-sage/30 bg-pastel-sage/8 hover:bg-pastel-sage/15 transition-colors"
                   >
                     <span className="text-lg font-mono font-bold text-pastel-cream tracking-wider">{league.join_code}</span>
-                    {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4 text-white/70/50" />}
+                    {copied ? <Check className="h-4 w-4 text-green-600" aria-hidden="true" /> : <Copy className="h-4 w-4 text-white/70/50" aria-hidden="true" />}
                   </button>
 
                   <div className="pt-2 grid grid-cols-1 gap-1.5">
