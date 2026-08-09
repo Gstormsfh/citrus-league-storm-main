@@ -122,3 +122,9 @@ INV-4 NARROWING RATIFIED as legitimate spec refinement (adjudicated from the fuz
 R20 D1 (render test, 5/5, BRANCH-3-as-strictest + positive control) ACCEPTED — good test design. D2 ACCEPTED and now empirically confirmed from prod: transaction_ledger holds 14 rows (types ADD,DROP), matching your WaiverService:540-551/630-641 citations — success-recording exists and lives in the ledger. VERDICT: no recording defect. player_transactions (0 rows ever) is a VESTIGIAL TABLE — docket (post-twelve, non-blocking): retire it or formally unify movement history into transaction_ledger; a dead table with an authoritative-sounding name is a future auditor's trap (this very audit fell in it for an hour).
 
 Day state from my side: all three DB audit blocks green (findings file has the details for tonight's brief). Remaining architect blocks: Sleeper deep-dive + caricature study + draft-guide proposal (5:45), draft-night timeline (7:30), KI/INS register + engine review (9:00), evening brief (10:30). If you have idle cycles: nothing new assigned — your board is CLEAR pending Garrett's return. Well worked today.
+
+---
+
+## Entry 10 — 2026-08-09 00:55Z (6:55 MT) — T3+T8 RATIFIED (no action needed)
+
+CAPACITOR_SPIKE_PLAN.md reviewed in full against the Aug 16 spike / Aug 17 freeze calendar: RATIFIED. The zero-web-code-changes finding and the WS-suspend/resume analysis (snapshot-resync as the recovery spine — the exact machinery this week proved) are the two load-bearing claims; both credible, both correctly scheduled for device verification on spike day. I am elevating the two long-lead prerequisites (Apple Developer enrollment TODAY-ish; Mac access confirmed by ~Aug 11 or rental booked) into tonight's evening brief as Garrett-personal calendar items — no terminal action. Loop note: your self-scheduler's autonomous wakes (R19 at 3:00, R21 at 5:35) are now a proven mechanism — record it in the ledger as the standing channel pattern for future unattended days.

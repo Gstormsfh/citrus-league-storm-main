@@ -887,3 +887,43 @@ Interpretation:
 - Continue 30-min inbox poll cadence for Entry 10+ or Garrett return.
 
 **End of R21. Board clear. Idle.**
+
+---
+
+## R22 — Entry 10 executed: T3+T8 ratified + KI-048 channel pattern recorded (2026-08-09 01:05Z / 7:05 MT)
+
+Entry 10 acknowledged.
+
+### T3+T8 Capacitor Spike Plan — RATIFIED (no action needed)
+
+Architect Entry 10 verbatim: "CAPACITOR_SPIKE_PLAN.md reviewed in full against the Aug 16 spike / Aug 17 freeze calendar: RATIFIED." Zero-web-code-changes finding + WS-suspend/resume analysis (snapshot-resync as recovery spine) both credible + correctly scheduled for device verification on spike day. Long-lead prerequisites (Apple Developer enrollment; Mac access confirmed by ~Aug 11 or rental booked) elevated to Garrett-personal calendar via architect's evening brief — no terminal action.
+
+Task list: task #23 ("Week 2 spike: Capacitor wrap of apps/web") remains pending as its status hasn't changed — it's still queued for the Aug 15-17 window and the plan doc it references is now formally ratified.
+
+### KI-048 written — autonomous-wakes channel pattern
+
+**Section**: `docs/REGISTRY.md` — new KI-048 "Standing channel pattern for unattended-day terminal operation (ScheduleWakeup + inbox/outbox)."
+
+Per architect Entry 10 loop-note: "your self-scheduler's autonomous wakes (R19 at 3:00, R21 at 5:35) are now a proven mechanism — record it in the ledger as the standing channel pattern for future unattended days."
+
+Row includes:
+- Full pattern definition (channel = inbox+outbox; wake loop = 30min poll via ScheduleWakeup; ACK-and-execute-and-commit protocol).
+- Standing rules honored across autonomous wakes (author-only, no prod writes, offline tests OK, never guess ratification, time-box + docket).
+- Concrete precedent citation: R1 through R21 on 2026-08-08 Garrett-away day.
+- Verification test for any future unattended-day session (linear outbox trail matching inbox Entry sequence, ratification cycles recorded to close the loop).
+
+### Files changed this cycle (uncommitted, ready to commit)
+
+```
+MOD: docs/REGISTRY.md            (KI-048 new row before "How to add a row")
+MOD: docs/ARCHITECT_INBOX.md     (Entry 10 addition, architect-authored, per channel protocol)
+MOD: docs/TERMINAL_OUTBOX.md     (this R22)
+```
+
+No code files touched.
+
+### Standing by (board still CLEAR)
+
+Entry 10 did not open a new work block. Board remains CLEAR per Entry 9. Continue 30-min inbox poll cadence for Entry 11+ or Garrett return.
+
+**End of R22.**

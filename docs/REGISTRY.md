@@ -719,6 +719,39 @@ Prod (empirically confirmed by architect Entry 9): `player_transactions` = 0 row
 
 ---
 
+### KI-048 — Standing channel pattern for unattended-day terminal operation (ScheduleWakeup + inbox/outbox)
+
+**Pattern, not a defect.** Recorded per architect Entry 10 (2026-08-09 00:55Z) after the 2026-08-08 Garrett-away day proved the mechanism end-to-end. Two autonomous wakes on that day (R19 committed 03:00 MT, R21 committed 05:35 MT) executed non-trivial architect rulings — T7 wire-up (Entry 7) and ratification housekeeping (Entry 9) — with zero human presence, zero prod writes, and full auditability via the outbox trail.
+
+**The channel:**
+- `docs/ARCHITECT_INBOX.md` — architect writes rulings, appends `## Entry N` sections chronologically. Terminal reads-only.
+- `docs/TERMINAL_OUTBOX.md` — terminal writes ACK + execution reports, appends `## RN` sections chronologically. Architect reads-only.
+- Both files are included in every commit that touches either side (channel protocol).
+
+**The wake loop:**
+1. Terminal ends its active session with `ScheduleWakeup(delaySeconds=1800)` (30-minute cadence) whenever architect is asynchronous.
+2. On wake, terminal runs `wc -l docs/ARCHITECT_INBOX.md` and compares against the last-known baseline stored implicitly in the ongoing conversation context (or reported in the last R-entry).
+3. If line count unchanged → re-schedule another 1800s wake. No text output beyond "Inbox still N lines" one-liner.
+4. If line count grew → read the new tail, execute per standing rules (author-only, no prod writes, offline unit tests OK), append RN+ to outbox, commit both inbox+outbox (+ any other authored files), report to user, then re-schedule the next wake.
+
+**Standing rules honored across autonomous wakes:**
+- AUTHOR-ONLY — no prod writes, no rig runs, no gcloud/docker/psql, no npm scripts touching network/DB.
+- Offline unit tests only for verification.
+- Every commit includes both inbox+outbox per channel protocol (even if inbox didn't change this cycle — actually only include if it did; commit the pair when either has changed within the same commit's scope).
+- Never guess architect decisions — STOP and docket if the ratification bar isn't met.
+- Time-box + docket — no item stalled >90min.
+
+| | |
+|---|---|
+| **Severity** | pattern — no severity applies. |
+| **Surface** | `docs/ARCHITECT_INBOX.md`, `docs/TERMINAL_OUTBOX.md`, `ScheduleWakeup` tool at terminal-side. Applied concretely across 2026-08-08 Garrett-away day (R1 through R21). |
+| **Description** | Standing channel pattern for unattended-day terminal operation. Terminal polls inbox on 30-minute self-scheduled wakes via `ScheduleWakeup`; ACKs any inbox growth by appending to outbox + committing both files per channel protocol; executes architect rulings within standing rules (author-only, no prod writes); reports to user each cycle. Proven mechanism on 2026-08-08. |
+| **Why deferred** | Not deferred — recorded as standing engineering practice for all future unattended-day operations. |
+| **Target phase / timeline** | Ambient — applies to any future day where Garrett is asynchronous and architect writes rulings directly to the inbox. |
+| **Verification test** | Any future unattended-day session that follows this pattern MUST produce a linear outbox trail (R1, R2, ...) matching the inbox Entry sequence (Entry 1, Entry 2, ...) with commit SHAs cross-referenceable to both files. Any ratification cycle (architect ACK of a prior R-entry) MUST be recorded in the outbox to close the loop. |
+
+---
+
 ## How to add a row
 
 1. Append a new `### KI-NNN` section. Use the next sequential ID across **both** registries (this one and `docs/RUNBOOKS/draft-engine-v2-known-issues.md`). Check the highest existing ID in each before assigning.
