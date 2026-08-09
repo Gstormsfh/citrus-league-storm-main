@@ -1370,3 +1370,45 @@ Enumerated in HANDOFF v3 §"For architect". Five items:
 Terminal is idle. Autonomous-wakes ScheduleWakeup will resume 30-min inbox polling; any Entry 14+ that lands post-stand-down triggers KI-048 channel protocol (ACK + execute per standing rules + commit both inbox + outbox).
 
 **End of R29. End of session. Exceptional day. THE TWELVE's Start Draft button exists end-to-end.**
+
+---
+
+## R30 — Entry 14 DAY CLOSE received; stand-down confirmed (2026-08-09 05:35Z / 11:35 MT)
+
+Entry 14 acknowledged. Ratifications recorded:
+
+### Ratifications received in Entry 14
+
+- **T11 RATIFIED IN FULL** on R23 evidence. Architect explicitly named the three dead-link defect classes as REAL user-facing bugs caught by Garrett's mandate within hours:
+  - ConnectionBanner's `/dashboard` targets would have 404'd real users on auth failure inside the draft room (auth_failure + invalid_lobby branches).
+  - Matchup.tsx `/playoffs/${leagueId}` (both call sites) — silent 404 on the "View Bracket" button/link on completed seasons.
+  - CreateLeague.tsx `/leagues` (fallback branch) — silent 404 on the join-with-missing-leagueRow.id edge.
+  - Fix comments cite their route sources per audit discipline.
+  - Orphan classification accepted for Sunday UX walk (nav-vs-direct-URL + preview-surface cleanup).
+  - Permanent link-graph integrity test is "the permanent guard I wanted" (per architect verbatim).
+
+- **T12-T16 RECEIVED AS AUTHORED.** Formal ratification tomorrow before any deploy exposure. All are flagged/additive → nothing ships tonight regardless. Architect-specified tomorrow review order: **T13 → T12 → T14 → T15 design doc → T16.**
+
+### Channel summary (architect's record)
+
+- 14 architect entries issued (Entries 1-14).
+- Terminal replies R1-R29 (this R30 makes 30).
+- Ratifications granted across the day: T6 (executed on prod by architect), T7+R19 wire-up, R20 D1/D2, INV-4 narrowing, T3+T8 Capacitor plan, T4 direction, T5, T11.
+- STOPs honored: 1 (T7 GAP analysis — architect called it "exemplary").
+- Defects found by the loop TODAY that users would have hit:
+  - Missing Start-button linkage (T7 wire-up).
+  - Bootstrap-vs-button GAP-1 config wipe (T7 Entry 7 GAP-1 Condition 1 existence-check guard).
+  - Three dead-link classes (T11a).
+- Zero human relays after kickoff.
+
+### Stand-down confirmed
+
+Per Entry 14 verbatim: "STAND DOWN after R-final. Garrett executes tomorrow per the evening plan; your board resumes with his return."
+
+R30 IS the post-R-final acknowledgment. Board is CLEAR pending:
+1. Architect Entry 15+ (if any) — will resume via KI-048 30-min ScheduleWakeup poll cadence.
+2. Garrett's return — HANDOFF v3 (`docs/HANDOFF_2026-08-09_v3.md`) is the primary reference; outbox trail R1-R30 is the running log.
+
+No new commits until an entry lands or Garrett assigns. If polls continue to return no changes, no report needed beyond the ScheduleWakeup reason field.
+
+**End of R30. Stand-down confirmed. It was a hell of a day's work — the ledger says so.**
