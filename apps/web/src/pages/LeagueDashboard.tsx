@@ -21,6 +21,7 @@ import { WaiverService } from '@/services/WaiverService';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import Navbar from '@/components/Navbar';
+import { LeagueTimelineCard } from '@/components/dashboard/LeagueTimelineCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -1658,6 +1659,22 @@ Your Commissioner`);
               </Card>
             )}
           </div>
+
+          {/* T12 architect Entry 13 (2026-08-09): league timeline —
+              Sleeper-gap 2 ("the league that convenes"). Read-only
+              feed assembled from data already recorded (draft
+              completion + transaction_ledger + matchup results). Pure
+              function in @citrus/shared; card handles fetch + render. */}
+          {leagueId && (
+            <div className="mb-6">
+              <LeagueTimelineCard
+                leagueId={leagueId}
+                draftStatus={league?.draft_status ?? null}
+                draftCompletedAt={league?.updated_at ?? null}
+                topPick={null}
+              />
+            </div>
+          )}
 
           {/* Teams List */}
           <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">

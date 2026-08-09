@@ -5,3 +5,4 @@ export * from './structuredLogger';
 export * from './playoffBracket';
 export * from './draftHash';
 export * from './playerIdDomain';
+export * from './leagueTimeline';

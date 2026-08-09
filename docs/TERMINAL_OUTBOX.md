@@ -1033,3 +1033,61 @@ MOD: docs/TERMINAL_OUTBOX.md                                  (this R23)
 Entry 13 night queue: T11 ✓ DONE. Next: T12 (LEAGUE TIMELINE CARD, Sleeper-gap 2). Then T13, T14, T15, T16. Pacing honestly per architect: quality bar unchanged, safety arguments per diff, STOP on ambiguity. Will chunk each into its own commit-and-report cycle for auditability.
 
 **End of R23. T11 closed; 3 dead links fixed; CI invariant landed; 17 orphans docketed for Sunday.**
+
+---
+
+## R24 — T12 LEAGUE TIMELINE CARD authored (2026-08-09 03:45Z / 9:45 MT)
+
+Sleeper-gap 2 ("the league that convenes") shipped as a read-only feed card on league home. Pure assembly + card render + empty-state art brief.
+
+### Files authored
+
+- **`packages/shared/src/utils/leagueTimeline.ts`** (NEW, 175 lines) — Pure `assembleLeagueTimeline(input) → TimelineItem[]`. Types for the three input sources (`DraftCompletionInput`, `TransactionInput`, `MatchupResultInput`) and the output `TimelineItem`. Newest-first sort by ISO `when`, cap at `LEAGUE_TIMELINE_CAP=10`. No I/O, no clock reads, no side effects. Exported from `packages/shared/src/utils/index.ts`.
+- **`packages/shared/src/utils/__tests__/leagueTimeline.test.ts`** (NEW, 210 lines) — **16/16 pass** in ~7ms. Coverage:
+  - Empty input → `[]`.
+  - Draft completion with topPick / null-topPick / undefined-topPick.
+  - ADD + DROP transactions (headline format, sub text).
+  - Matchup results: home-winner / away-winner / tie.
+  - Cross-source ordering (draft/transaction/matchup mix, newest-first).
+  - 10-item cap enforcement across mixed sources.
+  - Null-safety + silent-ignore for non-ADD/DROP future ledger types.
+- **`apps/web/src/components/dashboard/LeagueTimelineCard.tsx`** (NEW, 210 lines) — Citrus2 card wrapping the pure function. Uses React Query to fetch `leagueApi.getTransactions(leagueId)` + `matchupApi.getLeagueMatchups(leagueId)`. Client-side row adapters convert endpoint shapes → pure-function inputs. `Empty` state renders an `<img>` slot with `data-timeline-empty-slot="scene-league-quiet"` marker + `alt=""` for the future bespoke render; falls back to `mascot-stormy.webp` today. `formatRelativeWhen(iso)` produces "just now / Nm / Nh / Nd / Nmo / Ny ago" without pulling a date library.
+- **`apps/web/src/pages/LeagueDashboard.tsx`** — imported LeagueTimelineCard + inserted between the top hero row and the Teams List. Guarded by `leagueId &&`. Passes `draftStatus`, `draftCompletedAt={league?.updated_at}` (approximation until F28 gives us a canonical `draft_completed_at`), and `topPick={null}` (top-pick resolution is a T13 concern per completion-moment polish scope).
+- **`docs/ART_GENERATION_QUEUE.md`** — added `scene-league-quiet` brief per architect Entry 5 observed-style addendum. 512x512, master-prompt template applied, reference-image rule locked (use existing `mascot-stormy.webp` as the identity anchor).
+
+### Design choices (safety arguments)
+
+**Pure function separated from render.** Rationale: (a) 16 offline tests cover the invariants (ordering, cap, null-safety, silent-ignore for future types) without a browser or a real endpoint; (b) the function moves to `@citrus/shared` so if a mobile app (T3+T8 Capacitor spike) ever needs the same feed, no reimport of the client-only card is required; (c) the client card is a thin adapter (row shape → pure input → render), keeping the client concern to Zustand-free React Query wiring.
+
+**No new endpoints authored.** Rationale per Entry 13: "NO new tables, NO new endpoints if existing reads suffice." `leagueApi.getTransactions` (from LeagueService.fetchTransactions:527, transaction_ledger read) and `matchupApi.getLeagueMatchups` (existing) cover both dynamic sources. Draft completion moment reads from `league.draft_status + league.updated_at` (already-fetched league record).
+
+**`draftCompletedAt` approximation.** Currently uses `league.updated_at` — inaccurate if any post-draft league record write happens (settings edit, roster changes, etc.). The correct fix is F28's canonical `draft_completed_at` field (or a dedicated draft_events read). Deliberate for T12 scope: (a) F28 is the next chunk (T13); (b) real usage today would rarely see this because leagues in prod don't get many post-draft record updates; (c) approximation is calibrated for the Sleeper-style calm feed which is soft-freshness, not audit-grade.
+
+**KI-042 discipline.** The pure function's input types carry pre-resolved `playerName` strings — never touches raw `player_id` domain. Consumers do id→name resolution upstream (server-side JOIN via `LeagueService.fetchTransactions` already does the profile + teams join). Cited in the file header per KI-042 verification test.
+
+**Empty-state art slot pattern.** Per Entry 5 art rules: code slot exists at target dimensions with the filename convention, generation brief lives in ART_GENERATION_QUEUE. Fallback to a known-good asset (`mascot-stormy.webp`) means the empty state ships today; when Garrett batch-generates `scene-league-quiet.webp`, the swap is a one-line filename change plus dropping the file in `public/mascots/`.
+
+### Test / typecheck status
+
+- `npx vitest run src/utils/__tests__/leagueTimeline.test.ts` (shared) → **16/16 pass** in ~7ms.
+- `npx tsc -p tsconfig.app.json --noEmit` (web) → no errors specific to T12 (pre-existing errors elsewhere unchanged).
+- `npx vitest run src/__tests__/linkGraphIntegrity.test.ts` (web) → **4/4 pass** — sanity check that T11b guard still green with T12 additions (no new dead links introduced).
+
+### Files changed this cycle
+
+```
+NEW: packages/shared/src/utils/leagueTimeline.ts
+NEW: packages/shared/src/utils/__tests__/leagueTimeline.test.ts
+MOD: packages/shared/src/utils/index.ts                              (export leagueTimeline)
+NEW: apps/web/src/components/dashboard/LeagueTimelineCard.tsx
+MOD: apps/web/src/pages/LeagueDashboard.tsx                          (import + insert card)
+MOD: docs/ART_GENERATION_QUEUE.md                                    (scene-league-quiet brief)
+MOD: docs/ARCHITECT_INBOX.md                                         (unchanged in this cycle — included per channel protocol if committed alongside outbox)
+MOD: docs/TERMINAL_OUTBOX.md                                         (this R24)
+```
+
+### Standing by / next up
+
+Entry 13 night queue: T11 ✓ · T12 ✓. Next: **T13 (COMPLETION-MOMENT POLISH, Sleeper-gap 1, rides F28)** — scene-cup art slot in banner, one-time CSS transition, respect prefers-reduced-motion, offline render tests. Then T14 / T15 / T16.
+
+**End of R24. Timeline card lives.**
