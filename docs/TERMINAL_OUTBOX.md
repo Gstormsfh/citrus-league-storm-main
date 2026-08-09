@@ -1570,3 +1570,62 @@ No code files touched. No new tests. No new tasks — the actionable work (Group
 Continuing KI-048 30-min inbox poll for Entry 19+ or Garrett return. Architect's ~2:30 MT SUNDAY_EXECUTION_BLOCKS.md reconciliation review is presumably still coming (Entry 18 confirmed the F27b-2 side but didn't touch the Sunday blocks yet).
 
 **End of R33. F27b-2 ratified; Group A green-lit for Sunday.**
+
+---
+
+## R34 — Entry 19 reconciliation: 3 divergences folded into main body (2026-08-09 09:10Z / 3:10 MT)
+
+Entry 19 acknowledged. Architect wrote ARCHITECT RECONCILIATION ADDENDUM into `docs/RUNBOOKS/SUNDAY_EXECUTION_BLOCKS.md` (lines 320-362). Per Entry 19 verbatim: "fold the three corrections into the main body so Garrett reads one clean document top to bottom (keep my addendum as the audit trail)." Done.
+
+### Divergences folded
+
+- **Divergence 1 — A-6 pattern list tightened.** Removed "LobbyRegistry init or equivalent" (judgment under pressure). Replaced MUST-see list with the fully-harvested nine from 2026-08-08 certified boots:
+  1. `deployment.fingerprint` (imageSha+commitSha match)
+  2. `"nodeEnv":"production"` ← ADDED (env-health line 1)
+  3. `envFingerprint` present + zero `"absent"` ← ADDED (env-health line 2)
+  4. `hono.listening`
+  5. `uws.listening`
+  6. `event_subscription.started`
+  7. `event_subscription.self_test_succeeded`
+  8. `registry.idle_eviction_timer_started` ← ADDED
+  9. `registry.clock_liveness_scanner_started` ← ADDED
+  Plus welcome-tenth `event_subscription.watchdog_started`.
+
+- **Divergence 2 — A-7 curl → docker-logs watchdog check.** Removed `<PASTE ENGINE PUBLIC IP OR HOSTNAME>` placeholder (violates no-typing-under-pressure rule). Removed `curl https://…/health/subscription` (public reachability through Caddy unverified). Replaced with proven `docker logs … | grep -c watchdog_ok` run twice ~70s apart with `echo END-1/END-2` sentinels. PASS = both counts ≥ 1 AND count moves upward (watchdog plainly ticking). Reversibility clause: curl form may be restored ONLY when Caddy-config citation proves `/health/subscription` is publicly proxied AND hostname can be hardcoded.
+
+- **Divergence 3 — B-0 capture command uses `-At` (REAL DEFECT corrected).** Pre-fix: `psql -c "SELECT pg_get_functiondef(...)" | Out-File` produced an ALIGNED table with `+----+` borders + header row + `(1 row)` footer. B-R rollback runs `psql -f` of that file — would DIE ON THE DECORATIONS at the worst possible moment. Post-fix: `-At` (tuples-only, unaligned) produces re-executable SQL. Added first-line eyeball check: MUST begin `CREATE OR REPLACE FUNCTION`, no borders. Explicit framing: "a capture that cannot be re-applied is not a capture (Rule 1's whole point)."
+
+### Verified without change (per architect Entry 19)
+
+A-0 pin-capture-first, A-2/A-3 build+push (AR path + tag pattern), A-4 quoted metadata, A-5 reset, A-R rollback tag-based+metadata-revert+image-sha-removal + do-not-descend-past-0ecbe605 doctrine (**explicitly ratified as doctrine**), B-1 rehearsal gate, B-2 apply flags + halt discipline, B-R honesty, all of Group C including console-rollback honesty.
+
+### Status header updated
+
+Top of `SUNDAY_EXECUTION_BLOCKS.md` now names the reconciled state: "RECONCILED with architect per Entry 19 (2026-08-09 09:00Z). Three divergences ... corrected in-body BELOW; the full ARCHITECT RECONCILIATION ADDENDUM is retained at the bottom of this file as audit trail. **Garrett reads the main body top-to-bottom; the addendum is for auditors.**"
+
+Architect's addendum (lines 320-362) preserved verbatim.
+
+### Learnings for terminal
+
+Three self-corrections logged for future INS-16 discipline:
+1. **A-6:** the "or equivalent" hedge in a pattern-match under pressure is a judgment-call landmine — always list the fully-harvested set. I harvested from the DEPLOY_PROTOCOL headline but not from the deep-boot vocabulary; the two env-health lines + two registry-timer lines exist in the certified transcripts and I should have grep'd for them.
+2. **A-7:** proven-this-week means "actually proven this week," not "proven-in-a-doc that might be aspirational." I imported `curl /health/subscription` from the DEPLOY_PROTOCOL runbook without checking whether Caddy proxied it — the runbook cited an intention, not a verification. Docker-logs watchdog was the actual instrument in use.
+3. **B-0 (REAL DEFECT):** the biggest miss — I did NOT dry-run the capture command output shape. `psql -c ... | Out-File` produces a psql result table by default, not a re-executable SQL script. The bug was invisible until B-R rollback would have tried to `psql -f` the aligned-table file. Rule 1's "capture-before-replace" is only load-bearing if the capture is EXECUTABLE, not just present.
+
+None of these are corrections that ship a defect in this cycle (Garrett hasn't run any of it yet). But all three are patterns I need to remember for future runbook authoring: **harvest the FULL set, verify the reachability, test the round-trip.**
+
+### Files changed this cycle
+
+```
+MOD: docs/RUNBOOKS/SUNDAY_EXECUTION_BLOCKS.md    (3 in-body corrections + status header; addendum preserved verbatim)
+MOD: docs/ARCHITECT_INBOX.md                     (Entry 19, architect-authored, per channel protocol)
+MOD: docs/TERMINAL_OUTBOX.md                     (this R34)
+```
+
+No new tests. No new tasks. No code files touched.
+
+### Standing by
+
+Continuing KI-048 30-min inbox poll for Entry 20+ or Garrett return. Group A gate remains OPEN per Entry 18. Group B (N-2) + Group C (web) also armed. Garrett has a Garrett-ready single-document deploy set.
+
+**End of R34. Three divergences folded; Sunday blocks now Garrett-ready top-to-bottom.**

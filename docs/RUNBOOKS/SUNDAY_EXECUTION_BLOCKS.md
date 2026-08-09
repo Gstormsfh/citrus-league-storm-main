@@ -2,7 +2,7 @@
 
 **Author.** Terminal, 2026-08-09 O2 (Entry 16 overnight orders).
 **For:** Garrett, Sunday morning execution.
-**Prerequisite:** architect review at ~2:30 MT reconciles this against his own set; divergences = findings.
+**Status.** **RECONCILED with architect** per Entry 19 (2026-08-09 09:00Z). Three divergences (A-6 pattern list, A-7 watchdog probe, B-0 capture command) corrected in-body BELOW; the full ARCHITECT RECONCILIATION ADDENDUM is retained at the bottom of this file as audit trail. **Garrett reads the main body top-to-bottom; the addendum is for auditors.**
 **Standing rule:** author-only. Terminal does not execute these. Garrett pastes into an interactive PowerShell 5.1 session.
 
 ## Harvesting discipline (INS-16)
@@ -111,25 +111,32 @@ gcloud compute ssh citrus-draft-engine-staging `
   --command='sudo docker logs citrus-draft-engine --tail=200 2>&1'
 ```
 
-**MUST see (harvested from 2026-08-08 successful deploys, per DEPLOY_PROTOCOL §1 corrected vocabulary):**
+**MUST see (fully-harvested nine, per Entry 19 Divergence 1 ratification — no "or equivalent" under pressure):**
 - `deployment.fingerprint` — with `imageSha` == `$NEW_DIGEST` AND `commitSha` == `$FULL_SHA`.
+- `"nodeEnv":"production"`.
+- `envFingerprint` present AND zero occurrences of `"absent"`.
 - `hono.listening` — port 3001.
 - `uws.listening` — port 3002 (**the single MOST load-bearing check per 2026-07-27 strike #2**).
 - `event_subscription.started`.
 - `event_subscription.self_test_succeeded`.
-- `event_subscription.watchdog_started`.
-- `LobbyRegistry` init or equivalent.
+- `registry.idle_eviction_timer_started`.
+- `registry.clock_liveness_scanner_started`.
 
-If ANY missing after 60s AND another 30s refetch → **HALT + rollback per A-R below**. Do not diagnose forward.
+**Welcome tenth** (appears at boot too, per architect Entry 19 addendum): `event_subscription.watchdog_started`.
 
-### A-7. Health probe (twice, ~70s apart — proves watchdog advances)
+If ANY of the nine missing after 60s AND another 30s refetch → **HALT + rollback per A-R below**. Do not diagnose forward.
+
+### A-7. Watchdog probe (twice, ~70s apart — proves watchdog is ticking)
+
+**Per Entry 19 Divergence 2 ratification** — use the proven docker-logs instrument, NOT an unverified `/health/subscription` curl (public reachability through Caddy is unverified, and `<PASTE ENGINE IP>` placeholder violates the no-typing-under-pressure rule). Restore curl-based variant only when a Caddy-config citation proves `/health/subscription` is publicly proxied AND the hostname can be hardcoded — never a placeholder.
 
 ```powershell
-$engineHost = "<PASTE ENGINE PUBLIC IP OR HOSTNAME>"
-curl "https://$engineHost/health/subscription" ; Start-Sleep -Seconds 70 ; curl "https://$engineHost/health/subscription"
+gcloud compute ssh citrus-draft-engine-staging --project=citrus-fantasy-staging --zone=northamerica-northeast1-a --quiet --command="sudo docker logs citrus-draft-engine --since 3m 2>&1 | grep -c watchdog_ok; echo END-1"
+Start-Sleep -Seconds 70
+gcloud compute ssh citrus-draft-engine-staging --project=citrus-fantasy-staging --zone=northamerica-northeast1-a --quiet --command="sudo docker logs citrus-draft-engine --since 3m 2>&1 | grep -c watchdog_ok; echo END-2"
 ```
 
-Both should return `connected: true`. `lastSelfTestOkAt` MUST advance between the two reads.
+**PASS:** both counts ≥ 1 AND the count moves upward between the two reads (watchdog is plainly ticking; the sliding 3-min window catches new ticks). If count is 0 at either read → **HALT + rollback per A-R below**.
 
 ### A-R. Rollback (only if A-6 or A-7 fails)
 
@@ -173,13 +180,17 @@ gcloud compute instances reset citrus-draft-engine-staging `
 
 ### B-0. Capture population + preapply history read
 
-**Rule 1 (capture-before-replace)** — Garrett MUST populate the capture file with LIVE pg_get_functiondef output before the apply, or STEP 0 aborts with an explicit RAISE EXCEPTION. Capture command:
+**Rule 1 (capture-before-replace)** — Garrett MUST populate the capture file with LIVE pg_get_functiondef output before the apply, or STEP 0 aborts with an explicit RAISE EXCEPTION.
+
+**Per Entry 19 Divergence 3 ratification (REAL DEFECT corrected)** — the capture command MUST use `-At` (tuples-only, unaligned) to produce a re-executable SQL file. Default psql output writes aligned table borders (`+----+`, header row, `(1 row)` footer) that would DIE ON THE DECORATIONS if B-R's `psql -f` rollback ran the file. A capture that cannot be re-applied is not a capture (Rule 1's whole point).
 
 ```powershell
-psql "$env:SUPABASE_DB_URL?client_encoding=UTF8" -v ON_ERROR_STOP=1 `
+psql "$env:SUPABASE_DB_URL?client_encoding=UTF8" -v ON_ERROR_STOP=1 -At `
   -c "SELECT pg_get_functiondef('public.submit_pick_v2(uuid,uuid,integer,uuid,text,text,jsonb,text)'::regprocedure);" `
   | Out-File -Encoding utf8 supabase/migrations/captures/2026-08-08_pre_v2_draft_completion_clears_draft_state.sql
 ```
+
+**Eyeball the first line** of the capture file: it MUST begin with `CREATE OR REPLACE FUNCTION` — no borders, no headers, no `(1 row)` footer. If it doesn't, the `-At` flag didn't apply — re-run before proceeding.
 
 **PROD_CHANGE_LEDGER Rule 2 preapply history read** — check no other-workstream mutation on `submit_pick_v2` since the F24 rebase applied 2026-08-05:
 
@@ -314,3 +325,49 @@ Any HALT in ANY group: don't proceed to the next group. Investigate + fix the cu
 - NOT a substitute for THE_TWELVE_DRAFT_NIGHT.md (that's the DRAFT NIGHT runbook — recovery scenarios during a live draft).
 - NOT a substitute for PRE_TWELVE_DRY_RUN.md (that's the ONE-DAY-PRIOR dry-run).
 - Every command here is Garrett-executable-only. Terminal does not run these.
+
+---
+
+# ARCHITECT RECONCILIATION ADDENDUM (2026-08-09 08:55Z, night block N5 — corrected blocks below WIN over the versions above; three divergences found, everything else VERIFIED against the Aug 8 proven transcript)
+
+**VERIFIED WITHOUT CHANGE:** A-0 pin-capture-first with expected values; A-2/A-3 build+push (AR path, tag pattern); A-4 quoted metadata; A-5 reset; A-R rollback (tag-based + metadata revert + image-sha removal + the do-not-descend-past-0ecbe605 ruling — that ruling is exactly right and is hereby ratified as doctrine); B-1 rehearsal gate; B-2 apply flags + halt discipline; B-R honesty; all of Group C including the console-rollback honesty note.
+
+## DIVERGENCE 1 — A-6 pattern list: tighten to the fully-harvested nine
+
+"LobbyRegistry init or equivalent" invites judgment under pressure; two env-health lines are missing. REPLACE A-6's MUST-see list with (all harvested verbatim from the 2026-08-08 certified boots):
+- `deployment.fingerprint` with `imageSha` == $NEW_DIGEST AND `commitSha` == $FULL_SHA
+- `"nodeEnv":"production"`
+- `envFingerprint` present AND zero occurrences of `"absent"`
+- `hono.listening`
+- `uws.listening`
+- `event_subscription.started`
+- `event_subscription.self_test_succeeded`
+- `registry.idle_eviction_timer_started`
+- `registry.clock_liveness_scanner_started`
+(`event_subscription.watchdog_started` welcome as a tenth; it appears at boot too.)
+
+## DIVERGENCE 2 — A-7 health probe: use the proven instrument, not an unverified endpoint
+
+The curl probe assumes `/health/subscription` is publicly reachable through Caddy — unverified, and the `<PASTE ENGINE IP>` placeholder is exactly the under-pressure typing the runbooks ban. REPLACE A-7 with the docker-logs form proven all week:
+
+```powershell
+gcloud compute ssh citrus-draft-engine-staging --project=citrus-fantasy-staging --zone=northamerica-northeast1-a --quiet --command="sudo docker logs citrus-draft-engine --since 3m 2>&1 | grep -c watchdog_ok; echo END-1"
+Start-Sleep -Seconds 70
+gcloud compute ssh citrus-draft-engine-staging --project=citrus-fantasy-staging --zone=northamerica-northeast1-a --quiet --command="sudo docker logs citrus-draft-engine --since 3m 2>&1 | grep -c watchdog_ok; echo END-2"
+```
+
+PASS: both counts ≥1 and the watchdog is plainly ticking (counts move with the window). If the terminal can CITE Caddy config proving /health is proxied, the curl variant may be restored later — with the hostname hardcoded, never a placeholder.
+
+## DIVERGENCE 3 — B-0 capture command produces a NON-EXECUTABLE capture (real defect — the rollback path depends on this file)
+
+`psql -c "SELECT pg_get_functiondef(...)" | Out-File` writes an ALIGNED RESULT TABLE — header row, +----+ borders, "(1 row)" footer. B-R's rollback is `psql -f` of this very file, which would DIE ON THE DECORATIONS at the worst possible moment. REPLACE the capture command with tuples-only unaligned output:
+
+```powershell
+psql "$env:SUPABASE_DB_URL?client_encoding=UTF8" -v ON_ERROR_STOP=1 -At `
+  -c "SELECT pg_get_functiondef('public.submit_pick_v2(uuid,uuid,integer,uuid,text,text,jsonb,text)'::regprocedure);" `
+  | Out-File -Encoding utf8 supabase/migrations/captures/2026-08-08_pre_v2_draft_completion_clears_draft_state.sql
+```
+
+Then eyeball the file's FIRST line: it must begin `CREATE OR REPLACE FUNCTION` — no borders, no headers. A capture that cannot be re-applied is not a capture (Rule 1's whole point).
+
+**With these three corrections applied above, this file is GARRETT-READY.** — Architect

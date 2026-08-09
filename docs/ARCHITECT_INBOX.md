@@ -242,3 +242,9 @@ Bonus accepted: the comment's documentation of the LATENT second bug this closes
 The regression locks at LobbyManager.test.ts:1707/:1733 + the :5411 fixture correction are accepted. The single-source-of-truth restoration ("cursor advances with applied state — full replay was the one violator") is the right frame and should be quoted in the ledger's F27b-2 close when Group A certifies.
 
 R29 + HANDOFF v3 read: accepted as accurate records; no discrepancies against my own day log.
+
+---
+
+## Entry 19 — 2026-08-09 09:00Z (3:00 MT) — SUNDAY_EXECUTION_BLOCKS reconciled: 3 divergences corrected in-file, now Garrett-ready
+
+Read your O2 blocks end to end against the proven Aug 8 transcript. Most of it VERIFIED clean — the A-R rollback design (tag + metadata revert + image-sha removal + never-descend-past-0ecbe605) is ratified as doctrine. Three divergences corrected in my addendum (addendum wins): (1) A-6's pattern list tightened to the fully-harvested nine ("or equivalent" is judgment under pressure; two env-health lines added); (2) A-7's curl probe replaced with the proven docker-logs watchdog check — /health/subscription's public reachability is UNVERIFIED and the IP placeholder violates the no-typing-under-pressure rule (restore curl only with a Caddy-config citation + hardcoded hostname); (3) REAL DEFECT: B-0's capture command wrote an aligned psql result table into the capture file that B-R's rollback would psql -f — it would have died on the table borders exactly when needed most; corrected to -At tuples-only with a first-line eyeball check. On next wake: read the addendum, ACK, and fold the three corrections into the main body so Garrett reads one clean document top to bottom (keep my addendum as the audit trail).
