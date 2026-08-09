@@ -231,7 +231,7 @@ const FreeAgents = () => {
         } catch (error) {
           logger.error('Error fetching demo players:', error);
           toast({
-            title: "Error",
+            title: "Move Didn't Take",
             description: "Failed to load players. Please try again later.",
             variant: "destructive"
           });
@@ -683,7 +683,7 @@ const FreeAgents = () => {
     // Block guest operations
     if (shouldBlockGuestOperation(userLeagueState, (msg) => {
       toast({
-        title: "Sign Up Required",
+        title: "Save Your Spot",
         description: msg,
         variant: "default"
       });
@@ -694,7 +694,7 @@ const FreeAgents = () => {
 
     if (!user || !leagueId) {
       toast({
-        title: "Error",
+        title: "Move Didn't Take",
         description: "You must be logged in and have a team to add players.",
         variant: "destructive"
       });
@@ -722,7 +722,7 @@ const FreeAgents = () => {
       const { league, error: leagueError } = await LeagueService.getLeague(leagueId, user.id);
       if (leagueError || !league) {
         toast({
-          title: "Error",
+          title: "Move Didn't Take",
           description: "Could not load league information.",
           variant: "destructive"
         });
@@ -735,7 +735,7 @@ const FreeAgents = () => {
 
       if (!teamDataResult) {
         toast({
-          title: "Error",
+          title: "Move Didn't Take",
           description: "Team not found.",
           variant: "destructive"
         });
@@ -749,7 +749,7 @@ const FreeAgents = () => {
       if (rosterError) {
         logger.error('Error counting roster_assignments:', rosterError);
         toast({
-          title: "Error",
+          title: "Move Didn't Take",
           description: "Could not load roster for size check.",
           variant: "destructive"
         });
@@ -852,7 +852,7 @@ const FreeAgents = () => {
         });
       } else {
         toast({
-          title: "Error",
+          title: "Move Didn't Take",
           description: errorMessage,
           variant: "destructive"
         });
@@ -868,14 +868,14 @@ const FreeAgents = () => {
    */
   const handleAddWithDrop = async (player: Player) => {
     if (shouldBlockGuestOperation(userLeagueState, (msg) => {
-      toast({ title: "Sign Up Required", description: msg, variant: "default" });
+      toast({ title: "Save Your Spot", description: msg, variant: "default" });
       navigate('/auth?redirect=/free-agents');
     })) {
       return;
     }
     if (!user || !leagueId) {
       toast({
-        title: "Error",
+        title: "Move Didn't Take",
         description: "You must be logged in and have a team to swap players.",
         variant: "destructive",
       });
@@ -885,7 +885,7 @@ const FreeAgents = () => {
       const myTeamResponse = await leagueApi.getMyTeam(leagueId);
       const teamDataResult = myTeamResponse.data as { id: string } | undefined;
       if (!teamDataResult) {
-        toast({ title: "Error", description: "Team not found.", variant: "destructive" });
+        toast({ title: "Move Didn't Take", description: "Team not found.", variant: "destructive" });
         return;
       }
       setSwapAddPlayer(player);
@@ -894,7 +894,7 @@ const FreeAgents = () => {
     } catch (err) {
       logger.error('handleAddWithDrop failed', err);
       toast({
-        title: "Error",
+        title: "Move Didn't Take",
         description: "Could not open swap dialog. Please try again.",
         variant: "destructive",
       });
@@ -1151,7 +1151,7 @@ const FreeAgents = () => {
       setIsPlayerDialogOpen(true);
     } else {
       toast({
-        title: "Error",
+        title: "Move Didn't Take",
         description: "Could not load player stats. Please try again.",
         variant: "destructive"
       });

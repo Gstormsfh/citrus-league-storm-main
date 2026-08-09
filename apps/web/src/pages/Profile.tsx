@@ -393,7 +393,7 @@ const Profile = () => {
       } catch (error) {
         logger.error('Error loading league settings:', error);
         toast({
-          title: 'Error',
+          title: "Profile Hiccup",
           description: 'Failed to load league settings',
           variant: 'destructive',
         });
@@ -475,7 +475,7 @@ const Profile = () => {
 
       if (!saved) {
         toast({
-          title: 'Error',
+          title: "Profile Hiccup",
           description: errorMessage,
           variant: 'destructive',
         });
@@ -488,7 +488,7 @@ const Profile = () => {
       });
     } catch (err: any) {
       toast({
-        title: 'Error',
+        title: "Profile Hiccup",
         description: err.message || 'Failed to save settings',
         variant: 'destructive',
       });
@@ -507,7 +507,7 @@ const Profile = () => {
 
       if (!result.success) {
         toast({
-          title: 'Error',
+          title: "Profile Hiccup",
           description: result.error || 'Failed to process waivers',
           variant: 'destructive',
         });
@@ -529,7 +529,7 @@ const Profile = () => {
       }
     } catch (err: any) {
       toast({
-        title: 'Error',
+        title: "Profile Hiccup",
         description: err.message || 'Failed to process waivers',
         variant: 'destructive',
       });
@@ -550,7 +550,7 @@ const Profile = () => {
 
       if (!syncResult) {
         toast({
-          title: 'Error',
+          title: "Profile Hiccup",
           description: 'Failed to sync rosters',
           variant: 'destructive',
         });
@@ -576,7 +576,7 @@ const Profile = () => {
       }
     } catch (err: any) {
       toast({
-        title: 'Error',
+        title: "Profile Hiccup",
         description: err.message || 'Failed to sync rosters',
         variant: 'destructive',
       });
@@ -716,7 +716,7 @@ const Profile = () => {
       setIsEditing(false);
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: "Profile Hiccup",
         description: error.message || "Failed to update profile. Make sure all database columns exist.",
         variant: "destructive"
       });
@@ -761,7 +761,7 @@ const Profile = () => {
       });
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: "Profile Hiccup",
         description: error.message || "Failed to save team name.",
         variant: "destructive"
       });
@@ -783,7 +783,7 @@ const Profile = () => {
     if (!user || !profile) return;
     const trimmed = displayNameInput.trim();
     if (!trimmed) {
-      toast({ title: 'Error', description: 'Display name cannot be empty.', variant: 'destructive' });
+      toast({ title: "Profile Hiccup", description: 'Display name cannot be empty.', variant: 'destructive' });
       return;
     }
     setSavingDisplayName(true);
@@ -793,7 +793,7 @@ const Profile = () => {
       toast({ title: 'Display name updated', description: `Your display name is now "${trimmed}".` });
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: "Profile Hiccup",
         description: error instanceof Error ? error.message : 'Failed to update display name.',
         variant: 'destructive',
       });

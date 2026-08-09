@@ -391,8 +391,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
             logger.error('[LeagueContext] Error verifying membership:', error);
             navigate('/');
             toast({
-              title: "Error",
-              description: "Failed to verify league access.",
+              title: "Access Check Failed",
+              description: "Couldn't verify your league access — try again in a moment.",
               variant: "destructive"
             });
             return;
@@ -438,8 +438,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           const isPool = leagueType && leagueType !== 'fantasy';
           navigate(isPool ? '/' : '/gm-office');
           toast({
-            title: "Error",
-            description: "Failed to verify league access.",
+            title: "Access Check Failed",
+            description: "Couldn't verify your league access — try again in a moment.",
             variant: "destructive"
           });
         }

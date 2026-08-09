@@ -1749,7 +1749,7 @@ const DraftRoom = () => {
       if (!currentDraftState) {
         currentDraftState = await loadDraftState(0, true);
         if (!currentDraftState) {
-          toast({ title: "Error", description: "Cannot start draft: draft state could not be loaded. Please try starting the draft first.", variant: "destructive" });
+          toast({ title: "Draft Hiccup", description: "Cannot start draft: draft state could not be loaded. Please try starting the draft first.", variant: "destructive" });
           return;
         }
       }
@@ -1761,7 +1761,7 @@ const DraftRoom = () => {
         : null;
 
       if (!teamToPick) {
-        toast({ title: "Error", description: "Cannot start draft: draft state not ready. Please try starting the draft first.", variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: "Cannot start draft: draft state not ready. Please try starting the draft first.", variant: "destructive" });
         return;
       }
 
@@ -1776,7 +1776,7 @@ const DraftRoom = () => {
         });
       } catch (updateErr) {
         logger.error('Error saving timerStartedAt:', updateErr);
-        toast({ title: "Error", description: "Failed to start timer. Please try again.", variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: "Failed to start timer. Please try again.", variant: "destructive" });
         return;
       }
 
@@ -1794,7 +1794,7 @@ const DraftRoom = () => {
     } catch (error: unknown) {
       logger.error('Error starting draft timer:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast({ title: "Error", description: `Failed to start draft timer: ${errorMessage}`, variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: `Failed to start draft timer: ${errorMessage}`, variant: "destructive" });
     }
   };
 
@@ -2002,7 +2002,7 @@ const DraftRoom = () => {
     });
 
     if (!leagueId) {
-      toast({ title: "Error", description: "League ID is missing. Please refresh the page.", variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: "League ID is missing. Please refresh the page.", variant: "destructive" });
       logger.error('handlePlayerDraft: Missing leagueId');
       return;
     }
@@ -2019,7 +2019,7 @@ const DraftRoom = () => {
 
       if (!loadedState) {
         // State didn't load - show error
-        toast({ title: "Error", description: "Draft state not loaded. Please ensure the draft has been started. If you just started the draft, please wait a moment and try again.", variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: "Draft state not loaded. Please ensure the draft has been started. If you just started the draft, please wait a moment and try again.", variant: "destructive" });
         logger.error('handlePlayerDraft: Missing draftState after load attempt');
         return;
       }
@@ -2034,7 +2034,7 @@ const DraftRoom = () => {
         : null;
 
       if (!effectiveCurrentTeam) {
-        toast({ title: "Error", description: "Current team not found after loading draft state. Please try again.", variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: "Current team not found after loading draft state. Please try again.", variant: "destructive" });
         logger.error('handlePlayerDraft: Missing currentTeam after loading state', {
           nextTeamId: loadedState.nextTeamId,
           teams: teams.map(t => ({ id: t.id, name: t.team_name }))
@@ -2045,19 +2045,19 @@ const DraftRoom = () => {
 
     // Use effective state and team for the rest of the function
     if (!effectiveDraftState) {
-      toast({ title: "Error", description: "Draft state not available. Please try again.", variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: "Draft state not available. Please try again.", variant: "destructive" });
       return;
     }
 
     if (!effectiveCurrentTeam) {
-      toast({ title: "Error", description: "Current team not found. Please try again.", variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: "Current team not found. Please try again.", variant: "destructive" });
       return;
     }
 
     // For auto-draft (time expired or AI team), skip user checks
     if (!isAutoDraft) {
       if (!user) {
-        toast({ title: "Error", description: "User not authenticated. Please log in again.", variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: "User not authenticated. Please log in again.", variant: "destructive" });
         logger.error('handlePlayerDraft: Missing user');
         return;
       }
@@ -2289,7 +2289,7 @@ const DraftRoom = () => {
               );
               if (retryErr) {
                 setDraftedPlayerIds(prev => { const s = new Set(prev); s.delete(player.id); return s; });
-                toast({ title: "Error", description: `Retry failed: ${(retryErr as any)?.message || retryErr}`, variant: "destructive" });
+                toast({ title: "Draft Hiccup", description: `Retry failed: ${(retryErr as any)?.message || retryErr}`, variant: "destructive" });
               } else {
                 toast({ title: `${player.full_name} drafted!`, description: `Round ${retryRound}, Pick ${retryPick}` });
                 // Trigger a full reconciliation after successful retry
@@ -2305,7 +2305,7 @@ const DraftRoom = () => {
           }
         } catch (retryError) {
           logger.error('handlePlayerDraft: Auto-retry failed:', retryError);
-          toast({ title: "Error", description: "Could not sync draft state. Please refresh the page.", variant: "destructive" });
+          toast({ title: "Draft Hiccup", description: "Could not sync draft state. Please refresh the page.", variant: "destructive" });
         }
       } else {
         // Rollback optimistic update on non-race-condition errors
@@ -2326,7 +2326,7 @@ const DraftRoom = () => {
             : isNetwork
               ? 'Network error. Check your connection and try again.'
               : `Failed to draft player: ${errorMessage}`;
-          toast({ title: "Error", description: userMsg, variant: "destructive" });
+          toast({ title: "Draft Hiccup", description: userMsg, variant: "destructive" });
         }
       }
       // Don't throw - let draft continue
@@ -2573,7 +2573,7 @@ const DraftRoom = () => {
       const { undone, error: undoError } = await DraftService.undoLastPick(leagueId, user.id);
       if (undoError || !undone) {
         logger.error('handleUndoLastPick error:', undoError);
-        toast({ title: "Error", description: `Failed to undo pick: ${(undoError as any)?.message || 'No picks to undo'}`, variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: `Failed to undo pick: ${(undoError as any)?.message || 'No picks to undo'}`, variant: "destructive" });
         return;
       }
 
@@ -2611,7 +2611,7 @@ const DraftRoom = () => {
       await loadDraftState();
     } catch (error) {
       logger.error('handleUndoLastPick error:', error);
-      toast({ title: "Error", description: `Failed to undo pick: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: `Failed to undo pick: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
     }
   };
 
@@ -2622,7 +2622,7 @@ const DraftRoom = () => {
       const { error: resetError } = await DraftService.resetDraft(leagueId);
       if (resetError) {
         logger.error('Nuclear delete draft error:', resetError);
-        toast({ title: "Error", description: `Failed to delete draft: ${(resetError as any).message || 'Unknown error'}`, variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: `Failed to delete draft: ${(resetError as any).message || 'Unknown error'}`, variant: "destructive" });
         return;
       }
 
@@ -2638,7 +2638,7 @@ const DraftRoom = () => {
       window.location.reload();
     } catch (error) {
       logger.error('Nuclear delete draft exception:', error);
-      toast({ title: "Error", description: `Failed to delete draft: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: `Failed to delete draft: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
     }
   };
 
@@ -2650,7 +2650,7 @@ const DraftRoom = () => {
       const { error } = await LeagueService.simulateLeagueFill(leagueId, maxTeams);
       if (error) {
         logger.error('Error adding AI teams:', error);
-        toast({ title: "Error", description: "Failed to add AI teams. Please try again.", variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: "Failed to add AI teams. Please try again.", variant: "destructive" });
         return;
       }
 
@@ -2659,7 +2659,7 @@ const DraftRoom = () => {
       await loadDraftData();
     } catch (err) {
       logger.error('Exception adding AI teams:', err);
-      toast({ title: "Error", description: "Failed to add AI teams. Please try again.", variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: "Failed to add AI teams. Please try again.", variant: "destructive" });
     }
   };
 
@@ -2739,14 +2739,14 @@ const DraftRoom = () => {
     } catch (error: unknown) {
       logger.error('handleScheduleDraft: Error scheduling draft', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast({ title: "Error", description: `Failed to schedule draft: ${errorMessage}`, variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: `Failed to schedule draft: ${errorMessage}`, variant: "destructive" });
     }
   };
 
   const handleTeamsCountChange = async (count: number) => {
     if (!leagueId || !isCommissioner) return;
     if (count < teams.length) {
-      toast({ title: "Error", description: `Cannot set max teams below ${teams.length} (current team count).`, variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: `Cannot set max teams below ${teams.length} (current team count).`, variant: "destructive" });
       return;
     }
 
@@ -2764,7 +2764,7 @@ const DraftRoom = () => {
       toast({ title: "Teams Updated", description: `Max teams set to ${count}.` });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast({ title: "Error", description: `Failed to update teams count: ${errorMessage}`, variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: `Failed to update teams count: ${errorMessage}`, variant: "destructive" });
     }
   };
 
@@ -2839,7 +2839,7 @@ const DraftRoom = () => {
         );
         
         if (retryError) {
-          toast({ title: "Error", description: `Failed to prepare draft: ${(retryError as any).message || 'Unknown error'}. Please try resetting the draft.`, variant: "destructive" });
+          toast({ title: "Draft Hiccup", description: `Failed to prepare draft: ${(retryError as any).message || 'Unknown error'}. Please try resetting the draft.`, variant: "destructive" });
           return;
         }
       }
@@ -2850,7 +2850,7 @@ const DraftRoom = () => {
       } catch (leagueStatusErr) {
         const leagueStatusError = leagueStatusErr instanceof Error ? leagueStatusErr : new Error('Unknown error');
         logger.error('Error updating league status to queued:', leagueStatusError);
-        toast({ title: "Error", description: `Failed to queue draft: ${leagueStatusError.message || 'Unknown error'}`, variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: `Failed to queue draft: ${leagueStatusError.message || 'Unknown error'}`, variant: "destructive" });
         return;
       }
 
@@ -2860,14 +2860,14 @@ const DraftRoom = () => {
       }
 
       logger.log('handlePrepareDraft: Draft queued successfully');
-      toast({ title: "Success", description: "Draft prepared and queued! Click \"Start Draft\" when everyone is ready." });
+      toast({ title: "Draft Ready", description: "Draft prepared and queued! Click \"Start Draft\" when everyone is ready." });
       
       // Reload data to show updated status
       await loadDraftData();
     } catch (error: unknown) {
       logger.error('handlePrepareDraft: Error preparing draft', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast({ title: "Error", description: `Failed to prepare draft: ${errorMessage}`, variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: `Failed to prepare draft: ${errorMessage}`, variant: "destructive" });
     }
   };
 
@@ -2993,7 +2993,7 @@ const DraftRoom = () => {
       } catch (settingsErr) {
         const msg = settingsErr instanceof Error ? settingsErr.message : 'Unknown error';
         toast({
-          title: 'Error',
+          title: "Draft Hiccup",
           description: `Failed to save draft settings: ${msg}`,
           variant: 'destructive',
         });
@@ -3056,7 +3056,7 @@ const DraftRoom = () => {
       logger.error('handleStartDraft (v2): unexpected error', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       toast({
-        title: 'Error',
+        title: "Draft Hiccup",
         description: `Failed to start draft: ${errorMessage}`,
         variant: 'destructive',
       });
@@ -3215,7 +3215,7 @@ const DraftRoom = () => {
       );
 
       if (initError) {
-        toast({ title: "Error", description: `Failed to initialize draft order: ${(initError as any).message || 'Unknown error'}. Please try preparing the draft first.`, variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: `Failed to initialize draft order: ${(initError as any).message || 'Unknown error'}. Please try preparing the draft first.`, variant: "destructive" });
         return;
       }
 
@@ -3233,7 +3233,7 @@ const DraftRoom = () => {
       } catch (leagueStatusErr) {
         const leagueStatusError = leagueStatusErr instanceof Error ? leagueStatusErr : new Error('Unknown error');
         logger.error('Error updating league status:', leagueStatusError);
-        toast({ title: "Error", description: `Failed to start draft: ${leagueStatusError.message || 'Unknown error'}`, variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: `Failed to start draft: ${leagueStatusError.message || 'Unknown error'}`, variant: "destructive" });
         return;
       }
 
@@ -3310,7 +3310,7 @@ const DraftRoom = () => {
     } catch (error: unknown) {
       logger.error('handleStartDraft: Error starting draft', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast({ title: "Error", description: `Failed to start draft: ${errorMessage}`, variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: `Failed to start draft: ${errorMessage}`, variant: "destructive" });
     }
   };
 
@@ -3359,7 +3359,7 @@ const DraftRoom = () => {
     }
 
     if (!state) {
-      toast({ title: "Error", description: "Cannot continue draft: draft state not ready. Please try again.", variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: "Cannot continue draft: draft state not ready. Please try again.", variant: "destructive" });
       return;
     }
 
@@ -3409,7 +3409,7 @@ const DraftRoom = () => {
       } catch (statusErr) {
         const statusError = statusErr instanceof Error ? statusErr : new Error('Unknown error');
         logger.error('Error resetting league status:', statusError);
-        toast({ title: "Error", description: `Failed to reset draft: ${statusError.message || 'Unknown error'}`, variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: `Failed to reset draft: ${statusError.message || 'Unknown error'}`, variant: "destructive" });
         return;
       }
 
@@ -3427,12 +3427,12 @@ const DraftRoom = () => {
       await loadDraftData();
       
       logger.log('Draft reset complete - ready for fresh start');
-      toast({ title: "Success", description: "Draft reset complete! You can now start a fresh draft. When you click \"Start Draft\", a new draft session will be created." });
+      toast({ title: "Draft Ready", description: "Draft reset complete! You can now start a fresh draft. When you click \"Start Draft\", a new draft session will be created." });
       
     } catch (error: unknown) {
       logger.error('Error resetting draft:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast({ title: "Error", description: `Failed to reset draft: ${errorMessage}`, variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: `Failed to reset draft: ${errorMessage}`, variant: "destructive" });
     }
   };
 
@@ -3453,7 +3453,7 @@ const DraftRoom = () => {
       const { error } = await DraftService.deleteAllDraftData();
       if (error) {
         logger.error('Error deleting all draft data:', error);
-        toast({ title: "Error", description: `Failed to delete all draft data: ${(error as any).message || 'Unknown error'}`, variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: `Failed to delete all draft data: ${(error as any).message || 'Unknown error'}`, variant: "destructive" });
         return;
       }
 
@@ -3464,11 +3464,11 @@ const DraftRoom = () => {
       setDraftPhase(DraftPhase.LOBBY);
       await loadDraftData();
       
-      toast({ title: "Success", description: "All draft data has been deleted successfully." });
+      toast({ title: "Draft Ready", description: "All draft data has been deleted successfully." });
       
     } catch (error: unknown) {
       logger.error('Error deleting all draft data:', error);
-      toast({ title: "Error", description: `Failed to delete all draft data: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: `Failed to delete all draft data: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
     }
   };
 
@@ -3508,7 +3508,7 @@ const DraftRoom = () => {
       const { error } = await DraftService.hardDeleteDraft(leagueId);
       if (error) {
         logger.error('Error resetting draft:', error);
-        toast({ title: "Error", description: `Failed to reset draft: ${(error as any).message || 'Unknown error'}`, variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: `Failed to reset draft: ${(error as any).message || 'Unknown error'}`, variant: "destructive" });
         return;
       }
 
@@ -3550,7 +3550,7 @@ const DraftRoom = () => {
     } catch (error: unknown) {
       logger.error('Error resetting draft:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast({ title: "Error", description: `Failed to reset draft: ${errorMessage}`, variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: `Failed to reset draft: ${errorMessage}`, variant: "destructive" });
     }
   };
 
@@ -3721,7 +3721,7 @@ const DraftRoom = () => {
 
       if (!sessionId) {
         logger.error('Could not determine draft session ID');
-        toast({ title: "Error", description: "Unable to save draft snapshot. Draft session not found.", variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: "Unable to save draft snapshot. Draft session not found.", variant: "destructive" });
         setSavingSnapshot(false);
         return;
       }
@@ -3761,7 +3761,7 @@ const DraftRoom = () => {
 
       if (error) {
         logger.error('Error saving snapshot:', error);
-        toast({ title: "Error", description: "Failed to save draft snapshot. Please try again.", variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: "Failed to save draft snapshot. Please try again.", variant: "destructive" });
         setSavingSnapshot(false);
         return;
       }
@@ -3779,7 +3779,7 @@ const DraftRoom = () => {
       setSavingSnapshot(false);
     } catch (error) {
       logger.error('Error handling draft snapshot:', error);
-      toast({ title: "Error", description: "Failed to save draft snapshot. Please try again.", variant: "destructive" });
+      toast({ title: "Draft Hiccup", description: "Failed to save draft snapshot. Please try again.", variant: "destructive" });
       setSavingSnapshot(false);
     }
   };
@@ -4329,7 +4329,7 @@ const DraftRoom = () => {
                                       } : prev);
                                     }
                                   } else {
-                                    toast({ title: 'Error', description: result.error || 'Could not nominate player', variant: 'destructive' });
+                                    toast({ title: "Draft Hiccup", description: result.error || 'Could not nominate player', variant: 'destructive' });
                                   }
                                 }}
                               >

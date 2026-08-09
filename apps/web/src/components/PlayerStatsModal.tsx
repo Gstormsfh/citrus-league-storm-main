@@ -317,7 +317,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
   const handleDropPlayer = async () => {
     if (!user || !leagueId || !player?.id) {
-      toast({ title: "Error", description: "Unable to drop player. Missing required information.", variant: "destructive" });
+      toast({ title: "Can't Drop Player", description: "We're missing some info this drop needs — reopen the modal and try again.", variant: "destructive" });
       return;
     }
     if (!confirm(`Are you sure you want to drop ${player.name}?`)) return;
@@ -329,11 +329,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         onPlayerDropped?.();
         onClose();
       } else {
-        toast({ title: "Error", description: (error as { message?: string })?.message || "Failed to drop player.", variant: "destructive" });
+        toast({ title: "Drop Didn't Take", description: (error as { message?: string })?.message || "Couldn't drop the player — try again in a moment.", variant: "destructive" });
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to drop player.";
-      toast({ title: "Error", description: message, variant: "destructive" });
+      toast({ title: "Drop Didn't Take", description: message, variant: "destructive" });
     } finally {
       setIsDropping(false);
     }

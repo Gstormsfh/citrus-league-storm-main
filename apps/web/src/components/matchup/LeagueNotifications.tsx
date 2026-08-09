@@ -141,7 +141,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
     } catch (error: unknown) {
       logger.error('Error sending chat message:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to send message. Please try again.';
-      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+      toast({ title: "Message Didn't Send", description: errorMessage, variant: 'destructive' });
     } finally {
       setSendingMessage(false);
     }

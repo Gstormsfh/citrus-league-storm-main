@@ -88,8 +88,8 @@ const PoolSurvivor = () => {
       if (result.success) {
         toast({ title: 'Pick Locked In', description: `${selectedTeam} for Week ${currentWeek}.` });
         setUsedTeams([...usedTeams, selectedTeam]); setSelectedTeam(null);
-      } else { toast({ title: 'Error', description: result.error || 'Failed', variant: 'destructive' }); }
-    } catch { toast({ title: 'Error', description: 'Failed to submit', variant: 'destructive' }); }
+      } else { toast({ title: "Pick Didn't Submit", description: result.error || "Couldn't submit your pick — try again in a moment.", variant: 'destructive' }); }
+    } catch { toast({ title: "Pick Didn't Submit", description: "Couldn't reach the pool server — try again in a moment.", variant: 'destructive' }); }
     finally { setSubmitting(false); }
   };
 

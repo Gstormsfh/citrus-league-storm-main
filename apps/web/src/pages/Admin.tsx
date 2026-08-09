@@ -85,7 +85,7 @@ const Admin = () => {
         navigate('/');
         return;
       }
-      toast({ title: 'Error', description: 'Failed to load admin dashboard.', variant: 'destructive' });
+      toast({ title: "Admin Dashboard Won't Load", description: "Couldn't load the admin dashboard — refresh and we'll pick it back up.", variant: 'destructive' });
     } finally {
       setLoading(false);
     }

@@ -127,16 +127,16 @@ const PoolConfidence = () => {
   const handleSubmitPicks = async () => {
     if (!activeLeagueId || !user) return;
     const arr = Array.from(picks.values());
-    if (!arr.length) { toast({ title: 'Error', description: 'Make at least one pick.', variant: 'destructive' }); return; }
+    if (!arr.length) { toast({ title: 'No Picks Yet', description: 'Make at least one pick before submitting.', variant: 'destructive' }); return; }
     if (new Set(arr.map(p => p.confidence_points)).size !== arr.length) {
-      toast({ title: 'Error', description: 'Each pick needs a unique confidence value.', variant: 'destructive' }); return;
+      toast({ title: 'Confidence Duplicate', description: 'Each pick needs a unique confidence value.', variant: 'destructive' }); return;
     }
     setSubmitting(true);
     try {
       const r = await PoolService.submitConfidencePicks(activeLeagueId, user.id, currentWeek, arr);
       if (r.success) toast({ title: 'Picks Submitted', description: `${arr.length} picks saved.` });
-      else toast({ title: 'Error', description: r.error || 'Failed', variant: 'destructive' });
-    } catch { toast({ title: 'Error', description: 'Failed', variant: 'destructive' }); }
+      else toast({ title: "Picks Didn't Submit", description: r.error || "Couldn't submit your picks — try again in a moment.", variant: 'destructive' });
+    } catch { toast({ title: "Picks Didn't Submit", description: "Couldn't reach the pool server — try again in a moment.", variant: 'destructive' }); }
     finally { setSubmitting(false); }
   };
 

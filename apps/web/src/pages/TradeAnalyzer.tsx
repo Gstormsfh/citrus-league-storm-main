@@ -214,8 +214,8 @@ const TradeAnalyzer = () => {
         logger.error("[TradeAnalyzer] Error:", error);
         if (isMounted) {
           toast({
-            title: "Error",
-            description: "Failed to load trade data.",
+            title: "Trade Data Won't Load",
+            description: "Couldn't load the trade data — refresh and we'll pick it back up.",
             variant: "destructive"
           });
         }

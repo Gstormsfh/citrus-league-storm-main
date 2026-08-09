@@ -581,8 +581,8 @@ const Standings = () => {
                     } catch (error) {
                       logger.error('[Standings] Error refreshing:', error);
                       toast({
-                        title: 'Error',
-                        description: 'Failed to refresh standings',
+                        title: "Refresh Didn't Take",
+                        description: "Couldn't refresh the standings — try again in a moment.",
                         variant: 'destructive',
                       });
                       setLoading(false);

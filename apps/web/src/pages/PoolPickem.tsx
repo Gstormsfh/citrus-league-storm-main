@@ -300,9 +300,9 @@ const PoolPickem = () => {
       if (r.success) {
         toast({ title: 'Picks Saved!', description: `${arr.length} picks submitted.` });
       } else {
-        toast({ title: 'Error', description: r.error || 'Failed', variant: 'destructive' });
+        toast({ title: "Picks Didn't Submit", description: r.error || "Couldn't submit your picks — try again in a moment.", variant: 'destructive' });
       }
-    } catch { toast({ title: 'Error', description: 'Failed to submit', variant: 'destructive' }); }
+    } catch { toast({ title: "Picks Didn't Submit", description: "Couldn't reach the pool server — try again in a moment.", variant: 'destructive' }); }
     finally { setSubmitting(false); }
   };
 

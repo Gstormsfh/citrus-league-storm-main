@@ -323,7 +323,7 @@ const LeagueDashboard = () => {
         
         if (teamsData && teamsData.length > 0) {
           toast({
-            title: 'Success',
+            title: 'League Updated',
             description: `${teamsData.length} teams are now in the league.`,
           });
         }
@@ -331,8 +331,8 @@ const LeagueDashboard = () => {
     } catch (err: unknown) {
       logger.error('handleSimulateFill: Exception:', err);
       toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to simulate teams',
+        title: "Simulation Didn't Take",
+        description: err instanceof Error ? err.message : "Couldn't simulate the teams — try again in a moment.",
         variant: 'destructive',
       });
     } finally {
@@ -477,7 +477,7 @@ const LeagueDashboard = () => {
 
       if (!saved) {
         toast({
-          title: 'Error',
+          title: "Settings Didn't Stick",
           description: errorMessage,
           variant: 'destructive',
         });
@@ -494,8 +494,8 @@ const LeagueDashboard = () => {
       loadLeagueData();
     } catch (err: unknown) {
       toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to save settings',
+        title: "Settings Didn't Stick",
+        description: err instanceof Error ? err.message : "Couldn't save the settings — try again in a moment.",
         variant: 'destructive',
       });
     } finally {
@@ -516,8 +516,8 @@ const LeagueDashboard = () => {
 
       if (!result.success) {
         toast({
-          title: 'Error',
-          description: result.error || 'Failed to process waivers',
+          title: "Waivers Didn't Process",
+          description: result.error || "Couldn't process the waiver run — retrying might help.",
           variant: 'destructive',
         });
         return;
@@ -539,8 +539,8 @@ const LeagueDashboard = () => {
       }
     } catch (err: unknown) {
       toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to process waivers',
+        title: "Waivers Didn't Process",
+        description: err instanceof Error ? err.message : "Couldn't process the waiver run — retrying might help.",
         variant: 'destructive',
       });
     } finally {
@@ -561,8 +561,8 @@ const LeagueDashboard = () => {
 
       if (!syncResult) {
         toast({
-          title: 'Error',
-          description: 'Failed to sync rosters',
+          title: "Roster Sync Didn't Take",
+          description: "Couldn't sync the rosters — try again in a moment.",
           variant: 'destructive',
         });
         return;
@@ -590,8 +590,8 @@ const LeagueDashboard = () => {
       loadLeagueData();
     } catch (err: unknown) {
       toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to sync rosters',
+        title: "Roster Sync Didn't Take",
+        description: err instanceof Error ? err.message : "Couldn't sync the rosters — try again in a moment.",
         variant: 'destructive',
       });
     } finally {
@@ -1596,8 +1596,8 @@ Your Commissioner`);
                     onClick={() => {
                       if (!leagueId) {
                         toast({
-                          title: 'Error',
-                          description: 'League ID is missing. Please refresh the page.',
+                          title: 'Missing League ID',
+                          description: "Something's off with the URL — refresh the page and we'll pick it back up.",
                           variant: 'destructive',
                         });
                         return;

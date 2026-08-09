@@ -552,8 +552,8 @@ const PlayoffBracket = () => {
       await loadData();
     } catch (err: unknown) {
       toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to generate bracket',
+        title: "Bracket Didn't Build",
+        description: err instanceof Error ? err.message : "Couldn't generate the bracket — try again in a moment.",
         variant: 'destructive',
       });
     } finally {
@@ -576,8 +576,8 @@ const PlayoffBracket = () => {
       await loadData();
     } catch (err: unknown) {
       toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to advance round',
+        title: "Round Didn't Advance",
+        description: err instanceof Error ? err.message : "Couldn't advance the round — try again in a moment.",
         variant: 'destructive',
       });
     } finally {
@@ -598,8 +598,8 @@ const PlayoffBracket = () => {
       setSeries([]);
     } catch (err: unknown) {
       toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to reset bracket',
+        title: "Bracket Reset Didn't Take",
+        description: err instanceof Error ? err.message : "Couldn't reset the bracket — try again in a moment.",
         variant: 'destructive',
       });
     } finally {

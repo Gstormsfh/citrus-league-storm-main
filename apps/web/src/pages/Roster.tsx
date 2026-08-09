@@ -1259,8 +1259,8 @@ const Roster = () => {
         logger.error('[Roster] Error in initial load:', error);
         setLoading(false);
         toast({
-          title: 'Error',
-          description: 'Failed to load roster. Please try refreshing the page.',
+          title: "Roster Won't Load",
+          description: "Couldn't load your roster — refresh and we'll pick it back up.",
           variant: 'destructive'
         });
       }
@@ -2486,7 +2486,7 @@ const Roster = () => {
     // Read-only guard: Block drag-and-drop for guests and demo league
     if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
       toast({
-        title: "Demo Mode - Read Only",
+        title: "Demo League",
         description: "Sign up to create your own league and make lineup changes!",
         variant: "default",
       });
@@ -2826,7 +2826,7 @@ const Roster = () => {
   const handleMobileTapPlayer = (player: HockeyPlayer) => {
     // Read-only guards
     if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
-      toast({ title: "Demo Mode - Read Only", description: "Sign up to create your own league and make lineup changes!", variant: "default" });
+      toast({ title: "Demo League", description: "Sign up to create your own league and make lineup changes!", variant: "default" });
       return;
     }
     if (userTeam && isDemoLeague(userTeam.league_id)) {
@@ -3816,8 +3816,8 @@ const Roster = () => {
                     } catch (error) {
                       logger.error("[Roster] Error checking draft status:", error);
                       toast({
-                        title: "Error",
-                        description: "Could not verify draft status.",
+                        title: "Draft Status Unclear",
+                        description: "Couldn't verify where the draft is at — try again in a moment.",
                         variant: "destructive"
                       });
                       return;
@@ -3834,8 +3834,8 @@ const Roster = () => {
 
                       if (!dropSuccess) {
                         toast({
-                          title: "Error",
-                          description: dropError?.message || "Failed to drop player.",
+                          title: "Drop Didn't Take",
+                          description: dropError?.message || "Couldn't drop the player — try again in a moment.",
                           variant: "destructive"
                         });
                         return;
@@ -3853,7 +3853,7 @@ const Roster = () => {
                       if (result.success) {
                         if (result.isFreeAgent) {
                           toast({
-                            title: "Success",
+                            title: "Player Swapped",
                             description: `Dropped ${player.name} and added ${pendingAddPlayer.name} to your roster.`,
                           });
                         } else {
@@ -3879,8 +3879,8 @@ const Roster = () => {
                       }
                     } catch (error: any) {
                       toast({
-                        title: "Error",
-                        description: error?.message || "An error occurred.",
+                        title: "Move Didn't Take",
+                        description: error?.message || "Something got in the way — try that move again.",
                         variant: "destructive"
                       });
                     }

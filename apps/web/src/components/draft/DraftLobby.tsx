@@ -254,8 +254,8 @@ export const DraftLobby = ({
       const errorMessage = error instanceof Error ? error.message : (typeof error === 'string' ? error : JSON.stringify(error)) || 'Unknown error';
       logger.error('[DraftLobby] Error deleting team:', error);
       toast({
-        title: "Error",
-        description: `Failed to remove team: ${errorMessage}`,
+        title: "Team Didn't Remove",
+        description: `Couldn't remove that team: ${errorMessage}`,
         variant: "destructive"
       });
     }

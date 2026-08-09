@@ -300,8 +300,8 @@ const WaiverWire = () => {
     } catch (error) {
       logger.error("[WaiverWire] Error checking draft status:", error);
       toast({
-        title: "Error",
-        description: "Could not verify draft status.",
+        title: "Draft Status Unclear",
+        description: "Couldn't verify where the draft is at — try again in a moment.",
         variant: "destructive"
       });
       return;
