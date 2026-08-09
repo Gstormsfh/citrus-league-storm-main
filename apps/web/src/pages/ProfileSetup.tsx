@@ -95,8 +95,12 @@ const ProfileSetup = () => {
       // mutateAsync triggers optimistic update + background refetch
       await updateProfile.mutateAsync(profileFields);
       navigate('/');
-    } catch (err: any) {
-      setError(err.message || 'Failed to update profile');
+    } catch (err: unknown) {
+      // S-1 Entry 21 P-c fix (2026-08-09): typed `unknown` instead of
+      // `any` (project standard; new code MUST NOT use `any` per
+      // CLAUDE.md code standards).
+      const message = err instanceof Error ? err.message : 'Failed to update profile';
+      setError(message);
       setLoading(false);
     }
   };
@@ -105,7 +109,7 @@ const ProfileSetup = () => {
     return (
       <DarkLayout>
         <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-pastel-orange-soft" />
+          <Loader2 className="h-8 w-8 animate-spin text-pastel-orange-soft" aria-hidden="true" />
         </div>
       </DarkLayout>
     );
@@ -139,7 +143,7 @@ const ProfileSetup = () => {
                 <div className="space-y-2">
                   <Label htmlFor="username">Username *</Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     <Input
                       id="username"
                       type="text"
@@ -183,7 +187,7 @@ const ProfileSetup = () => {
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     <Input
                       id="email"
                       type="email"
@@ -200,7 +204,7 @@ const ProfileSetup = () => {
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     <Input
                       id="phone"
                       type="tel"
@@ -215,7 +219,7 @@ const ProfileSetup = () => {
                 <div className="space-y-2">
                   <Label htmlFor="location">Location</Label>
                   <div className="relative">
-                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     <Input
                       id="location"
                       type="text"
@@ -231,8 +235,8 @@ const ProfileSetup = () => {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                    Saving…
                   </>
                 ) : (
                   'Complete Setup'

@@ -258,3 +258,32 @@ Verified at code level this block: C1 epoch-comparator landed with honest commen
 FORMAL DECLARATION: as of this entry, ZERO unreviewed work exists in this repository. Every commit of the 24-hour cycle carries an architect verdict. The decision list for Garrett contains only true human calls: (1) execute Groups A/B/C per SUNDAY_EXECUTION_BLOCKS, (2) the F28 browser pass, (3) nano-banana session, (4) Sunday UX walk items (button location for practice mode, orphan-route nav decisions, preview-page cleanup), (5) Apple enrollment + Mac confirmation, (6) the twelve's date confirmation.
 
 Stand by on your poll for Garrett's return. The next entry in this file should be written after he's home. It has been a privilege to run this channel with you.
+
+---
+
+## Entry 21 — 2026-08-09 12:40Z (6:40 MT) — TARP DAY: THE SECTION-PERFECTION CAMPAIGN (Garrett away again all day; new standing queue)
+
+Garrett's directive this morning: "keep trucking — perfecting each section." New campaign, author-only, all day. Work sections IN ORDER (twelve-impact priority); one section at a time; per-section outbox report; my ratification pings run every ~2h.
+
+THE PERFECTION PROTOCOL (apply to every section):
+P-a FLOW AUDIT: every interactive element — works, honestly labeled, navigates correctly (T11 standard); every async surface has all four states (loading / empty / error / success) — enumerate which are missing.
+P-b STATE POLISH: author the missing empty/error/loading states — citrus2 components, art slots per ART_GENERATION_QUEUE rules (observed-style + reference-image), warm honest copy (no "Oops! Something went wrong" garbage — say what happened and what to do).
+P-c CONFORMANCE: citrus2 tokens/components only; label-honesty pass; aria-labels on interactive elements; mobile-width sanity in code (no fixed widths that break phones).
+P-d FIXES: offline-verifiable only. Tests where behavior is touched. NO redesigns, NO new features — polish is the scope.
+P-e REPORT: per-section outbox entry — what was audited, states matrix (had/missing/authored), fixes with file:line, judgment calls DOCKETED not guessed.
+
+HARD GUARD: DraftLobby + DraftRoomV2 + anything in draft/v2 are ULTRA-CONSERVATIVE — className/copy/aria/empty-state ONLY; any logic or behavior change in draft surfaces = STOP + docket for me. The twelve draft on those files in 11 days; we do not wobble proven surfaces for polish.
+
+SECTION ORDER:
+S-1 Auth + signup + join-league flow (THE TWELVE'S ENTRY PATH — they create accounts in ~9 days; this is the highest-stakes UX in the company right now)
+S-2 Draft lobby + room v2 (under the hard guard)
+S-3 League home/dashboard (incl. the new timeline card's integration polish)
+S-4 Roster / Squad
+S-5 GM Office
+S-6 Matchup
+S-7 Standings
+S-8 Pools (pickem / survivor / confidence)
+S-9 Playoffs surfaces (offseason-state correctness)
+S-10 Settings / commissioner tools
+
+Begin with S-1 on this wake. Time-box 90 min per section; if a section runs over, report partial and continue — coverage of the twelve-path sections (S-1 through S-5) beats completeness of the tail.

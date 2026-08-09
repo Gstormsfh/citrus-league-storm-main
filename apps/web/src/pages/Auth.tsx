@@ -254,7 +254,7 @@ const Auth = () => {
                 <form onSubmit={handleSignIn} className="space-y-3">
                   {error && (
                     <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200">
-                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} aria-hidden="true" />
                       <span className="text-[13px] font-medium leading-snug">{error}</span>
                     </div>
                   )}
@@ -262,7 +262,7 @@ const Auth = () => {
                   <div className="space-y-1.5">
                     <Label htmlFor="signin-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Email</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="signin-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
                     </div>
                   </div>
@@ -273,7 +273,7 @@ const Auth = () => {
                       <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
                         <DialogTrigger asChild>
                           <button type="button" className="text-[11px] text-pastel-orange-soft hover:text-pastel-orange transition-colors flex items-center gap-1 font-bold" onClick={() => { setResetEmail(email); setResetSuccess(false); setError(null); }}>
-                            <HelpCircle className="h-3 w-3" strokeWidth={2.5} />
+                            <HelpCircle className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
                             Forgot password?
                           </button>
                         </DialogTrigger>
@@ -285,7 +285,7 @@ const Auth = () => {
                           <div className="space-y-4 py-2">
                             {resetSuccess ? (
                               <div className="flex items-start gap-2 px-3 py-3 rounded-md bg-pastel-sage/15 ring-1 ring-pastel-sage/40 text-pastel-sage-soft">
-                                <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                                <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} aria-hidden="true" />
                                 <span className="text-[13px] font-medium leading-snug">Reset email sent. Check your inbox.</span>
                               </div>
                             ) : (
@@ -296,7 +296,7 @@ const Auth = () => {
                                 </div>
                                 {error && (
                                   <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200">
-                                    <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                                    <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} aria-hidden="true" />
                                     <span className="text-[13px] font-medium leading-snug">{error}</span>
                                   </div>
                                 )}
@@ -310,7 +310,7 @@ const Auth = () => {
                       </Dialog>
                     </div>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="signin-password" type="password" placeholder="••••••••" value={password} onChange={(e) => { setPassword(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
                     </div>
                   </div>
@@ -335,7 +335,7 @@ const Auth = () => {
                 <form onSubmit={handleSignUp} className="space-y-3">
                   {error && (
                     <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200">
-                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} aria-hidden="true" />
                       <span className="text-[13px] font-medium leading-snug">{error}</span>
                     </div>
                   )}
@@ -343,7 +343,7 @@ const Auth = () => {
                   <div className="space-y-1.5">
                     <Label htmlFor="signup-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Email</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="signup-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
                     </div>
                   </div>
@@ -351,7 +351,7 @@ const Auth = () => {
                   <div className="space-y-1.5">
                     <Label htmlFor="signup-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Password</Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="signup-password" type="password" placeholder="••••••••" value={password} onChange={(e) => { setPassword(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required minLength={8} />
                     </div>
                     {password && <PasswordStrength password={password} />}
@@ -360,7 +360,7 @@ const Auth = () => {
                   <div className="space-y-1.5">
                     <Label htmlFor="confirm-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Confirm Password</Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="confirm-password" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
                     </div>
                   </div>

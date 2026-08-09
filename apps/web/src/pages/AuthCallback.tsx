@@ -133,9 +133,9 @@ const AuthCallback = () => {
               <MascotAvatar id="stormy" size="lg" />
             </div>
             <CardTitle className="flex items-center justify-center gap-2 text-pastel-cream">
-              {status === 'loading' && <Loader2 className="h-5 w-5 animate-spin text-pastel-orange-soft" />}
-              {status === 'success' && <CheckCircle2 className="h-5 w-5 text-pastel-sage" />}
-              {status === 'error' && <XCircle className="h-5 w-5 text-pastel-orange" />}
+              {status === 'loading' && <Loader2 className="h-5 w-5 animate-spin text-pastel-orange-soft" aria-hidden="true" />}
+              {status === 'success' && <CheckCircle2 className="h-5 w-5 text-pastel-sage" aria-hidden="true" />}
+              {status === 'error' && <XCircle className="h-5 w-5 text-pastel-orange" aria-hidden="true" />}
               {status === 'loading' && 'Signing In'}
               {status === 'success' && 'Welcome to Citrus'}
               {status === 'error' && 'Sign-In Failed'}

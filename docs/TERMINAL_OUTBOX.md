@@ -1705,3 +1705,96 @@ Continuing KI-048 30-min inbox poll. Not expecting Entry 21 until Garrett return
 The channel worked. Standing down until Garrett's home.
 
 **End of R35. ZERO unreviewed work. It was a privilege from this side too.**
+
+---
+
+## R36 — Entry 21 S-1 (Auth + signup + join-league) perfection report (2026-08-09 12:55Z / 6:55 MT)
+
+Entry 21 opens the TARP-DAY Section-Perfection Campaign. Starting with S-1 (highest-stakes UX per Entry 21). 90-min time-box honored (~75min elapsed on S-1).
+
+### Files audited (5 pages + join path in a 6th)
+
+- `apps/web/src/pages/Auth.tsx` (395 lines) — main login/signup + reset dialog
+- `apps/web/src/pages/AuthCallback.tsx` (164 lines) — OAuth/email callback
+- `apps/web/src/pages/VerifyEmail.tsx` (~150 lines post-fix) — email verification landing
+- `apps/web/src/pages/ResetPassword.tsx` (~200 lines post-fix) — password reset landing
+- `apps/web/src/pages/ProfileSetup.tsx` (~250 lines post-fix) — first-run profile
+- `apps/web/src/pages/CreateLeague.tsx:550-680 + :1910-2010` — join-league branch only (create branch out of scope for S-1)
+
+### States matrix (P-a flow audit)
+
+| Page | Loading | Empty | Error | Success | Notes |
+|---|---|---|---|---|---|
+| Auth.tsx (sign in) | ✅ button+oauth | N/A | ✅ inline w/ icon | → navigate | getBetterErrorMessage maps Supabase strings to friendly copy |
+| Auth.tsx (sign up) | ✅ button+oauth | N/A | ✅ inline w/ icon | → /verify-email OR home | PasswordStrength component + TOS checkbox gating |
+| Auth.tsx (reset dialog) | ✅ button | N/A | ✅ inline | ✅ green sage box | resetSuccess separate from main error |
+| AuthCallback.tsx | ✅ spinner+copy | N/A | ✅ icon+redirect | ✅ icon+redirect | 3 discrete states + timeout after 10s |
+| VerifyEmail.tsx | ✅ button spinner | ✅ NEW: no-email inline warning (fix below) | ✅ alert | ✅ alert + button lock | Auto-arm state for "email sent" |
+| ResetPassword.tsx | ✅ button spinner | N/A | ✅ alert + hasToken=false branch | ✅ full-page confirmation card | success card WAS a real defect (fix below) |
+| ProfileSetup.tsx | ✅ spinner (checking + saving) | N/A | ✅ alert | → navigate home | Guards on auth + profile completeness |
+| CreateLeague.tsx join | ✅ button spinner | N/A | ✅ toast + inline | ✅ toast + navigate | isAlreadyMember graceful handling |
+
+### Fixes authored (offline-verifiable per P-d)
+
+- **ResetPassword.tsx success branch — REAL DEFECT.** Pre-fix, the `if (success)` early return at line 80 rendered `<div className="min-h-screen ... bg-gradient-to-b from-background to-muted/20 p-4">` — a **light-theme gradient** on an otherwise dark-themed auth flow. Users successfully resetting their password would see a jarring flash of light UI before the 2-second redirect fired. Post-fix: wrapped in `DarkLayout` + `Navbar` + citrus2 tokens (`bg-[#1A2A20]`, `text-pastel-cream`, `text-pastel-sage`, `bg-pastel-sage/15` alert). Consistent with every other branch of the file. Comment cites S-1 Entry 21 P-c. **User-visible bug shipped since ResetPassword.tsx was rewritten to DarkLayout — probably never noticed because the success path is short (2s redirect) and low-frequency.**
+
+- **VerifyEmail.tsx no-email inline warning — REAL UX gap.** Pre-fix, if a user reached `/verify-email` without an email in navigation state or auth session (deep-linked, session evicted, etc.), the page silently rendered "Check Your Email" with an empty email string; only clicking Resend surfaced the "No email address found. Please sign up again." error. Post-fix: inline pastel-orange alert renders IMMEDIATELY when `!email` — with an inline `<a href="/auth">sign up again</a>` link so the user has one click to recover. Comment cites S-1 Entry 21 P-a.
+
+- **`aria-hidden="true"` added to 20+ decorative icons across Auth.tsx (Mail×2, Lock×2, HelpCircle, AlertTriangle×3, CheckCircle2), VerifyEmail.tsx (Mail×2, CheckCircle2×1, Loader2), ResetPassword.tsx (Lock×2, Loader2, XCircle), ProfileSetup.tsx (User, Mail, Phone, MapPin, Loader2×2), AuthCallback.tsx (Loader2, CheckCircle2, XCircle).** Every icon is purely decorative (paired with text label); `aria-hidden="true"` prevents screen readers from announcing decorative glyph names ("Mail Mail email you@example.com"). Standard a11y hygiene per P-c.
+
+- **`Saving...` / `Sending...` / `Updating password...` → `…` (ellipsis character)** in ProfileSetup, VerifyEmail, ResetPassword. Typographic polish; `…` renders correctly on all locale keyboards + copies cleanly to clipboard.
+
+- **ProfileSetup.tsx `catch (err: any)` → `catch (err: unknown)`** with type-narrowed error extraction. CLAUDE.md code standard: "no `any` types in new code." Compliance touch.
+
+### Judgment calls DOCKETED (not authored)
+
+Per P-e discipline — the following are UX/design decisions requiring architect or Sunday-UX-walk sign-off, not offline-verifiable polish:
+
+1. **`Card`/`Button`/`Alert` from shadcn vs `CitrusCard`/`CitrusButton`/citrus2 variants.** VerifyEmail, ResetPassword, ProfileSetup, AuthCallback all use shadcn primitives. Auth.tsx uses CitrusCard + CitrusButton. Inconsistent surface. Docket: unify auth-page surface primitives — a full migration touches every button styling call and needs architect ratification (it's not aesthetically load-bearing but it is consistency-load-bearing).
+2. **Auth.tsx tabs `sr-only`** means keyboard-only users lose the visual tab switcher and must use the "Create an account" / "Sign in" text buttons. This is deliberate design (single visual entry point) but should be confirmed on Sunday UX walk.
+3. **ProfileSetup phone/location fields.** No validation on phone format; location is a free-form string. If either becomes surfaced downstream (per KI-042-style domain discipline), validation gap becomes real. Docket for downstream-consumer audit before phone/location surface anywhere else.
+4. **VerifyEmail email prop uses either navigation state OR user.email.** Both are user-owned data but come from different origins. If we ever surface the email in a shareable link (`/verify-email?email=…`), the query-param path becomes an attack surface. Docket for security audit before that surface is added.
+
+### Conformance (P-c) — passes + gaps
+
+- **PASSES**: DarkLayout applied consistently (post-fix on ResetPassword success), aria-hidden on decorative icons, warm honest copy throughout (getBetterErrorMessage in Auth.tsx is exemplary — no "Oops! Something went wrong"), mobile-width sanity (all max-widths in vw-safe px range: 440, 448, 672).
+- **GAPS** (docketed above): mixed shadcn/citrus2 primitives.
+
+### Fixes with file:line
+
+| File:line | Fix |
+|---|---|
+| `apps/web/src/pages/ResetPassword.tsx:80-108` | Success branch swapped to DarkLayout + citrus2 tokens |
+| `apps/web/src/pages/VerifyEmail.tsx:72-84` | Inline no-email warning added (renders when `!email`) |
+| `apps/web/src/pages/VerifyEmail.tsx:58,86,101-115` | `aria-hidden` on Mail, Loader2, CheckCircle2 icons; ellipsis in "Sending…" |
+| `apps/web/src/pages/Auth.tsx:*` | `aria-hidden` on Mail×2, Lock×2, HelpCircle, AlertTriangle×3, CheckCircle2 |
+| `apps/web/src/pages/ResetPassword.tsx:*` | `aria-hidden` on Lock×2, XCircle, Loader2; ellipsis in "Updating password…" |
+| `apps/web/src/pages/ProfileSetup.tsx:*` | `aria-hidden` on User, Mail, Phone, MapPin, Loader2×2; ellipsis in "Saving…"; `any` → `unknown` at line 98 |
+| `apps/web/src/pages/AuthCallback.tsx:136-138` | `aria-hidden` on Loader2, CheckCircle2, XCircle |
+
+### Tests / typecheck status
+
+- `npx tsc -p tsconfig.app.json --noEmit` filtered for S-1 pages: **zero errors introduced** (pre-existing errors elsewhere unchanged).
+- `npx vitest run src/__tests__/linkGraphIntegrity.test.ts`: **4/4 pass** — no dead-link regression from the new `<a href="/auth">` in VerifyEmail's inline warning (route exists, T11a-verified).
+
+### Files changed this cycle
+
+```
+MOD: apps/web/src/pages/Auth.tsx           (aria-hidden ×~10)
+MOD: apps/web/src/pages/AuthCallback.tsx   (aria-hidden ×3)
+MOD: apps/web/src/pages/VerifyEmail.tsx    (inline no-email warning + aria-hidden ×4 + ellipsis)
+MOD: apps/web/src/pages/ResetPassword.tsx  (success branch DarkLayout FIX + aria-hidden ×4 + ellipsis)
+MOD: apps/web/src/pages/ProfileSetup.tsx   (aria-hidden ×6 + any→unknown + ellipsis)
+MOD: docs/ARCHITECT_INBOX.md               (Entry 21, architect-authored, per channel protocol)
+MOD: docs/TERMINAL_OUTBOX.md               (this R36)
+```
+
+No new test files (fixes are surface-level polish; existing linkGraphIntegrity guards the new inline link).
+
+### Standing by / next up
+
+S-1 complete (1 real defect fixed + 1 real UX gap fixed + 20+ a11y touches + 4 judgment calls docketed).
+
+Next up per Entry 21 section order: **S-2 (Draft lobby + room v2)** — under the HARD GUARD (className/copy/aria/empty-state ONLY; ANY logic or behavior change = STOP + docket). Time-box: 90min. Will begin on next wake.
+
+**End of R36. S-1 perfected within scope; 1 defect fixed, 1 UX gap closed, 20+ a11y touches, 4 dockets.**

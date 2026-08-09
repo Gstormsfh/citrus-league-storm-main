@@ -55,7 +55,7 @@ const VerifyEmail = () => {
               <MascotAvatar id="stormy" size="lg" />
             </div>
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-              <Mail className="h-6 w-6 text-primary" />
+              <Mail className="h-6 w-6 text-primary" aria-hidden="true" />
             </div>
             <CardTitle className="text-2xl font-bold">Check Your Email</CardTitle>
             <CardDescription>
@@ -67,9 +67,23 @@ const VerifyEmail = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* S-1 Entry 21 P-a fix (2026-08-09): inline warning when we
+                have NO email context. Pre-fix the user only saw this
+                message AFTER clicking Resend (error state). Surface it
+                immediately so they know why the Resend button won't
+                help them — signup flow got interrupted; they need to
+                start over. */}
+            {!email && (
+              <Alert className="bg-pastel-orange/15 ring-1 ring-pastel-orange/40 border-0 text-pastel-orange-soft">
+                <AlertDescription>
+                  We don't have your email on file. Please <a href="/auth" className="underline font-semibold">sign up again</a> to receive a fresh verification link.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {success && (
               <Alert>
-                <CheckCircle2 className="h-4 w-4" />
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                 <AlertDescription>
                   Verification email sent! Check your inbox and click the link to verify your account.
                 </AlertDescription>
@@ -100,17 +114,17 @@ const VerifyEmail = () => {
               >
                 {loading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                    Sending…
                   </>
                 ) : success ? (
                   <>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden="true" />
                     Email Sent
                   </>
                 ) : (
                   <>
-                    <Mail className="mr-2 h-4 w-4" />
+                    <Mail className="mr-2 h-4 w-4" aria-hidden="true" />
                     Resend Verification Email
                   </>
                 )}

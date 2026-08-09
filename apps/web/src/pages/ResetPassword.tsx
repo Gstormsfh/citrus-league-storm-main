@@ -79,22 +79,30 @@ const ResetPassword = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/20 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-              Password Reset Successful
-            </CardTitle>
-            <CardDescription>Your password has been updated successfully.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Alert>
-              <AlertDescription>Redirecting to sign in...</AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
-      </div>
+      // S-1 Entry 21 P-c conformance fix (2026-08-09): success branch
+      // previously rendered `bg-gradient-to-b from-background to-muted/20`
+      // — a light-theme gradient — causing a jarring flash of light UI
+      // between password submit and /auth redirect. All other branches
+      // of this file (and every auth page) use DarkLayout. Now unified.
+      <DarkLayout>
+        <Navbar />
+        <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
+          <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-pastel-cream">
+                <CheckCircle2 className="h-5 w-5 text-pastel-sage" aria-hidden="true" />
+                Password Reset Successful
+              </CardTitle>
+              <CardDescription className="text-white/60">Your password has been updated successfully.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Alert className="bg-pastel-sage/15 ring-1 ring-pastel-sage/40 border-0 text-pastel-sage-soft">
+                <AlertDescription>Redirecting to sign in…</AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        </main>
+      </DarkLayout>
     );
   }
 
@@ -106,7 +114,7 @@ const ResetPassword = () => {
           <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-pastel-cream">
-                <XCircle className="h-5 w-5 text-pastel-orange" />
+                <XCircle className="h-5 w-5 text-pastel-orange" aria-hidden="true" />
                 Invalid Reset Link
               </CardTitle>
               <CardDescription className="text-white/60">{error || 'This password reset link is invalid or has expired.'}</CardDescription>
@@ -142,7 +150,7 @@ const ResetPassword = () => {
             <div className="space-y-2">
               <Label htmlFor="password">New Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   id="password"
                   type="password"
@@ -160,7 +168,7 @@ const ResetPassword = () => {
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirm Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   id="confirm-password"
                   type="password"
@@ -176,8 +184,8 @@ const ResetPassword = () => {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating password...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  Updating password…
                 </>
               ) : (
                 'Update Password'
