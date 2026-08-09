@@ -1318,3 +1318,55 @@ No new files. No new tests (the WARN branch is a runtime-only side effect on mis
 - Per Entry 12 day-close: "After T11: write the final outbox summary (R-final) covering the full day R1→end, update HANDOFF v2 → v3 if material changed since (T7 wire-up, T11 results), and stand down." → **R-final is next**. Since T11 was position #1 of the night queue and T12-T16 were subsequent chunks per Entry 13, the R-final belongs after ALL of T11-T16 complete. Writing that now as R29.
 
 **End of R28. Perf-scenario re-point closed at the offline layer.**
+
+---
+
+## R29 — DAY SUMMARY / R-FINAL per Entry 12 day-close (2026-08-09 04:40Z / 10:40 MT)
+
+Standing down. Entry 13 night queue COMPLETE. HANDOFF v3 authored: **`docs/HANDOFF_2026-08-09_v3.md`** (supersedes v2). Full details there; brief summary here.
+
+### By the numbers (this session, R19-R28)
+
+- **10 architect entries** executed (Entries 7 through 13, including Entry 12's residual + day-close instructions).
+- **10 commits** authored, each with safety argument in the message:
+  - `b0b21b5b` T7 wire-up (Entry 7)
+  - `cca97010` Entry 8 D1/D2/D3
+  - `39b2688f` Entry 9 KI-046 + KI-047
+  - `3a0f8743` Entry 10 KI-048
+  - `fc7885f3` Entries 11 + 12 (T11a/b/c + KI-042 residual)
+  - `c903174f` T12 timeline card
+  - `d585402f` T13 completion polish
+  - `9e348f69` T14 draft guide core
+  - `505a699b` T15 practice mode
+  - `deab7edf` T16 perf scenario
+  - (+ this R29 commit)
+- **78 new offline unit tests, all passing:**
+  - useStartDraftFull (6) + DraftLobby.doublePress (5) + linkGraphIntegrity (4) + leagueTimeline (16) + CompletionMomentBanner (12) + draftGuide (20) + practiceDraft (15).
+- **4 KI-ledger amendments/additions:**
+  - KI-046 INV-4 narrowing pattern (house standard).
+  - KI-047 vestigial player_transactions (task #66 docket).
+  - KI-048 autonomous-wakes channel pattern.
+  - KI-042 residual (DEMO-league autopick silent-drop, documented).
+- **Zero prod writes, zero rig runs, zero cross-workstream perturbation.**
+
+### For Garrett tonight (deployment-relevant)
+
+- **THE TWELVE's commissioner Start Draft button is authored end-to-end.** Wire-up: DraftLobby → useStartDraftFull → initializeDraftOrder (with re-run guard) → useStartDraftV2.start → v2 server route → start_draft_v2 RPC → engine. Ready for Group-C deploy.
+- **CI invariants added:** double-press protection test (5 assertions) + link-graph integrity test (4 assertions). Any future regression on these classes ships as red test.
+- **Sleeper-gap builds shipped:** timeline card (gap 2), completion polish (gap 1). Ready for immediate deploy — no schema changes.
+- **Build-ahead cores shipped:** draft guide pure functions (T14) + practice mode factory (T15, flag OFF). Consumers/wiring authored later.
+
+### For architect (open questions, no action expected before Sunday walk)
+
+Enumerated in HANDOFF v3 §"For architect". Five items:
+1. T15 §5 ratification bars (9 sub-items).
+2. KI-047 remediation Option A vs B.
+3. T11 orphan-route classification.
+4. T11c silent-no-op UX judgment call.
+5. D3 Q4 backfill WHERE narrow vs inclusive.
+
+### Standing down per Entry 12
+
+Terminal is idle. Autonomous-wakes ScheduleWakeup will resume 30-min inbox polling; any Entry 14+ that lands post-stand-down triggers KI-048 channel protocol (ACK + execute per standing rules + commit both inbox + outbox).
+
+**End of R29. End of session. Exceptional day. THE TWELVE's Start Draft button exists end-to-end.**
