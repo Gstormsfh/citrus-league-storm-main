@@ -640,8 +640,14 @@ const Standings = () => {
                 <tbody className="divide-y divide-white/5" style={{ visibility: 'visible', opacity: 1 }}>
                   {sortedTeams.length === 0 ? (
                     <tr style={{ visibility: 'visible', opacity: 1 }}>
-                      <td colSpan={hasMatchups ? 8 : (isSeasonPoints ? 4 : 3)} className="px-3 sm:px-6 py-12 text-center text-white/55" style={{ visibility: 'visible', opacity: 1 }}>
-                        No teams found in this league.
+                      <td colSpan={hasMatchups ? 8 : (isSeasonPoints ? 4 : 3)} className="px-3 sm:px-6 py-12 text-center" style={{ visibility: 'visible', opacity: 1 }}>
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">
+                            ✦ Preseason
+                          </div>
+                          <p className="text-pastel-cream font-bold text-base">The league is still filling up.</p>
+                          <p className="text-[13px] text-white/55 max-w-xs">Standings will light up as soon as the roster locks and week 1 puck drops.</p>
+                        </div>
                       </td>
                     </tr>
                   ) : (

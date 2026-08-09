@@ -119,10 +119,27 @@ const News = () => {
         {!loading && filtered.length === 0 && (
           <Card className="p-12 text-center bg-[#1A2A20] border-white/10">
             <CardContent className="flex flex-col items-center gap-4">
-              <Newspaper className="h-12 w-12 text-white/30" />
-              <p className="text-lg text-white/55">
-                No articles found{searchTerm ? ` for "${searchTerm}"` : ''}.
+              <Newspaper className="h-12 w-12 text-pastel-orange-soft/60" aria-hidden="true" />
+              <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">
+                ✦ Nothing on the wire
+              </div>
+              <p className="text-lg text-pastel-cream font-bold">
+                {searchTerm ? `No stories matched "${searchTerm}".` : 'The news feed is quiet.'}
               </p>
+              <p className="text-sm text-white/55 max-w-sm">
+                {searchTerm
+                  ? 'Try a different keyword, or clear the search to see everything we\'ve pulled today.'
+                  : 'Check back after the next puck drop — the beat picks up during game hours.'}
+              </p>
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pastel-orange text-white text-sm font-bold hover:bg-pastel-orange-soft transition-colors"
+                >
+                  Clear search →
+                </button>
+              )}
             </CardContent>
           </Card>
         )}

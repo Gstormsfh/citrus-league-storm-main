@@ -1816,7 +1816,7 @@ const FreeAgents = () => {
                       {/* Infinite scroll sentinel + count */}
                       <div className="text-center py-2 text-xs text-white/55">
                         {filteredPlayers.length === 0 && players.length > 0
-                          ? 'No players match your current filters'
+                          ? 'No players match those filters — try widening a position or team.'
                           : `Showing ${visiblePlayers.length} of ${filteredPlayers.length} players`}
                       </div>
                       {hasMorePlayers && (

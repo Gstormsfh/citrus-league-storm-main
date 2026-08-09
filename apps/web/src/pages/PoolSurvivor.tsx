@@ -286,9 +286,12 @@ const PoolSurvivor = () => {
               <div>
                 {standings.length === 0 ? (
                   <div className="text-center py-16">
-                    <SurvivorIcon className="w-12 h-12 mx-auto mb-4 text-white/30" />
-                    <p className="font-bold text-pastel-cream">No standings yet</p>
-                    <p className="text-[13px] text-white/45 mt-1">Standings populate after the first slate.</p>
+                    <SurvivorIcon className="w-12 h-12 mx-auto mb-4 text-pastel-orange-soft/60" />
+                    <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">
+                      ✦ Everyone's still alive
+                    </div>
+                    <p className="font-bold text-pastel-cream text-base">Standings light up after the first slate wraps.</p>
+                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Lock in your team before puck drops — one wrong pick and you're out.</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -350,9 +353,19 @@ const PoolSurvivor = () => {
               {pickHistory.length === 0 ? (
                 <GlowCard accent="orange">
                   <div className="py-16 text-center">
-                    <SurvivorIcon className="w-12 h-12 mx-auto mb-4 text-white/30" />
-                    <p className="font-bold text-pastel-cream">No picks yet</p>
-                    <p className="text-[13px] text-white/45 mt-1">Your picks will show here once you make them.</p>
+                    <SurvivorIcon className="w-12 h-12 mx-auto mb-4 text-pastel-orange-soft/60" />
+                    <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">
+                      ✦ Ready when you are
+                    </div>
+                    <p className="font-bold text-pastel-cream text-base">Your pick history is empty.</p>
+                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Head to the Picks tab and lock in this week's team — every choice you make lands here.</p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('picks')}
+                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pastel-orange text-white text-sm font-bold hover:bg-pastel-orange-soft transition-colors"
+                    >
+                      Make your pick →
+                    </button>
                   </div>
                 </GlowCard>
               ) : (

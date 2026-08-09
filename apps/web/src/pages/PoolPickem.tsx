@@ -403,9 +403,12 @@ const PoolPickem = () => {
               {games.length === 0 ? (
                 <GlowCard accent="orange">
                   <div className="py-16 text-center">
-                    <PickemIcon className="w-12 h-12 mx-auto mb-4 text-white/30" />
-                    <p className="font-bold text-lg text-pastel-cream">No games this week</p>
-                    <p className="text-[13px] text-white/45 mt-1">Check back when the slate drops.</p>
+                    <PickemIcon className="w-12 h-12 mx-auto mb-4 text-pastel-orange-soft/60" />
+                    <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">
+                      ✦ Between slates
+                    </div>
+                    <p className="font-bold text-lg text-pastel-cream">The board is dark tonight.</p>
+                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">This week's slate hasn't dropped yet — swing back Wednesday for lock-in.</p>
                   </div>
                 </GlowCard>
               ) : (
@@ -465,9 +468,19 @@ const PoolPickem = () => {
               <div>
                 {standings.length === 0 ? (
                   <div className="text-center py-16">
-                    <PickemIcon className="w-12 h-12 mx-auto mb-4 text-white/30" />
-                    <p className="font-bold text-pastel-cream">No standings yet</p>
-                    <p className="text-[13px] text-white/45 mt-1">Standings populate after the first slate.</p>
+                    <PickemIcon className="w-12 h-12 mx-auto mb-4 text-pastel-orange-soft/60" />
+                    <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">
+                      ✦ Awaiting the first whistle
+                    </div>
+                    <p className="font-bold text-pastel-cream text-base">Standings light up after week 1 wraps.</p>
+                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Get your picks in first — every game counts.</p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('picks')}
+                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pastel-orange text-white text-sm font-bold hover:bg-pastel-orange-soft transition-colors"
+                    >
+                      Make picks →
+                    </button>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">

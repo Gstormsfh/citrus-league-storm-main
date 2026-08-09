@@ -25,7 +25,7 @@ Scenes (11 compositions):
 - `scene-xg-model.webp` — xG model / projections
 
 **Style profile (derived from existing files):**
-- Warm hand-painted texture, character-forward compositions
+- (SUPERSEDED 2026-08-09 — see ARCHITECT OBSERVED-STYLE ADDENDUM below; the set is low-poly 3D render, NOT hand-painted) character-forward compositions
 - Citrus-family fruit characters personified as hockey players/officials
 - Palette: cream / peach / sage-green / orange (Citrus 2.0 tokens per `apps/web/src/components/citrus2/tokens.ts`)
 - Dark forest backgrounds `#0F1F15` (matches C2.bg token) or warm cream backgrounds
@@ -64,7 +64,48 @@ Scenes (11 compositions):
 
 ---
 
-**Empty as of 2026-08-08 second-shift T10 audit.** No pages on regular-season or offseason surfaces are missing art slots — the existing 16-asset set covers all identified needs.
+**U2 (Entry 25) added 2026-08-09.** Two candidate slots surfaced during the empty-states-to-moments deep sweep. Both permanent-surface preseason states that will render for every user of a new league — high visibility, worth bespoke art rather than reusing an existing scene.
+
+### scene-standings-preseason — target page: Standings.tsx
+
+- **Filename:** `scene-standings-preseason.webp`
+- **Dimensions:** 512x512px (renders at ~96x96 inside a table-empty cell; generate 512² for retina + reuse potential)
+- **Target page + component:** `apps/web/src/pages/Standings.tsx` empty-tbody branch (currently text-only via `sortedTeams.length === 0`). Slot lives in the `<td colSpan>` cell — add `<img src="/mascots/scene-standings-preseason.webp" className="w-24 h-24 mx-auto opacity-90" alt="" />` above the kicker copy when this asset lands.
+- **Nano-banana prompt (style-anchored, use MASTER PROMPT TEMPLATE):**
+  ```
+  Stylized low-poly 3D character render of Kiwi standing at center-ice with a
+  clipboard, looking down the empty leaderboard column with a patient, confident
+  half-smile, wooden hockey stick planted next to skates, soft faceted geometry
+  with smooth shading, Pixar-warm personality, wearing sage-green hockey jersey
+  with cream trim and orange-slice crest and cream number 44, warm key light
+  with glowing peach rim light, deep forest-green studio background with soft
+  vignette and gentle ground shadow, big expressive eyes behind round glasses,
+  playful and confident, square 1:1 aspect, no text, no watermark
+  ```
+- **Consistency notes:** Reference-image lock to `mascot-kiwi.webp` per addendum. Mood is confident-anticipation ("we're ready — puck hasn't dropped yet"), NOT sadness/emptiness. Clipboard suggests scorekeeper; the standings will populate.
+
+### scene-roster-clean-slate — target page: Roster.tsx (Transaction History tab)
+
+- **Filename:** `scene-roster-clean-slate.webp`
+- **Dimensions:** 512x512px (renders at ~80x80 inside the dashed-border empty box)
+- **Target page + component:** `apps/web/src/pages/Roster.tsx` `historyRows.length === 0` branch (currently uses lucide `ArrowUpRight` icon). Swap `<ArrowUpRight … />` for `<img src="/mascots/scene-roster-clean-slate.webp" className="w-20 h-20 mx-auto mb-3" alt="" />` when this asset lands.
+- **Nano-banana prompt (style-anchored, use MASTER PROMPT TEMPLATE):**
+  ```
+  Stylized low-poly 3D character render of Lemon at a pristine equipment locker,
+  neatly arranging a stack of fresh jerseys and a brand-new stick, morning
+  light streaming in, calm confident expression looking at the viewer, soft
+  faceted geometry with smooth shading, Pixar-warm personality, wearing sage-
+  green hockey jersey with cream trim and orange-slice crest and cream number 9,
+  warm key light with glowing peach rim light, deep forest-green studio
+  background with soft vignette and gentle ground shadow, leaf-stem cap, big
+  expressive eyes, playful and confident, square 1:1 aspect, no text, no
+  watermark
+  ```
+- **Consistency notes:** Reference-image lock to `mascot-lemon.webp` per addendum. Mood is "fresh start" / "ready to work" — sage-green quiet, warm anticipation. Not a celebration; that comes in scene-cup. This is preseason readiness.
+
+---
+
+**Empty as of 2026-08-08 second-shift T10 audit — superseded by U2 above.** No OTHER pages on regular-season or offseason surfaces are missing art slots — the existing 16-asset set covers all remaining identified needs.
 
 If NEW art becomes needed (post-Garrett-review), add entries below in this format:
 

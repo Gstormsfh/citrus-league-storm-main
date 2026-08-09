@@ -3611,8 +3611,13 @@ const Roster = () => {
                             <p className="text-xs text-white/55 mt-1">All times shown in Mountain Time (MT)</p>
                           </div>
                           {historyRows.length === 0 ? (
-                            <div className="text-center py-8 text-white/55 border rounded-lg border-dashed">
-                              No transactions found.
+                            <div className="text-center py-10 border rounded-lg border-dashed border-white/10">
+                              <ArrowUpRight className="w-8 h-8 mx-auto mb-3 text-pastel-sage/40" strokeWidth={2} aria-hidden="true" />
+                              <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-sage font-bold mb-2">
+                                ✦ Clean slate
+                              </div>
+                              <p className="text-pastel-cream font-bold text-base">No moves yet.</p>
+                              <p className="text-sm text-white/55 mt-2 max-w-sm mx-auto">Every add, drop, trade, and waiver claim you make lands here — the receipts of your season.</p>
                             </div>
                           ) : (
                             <div className="rounded-md border">

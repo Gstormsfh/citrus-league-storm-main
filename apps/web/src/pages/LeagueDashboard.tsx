@@ -1688,10 +1688,13 @@ Your Commissioner`);
             </CardHeader>
             <CardContent>
               {teams.length === 0 ? (
-                <div className="text-center py-8 text-white/55">
-                  <PuckIcon className="w-10 h-10 mx-auto mb-3 text-pastel-orange/30" strokeWidth={2} aria-hidden="true" />
-                  <p>No teams found in this league.</p>
-                  <p className="text-sm mt-2">Teams will appear here once they join.</p>
+                <div className="text-center py-10">
+                  <PuckIcon className="w-10 h-10 mx-auto mb-3 text-pastel-orange/40" strokeWidth={2} aria-hidden="true" />
+                  <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">
+                    ✦ Empty rink
+                  </div>
+                  <p className="text-pastel-cream font-bold text-base">This league is still filling up.</p>
+                  <p className="text-sm text-white/55 mt-2 max-w-xs mx-auto">Grab the join code from the Settings tab and send it to your league mates.</p>
                 </div>
               ) : (
                 <div className="space-y-2">

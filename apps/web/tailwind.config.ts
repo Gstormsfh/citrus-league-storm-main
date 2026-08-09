@@ -77,8 +77,22 @@ export default {
 					forest: '#4A5F4D',      // Soft forest - NOT too dark
 				},
 				// ==========================================
-				// PREMIUM REDESIGN TOKENS — additive, do not modify existing citrus-* or fantasy-* tokens
-				// Used by /preview-redesign route only. Slapshot Editorial design system.
+				// CITRUS2 DARK FOREST SURFACES (Entry 27 docket a, 2026-08-09).
+				// Additive name-only exposure of the two shipped page/card
+				// surfaces so future code can migrate off `bg-[#0F1F15]` +
+				// `bg-[#1A2A20]` arbitrary-hex without a config chase.
+				// The 72+ existing arbitrary-hex usages are NOT swept here —
+				// that migration is post-twelve per DESIGN_DIRECTION.md.
+				// ==========================================
+				citrus2: {
+					bg: '#0F1F15',       // page bg — deepest surface
+					card: '#1A2A20',     // card + skeleton surface
+				},
+				// ==========================================
+				// PREMIUM REDESIGN TOKENS (originally scoped to /preview-redesign;
+				// premium-* is now consumed by live components too — the
+				// "/preview-redesign only" claim was stale as of 2026-08-09).
+				// Additive; do not modify existing citrus-* or fantasy-* tokens.
 				// ==========================================
 				premium: {
 					// Surface hierarchy — forest-black with subtle green undertone (preserves Citrus brand memory)
@@ -105,7 +119,10 @@ export default {
 					'border-strong': 'rgba(255, 255, 255, 0.15)', // ghost border accessible
 				},
 				// ==========================================
-				// PASTEL VIBRANT TOKENS — additive, for /preview-redesign only
+				// PASTEL VIBRANT TOKENS (originally scoped to /preview-redesign;
+				// pastel-cream / pastel-sage / pastel-orange are now the
+				// citrus2 canonical palette consumed across live pages — the
+				// "/preview-redesign only" claim was stale as of 2026-08-09).
 				// Citrus brand: warm cream/peach pastel base, vibrant orange punches.
 				// Glossier × Casper × Notion register.
 				// ==========================================
