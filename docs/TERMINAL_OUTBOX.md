@@ -1208,3 +1208,77 @@ MOD: docs/TERMINAL_OUTBOX.md                               (this R26)
 Entry 13 night queue: T11 ✓ · T12 ✓ · T13 ✓ · T14 ✓. Next: **T15 (MOCK/PRACTICE DRAFT MODE — design doc + core service behind feature flag)**. Direction pre-ratified: throwaway-league + autopick-opponents + soft-delete-after. Full ratification of design doc required before deploy exposure.
 
 **End of R26. Draft guide core lives.**
+
+---
+
+## R27 — T15 MOCK/PRACTICE DRAFT MODE (design + core + flag) shipped (2026-08-09 04:20Z / 10:20 MT)
+
+Sleeper-gap 4 ("the ritual"). Design doc awaiting architect ratification per §5 bars; core service scaffold + pure factory + feature flag authored. UI button stub explicitly DEFERRED until architect Sunday walk decides WHERE the button lands.
+
+### Files authored
+
+- **`docs/DESIGN_T15_practice_draft_mode.md`** (NEW, 130 lines) — full ratification-ready design doc in F23/F27 house style:
+  - §1 Problem: managers want low-friction rehearsal; today only real leagues offer the draft experience.
+  - §2 Non-goals: not shared multiplayer mock, not strategy engine, not resumable, not real-league replacement, not mobile UX polish.
+  - §3 Design shape (pre-ratified by Entry 13): throwaway league with 1 human + 11 AI seats, `settings.practice=true` marker (fixture-12 f27_native pattern reuse), DEFAULT_SCORING deterministic, soft-delete-on-leave lifecycle, guardrails so aggregation reads filter practice out.
+  - §4 Feature flag: static const boolean in `apps/web/src/lib/featureFlags.ts` — flag flip gated on architect ratification + post-TWELVE + Garrett-manual git commit.
+  - §5 **Ratification bars (architect adjudicates in order): 9 items** — throwaway lifecycle model, practice marker location, guardrail scope, feature-flag mechanism, autopick_user_id reuse, F27 ignition path, concurrency policy (1 per user), KI-047 interaction, KI-042 interaction.
+  - §6 Files to author in T15 vs deferred to post-ratification (server-side factory, aggregation-query audit, janitor task).
+  - §7 Diff safety argument: zero DB writes in T15 scope; even if flag accidentally flipped, no server-side service exists to consume the factory output.
+  - §8 See-also cross-references to Entry 13, fixture-12 pattern, KI-041, KI-047, Rider 2 handling, DESIGN_F27.
+
+- **`apps/web/src/lib/featureFlags.ts`** (NEW, thin) — `FEATURE_PRACTICE_DRAFT = false`. Static const, no env plumbing. Header names the flip gates: (1) architect ratification, (2) post-TWELVE, (3) Garrett-manual git commit.
+
+- **`packages/shared/src/utils/practiceDraft.ts`** (NEW, 155 lines) — pure factory:
+  - `buildPracticeLeaguePayload(userId, options?) → PracticeLeaguePayload` — returns a fully-typed INSERT payload for `public.leagues`. Fields: `name` (Practice — <ISO now>), `commissioner_id`, `teams_count=12`, `draft_rounds=21`, `scoring_settings=DEFAULT_SCORING`, `draft_status='not_started'`, `settings={practice:true, pickTimeLimit:30, createdFrom:'practice_factory_v1'}`, soft-delete fields `is_deleted:false, deleted_at:null`.
+  - Deterministic via `options.now` injection; otherwise pulls `new Date().toISOString()` at call time (only non-pure aspect, cited in header).
+  - `isPracticeLeagueSettings(settings) → boolean` — guardrail helper for aggregation-query filters. Accepts `unknown` because raw JSONB.
+  - Exported constants `PRACTICE_DRAFT_DEFAULT_TEAM_COUNT / _ROUNDS / _PICK_SECONDS`.
+
+- **`packages/shared/src/utils/__tests__/practiceDraft.test.ts`** (NEW, 100 lines) — **15/15 pass** in ~6ms. Coverage:
+  - Payload shape (all fields present, marker in settings, deterministic naming, 30s default pick timer).
+  - Overrides (teamsCount / draftRounds / pickTimeLimitSeconds).
+  - Defaults (constants match runtime, live-clock name has ISO Z suffix, consecutive calls with different `now` yield different names).
+  - `isPracticeLeagueSettings` guardrail: true when marker present, false when absent/false, false for non-object inputs, accepts real factory payload.
+
+- **`packages/shared/src/utils/index.ts`** — added `export * from './practiceDraft';`.
+
+### What's NOT authored (deferred per §6)
+
+- **UI button stub.** Architect Entry 13 said "UI = one button stub behind the flag, disabled by default." Deferred because the button location (GMOffice? DraftLobby? new practice-mode landing page?) is a Sunday UX walk call, not a code decision. When architect ratifies §5 + names the location, the button is a 10-line add.
+- **Server-side `createPracticeLeague`.** Consumes the pure payload from `buildPracticeLeaguePayload`, writes to DB, returns the created league id. Blocked on §5 ratification because guardrail-audit list (§3) determines which existing services need filter additions.
+- **Aggregation-query audit + filter additions.** Every existing SELECT that aggregates across leagues (`fetchTransactions`, `computeStandings`, `getLeaderboard`, etc.) needs a `NOT settings.practice` filter. Scope call in §5 #3.
+- **Janitor task** for hard-delete > 30 days.
+
+### Design choices (safety arguments)
+
+**Pure factory separate from server-side service.** Payload shape is testable offline (15 tests today), reusable across surfaces (client dry-run for UI preview vs. server INSERT), and doesn't require DB. Server-side service is a thin adapter later.
+
+**Feature-flag gate at BOTH caller boundaries (UI + server API).** UI reads flag → renders disabled stub. Server API reads flag → returns `error: 'feature_disabled'`. Defense-in-depth: if the UI accidentally leaks and the client hits the API, the flag on the server prevents the write.
+
+**Ratification bars enumerated explicitly (§5, 9 items).** Architect adjudicates each in order. Without ratification the flag stays false and the code paths never execute in prod.
+
+**Zero DB writes today.** Even if flag accidentally flipped: no server-side service exists to consume `buildPracticeLeaguePayload`'s output. Payload would be built and thrown away. Full reversibility.
+
+### Test / typecheck status
+
+- `npx vitest run src/utils/__tests__/practiceDraft.test.ts` (shared) → **15/15 pass** in ~6ms.
+- No T15-specific tsc errors.
+
+### Files changed this cycle
+
+```
+NEW: docs/DESIGN_T15_practice_draft_mode.md
+NEW: apps/web/src/lib/featureFlags.ts
+NEW: packages/shared/src/utils/practiceDraft.ts
+NEW: packages/shared/src/utils/__tests__/practiceDraft.test.ts
+MOD: packages/shared/src/utils/index.ts                        (export practiceDraft)
+MOD: docs/ARCHITECT_INBOX.md                                   (unchanged in this cycle; included per protocol if committed alongside outbox)
+MOD: docs/TERMINAL_OUTBOX.md                                   (this R27)
+```
+
+### Standing by / next up
+
+Entry 13 night queue: T11 ✓ · T12 ✓ · T13 ✓ · T14 ✓ · T15 ✓ (design + core + tests; UI stub deferred). Next: **T16 (S1-S4 PERF SCENARIO RE-POINT — instrument hygiene per P10 plan)**. Migrate perf scenarios onto F27-native fixtures. When green offline, mark draft-harness legacy fallback deprecated with removal date.
+
+**End of R27. Practice mode designed + costed + ratifiable.**
