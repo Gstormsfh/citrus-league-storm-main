@@ -2443,3 +2443,129 @@ S-9 complete (24 a11y touches across 6 playoff files; offseason-state copy hones
 Next up per Entry 21 section order: **S-10 Settings / commissioner tools (FINAL SECTION)**. Time-box: 90min. Will begin immediately.
 
 **End of R44. 24 a11y touches; offseason-state honesty verified; 4 dockets.**
+
+---
+
+## R45 — Entry 21 S-10 (Settings + Admin + commissioner tools) perfection report — FINAL SECTION (2026-08-09 14:20Z / 8:20 MT)
+
+Entry 21 S-10 executed. Time-box ~5min (both files essentially zero-touch).
+
+### Files audited
+
+- `apps/web/src/pages/Settings.tsx` (**11 lines**) — pure `<Navigate to="/profile?tab=settings" replace />` redirect stub.
+- `apps/web/src/pages/Admin.tsx` (298 lines) — platform admin dashboard (users / leagues / active drafts / health / pipeline).
+- Commissioner tools: NOT a separate page — embedded in `DraftLobby.tsx` (covered in S-2 under HARD GUARD) + `LeagueDashboard.tsx` settings tab (covered in S-3).
+
+### States matrix (P-a flow audit)
+
+| Component | Loading | Empty | Error | Success | Notes |
+|---|---|---|---|---|---|
+| Settings.tsx | N/A | N/A | N/A | ✅ redirects | Stub — no user-visible surface |
+| Admin.tsx | ✅ inline loading state per section | ✅ "No X found" branches | ✅ toast on API fail | ✅ platform stats + health checks + pipeline status rendered in tables | Zero lucide icons — pure data tables |
+| Commissioner tools (in DraftLobby) | ✅ isStartingDraft | ✅ empty-teams state | ✅ toast + auth guards | ✅ Start Draft button | Already covered S-2 |
+| Commissioner tools (in LeagueDashboard) | ✅ inline | ✅ N/A | ✅ toast | ✅ settings tab render | Already covered S-3 |
+
+All 4 async states covered on every S-10 surface.
+
+### Fixes authored — NONE needed
+
+- **Settings.tsx**: 11-line redirect stub. Zero content. Zero touch.
+- **Admin.tsx**: Zero lucide imports. Zero custom icons. Zero `<svg>` decorations. Uses `<Table>` / `<Badge>` / `<Card>` from shadcn — no decorative-icon a11y burden. Zero touch.
+- **Commissioner tools**: already touched via S-2 (DraftLobby 42 aria-hidden) + S-3 (LeagueDashboard 35 aria-hidden).
+
+### Judgment calls DOCKETED
+
+Per P-e:
+
+1. **Admin.tsx `role="admin"` check** — the page's own guard (redirect if not admin) is not this cycle's polish concern but is worth confirming still works. Docket for Sunday walk with admin-role account.
+2. **Admin.tsx uptime + health check display** — currently plain text. Could benefit from a live indicator (green dot for healthy, red for down) for at-a-glance status. Beyond polish scope; docket as feature idea.
+3. **Settings.tsx redirect** — the redirect is silent (no toast). Users with `/settings` bookmarks land directly on `/profile?tab=settings` — good. Docket for future: consider whether the URL rewrite is confusing (users might expect to stay on `/settings`).
+
+### Tests / typecheck status
+
+- No files changed → no tsc regression risk.
+- No new tests needed.
+
+### Files changed this cycle
+
+```
+MOD: docs/TERMINAL_OUTBOX.md    (this R45)
+```
+
+**ZERO code files touched** — Settings is stub, Admin has no icons, commissioner tools already handled.
+
+---
+
+## TARP-DAY CAMPAIGN SUMMARY — Entry 21 S-1 through S-10 COMPLETE (2026-08-09 14:20Z / 8:20 MT)
+
+Entry 21 Section-Perfection Campaign complete. 10 sections × 90-min time-box, most sections completed in ~5-20min via efficient batch-fix patterns.
+
+### Aggregate by-the-numbers
+
+| Section | Files touched | Aria-hidden added | Dead links fixed | Real defects | Dockets |
+|---|---|---|---|---|---|
+| S-1 Auth+signup | 5 | 20+ | 0 | 2 (ResetPassword light-flash, VerifyEmail no-email inline) | 4 |
+| S-2 Draft lobby+room v2 (HARD GUARD) | 1 (draft/v2 verified clean) | 42 | 0 | 0 (guard honored) | 4 |
+| S-3 League home+timeline | 1 (timeline verified clean) | 35 | 0 | 0 | 4 |
+| S-4 Roster/Squad | 1 | 18 | 0 | 0 | 4 |
+| S-5 GM Office | 6 | 26 | 2 (T11a-class /playoffs/${x} in GMOffice.tsx :201 + :219) | 2 | 3 |
+| S-6 Matchup | 6 | 22 | 0 (class closed campaign-wide) | 0 | 3 |
+| S-7 Standings | 1 | 1 | 0 | 0 | 3 |
+| S-8 Pools (pickem/survivor/confidence) | 3 | 36 | 0 | 0 (1 real a11y gap surfaced + docketed: chevron buttons need aria-label) | 3 |
+| S-9 Playoffs surfaces | 6 | 24 | 0 | 0 | 4 |
+| S-10 Settings/Admin/commissioner | 0 | 0 (already covered) | 0 | 0 | 3 |
+| **TOTAL** | **30 files** | **224 aria-hidden additions** | **2** | **2 defects fixed** | **35 dockets** |
+
+### Real defects fixed this campaign (both T11a-class, live user-facing bugs)
+
+1. **GMOffice.tsx:201** — `<Link to={\`/playoffs/${activeLeagueId}\`}>` → `/league/${activeLeagueId}/playoffs`. Gold champion banner "View Bracket" CTA. Would have 404'd real users on completed-season leagues.
+2. **GMOffice.tsx:219** — same class, compact playoffs-in-progress indicator. Same 404 risk.
+
+Same defect class as T11a (Aug 8) Matchup.tsx fixes ×2 — indicating the codebase had 4 identical dead links total pre-Aug 8. **Class now closed campaign-wide** (grep verified zero remaining).
+
+### Prior-cycle defects fixed (S-1 non-dead-link)
+
+- **ResetPassword.tsx success branch** — light-theme gradient flash on an otherwise dark auth flow. FIXED.
+- **VerifyEmail.tsx no-email inline warning** — silent broken state pre-fix. FIXED with inline `<a href="/auth">sign up again</a>` recovery link.
+
+### T11b regex gap discovered (S-5 finding, docketed for improvement)
+
+The linkGraphIntegrity test's regex missed the multi-line `<Link>\n  to={\`…\`}>` form — allowed the 2 GMOffice dead links to escape the guard for the entire cycle since T11b landed. Docketed for architect ratification: regex tuning OR AST-based extraction migration. Non-blocking (dead links now fixed; test still catches single-line dead links).
+
+### Docketed a11y gaps (35 total across campaign)
+
+Not exhaustively enumerated here; specific items live in each R36-R45 section report. Key patterns docketed:
+
+- **Icon-only buttons without aria-label** — surfaced in S-8 (Pool ChevronLeft/Right week nav ×6). Same pattern likely in S-9 (ChevronDown/Up in PoolPlayoffConfidence). Docketed for architect ratification of "add aria-label to icon-only buttons" as a systematic add.
+- **Silent-no-op onClick patterns** — Navbar Matchups ×2, Standings View Bracket, playoff link `activeLeagueId && navigate(...)` — need visual gate (disable when preconditions missing) or fallback route. Docketed for Sunday UX walk (T11c-adjacent).
+- **shadcn Card/Button/Alert vs citrus2 primitives** — auth pages use mixed surface primitives. Docketed for consistency pass (post-twelve).
+- **Empty-state copy state-awareness** — several pages have generic "No X" copy; could be draft-state-aware (e.g. "Draft complete — set your Week 1 lineup" vs "No players"). Docketed for Sunday walk.
+
+### HARD GUARD honored (S-2)
+
+Zero logic changes to draft/v2 subtree or DraftLobby/DraftRoomV2 behavior throughout the campaign. All S-2 work was className / aria-hidden / copy — no state, no handler, no data-flow touches.
+
+### Test / typecheck status across campaign
+
+- **Zero new tsc errors introduced.** Pre-existing errors (per HANDOFF v3 known issues) unchanged.
+- **linkGraphIntegrity 4/4 pass** after every commit that touched a page with routing.
+- **No offline unit tests broken.** No new tests authored (aria-hidden is static-attribute polish).
+
+### Commit trail (10 sections × R36-R45)
+
+- `df3e1a64` S-1 Auth+signup+join
+- `41f18ef0` S-2 Draft lobby+room v2 (HARD GUARD)
+- `aec75498` S-3 League dashboard+timeline
+- `1783163a` S-4 Roster/Squad
+- `3b82cdcd` S-5 GM Office (**2 dead links + 26 aria-hidden**)
+- `5b0026af` S-6 Matchup
+- `cb9a9e38` S-7 Standings
+- `8083305e` S-8 Pools
+- `755d8c64` S-9 Playoffs surfaces
+- (this cycle) S-10 Settings/Admin — zero code changes
+
+### Standing by
+
+TARP-DAY campaign COMPLETE. Continuing KI-048 30-min inbox poll for Entry 22+ or Garrett return.
+
+**End of R45 + TARP-DAY CAMPAIGN SUMMARY. 10 sections executed, 224 aria-hidden additions, 2 REAL user-facing dead links fixed (T11a class closed campaign-wide), 2 prior UX defects fixed, 35 judgment calls docketed. Zero logic regressions. HARD GUARD honored throughout.**
