@@ -179,7 +179,7 @@ const ScheduleManager = () => {
                 {viewMode === 'summary' ? (
                   <Button
                     onClick={() => setViewMode('full')}
-                    className="w-full md:w-auto bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] hover:shadow-[0_12px_32px_-8px_rgba(255,168,87,0.6)] transition-all"
+                    className="w-full md:w-auto bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] hover:shadow-[0_12px_32px_-8px_rgba(255,168,87,0.6)] transition-all"
                   >
                     Full slate view
                   </Button>

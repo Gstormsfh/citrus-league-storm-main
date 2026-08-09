@@ -746,14 +746,14 @@ const CreateLeague = () => {
                 <TabsList className="grid w-full grid-cols-2 mb-8 bg-[#0F1F15] ring-1 ring-white/10 p-1 rounded-xl">
                   <TabsTrigger
                     value="create"
-                    className="flex items-center gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                    className="flex items-center gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                   >
                     <CupIcon className="w-4 h-4" strokeWidth={2} />
                     Create League
                   </TabsTrigger>
                   <TabsTrigger
                     value="join"
-                    className="flex items-center gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                    className="flex items-center gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                   >
                     <UserPlus className="w-4 h-4" />
                     Join League

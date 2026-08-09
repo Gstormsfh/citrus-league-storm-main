@@ -254,13 +254,13 @@ const StormyAssistant = () => {
                   <TabsList className="grid w-full grid-cols-2 max-w-[400px] mx-auto mb-8 bg-[#1A2A20] ring-1 ring-white/10 p-1 rounded-xl">
                     <TabsTrigger
                       value="chat"
-                      className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                      className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                     >
                       <MessageSquare className="h-4 w-4" /> Chat
                     </TabsTrigger>
                     <TabsTrigger
                       value="settings"
-                      className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                      className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                     >
                       <Settings className="h-4 w-4" /> Settings
                     </TabsTrigger>
@@ -367,7 +367,7 @@ const StormyAssistant = () => {
                             <Button
                               type="submit"
                               size="icon"
-                              className="h-12 w-12 bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] disabled:opacity-50"
+                              className="h-12 w-12 bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] disabled:opacity-50"
                               disabled={!inputValue.trim() || isLoading}
                             >
                               {isLoading ? (
@@ -446,7 +446,7 @@ const StormyAssistant = () => {
                             <span className="font-bold text-pastel-cream">Every 7 days</span>
                           </div>
 
-                          <Button className="w-full bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
+                          <Button className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
                             <Crown className="h-5 w-5 mr-2" />
                             Upgrade to Unlimited
                           </Button>

@@ -277,7 +277,7 @@ const MobileMenuButton = () => {
                   </div>
                 </div>
               ) : (
-                <Button className="w-full h-11 font-bold rounded-xl bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]" asChild>
+                <Button className="w-full h-11 font-bold rounded-xl bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]" asChild>
                   <Link to="/auth" onClick={closeMenu}>Sign In</Link>
                 </Button>
               )}

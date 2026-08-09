@@ -1296,19 +1296,19 @@ const FreeAgents = () => {
           <TabsList className="grid w-full grid-cols-3 max-w-2xl mb-6 bg-[#1A2A20] ring-1 ring-white/10 p-1 rounded-xl">
             <TabsTrigger
               value="available"
-              className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+              className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
             >
               Available
             </TabsTrigger>
             <TabsTrigger
               value="schedule"
-              className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+              className="gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
             >
               <Calendar className="h-4 w-4" /> Schedule
             </TabsTrigger>
             <TabsTrigger
               value="watch"
-              className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+              className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
             >
               Watch List
             </TabsTrigger>
@@ -1324,7 +1324,7 @@ const FreeAgents = () => {
                     key={pos}
                     className={`cursor-pointer px-4 py-1 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold border-0 transition-all ${
                       isActive
-                        ? 'bg-pastel-orange text-[#0F1F15] shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]'
+                        ? 'bg-pastel-orange text-[#581E00] shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]'
                         : 'bg-white/5 ring-1 ring-white/10 text-white/70 hover:bg-white/[0.08] hover:ring-pastel-orange/30'
                     }`}
                     onClick={() => setPositionFilter(pos)}

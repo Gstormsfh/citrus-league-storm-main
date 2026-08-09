@@ -120,7 +120,7 @@ const ResetPassword = () => {
               <CardDescription className="text-white/60">{error || 'This password reset link is invalid or has expired.'}</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={() => navigate('/auth')} className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-deep">
+              <Button onClick={() => navigate('/auth')} className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft">
                 Return to Sign In
               </Button>
             </CardContent>

@@ -68,7 +68,7 @@ const Waitlist = () => {
               <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
                 <Link
                   to="/create-league"
-                  className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-6 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 active:scale-95 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)]"
+                  className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-6 rounded-md hover:bg-pastel-orange-soft hover:-translate-y-0.5 active:scale-95 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)]"
                   style={{ height: '48px' }}
                 >
                   Try a Test League Now <ArrowRight className="w-4 h-4" strokeWidth={2.5} />

@@ -455,7 +455,7 @@ export function Homepage() {
             </p>
             <Link
               to="/gm-office/stormy"
-              className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-5 h-11 rounded-md hover:bg-pastel-orange-deep transition-colors"
+              className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-5 h-11 rounded-md hover:bg-pastel-orange-soft transition-colors"
             >
               Try Stormy <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
             </Link>

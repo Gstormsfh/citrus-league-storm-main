@@ -132,7 +132,7 @@ export default function PreviewArena() {
             </Link>
             <Link
               to="/create-league"
-              className="text-[13px] font-bold px-4 h-10 inline-flex items-center bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-deep rounded-md transition-colors"
+              className="text-[13px] font-bold px-4 h-10 inline-flex items-center bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft rounded-md transition-colors"
             >
               Get the App
             </Link>
@@ -165,7 +165,7 @@ export default function PreviewArena() {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-4 mb-10">
               <Link
                 to="/create-league"
-                className="group inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[15px] font-bold px-7 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 shadow-[0_8px_24px_-8px_rgba(255,107,26,0.5)]"
+                className="group inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[15px] font-bold px-7 rounded-md hover:bg-pastel-orange-soft hover:-translate-y-0.5 transition-all duration-200 shadow-[0_8px_24px_-8px_rgba(255,107,26,0.5)]"
                 style={{ height: '52px' }}
               >
                 <span>Play Now</span>
@@ -331,7 +331,7 @@ export default function PreviewArena() {
                   <span className="font-jbmono text-[10px] tracking-wider uppercase text-white/40">
                     {g.seasonal}
                   </span>
-                  <button className="inline-flex items-center gap-1.5 bg-pastel-orange text-[#581E00] px-4 h-9 rounded-md text-[12px] font-bold hover:bg-pastel-orange-deep transition-colors">
+                  <button className="inline-flex items-center gap-1.5 bg-pastel-orange text-[#581E00] px-4 h-9 rounded-md text-[12px] font-bold hover:bg-pastel-orange-soft transition-colors">
                     Play <ArrowRight className="w-3 h-3" strokeWidth={2.5} />
                   </button>
                 </div>

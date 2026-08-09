@@ -92,7 +92,7 @@ export default function PreviewSunlight() {
       <section className="max-w-[920px] mx-auto px-6 pb-24 text-center">
         <Link
           to="/create-league"
-          className="group inline-flex items-center gap-2 bg-pastel-forest text-pastel-cream text-[15px] font-medium pl-7 pr-6 h-14 rounded-full hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 shadow-[0_12px_28px_-12px_rgba(27,48,34,0.4)]"
+          className="group inline-flex items-center gap-2 bg-pastel-forest text-pastel-cream text-[15px] font-medium pl-7 pr-6 h-14 rounded-full hover:bg-pastel-orange-soft hover:-translate-y-0.5 transition-all duration-200 shadow-[0_12px_28px_-12px_rgba(27,48,34,0.4)]"
         >
           <span>Get tonight's edge</span>
           <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" strokeWidth={2.5} />

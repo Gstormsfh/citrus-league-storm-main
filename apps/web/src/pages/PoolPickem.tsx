@@ -452,7 +452,7 @@ const PoolPickem = () => {
                         {picks.size === 0 ? 'Tap a team' : `${picks.size}/${required} picked`}
                       </span>
                     </div>
-                    <Button onClick={handleSubmit} disabled={picks.size === 0 || submitting} size="lg" className="font-bold uppercase tracking-wider bg-pastel-orange hover:bg-pastel-orange-deep text-white border-0 active:scale-95 transition-all">
+                    <Button onClick={handleSubmit} disabled={picks.size === 0 || submitting} size="lg" className="font-bold uppercase tracking-wider bg-pastel-orange hover:bg-pastel-orange-soft text-white border-0 active:scale-95 transition-all">
                       {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
                       Submit
                     </Button>

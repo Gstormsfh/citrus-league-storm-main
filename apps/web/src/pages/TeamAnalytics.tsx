@@ -566,7 +566,7 @@ const TeamAnalytics = () => {
                                 <div className="font-bold text-pastel-cream truncate">{player.name}</div>
                                 <div className="text-xs text-white/55 mt-0.5">{player.team} · {player.position}</div>
                               </div>
-                              <Button size="sm" className="h-7 text-xs bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shrink-0">Claim</Button>
+                              <Button size="sm" className="h-7 text-xs bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shrink-0">Claim</Button>
                             </div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               <div className="bg-black/30 ring-1 ring-white/5 p-1.5 rounded-lg flex flex-col items-center">

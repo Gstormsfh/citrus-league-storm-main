@@ -623,7 +623,7 @@ const LeagueDashboard = () => {
             <CardContent>
               <Button
                 onClick={() => navigate('/')}
-                className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]"
+                className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]"
               >
                 Go Home
               </Button>
@@ -714,7 +714,7 @@ const LeagueDashboard = () => {
                               <TabsTrigger
                                 key={tab}
                                 value={tab}
-                                className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                                className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                               >
                                 {tab === 'rosterslots' ? 'Roster Slots' : tab.charAt(0).toUpperCase() + tab.slice(1)}
                               </TabsTrigger>
@@ -1606,7 +1606,7 @@ Your Commissioner`);
                     }}
                     className={`w-full font-bold ${
                       league.draft_status === 'in_progress'
-                        ? 'bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]'
+                        ? 'bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]'
                         : 'bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50'
                     } disabled:opacity-50`}
                     disabled={!leagueId}

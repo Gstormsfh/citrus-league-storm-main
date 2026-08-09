@@ -540,7 +540,7 @@ const TradeAnalyzer = () => {
                       </ul>
                       {activeLeagueId && (
                         <div className="pt-4">
-                          <Button asChild className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
+                          <Button asChild className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
                             <a href={`/draft-room?league=${activeLeagueId}`}>
                               Go to Draft Room
                             </a>
@@ -586,13 +586,13 @@ const TradeAnalyzer = () => {
           <TabsList className="w-full md:w-auto bg-[#1A2A20] ring-1 ring-white/10 p-1 rounded-xl">
             <TabsTrigger
               value="propose"
-              className="flex items-center gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+              className="flex items-center gap-2 text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
             >
               <ArrowLeftRight className="h-4 w-4" /> Propose Trade
             </TabsTrigger>
             <TabsTrigger
               value="offers"
-              className="flex items-center gap-2 relative text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+              className="flex items-center gap-2 relative text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
             >
               <History className="h-4 w-4" /> Trade Offers
               {tradeOffers.filter(o => o.status === 'pending').length > 0 && (
@@ -740,7 +740,7 @@ const TradeAnalyzer = () => {
                     )}
                     <Button
                       size="sm"
-                      className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
+                      className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
                       disabled={myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
                       onClick={handleProposeTrade}
                     >
@@ -867,7 +867,7 @@ const TradeAnalyzer = () => {
                     onChange={(e) => setTradeMessage(e.target.value)}
                   />
                   <Button
-                    className="w-full bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] mt-2 disabled:opacity-50"
+                    className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] mt-2 disabled:opacity-50"
                     disabled={myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
                     onClick={handleProposeTrade}
                   >

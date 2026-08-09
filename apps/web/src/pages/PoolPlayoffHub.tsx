@@ -483,7 +483,7 @@ export default function PoolPlayoffHub() {
                           ? 'Pick winners and assign confidence values to each series.'
                           : 'Pick the winner and # of games for each playoff series.'}
                   </p>
-                  <Button asChild className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
+                  <Button asChild className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
                     <Link to={`${makePicksRoute}?league=${leagueId}`}>
                       {lockCountdown?.locked ? 'View Picks' : 'Make My Picks'} <ChevronRight className="h-4 w-4 ml-1" />
                     </Link>

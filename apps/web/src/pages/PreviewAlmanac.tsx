@@ -133,7 +133,7 @@ export default function PreviewAlmanac() {
             </p>
             <Link
               to="/create-league"
-              className="group inline-flex items-center gap-2 mt-9 self-start bg-pastel-forest text-pastel-cream text-[14px] font-medium tracking-[0.08em] uppercase pl-6 pr-5 h-12 rounded-none ring-1 ring-pastel-forest hover:bg-pastel-orange-deep hover:ring-pastel-orange-deep transition-colors"
+              className="group inline-flex items-center gap-2 mt-9 self-start bg-pastel-forest text-pastel-cream text-[14px] font-medium tracking-[0.08em] uppercase pl-6 pr-5 h-12 rounded-none ring-1 ring-pastel-forest hover:bg-pastel-orange-soft hover:ring-pastel-orange-deep transition-colors"
             >
               <span>Start a Test League</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" strokeWidth={2.5} />

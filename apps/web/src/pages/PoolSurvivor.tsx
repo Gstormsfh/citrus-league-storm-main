@@ -270,7 +270,7 @@ const PoolSurvivor = () => {
                         </span>
                       ) : <span className="text-white/55">Tap a team to make your pick</span>}
                     </span>
-                    <Button onClick={handleSubmitPick} disabled={!selectedTeam || submitting} className="font-bold uppercase tracking-wider bg-pastel-orange hover:bg-pastel-orange-deep text-white border-0 active:scale-95 transition-all">
+                    <Button onClick={handleSubmitPick} disabled={!selectedTeam || submitting} className="font-bold uppercase tracking-wider bg-pastel-orange hover:bg-pastel-orange-soft text-white border-0 active:scale-95 transition-all">
                       {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
                       Lock In Pick
                     </Button>

@@ -90,7 +90,7 @@ const Podcasts = () => {
                     Join our hosts as they discuss championship-winning strategies with three-time fantasy champion Marcus Johnson.
                   </p>
                   <div className="flex items-center gap-3 flex-wrap">
-                    <button className="inline-flex items-center gap-2 bg-pastel-orange hover:bg-pastel-orange-deep text-white text-[13px] font-bold px-5 h-10 rounded-md hover:-translate-y-0.5 active:scale-95 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)]">
+                    <button className="inline-flex items-center gap-2 bg-pastel-orange hover:bg-pastel-orange-soft text-white text-[13px] font-bold px-5 h-10 rounded-md hover:-translate-y-0.5 active:scale-95 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)]">
                       <Play className="w-4 h-4 fill-white" strokeWidth={0} />
                       Play Episode
                     </button>

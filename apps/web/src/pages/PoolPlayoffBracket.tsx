@@ -257,7 +257,7 @@ export default function PoolPlayoffBracket() {
               {pickMode === 'full-bracket' && (
                 <Badge className={cn(
                   'text-[10px] font-display font-bold',
-                  isGloballyLocked ? 'bg-white/5 ring-1 ring-white/10 text-white/55' : 'bg-pastel-orange text-[#0F1F15]'
+                  isGloballyLocked ? 'bg-white/5 ring-1 ring-white/10 text-white/55' : 'bg-pastel-orange text-[#581E00]'
                 )}>
                   {isGloballyLocked ? <><Lock className="h-3 w-3 mr-1" />BRACKET LOCKED</> : 'FULL BRACKET MODE'}
                 </Badge>

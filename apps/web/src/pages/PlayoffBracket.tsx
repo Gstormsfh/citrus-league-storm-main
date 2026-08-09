@@ -445,7 +445,7 @@ const SeedList: React.FC<{
               <div key={seed.id} className="flex items-center gap-2 px-4 py-2 text-sm">
                 <span className={cn(
                   'w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                  seed.seed_number <= 2 ? 'bg-pastel-orange text-[#0F1F15]' : 'bg-white/5 ring-1 ring-white/10 text-white/55',
+                  seed.seed_number <= 2 ? 'bg-pastel-orange text-[#581E00]' : 'bg-white/5 ring-1 ring-white/10 text-white/55',
                 )}>
                   {seed.seed_number}
                 </span>

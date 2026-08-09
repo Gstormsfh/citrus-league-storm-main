@@ -171,7 +171,7 @@ const Blog = () => {
         </div>
 
         <div className="flex justify-center">
-          <Button className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-deep font-bold rounded-md px-7 h-12">
+          <Button className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold rounded-md px-7 h-12">
             Load More Articles
           </Button>
         </div>

@@ -99,7 +99,7 @@ const News = () => {
               className={cn(
                 'rounded-full whitespace-nowrap flex-shrink-0 font-jbmono text-[11px] tracking-wider uppercase font-bold',
                 activeCategory === cat.key
-                  ? 'bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-deep'
+                  ? 'bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft'
                   : 'bg-white/5 text-white/65 hover:bg-white/10 hover:text-pastel-cream ring-1 ring-white/10',
               )}
             >

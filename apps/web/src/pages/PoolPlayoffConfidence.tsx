@@ -381,7 +381,7 @@ export default function PoolPlayoffConfidence() {
                                     className={cn(
                                       'w-7 h-7 rounded-full text-[11px] font-bold transition-all border',
                                       isSelected
-                                        ? 'bg-pastel-orange text-[#0F1F15] ring-2 ring-pastel-orange/60 scale-110 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]'
+                                        ? 'bg-pastel-orange text-[#581E00] ring-2 ring-pastel-orange/60 scale-110 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]'
                                         : isUsedElsewhere
                                           ? 'bg-white/5 ring-1 ring-white/10 text-white/30 cursor-not-allowed'
                                           : 'bg-white/5 ring-1 ring-white/10 text-white/55 hover:ring-pastel-orange/40 hover:text-pastel-cream'

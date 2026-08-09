@@ -67,7 +67,7 @@ export default function PreviewBoards() {
             </nav>
             <Link
               to="/create-league"
-              className="text-[13px] font-bold px-4 h-10 inline-flex items-center bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-deep rounded-md transition-colors"
+              className="text-[13px] font-bold px-4 h-10 inline-flex items-center bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft rounded-md transition-colors"
             >
               Get the App
             </Link>
@@ -96,7 +96,7 @@ export default function PreviewBoards() {
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-4">
             <Link
               to="/create-league"
-              className="group inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[15px] font-bold px-8 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 shadow-[0_8px_32px_-8px_rgba(255,107,26,0.5)]"
+              className="group inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[15px] font-bold px-8 rounded-md hover:bg-pastel-orange-soft hover:-translate-y-0.5 transition-all duration-200 shadow-[0_8px_32px_-8px_rgba(255,107,26,0.5)]"
               style={{ height: '54px' }}
             >
               <span>Play Now</span>

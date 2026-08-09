@@ -576,7 +576,7 @@ const WaiverWire = () => {
                         className={cn(
                           'flex items-center gap-2 pl-1 pr-3 py-1 rounded-full ring-1 transition-all font-jbmono text-[10px] uppercase tracking-[0.18em] font-bold',
                           active
-                            ? `bg-pastel-orange text-[#0F1F15] ${chip.ring} shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]`
+                            ? `bg-pastel-orange text-[#581E00] ${chip.ring} shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]`
                             : 'bg-white/5 text-white/70 ring-white/10 hover:bg-white/10 hover:text-pastel-cream',
                         )}
                         aria-pressed={active}
@@ -629,7 +629,7 @@ const WaiverWire = () => {
                   <Button
                     onClick={searchPlayers}
                     disabled={searchLoading}
-                    className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] disabled:opacity-50 h-12"
+                    className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] disabled:opacity-50 h-12"
                   >
                     {searchLoading ? 'Searching…' : 'Search'}
                   </Button>
@@ -667,7 +667,7 @@ const WaiverWire = () => {
                           size="sm"
                           className={isGameLocked
                             ? "bg-amber-400/20 ring-1 ring-amber-400/40 text-amber-300 hover:bg-amber-400/30 font-bold shrink-0"
-                            : "bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] shrink-0"
+                            : "bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] shrink-0"
                           }
                         >
                           {isGameLocked ? 'Claim' : 'Add'}
@@ -759,7 +759,7 @@ const WaiverWire = () => {
                   <div className="flex items-center gap-2">
                     <Button
                       onClick={handleSubmitClaim}
-                      className="flex-1 bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]"
+                      className="flex-1 bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]"
                     >
                       {isFAAB ? `Submit $${faabBidAmount} Bid` : 'Submit Claim'}
                     </Button>

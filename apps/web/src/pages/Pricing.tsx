@@ -111,7 +111,7 @@ export default function Pricing() {
               </ul>
               <Link
                 to="/create-league"
-                className="w-full inline-flex items-center justify-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-5 rounded-md hover:bg-pastel-orange-deep hover:-translate-y-0.5 transition-all duration-200 active:scale-95 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)] relative z-10"
+                className="w-full inline-flex items-center justify-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-5 rounded-md hover:bg-pastel-orange-soft hover:-translate-y-0.5 transition-all duration-200 active:scale-95 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)] relative z-10"
                 style={{ height: '48px' }}
               >
                 Drop the Puck <ArrowRight className="w-4 h-4" strokeWidth={2.5} />

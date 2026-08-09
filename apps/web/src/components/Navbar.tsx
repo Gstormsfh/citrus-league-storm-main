@@ -275,7 +275,7 @@ const Navbar = () => {
                 </DropdownMenu>
               </>
             ) : (
-              <Button size="sm" className="h-9 px-6 text-[13px] font-bold bg-pastel-orange hover:bg-pastel-orange-deep text-white border-0 rounded-md shadow-[0_4px_12px_-4px_rgba(255,107,26,0.4)]" asChild>
+              <Button size="sm" className="h-9 px-6 text-[13px] font-bold bg-pastel-orange hover:bg-pastel-orange-soft text-white border-0 rounded-md shadow-[0_4px_12px_-4px_rgba(255,107,26,0.4)]" asChild>
                 <Link to="/auth">Sign In</Link>
               </Button>
             )}
@@ -522,7 +522,7 @@ const Navbar = () => {
                   </div>
                 </div>
               ) : (
-                <Button className="w-full h-11 font-bold rounded-md bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-deep" asChild>
+                <Button className="w-full h-11 font-bold rounded-md bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft" asChild>
                   <Link to="/auth" onClick={closeMobileMenu}>Sign In</Link>
                 </Button>
               )}

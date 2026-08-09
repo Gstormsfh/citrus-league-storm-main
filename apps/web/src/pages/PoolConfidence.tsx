@@ -362,7 +362,7 @@ const PoolConfidence = () => {
                     <span className="text-[13px] text-pastel-cream">
                       {picks.size === 0 ? <span className="text-white/55">Pick a team, then assign confidence</span> : <><span className="font-bold tabular-nums">{picks.size}</span> of <span className="tabular-nums">{games.length}</span> picked</>}
                     </span>
-                    <Button onClick={handleSubmitPicks} disabled={picks.size === 0 || submitting} className="font-bold uppercase tracking-wider bg-pastel-orange hover:bg-pastel-orange-deep text-white border-0 active:scale-95 transition-all">
+                    <Button onClick={handleSubmitPicks} disabled={picks.size === 0 || submitting} className="font-bold uppercase tracking-wider bg-pastel-orange hover:bg-pastel-orange-soft text-white border-0 active:scale-95 transition-all">
                       {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
                       Submit Picks
                     </Button>

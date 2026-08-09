@@ -945,7 +945,7 @@ const Profile = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 relative z-10">
-                  <Button asChild className="w-full bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
+                  <Button asChild className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
                     <Link to="/auth">Sign In / Sign Up</Link>
                   </Button>
                   <Button asChild variant="outline" className="w-full bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold">
@@ -1009,7 +1009,7 @@ const Profile = () => {
                             if (e.key === 'Escape') { setIsEditingDisplayName(false); setDisplayNameInput(profile?.display_name || ''); }
                           }}
                         />
-                        <Button size="sm" onClick={handleSaveDisplayName} disabled={savingDisplayName} className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold disabled:opacity-50">
+                        <Button size="sm" onClick={handleSaveDisplayName} disabled={savingDisplayName} className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold disabled:opacity-50">
                           {savingDisplayName ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => { setIsEditingDisplayName(false); setDisplayNameInput(profile?.display_name || ''); }} className="text-white/55 hover:text-pastel-cream hover:bg-white/5">
@@ -1044,10 +1044,10 @@ const Profile = () => {
                 </div>
 
                 <TabsList className="animated-element w-full lg:w-auto grid grid-cols-4 lg:flex bg-[#1A2A20] ring-1 ring-white/10 p-1 rounded-xl">
-                  <TabsTrigger value="overview" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Overview</TabsTrigger>
-                  <TabsTrigger value="stats" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Statistics</TabsTrigger>
-                  <TabsTrigger value="achievements" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Trophies</TabsTrigger>
-                  <TabsTrigger value="settings" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Settings</TabsTrigger>
+                  <TabsTrigger value="overview" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Overview</TabsTrigger>
+                  <TabsTrigger value="stats" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Statistics</TabsTrigger>
+                  <TabsTrigger value="achievements" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Trophies</TabsTrigger>
+                  <TabsTrigger value="settings" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Settings</TabsTrigger>
                 </TabsList>
               </div>
 
@@ -1161,7 +1161,7 @@ const Profile = () => {
 
                         {isEditing && (
                           <div className="flex gap-2 pt-4">
-                            <Button onClick={handleSave} className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Save Changes</Button>
+                            <Button onClick={handleSave} className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Save Changes</Button>
                             <Button variant="outline" onClick={() => setIsEditing(false)} className="bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold">Cancel</Button>
                           </div>
                         )}
@@ -1338,7 +1338,7 @@ const Profile = () => {
                             : 'Join a league and complete a season to see your performance history here.'}
                         </p>
                         {userLeagueState !== 'active-user' && (
-                          <Button asChild className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
+                          <Button asChild className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
                             <Link to="/create-league">Create or Join a League</Link>
                           </Button>
                         )}
@@ -1389,7 +1389,7 @@ const Profile = () => {
                           : 'Join a league and start competing to earn achievements!'}
                       </p>
                       {userLeagueState !== 'active-user' && (
-                        <Button asChild className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
+                        <Button asChild className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
                           <Link to="/create-league">Create or Join a League</Link>
                         </Button>
                       )}
@@ -1432,7 +1432,7 @@ const Profile = () => {
                                 onClick={handleSaveDisplayName}
                                 disabled={savingDisplayName || displayNameInput.trim() === (profile?.display_name || '')}
                                 size="sm"
-                                className="shrink-0 bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold disabled:opacity-50"
+                                className="shrink-0 bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold disabled:opacity-50"
                               >
                                 {savingDisplayName ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
                               </Button>
@@ -1465,7 +1465,7 @@ const Profile = () => {
                                   variant={theme === value ? 'default' : 'outline'}
                                   onClick={() => setTheme(value)}
                                   className={`flex-1 font-bold ${theme === value
-                                    ? 'bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]'
+                                    ? 'bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]'
                                     : 'bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50'}`}
                                   size="sm"
                                 >
@@ -1518,7 +1518,7 @@ const Profile = () => {
                         <Button
                           type="submit"
                           disabled={changePasswordLoading || !newPassword || !confirmPassword}
-                          className="w-full bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
+                          className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
                         >
                           {changePasswordLoading ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Updating…</>
@@ -1568,7 +1568,7 @@ const Profile = () => {
                           className="min-h-[80px] bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
                         />
                       </div>
-                      <Button onClick={handleSaveTeamName} className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Save Team Details</Button>
+                      <Button onClick={handleSaveTeamName} className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Save Team Details</Button>
                     </CardContent>
                   </Card>
 
@@ -1670,10 +1670,10 @@ const Profile = () => {
                         ) : selectedSettingsLeagueId && selectedLeagueData ? (
                           <Tabs value={commSettingsTab} onValueChange={setCommSettingsTab} className="w-full">
                             <TabsList className="grid w-full grid-cols-4 bg-[#0F1F15] ring-1 ring-white/10 p-1 rounded-xl">
-                              <TabsTrigger value="waivers" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Waivers</TabsTrigger>
-                              <TabsTrigger value="scoring" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Scoring</TabsTrigger>
-                              <TabsTrigger value="draft" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Draft</TabsTrigger>
-                              <TabsTrigger value="rosters" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#0F1F15] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Rosters</TabsTrigger>
+                              <TabsTrigger value="waivers" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Waivers</TabsTrigger>
+                              <TabsTrigger value="scoring" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Scoring</TabsTrigger>
+                              <TabsTrigger value="draft" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Draft</TabsTrigger>
+                              <TabsTrigger value="rosters" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Rosters</TabsTrigger>
                             </TabsList>
 
                             {/* Waiver Settings Tab */}
@@ -1967,7 +1967,7 @@ const Profile = () => {
                         {/* Save Button */}
                         {selectedSettingsLeagueId && selectedLeagueData && commSettingsTab !== 'rosters' && (
                           <div className="flex justify-end gap-2 border-t border-white/10 pt-4">
-                            <Button onClick={handleSaveCommSettings} disabled={savingCommSettings} className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50">
+                            <Button onClick={handleSaveCommSettings} disabled={savingCommSettings} className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50">
                               {savingCommSettings ? (
                                 <>
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

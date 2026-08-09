@@ -561,7 +561,7 @@ const OtherTeam = () => {
           <h1 className="font-calistoga text-2xl text-pastel-cream mb-5">We couldn&rsquo;t find that team.</h1>
           <Button
             onClick={() => navigate('/standings')}
-            className="bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold"
+            className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold"
           >
             Back to Standings
           </Button>
@@ -621,7 +621,7 @@ const OtherTeam = () => {
             {userLeagueState === 'active-user' && (
               <Button
                 size="lg"
-                className="w-full md:w-auto bg-pastel-orange text-[#0F1F15] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] hover:shadow-[0_12px_32px_-8px_rgba(255,168,87,0.6)] transition-all"
+                className="w-full md:w-auto bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] hover:shadow-[0_12px_32px_-8px_rgba(255,168,87,0.6)] transition-all"
                 onClick={() => navigate(`/trade-analyzer?partner=${team.id}`)}
               >
                 <ArrowRightLeft className="w-4 h-4 mr-2" />
