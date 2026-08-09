@@ -1389,7 +1389,7 @@ const FreeAgents = () => {
 
                         {/* Desktop Table View */}
                         <div className="hidden md:block">
-                          <Table className="[&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
+                          <Table className="[&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Player</TableHead>
@@ -1510,7 +1510,7 @@ const FreeAgents = () => {
 
                         {/* Desktop Table View */}
                         <div className="hidden md:block">
-                          <Table className="[&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
+                          <Table className="[&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Player</TableHead>
@@ -1601,7 +1601,7 @@ const FreeAgents = () => {
                     
                     <div className="border rounded-lg overflow-hidden">
                       <div className="overflow-x-auto">
-                        <Table className="min-w-[600px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
+                        <Table className="min-w-[600px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
                           <TableHeader>
                             <TableRow>
                               <TableHead
@@ -1794,10 +1794,10 @@ const FreeAgents = () => {
                                       >
                                         <Star className={`h-3.5 w-3.5 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                       </Button>
-                                      <Button size="icon" variant="ghost" className="h-7 w-7 text-white/55" onClick={() => handlePlayerClick(player)}>
+                                      <Button size="icon" variant="ghost" className="h-9 w-9 text-white/55 touch-manipulation" onClick={() => handlePlayerClick(player)}>
                                         <Info className="h-3.5 w-3.5" />
                                       </Button>
-                                      <Button size="sm" variant="default" className={`h-7 w-7 font-bold text-base border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                      <Button size="sm" variant="default" className={`h-9 w-9 font-bold text-base border shadow-sm p-0 disabled:opacity-50 touch-manipulation ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                         {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
                                       </Button>
                                     </div>
@@ -1864,7 +1864,7 @@ const FreeAgents = () => {
              ) : (
                <div className="border rounded-lg overflow-hidden">
                  <div className="overflow-x-auto">
-                   <Table className="min-w-[500px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
+                   <Table className="min-w-[500px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
                      <TableHeader>
                        <TableRow className="bg-white/5">
                          <TableHead
@@ -1977,7 +1977,7 @@ const FreeAgents = () => {
                                    {isTopPick && (
                                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
                                        index === 0 ? 'bg-yellow-500 text-white' :
-                                       index === 1 ? 'bg-gray-400 text-white' :
+                                       index === 1 ? 'bg-white/45 text-[#0F1F15]' :
                                        'bg-amber-700 text-white'
                                      }`}>
                                        {index + 1}
@@ -2080,7 +2080,7 @@ const FreeAgents = () => {
                                    >
                                      <Star className={`h-3.5 w-3.5 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                    </Button>
-                                   <Button size="sm" variant="default" className={`h-7 px-2 text-xs font-bold border shadow-sm disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                   <Button size="sm" variant="default" className={`h-9 px-3 text-xs font-bold border shadow-sm disabled:opacity-50 touch-manipulation ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+ Add'}
                                    </Button>
                                    <Button
@@ -2144,7 +2144,7 @@ const FreeAgents = () => {
             ) : (
               <div className="border rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
-                  <Table className="min-w-[600px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5">
+                  <Table className="min-w-[600px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
                     <TableHeader>
                       <TableRow>
                         <TableHead
@@ -2339,10 +2339,10 @@ const FreeAgents = () => {
                                 >
                                   <Star className="h-3.5 w-3.5 fill-current" />
                                 </Button>
-                                <Button size="icon" variant="ghost" className="h-7 w-7 text-white/55" onClick={() => handlePlayerClick(player)}>
+                                <Button size="icon" variant="ghost" className="h-9 w-9 text-white/55 touch-manipulation" onClick={() => handlePlayerClick(player)}>
                                   <Info className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button size="sm" variant="default" className={`h-7 w-7 font-bold text-base border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                <Button size="sm" variant="default" className={`h-9 w-9 font-bold text-base border shadow-sm p-0 disabled:opacity-50 touch-manipulation ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                   {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
                                 </Button>
                               </div>

@@ -2939,7 +2939,7 @@ const Roster = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-foreground relative">
+    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
       {/* Loading overlay during league switch - non-blocking */}
       {showLoadingOverlay && (
         <div className="fixed inset-0 bg-[#0F1F15]/90 backdrop-blur-lg z-[100] flex items-center justify-center">
@@ -3483,7 +3483,7 @@ const Roster = () => {
                                {Object.entries(posStats[pos as 'C'|'LW'|'RW'|'D']).map(([key, value]) => (
                                   <div key={key} className="flex flex-col p-3 bg-white/5 rounded-lg border text-center">
                                      <span className="text-white/55 uppercase text-xs font-bold tracking-wider">{key}</span>
-                                     <span className="text-xl font-bold mt-1 text-foreground">{value}</span>
+                                     <span className="text-xl font-bold mt-1 text-pastel-cream">{value}</span>
                                   </div>
                                ))}
                             </div>
