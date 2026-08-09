@@ -1154,3 +1154,57 @@ MOD: docs/TERMINAL_OUTBOX.md                             (this R25)
 Entry 13 night queue: T11 ✓ · T12 ✓ · T13 ✓. Next: **T14 (DRAFT GUIDE COMPUTATION CORE)** — pure functions in `packages/shared` for `reweightProjections` / `computeTiers` / `scarcityByPosition`, with exhaustive offline tests. NO UI, NO data fetching. KI-042 discipline: canonical numeric ids only.
 
 **End of R25. Completion moment lives.**
+
+---
+
+## R26 — T14 DRAFT GUIDE COMPUTATION CORE shipped (2026-08-09 04:10Z / 10:10 MT)
+
+Pure functions for the post-twelve draft guide. Build-ahead: math + exhaustive tests today; the page wiring is a downstream thin adapter later.
+
+### Files authored
+
+- **`packages/shared/src/utils/draftGuide.ts`** (NEW, 250 lines). Three exports per architect Entry 13:
+  - **`reweightProjections(projections, scoringSettings) → RankedPlayer[]`** — multiplies per-category projection × per-category scoring weight (skater path or goalie path via `isGoalie` discriminator). Sorted by `projectedPoints DESC` with `playerId ASC` tie-break for determinism. 1-indexed rank assigned. `PlayerProjection` typed with `playerId: number` (KI-042 discipline; uuid rows must be filtered upstream).
+  - **`computeTiers(ranked, leagueSize, rosterShape) → Tier[]`** — restricts to the "startable pool" (`min(ranked.length, leagueSize × perTeamDemand)`), computes pairwise gaps, picks top-K gaps by magnitude where `K = ceil(pool / 12)` (targets ~1 cliff per 12 players — Yahoo/ESPN pacing), then carves contiguous tiers. Final tier's `cliffMagnitude=null`.
+  - **`scarcityByPosition(ranked, rosterShape) → PositionScarcity[]`** — per-position `supply / demand` ratio. `supply=0 → ratio=0`, `demand=0 → ratio=Infinity`. Sorted by ratio ASC (most-scarce first). Multi-position eligibility explicitly NOT modeled — downstream policy call.
+
+- **`packages/shared/src/utils/__tests__/draftGuide.test.ts`** (NEW, 210 lines) — **20/20 pass** in ~7ms. Coverage buckets:
+  - `reweightProjections — happy path`: skater default-scoring math, goalie math, rank assignment DESC, tie-break by playerId ASC.
+  - `reweightProjections — settings edge cases`: missing categories in ScoringSettings treated as 0-weighted, null/undefined stat values coerced to 0, negative projected points allowed, empty input → [].
+  - `computeTiers — happy path`: largest-magnitude cliff always among tier boundaries (verified with varied-gap fixtures to avoid tie-on-magnitude pathology).
+  - `computeTiers — zero-size guards`: leagueSize=0 → [], empty rosterShape → [], empty ranked → [], single-player pool → 1 tier with `cliffMagnitude=null`, ranked list larger than pool → only pool considered.
+  - `scarcityByPosition — happy path`: supply/demand ratio, ratio ordering (D=0.5 before C=1.5), sort determinism.
+  - `scarcityByPosition — edge cases`: supply=0 → ratio=0, demand=0 → ratio=Infinity, empty rosterShape → [], multi-position eligibility NOT modeled (documented).
+
+- **`packages/shared/src/utils/index.ts`** — added `export * from './draftGuide';`.
+
+### Design choices (safety arguments)
+
+**Deliberate non-goals in the file header.** No UI. No data fetching. No knowledge of specific NHL positions beyond input. No opinion on category-league vs points-league math beyond honoring `ScoringSettings`. This keeps the surface small enough that the page-wiring step later is a thin adapter.
+
+**KI-042 discipline in types.** `PlayerProjection.playerId: number` — canonical numeric NHL id. Uuid-domain rows must be filtered upstream. Cited in header per KI-042 verification test.
+
+**Settings edge cases explicitly tested.** Missing categories in scoring settings → treated as 0-weighted (partial scoring settings without required-field burden). Null/undefined stat values coerced via `n(v)` helper. Empty inputs handled at every boundary.
+
+**Tiering heuristic documented.** Top-K gaps by magnitude where K = ceil(pool/12) matches Yahoo/ESPN pacing (~5-8 players per tier). Not the most sophisticated tiering algorithm possible (median-relative-threshold would be nicer for pathological same-gap distributions), but appropriate for scope of "build-ahead of the page." When real projection data lands, a downstream tuning task can revisit.
+
+### Test / typecheck status
+
+- `npx vitest run src/utils/__tests__/draftGuide.test.ts` (shared) → **20/20 pass** in ~7ms.
+- No T14-specific tsc errors.
+
+### Files changed this cycle
+
+```
+NEW: packages/shared/src/utils/draftGuide.ts
+NEW: packages/shared/src/utils/__tests__/draftGuide.test.ts
+MOD: packages/shared/src/utils/index.ts                    (export draftGuide)
+MOD: docs/ARCHITECT_INBOX.md                               (unchanged in this cycle; included per protocol if committed alongside outbox)
+MOD: docs/TERMINAL_OUTBOX.md                               (this R26)
+```
+
+### Standing by / next up
+
+Entry 13 night queue: T11 ✓ · T12 ✓ · T13 ✓ · T14 ✓. Next: **T15 (MOCK/PRACTICE DRAFT MODE — design doc + core service behind feature flag)**. Direction pre-ratified: throwaway-league + autopick-opponents + soft-delete-after. Full ratification of design doc required before deploy exposure.
+
+**End of R26. Draft guide core lives.**
