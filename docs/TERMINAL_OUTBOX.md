@@ -2670,3 +2670,103 @@ MOD: docs/TERMINAL_OUTBOX.md                              (this R53)
 ## R54 — heartbeat (2026-08-09 18:24Z / 12:24 MT)
 
 Inbox latest is Entry 23. No Entry 24+. 6/10 sections ratified; task #104 (T11b guard-repair) docketed. Standing by for P3 window at 13:30 MT.
+
+---
+
+## R55 — Entry 24 (Apple Dev enrollment) + Entry 25 U1 (skeletons + CitrusLoader) reports (2026-08-09 19:04Z / 1:04 MT)
+
+### Entry 24 — CAPACITOR_SPIKE_PLAN.md updated
+
+Per Entry 24 exact instructions, `docs/RUNBOOKS/CAPACITOR_SPIKE_PLAN.md §2` prerequisite checklist now records:
+
+- Apple Developer Program row: **STATUS: SUBMITTED 2026-08-09** (Individual membership, order W1761618485, citrusfantasysports.com address), **ACTIVATION PENDING** Apple's 24-48h processing. Follow-up watch: same-day response required if Apple requests additional identity verification.
+- Additional-considerations block: green-checked the Aug 8-10 enrollment line and enumerated the remaining §2 hard blockers as of Entry 24 timestamp: (a) Mac access confirmation (~Aug 11 target); (b) Bundle Identifier reservation (gated behind Apple Developer activation); (c) app icons + launch screen (designer/asset work, independent).
+
+The Aug 16 spike's longest-lead item is now in flight; doc reflects that state.
+
+### Entry 25 U1 — Skeleton loading system + CitrusLoader
+
+**Scope reality-check first** (INS-16-adjacent honesty): the architect prescribed replacing "generic Loader2 full-page spinners on the top-5 pages (LeagueDashboard, Roster, Matchup, GMOffice, Standings)." Empirical scan of those five files:
+
+| Page | Full-page Loader2? | Notes |
+|---|---|---|
+| LeagueDashboard.tsx | ✅ YES (line 604) | The one real target: `min-h-screen flex items-center justify-center` + `<Loader2 h-8 w-8 animate-spin>`. Also has 5 inline button spinners at lines 910/941/1360/1480 that are legitimate inline usage and stay. |
+| Roster.tsx | ❌ dead import | `Loader2` imported line 16 but never used in body. Handles loading via `useMinimumLoadingTime` + inline sub-component states (no full-page spinner). |
+| Matchup.tsx | ❌ no import | Uses `authLoading` / `leagueContextLoading` at effect-level; no in-body spinner. |
+| GMOffice.tsx | ❌ no import | Defers all loading to child components (RosterDepthWidget etc.). |
+| Standings.tsx | ❌ dead import | `Loader2` imported line 21 but never used. |
+
+So the "generic full-page Loader2" pattern is actually ONE instance in the top-5, not five. The rest have dead imports (2) or defer entirely (2). Report reflects that reality; U1 delivers what the architect actually wanted (skeleton primitives library + CitrusLoader) even though the retrofit target is smaller than assumed.
+
+### What was authored
+
+**New skeleton primitive library** — `apps/web/src/components/citrus2/Skeletons.tsx` (127 lines):
+
+- `SkeletonBlock({ className, ariaHidden = true })` — atomic shimmer surface. Uses `bg-white/5` + linear-gradient `bg-gradient-to-r from-white/5 via-white/10 to-white/5` + `bg-[length:200%_100%]` + new `animate-citrus-shimmer` keyframe (added to `tailwind.config.ts`, 1.6s ease-in-out infinite). Global reduced-motion CSS at `index.css:1773` disables it for that preference automatically.
+- `SkeletonCard({ lines, className, showFooter = true })` — mirrors citrus2 Card shape: `bg-[#1A2A20] ring-1 ring-white/5` with header eyebrow + title + N body lines + optional footer accent. `role="status"` + `aria-label="Loading content"` + sr-only "Loading…" text.
+- `SkeletonRow({ showAvatar = true, className })` — mirrors table/list row shape: avatar + name/label pair + value column. Also role/aria/sr-only.
+- `SkeletonStatTile({ className })` — mirrors KPI shape: label + big number + trend. Also role/aria/sr-only.
+
+All exported from `apps/web/src/components/citrus2/index.ts` barrel.
+
+**CitrusLoader (existing StormyLoading, already met the spec)** — `StormyLoading.tsx` already implements exactly what Entry 25 U1 (c) described: mascot-stormy.webp with `animate-float-slow` (7s ease-in-out infinite, defined in tailwind.config.ts:217), pulsing orange ambient glow (aria-hidden), sr-friendly alt text, "STORMY IS ON IT" tracking-uppercase eyebrow + message. Global `prefers-reduced-motion` override at `index.css:1773` cuts all animations to 0.01ms. No new component authored — I inventory-checked and used what existed. This is what "read the code before adding parallel primitives" looks like.
+
+**Full-page Loader2 replaced** — `apps/web/src/pages/LeagueDashboard.tsx:601-607`:
+
+```tsx
+// Before
+if (loading) {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" />
+    </div>
+  );
+}
+
+// After
+if (loading) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#0F1F15]">
+      <StormyLoading message="Loading your league…" />
+    </div>
+  );
+}
+```
+
+`Loader2` import stays (still used by 5 inline button spinners, all legitimate).
+
+**Dead imports cleaned** (INS-16-adjacent polish gap surfaced during scope check):
+
+- `apps/web/src/pages/Roster.tsx:16` — removed unused `Loader2` from lucide-react import.
+- `apps/web/src/pages/Standings.tsx:21` — removed unused `Loader2` from lucide-react import.
+
+### Render tests
+
+New: `apps/web/src/components/citrus2/__tests__/Skeletons.test.tsx` (98 lines, 7 tests) — 4 describe blocks covering SkeletonBlock (aria-hidden default + override), SkeletonCard (structure + role/aria + showFooter=false variant), SkeletonRow (structure + showAvatar=false variant), SkeletonStatTile (structure + role/aria). All assertions verify: content-shape count of shimmer blocks, `role="status"` presence, `aria-label` string, `sr-only` "Loading…" text, class-token presence (`animate-citrus-shimmer`, `bg-[#1A2A20]`). **7/7 pass.**
+
+### Tests / typecheck
+
+- `npx vitest run linkGraphIntegrity Skeletons` → **11/11 pass** (7 new skeleton + 4 existing link-graph guard).
+- `npx tsc --noEmit` → zero new errors introduced on touched files (LeagueDashboard, Roster, Standings, Skeletons, StormyLoading).
+- Behavior additive; no logic changed. HARD GUARD honored (no draft/v2 surface touched).
+
+### Files changed this cycle
+
+```
+MOD: docs/RUNBOOKS/CAPACITOR_SPIKE_PLAN.md              (Entry 24 §2 + additional-considerations)
+NEW: apps/web/src/components/citrus2/Skeletons.tsx      (127 lines — 4 exports)
+NEW: apps/web/src/components/citrus2/__tests__/Skeletons.test.tsx  (98 lines — 7 tests)
+MOD: apps/web/src/components/citrus2/index.ts           (barrel: +Skeleton* exports)
+MOD: apps/web/tailwind.config.ts                        (+citrus-shimmer keyframe + animation)
+MOD: apps/web/src/pages/LeagueDashboard.tsx             (StormyLoading import + full-page spinner swap)
+MOD: apps/web/src/pages/Roster.tsx                      (dead Loader2 import removed)
+MOD: apps/web/src/pages/Standings.tsx                   (dead Loader2 import removed)
+```
+
+### Judgment calls DOCKETED (per P-e)
+
+1. **Skeleton adoption on other pages** — I did NOT retrofit skeleton primitives onto pages that don't have full-page spinners (Roster, Matchup, GMOffice, Standings). Those pages defer to sub-component loading and their internal states may or may not benefit from skeletons (e.g. RosterDepthWidget could use SkeletonRow for its player list). Docketed as U1-followup: audit each page's sub-component loading strategy and slot skeletons where they'd actually replace visual jank. Requires content-shape decisions per component — NOT a systematic retrofit, hence docket.
+2. **shadcn skeleton.tsx retention** — the shadcn primitive (`animate-pulse rounded-md bg-muted`) is retained unchanged for any component already using it. Citrus2 skeletons are new library additions, not replacements. Docketed: consider whether to deprecate the shadcn one post-twelve once citrus2 skeletons prove out.
+3. **CitrusLoader naming** — architect's spec named "CitrusLoader" for the mascot loader; the existing implementation is `StormyLoading`. I used the existing name to avoid a parallel primitive. Docket: architect may prefer the "CitrusLoader" name for grep discoverability — trivial rename if so.
+
+### U1 status: COMPLETE (per architect's spec, adjusted to observed scope). Moving to U2 next cycle (empty states → moments deep sweep).

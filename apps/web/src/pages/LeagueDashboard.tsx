@@ -14,6 +14,7 @@ import {
   RangeIcon,
   MascotPortrait,
 } from '@/components/citrus2';
+import { StormyLoading } from '@/components/citrus2/StormyLoading';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { LeagueService, League, Team } from '@/services/LeagueService';
@@ -600,8 +601,8 @@ const LeagueDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" />
+      <div className="min-h-screen flex items-center justify-center bg-[#0F1F15]">
+        <StormyLoading message="Loading your league…" />
       </div>
     );
   }

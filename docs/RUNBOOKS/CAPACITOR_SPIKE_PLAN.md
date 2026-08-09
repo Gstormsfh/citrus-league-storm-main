@@ -33,7 +33,7 @@
 
 | Item | Owner | Where | Notes |
 |---|---|---|---|
-| Apple Developer Program account | Garrett | developer.apple.com | Individual ($99/yr) OR Organization. **Organization needs D-U-N-S number (adds 1-2 weeks to enrollment)** — start with Individual if not already enrolled. |
+| Apple Developer Program account | Garrett | developer.apple.com | Individual ($99/yr) OR Organization. **Organization needs D-U-N-S number (adds 1-2 weeks to enrollment)** — start with Individual if not already enrolled. **STATUS: SUBMITTED 2026-08-09** (Individual membership; order W1761618485; confirmation to citrusfantasysports.com address). **ACTIVATION PENDING Apple's 24-48h processing.** Follow-up watch: Apple may request additional identity verification — **same-day response required** to avoid stalling the Aug 16 spike. |
 | Bundle Identifier reservation | Garrett | App Store Connect | Reserve `com.citrusfantasysports.app` (or whichever) via App Store Connect → Certificates, Identifiers & Profiles. Must match `capacitor.config.ts`. |
 | Xcode 15+ | Garrett | Mac App Store | Free. Latest stable. **REQUIRES macOS Sonoma 14+.** |
 | macOS device | Garrett | own machine | Xcode does not run on Windows or Linux. If Garrett only has Windows, this is a HARD BLOCKER — need Mac access (rent M-series Mac Mini on Scaleway, borrow from someone, etc.). |
@@ -44,8 +44,12 @@
 | App-Store Connect **internal-tester group** | Garrett | ASC → TestFlight | Add himself + ~5 volunteers by email. Internal testers don't require App Store review, so distribution is instant. |
 
 **Additional considerations:**
-- Apple Developer enrollment can take days-to-weeks for Organization accounts. **Start Aug 8-10 if not already enrolled.**
+- Apple Developer enrollment can take days-to-weeks for Organization accounts. **Start Aug 8-10 if not already enrolled.** ✅ Individual enrollment SUBMITTED 2026-08-09 (Entry 24).
 - Bundle ID must be globally unique across all Apple developers; verify availability before reserving.
+- **Remaining §2 hard blockers (as of 2026-08-09 12:20 MT / Entry 24):**
+  - macOS device / Mac access — target confirmation ~Aug 11.
+  - Bundle Identifier reservation — gated behind Apple Developer activation.
+  - App icons, launch screen — designer/asset work independent of Apple.
 
 ---
 

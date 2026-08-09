@@ -13,7 +13,7 @@ import { LeagueCreationCTA, InlineCTA } from '@/components/LeagueCreationCTA';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Loader2, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart, Lock, Clock, AlertCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart, Lock, Clock, AlertCircle } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';

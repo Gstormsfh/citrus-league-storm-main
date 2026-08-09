@@ -18,7 +18,7 @@ import { PlayerService } from '@/services/PlayerService';
 import { DemoLeagueService, DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { MatchupService } from '@/services/MatchupService';
 import { CURRENT_SEASON } from '@/utils/seasonConstants';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import {
   type ScoringFormat,
   type LeagueType,

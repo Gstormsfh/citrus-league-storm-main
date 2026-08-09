@@ -308,3 +308,38 @@ S-5 (GM Office) — RATIFIED WITH DISTINCTION + one docket accepted. The two dea
 S-6 (matchup) — RATIFIED. Class-closure grep for the /playoffs/${...} pattern independently re-verified by me: zero instances repo-wide. The dead-link CLASS is closed, not just its instances.
 
 Running tally: 6 of 10 sections ratified. P3 (1:30) takes S-7 through S-10 + the fresh-eyes drift check. Keep heartbeating.
+
+---
+
+## Entry 24 — 2026-08-09 18:20Z (12:20 MT) — SPIKE PREREQUISITE LANDED: Apple Developer enrollment SUBMITTED
+
+Garrett enrolled from the field (individual membership, order W1761618485, confirmation to the citrusfantasysports.com address; activation pending Apple's 24-48h processing). On next wake: update CAPACITOR_SPIKE_PLAN.md §2's prerequisite checklist — mark Apple Developer enrollment as SUBMITTED 2026-08-09 / ACTIVATION PENDING with the order number, and note the follow-up watch ("Apple may request additional identity verification — same-day response required"). Remaining §2 hard blocker: Mac access confirmation (target ~Aug 11). The Aug 16 spike's longest-lead item is now in flight.
+
+---
+
+## Entry 25 — 2026-08-09 18:35Z (12:35 MT) — THE SLEEPER-BAR DEEP QUEUE (Garrett's direct order: "sleeper quality everything — best hockey app of all time." Your heartbeats found no work; here is hours of it. Work U1→U8 continuously; report per item; my pings now run hourly.)
+
+U1 — SKELETON LOADING SYSTEM + STORMY LOADER (biggest felt-quality jump available): Sleeper's polish is perceived speed. Author (a) citrus2 skeleton components (SkeletonCard, SkeletonRow, SkeletonStatTile — shimmer via CSS, tokens-only, dark-theme native); (b) replace generic Loader2 full-page spinners on the top-5 pages (LeagueDashboard, Roster, Matchup, GMOffice, Standings) with content-shaped skeletons; (c) a CitrusLoader component — mascot-stormy.webp with a gentle CSS float/bob (respect prefers-reduced-motion) for the few true full-screen waits + replacing loading-citrus.png usage where code-reachable. Render tests: skeletons render structure, loader respects reduced-motion. This is additive; behavior untouched.
+
+U2 — EMPTY STATES → MOMENTS: deepen the S-sweep. Every empty state on the top-10 pages gets (a) warm specific copy in one consistent voice, (b) an art slot per the observed-style rules where one is missing, (c) ONE clear next action. Add any new briefs to ART_GENERATION_QUEUE (reference-image rule). Table of upgraded states to outbox.
+
+U3 — INTERACTION CONSISTENCY PASS: focus-visible rings on ALL interactive elements (keyboard nav is a11y AND polish), consistent hover/active states via citrus2 tokens, standardized transition durations (fast 150ms / normal 200ms / entrance 300ms as tokens). Class-level assertions where testable. No behavior changes.
+
+U4 — INFORMATION HIERARCHY (Sleeper's confident numbers): league home + matchup + standings pass — scores/points BIG and instantly scannable, labels quiet, one accent doing the alerting. className/typography only. Before/after class diffs in the report. (Draft surfaces stay under the HARD GUARD — skip them.)
+
+U5 — MOBILE DEEP PASS (Sleeper is mobile-first; so are the twelve): audit top-10 pages for 360px correctness in code — fixed widths, overflow risks, tap targets <44px, text truncation handling. Author fixes. This is the highest-stakes U-item for draft night phones.
+
+U6 — PERF AUDIT (audit-only first): bundle heaviness per route (cite the lazy-load map), any list rendering >100 items without virtualization (player lists in Roster/free agents!), image loading attributes (lazy/decoding). AUTHOR only the zero-risk wins (loading="lazy", decoding="async"); virtualization or code-splitting changes = docket with evidence for post-twelve.
+
+U7 — VOICE DOC + TOAST SWEEP: write docs/COPY_VOICE.md (the Citrus voice: warm, confident, hockey-native, Stormy-flavored where playful; never corporate, never "Oops") then sweep every toast/system message on the top-10 pages to conform. Copy-only.
+
+U8 — SELF-AUDIT FINALE: re-walk U1-U7 output with the hostile-reviewer lens + update SECTION_PERFECTION_SUMMARY with the U-campaign; refresh the worklog.
+
+Discipline unchanged: author-only, offline tests, hard guard on draft surfaces, STOP on product-judgment ambiguity, time-box 90min/item. GO.
+
+## Entry 26 — 2026-08-09 18:58Z (12:58 MT) — DESIGN NORTH STAR LANDED: docs/DESIGN_DIRECTION.md (align U-queue to it; ack Entry 25 pickup)
+
+1. **New file `docs/DESIGN_DIRECTION.md`** — the distilled architect design direction (tokens, ten rules, mobile floor, mechanics map), harvested from the shipped art per INS-16. The full visual specimen board was delivered to Garrett and persisted as a desktop artifact. **U1–U8 work should conform to this file.** Where it conflicts with tailwind.config, code wins — but flag the conflict in your report rather than silently following either.
+2. **Race note:** your R54 (18:24Z) read the inbox as "latest Entry 23" — Entries 24 (18:20Z) and 25 (18:35Z) are on disk and confirmed present at 18:56Z. **In your next report, explicitly ack Entry 24 + 25 pickup.** If your reader is caching, note it — this is a KI-048 channel-integrity data point.
+3. **Cadence:** Garrett has ordered maximum tempo ("even more often if you can"). Architect firings now run ~every 30 minutes (P-blocks at :30, new D-blocks at :00). Your 30-min self-wake stands; with U1–U8 queued you should never heartbeat-empty again today. If you exhaust U8, self-assign from DESIGN_DIRECTION.md conformance sweeps (tokens-only) and report.
+4. Standing rules unchanged: AUTHOR-ONLY, HARD GUARD on draft surfaces, STOP-and-docket on ambiguity, safety arguments per diff.

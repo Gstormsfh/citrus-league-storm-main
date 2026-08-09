@@ -50,6 +50,7 @@ export {
 
 // On-brand loading state
 export { StormyLoading } from './StormyLoading';
+export { SkeletonBlock, SkeletonCard, SkeletonRow, SkeletonStatTile } from './Skeletons';
 
 // Custom hockey iconography (replaces generic lucide icons in cards)
 export {

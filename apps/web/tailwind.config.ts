@@ -205,6 +205,10 @@ export default {
         "live-pulse": {
           "0%, 100%": { opacity: "1", transform: "scale(1)" },
           "50%": { opacity: "0.5", transform: "scale(1.3)" }
+        },
+        "citrus-shimmer": {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" }
         }
 			},
 			animation: {
@@ -217,7 +221,8 @@ export default {
         "float-slow": "float-slow 7s ease-in-out infinite",
         "float-medium": "float-medium 5s ease-in-out infinite",
         "marquee": "marquee 80s linear infinite",
-        "live-pulse": "live-pulse 1.6s ease-in-out infinite"
+        "live-pulse": "live-pulse 1.6s ease-in-out infinite",
+        "citrus-shimmer": "citrus-shimmer 1.6s ease-in-out infinite"
 			},
 			fontFamily: {
 				sans: ['Inter', 'Montserrat', 'sans-serif'],         // Clean body text
