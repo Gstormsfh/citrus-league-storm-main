@@ -2947,3 +2947,78 @@ I would take (b) if forced to choose (incremental, revert-friendly, honors the S
 Post-M-queue per Entry 29 order: resume U-queue = **U4 (information hierarchy)** next, unless architect adjudicates M-1 first. Continuing 30-min heartbeat.
 
 **End of R57. Entry 29 fully executed except M-1, which STOPPED at scope. Architect adjudication requested on M-1a vs b vs c path.**
+
+---
+
+## R58 — Entry 30 ACK + S-8b + M-1a/b/c executed (2026-08-09 21:04Z / 3:04 MT)
+
+### Entry 30 ACK — comprehensive
+
+- **Section-Perfection Campaign CLOSED** (S-1 through S-10 all ratified). Total campaign span: 4-tier ratification (P1 → P2 → P2.5 omnibus).
+- **S-8b APPROVED** — executed (see below).
+- **U3 RATIFIED** with one honesty flag noted: `.dark --ring` peach-HSL change ripples visually onto draft rooms too. **Acknowledged and re-flagged for F28 browser pass**: peach focus rings are EXPECTED on draft/v2 surfaces (not a surprise), zero logic touched, no HARD GUARD violation. Documenting here for the browser-pass reviewer's benefit.
+- **M-1 = option (b)** adjudicated — executed in 3 phased commits (see below).
+- **M-2 / M-3 RATIFIED**. **U9b / L-1 RATIFIED** into the gated lane.
+- **Channel-race diagnosis accepted** — no protocol change.
+
+### S-8b executed (a0f492d4)
+
+Per Entry 30 approval — 6 aria-labels + fold-in of R44 docket #2 + broader audit.
+
+**aria-label additions (6 buttons across 3 pool pages)**:
+- `PoolPickem.tsx:364/371` — ChevronLeft/Right week-nav Buttons → `aria-label="Previous week"` / `"Next week"`
+- `PoolSurvivor.tsx:143/150` — same
+- `PoolConfidence.tsx:197/204` — same
+
+Icons stay aria-hidden; parent Buttons now carry accessible names, resolving the WCAG 4.1.2 gap.
+
+**Unparseable class fix (broader audit per feedback rule)**: architect flagged 1 site (`text-white/70/50` at PoolPlayoffHub:947). Grepping the file found **7 hits of `text-white/70/50`** + **3 hits of `border-pastel-sage/40/30`** — same double-slash typo family. All 10 fixed:
+- 7 × `text-white/70/50` → `text-white/50` (lines 622, 668, 815, 855, 897, 941, 947)
+- 3 × `border-pastel-sage/40/30` → `border-pastel-sage/30` (lines 558, 668, 850)
+
+Tailwind drops unparseable classes silently, so these sites rendered with NO alpha modifier (100% opaque white / 30% assumed but actually dropped). Post-fix they'll render one shade softer as authored.
+
+### M-1 executed in 3 phased commits per Entry 30 option (b)
+
+**M-1a (589f21fe) — outer surface + scores (5 edit blocks + render test)**:
+- Outer card: bg-[#E8EED9]/50 + citrus-forest borders + shadow → bg-[#1A2A20] + ring-white/10 + dark shadow.
+- Mobile + desktop score clusters: winner text-pastel-sage / loser text-white/70 + tabular-nums on all 4 score nodes.
+- Dashed divider: border-citrus-forest/30 → border-white/10.
+- "vs" span text: citrus-forest → white/55.
+- **NEW render test** (`ScoreCard.test.tsx`, 5 tests): asserts both mobile+desktop clusters render, winner sage / loser white/70 signal, inverted score inverts accent, tabular-nums present, tied score → both white/70. Required mocking WinProbabilityBar (eager matchupApi import → supabase env). **5/5 pass.**
+- One judgment call: caught + corrected a logic inversion in opponent-score color branch mid-edit — original used citrus-green-medium as opponent-winning highlight, my first pass mapped it wrong. Fixed before commit.
+
+**M-1b (5effd2ab) — badges + records + vs-patch (6 edit blocks / 14 tokens)**:
+- Mobile team-1 + team-2 badges: sage/peach mix → all sage/20 fill + sage/40 ring (per rule 2 "one accent per cluster").
+- Mobile name + record: cream / white/55 (was citrus-sage / citrus-forest).
+- Desktop team-1 + team-2 patch clusters: sage/15 fill + sage/40 ring (was mixed sage + green-light).
+- Desktop 12×12 badge circles: sage/20 + sage/40 (was sage + peach + citrus-forest borders).
+- Desktop "vs" patch: sage/20 + sage/40 + pastel-cream (was citrus-sage/80 + citrus-sage + [#E8EED9]). Font-script + shadow-patch + rounded-varsity preserved verbatim.
+- Desktop container: bg-[#E8EED9]/50 + border-b-4 border-citrus-forest → border-b border-white/10 (surface collapsed to outer card).
+- **Docket surfaced**: HOME/AWAY color signal was previously encoded by badge BACKGROUND color (sage=home, peach=away). Now the differentiation is via the "H"/"A" letters + team-name label position only. Per architect spec ("all patches to pastel-cream on sage/20"), but Garrett may want a subtle secondary tint on AWAY to preserve the at-a-glance signal. Docketed for architect adjudication on M-1 review.
+
+**M-1c (e4ff5ec4) — games-remaining chips + decorative accents (4 edit blocks)**:
+- Team-1 + team-2 games-remaining chips: bg-[#E8EED9]/50 border-citrus-sage/40 → bg-white/5 ring-1 ring-pastel-sage/30. Calendar + Wedge icons + number + "left" label all recolored to citrus2 palette.
+- Games-remaining numbers now tabular-nums.
+- Decorative CitrusSlice + CitrusBurst (10% opacity): text-citrus-sage/10 → text-pastel-sage/10 + aria-hidden added.
+
+**M-1 campaign totals**: **13 className-edit blocks / ~30 tokens** across ScoreCard.tsx (180 lines). **Zero Citrus 1.0 tokens remain** in the file (grep verified). Font-varsity + patch geometry + H/A/vs/wedge accents preserved verbatim throughout — varsity charm intact.
+
+### Test / typecheck status
+
+- `npx vitest run linkGraphIntegrity Skeletons CitrusButton.focus ScoreCard` → **20/20 pass** (4 linkGraph + 7 Skeletons + 4 CitrusButton.focus + 5 ScoreCard).
+- Zero new tsc errors introduced.
+- HARD GUARD honored throughout (verified via `git diff --name-only | grep draft = 0` after each commit).
+
+### Files changed across this cycle
+
+**S-8b (a0f492d4)** — 4 pool files (6 aria-labels + 10 unparseable-class fixes)
+**M-1a (589f21fe)** — 2 files (ScoreCard.tsx + new ScoreCard.test.tsx)
+**M-1b (5effd2ab)** — 1 file (ScoreCard.tsx)
+**M-1c (e4ff5ec4)** — 1 file (ScoreCard.tsx)
+
+### Continuing U-queue
+
+**U4 (information hierarchy)** next per Entry 30 order. 30-min heartbeat cadence continues per KI-048.
+
+**End of R58. Entry 30 fully executed. Section-Perfection Campaign CLOSED. M-1 done in 3 phased commits with test lock on the score signal. HOME/AWAY color-signal docket surfaced for architect review.**

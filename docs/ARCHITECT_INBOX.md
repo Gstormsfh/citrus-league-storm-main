@@ -395,3 +395,34 @@ Ack Entries 26/27/28 in next report. Continue U2 first — U9 queues behind it.
 **Standings: CONFORMANT — no orders.** Your alpha-wash orange idiom (`/10-/20` accents, solid laser only on playoff-zone badge) is correct and is now the named pattern: solid laser = action/state, alpha wash = ambient. One no-touch curiosity docketed: `style={{ visibility: 'visible', opacity: 1 }}` inline relics (Standings:640-643) — pre-existing, presumably an old bug fight; leave alone unattended, investigate post-twelve.
 
 Ack this entry; order after current U3: U9b+L-1 → M-2 → M-3 → M-1 → resume U-queue.
+
+## Entry 30 — 2026-08-09 20:50Z (2:50 MT) — P2.5 omnibus: S-7/S-8/S-9/S-10 RATIFIED (campaign closed) · S-8b approved · U3 RATIFIED (one flag) · M-1 = option (b)
+
+**Section-Perfection Campaign formally CLOSED: S-1 through S-10 all ratified.** S-7 (R42): ratified — honest matrix, T11a links verified. S-8 (R43): ratified — 36 aria-hiddens clean. S-9 (R44): ratified — offseason honesty audit passed on all six playoff surfaces. S-10 (R45): ratified — zero-touch is the correct touch on a stub + icon-free admin.
+
+**S-8b APPROVED (your R43 docket #3 — do as one small commit):** icon-only week-nav buttons with aria-hidden icons and no accessible name are a real WCAG 4.1.2 failure, and the fix completes work already started. Add `aria-label="Previous week"` / `aria-label="Next week"` to the six ChevronLeft/Right parent Buttons (2 × 3 pool pages). Fold in R44 docket #2: `text-white/70/50` (PoolPlayoffHub:947) is an unparseable class — set `text-white/50`. Additive attributes + one class fix, zero behavior.
+
+**U3 RATIFIED** — verified on disk: ui/button.tsx:8, `.dark --ring: 20 100% 78%` (= #FFB591, HSL math checked), light-theme ring untouched at :290, focus tests 4/4. Clever lever. **One honesty flag for the record:** the `.dark --ring` var change alters focus-ring color on EVERY dark surface **including draft rooms** — no draft file touched, no logic changed, but a visual diff on guarded surfaces exists. Acceptable class (pure token), flagged so the F28 browser pass knows peach rings are expected there, not a surprise.
+
+**M-1 ADJUDICATION: option (b) — phased, with momentum.** Execute M-1a (outer surface + both score clusters, ~4 edits) as its own commit **with a minimal render test** (ScoreCard renders both scores; winning node carries `text-pastel-sage`, losing carries `text-white/70`) — we are touching the hero, it gets a lock. If M-1a passes tests+tsc cleanly, proceed DIRECTLY to M-1b (badges/records, ~10) and M-1c (games-remaining chips, ~10) in the same cycle, each its own commit, each independently revertable. Three commits, one cycle, STOP only if any phase's diff surprises you beyond the count. Keep font-varsity + patches + geometry exactly; `tabular-nums` applied-for-intent accepted (your Graduate observation noted and agreed). Your (b) instinct was right.
+
+**M-2/M-3 RATIFIED** — verified Matchup:5049 + all four other pages carry StormyLoading (import+usage). Per-page message props are a nice touch. U9b/L-1 RATIFIED — 40-site hover sweep + 17-site normalization accepted into the gated lane.
+
+Order after this: S-8b quick commit → M-1a/b/c → resume U4. Ack Entry 30.
+
+## Entry 31 — 2026-08-09 21:15Z (3:15 MT) — D4 walkthrough part 2 (Roster/FreeAgents/GMOffice/OtherTeam) + mobile audit → FA-queue (feeds U5; don't double-sweep)
+
+**Clean bills:** GMOffice (1 laser = legit CTA), OtherTeam (2 = legit), Roster nearly clean (orders below). **Idiom taxonomy confirmed page-wide and now canonical:** solid laser = CTA or active-state marker; alpha wash = ambient accent; `data-[state=active]:bg-pastel-orange` tabs are state markers, NOT laser-rule violations. FreeAgents' `min-w-[500-600px]` stat tables scroll inside shadcn's overflow-auto wrapper — acceptable idiom (docket the Sleeper-style card-list-on-mobile question for Garrett's Sunday walk, not for us).
+
+**FA-queue (FreeAgents.tsx — tokens-only, one commit):**
+1. **FA-1 tap targets (the real one):** claim/add + ghost icon buttons are h-7 (28px) at :1797, :1800, :2083, :2342, :2345 — primary action of the page, sub-44px. Bump all five to `h-9 w-9` (36px) + add `touch-manipulation`. The full-44px ideal vs table-density tradeoff is DOCKETED for Garrett's Sunday walk — 36px is the tokens-only floor-raise we can do without reflowing rows.
+2. **FA-2 tabular-nums, the elegant version:** the page has ZERO tabular figures in pure stat tables. Add `[&_td]:tabular-nums` to the Table className chains at :1392, :1604, :1867, :2147 (+ any sibling I missed — grep `<Table className`) — four one-line edits cover every numeric column on the page.
+3. **FA-3 medal relic:** :1980 `bg-gray-400 text-white` (silver rank) → `bg-white/45 text-[#0F1F15]` — keeps the silver semantic, drops the gray-* family.
+
+**R-2 (Roster.tsx, same commit fine):** :2942 + :3486 `text-foreground` → `text-pastel-cream`. (:3534 `min-w-[200px]` is a legit flex floor — no touch.)
+
+**U5 cross-check:** this audit covers Roster/FreeAgents/GMOffice/OtherTeam at 360px — when U5 runs, SKIP re-sweeping these four; U5's remaining scope = Home/Matchup/Standings mobile + the ~200 inline-button focus audit you deferred from U3 + nav/tab surfaces.
+
+**Cadence health (for the record): HEALTHY.** R55 19:04 → R56 19:52 → R57 20:35 — ~45-min effective cycles under heavy load, instant STOP compliance on M-1, zero empty heartbeats since Entry 25. Exactly what Garrett asked for.
+
+Order: current M-queue finishes first → S-8b → FA-queue+R-2 → U4. Ack Entry 31.
