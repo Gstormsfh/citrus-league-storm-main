@@ -52,8 +52,8 @@ export const ScoreCard = ({
   return (
     <div className="mb-4 md:mb-6 rounded-xl md:rounded-[2rem] bg-[#1A2A20] ring-1 ring-white/10 md:ring-2 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.4)] overflow-hidden relative">
       {/* Floating Citrus Decorations - Hidden on mobile */}
-      <CitrusSlice className="hidden md:block absolute top-3 right-3 w-8 h-8 text-citrus-sage/10 rotate-12" />
-      <CitrusBurst className="hidden md:block absolute bottom-3 left-3 w-10 h-10 text-citrus-sage/10" />
+      <CitrusSlice className="hidden md:block absolute top-3 right-3 w-8 h-8 text-pastel-sage/10 rotate-12" aria-hidden="true" />
+      <CitrusBurst className="hidden md:block absolute bottom-3 left-3 w-10 h-10 text-pastel-sage/10" aria-hidden="true" />
       
       {/* Mobile: Compact single-row layout */}
       <div className="md:hidden px-3 py-2">
@@ -111,15 +111,15 @@ export const ScoreCard = ({
               <div className="font-mono text-xs text-white/55">{myTeamRecord.wins}-{myTeamRecord.losses}</div>
               <div className="flex flex-col gap-0.5 mt-1">
                 {/* Games Remaining */}
-                <div className="flex items-center gap-1 bg-[#E8EED9]/50 backdrop-blur-sm/60 px-2 py-0.5 rounded-md border border-citrus-sage/40">
-                  <Calendar className="w-2.5 h-2.5 text-citrus-forest" />
-                  <span className="text-[9px] font-varsity font-bold text-citrus-forest">
+                <div className="flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-md ring-1 ring-pastel-sage/30">
+                  <Calendar className="w-2.5 h-2.5 text-pastel-sage" aria-hidden="true" />
+                  <span className="text-[9px] font-varsity font-bold text-pastel-cream tabular-nums">
                     {myTeamGamesRemaining}
                   </span>
-                  <span className="text-[8px] font-display text-citrus-charcoal/70">
+                  <span className="text-[8px] font-display text-white/55">
                     left
                   </span>
-                  <CitrusWedge className="w-2 h-2 text-citrus-sage opacity-60" />
+                  <CitrusWedge className="w-2 h-2 text-pastel-sage opacity-60" />
                 </div>
               </div>
             </div>
@@ -146,15 +146,15 @@ export const ScoreCard = ({
               <div className="font-mono text-xs text-white/55 text-right">{opponentTeamRecord.wins}-{opponentTeamRecord.losses}</div>
               <div className="flex flex-col gap-0.5 mt-1 items-end">
                 {/* Games Remaining */}
-                <div className="flex items-center gap-1 bg-[#E8EED9]/50 backdrop-blur-sm/60 px-2 py-0.5 rounded-md border border-citrus-peach/40">
-                  <CitrusWedge className="w-2 h-2 text-citrus-peach opacity-60" />
-                  <span className="text-[8px] font-display text-citrus-charcoal/70">
+                <div className="flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-md ring-1 ring-pastel-sage/30">
+                  <CitrusWedge className="w-2 h-2 text-pastel-sage opacity-60" />
+                  <span className="text-[8px] font-display text-white/55">
                     left
                   </span>
-                  <span className="text-[9px] font-varsity font-bold text-citrus-forest">
+                  <span className="text-[9px] font-varsity font-bold text-pastel-cream tabular-nums">
                     {opponentTeamGamesRemaining}
                   </span>
-                  <Calendar className="w-2.5 h-2.5 text-citrus-forest" />
+                  <Calendar className="w-2.5 h-2.5 text-pastel-sage" aria-hidden="true" />
                 </div>
               </div>
             </div>
