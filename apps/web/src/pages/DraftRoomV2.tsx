@@ -28,6 +28,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ConnectionBanner } from '@/components/draft/v2/ConnectionBanner';
+import { CompletionMomentBanner } from '@/components/draft/v2/CompletionMomentBanner';
 import {
   DraftTimerV2,
   useClockOffsetEstimator,
@@ -702,22 +703,19 @@ function MainTabs({
 
   return (
     <div className="space-y-3">
-      {/* DR-4 (2026-07-30) — completed-draft empty state. Deliberate
-          copy + link to /roster (route verified at App.tsx:184). */}
+      {/* T13 architect Entry 13 (2026-08-09) — completion-moment
+          polish. Replaces the DR-4 minimal green box with an elevated
+          citrus2-style banner: scene-cup art slot, one-time fade+rise
+          transition (prefers-reduced-motion respected), invite to
+          screenshot the final board. data-testid preserved for
+          DR-4-era test binding. Route to /roster verified at
+          App.tsx:184; T11a link-graph integrity test guards this. */}
       {isDraftComplete && (
-        <div
-          className="rounded border-2 border-green-600 bg-green-50 p-4 text-sm text-green-900"
-          data-testid="completed-draft-banner"
-        >
-          <div className="font-semibold text-base">Draft complete</div>
-          <div className="mt-1">
-            All {derived?.totalPicks ?? 0} picks are in. Head to your{' '}
-            <a href="/roster" className="underline font-medium">
-              roster
-            </a>{' '}
-            to see the team you built.
-          </div>
-        </div>
+        <CompletionMomentBanner
+          totalPicks={derived?.totalPicks ?? 0}
+          topPickTeamName={null}
+          topPickPlayerName={null}
+        />
       )}
 
       {/* DR-3.1 (2026-07-29) — F8 fix: sticky on-clock action bar

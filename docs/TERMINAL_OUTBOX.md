@@ -1091,3 +1091,66 @@ MOD: docs/TERMINAL_OUTBOX.md                                         (this R24)
 Entry 13 night queue: T11 ✓ · T12 ✓. Next: **T13 (COMPLETION-MOMENT POLISH, Sleeper-gap 1, rides F28)** — scene-cup art slot in banner, one-time CSS transition, respect prefers-reduced-motion, offline render tests. Then T14 / T15 / T16.
 
 **End of R24. Timeline card lives.**
+
+---
+
+## R25 — T13 COMPLETION-MOMENT POLISH shipped (2026-08-09 03:55Z / 9:55 MT)
+
+Sleeper-gap 1 ("the moment the draft ends"). Replaces the DR-4 minimal green banner with an elevated citrus2-style completion moment.
+
+### Files authored
+
+- **`apps/web/src/components/draft/v2/CompletionMomentBanner.tsx`** (NEW, 140 lines) — self-contained banner. Includes:
+  - Scene-cup art slot with `data-completion-art-slot="scene-cup"` marker (stable swap point for the future bespoke `scene-cup-completion.webp` render).
+  - One-time CSS transition (`transition-all duration-700`) on opacity + translate-y. Uses `requestAnimationFrame` to guarantee the initial hidden frame renders before flip.
+  - `prefers-reduced-motion` respected via `window.matchMedia` with jsdom-safe try/catch fallback. `skipAnimationForTests` prop for deterministic test rendering.
+  - Top-pick line conditional: `${team} took ${player} #1 overall` if both provided; falls back to `"Rosters are set"`.
+  - Sub-copy invites screenshot: *"All {N} picks are in. Screenshot the board — it's your league's opening-day photo."*
+  - Roster CTA with default `href="/roster"` (App.tsx:184; guarded by T11b link-graph integrity test).
+  - `role="status"` + `aria-live="polite"` for screen-reader arrival announcement.
+  - DR-4 `data-testid="completed-draft-banner"` preserved so any DR-4-era tests continue to bind.
+  - `data-completion-controls-disabled="true"` contract exposed for E2E to assert pick/queue controls are removed at completion (contract at DraftRoomV2; the parent's render tree removes them when `derived?.draftStatus === 'completed'`).
+
+- **`apps/web/src/components/draft/v2/__tests__/CompletionMomentBanner.test.tsx`** (NEW, 130 lines) — **12/12 pass** in ~58ms. Coverage:
+  - DR-4 `data-testid` + controls-disabled contract preserved.
+  - Art slot present with stable marker + decorative alt="".
+  - Top-pick line renders when both name fields provided.
+  - Fallback to "Rosters are set" when only team / neither / both null.
+  - Total-picks count in sub-copy.
+  - Roster CTA href default `/roster` and custom-href override.
+  - `prefers-reduced-motion` mode initializes `shown=true` (no animation frame needed).
+  - `skipAnimationForTests` bypass without matchMedia mock.
+  - `role="status"` + `aria-live="polite"` a11y contract.
+
+- **`apps/web/src/pages/DraftRoomV2.tsx`** — imports `CompletionMomentBanner`, replaces the inline DR-4 block. Comment cites T13 + App.tsx:184 route + T11a link-graph guard. Passes `totalPicks={derived?.totalPicks ?? 0}` and `topPickTeamName={null}` / `topPickPlayerName={null}` for now (top-pick resolution folds in with F28 canonical completion payload — deliberately left null; T13 scope was polish, not data plumbing).
+
+### Design choices (safety arguments)
+
+**Rides F28, doesn't front-run it.** Entry 13 said "rides F28"; T13 authors the polish surface but doesn't try to sneak in a draft_events read to resolve the top pick. The `topPickTeamName` / `topPickPlayerName` props are wired for the future — the banner already renders the top-pick line when they're populated. When F28's canonical completion payload lands (with `top_pick` sub-object), the parent passes those two fields through and the elevated headline lights up. Zero refactor in the banner needed.
+
+**Empty-state art slot pattern (again).** Same shape as T12: known-good asset today (`scene-cup.webp` — already exists in `public/mascots/`), stable data-* marker for the swap. Not adding a new brief to ART_GENERATION_QUEUE for T13 because the existing scene-cup is stylistically appropriate for the moment; if Garrett wants a bespoke render, one-line filename change + drop file.
+
+**CSS-only transition (no library).** Per Entry 13 verbatim: "one-time transition (CSS only, no library)". Uses Tailwind's `transition-all duration-700 ease-out` on opacity + translate-y. Two-state useState + rAF handles the mount trigger without a library.
+
+**prefers-reduced-motion handling.** Detect once on mount via `useMemo`. If reduced, `shown` initializes to `true` — no transition plays, static render arrives fully-visible. jsdom safety via try/catch on `matchMedia`.
+
+### Test / typecheck status
+
+- `npx vitest run src/components/draft/v2/__tests__/CompletionMomentBanner.test.tsx` → **12/12 pass** in ~58ms.
+- No T13-specific tsc errors (pre-existing errors elsewhere unchanged).
+
+### Files changed this cycle
+
+```
+NEW: apps/web/src/components/draft/v2/CompletionMomentBanner.tsx
+NEW: apps/web/src/components/draft/v2/__tests__/CompletionMomentBanner.test.tsx
+MOD: apps/web/src/pages/DraftRoomV2.tsx                  (import + swap inline banner)
+MOD: docs/ARCHITECT_INBOX.md                             (unchanged in this cycle; included per channel protocol if committed alongside outbox)
+MOD: docs/TERMINAL_OUTBOX.md                             (this R25)
+```
+
+### Standing by / next up
+
+Entry 13 night queue: T11 ✓ · T12 ✓ · T13 ✓. Next: **T14 (DRAFT GUIDE COMPUTATION CORE)** — pure functions in `packages/shared` for `reweightProjections` / `computeTiers` / `scarcityByPosition`, with exhaustive offline tests. NO UI, NO data fetching. KI-042 discipline: canonical numeric ids only.
+
+**End of R25. Completion moment lives.**
