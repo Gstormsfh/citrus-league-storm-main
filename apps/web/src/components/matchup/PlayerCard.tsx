@@ -306,7 +306,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                   <div className="lg:hidden flex items-center gap-1 flex-wrap">
                     {/* Opponent logo + abbrev */}
                     <div className="flex items-center gap-0.5">
-                      <img src={logoUrl} alt={opponent || ''} className="w-3.5 h-3.5 object-contain" />
+                      <img loading="lazy" decoding="async" src={logoUrl} alt={opponent || ''} className="w-3.5 h-3.5 object-contain" />
                       <span className="text-[10px] font-display font-semibold text-citrus-charcoal/60">{opPrefix} {opponent}</span>
                     </div>
                     {/* Live badge + score */}

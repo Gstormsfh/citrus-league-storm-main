@@ -179,7 +179,7 @@ export default function SigningSimulator() {
               className="w-full px-4 py-3 bg-gradient-to-r from-citrus-sage/20 to-citrus-sage/10 flex items-center gap-3 hover:from-citrus-sage/25 transition-colors"
             >
               {teamInfo ? (
-                <img src={teamInfo.logoUrl} alt={teamInfo.abbrev} className="w-8 h-8 object-contain" />
+                <img loading="lazy" decoding="async" src={teamInfo.logoUrl} alt={teamInfo.abbrev} className="w-8 h-8 object-contain" />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-citrus-sage/20 flex items-center justify-center">
                   <Shield className="w-4 h-4 text-citrus-sage/60" />
@@ -205,7 +205,7 @@ export default function SigningSimulator() {
                         selectedTeam === t.abbrev ? "border-citrus-sage bg-citrus-sage/20" : "border-transparent hover:border-citrus-sage/30"
                       )}
                     >
-                      <img src={t.logoUrl} alt={t.abbrev} className="w-6 h-6 object-contain" />
+                      <img loading="lazy" decoding="async" src={t.logoUrl} alt={t.abbrev} className="w-6 h-6 object-contain" />
                       <span className="text-[8px] font-varsity text-citrus-forest">{t.abbrev}</span>
                     </button>
                   ))}
@@ -404,7 +404,7 @@ export default function SigningSimulator() {
               <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
                 <div className="px-4 md:px-6 py-3 bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    {teamInfo && <img src={teamInfo.logoUrl} alt={teamInfo.abbrev} className="w-8 h-8 object-contain" />}
+                    {teamInfo && <img loading="lazy" decoding="async" src={teamInfo.logoUrl} alt={teamInfo.abbrev} className="w-8 h-8 object-contain" />}
                     <div>
                       <h3 className="font-varsity text-lg text-citrus-cream">{teamData.teamName}</h3>
                       <p className="text-[10px] text-citrus-sage/70 font-display">Cap Impact Analysis</p>

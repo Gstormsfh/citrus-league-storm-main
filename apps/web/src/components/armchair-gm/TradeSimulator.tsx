@@ -444,7 +444,7 @@ function TradePanel({
         className="w-full px-4 py-3 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-sage/20 border-b-2 border-citrus-sage/30 flex items-center gap-3 hover:from-citrus-sage/25 hover:to-citrus-sage/25 transition-colors"
       >
         {teamInfo && !imgErr ? (
-          <img src={teamInfo.logoUrl} alt={teamInfo.abbrev} className="w-8 h-8 object-contain" onError={() => setImgErr(true)} />
+          <img loading="lazy" decoding="async" src={teamInfo.logoUrl} alt={teamInfo.abbrev} className="w-8 h-8 object-contain" onError={() => setImgErr(true)} />
         ) : (
           <div className="w-8 h-8 rounded-full bg-citrus-sage/20 flex items-center justify-center">
             <Shield className="w-4 h-4 text-citrus-sage/60" />
@@ -474,7 +474,7 @@ function TradePanel({
                     : "border-transparent hover:border-citrus-sage/30 hover:bg-citrus-sage/5"
                 )}
               >
-                <img src={t.logoUrl} alt={t.abbrev} className="w-6 h-6 object-contain" />
+                <img loading="lazy" decoding="async" src={t.logoUrl} alt={t.abbrev} className="w-6 h-6 object-contain" />
                 <span className="text-[8px] font-varsity text-citrus-forest">{t.abbrev}</span>
               </button>
             ))}
@@ -657,7 +657,7 @@ function TradeSummaryCard({
       {/* Team header */}
       <div className="flex items-center gap-2 mb-3">
         {!imgErr ? (
-          <img src={logoUrl} alt={teamName} className="w-8 h-8 object-contain" onError={() => setImgErr(true)} />
+          <img loading="lazy" decoding="async" src={logoUrl} alt={teamName} className="w-8 h-8 object-contain" onError={() => setImgErr(true)} />
         ) : (
           <Shield className="w-8 h-8 text-citrus-sage/50" />
         )}

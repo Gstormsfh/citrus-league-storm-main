@@ -1481,9 +1481,11 @@ const FreeAgents = () => {
                                         return (
                                           <div key={idx} className="flex items-center gap-0.5 bg-white/5 ring-1 ring-white/10 rounded px-1 py-0.5">
                                             <span className="text-[10px] text-white/55">{isHome ? 'vs' : '@'}</span>
-                                            <img 
+                                            <img
                                               src={`https://assets.nhle.com/logos/nhl/svg/${opponentAbbrev}_light.svg`}
                                               alt={opponentAbbrev}
+                                              loading="lazy"
+                                              decoding="async"
                                               className="w-4 h-4"
                                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                             />
@@ -1547,9 +1549,11 @@ const FreeAgents = () => {
                                           return (
                                             <div key={idx} className="flex items-center gap-0.5 bg-white/5 ring-1 ring-white/10 rounded px-1.5 py-0.5">
                                               <span className="text-[10px] text-white/55">{isHome ? 'vs' : '@'}</span>
-                                              <img 
+                                              <img
                                                 src={`https://assets.nhle.com/logos/nhl/svg/${opponentAbbrev}_light.svg`}
                                                 alt={opponentAbbrev}
+                                                loading="lazy"
+                                                decoding="async"
                                                 className="w-5 h-5"
                                                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                               />
@@ -2030,9 +2034,11 @@ const FreeAgents = () => {
                                                  }`}
                                                  title={`${isHome ? 'vs' : '@'} ${opponent} - ${gameDateStr}`}
                                                >
-                                                 <img 
+                                                 <img
                                                    src={`https://assets.nhle.com/logos/nhl/svg/${opponent.toUpperCase()}_light.svg`}
                                                    alt={opponent}
+                                                   loading="lazy"
+                                                   decoding="async"
                                                    className="w-4 h-4 object-contain"
                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                                                  />

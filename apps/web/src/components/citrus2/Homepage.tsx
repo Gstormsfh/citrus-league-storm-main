@@ -88,7 +88,7 @@ const STORMY_EXCHANGE = {
 function SceneVisual({ src, alt }: { src: string; alt: string }) {
   return (
     <div className="relative w-full aspect-square max-w-[480px] mx-auto rounded-3xl overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
-      <img src={src} alt={alt} className="w-full h-full object-cover" loading="eager" />
+      <img loading="lazy" decoding="async" src={src} alt={alt} className="w-full h-full object-cover" loading="eager" />
     </div>
   );
 }

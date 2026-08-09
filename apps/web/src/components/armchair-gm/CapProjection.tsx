@@ -136,7 +136,7 @@ export default function CapProjection() {
           className="w-full px-4 py-3 bg-gradient-to-r from-citrus-sage/20 to-citrus-sage/10 flex items-center gap-3 hover:from-citrus-sage/25 transition-colors"
         >
           {teamInfo ? (
-            <img src={teamInfo.logoUrl} alt={teamInfo.abbrev} className="w-8 h-8 object-contain" />
+            <img loading="lazy" decoding="async" src={teamInfo.logoUrl} alt={teamInfo.abbrev} className="w-8 h-8 object-contain" />
           ) : (
             <div className="w-8 h-8 rounded-full bg-citrus-sage/20 flex items-center justify-center">
               <Shield className="w-4 h-4 text-citrus-sage/60" />
@@ -165,7 +165,7 @@ export default function CapProjection() {
                       : "border-transparent hover:border-citrus-sage/30"
                   )}
                 >
-                  <img src={t.logoUrl} alt={t.abbrev} className="w-6 h-6 object-contain" />
+                  <img loading="lazy" decoding="async" src={t.logoUrl} alt={t.abbrev} className="w-6 h-6 object-contain" />
                   <span className="text-[7px] font-varsity text-citrus-forest">{t.abbrev}</span>
                 </button>
               ))}

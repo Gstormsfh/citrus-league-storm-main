@@ -357,7 +357,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
             {/* Team logo / player avatar */}
             <div className="w-16 h-16 flex-shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm border-2 border-white/20 flex items-center justify-center overflow-hidden shadow-lg">
               {!imgErr ? (
-                <img src={teamLogoUrl} alt={teamAbbr} className="w-12 h-12 object-contain" onError={() => setImgErr(true)} />
+                <img loading="lazy" decoding="async" src={teamLogoUrl} alt={teamAbbr} className="w-12 h-12 object-contain" onError={() => setImgErr(true)} />
               ) : (
                 <span className="text-2xl font-varsity font-black text-white/80">{player.number}</span>
               )}

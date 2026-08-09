@@ -72,9 +72,11 @@ export const PlayerCard = ({ player, onClick, draggable = true, className }: Pla
       onClick={onClick}
     >
       <div className="aspect-square relative">
-        <img 
-          src={player.image} 
-          alt={player.name} 
+        <img
+          src={player.image}
+          alt={player.name}
+          loading="lazy"
+          decoding="async"
           className="object-cover w-full h-full"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-citrus-forest/90 via-citrus-forest/40 to-transparent flex flex-col justify-end p-3">

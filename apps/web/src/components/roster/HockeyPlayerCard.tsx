@@ -412,9 +412,11 @@ const HockeyPlayerCardContent = ({
         {/* Team Logo - GREEN VARSITY BADGE */}
         <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-citrus-sage/20 to-citrus-sage/10 rounded-xl shadow-varsity p-1 border-2 border-citrus-sage relative before:content-[''] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-br before:from-transparent before:to-citrus-sage/20 hover:border-[#7CB518] hover:shadow-[0_0_12px_rgba(124,181,24,0.5)] transition-all">
            {!imageError ? (
-             <img 
-               src={teamLogoUrl} 
-               alt={teamAbbr} 
+             <img
+               src={teamLogoUrl}
+               alt={teamAbbr}
+               loading="lazy"
+               decoding="async"
                className="w-full h-full object-contain"
                onError={() => setImageError(true)}
              />

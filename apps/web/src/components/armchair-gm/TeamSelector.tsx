@@ -191,7 +191,7 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
                   )}
                 >
                   <span className="text-[9px] sm:text-[10px] text-citrus-charcoal/50 font-display font-semibold text-center">{i + 1}</span>
-                  <img src={info?.logoUrl || ''} alt={team.teamAbbrev} className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
+                  <img loading="lazy" decoding="async" src={info?.logoUrl || ''} alt={team.teamAbbrev} className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
                   <div className="min-w-0">
                     <span className="font-display font-bold text-[10px] sm:text-xs text-citrus-forest truncate block">{team.teamName}</span>
                     <div className="h-1 mt-0.5 sm:mt-1 bg-citrus-cream rounded-full overflow-hidden">
