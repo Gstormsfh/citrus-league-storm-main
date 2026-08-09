@@ -1892,3 +1892,86 @@ MOD: docs/TERMINAL_OUTBOX.md                        (this R37)
 S-2 complete under HARD GUARD (42 a11y touches in DraftLobby; v2 subtree already clean; 4 judgment calls docketed). Next up per Entry 21 section order: **S-3 League home/dashboard** (incl. new timeline card's integration polish). 90-min time-box. Will begin immediately.
 
 **End of R37. HARD GUARD honored; 42 a11y touches; v2 subtree verified already-clean; 4 dockets.**
+
+---
+
+## R38 — Entry 21 S-3 (League dashboard + timeline card) perfection report (2026-08-09 13:15Z / 7:15 MT)
+
+Entry 21 S-3 executed. Time-box ~10min (efficient — LeagueTimelineCard was already clean from T12).
+
+### Files audited
+
+- `apps/web/src/pages/LeagueDashboard.tsx` (~1800 lines) — the league home / dashboard page.
+- `apps/web/src/components/dashboard/LeagueTimelineCard.tsx` (~250 lines) — new timeline card from T12.
+
+### States matrix (P-a flow audit)
+
+| Component | Loading | Empty | Error | Success | Notes |
+|---|---|---|---|---|---|
+| LeagueDashboard.tsx | ✅ Loader2 spinner on initial fetch | ✅ "No teams found" section (line 1691) | ✅ "Error loading league" branch + retry button | ✅ league summary + teams list + timeline | Extensive commissioner + non-commissioner branches; async settings save, refresh_scores, refresh_matchups, join code copy all have loading/success/error |
+| LeagueTimelineCard.tsx | ✅ "Loading…" text | ✅ Mascot art slot + "Quiet on the ice" copy | ✅ silent fallback (matchups fail treated as empty per Sleeper-calm design) | ✅ ordered list of items | All 4 states already polished at T12 |
+
+**All four states covered on both S-3 surfaces.** No missing state authoring needed.
+
+### Fixes authored — aria-hidden ONLY
+
+**LeagueDashboard.tsx: 35 aria-hidden additions.** Before: 4 aria-hidden (from earlier chunks). After: 39 total.
+
+Lucide icons touched (via `replace_all=true` on unique className strings):
+- `<Loader2>` × 4 (h-8/animate-spin, mr-2/h-4/animate-spin, mr-2/h-4/animate-spin — dup, h-4/animate-spin/mx-auto)
+- `<Crown>` × 1, `<Settings>` × 2 (mr-2, h-5/text-orange)
+- `<Clock>` × 2 (h-4, h-5/text-orange)
+- `<RefreshCw>` × 2 (h-4, mr-2/h-4)
+- `<Trophy>` × 1, `<Shield>` × 1, `<Layers>` × 1
+- `<Play>` × 3 (h-4, h-5/text-orange, mr-2/h-4)
+- `<ArrowLeftRight>` × 1
+- `<UserPlus>` × 1, `<Copy>` × 2 (h-4, h-3.5/mr-1.5), `<Mail>` × 1
+
+Custom hockey icons touched:
+- `<CupIcon>` × 2 (w-3.5, mr-2/h-4)
+- `<CrossedSticksIcon>` × 2 (h-3.5, h-5/text-orange)
+- `<ScoreboardIcon>` × 2 (h-3.5, mr-2/h-4)
+- `<PuckIcon>` × 1, `<RangeIcon>` × 1
+
+**Verified via `grep -c "aria-hidden"`**: 39 total (was 4 pre-fix; 35 added).
+
+### LeagueTimelineCard.tsx — VERIFIED already clean (no changes needed)
+
+Grep for `aria-hidden|<img|from 'lucide-react'` shows:
+- `<img aria-hidden="true">` — art slot (already correct at T12 author).
+- `<span aria-hidden="true">` — glyph icon in each timeline row (already correct at T12).
+- No lucide imports (uses emoji glyphs `⭐＋－🏒` mapped by kind).
+
+Zero touch needed. T12's authoring anticipated a11y hygiene.
+
+### Judgment calls DOCKETED
+
+Per P-e discipline — the following were surfaced but NOT authored (require architect input or Sunday UX walk):
+
+1. **Timeline card `draftCompletedAt` still uses `league.updated_at` approximation** — task #85 already docketed for canonical draft_events last-event timestamp read post-T7-close. No S-3 action.
+2. **LeagueDashboard.tsx guest-mode branches** — verify the "No teams found" empty state renders cleanly for a guest (unlikely to reach dashboard as guest, but worth confirming). Docket for browser walk.
+3. **Copy: "This week's matchup" link at line 1750** — no leagueId context in the URL `/matchup`. Route table allows both `/matchup` and `/matchup/:leagueId/:weekId?`; the bare `/matchup` fallback triggers the useEffect that syncs the URL against the active league. Correct behavior but the sr-only announcement could be more specific. Docket for Sunday UX walk (T11c label-honesty follow-up territory).
+4. **`RefreshCw` icon on Refresh Scores / Refresh Matchups buttons** — the icons are accompanied by "Refresh" or "Regen" text label already; aria-hidden added. Consider adding `aria-busy` when the button is loading (aria-live for status announcement). Docket as a11y v2 polish — outside "polish is the scope" per P-d.
+
+### Tests / typecheck status
+
+- `npx tsc -p tsconfig.app.json --noEmit` filtered for S-3 files: **zero errors introduced**.
+- No new tests needed (aria-hidden is a static-attribute addition; existing renders unchanged).
+
+### Files changed this cycle
+
+```
+MOD: apps/web/src/pages/LeagueDashboard.tsx   (35 aria-hidden additions on decorative icons)
+MOD: docs/TERMINAL_OUTBOX.md                  (this R38)
+```
+
+**Zero LeagueTimelineCard changes** (verified already clean).
+**Zero logic changes.**
+
+### Standing by / next up
+
+S-3 complete (35 a11y touches on LeagueDashboard; timeline card verified already-clean at T12; 4 judgment calls docketed).
+
+Next up per Entry 21 section order: **S-4 Roster / Squad**. Time-box: 90min. Will begin immediately.
+
+**End of R38. 35 a11y touches; timeline verified already-clean; 4 dockets.**

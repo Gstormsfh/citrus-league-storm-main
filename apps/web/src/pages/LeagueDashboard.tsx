@@ -601,7 +601,7 @@ const LeagueDashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" />
       </div>
     );
   }
@@ -652,7 +652,7 @@ const LeagueDashboard = () => {
             <div className="flex items-center justify-between mb-4 gap-3">
               <div className="min-w-0">
                 <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 flex items-center gap-2">
-                  <CupIcon className="w-3.5 h-3.5" strokeWidth={2} />
+                  <CupIcon className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
                   ✦ League HQ
                 </div>
                 <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none mb-3 truncate">{league.name}</h1>
@@ -674,7 +674,7 @@ const LeagueDashboard = () => {
                   })()}
                   {isCommissioner && (
                     <Badge className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft border-0 flex items-center gap-1 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold">
-                      <Crown className="h-3 w-3" />
+                      <Crown className="h-3 w-3" aria-hidden="true" />
                       Commissioner
                     </Badge>
                   )}
@@ -688,7 +688,7 @@ const LeagueDashboard = () => {
                         variant="outline"
                         className="bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold shrink-0"
                       >
-                        <Settings className="mr-2 h-4 w-4" />
+                        <Settings className="mr-2 h-4 w-4" aria-hidden="true" />
                         League Settings
                       </Button>
                     </DialogTrigger>
@@ -698,7 +698,7 @@ const LeagueDashboard = () => {
                           ✦ Commissioner
                         </div>
                         <DialogTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
-                          <Settings className="h-5 w-5 text-pastel-orange" />
+                          <Settings className="h-5 w-5 text-pastel-orange" aria-hidden="true" />
                           League Settings
                         </DialogTitle>
                         <DialogDescription className="text-white/55">
@@ -726,7 +726,7 @@ const LeagueDashboard = () => {
                         {/* Waiver Process Time */}
                         <div className="space-y-2">
                           <Label className="flex items-center gap-2">
-                            <Clock className="h-4 w-4" />
+                            <Clock className="h-4 w-4" aria-hidden="true" />
                             Waiver Process Time (MT)
                           </Label>
                           <Select 
@@ -753,7 +753,7 @@ const LeagueDashboard = () => {
                         {/* Waiver Period */}
                         <div className="space-y-2">
                           <Label className="flex items-center gap-2">
-                            <RefreshCw className="h-4 w-4" />
+                            <RefreshCw className="h-4 w-4" aria-hidden="true" />
                             Waiver Period (Hours)
                           </Label>
                           <Select 
@@ -777,7 +777,7 @@ const LeagueDashboard = () => {
                         {/* Waiver Type */}
                         <div className="space-y-2">
                           <Label className="flex items-center gap-2">
-                            <Trophy className="h-4 w-4" />
+                            <Trophy className="h-4 w-4" aria-hidden="true" />
                             Waiver Type
                           </Label>
                           <Select 
@@ -802,7 +802,7 @@ const LeagueDashboard = () => {
                         <div className="flex items-center justify-between">
                           <div className="space-y-0.5">
                             <Label className="flex items-center gap-2">
-                              <Shield className="h-4 w-4" />
+                              <Shield className="h-4 w-4" aria-hidden="true" />
                               Game Lock
                             </Label>
                             <p className="text-xs text-white/55">
@@ -819,7 +819,7 @@ const LeagueDashboard = () => {
                         <div className="flex items-center justify-between">
                           <div className="space-y-0.5">
                             <Label className="flex items-center gap-2">
-                              <RefreshCw className="h-4 w-4" />
+                              <RefreshCw className="h-4 w-4" aria-hidden="true" />
                               Allow Trades During Games
                             </Label>
                             <p className="text-xs text-white/55">
@@ -835,7 +835,7 @@ const LeagueDashboard = () => {
                         {/* Transaction Limits - ESPN/Yahoo/Sleeper industry standard */}
                         <div className="space-y-2">
                           <Label className="flex items-center gap-2">
-                            <Layers className="h-4 w-4" />
+                            <Layers className="h-4 w-4" aria-hidden="true" />
                             Max Adds Per Week
                           </Label>
                           <Select
@@ -863,7 +863,7 @@ const LeagueDashboard = () => {
 
                         <div className="space-y-2">
                           <Label className="flex items-center gap-2">
-                            <Layers className="h-4 w-4" />
+                            <Layers className="h-4 w-4" aria-hidden="true" />
                             Max Adds Per Season
                           </Label>
                           <Select
@@ -892,7 +892,7 @@ const LeagueDashboard = () => {
                           <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
                               <Label className="flex items-center gap-2">
-                                <Play className="h-4 w-4" />
+                                <Play className="h-4 w-4" aria-hidden="true" />
                                 Process Waivers Now
                               </Label>
                               <p className="text-xs text-white/55">
@@ -907,12 +907,12 @@ const LeagueDashboard = () => {
                             >
                               {processingWaivers ? (
                                 <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                                   Processing...
                                 </>
                               ) : (
                                 <>
-                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
                                   Process Now
                                 </>
                               )}
@@ -923,7 +923,7 @@ const LeagueDashboard = () => {
                           <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
                               <Label className="flex items-center gap-2">
-                                <RefreshCw className="h-4 w-4" />
+                                <RefreshCw className="h-4 w-4" aria-hidden="true" />
                                 Sync Rosters from Draft
                               </Label>
                               <p className="text-xs text-white/55">
@@ -938,12 +938,12 @@ const LeagueDashboard = () => {
                             >
                               {syncingRosters ? (
                                 <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                                   Syncing...
                                 </>
                               ) : (
                                 <>
-                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
                                   Sync Now
                                 </>
                               )}
@@ -1155,7 +1155,7 @@ const LeagueDashboard = () => {
                           <div className="space-y-4">
                             <div className="space-y-2">
                               <Label className="flex items-center gap-2">
-                                <ArrowLeftRight className="h-4 w-4" />
+                                <ArrowLeftRight className="h-4 w-4" aria-hidden="true" />
                                 Trade Review Type
                               </Label>
                               <Select
@@ -1357,7 +1357,7 @@ const LeagueDashboard = () => {
                             <h3 className="text-lg font-semibold">Team Rosters</h3>
                             {loadingRosterCounts ? (
                               <div className="text-center py-4">
-                                <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                                <Loader2 className="h-4 w-4 animate-spin mx-auto" aria-hidden="true" />
                                 <p className="text-sm text-white/55 mt-2">Loading roster counts...</p>
                               </div>
                             ) : (
@@ -1383,7 +1383,7 @@ const LeagueDashboard = () => {
                         <div className="space-y-3">
                           <div>
                             <Label className="text-sm font-semibold flex items-center gap-2">
-                              <UserPlus className="h-3.5 w-3.5" />
+                              <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
                               League Invite Code
                             </Label>
                           </div>
@@ -1407,7 +1407,7 @@ const LeagueDashboard = () => {
                                 }
                               }}
                             >
-                              <Copy className="h-4 w-4" />
+                              <Copy className="h-4 w-4" aria-hidden="true" />
                             </Button>
                           </div>
 
@@ -1444,7 +1444,7 @@ Your Commissioner`);
                                 }
                               }}
                             >
-                              <Mail className="h-3.5 w-3.5 mr-1.5" />
+                              <Mail className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
                               Email
                             </Button>
                             <Button
@@ -1462,7 +1462,7 @@ Your Commissioner`);
                                 }
                               }}
                             >
-                              <Copy className="h-3.5 w-3.5 mr-1.5" />
+                              <Copy className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
                               Link
                             </Button>
                           </div>
@@ -1477,7 +1477,7 @@ Your Commissioner`);
                           <Button onClick={handleSaveSettings} disabled={savingSettings}>
                             {savingSettings ? (
                               <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                                 Saving...
                               </>
                             ) : (
@@ -1499,7 +1499,7 @@ Your Commissioner`);
               <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-orange/10 rounded-full blur-3xl pointer-events-none" />
               <CardHeader className="pb-2 relative z-10">
                 <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
-                  <CrossedSticksIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                  <CrossedSticksIcon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
                   Teams
                 </CardTitle>
               </CardHeader>
@@ -1524,7 +1524,7 @@ Your Commissioner`);
               <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-sage/10 rounded-full blur-3xl pointer-events-none" />
               <CardHeader className="pb-2 relative z-10">
                 <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
-                  <ScoreboardIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                  <ScoreboardIcon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
                   Roster Size
                 </CardTitle>
               </CardHeader>
@@ -1561,9 +1561,9 @@ Your Commissioner`);
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
                     {league.draft_status === 'in_progress' ? (
-                      <><Play className="h-5 w-5 text-pastel-orange" /> Draft In Progress</>
+                      <><Play className="h-5 w-5 text-pastel-orange" aria-hidden="true" /> Draft In Progress</>
                     ) : league.scheduled_draft_time ? (
-                      <><Clock className="h-5 w-5 text-pastel-orange" /> Draft Scheduled</>
+                      <><Clock className="h-5 w-5 text-pastel-orange" aria-hidden="true" /> Draft Scheduled</>
                     ) : (
                       <><DraftIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} /> Draft Room</>
                     )}
@@ -1610,7 +1610,7 @@ Your Commissioner`);
                     } disabled:opacity-50`}
                     disabled={!leagueId}
                   >
-                    <Play className="mr-2 h-4 w-4" />
+                    <Play className="mr-2 h-4 w-4" aria-hidden="true" />
                     {league.draft_status === 'in_progress'
                       ? 'Join Draft Room'
                       : isCommissioner
@@ -1643,7 +1643,7 @@ Your Commissioner`);
                       className="w-full bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft hover:bg-pastel-sage/30 font-bold"
                     >
                       <Link to="/roster">
-                        <ScoreboardIcon className="mr-2 h-4 w-4" strokeWidth={2} /> View Roster
+                        <ScoreboardIcon className="mr-2 h-4 w-4" strokeWidth={2} aria-hidden="true" /> View Roster
                       </Link>
                     </Button>
                     <Button
@@ -1651,7 +1651,7 @@ Your Commissioner`);
                       className="w-full bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold"
                     >
                       <Link to="/gm-office">
-                        <CupIcon className="mr-2 h-4 w-4" strokeWidth={2} /> GM Office
+                        <CupIcon className="mr-2 h-4 w-4" strokeWidth={2} aria-hidden="true" /> GM Office
                       </Link>
                     </Button>
                   </div>
@@ -1680,7 +1680,7 @@ Your Commissioner`);
           <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
             <CardHeader>
               <CardTitle className="font-calistoga text-pastel-cream flex items-center gap-2">
-                <CrossedSticksIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} />
+                <CrossedSticksIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} aria-hidden="true" />
                 Teams
               </CardTitle>
               <CardDescription className="text-white/55">All teams in this league</CardDescription>
@@ -1688,7 +1688,7 @@ Your Commissioner`);
             <CardContent>
               {teams.length === 0 ? (
                 <div className="text-center py-8 text-white/55">
-                  <PuckIcon className="w-10 h-10 mx-auto mb-3 text-pastel-orange/30" strokeWidth={2} />
+                  <PuckIcon className="w-10 h-10 mx-auto mb-3 text-pastel-orange/30" strokeWidth={2} aria-hidden="true" />
                   <p>No teams found in this league.</p>
                   <p className="text-sm mt-2">Teams will appear here once they join.</p>
                 </div>
@@ -1759,7 +1759,7 @@ Your Commissioner`);
                 </div>
                 <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="flex items-center gap-2 mb-2">
-                    <RangeIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
+                    <RangeIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} aria-hidden="true" />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">League quicklinks</div>
                   </div>
                   <div className="space-y-1.5">
