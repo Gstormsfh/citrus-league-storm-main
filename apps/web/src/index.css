@@ -1758,6 +1758,23 @@ html, body {
    ACCESSIBILITY
    ========================================== */
 
+/* Entry 25 U5 (2026-08-09) — focus-visible utility for bespoke
+ * <button> / <a> elements that bypass shadcn primitives.
+ * Encodes DESIGN_DIRECTION.md rule 4 (peach family, 2px offset 2,
+ * never suppressed) as a single class so adding a new bespoke
+ * button doesn't require memorizing the ring recipe.
+ *
+ * Consumers apply .focus-citrus (or @apply focus-citrus in a
+ * component's own utility class) alongside their normal styling.
+ * Shadcn primitives already carry this via CSS-var ring-ring —
+ * this is only for elements that don't route through the primitive. */
+.focus-citrus:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #0F1F15,
+    0 0 0 4px #FFB591; /* pastel-peach-deep — matches rule 4 */
+}
+
 /* Skip-to-content link (visible on focus for keyboard users) */
 .skip-to-content {
   position: absolute;

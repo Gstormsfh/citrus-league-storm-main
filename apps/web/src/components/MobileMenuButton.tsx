@@ -123,7 +123,7 @@ const MobileMenuButton = () => {
   return (
     <>
       <button
-        className="p-2 rounded-xl text-pastel-cream active:bg-white/10 transition-colors"
+        className="focus-citrus p-2 rounded-xl text-pastel-cream active:bg-white/10 transition-colors"
         onClick={() => setMenuOpen(!menuOpen)}
         aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
         aria-expanded={menuOpen}
@@ -146,7 +146,7 @@ const MobileMenuButton = () => {
                 <span className="font-calistoga text-lg text-pastel-cream leading-none">Citrus</span>
               </Link>
               <button
-                className="p-2.5 rounded-xl text-pastel-cream active:bg-white/10 transition-colors"
+                className="focus-citrus p-2.5 rounded-xl text-pastel-cream active:bg-white/10 transition-colors"
                 onClick={closeMenu}
                 aria-label="Close menu"
               >
@@ -158,7 +158,7 @@ const MobileMenuButton = () => {
             {userLeagues.length > 0 && !leagueLoading && (
               <div className="mb-3 relative z-10">
                 <button
-                  className="flex items-center gap-3 px-3 py-2.5 bg-white/5 ring-1 ring-white/10 rounded-xl w-full active:bg-white/[0.08] transition-colors"
+                  className="focus-citrus flex items-center gap-3 px-3 py-2.5 bg-white/5 ring-1 ring-white/10 rounded-xl w-full active:bg-white/[0.08] transition-colors"
                   onClick={() => setLeagueListOpen(prev => !prev)}
                 >
                   <Trophy className="h-4 w-4 text-pastel-orange flex-shrink-0" />
@@ -180,7 +180,7 @@ const MobileMenuButton = () => {
                         <button
                           key={l.id}
                           className={cn(
-                            "flex items-center gap-3 w-full px-3 py-3 text-left active:bg-white/[0.08] transition-colors border-b border-white/10 last:border-b-0",
+                            "focus-citrus flex items-center gap-3 w-full px-3 py-3 text-left active:bg-white/[0.08] transition-colors border-b border-white/10 last:border-b-0",
                             isActive && "bg-pastel-orange/10"
                           )}
                           onClick={() => {
@@ -212,7 +212,7 @@ const MobileMenuButton = () => {
                       );
                     })}
                     <button
-                      className="flex items-center gap-3 w-full px-3 py-3 text-left active:bg-white/[0.08] transition-colors text-pastel-orange-soft font-bold"
+                      className="focus-citrus flex items-center gap-3 w-full px-3 py-3 text-left active:bg-white/[0.08] transition-colors text-pastel-orange-soft font-bold"
                       onClick={() => { navigate('/create-league'); closeMenu(); }}
                     >
                       <UserPlus className="h-4 w-4" />
@@ -271,7 +271,7 @@ const MobileMenuButton = () => {
                     <Link to="/profile" onClick={closeMenu} className="p-2 rounded-lg bg-white/5 ring-1 ring-white/10 active:bg-white/[0.08] transition-colors">
                       <CircleUser className="h-4 w-4 text-pastel-cream" />
                     </Link>
-                    <button onClick={handleSignOut} className="p-2 rounded-lg bg-red-400/15 ring-1 ring-red-400/30 active:bg-red-400/25 transition-colors" aria-label="Sign out">
+                    <button onClick={handleSignOut} className="focus-citrus p-2 rounded-lg bg-red-400/15 ring-1 ring-red-400/30 active:bg-red-400/25 transition-colors" aria-label="Sign out">
                       <LogOut className="h-4 w-4 text-red-300" />
                     </button>
                   </div>

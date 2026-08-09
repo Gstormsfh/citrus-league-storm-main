@@ -157,7 +157,7 @@ const Navbar = () => {
             {user && !leagueLoading && userLeagues.length === 0 && (
               <button
                 onClick={() => navigate('/create-league')}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/40 transition-all"
+                className="focus-citrus flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/40 transition-all"
               >
                 <UserPlus className="h-4 w-4 text-pastel-orange" />
                 <span className="text-[13px] font-bold text-pastel-cream">
@@ -174,7 +174,7 @@ const Navbar = () => {
             {userLeagues.length > 0 && !leagueLoading && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/40 transition-all">
+                  <button className="focus-citrus flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/40 transition-all">
                     <Trophy className="h-4 w-4 text-pastel-orange" />
                     <span className="text-[13px] font-bold text-pastel-cream max-w-[200px] truncate">
                       {activeLeague?.name || 'Select League'}
@@ -236,7 +236,7 @@ const Navbar = () => {
                 {/* Notifications */}
                 <button
                   onClick={() => activeLeagueId && navigate(`/matchup/${activeLeagueId}`)}
-                  className="relative p-2.5 rounded-md hover:bg-white/5 transition-colors"
+                  className="focus-citrus relative p-2.5 rounded-md hover:bg-white/5 transition-colors"
                   aria-label="Notifications"
                 >
                   <Bell className="h-5 w-5 text-white/70" />
@@ -250,7 +250,7 @@ const Navbar = () => {
                 {/* User menu */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/5 transition-colors">
+                    <button className="focus-citrus flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/5 transition-colors">
                       <div className="h-7 w-7 rounded-full bg-pastel-orange flex items-center justify-center text-white text-xs font-bold">
                         {userInitial}
                       </div>
@@ -356,7 +356,7 @@ const Navbar = () => {
           <div className="flex items-center gap-1">
             {user && (
               <button
-                className="p-3 rounded-md text-pastel-cream/80 hover:text-pastel-cream relative transition-colors"
+                className="focus-citrus p-3 rounded-md text-pastel-cream/80 hover:text-pastel-cream relative transition-colors"
                 onClick={() => activeLeagueId && navigate(`/matchup/${activeLeagueId}`)}
                 aria-label="Notifications"
               >
@@ -369,7 +369,7 @@ const Navbar = () => {
               </button>
             )}
             <button
-              className="p-3 rounded-md text-pastel-cream/80 hover:text-pastel-cream transition-colors"
+              className="focus-citrus p-3 rounded-md text-pastel-cream/80 hover:text-pastel-cream transition-colors"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
               aria-expanded={mobileMenuOpen}
@@ -389,7 +389,7 @@ const Navbar = () => {
               <div className="mb-3">
                 <button
                   onClick={() => { navigate('/create-league'); closeMobileMenu(); }}
-                  className="flex items-center gap-3 px-3 py-2.5 bg-white/5 ring-1 ring-pastel-orange/30 rounded-md w-full hover:bg-pastel-orange/10 hover:ring-pastel-orange/50 transition-all"
+                  className="focus-citrus flex items-center gap-3 px-3 py-2.5 bg-white/5 ring-1 ring-pastel-orange/30 rounded-md w-full hover:bg-pastel-orange/10 hover:ring-pastel-orange/50 transition-all"
                 >
                   <UserPlus className="h-4 w-4 text-pastel-orange flex-shrink-0" />
                   <span className="text-[13px] font-bold text-pastel-cream">
@@ -408,7 +408,7 @@ const Navbar = () => {
               <div className="mb-3">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-3 px-3 py-2.5 bg-white/5 ring-1 ring-white/10 rounded-md w-full hover:bg-white/10 hover:ring-pastel-orange/40 transition-all">
+                    <button className="focus-citrus flex items-center gap-3 px-3 py-2.5 bg-white/5 ring-1 ring-white/10 rounded-md w-full hover:bg-white/10 hover:ring-pastel-orange/40 transition-all">
                       <Trophy className="h-4 w-4 text-pastel-orange flex-shrink-0" />
                       <span className="text-[13px] font-bold text-pastel-cream truncate flex-1 text-left">
                         {activeLeague?.name || 'Select League'}
@@ -516,7 +516,7 @@ const Navbar = () => {
                     <Link to="/profile" onClick={closeMobileMenu} className="p-2 rounded-md bg-white/5 hover:bg-white/10 transition-colors">
                       <CircleUser className="h-4 w-4 text-pastel-cream" />
                     </Link>
-                    <button onClick={handleSignOut} className="p-2 rounded-md bg-red-500/10 hover:bg-red-500/20 transition-colors" aria-label="Sign out">
+                    <button onClick={handleSignOut} className="focus-citrus p-2 rounded-md bg-red-500/10 hover:bg-red-500/20 transition-colors" aria-label="Sign out">
                       <LogOut className="h-4 w-4 text-red-400" />
                     </button>
                   </div>
