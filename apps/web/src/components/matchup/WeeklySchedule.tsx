@@ -102,17 +102,17 @@ export const WeeklySchedule = ({
   return (
     <div className="w-full">
       {/* Header row with view indicator and Full Week button */}
-      <div className="flex items-center justify-between mb-1.5 md:mb-3 p-1 md:p-2 bg-gradient-to-r from-citrus-sage/10 via-citrus-cream to-citrus-peach/10 rounded-xl border-2 border-citrus-sage/30">
-        <div className="text-[9px] md:text-sm font-varsity font-bold text-citrus-forest flex items-center gap-1 md:gap-2">
+      <div className="flex items-center justify-between mb-1.5 md:mb-3 p-1 md:p-2 bg-white/5 rounded-xl ring-1 ring-white/10">
+        <div className="text-[9px] md:text-sm font-varsity font-bold text-pastel-cream flex items-center gap-1 md:gap-2">
           {selectedDate ? (
             <span className="flex items-center gap-1 md:gap-2">
-              <CitrusSparkle className="w-3 h-3 md:w-4 md:h-4 text-citrus-orange" />
+              <CitrusSparkle className="w-3 h-3 md:w-4 md:h-4 text-pastel-orange" aria-hidden="true" />
               <span className="text-[9px] md:text-xs uppercase tracking-wide">Viewing:</span>
-              <span className="text-citrus-orange">{formatDateLabel(selectedDate)}</span>
+              <span className="text-pastel-orange">{formatDateLabel(selectedDate)}</span>
             </span>
           ) : (
             <span className="flex items-center gap-1 md:gap-2">
-              <CitrusSparkle className="w-3 h-3 md:w-4 md:h-4 text-citrus-orange" />
+              <CitrusSparkle className="w-3 h-3 md:w-4 md:h-4 text-pastel-orange" aria-hidden="true" />
               <span className="text-[9px] md:text-xs uppercase tracking-wide">Week Overview</span>
             </span>
           )}
@@ -120,12 +120,12 @@ export const WeeklySchedule = ({
         {selectedDate && (
           <button
             onClick={() => onDayClick(null)}
-            className="px-2 py-1 md:px-3 md:py-1.5 text-[9px] md:text-xs font-varsity font-bold uppercase rounded-xl 
-              bg-citrus-sage/20 hover:bg-citrus-sage 
-              text-citrus-forest border-2 border-citrus-sage hover:text-[#E8EED9]
-              transition-all flex items-center gap-1 shadow-sm hover:shadow-patch hover:-translate-y-0.5"
+            className="focus-citrus px-2 py-1 md:px-3 md:py-1.5 text-[9px] md:text-xs font-varsity font-bold uppercase rounded-xl
+              bg-pastel-sage/15 hover:bg-pastel-sage/25
+              text-pastel-cream ring-1 ring-pastel-sage/40
+              transition-all flex items-center gap-1 shadow-sm hover:-translate-y-0.5"
           >
-            <span>←</span>
+            <span aria-hidden="true">←</span>
             <span>Full Week</span>
           </button>
         )}
@@ -144,39 +144,38 @@ export const WeeklySchedule = ({
           return (
             <Card
               key={date}
+              data-today={isTodayDate ? 'true' : undefined}
+              data-selected={isSelectedDate ? 'true' : undefined}
               className={cn(
-                "cursor-pointer transition-all hover:shadow-patch hover:-translate-y-1 border-3 rounded-xl overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm",
-                isSelectedDate && "ring-4 ring-citrus-sage shadow-varsity border-citrus-sage",
-                isTodayDate && !isSelectedDate && "ring-3 ring-citrus-orange border-citrus-orange",
-                !isSelectedDate && !isTodayDate && "border-citrus-sage/40",
+                "cursor-pointer transition-all hover:-translate-y-0.5 rounded-xl overflow-hidden bg-[#1A2A20]",
+                isSelectedDate && "ring-2 ring-pastel-sage shadow-[0_8px_24px_-8px_rgba(132,165,125,0.4)]",
+                isTodayDate && !isSelectedDate && "ring-2 ring-pastel-orange",
+                !isSelectedDate && !isTodayDate && "ring-1 ring-white/10",
                 isPastDate && "opacity-75"
               )}
               onClick={() => onDayClick(date)}
             >
               <CardContent className="p-1 md:p-2 relative">
-                {/* Subtle corduroy texture */}
-                <div className="absolute inset-0 opacity-10 corduroy-texture pointer-events-none"></div>
-                
                 <div className="flex flex-col items-center gap-0.5 md:gap-1 relative z-10">
                   {/* Day Label - Ultra Compact */}
                   <div className={cn(
                     "text-[8px] md:text-[10px] font-varsity font-black uppercase tracking-wider leading-none",
-                    isTodayDate ? "text-citrus-orange" : "text-citrus-charcoal"
+                    isTodayDate ? "text-pastel-orange" : "text-white/55"
                   )}>
                     {formatDayLabel(date)}
                   </div>
 
                   {/* Date - Compact */}
                   <div className={cn(
-                    "text-[9px] md:text-xs font-varsity font-bold leading-tight",
-                    isTodayDate ? "text-citrus-orange" : "text-citrus-forest"
+                    "text-[9px] md:text-xs font-varsity font-bold leading-tight tabular-nums",
+                    isTodayDate ? "text-pastel-orange" : "text-pastel-cream"
                   )}>
                     {formatDateLabel(date)}
                   </div>
 
                   {/* Status Indicator - Minimal */}
                   {isTodayDate && !isPastDate && (
-                    <Badge variant="default" className="text-[6px] md:text-[8px] py-0 md:py-0.5 px-1 md:px-1.5 h-3 md:h-4 bg-citrus-orange border-2 border-citrus-forest text-[#E8EED9] leading-none font-varsity font-bold shadow-sm">
+                    <Badge variant="default" className="text-[6px] md:text-[8px] py-0 md:py-0.5 px-1 md:px-1.5 h-3 md:h-4 bg-pastel-orange text-[#581E00] leading-none font-varsity font-bold shadow-sm border-0">
                       Today
                     </Badge>
                   )}
@@ -185,29 +184,29 @@ export const WeeklySchedule = ({
                   {!hideScores && (
                     <div className="w-full mt-1 md:mt-1.5 space-y-0.5 md:space-y-1">
                       {/* Team 1 */}
-                      <div className="flex flex-col gap-0 md:gap-0.5 p-0.5 md:p-1 bg-citrus-sage/10 rounded-md border border-citrus-sage/30">
-                        <div className="text-[7px] md:text-[8px] font-display font-semibold text-citrus-charcoal leading-tight line-clamp-1 text-center px-0.5" title={team1Name || 'My Team'}>
+                      <div className="flex flex-col gap-0 md:gap-0.5 p-0.5 md:p-1 bg-white/5 rounded-md ring-1 ring-white/10">
+                        <div className="text-[7px] md:text-[8px] font-display font-semibold text-white/55 leading-tight line-clamp-1 text-center px-0.5" title={team1Name || 'My Team'}>
                           {team1Name || 'My'}
                         </div>
                         <div className={cn(
-                          "text-[10px] md:text-sm font-varsity font-black text-center leading-tight",
-                          myDailyPointsForDay !== undefined && myDailyPointsForDay > 0 ? "text-citrus-forest" : "text-citrus-charcoal/50"
+                          "text-[10px] md:text-sm font-varsity font-black text-center leading-tight tabular-nums",
+                          myDailyPointsForDay !== undefined && myDailyPointsForDay > 0 ? "text-pastel-cream" : "text-white/35"
                         )}>
                           {myDailyPointsForDay !== undefined ? myDailyPointsForDay.toFixed(1) : '-'}
                         </div>
                       </div>
-                      
+
                       {/* Divider - Subtle */}
-                      <div className="h-[1px] bg-citrus-sage/20 w-full"></div>
-                      
+                      <div aria-hidden="true" className="h-[1px] bg-white/10 w-full"></div>
+
                       {/* Team 2 */}
-                      <div className="flex flex-col gap-0 md:gap-0.5 p-0.5 md:p-1 bg-citrus-peach/10 rounded-md border border-citrus-peach/30">
-                        <div className="text-[7px] md:text-[8px] font-display font-semibold text-citrus-charcoal leading-tight line-clamp-1 text-center px-0.5" title={team2Name || 'Opponent'}>
+                      <div className="flex flex-col gap-0 md:gap-0.5 p-0.5 md:p-1 bg-white/5 rounded-md ring-1 ring-white/10">
+                        <div className="text-[7px] md:text-[8px] font-display font-semibold text-white/55 leading-tight line-clamp-1 text-center px-0.5" title={team2Name || 'Opponent'}>
                           {team2Name || 'Opp'}
                         </div>
                         <div className={cn(
-                          "text-[10px] md:text-sm font-varsity font-black text-center leading-tight",
-                          oppDailyPointsForDay !== undefined && oppDailyPointsForDay > 0 ? "text-red-700" : "text-citrus-charcoal/50"
+                          "text-[10px] md:text-sm font-varsity font-black text-center leading-tight tabular-nums",
+                          oppDailyPointsForDay !== undefined && oppDailyPointsForDay > 0 ? "text-pastel-cream" : "text-white/35"
                         )}>
                           {oppDailyPointsForDay !== undefined ? oppDailyPointsForDay.toFixed(1) : '-'}
                         </div>
