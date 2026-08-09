@@ -555,7 +555,7 @@ export default function PoolPlayoffHub() {
                             <div key={g.game_id} className={cn(
                               'relative rounded-xl border-2 overflow-hidden bg-white transition-all',
                               isLive && 'border-red-400 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]',
-                              isFinal && 'border-pastel-sage/40/30',
+                              isFinal && 'border-pastel-sage/30',
                               !isLive && !isFinal && 'border-pastel-sage/40/20'
                             )}>
                               {/* Team-colored header with score */}
@@ -619,7 +619,7 @@ export default function PoolPlayoffHub() {
                               {/* Your players in this game */}
                               <div className="p-3 space-y-1.5">
                                 <div className="flex items-center justify-between mb-1 pb-1 border-b border-pastel-sage/40/10">
-                                  <span className="text-[10px] uppercase font-display font-bold text-white/70/50 tracking-wider">
+                                  <span className="text-[10px] uppercase font-display font-bold text-white/50 tracking-wider">
                                     Your Players ({g.myPlayers.length})
                                   </span>
                                   {hasGameData && (
@@ -665,7 +665,7 @@ export default function PoolPlayoffHub() {
                           );
                         })}
                         {gamesWithMyPlayers.length === 0 && rosterCtx.length > 0 && (
-                          <div className="col-span-full text-center text-sm text-white/70/50 italic py-6 border border-dashed border-pastel-sage/40/30 rounded-lg">
+                          <div className="col-span-full text-center text-sm text-white/50 italic py-6 border border-dashed border-pastel-sage/30 rounded-lg">
                             None of your rostered players have games today. Check back tomorrow!
                           </div>
                         )}
@@ -812,7 +812,7 @@ export default function PoolPlayoffHub() {
                             !isFinal && pick && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/8',
                             !pick && 'border-2 border-dashed border-white/15 bg-white/5'
                           )}>
-                            <span className="text-[9px] font-mono text-white/70/50 w-8">{roundName}-{String.fromCharCode(64 + s.bracket_slot)}</span>
+                            <span className="text-[9px] font-mono text-white/50 w-8">{roundName}-{String.fromCharCode(64 + s.bracket_slot)}</span>
                             {pick && pickedInfo ? (
                               <>
                                 <div
@@ -847,12 +847,12 @@ export default function PoolPlayoffHub() {
               )}
 
               {/* Leaderboard — members + live standings in ONE table */}
-              <Card className="border-pastel-sage/40/30">
+              <Card className="border-pastel-sage/30">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Trophy className="h-4 w-4 text-pastel-orange" aria-hidden="true" />
                     Leaderboard
-                    <span className="text-[10px] text-white/70/50 font-normal ml-auto">
+                    <span className="text-[10px] text-white/50 font-normal ml-auto">
                       {teams.length} {teams.length === 1 ? 'member' : 'members'} · updates every 60s
                     </span>
                   </CardTitle>
@@ -894,7 +894,7 @@ export default function PoolPlayoffHub() {
                                   )}
                                   onClick={isRosterPool ? () => navigate(`/pool/playoff-roster?league=${leagueId}&view=${t.owner_id}`) : undefined}
                                 >
-                                  <td className="px-3 py-2 text-xs font-mono text-white/70/50 tabular-nums">
+                                  <td className="px-3 py-2 text-xs font-mono text-white/50 tabular-nums">
                                     {i === 0 ? <span className="text-pastel-orange text-base">🏆</span> : i + 1}
                                   </td>
                                   <td className="px-3 py-2 text-sm">
@@ -938,13 +938,13 @@ export default function PoolPlayoffHub() {
                   <CardTitle className="text-sm font-display">Invite Friends</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="text-[10px] uppercase font-display text-white/70/50">Join Code</div>
+                  <div className="text-[10px] uppercase font-display text-white/50">Join Code</div>
                   <button
                     onClick={copyJoinCode}
                     className="w-full flex items-center justify-between p-2 rounded ring-1 ring-pastel-sage/30 bg-pastel-sage/8 hover:bg-pastel-sage/15 transition-colors"
                   >
                     <span className="text-lg font-mono font-bold text-pastel-cream tracking-wider">{league.join_code}</span>
-                    {copied ? <Check className="h-4 w-4 text-green-600" aria-hidden="true" /> : <Copy className="h-4 w-4 text-white/70/50" aria-hidden="true" />}
+                    {copied ? <Check className="h-4 w-4 text-green-600" aria-hidden="true" /> : <Copy className="h-4 w-4 text-white/50" aria-hidden="true" />}
                   </button>
 
                   <div className="pt-2 grid grid-cols-1 gap-1.5">

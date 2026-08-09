@@ -140,14 +140,14 @@ const PoolSurvivor = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 sticky top-[92px] z-30 bg-[#0F1F15]/95 backdrop-blur-md py-2 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
             <div className="flex items-center gap-2">
               <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
+                <Button variant="ghost" size="icon" aria-label="Previous week" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
                   <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </Button>
                 <div className="px-3 text-center border-x border-white/10">
                   <div className="text-[9px] font-jbmono text-white/45 uppercase tracking-widest leading-none">Week</div>
                   <div className="text-base font-bold text-pastel-cream leading-none tabular-nums">{currentWeek}</div>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
+                <Button variant="ghost" size="icon" aria-label="Next week" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
                   <ChevronRight className="w-4 h-4" aria-hidden="true" />
                 </Button>
               </div>

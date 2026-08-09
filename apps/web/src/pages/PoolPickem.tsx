@@ -361,14 +361,14 @@ const PoolPickem = () => {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
-                <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
+                <Button variant="ghost" size="icon" aria-label="Previous week" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
                   <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </Button>
                 <div className="px-2 sm:px-3 text-center border-x border-white/10">
                   <div className="text-[8px] sm:text-[9px] font-jbmono text-white/45 uppercase tracking-widest leading-none">Week</div>
                   <div className="text-base sm:text-lg font-bold text-pastel-cream leading-none tabular-nums">{currentWeek}</div>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
+                <Button variant="ghost" size="icon" aria-label="Next week" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
                   <ChevronRight className="w-4 h-4" aria-hidden="true" />
                 </Button>
               </div>
