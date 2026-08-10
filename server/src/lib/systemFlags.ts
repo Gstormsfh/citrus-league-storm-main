@@ -90,11 +90,14 @@ export async function readSystemFlag(
     cache.set(flagName, { value, fetchedAt: now });
     return value;
   } catch (err) {
-    structuredLogger.warn(
-      'system_flags.read_threw',
-      { flagName, usingCached: cached !== undefined },
-      err,
-    );
+    // Docket #22 promotes to fix (Entry 64 gate strict): the shared
+    // structuredLogger.warn takes (event, context?) only. Merge the
+    // error into context rather than passing a 3rd arg.
+    structuredLogger.warn('system_flags.read_threw', {
+      flagName,
+      usingCached: cached !== undefined,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return cached?.value ?? false;
   }
 }

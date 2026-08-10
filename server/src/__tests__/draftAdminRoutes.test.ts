@@ -25,7 +25,7 @@ vi.mock('../middleware/auth', () => ({
 interface MockRegistry {
   evictResult: { connectionsClosed: number } | null;
   forceSnapshotResult: { scheduled: boolean } | null;
-  diagnostic: ReturnType<NonNullable<unknown> & { __t?: never }> | unknown;
+  diagnostic: unknown;
   getDiagnosticInfo: () => {
     lobbyId: string;
     leagueId: string;
@@ -175,7 +175,7 @@ function buildApp(
   app.route('/api/admin', routes);
   return {
     app,
-    sentReq: (path: string, init?: RequestInit) =>
+    sentReq: async (path: string, init?: RequestInit) =>
       app.request(path, {
         headers: { Authorization: 'Bearer test-token' },
         ...init,

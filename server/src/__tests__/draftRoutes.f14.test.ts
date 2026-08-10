@@ -42,7 +42,11 @@ vi.mock('../middleware/auth', () => ({
 // Supabase mocking — controls what checkMembership() and
 // getUserTeamIdFresh() observe.
 let currentOwnedTeamId: string | null = 'old-team-uuid';
-let mockUserClientRpc: ReturnType<typeof vi.fn>;
+// Entry 64 gate strict: vitest 4's `ReturnType<typeof vi.fn>` widens
+// to `Mock<Procedure | Constructable>` which is no longer callable
+// without `new`. Explicit callable signature restores type-safety.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let mockUserClientRpc: ReturnType<typeof vi.fn<(...args: any[]) => Promise<any>>>;
 
 function makeFromChain(terminal: any = { data: null, error: null }): any {
   const chain: any = {};

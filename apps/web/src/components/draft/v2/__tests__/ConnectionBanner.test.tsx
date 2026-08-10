@@ -155,7 +155,7 @@ describe('ConnectionBanner — reconnecting state', () => {
 });
 
 describe('ConnectionBanner — fatal states', () => {
-  it('renders auth_failure banner with "Return to dashboard" link', () => {
+  it('renders auth_failure banner with "Sign in again" link (T11a link fix 2026-08-09)', () => {
     setStateTo({
       kind: 'fatal',
       reason: 'auth_failure',
@@ -164,13 +164,15 @@ describe('ConnectionBanner — fatal states', () => {
     renderBanner();
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByText(/no longer authorized/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Return to dashboard/i })).toHaveAttribute(
+    // T11a link fix: /dashboard route doesn't exist; auth_failure users
+    // need to sign in again → link to /auth directly.
+    expect(screen.getByRole('link', { name: /Sign in again/i })).toHaveAttribute(
       'href',
-      '/dashboard',
+      '/auth',
     );
   });
 
-  it('renders invalid_lobby banner with "Back to dashboard" link', () => {
+  it('renders invalid_lobby banner with "Back to GM Office" link (T11a link fix 2026-08-09)', () => {
     setStateTo({
       kind: 'fatal',
       reason: 'invalid_lobby',
@@ -178,7 +180,13 @@ describe('ConnectionBanner — fatal states', () => {
     });
     renderBanner();
     expect(screen.getByText(/no longer available/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Back to dashboard/i })).toBeInTheDocument();
+    // T11a link fix: /dashboard route doesn't exist; invalid_lobby users
+    // are authenticated → link to /gm-office (closest existing "dashboard"
+    // route; ProtectedRoute redirects to /auth if session expired).
+    expect(screen.getByRole('link', { name: /Back to GM Office/i })).toHaveAttribute(
+      'href',
+      '/gm-office',
+    );
   });
 
   it('renders permanent_server_error banner with DR-4 honest copy (no auto-retry promise)', () => {
