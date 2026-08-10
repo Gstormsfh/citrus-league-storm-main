@@ -127,8 +127,8 @@ const LeagueDashboard = () => {
         if ((leagueError as Error).message?.includes('Access denied') || (leagueError as Error).message?.includes('not a member')) {
           navigate('/gm-office');
           toast({
-            title: "Access Denied",
-            description: "You are not a member of this league.",
+            title: "Wrong League",
+            description: "This one's not on your list — check the invite link or pick one from GM Office.",
             variant: "destructive"
           });
           return;
@@ -226,7 +226,7 @@ const LeagueDashboard = () => {
       const { team: userTeamData } = await LeagueService.getUserTeam(leagueId, user.id);
       setUserTeam(userTeamData);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load league data');
+      setError(err instanceof Error ? err.message : "Couldn't load the league — refresh to try again.");
     } finally {
       setLoading(false);
     }
