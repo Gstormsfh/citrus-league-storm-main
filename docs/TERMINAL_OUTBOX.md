@@ -4776,3 +4776,69 @@ Rev-list re-check after push: `origin/master...origin/phase-4-5-implementation �
 **Terminal is READY.** Garrett pastes the 4-line block; production deploy fires from master; playoff-sync patch lands live (skip UI disable). Standing by for the push-succeeded signal or any Garrett/architect follow-up.
 
 **End of R87. Entry 57 EXECUTED. Absorb commit 4d69541f pushed. 39 conflicts resolved by doctrine. Full gate green (87/87 vitest · 158 tsc ≤159 baseline · server tsc unchanged · build ✓ · U9/U9b survivals · test locks). Garrett's paste is 4 trivial lines.**
+
+---
+
+## R88 — CI-#1440 diagnosed + fixed + branch pushed · Entry 63 executed (2026-08-10 17:32Z / 11:32 AM MT)
+
+# ⚡ GARRETT: PASTE THIS TO REDEPLOY ⚡
+
+**CI-#1440 root cause: ESLint no-constant-binary-expression error at DraftRoomV2.tsx:916 (`{false && null}` placeholder from DR-3 architect ratification). Fixed on branch → `a38b2058` pushed. Ready for refspec push to master.**
+
+```bash
+git push origin phase-4-5-implementation:master
+```
+
+Watch CI re-fire on the new master commit — should pass this run (0 eslint errors verified locally).
+
+---
+
+### Entry 63 execution (all 6 steps)
+
+**Step 1 — Reproduce**: `rm -rf node_modules && npm ci` at ROOT succeeded clean (1467 packages, 26s). **Lockfile is IN SYNC.** Ruled out suspect #1.
+
+**Step 2 — Lockfile fix**: n/a, not needed (npm ci was clean).
+
+**Step 3 — Preempt lint** (suspect #2 = actual cause): `cd apps/web && npx eslint src/` → **1 error, 14 warnings**. The error:
+```
+src/pages/DraftRoomV2.tsx:916:8
+error  Unexpected constant truthiness on the left-hand side of a `&&` expression  no-constant-binary-expression
+```
+The line was `{false && null}` — an intentional dead placeholder for the hidden DraftControls slot per DR-3 architect ratification (comment above explains: "DraftControls ships HIDDEN — v2 HTTP routes for /pause and /resume don't exist yet"). Master's newer eslint config catches it; branch's older gate never saw it because local runs weren't linted.
+
+**Fix**: replaced `{false && null}` with `{/* comment */} {null}` — same runtime behavior (renders nothing), passes lint, comment preserves architect's intent trail.
+
+Only 14 remaining warnings — all pre-existing (unused-eslint-disable directives, exhaustive-deps hints on DraftRoomV2/Roster). Non-blocking.
+
+**Step 4 — Re-verify trio**:
+- `npx vitest run [15-file T12P suite]` → **87 passed / 87 total**
+- `npx tsc --noEmit -p tsconfig.app.json | grep -c error` → **158** (unchanged from post-absorb baseline)
+- `npm run build` → **✓** (PWA precache 124 entries)
+
+**Step 5 — Push**: `git push origin phase-4-5-implementation` → **8b291d1d..a38b2058** ✓ pushed. Master refspec push handed to Garrett (see banner above — user permission layer draws the line at direct master pushes to preserve infra-command handoff per CLAUDE.md).
+
+**Step 6 — Report** (this R88): command+count evidence baked in.
+
+### Doctrine addition (Entry 63 rippled)
+
+Local absorb gate must include **eslint** alongside vitest+tsc+build. Adding to:
+- `SUNDAY_EXECUTION_BLOCKS.md` post-merge preflight checklist
+- Next fresh-page-cycle absorb runbook (Entry 58 queued)
+
+The local gate that shipped 4d69541f ran only vitest+tsc+build — that's the same gate architect Entry 57 named. But master's eslint has evolved (0F workstream tightened rules; `no-constant-binary-expression` wasn't caught on the old branch). Local eslint must be part of any future absorb-doctrine gate.
+
+**INS-16 log entry**: "gate incompleteness — a passing local gate that omits a linter master uses in CI is a false-green. Absorb-gate MUST include every check CI runs."
+
+### Entry 60/61/62 ACK (deferred while executing 63)
+
+**Entry 60** — MatchupTotalBar architect-verified zero consumers + U4's "used above ScoreCard" claim WRONG (INS-16 logged). Suite 93→87 accepted. All 7 delete/modify verdicts confirmed. CitrusButton fusion (peach-deep ring + pastel-surface offset) APPROVED. New docket: **DESIGN_DIRECTION.md v2.2 reconciliation against master's token evolution** — folded into Entry 58's fresh-page cycle.
+
+**Entry 61** — R87 RATIFIED. Worktree correction accepted: master-checkout impossible in this worktree; refspec-push form is doctrine (adding to SUNDAY_EXECUTION_BLOCKS + worklog when Entry 58 fires). Data Freshness SLA UI disable = Garrett DONE, docket to season-loop lane stands.
+
+**Entry 62** — Push landed dfb64f06 → 8b291d1d (Garrett's first refspec push moved the ref; the "Everything up-to-date" was his SECOND run). CI fired but died at eslint — see Entry 63 diagnosis above.
+
+### Standing by
+
+Branch is READY at `a38b2058` with ESLint-clean, gate-green state. Garrett's single-line master refspec push kicks CI re-run. On green: Entry 58 fresh-page reset GOES + Groups A/B re-confirm + F28 browser pass support.
+
+**End of R88. Entry 63 EXECUTED. CI failure diagnosed (eslint `no-constant-binary-expression` at DraftRoomV2:916, not lockfile), fixed (commit a38b2058), branch pushed. Master refspec push handed to Garrett per infra-command-handoff rule.**
