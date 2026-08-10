@@ -4374,3 +4374,46 @@ Cleanup rider complete. Campaign remains CLOSED and ratified (Entry 50: "this is
 Right back at you — good night's work all around, architect. Standing by.
 
 **End of R82.**
+
+---
+
+## R83 — Entry 52 ACK + spike plan §2.5 landed (2026-08-10 14:30Z / 8:30 AM MT)
+
+### Entry 52 ACK
+
+Apple Developer approval acknowledged (screenshot-verified 8:19 AM MT, Order W1761618485, garrettstorms@hotmail.com team, Account Holder / Developer role, enrolled Aug 9 → active Aug 10 no identity follow-up). Spike blocker count reduced from 3 to 1 — **Mac access ~Aug 11-12 is the last remaining §2 blocker**.
+
+### Landed this cycle (commit 5e2535f8)
+
+`docs/RUNBOOKS/CAPACITOR_SPIKE_PLAN.md` — three coordinated edits, +75 lines net (336 → 411):
+
+**Edit 1 — §2 additional considerations (:47-52)**:
+- Enrollment line: `SUBMITTED 2026-08-09` → `ACTIVE (screenshot-verified 2026-08-10, Entry 52)` with full attribution (team, order #, role).
+- Remaining §2 hard blockers narrowed from 3 items to exactly ONE: Mac access ~Aug 11-12.
+- Bundle ID reservation moved from "gated behind Apple Developer activation" to "PRE-MAC WIN, browser-only, doable this week" with §2.5 pointer.
+
+**Edit 2 — NEW §2.5 PRE-MAC WINS (browser-only, no Mac needed)** — 10-minute checklist:
+- **PMW-1** register bundle identifier at `developer.apple.com/account` → Certificates, Identifiers & Profiles → Identifiers. 8-step click-path. Bundle ID `com.citrusfantasysports.app` cited (already canonical at §4.1 :117 + §3 Aug 16 :68 — Entry 52's proposal matches existing plan, no negotiation). Fallback order documented per §7:242 collision risk: `.ios` → `com.citrusfantasy.app` → `com.citrusleaguestorm.app`.
+- **PMW-2** create App Store Connect app record at `appstoreconnect.apple.com` → My Apps. 9-step click-path with all fields (Name `Citrus Fantasy Sports` / Language English (U.S.) / Bundle ID from dropdown / SKU `citrus-fantasy-sports-ios` / Full Access). Explicit "NOT NEEDED for free TestFlight" list per Entry 52 (pricing tier, availability, paid-agreements, tax/banking).
+- **PMW-3** confirm team in App Store Connect (Account Holder role + team ID visible under Users and Access → Teams) — needed for Xcode Automatically-manage-signing on Aug 16 §3 step 8.
+- **PMW-4** DO NOT pre-generate certificates or provisioning profiles per Entry 52 explicit order; WHY documented (orphan artifacts break Xcode's auto-manage; Aug 16 §3 step 15 would fail with confusing signing errors).
+- Success criteria checklist (4 items). Explicit effect on §8 preflight (PMW-1 checks off "Bundle ID reserved" before Aug 15; Saturday spike then starts with ID already claimed + ASC listening for first upload).
+
+**Edit 3 — §8 preflight checklist (:265-267)**:
+- Apple Developer Program: `[ ]` → `[x]` with Entry 52 citation.
+- Mac + Xcode 15+: annotated "**the last remaining §2 hard blocker**" for at-a-glance status.
+- Bundle ID reserved: pointer to §2.5 PMW-1.
+
+### Verification
+
+- `wc -l docs/RUNBOOKS/CAPACITOR_SPIKE_PLAN.md`: 336 → 411 (+75 lines)
+- `git diff --name-only apps server packages`: 0 (docs-only)
+- Bundle ID citation verified: `com.citrusfantasysports.app` already the canonical value at §4.1 :117 (capacitor.config.ts template) + §3 :68 (Aug 16 cap init command). Entry 52 proposed the same ID; plan already had it.
+
+### Standing by
+
+Spike blocker count is now **1** (Mac access). Post-PMW-1 that becomes still-1 but with a claim on the ID so Aug 16 upload starts smoother. Garrett can run the PMW-1 → PMW-2 → PMW-3 sequence anytime this week from any browser (~10 min).
+
+30-min wake cadence stands. Ready for Entry 53+ or Garrett walk-in.
+
+**End of R83. Entry 52 ACK'd with §2.5 landed (+75 lines, commit 5e2535f8). Apple Developer ACTIVE. Spike blocker count 3 → 1 (Mac only). PRE-MAC WINS checklist ready for Garrett's ~10-min browser session this week.**
