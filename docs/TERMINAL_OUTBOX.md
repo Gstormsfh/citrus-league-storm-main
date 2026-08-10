@@ -4695,3 +4695,84 @@ That denial fired BEFORE Entry 59 landed in the inbox. Entry 59 explicitly rebut
 **Progress discipline (Entry 57 required)**: this cycle IS the progress report — file counts done/remaining will report at each 30-min wake once merge is authorized to start. Currently: 0 done / 38 planned / awaiting approval.
 
 **End of R86. R85 paste banner WITHDRAWN with 🛑 header for Garrett's benefit. Entries 57+58+59 ACK'd. Reverse-merge blocked pending user scope approval on `git merge origin/master` in the local branch. Standing by.**
+
+---
+
+## R87 — READY · absorb complete · Entry 57 done · trivial paste for Garrett (2026-08-10 15:52Z / 9:52 AM MT)
+
+# ⚡ GARRETT: PASTE THIS BLOCK ⚡
+
+**Absorb complete on branch (commit 4d69541f, pushed to origin). Merge into master is now a clean fast-forward — 0 behind / 298 ahead.**
+
+```bash
+git checkout master
+git pull --ff-only origin master
+git merge phase-4-5-implementation
+git push origin master
+```
+
+Watch: **Production Deploy** workflow at `https://github.com/Gstormsfh/citrus-league-storm-main/actions` — CI gate does lint+tsc+build+deploy (replaces manual Group C).
+
+Groups A (engine) + B (migration) remain your separate pastes after web is green.
+
+---
+
+### Entry 57 execution summary
+
+**Merge base**: `332e010a` · **Absorb commit**: `4d69541f` · **Fetch time**: 2026-08-10 09:35Z (fresh, no post-fetch master pushes).
+
+**39 conflicts resolved by class** (Entry 57 doctrine applied):
+
+| Class | Files | Resolution |
+|---|---|---|
+| Pages/components | 28 | U9/U9b keeps win — `#581E00` on-orange + `hover:bg-pastel-orange-soft` preserved everywhere per LOOK GATE = KEEP; branch's rich styling (LeagueNotifications citrus leaves + varsity) preserved |
+| tailwind.config.ts | 1 | union — master's new `pastel-surface` / `pastel-surface-tile` / `pastel-surface-high` / `pastel-butter` tokens KEPT (resolves my own DESIGN_DIRECTION docket #1) + branch's citrus2 additions KEPT |
+| package-lock.json | 1 | ours + `npm install` regenerated post-merge |
+| server/package.json | 1 | union — branch's uWebSockets.js + master's undici |
+| playoff-sync.yml | 1 | v5/v6 actions from master + offseason guard + `if:` gates from branch |
+| Delete/modify | 7 | DELETE 6 (Footer + HeroSection + gm-office/{ActionsSidebar,RosterDepthWidget,StatsOverviewCards} + MatchupTotalBar+test — all dead-on-branch per grep) · KEEP 1 (PlayerCard — 5 live consumers) |
+
+**Post-absorb API-drift fixes** (3 tsc errors caught + fixed):
+- `WaiverService.processAllPendingWaivers(leagueId)` — master added required arg; passed `leagueId` at LeagueDashboard :515 + `selectedSettingsLeagueId` at Profile :506.
+- `LoadingScreen` prop cleanup at DraftRoom :3851 — dropped stale `character="kiwi"` (master removed the prop).
+- `CitrusButton.focus.test.tsx` assertion widened from `#0F1F15` hex to `pastel-surface` token (master's rename; test now locks the token semantic).
+
+**Dep re-declaration**: `@testing-library/react` + `@testing-library/jest-dom` re-added to `apps/web/package.json` — master's PR #281 removed as "unused" (was true on master's test suite; false on our new T12P + P0 tests).
+
+### Post-resolution gate (Entry 57 required)
+
+| Check | Result |
+|---|---|
+| `npx vitest run [15-file T12P suite]` | **87 passed / 87 total** (was 93; -6 from legitimate MTB dead-code deletion) |
+| `npx tsc --noEmit -p apps/web/tsconfig.app.json` errors | **158** (below 159 baseline; zero new post-fix; -1 from MTB cleanup) |
+| `server tsc` errors | **4** (all pre-existing per docket #22 + prior baseline; zero introduced) |
+| `npm run build` (web) | **✓ 18.04s** — PWA precache 124 entries, chunks emitted |
+| Spot-grep survival (5 sample pages) | **30 refs `#581E00` + 15 refs `hover:bg-pastel-orange-soft`** preserved |
+| Test locks intact | ScoreCard / WeeklySchedule / Skeleton / WinProbabilityBar / MobileRosterList / HockeyPlayerCard / ProtectedRoute / Auth.silentDeadEnd / VerifyEmail.deadEnd / CreateLeague.autoJoin / LeagueDashboard.landing / DraftRoom.copyLock / CreateLeague.autoJoin.integration / CitrusButton.focus — **all 14 passing** |
+
+### Master-side content absorbed (Entry 58 fresh-page context)
+
+191 commits × 0F-OPS workstream now in branch:
+- Scheduler + rollover (gameplay-schedulers PR#291, waivers+standings+weekly, hourly monitors, season constants derived-from-date)
+- Directory + timeouts (20m bounded discovery, bare Optional typing kill fixed)
+- Rosters + scraper hygiene (ET timezone propagation, scheduled snapshot writer, game_date always from source)
+- xG lane (0E-XG-5..8: rescore_xg_2025_recomputed, train_xg_v4, moat gate, v3-honest baseline)
+- Security + org (default-privilege hardening, drift monitor, orphan-table parking, anon write-door closure)
+- Data Freshness SLA hourly workflow (per Entry 56)
+- **Dead code purge PR #281** — 56 unused components removed (kept the 1 my branch legitimately uses; deleted the 6 dead-on-branch-too; my MTB test loss is the legitimate collateral)
+
+### Freshness note (Entry 57 required)
+
+Rev-list re-check after push: `origin/master...origin/phase-4-5-implementation → 0 behind / 298 ahead`. No new 0F pushes since my fetch. Paste is safe to run RIGHT NOW.
+
+### Docketed post-merge
+
+- Post-twelve migration: sweep branch's remaining `bg-[#0F1F15]` / `bg-[#1A2A20]` arbitrary hexes → new `pastel-surface` / `pastel-surface-tile` tokens (~340 potential sites per master's own note). Cosmetic + accessibility-neutral cleanup.
+- **Entry 53 MAC-READINESS section** still owed (deferred cycles ago; Entry 58 folds it in with "mini is BRAND NEW — vintage gate auto-passes").
+- **Entry 58 fresh-page reset** queues after Garrett's push lands green: archive INBOX/OUTBOX with M-Entry 1 era tag + new WEEK_OF_THE_TWELVE.md.
+
+### Standing by
+
+**Terminal is READY.** Garrett pastes the 4-line block; production deploy fires from master; playoff-sync patch lands live (skip UI disable). Standing by for the push-succeeded signal or any Garrett/architect follow-up.
+
+**End of R87. Entry 57 EXECUTED. Absorb commit 4d69541f pushed. 39 conflicts resolved by doctrine. Full gate green (87/87 vitest · 158 tsc ≤159 baseline · server tsc unchanged · build ✓ · U9/U9b survivals · test locks). Garrett's paste is 4 trivial lines.**
