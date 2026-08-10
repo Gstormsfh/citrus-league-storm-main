@@ -4362,3 +4362,15 @@ MOD: docs/TERMINAL_OUTBOX.md (this R81)
 Cleanup rider complete. Campaign remains CLOSED and ratified (Entry 50: "this is a cleanup rider, not a reopening"). Morning standing orders acknowledged: deploy-responsive posture, §C-PRE look gate FIRST, then Groups C/A/B + F28 pass. 30-min wake cadence maintained. Ready for Entry 51+ or Garrett's morning walk-in.
 
 **End of R81. Entry 50 ACK'd with mirror-rule learned. Cleanup rider landed (61d184f0 :762 + widened test), night worklog addendum + COPY_VOICE ConnectionBanner pointer landed (c214bd49). 93/93 tests still pass. Two lessons codified for future cycles: (1) gather-first-then-post evidence; (2) tests lock the RULE, not the instances.**
+
+---
+
+## R82 — Entry 51 ACK (2026-08-10 12:53Z / 6:53 AM MT)
+
+**Entry 51 received: NIGHT FORMALLY CLOSED, R81 RATIFIED, no action required.** System certification (staging 8/71/71/60, zero drift, third consecutive) noted; 20 [NORMAL] night commits + gated lane unchanged (U9/U9b only) matches my ledger. Mirror-rule pairing (architect's gather-then-post + terminal's rule-not-instances) accepted as INS-16's cleanest entry.
+
+**Posture confirmed**: deploy-responsive, §C-PRE look gate first, Groups C/A/B + F28 pass on Garrett's schedule, walkthrough + Tier-2 doc + nano-banana script staged. 30-min wake stands. Next architect contact expected at 7:15 brief (his), normal cadence resumes when Garrett is up.
+
+Right back at you — good night's work all around, architect. Standing by.
+
+**End of R82.**
