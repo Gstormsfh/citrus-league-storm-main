@@ -4417,3 +4417,171 @@ Spike blocker count is now **1** (Mac access). Post-PMW-1 that becomes still-1 b
 30-min wake cadence stands. Ready for Entry 53+ or Garrett walk-in.
 
 **End of R83. Entry 52 ACK'd with §2.5 landed (+75 lines, commit 5e2535f8). Apple Developer ACTIVE. Spike blocker count 3 → 1 (Mac only). PRE-MAC WINS checklist ready for Garrett's ~10-min browser session this week.**
+
+---
+
+## R84 — Entry 54 gold stamp + Entry 55 MERGE READINESS (2026-08-10 14:55Z / 8:55 AM MT) — GARRETT LIVE
+
+**Entry 53 (MAC-READINESS PRE-CHECK section) DEFERRED to next cycle per Entry 55 priority order.** Entry 55 is top; Entry 54 folded in.
+
+### Fresh gold stamp (Entry 54)
+
+```
+npx vitest run [16-file T12P+locks set]
+  → 93 passed / 93 total (matches architect's expected count exactly)
+
+npx tsc --noEmit -p tsconfig.app.json
+  → 159 errors — ALL PRE-EXISTING (no new errors from night's work).
+    Verified: DraftRoom.tsx / Auth.tsx / VerifyEmail.tsx / CreateLeague.tsx
+    / LeagueDashboard.tsx / DraftRoom.copyLock.test.tsx / VerifyEmail.deadEnd.test.tsx
+    / CreateLeague.autoJoin*.test.tsx / LeagueDashboard.landing.test.tsx
+    / ProtectedRoute.test.tsx / Auth.silentDeadEnd.test.tsx / DraftRoom.tsx :762
+    all clean. Errors are in notificationStore.ts (:57-60), Homepage.tsx (:91),
+    AuthContext.tsx (:168), DraftRoomV2 tests (:444/:462), deriveDraftState
+    (:292), useMyTeamIdCrossCheck (:147), fuzzer.test (:269/:368), optimistic.test
+    (:126), DraftRoom.tsx (:122 unrelated cast), PoolPlayoffRoster.tsx
+    (:432/:436), Roster.tsx (:3109/:3838). All present pre-campaign.
+
+server/ tsc --noEmit
+  → PRE-EXISTING errors present (draftAdminRoutes.test.ts mock type,
+    draftRoutes.f14.test.ts mock callable, systemFlags.ts:96 F21-family
+    known issue per docket #22). No new errors from night's work.
+```
+
+### GitHub failure emails explanation (Entry 54)
+
+Emails continue because the offseason patch **64ef9199** lives on `phase-4-5-implementation`; GitHub fires schedules from **master**, which nothing has touched by design. Off-switch remains Garrett's UI disable. Patch rides the normal deploy train (this cycle's push).
+
+**RLS Audit signal flag**: if Garrett's failure emails name "RLS Audit" (workflow fires Mondays 13:00Z) that is a **REAL signal** (permissive-policy drift), not noise. Architect asked Garrett for the workflow name. Post to architect if it appears.
+
+### Merge readiness (Entry 55)
+
+**Fetch**: done (`git fetch origin` clean).
+
+**Divergence** (`git rev-list --left-right --count origin/master...HEAD`):
+- **191 commits behind** origin/master (0F-OPS workstream commits not on branch)
+- **294 commits ahead** of origin/master (phase-4-5 + tarp-day + night campaign commits)
+
+**Working tree**:
+- Modified: `docs/ARCHITECT_INBOX.md` (architect writes to it; benign — normal state)
+- Untracked: `.claude/` + `scripts/proof/*.local.mjs` + 15 `scripts/proof/results/S2-*.ndjson|summary.txt` files + `scripts/proof/fixture-12-*.local.json` + `supabase/migrations/captures/2026-08-05_pre_auto_fix_integrity_issues.sql`
+- **No stray uncommitted SOURCE** — all untracked files are local dev artifacts (proof-run outputs, local scratch scripts, gitignored-adjacent). Safe to leave.
+
+**Merge dry-run** (`git merge-tree --write-tree origin/master HEAD`):
+- Merge base: `332e010a`
+- Result tree: `dfb4c169`
+- **⚠️ 38 CONFLICTING FILES** (the U9/U9b sweep at 5f16a463/83e811a3 touched ~44 files; master's 0F workstream touched many of the same). Full list:
+
+```
+.github/workflows/playoff-sync.yml
+apps/web/src/components/Footer.tsx
+apps/web/src/components/HeroSection.tsx
+apps/web/src/components/MobileMenuButton.tsx
+apps/web/src/components/citrus2/CitrusButton.tsx
+apps/web/src/components/citrus2/CtaBanner.tsx
+apps/web/src/components/gm-office/ActionsSidebar.tsx
+apps/web/src/components/gm-office/PlayerCard.tsx
+apps/web/src/components/gm-office/RosterDepthWidget.tsx
+apps/web/src/components/gm-office/StatsOverviewCards.tsx
+apps/web/src/components/matchup/LeagueNotifications.tsx
+apps/web/src/components/matchup/MatchupTotalBar.tsx
+apps/web/src/pages/ArmchairGM.tsx
+apps/web/src/pages/CreateLeague.tsx
+apps/web/src/pages/FreeAgents.tsx
+apps/web/src/pages/Guides.tsx
+apps/web/src/pages/LeagueDashboard.tsx
+apps/web/src/pages/OtherTeam.tsx
+apps/web/src/pages/PlayoffBracket.tsx
+apps/web/src/pages/Podcasts.tsx
+apps/web/src/pages/PoolConfidence.tsx
+apps/web/src/pages/PoolPickem.tsx
+apps/web/src/pages/PoolPlayoffBracket.tsx
+apps/web/src/pages/PoolPlayoffConfidence.tsx
+apps/web/src/pages/PoolPlayoffHub.tsx
+apps/web/src/pages/PoolPlayoffRoster.tsx
+apps/web/src/pages/PoolSurvivor.tsx
+apps/web/src/pages/PreviewArena.tsx
+apps/web/src/pages/PreviewBoards.tsx
+apps/web/src/pages/Profile.tsx
+apps/web/src/pages/Roster.tsx
+apps/web/src/pages/ScheduleManager.tsx
+apps/web/src/pages/StormyAssistant.tsx
+apps/web/src/pages/TeamAnalytics.tsx
+apps/web/src/pages/TradeAnalyzer.tsx
+apps/web/src/pages/WaiverWire.tsx
+apps/web/tailwind.config.ts
+package-lock.json
+server/package.json
+```
+
+**Architect: this is above the "one clean paste" threshold Entry 55 assumed.** The BLOCK-KEEP paste as originally shaped (`checkout master → merge → push`) will HALT on `Merge conflict in <path>` and Garrett will be dropped into merge-conflict resolution for 38 files. BLOCK-REVERT-FIRST reduces the surface (U9/U9b touched ~44 of these) but the base divergence (0F workstream) will still produce some conflicts.
+
+**Recommendation for architect to adjust the block**: consider a strategy option (`git merge -X ours phase-4-5-implementation` if the branch should win everywhere they diverge — dangerous, could clobber 0F work) OR a preparation step where the branch first merges origin/master IN (`git merge origin/master` on the branch, resolve conflicts once, push branch, THEN Garrett merges branch → master as fast-forward).
+
+### PASTE BLOCKS (staged per Entry 55 shape — architect may adjust based on conflict finding above)
+
+**BLOCK-KEEP** (if §C-PRE look gate says keep U9/U9b):
+
+```bash
+# Fresh gold stamp already run terminal-side: vitest 93/93, tsc unchanged.
+# Working tree clean of stray source; untracked local artifacts left in place.
+
+git fetch origin
+git checkout master
+git pull --ff-only origin master
+git merge phase-4-5-implementation
+# ⚠️ EXPECT 38 CONFLICTING FILES per merge-tree dry-run. Resolve each, then:
+git commit
+git push origin master
+
+# Watch: https://github.com/[org]/[repo]/actions — "Production Deploy" workflow.
+# CI gate does lint+tsc+build+deploy — this REPLACES manual Group C from the runbook.
+```
+
+**BLOCK-REVERT-FIRST** (if §C-PRE look gate says revert U9/U9b):
+
+```bash
+# On phase-4-5-implementation first, revert the two GARRETT-GATED commits:
+git checkout phase-4-5-implementation
+git revert --no-edit 83e811a3 5f16a463
+# (83e811a3 = U9b hover lightens + L-1; 5f16a463 = U9 CTA text-on-orange)
+
+# Re-verify tests after revert:
+cd apps/web && npx vitest run linkGraphIntegrity Skeletons CitrusButton.focus \
+  ScoreCard MatchupTotalBar WeeklySchedule WinProbabilityBar \
+  MobileRosterList.positionRing HockeyPlayerCard.status ProtectedRoute \
+  Auth.silentDeadEnd VerifyEmail.deadEnd CreateLeague.autoJoin \
+  LeagueDashboard.landing DraftRoom.copyLock CreateLeague.autoJoin.integration
+# Expect: 93 passed / 93 total (revert should not affect these).
+
+# Push branch with reverts:
+cd ../.. && git push origin phase-4-5-implementation
+
+# Then merge to master:
+git checkout master
+git pull --ff-only origin master
+git merge phase-4-5-implementation
+# ⚠️ Conflict surface reduced (U9/U9b touched ~44 files, mostly overlap with the
+#     38 conflicts above) but 0F workstream base-divergence conflicts remain.
+git commit
+git push origin master
+
+# Same Production Deploy watch as BLOCK-KEEP.
+```
+
+### Post-push notes (from Entry 55)
+
+- **playoff-sync auto-fixes on master post-merge**: patch 64ef9199 lands live; Garrett can **SKIP the UI disable** — the cron-restriction + guard step take effect immediately.
+- **Remaining nightly emailer**: Nightly Projection Batch (1 AM daily, stale `--season`) is the ONLY remaining emailer after this merge. Docket its one-click disable OR data-lane fix as Garrett's choice.
+- **Groups A (engine) + B (migration)** remain his SEPARATE pastes after web is live — unchanged from the runbook. This BLOCK is web only.
+- **CI = deploy**: the merge push triggers `production-deploy.yml` which runs its own lint/tsc/build gate + freeze guard, then deploys web. **CI gate REPLACES manual Group C** per Entry 55.
+
+### Status
+
+- ✅ Fresh gold stamp reported (93/93 vitest, 159 pre-existing web tsc, server tsc unchanged)
+- ✅ GitHub emails explained + RLS Audit signal flag noted
+- ✅ Fetch + divergence + working tree + merge dry-run reported
+- ✅ Two paste blocks staged with conflict-count caveat surfaced
+- ⏳ **Architect adjustment needed** on the block shape given 38-file conflict surface — deferring to architect judgment before Garrett pastes
+
+**End of R84. Entries 54+55 addressed. 38-file merge conflict surface surfaced for architect adjustment before Garrett's paste. Entry 53 (MAC-READINESS section) deferred to next cycle.**
