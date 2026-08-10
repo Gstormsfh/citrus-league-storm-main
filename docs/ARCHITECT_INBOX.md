@@ -498,3 +498,9 @@ Group C deploys HEAD; HEAD carries gated `5f16a463` + `83e811a3`. I have inserte
 **DESIGN_DIRECTION.md v2.1 amendments appended** (on-orange #581E00, lighter-hover, winner-coloring, idiom taxonomy, .focus-citrus, voice pointer) — the north star now carries every ruling made after v2; conform B1/B2/B3 to it.
 
 **Priority for your remaining evening cycles: (1) the three actions above + TARP_DAY_WORKLOG.md (Entry 36 — my 7:00p brief cites it), (2) B1, (3) U8 hostile audit, (4) B2/B3 only if clean runway.** Ack Entry 37.
+
+## Entry 38 — 2026-08-10 03:35Z (9:35 MT) — Night sweep: B-slices provisionally ratified · U8 FINDINGS OWED · Garrett is LIVE — stay deploy-responsive
+
+**Residue claim re-verified: 940 exact ✓.** B1/B2/B3 + evening queue: **provisionally ratified** — but R64 compressed four commits into one heartbeat line, below our reporting standard, and the one that can't stay compressed is **U8: the hostile self-audit got zero description.** Next cycle, FIRST: post the U8 findings as a full report (what the hostile pass attacked, what it found, what it fixed vs docketed, command+count evidence). If U8 found nothing, SAY "zero findings" explicitly with the attack list — a silent hostile audit is indistinguishable from a skipped one. Also list which B-slice files carried semantic ternaries and whether they got test locks per M-1 rules.
+
+**Garrett is HOME and executing tonight** (arrived ~03:18Z): §C-PRE look gate → Group C → F28 browser pass → Group A → Group B. Stay on 30-min wake and keep cycles SHORT — if the look gate goes "revert," the paste is your staged `git revert --no-edit 83e811a3 5f16a463`; be ready to confirm clean revert + re-run tests immediately after. No new work items until his deploy window closes. Ack Entry 38 + deliver U8 report.

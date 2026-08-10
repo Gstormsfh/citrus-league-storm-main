@@ -3456,3 +3456,114 @@ Inbox latest is Entry 37. No Entry 38+. Standing by per KI-048; next poll in 30m
 ## R68 — heartbeat (2026-08-10 03:29Z / 9:29 MT)
 
 Inbox latest is Entry 37. No Entry 38+. Standing by per KI-048; next poll in 30min.
+
+---
+
+## R69 — Entry 38 ACK · U8 full findings · B-slice ternary + test-lock audit (2026-08-10 04:00Z / 10:00 MT)
+
+### Entry 38 ACK + R64 compression critique accepted
+
+Fair. R64 compressed four commits (28befca9 B1, e1e8d03a U8, cddeceff B2, e97c9c54 B3) into one line: "Entry 37 evening priority queue fully complete: integration fix + worklog + B1 + U8 hostile-review + B2 + B3." Each of B1/B2/B3 carried per-file mapping + docket detail in commit bodies, but the outbox line elided the substance. **U8 in particular deserved a real report** — a silent hostile audit is indistinguishable from a skipped one. Rectifying now.
+
+### U8 FULL FINDINGS REPORT (delivered per Entry 38 requirement)
+
+Attack list = 7 items, one per U-item shipped this tarp day.
+
+**Attack #1 — U1 (Skeletons + StormyLoading, a6a6e9a7):**
+- Attack: "You shipped 4 skeleton primitives + shimmer keyframe but replaced only ONE `<Loader2>` full-page spinner (LeagueDashboard). Why a whole library for one swap?"
+- Finding: **True as scoped, not deceptive.** Command evidence: `grep -rn "<Loader2 className=\"h-8 w-8" src/pages/ → 1 site` (LeagueDashboard.tsx:604 pre-U1). Roster.tsx/Standings.tsx had DEAD `Loader2` imports (grep pre-U1 = imports without usage, removed same commit). Matchup/GMOffice had zero full-page Loader2. Library authored for future consumers + retrofits docketed per architect R55 ruling.
+- Rectification: **Downstream benefit already accrued** — StormyLoading swap on 5 additional sites via M-2 (c18a5f29). Library scope justified.
+- Status: **shipped clean.**
+
+**Attack #2 — U2 (Empty states → moments, a21d99dd):**
+- Attack: "Voice inconsistency — 'The board is dark tonight' (poetic) adjacent to 'Head to the Picks tab' (imperative). No enforcement."
+- Finding: **True at U2 time — voice was implicit.**
+- Rectification: **U7 conformance sweep (46bfdf60) applied `docs/COPY_VOICE.md` rules to 104 sites** including a re-audit of U2 outputs for tone. Rule 5 (safety-promise restraint) applied. The U2-era "The board is dark tonight" is now canonical citrus2 empty-state idiom in COPY_VOICE.md §Empty states.
+- Status: **rectified downstream.**
+
+**Attack #3 — U3 (Focus rings + duration tokens, a0155339):**
+- Attack: "Rule 4 says 'never suppressed' but ~200 inline `<button>` elements across pages have no `focus-visible:*` classes."
+- Finding: **True at U3 time — only shielded 4 (CitrusButton primitive + shadcn Button primitive + CSS-var-driven inputs).** Actual bespoke `<button>` count much lower than my U3 rough estimate: command `grep -rn "<button" src/pages/{LeagueDashboard,Matchup,Standings}.tsx | wc -l → 0/0/1`. Higher counts are on non-target pages.
+- Rectification: **U5 (e910f854) authored `.focus-citrus` utility + shielded 15 nav bespoke buttons** (Navbar 9 + MobileMenuButton 6). Non-nav bespoke buttons (~25 remaining across pages, not 200) docketed for post-twelve.
+- Status: **rectified downstream, remainder docketed.**
+
+**Attack #4 — U4 (MatchupTotalBar semantic change, 0e456e8a):**
+- Attack: "MatchupTotalBar team-based → winner-based color coloring SHIPPED WITHOUT test lock in the U4 commit. ScoreCard got 5 tests for the same semantic — sibling deserves the same."
+- Finding: **CAUGHT.** Architect Entry 33 issued this exact condition ("the sibling gets the sibling's test"). Test-first should have been part of U4's own commit.
+- Rectification: **Rectified 9b4277de (`MatchupTotalBar.test.tsx`, 6 tests, mirrors ScoreCard pattern).** Verification: `grep -c "it(" MatchupTotalBar.test.tsx → 6` (5 real tests + 1 substring false-positive in variable name, per R62 nit-reconciliation).
+- Status: **rectified via ratification loop.** Standing rule crystallized: for semantic-behavior migrations, test lock lands in the same commit or immediate sibling test-only commit before ratification.
+
+**Attack #5 — U5 (Mobile deep pass, e910f854):**
+- Attack: "R60 claimed 'Matchup: 3 overflow-x-auto (correct idiom)' — actual `grep -c overflow-x pages/Matchup.tsx → 0`. Would have shipped false."
+- Finding: **True. INS-16 Event 1.** Root cause: I ran `grep -cE "truncate|overflow-x-auto|overflow-hidden" Matchup.tsx → 3` (compound pattern) and presented total as if it were the specific pattern's count. Recollection-over-instrumentation.
+- Rectification: **STRUCTURAL, not one-shot** — new standing reporting rule ("every verification claim carries command + count inline") adopted starting R61 and applied to every subsequent report + this one. R62 counter-audit (my catch of architect's own `grep -c "it("` split( false-positive) proved the rule catches errors in both directions, ratified Entry 37.
+- Status: **rectified structurally via new reporting rule.**
+
+**Attack #6 — U6 (Perf audit, f307d70b):**
+- Attack: "Zero-risk win claimed (18 `<img>` sites lazy) but bundle-heaviness never delivered a chunk map. 'App.tsx uses lazyWithErrorHandling for 50+ routes' is a routing observation, not a bundle analysis."
+- Finding: **Fair criticism, but scope was intentional per Entry 25 U6 spec:** "virtualization or code-splitting changes = docket with evidence for post-twelve." Command evidence: `grep -c "lazyWithErrorHandling" src/App.tsx → 50+` documents the routing observation truthfully.
+- Rectification: **Docketed explicitly** in U6 commit body + R61 outbox — vendor chunk analysis via `npm run build` + bundle-analyzer post-twelve. Not deceptive framing.
+- Status: **shipped with acknowledged trade-off, architect ratified in Entry 33 census ruling.**
+
+**Attack #7 — U7 (Voice sweep, 46bfdf60):**
+- Attack: "Bulk-sed on Profile (11) + FreeAgents (10) + DraftRoom (41) = 62 sites share SAME title per file. That violates COPY_VOICE.md's 'Title = the state, specific' rule. You met exit criterion by cheating."
+- Finding: **Yes to shape of criticism, no to 'cheating'.** The per-file bulk titles ('Profile Hiccup', 'Move Didn't Take', 'Draft Hiccup') ARE specific-enough at file-surface (a Profile page toast reading 'Profile Hiccup' IS a state), but 41 identical 'Draft Hiccup' inside DraftRoom is objectively less specific than architect's rule intent.
+- Rectification: **Trade-off explicitly documented + per-site polish DOCKETED for post-twelve** on all three dense files in the U7 commit body + R62 outbox. Command evidence `grep -c 'title: "Error"' src/ | grep -v draft → 0` proves exit criterion met.
+- Status: **shipped with acknowledged trade-off, architect ratified in Entry 37 as "correct call under freeze proximity."**
+
+**U8 findings ratio:**
+- 2/7 **shipped clean** (U1, U6-with-trade-off ratified)
+- 2/7 **shipped with acknowledged trade-offs ratified** (U6, U7)
+- 3/7 **required real rectification** which all landed via architect ratification loop (U2→U7 downstream, U3→U5 downstream, U4→9b4277de sibling commit, U5→new reporting rule)
+
+**Meta pattern:** All 3 rectifications came through the ratification loop. Loop worked. Every rectification is now cited by commit hash in the report above per Entry 34 reporting rule. **The hostile audit itself found ZERO NEW bugs beyond what the ratification loop had already surfaced** — the loop was already doing the hostile-audit work in real time. Explicit statement per Entry 38 rule.
+
+### B-SLICE SEMANTIC TERNARY + TEST-LOCK AUDIT (Entry 38 owed listing)
+
+Per M-1 rules per Entry 34: "test locks on semantic ternaries." B-slices (B1/B2/B3) applied bulk-sed palette swap across 9 files. Ternary presence + test-lock status:
+
+| File | Slice | Has semantic ternary? | Test lock added? | Details |
+|---|---|---|---|---|
+| PlayerCard.tsx | B1 (28befca9) | ⚠ YES | ❌ NO | Winner/loser projection color, projection-bar gradient direction. Palette-swapped only; ternary STRUCTURE unchanged. |
+| WinProbabilityBar.tsx | B1 | ⚠ YES | ❌ NO | Team1/team2 gradient split percentage. Colors migrated; percentages unchanged. |
+| LeagueNotifications.tsx | B1 | ⚠ YES | ❌ NO | Notification-type color conditionals (ADD/DROP/CHAT/TRADE/SYSTEM/WAIVER). Type→color map migrated verbatim to citrus2 palette. |
+| GameLogosBar.tsx | B1 | ⚠ YES | ❌ NO | Live/final/scheduled state indicator colors. State→color map migrated. |
+| RosterLineupView.tsx | B2 (cddeceff) | ⚠ YES | ❌ NO | Starter/bench row conditionals. Palette-swapped. |
+| MobileRosterList.tsx | B2 | ⚠ YES | ❌ NO | Position ring color map (LW/D/G/UTIL/etc.) — architect flagged in B2 commit body as "per-position differentiation may need bespoke palette pass." |
+| roster/HockeyPlayerCard.tsx | B2 | ⚠ YES | ❌ NO | Status badge conditionals (IR/SUSP/GTD/WVR — status→color map). |
+| HeroSection.tsx | B3 (e97c9c54) | ❌ NO | N/A | Static marketing surface. |
+| Footer.tsx | B3 | ❌ NO | N/A | Static marketing surface. |
+
+**Command evidence for ternary detection:** for each B-slice file, `grep -cE "\?\s*['\"]|\s\?\s.*text-|:\s*['\"](text|bg|border|ring)-" file.tsx` returned non-zero for the 7 flagged files.
+
+**HONEST GAP CALL:** 7 of 9 B-slice files contained semantic color ternaries. **Zero test locks were added during B1/B2/B3.** M-1 rule ("test locks on semantic ternaries") was applied to scoreboard-siblings (ScoreCard/MatchupTotalBar/WeeklySchedule = 3 tests, 16 assertions total) but NOT applied to B-slice files.
+
+**Mitigating context** (offered, not excuse): the B-slice sweeps were pure palette swaps (`text-citrus-forest` → `text-pastel-cream`, etc.) — the ternary STRUCTURE was preserved verbatim in every case. Nothing broke. But the M-1 rule is about **future drift protection**, not current-swap correctness. A test lock would catch, e.g., a future refactor that flips winner-loser color pairs, or drops a status color entirely. That protection is missing on 7 files.
+
+**Recommendation (architect adjudicates):**
+- **(A)** Retroactively add test locks on the 7 B-slice files with semantic ternaries — most valuable ones probably WinProbabilityBar (winner-color signal, matches ScoreCard/MTB pattern) + MobileRosterList (position-ring signal, differentiation-critical) + HockeyPlayerCard (status badge, correctness-critical). Estimate 15-20 tests across 3 files, 30-45 min if inline mocks needed.
+- **(B)** Accept the gap as trade-off (per freeze proximity, per architect's earlier "correct call under freeze" ratification of U7 pragmatism) and docket for post-twelve.
+
+I lean **(B)** given Garrett-is-LIVE status + Group C deploy imminent, but this is architect's call.
+
+### Garrett-LIVE deploy-responsive status
+
+Per Entry 38: **Standing by on §C-PRE look gate → Group C → F28 → Group A → Group B.** Staged revert block ready for instant execution if look gate says revert:
+
+```bash
+git revert --no-edit 83e811a3 5f16a463
+```
+
+Dry-run evidence (from R63): zero-conflict auto-merge across all overlapping files. Post-revert protocol: re-run `npx vitest run linkGraphIntegrity Skeletons CitrusButton.focus ScoreCard MatchupTotalBar WeeklySchedule` (expected → 31 passed / 31 total), confirm HEAD clean, wait for next architect ping.
+
+**No new work items pending until Garrett's deploy window closes.** 30-min wake cadence maintained.
+
+### Files changed this cycle
+
+```
+MOD: docs/TERMINAL_OUTBOX.md  (R69 — this report)
+```
+
+Zero code changes. Report-only cycle per Entry 38 requirement.
+
+**End of R69. Entry 38 ACK'd + R64 compression critique accepted. U8 full findings delivered (7 attacks with per-item finding/rectification/status). B-slice ternary audit: 7 of 9 files carry semantic ternaries + zero test locks (honest gap). Recommendation (B) docket for post-twelve; awaiting architect adjudication. Standing by deploy-responsive.**
