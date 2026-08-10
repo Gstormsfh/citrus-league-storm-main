@@ -375,8 +375,8 @@ const HockeyPlayerCardContent = ({
           : "border border-border/40 hover:border-primary/50 hover:shadow-md",
         isDragging && "shadow-xl z-50 opacity-90",
         isLocked && "opacity-75 bg-muted/30",
-        isSwapSelected && "!ring-2 !ring-citrus-orange !ring-offset-1 !border-citrus-orange !shadow-lg",
-        isSwapTarget && "!ring-2 !ring-citrus-sage !ring-offset-1 !border-citrus-sage animate-pulse",
+        isSwapSelected && "!ring-2 !ring-pastel-orange !ring-offset-1 !border-pastel-orange !shadow-lg",
+        isSwapTarget && "!ring-2 !ring-pastel-sage !ring-offset-1 !border-pastel-sage animate-pulse",
         className
       )}
       onClick={onClick}
@@ -395,14 +395,14 @@ const HockeyPlayerCardContent = ({
       )}
 
       {/* Surfer Varsity Header - MAXIMUM GREEN VIBES */}
-      <div className="relative p-2 bg-gradient-to-r from-citrus-sage/25 via-citrus-sage/15 to-citrus-sage/25 border-b-2 border-citrus-sage/50 flex items-center gap-2 min-h-[42px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-gradient-to-r before:from-citrus-sage before:via-[#7CB518] before:to-citrus-sage before:opacity-60">
+      <div className="relative p-2 bg-gradient-to-r from-pastel-sage/25 via-pastel-sage/15 to-pastel-sage/25 border-b-2 border-pastel-sage/50 flex items-center gap-2 min-h-[42px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-gradient-to-r before:from-pastel-sage before:via-[#7CB518] before:to-pastel-sage before:opacity-60">
         {getStatusBadge()}
         
         {/* Lock Icon Badge - Varsity Style */}
         {isLocked && (
           <Badge 
             variant="secondary"
-            className="absolute top-1 left-1 text-[7px] font-bold h-5 px-1.5 z-10 gap-0.5 flex items-center bg-citrus-sage/30 text-citrus-forest border-2 border-citrus-sage rounded-lg shadow-sm"
+            className="absolute top-1 left-1 text-[7px] font-bold h-5 px-1.5 z-10 gap-0.5 flex items-center bg-pastel-sage/30 text-pastel-cream border-2 border-pastel-sage rounded-lg shadow-sm"
             title="Player's game has started - cannot be moved"
           >
             <Lock className="w-3 h-3" />
@@ -410,7 +410,7 @@ const HockeyPlayerCardContent = ({
         )}
 
         {/* Team Logo - GREEN VARSITY BADGE */}
-        <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-citrus-sage/20 to-citrus-sage/10 rounded-xl shadow-varsity p-1 border-2 border-citrus-sage relative before:content-[''] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-br before:from-transparent before:to-citrus-sage/20 hover:border-[#7CB518] hover:shadow-[0_0_12px_rgba(124,181,24,0.5)] transition-all">
+        <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-pastel-sage/20 to-pastel-sage/10 rounded-xl shadow-varsity p-1 border-2 border-pastel-sage relative before:content-[''] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-br before:from-transparent before:to-pastel-sage/20 hover:border-[#7CB518] hover:shadow-[0_0_12px_rgba(124,181,24,0.5)] transition-all">
            {!imageError ? (
              <img
                src={teamLogoUrl}
@@ -421,14 +421,14 @@ const HockeyPlayerCardContent = ({
                onError={() => setImageError(true)}
              />
            ) : (
-             <Shield className="w-5 h-5 text-citrus-sage" />
+             <Shield className="w-5 h-5 text-pastel-sage" />
            )}
         </div>
 
         {/* Player Name and Team - Varsity Typography */}
         <div className="flex-1 min-w-0 pr-5">
           <h3 
-            className="font-display font-bold text-[11px] leading-tight line-clamp-2 cursor-pointer hover:text-citrus-sage transition-colors text-citrus-forest"
+            className="font-display font-bold text-[11px] leading-tight line-clamp-2 cursor-pointer hover:text-pastel-sage transition-colors text-pastel-cream"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
@@ -437,7 +437,7 @@ const HockeyPlayerCardContent = ({
           >
             {player.name}
           </h3>
-          <div className="flex items-center text-[9px] text-citrus-sage font-display font-bold mt-1 gap-1 uppercase tracking-wide">
+          <div className="flex items-center text-[9px] text-pastel-sage font-display font-bold mt-1 gap-1 uppercase tracking-wide">
             <span>{teamAbbr}</span>
             <span>•</span>
             <span>#{player.number}</span>
@@ -449,14 +449,14 @@ const HockeyPlayerCardContent = ({
 
         {/* Position Badge - GREEN VARSITY PATCH absolute top right */}
         <Badge 
-          className="absolute top-0.5 right-0.5 bg-gradient-to-br from-citrus-sage to-[#7CB518] border-2 border-citrus-forest text-citrus-forest font-varsity shadow-patch text-[9px] tracking-wider font-black h-5 px-2"
+          className="absolute top-0.5 right-0.5 bg-gradient-to-br from-pastel-sage to-[#7CB518] border-2 border-white/10 text-pastel-cream font-varsity shadow-patch text-[9px] tracking-wider font-black h-5 px-2"
         >
           {positionAbbr}
         </Badge>
       </div>
 
       {/* Stats Grid — actuals for live/final, season stats otherwise */}
-      <div className="p-2 bg-gradient-to-br from-citrus-sage/10 via-citrus-sage/5 to-citrus-sage/10 flex-1 flex items-center justify-center border-t-2 border-citrus-sage/40 relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-gradient-to-r before:from-citrus-sage/50 before:via-[#7CB518] before:to-citrus-sage/50">
+      <div className="p-2 bg-gradient-to-br from-pastel-sage/10 via-pastel-sage/5 to-pastel-sage/10 flex-1 flex items-center justify-center border-t-2 border-pastel-sage/40 relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-gradient-to-r before:from-pastel-sage/50 before:via-[#7CB518] before:to-pastel-sage/50">
         {(() => {
           const gameStatus = player.nextGame?.gameStatus;
           const showActuals = hasGameOnSelectedDate && player.daily_actual_stats &&
@@ -522,33 +522,33 @@ const HockeyPlayerCardContent = ({
       </div>
 
       {/* Projected Points / Game Bar - VARSITY SCOREBOARD STYLE */}
-      <div className="relative px-2 pb-2 pt-1.5 bg-gradient-to-br from-citrus-sage/15 via-citrus-cream/50 to-citrus-peach/10 flex flex-col justify-center gap-1.5 border-t-2 border-citrus-sage/40 min-h-[32px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-citrus-sage before:to-transparent before:opacity-60">
+      <div className="relative px-2 pb-2 pt-1.5 bg-gradient-to-br from-pastel-sage/15 via-white/50 to-pastel-sage/10 flex flex-col justify-center gap-1.5 border-t-2 border-pastel-sage/40 min-h-[32px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-pastel-sage before:to-transparent before:opacity-60">
         <div className="flex items-center justify-between h-3.5">
           <div className="flex items-center gap-1.5">
             {hasGameOnSelectedDate ? (
               <>
-                <div className="flex items-center gap-1 bg-citrus-sage/20 px-1.5 py-0.5 rounded-md border border-citrus-sage/40">
-                  <CalendarDays className="w-2.5 h-2.5 text-citrus-forest" />
-                  <span className="text-[8px] font-varsity font-bold text-citrus-forest tracking-wide truncate max-w-[50px]">
+                <div className="flex items-center gap-1 bg-pastel-sage/20 px-1.5 py-0.5 rounded-md border border-pastel-sage/40">
+                  <CalendarDays className="w-2.5 h-2.5 text-pastel-cream" />
+                  <span className="text-[8px] font-varsity font-bold text-pastel-cream tracking-wide truncate max-w-[50px]">
                      {player.nextGame?.opponent || 'Game'}
                   </span>
                   {player.nextGame?.gameTime && (
-                    <span className="text-[7px] text-citrus-forest/70 font-display font-medium">
+                    <span className="text-[7px] text-pastel-cream/70 font-display font-medium">
                       {player.nextGame.gameTime}
                     </span>
                   )}
                 </div>
               </>
             ) : (
-               <span className="text-[8px] font-display text-citrus-charcoal/40 italic">No Game</span>
+               <span className="text-[8px] font-display text-white/40 italic">No Game</span>
             )}
           </div>
           
-          <div className="flex items-center gap-1 bg-citrus-peach/30 px-2 py-0.5 rounded-md border-2 border-citrus-peach/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]">
-             <span className="text-[7px] text-citrus-charcoal uppercase font-varsity font-bold tracking-wider">PROJ</span>
+          <div className="flex items-center gap-1 bg-pastel-sage/30 px-2 py-0.5 rounded-md border-2 border-pastel-sage/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]">
+             <span className="text-[7px] text-white/55 uppercase font-varsity font-bold tracking-wider">PROJ</span>
              <span className={cn(
                "text-[10px] font-varsity font-black tracking-tight",
-               hasGameOnSelectedDate ? "text-citrus-orange" : "text-citrus-charcoal/40"
+               hasGameOnSelectedDate ? "text-pastel-orange" : "text-white/40"
              )}>
                  {hasGameOnSelectedDate ? projectedPoints.toFixed(1) : '-'}
              </span>
@@ -556,12 +556,12 @@ const HockeyPlayerCardContent = ({
         </div>
         
         {/* Collegiate Progress Bar with Stitching */}
-        <div className="relative h-2 bg-[#E8EED9]/50 backdrop-blur-sm rounded-full overflow-hidden border-2 border-dashed border-citrus-sage/40 w-full shadow-[inset_0_1px_3px_rgba(0,0,0,0.15)]">
+        <div className="relative h-2 bg-[#1A2A20] backdrop-blur-sm rounded-full overflow-hidden border-2 border-dashed border-pastel-sage/40 w-full shadow-[inset_0_1px_3px_rgba(0,0,0,0.15)]">
           <div 
             className={cn(
               "h-full rounded-full transition-all duration-700 ease-out relative", 
               hasGameOnSelectedDate 
-                ? "bg-gradient-to-r from-citrus-sage via-[#7CB518] to-citrus-sage shadow-[0_0_8px_rgba(124,181,24,0.4)]" 
+                ? "bg-gradient-to-r from-pastel-sage via-[#7CB518] to-pastel-sage shadow-[0_0_8px_rgba(124,181,24,0.4)]" 
                 : "bg-transparent"
             )}
             style={{ width: `${projectionPercentage}%` }}

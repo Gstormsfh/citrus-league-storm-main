@@ -19,22 +19,22 @@ const getPositionAbbr = (pos: string) => {
 import type { PositionType } from "@/utils/rosterUtils";
 
 const posColor: Record<string, string> = {
-  LW: 'bg-citrus-green-dark',
-  C: 'bg-citrus-sage',
-  RW: 'bg-citrus-orange',
-  D: 'bg-citrus-forest',
-  G: 'bg-citrus-peach text-citrus-forest',
-  UTIL: 'bg-citrus-green-medium',
+  LW: 'bg-pastel-sage-soft',
+  C: 'bg-pastel-sage',
+  RW: 'bg-pastel-orange',
+  D: 'bg-[#1A2A20]',
+  G: 'bg-pastel-sage/15 text-pastel-cream',
+  UTIL: 'bg-pastel-sage',
   F: 'bg-emerald-600',
 };
 
 const posRingColor: Record<string, string> = {
-  LW: 'ring-citrus-green-dark/30',
-  C: 'ring-citrus-sage/30',
-  RW: 'ring-citrus-orange/30',
-  D: 'ring-citrus-forest/30',
-  G: 'ring-citrus-peach/50',
-  UTIL: 'ring-citrus-green-medium/30',
+  LW: 'ring-pastel-sage-soft/30',
+  C: 'ring-pastel-sage/30',
+  RW: 'ring-pastel-orange/30',
+  D: 'ring-white/30',
+  G: 'ring-pastel-sage/50',
+  UTIL: 'ring-pastel-sage/30',
   F: 'ring-emerald-600/30',
 };
 
@@ -130,7 +130,7 @@ const GameStatusBadge = ({ status, score }: { status?: string; score?: string })
 
   if (status === 'final') {
     return (
-      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-citrus-charcoal/10 text-citrus-charcoal/70 uppercase">
+      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-white/10 text-white/70 uppercase">
         Final{score ? ` ${score}` : ''}
       </span>
     );
@@ -184,9 +184,9 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
   return (
     <div
       className={cn(
-        "flex items-center gap-2.5 px-3 py-2 min-h-[52px] transition-all border-b border-citrus-sage/10",
-        isSwapSelected && "!bg-citrus-orange/10 !border-citrus-orange/30",
-        isEligibleTarget && !isSwapSelected && "!bg-citrus-sage/10 !border-citrus-sage/30",
+        "flex items-center gap-2.5 px-3 py-2 min-h-[52px] transition-all border-b border-pastel-sage/10",
+        isSwapSelected && "!bg-pastel-orange/10 !border-pastel-orange/30",
+        isEligibleTarget && !isSwapSelected && "!bg-pastel-sage/10 !border-pastel-sage/30",
         isLocked && "opacity-60",
       )}
     >
@@ -195,10 +195,10 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
         className={cn(
           "w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center text-white font-varsity text-[11px] font-black tracking-wide",
           "ring-1 active:scale-95 transition-transform cursor-pointer",
-          posColor[slotPosition] || 'bg-citrus-charcoal/40',
-          posRingColor[slotPosition] || 'ring-citrus-charcoal/20',
-          isEligibleTarget && !isSwapSelected && "!ring-citrus-sage !ring-2 animate-pulse",
-          isSwapSelected && "!ring-citrus-orange !ring-2",
+          posColor[slotPosition] || 'bg-white/40',
+          posRingColor[slotPosition] || 'ring-white/20',
+          isEligibleTarget && !isSwapSelected && "!ring-pastel-sage !ring-2 animate-pulse",
+          isSwapSelected && "!ring-pastel-orange !ring-2",
         )}
         onClick={(e) => { e.stopPropagation(); onPositionTap?.(); }}
       >
@@ -208,7 +208,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
       {player ? (
         <>
           {/* Team logo */}
-          <div className="w-7 h-7 flex-shrink-0 rounded-full overflow-hidden bg-citrus-sage/10 border border-citrus-sage/20 relative">
+          <div className="w-7 h-7 flex-shrink-0 rounded-full overflow-hidden bg-pastel-sage/10 border border-pastel-sage/20 relative">
             {!imgErr ? (
               <img
                 src={teamLogoUrl}
@@ -217,7 +217,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 onError={() => setImgErr(true)}
               />
             ) : (
-              <Shield className="w-4 h-4 text-citrus-sage absolute inset-0 m-auto" />
+              <Shield className="w-4 h-4 text-pastel-sage absolute inset-0 m-auto" />
             )}
             {isLocked && (
               <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
@@ -230,7 +230,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
           <div className="flex-1 min-w-0 cursor-pointer" onClick={(e) => { e.stopPropagation(); onNameTap?.(); }}>
             {/* Line 1: Name + status badge */}
             <div className="flex items-center gap-1.5">
-              <span className="font-display font-bold text-[13px] text-citrus-forest truncate leading-tight">
+              <span className="font-display font-bold text-[13px] text-pastel-cream truncate leading-tight">
                 {player.name}
               </span>
               {statusBadge && (
@@ -240,12 +240,12 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
               )}
             </div>
             {/* Line 2: Team · Opponent · Game status/time · Stats (single line, truncated) */}
-            <div className="flex items-center gap-1 text-[11px] text-citrus-charcoal/55 font-display leading-tight mt-0.5 overflow-hidden">
+            <div className="flex items-center gap-1 text-[11px] text-white/55 font-display leading-tight mt-0.5 overflow-hidden">
               <span className="font-semibold flex-shrink-0">{teamAbbr}</span>
               {player.nextGame?.opponent && (
                 <>
-                  <span className="text-citrus-charcoal/25 flex-shrink-0">·</span>
-                  <span className="text-citrus-sage font-semibold flex-shrink-0">
+                  <span className="text-white/25 flex-shrink-0">·</span>
+                  <span className="text-pastel-sage font-semibold flex-shrink-0">
                     {player.nextGame.opponent}
                   </span>
                 </>
@@ -254,14 +254,14 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 <>
                   {isLiveOrFinal ? (
                     <>
-                      <span className="text-citrus-charcoal/25 flex-shrink-0">·</span>
+                      <span className="text-white/25 flex-shrink-0">·</span>
                       <GameStatusBadge status={gameStatus} score={player.nextGame.score} />
                       {(() => {
                         const statInfo = formatStatLine(player);
                         if (!statInfo) return null;
                         return (
                           <>
-                            <span className="text-citrus-charcoal/25 flex-shrink-0">·</span>
+                            <span className="text-white/25 flex-shrink-0">·</span>
                             <span className="text-emerald-700 font-semibold truncate">
                               {statInfo.text}
                             </span>
@@ -271,8 +271,8 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                     </>
                   ) : player.nextGame.gameTime ? (
                     <>
-                      <span className="text-citrus-charcoal/25 flex-shrink-0">·</span>
-                      <span className="text-citrus-charcoal/45 font-medium flex-shrink-0">
+                      <span className="text-white/25 flex-shrink-0">·</span>
+                      <span className="text-white/45 font-medium flex-shrink-0">
                         {player.nextGame.gameTime}
                       </span>
                     </>
@@ -288,19 +288,19 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
               <div className="flex flex-col items-end">
                 <span className={cn(
                   "font-varsity text-[15px] font-black leading-none",
-                  isLiveOrFinal ? "text-emerald-700" : "text-citrus-orange"
+                  isLiveOrFinal ? "text-emerald-700" : "text-pastel-orange"
                 )}>
                   {displayPts.toFixed(1)}
                 </span>
                 <span className={cn(
                   "text-[9px] font-display font-semibold uppercase leading-tight mt-0.5",
-                  isLiveOrFinal ? "text-emerald-600/70" : "text-citrus-charcoal/40"
+                  isLiveOrFinal ? "text-emerald-600/70" : "text-white/40"
                 )}>
                   {isLiveOrFinal ? (gameStatus === 'final' ? 'final' : 'live') : 'proj'}
                 </span>
               </div>
             ) : (
-              <span className="text-[11px] text-citrus-charcoal/30 font-display">—</span>
+              <span className="text-[11px] text-white/30 font-display">—</span>
             )}
           </div>
         </>
@@ -309,13 +309,13 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
         <div
           className={cn(
             "flex-1 flex items-center justify-center py-1.5 rounded-md border border-dashed",
-            isEligibleTarget ? "border-citrus-sage bg-citrus-sage/5" : "border-citrus-charcoal/10 bg-citrus-charcoal/3",
+            isEligibleTarget ? "border-pastel-sage bg-pastel-sage/5" : "border-white/10 bg-white/3",
           )}
           onClick={onEmptySlotTap}
         >
           <span className={cn(
             "text-xs font-display",
-            isEligibleTarget ? "text-citrus-sage font-bold" : "text-citrus-charcoal/25",
+            isEligibleTarget ? "text-pastel-sage font-bold" : "text-white/25",
           )}>
             {isEligibleTarget ? "Tap to move here" : "Empty"}
           </span>
@@ -327,10 +327,10 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
 
 // ─── Section header ──────────────────────────────────────────────────
 const SectionHeader = ({ label, count, icon }: { label: string; count: number; icon: React.ReactNode }) => (
-  <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-transparent border-b border-citrus-sage/25">
+  <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-pastel-sage/20 via-pastel-sage/10 to-transparent border-b border-pastel-sage/25">
     {icon}
-    <span className="text-sm font-varsity font-black text-citrus-forest uppercase tracking-wide">{label}</span>
-    <Badge variant="outline" className="text-[10px] font-display h-4 px-1.5 ml-auto border-citrus-sage/30 text-citrus-charcoal/60">
+    <span className="text-sm font-varsity font-black text-pastel-cream uppercase tracking-wide">{label}</span>
+    <Badge variant="outline" className="text-[10px] font-display h-4 px-1.5 ml-auto border-pastel-sage/30 text-white/60">
       {count}
     </Badge>
   </div>
@@ -404,12 +404,12 @@ const MobileRosterList = ({
   const benchIsTarget = tapSelectedPlayerId != null && tapEligibleSlots.has('bench-grid');
 
   return (
-    <div className="bg-card rounded-xl border border-citrus-sage/25 shadow-sm overflow-hidden">
+    <div className="bg-card rounded-xl border border-pastel-sage/25 shadow-sm overflow-hidden">
       {/* Starters: Forwards */}
       <SectionHeader
         label="Forwards"
         count={forwardSlots.filter(s => getPlayerInSlot(s) != null).length}
-        icon={<CitrusSparkle className="w-4 h-4 text-citrus-orange" />}
+        icon={<CitrusSparkle className="w-4 h-4 text-pastel-orange" />}
       />
       {renderSlotRows(forwardSlots)}
 
@@ -417,7 +417,7 @@ const MobileRosterList = ({
       <SectionHeader
         label="Defense"
         count={defenseSlots.filter(s => getPlayerInSlot(s) != null).length}
-        icon={<Shield className="w-4 h-4 text-citrus-forest" />}
+        icon={<Shield className="w-4 h-4 text-pastel-cream" />}
       />
       {renderSlotRows(defenseSlots)}
 
@@ -425,7 +425,7 @@ const MobileRosterList = ({
       <SectionHeader
         label="Goalies"
         count={goalieSlots.filter(s => getPlayerInSlot(s) != null).length}
-        icon={<Shield className="w-4 h-4 text-citrus-peach" />}
+        icon={<Shield className="w-4 h-4 text-pastel-cream" />}
       />
       {renderSlotRows(goalieSlots)}
 
@@ -433,25 +433,25 @@ const MobileRosterList = ({
       <SectionHeader
         label="Utility"
         count={utilSlots.filter(s => getPlayerInSlot(s) != null).length}
-        icon={<CitrusSparkle className="w-4 h-4 text-citrus-green-medium" />}
+        icon={<CitrusSparkle className="w-4 h-4 text-pastel-sage" />}
       />
       {renderSlotRows(utilSlots)}
 
       {/* Bench */}
       <div
         className={cn(
-          benchIsTarget && "bg-citrus-sage/5",
+          benchIsTarget && "bg-pastel-sage/5",
         )}
         onClick={benchIsTarget && bench.length === 0 ? onBenchTap : undefined}
       >
         <SectionHeader
           label="Bench"
           count={bench.length}
-          icon={<CitrusLeaf className="w-4 h-4 text-citrus-sage" />}
+          icon={<CitrusLeaf className="w-4 h-4 text-pastel-sage" />}
         />
         {benchIsTarget && bench.length === 0 && (
           <div className="px-3 py-4 text-center">
-            <span className="text-xs font-display text-citrus-sage font-bold">Tap to move to bench</span>
+            <span className="text-xs font-display text-pastel-sage font-bold">Tap to move to bench</span>
           </div>
         )}
         {bench.map(player => {
