@@ -3573,3 +3573,9 @@ Zero code changes. Report-only cycle per Entry 38 requirement.
 ## R70 — heartbeat (2026-08-10 04:33Z / 10:33 MT)
 
 Inbox latest is Entry 38. No Entry 39+. Garrett deploy in progress (§C-PRE look gate → Group C → F28 → Group A → Group B per Entry 38). Staged revert `git revert --no-edit 83e811a3 5f16a463` ready for instant execution if look gate says revert (dry-run zero-conflict evidence in R63). Standing by deploy-responsive per KI-048; next poll in 30min.
+
+---
+
+## R71 — heartbeat (2026-08-10 05:04Z / 11:04 MT)
+
+Inbox latest is Entry 38. No Entry 39+. Garrett deploy in progress. Staged revert block ready. Standing by deploy-responsive per KI-048; next poll in 30min.
