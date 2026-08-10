@@ -3802,3 +3802,95 @@ MOD: docs/TERMINAL_OUTBOX.md (this R75)
 Per Entry 39 order: **T12P-2 next** (Email verification corridor: VerifyEmail.tsx + resend path — expired links, double-clicks, already-verified re-entry). Architect ratification sweeps continue.
 
 **End of R75. Entry 44 ACK'd. T12P-1 shipped one P0-candidate fix (silent dead-end on sign-in) + 18 COPY_VOICE polish sites + 5-test lock. 66/66 tests pass. Corridor step 1 of 5 complete.**
+
+---
+
+## R76 — Entry 45 ACK + T12P-2 committed (2026-08-10 08:05Z / 2:05 AM MT)
+
+### Entry 45 ACK
+
+T12P-1 RATIFIED. The safety-timeout dead-end was the hostile pass earning its keep. Regex catch transparency appreciated. Dockets accepted as filed. Entry 45's T12P-3 amendment noted for the next cycle: **attack the fixed Tier-1 path** — verify auto-join actually fires post-redirect, verify the `?code=` param survives round-trip into `searchParams` on protected mount, plus full-league / already-member / invalid-code / expired-invite refusals. Auto-join-after-redirect is the C3-decides gate.
+
+### T12P-2 executed (7fbc5dba)
+
+**P-a Flow audit** (VerifyEmail.tsx = 4 primary states × 3 entry paths):
+
+| State | New-signup entry | Signed-in-unverified | Signed-in-verified |
+|---|---|---|---|
+| Idle | ✅ card with location.state email | ✅ card with user.email | ❌ **DEAD-END** (pre-fix) |
+| Loading (Resend) | ✅ spinner + "Sending…" | ✅ | N/A |
+| Success | ✅ CheckCircle + banner + button locked | ✅ | N/A |
+| Error | ✅ AlertDestructive + retry available | ✅ | N/A |
+
+**HOSTILE probes — enumerated unhandled rejections + dead ends**:
+
+1. **Expired verification link** → hits `/auth/callback` → `hashError`/`queryError` branch → `fail()` → 3s redirect to `/auth`. ✓ door.
+2. **Double-click on verification link** → first click consumes PKCE code, second returns error → same `hashError` path → `fail()`. ✓ door.
+3. **Already-verified re-entry (P0-CANDIDATE, PRE-FIX)**: signed-in verified user lands on /verify-email → sees full "Check Your Email" card with own email + Resend button. **Zero acknowledgment they're already done. Silent dead-end.**
+4. **Resend cooldown/rate-limit** → Supabase returns "For security purposes, you can only request this after X seconds." Message propagates verbatim via `error.message`. Not warm but honest. Docketed.
+5. **Session mid-flight edge (verify while signed in)** → subsumed by #3. Same fix.
+6. **Token-not-found at callback** → `/auth/callback` with no hash + no session → 10s timeout → `fail("Sign-in took too long")`. ✓ door.
+7. **Rapid Resend button double-click** → `disabled={loading || success}` protects. ✓
+8. **!email + Resend tap** → inline Alert (line 77-82) already offers "sign up again" hyperlink door. `setError` message was redundant + preachy. Copy-polished.
+9. **Success + email doesn't arrive** → no re-resend path without navigating away. Docketed.
+10. **Unverified signin loop** → Supabase "Email not confirmed" flows to getBetterErrorMessage; text-only guidance, no button to /verify-email. Docketed.
+
+**P0-CANDIDATE FIX**:
+
+```typescript
+useEffect(() => {
+  if (user?.email_confirmed_at) {
+    navigate('/', { replace: true });
+  }
+}, [user, navigate]);
+```
+
+The `email_confirmed_at` gate preserves the rare session-without-confirmation edge (some Supabase configs allow this). Fail-safe: unverified sessions still see the verify card.
+
+**P-b State polish + P-c COPY_VOICE conformance** (3 sites):
+
+- `'Failed to send verification email. Please try again.'` → `"Couldn't send that link — try again in a moment."` (banned "Failed" purged; owns blame per rule 3)
+- `'No email address found. Please sign up again.'` → `"We don't have your email — sign up again to get a fresh link."` (drops politeness padding; names actor)
+- `'An unexpected error occurred.'` → `"That resend hit a snag — try again in a moment."` (contextual + door)
+
+**P-d offline-verifiable fixes only**: one useEffect, three copy strings. Zero backend/routing/token-flow changes. Zero mock-only assumptions.
+
+**P-e Test lock** (`VerifyEmail.deadEnd.test.tsx`, 7 tests):
+
+Render tests (redirect contract):
+1. Unauthenticated → verify card renders (no redirect)
+2. Authenticated + `email_confirmed_at: null` → verify card (still needs)
+3. Authenticated + `email_confirmed_at: '2026-01-01T00:00:00Z'` → **redirects to home** (kills dead-end)
+
+Source-read tests (COPY_VOICE invariants):
+4. `!/Failed to send/` across whole source
+5. `/try again/i` present (door language retained)
+6. `!/unexpected error occurred/` (banned generic)
+7. `!/Please sign up/` (banned politeness padding)
+
+### Docketed T12P-2 findings (not this commit)
+
+- **Unverified signin loop**: Supabase's "Email not confirmed" error currently text-only. Add button to /verify-email in signIn error branch. Post-twelve.
+- **Post-success re-resend**: No cooldown-then-re-enable path. Nice-to-have.
+- **shadcn Card/Alert/Button + text-muted-foreground/text-primary tokens** — task #103 covers this file as POST-TWELVE citrus2 sweep.
+- **AuthContext resendVerificationEmail rate-limit copy** — raw Supabase phrasing acceptable but could be warmed.
+
+### Test / typecheck status
+
+- `npx vitest run [suite list] → 73 passed / 73 total` (66 prior + 7 new = 73 exact match)
+- `npx tsc --noEmit -p tsconfig.app.json | grep VerifyEmail → 0 lines` (zero new tsc errors)
+- HARD GUARD honored (`git diff --name-only | grep draft = 0`).
+
+### Files changed this cycle
+
+```
+MOD: apps/web/src/pages/VerifyEmail.tsx (useEffect + 3 copy sites)
+NEW: apps/web/src/pages/__tests__/VerifyEmail.deadEnd.test.tsx (7 tests)
+MOD: docs/TERMINAL_OUTBOX.md (this R76)
+```
+
+### T12P queue standing
+
+Per Entry 39 order + Entry 45 amendment: **T12P-3 next** (Join-by-code hostile on CreateLeague.tsx :220/:605/:563 — attack the Tier-1 fixed path: does auto-join fire post-redirect, does ?code survive into searchParams on protected mount, plus full-league / already-member / invalid-code / expired-invite refusals). Corridor step 3 of 5.
+
+**End of R76. Entry 45 ACK'd. T12P-2 shipped one P0-candidate fix (already-verified redirect) + 3 COPY_VOICE polish sites + 7-test lock. 73/73 tests pass. Corridor step 2 of 5 complete.**
