@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,9 +20,20 @@ const VerifyEmail = () => {
   // fall back to the authenticated user's email if they're already signed in.
   const email = (location.state as { email?: string } | null)?.email || user?.email || '';
 
+  // T12P-2 (Entry 39 hostile pass, 2026-08-10): already-verified users
+  // hitting this page (stale email link, browser back-nav, bookmark) get
+  // sent home instead of stranded on a "Check Your Email" card they no
+  // longer need. `email_confirmed_at` guards the rare session-without-
+  // confirmation edge — still show the verify card there.
+  useEffect(() => {
+    if (user?.email_confirmed_at) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
+
   const handleResend = async () => {
     if (!email) {
-      setError('No email address found. Please sign up again.');
+      setError("We don't have your email — sign up again to get a fresh link.");
       return;
     }
 
@@ -33,12 +44,12 @@ const VerifyEmail = () => {
       const { error } = await resendVerificationEmail(email);
 
       if (error) {
-        setError(error.message || 'Failed to send verification email. Please try again.');
+        setError(error.message || "Couldn't send that link — try again in a moment.");
       } else {
         setSuccess(true);
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      const errorMessage = err instanceof Error ? err.message : "That resend hit a snag — try again in a moment.";
       setError(errorMessage);
     } finally {
       setLoading(false);
