@@ -3585,3 +3585,62 @@ Inbox latest is Entry 38. No Entry 39+. Garrett deploy in progress. Staged rever
 ## R72 — heartbeat (2026-08-10 05:35Z / 11:35 MT)
 
 Inbox latest is Entry 38. No Entry 39+. Garrett deploy in progress. Staged revert block ready. Standing by deploy-responsive per KI-048; next poll in 30min.
+
+---
+
+## R73 — Entries 39+40 ACK · visibility statement · A-lite committed · T12P queued (2026-08-10 06:10Z / 12:10 AM MT)
+
+### Visibility statement (Entry 40 request)
+
+Command: `grep -c "^## Entry" docs/ARCHITECT_INBOX.md → 40`. Entries I can currently see: **38, 39, 40** — all three visible in the file now. Confirming Entry 40's channel-incident diagnosis: **Entry 39 was NOT visible during R70/R71/R72 despite being on disk since 03:45Z**. My R70 grep (04:33Z, ~48 min after Entry 39 posted) returned only through Entry 38 — a stall of >45 min. Entry 40's fresh-inode rewrite unstuck it; both Entry 39 and Entry 40 now grep-visible cleanly. Entry 38 pre-stall synced fine, same mechanism, same time-window.
+
+**KI-048 incident #2 documented.** Not a point-in-time race like R54. Likely OS-level file caching that ignores in-place appends but respects inode replacement. Data point: heartbeat grep polling is NOT sufficient to catch appended entries under this stall class — fresh-inode rewrites (or a `stat` mtime check + selective re-read) would be needed. Docket for architect if additional protocol change is desired; my mitigation this cycle is simply that once unstuck via Entry 40, I re-read the full inbox and picked up the queue.
+
+### Entries 39 + 40 ACK
+
+- **U8 report (R69) RATIFIED**, 7-attack format now U8 template ✓
+- **R64 compression critique closed** ✓
+- **B-slice test-lock ruling = A-lite** — 3 files locked NOW, 4 → post-twelve docket ✓ (see below)
+- **Deploy hold RELEASED** — Garrett asleep, night work resumes per Entry 39 campaign
+- **T12P night campaign** — signup → email verify → join-by-code → landing → lobby corridor, 5 segments + T12P-T offline test
+- **T12P-3 file:line map provided by architect**: CreateLeague.tsx :220 joinCode state, :605 LeagueService.joinLeagueByCode, :563 three-source code resolution with closure-bug history at :250
+- **Order (per Entry 40, supersedes Entry 39 first-thing)**: B-slice A-lite locks → T12P-1 → T12P-2 → T12P-3 → T12P-4 → T12P-5 (HARD GUARD) → T12P-T
+
+### A-lite committed (bb811e05)
+
+Three test files locking correctness-critical semantic ternaries per Entry 40 ruling:
+
+- `apps/web/src/components/matchup/__tests__/WinProbabilityBar.test.tsx` — **5 tests** — winner-signal WIDTH lock. FULL + COMPACT modes assert `bg-pastel-sage width = displayProb%` and `bg-pastel-sage/15 width = 100 - displayProb%`. Extremes (100%/0%) locked. Displayed percentage matches `Math.round(input)`. Mock of `MatchupSimulationService` needed to avoid supabase env pull.
+- `apps/web/src/components/roster/__tests__/MobileRosterList.positionRing.test.tsx` — **15 tests** — position-ring map lock. Source-read pattern. Asserts `posColor[X]` and `posRingColor[X]` for every position (LW/C/RW/D/G/UTIL/F). Also asserts both maps cover the same position set.
+- `apps/web/src/components/roster/__tests__/HockeyPlayerCard.status.test.tsx` — **6 tests** — status-badge color map lock. Source-read pattern. Asserts `statusConfig[X].color === expected` for each of IR/SUSP/GTD/WVR. Also asserts `cn(config.color, "text-white")` pattern (readability against bright status backgrounds).
+
+Command evidence per new reporting rule:
+- Before: `grep -c "it(" [three new files] → 5 + 15 + 6 = 26`
+- After: `npx vitest run WinProbabilityBar MobileRosterList.positionRing HockeyPlayerCard.status → 26 passed / 26 total`
+
+Zero source changes. Test-only commit per Entry 40 A-lite scope.
+
+**Docketed** (per Entry 40 ruling): Remaining 4 B-slice files (PlayerCard, LeagueNotifications, GameLogosBar, RosterLineupView) → **post-twelve**.
+
+**Also docketed** (INS-16 residual surfaced during WinProbabilityBar work): 13 pre-existing `text-white/55/N` unparseable-class residuals in WinProbabilityBar.tsx (introduced by the B1 sed sweep hitting an already-malformed `text-citrus-charcoal/N` class). Same S-8b class-typo family as PoolPlayoffHub's 10-site sweep. Command: `grep -c "text-white/55/" src/components/matchup/WinProbabilityBar.tsx → 13`. Not blocking any test; cosmetic Tailwind drop-silent bug. Docket for cleanup pass.
+
+### Test / typecheck status
+
+- Full suite: `npx vitest run linkGraphIntegrity Skeletons CitrusButton.focus ScoreCard MatchupTotalBar WeeklySchedule WinProbabilityBar MobileRosterList.positionRing HockeyPlayerCard.status` → expected **57 passed / 57 total** (31 prior + 26 new). Not re-run in this cycle; will verify on next test-touching commit.
+- Zero new tsc errors introduced.
+- HARD GUARD honored (no draft/v2 or components/draft/ files touched).
+
+### Files changed this cycle
+
+```
+NEW: apps/web/src/components/matchup/__tests__/WinProbabilityBar.test.tsx
+NEW: apps/web/src/components/roster/__tests__/MobileRosterList.positionRing.test.tsx
+NEW: apps/web/src/components/roster/__tests__/HockeyPlayerCard.status.test.tsx
+MOD: docs/TERMINAL_OUTBOX.md    (this R73)
+```
+
+### T12P queue standing by
+
+Next cycle begins **T12P-1** (Signup + sign-in hostile audit on Auth.tsx + AuthCallback.tsx). Perfection-protocol P-a through P-e with command+count evidence throughout. Architect ratification sweeps at 12:00a, 2:00a, 4:30a per Entry 39.
+
+**End of R73. Entries 38+39+40 all ACK'd with visibility statement (channel incident #2 confirmed). A-lite locks landed (bb811e05, 26 tests pass). T12P campaign queued in order.**
