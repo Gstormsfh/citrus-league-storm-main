@@ -549,7 +549,7 @@ const CreateLeague = () => {
 
   const handleJoinLeague = async (codeOverride?: string) => {
     if (!user) {
-      setError("You must be logged in to join a league");
+      setError("Sign in first, then jump into the league.");
       navigate("/auth");
       return;
     }
@@ -569,7 +569,7 @@ const CreateLeague = () => {
     }
 
     if (!resolvedCode) {
-      setError("Join code is required");
+      setError("Add a join code first — check your invite link.");
       return;
     }
     const effectiveCode = resolvedCode;
@@ -609,7 +609,7 @@ const CreateLeague = () => {
       );
 
       if (joinError) throw joinError;
-      if (!league || !team) throw new Error("Failed to join league");
+      if (!league || !team) throw new Error("Couldn't join that league — try again in a moment.");
 
       // Refresh the league list, THEN pin the newly joined league as the
       // active one BEFORE navigating. Without this, LeagueContext can
@@ -627,7 +627,7 @@ const CreateLeague = () => {
       setLoading(false);
       routeToLeague(league.id, league.settings as Record<string, unknown> | null);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to join league";
+      const errorMessage = err instanceof Error ? err.message : "Couldn't join that league — try again in a moment.";
 
       // "Already a member" is a success case — the first attempt actually
       // joined (even if the response looked glitchy). Redirect them to the
@@ -682,7 +682,7 @@ const CreateLeague = () => {
       setLoading(false);
 
       toast({
-        title: "Error Joining League",
+        title: "Can't Join Right Now",
         description: errorMessage,
         variant: "destructive",
       });
