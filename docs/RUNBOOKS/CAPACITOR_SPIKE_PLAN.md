@@ -44,12 +44,87 @@
 | App-Store Connect **internal-tester group** | Garrett | ASC → TestFlight | Add himself + ~5 volunteers by email. Internal testers don't require App Store review, so distribution is instant. |
 
 **Additional considerations:**
-- Apple Developer enrollment can take days-to-weeks for Organization accounts. **Start Aug 8-10 if not already enrolled.** ✅ Individual enrollment SUBMITTED 2026-08-09 (Entry 24).
+- Apple Developer enrollment can take days-to-weeks for Organization accounts. **Start Aug 8-10 if not already enrolled.** ✅ **Individual enrollment ACTIVE** (screenshot-verified 2026-08-10, Entry 52 — Account Holder, Developer role, `garrettstorms@hotmail.com` team, Order W1761618485). Enrolled Aug 9 → active Aug 10 morning; no identity follow-up required.
 - Bundle ID must be globally unique across all Apple developers; verify availability before reserving.
-- **Remaining §2 hard blockers (as of 2026-08-09 12:20 MT / Entry 24):**
-  - macOS device / Mac access — target confirmation ~Aug 11.
-  - Bundle Identifier reservation — gated behind Apple Developer activation.
-  - App icons, launch screen — designer/asset work independent of Apple.
+- **Remaining §2 hard blockers (as of 2026-08-10 Entry 52): exactly ONE — macOS device / Mac access, target ~Aug 11-12.**
+- Bundle Identifier reservation is now a **PRE-MAC WIN** (browser-only, doable this week) — see §2.5 below.
+- App icons, launch screen — designer/asset work independent of Apple (unblocked from day one, no change).
+
+---
+
+## §2.5 — PRE-MAC WINS (browser-only, no Mac needed) — 2026-08-10 Entry 52
+
+Ten-minute checklist Garrett can knock out from any browser this week (Aug 10-14). Every item is Mac-independent — reserves the identifiers and app record so Saturday's spike is pure code + Xcode. Same paste-block care as the deploy runbooks.
+
+### PMW-1 — Register the bundle identifier
+
+**Where:** `developer.apple.com/account`
+
+Click-path:
+1. Left nav → **Certificates, Identifiers & Profiles**
+2. Left sub-nav → **Identifiers**
+3. Top right **+** button → **App IDs** → **Continue**
+4. Select **App** → **Continue**
+5. Description: `Citrus Fantasy Sports`
+6. Bundle ID: **Explicit**, value `com.citrusfantasysports.app` (already the canonical ID — see §4.1 `capacitor.config.ts` template :117 + §3 Aug 16 spike day :68)
+7. Capabilities: leave defaults (Push Notifications is docketed post-spike per §8)
+8. **Continue** → **Register**
+
+✅ Success: `com.citrusfantasysports.app` appears in the Identifiers list.
+
+⚠️ Fallback (unlikely — plan §7:242 lists this risk): if the ID is taken, try in order:
+- `com.citrusfantasysports.ios`
+- `com.citrusfantasy.app`
+- `com.citrusleaguestorm.app`
+
+Cite the chosen ID in the outbox ack so the plan can be updated in one place.
+
+### PMW-2 — Create the App Store Connect app record
+
+**Where:** `appstoreconnect.apple.com` (Note: separate site from `developer.apple.com`; both use same Apple ID)
+
+Prerequisite: PMW-1 complete AND ~5 min elapsed for the bundle ID to propagate to ASC's dropdown.
+
+Click-path:
+1. Top nav → **My Apps**
+2. Top left **+** button → **New App**
+3. Platforms: check **iOS**
+4. Name: `Citrus Fantasy Sports`
+5. Primary Language: **English (U.S.)**
+6. Bundle ID: pick **`com.citrusfantasysports.app`** from dropdown (should appear post-PMW-1)
+7. SKU: `citrus-fantasy-sports-ios` (internal identifier, never shown to users)
+8. User Access: **Full Access**
+9. **Create**
+
+✅ Success: `Citrus Fantasy Sports` shows in My Apps with status **Prepare for Submission**.
+
+**NOT NEEDED for free TestFlight**: pricing tier, availability, paid-agreements, tax/banking. Skip every "Agreements, Tax, and Banking" prompt — TestFlight distribution to internal testers is free and requires none of that paperwork. (Full App Store submission is post-TestFlight per §8:272 — different gate, different day.)
+
+### PMW-3 — Confirm team shows in App Store Connect
+
+Same session as PMW-2:
+1. Top-right → click avatar
+2. Confirm role dropdown shows **Account Holder** with team name matching the Apple Developer app screenshot
+3. **Users and Access** → **Teams** → confirm team ID is visible (needed for Xcode's "Automatically manage signing" on Aug 16 §3 step 8)
+
+✅ Success: Account Holder + team ID visible.
+
+### PMW-4 — Do NOT pre-generate certificates or provisioning profiles
+
+Signing certificates + provisioning profiles are **Mac-day work only**. Xcode's "Automatically manage signing" (checked in §3 Aug 16 step 8) generates them on demand — pre-generating manually creates orphan artifacts Xcode won't recognize, and can cause the Aug 16 upload step (§3 step 15) to fail with confusing signing errors.
+
+If any Apple prompt this week says "Create Certificate" or "Create Provisioning Profile" or "Register a New Device" — **decline / close the tab**. Xcode handles all of it Saturday.
+
+### Success criteria for the pre-Mac wins block (~10 min total)
+
+- [ ] **PMW-1:** `com.citrusfantasysports.app` (or fallback) shows in developer.apple.com Identifiers list
+- [ ] **PMW-2:** `Citrus Fantasy Sports` shows in App Store Connect My Apps at status "Prepare for Submission"
+- [ ] **PMW-3:** Account Holder role + team ID confirmed in App Store Connect
+- [ ] **PMW-4:** Zero manual certificates / provisioning profiles / device registrations created
+
+### Effect on §8 preflight
+
+PMW-1 checks off "**Bundle ID reserved**" from the §8:267 preflight list before Aug 15. Saturday's spike then starts with the bundle ID already claimed and the App Store Connect record already listening for the first Xcode upload — Aug 16 §3 morning steps 1-9 run without the "wait for ASC to accept this bundle ID" pause that would otherwise hit at step 15 (Xcode → Distribute App → Upload).
 
 ---
 
@@ -262,9 +337,9 @@ Consolidated from `docs/APPLE_APP_STORE_GAP_ANALYSIS.md` (Jan 2026) into an acti
 - [x] App features complete (draft, roster, matchup, pool games all live per gap-doc)
 
 ### BLOCKS TestFlight (must clear before Aug 16 spike)
-- [ ] **Apple Developer Program enrollment** (Garrett — start Aug 8-10 if not already)
-- [ ] **Mac + Xcode 15+** (Garrett — verify or rent)
-- [ ] **Bundle ID reserved** (Garrett — App Store Connect, matches capacitor.config.ts)
+- [x] **Apple Developer Program enrollment** (Garrett — ACTIVE 2026-08-10 Entry 52; individual account, garrettstorms@hotmail.com team)
+- [ ] **Mac + Xcode 15+** (Garrett — verify or rent by ~Aug 11-12 — **the last remaining §2 hard blocker**)
+- [ ] **Bundle ID reserved** (Garrett — see §2.5 PMW-1; browser-only, doable this week)
 - [ ] **App icons full set** (Garrett or designer — 1024×1024 baseline + full sizes)
 - [ ] **Launch screen asset or storyboard** (Garrett or designer — dark forest + logo)
 - [ ] **Capacitor scaffolds authored** (Terminal — §4 templates; done post-authoring)
