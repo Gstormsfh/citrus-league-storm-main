@@ -41,6 +41,10 @@ Four-part stack, in order: **✦ kicker** (jbmono 10px, tracking-0.32em, orange-
 
 "Loading your league…" · "Loading the matchup…" · "Loading the standings…" · "Loading your roster…" · "Loading free agents…" · "Loading the playoff bracket…" — pattern: *"Loading [the/your] [surface]…"*, ≤4 words after Loading. Kicker "STORMY IS ON IT" is component-fixed — never duplicate it in messages.
 
+## Exemplar (T12P-5 finding — reference for state-driven banners)
+
+`apps/web/src/components/draft/v2/ConnectionBanner.tsx` is the canonical implementation for state-driven fatal + transient banner copy. All six states there — connecting/resyncing (transient inline) · reconnecting (countdown + Retry) · fatal-auth ("You're no longer authorized to access this draft" + "Sign in again") · fatal-lobby ("This draft is no longer available" + "Back to GM Office") · fatal-not-initialized ("Waiting on your commissioner" + Retry) · fatal-server ("Can't reach the draft server" + Retry + Reload + collapsible technical details) — hit the taxonomy exactly: state-name titles, warm bodies that own blame, one clear door per state. When authoring new banner copy elsewhere, mirror this file.
+
 ## U7 CONFORMANCE ORDER (terminal)
 
 Copy-only commits, batched per page, tests untouched: (1) census the 55 `title: "Error"` sites (command+count per the reporting rule); (2) rewrite each via the taxonomy — specific state title + blame-owning description + door; keep every fact; where a description already carries the fact, only the title changes; (3) the 4 "Success" titles → state names; (4) the Demo-mode ×4 → "Demo League" framing; (5) NO safety promises ("your X is safe") unless the operation truly lost nothing — verify before writing; (6) draft-surface toasts: copy-only changes ARE allowed under the guard, but flag each in the report. Report before/after counts: `grep -c 'title: "Error"' → 0` is the exit criterion.

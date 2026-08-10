@@ -243,3 +243,144 @@ Three of seven U-items generated a rectification (U3→U5 focus rings, U4→Entr
 ---
 
 **Ledger complete.** For Garrett + Zach's five-minute read. Referenced by architect's evening brief.
+
+---
+
+# NIGHT SHIFT ADDENDUM (Aug 9 late → Aug 10 early)
+
+Architect Entry 50 ordered a night addendum in R63 shape. This section covers 22:15Z Aug 9 → 11:45Z Aug 10 — Entries 38 through 50 in the architect inbox, R69 through R80 in the terminal outbox, plus this cycle's Entry-50 rider. All night commits are **[NORMAL]** — none gated (the P0 landed with explicit live Garrett approval; the two takeover commits followed architect-authoring precedent per KI-048; the copy-license commits landed under U7's existing exception + Entry-49 explicit extension).
+
+## 1. Commit ledger — night rows (18 commits since 22:15Z Aug 9)
+
+| # | Commit | Chunk / owner | Flag | One-line |
+|---|---|---|---|---|
+| 1 | bb811e05 | Entry 40 A-lite | [NORMAL] | 3 test locks (WinProbabilityBar / MobileRosterList / HockeyPlayerCard) — B-slice signal-critical locks |
+| 2 | fc4e73e8 | R73 | [NORMAL] | Entries 39+40 ACK + visibility statement + A-lite committed |
+| 3 | 7226efa8 | Entry 41 P0 | **[GARRETT-APPROVED-LIVE 06:33Z]** | Tier-1 redirect preservation on protected routes (architect-authored via takeover) |
+| 4 | 64ef9199 | Entry 42 | [NORMAL] | playoff-sync.yml offseason gate (cron restricted Apr-Jun + belt/suspenders guard) |
+| 5 | 9c86263d | R74 | [NORMAL] | Takeover verification — 61/61 pass |
+| 6 | cfe2967a | T12P-1 | [NORMAL] | Auth silent-dead-end guard + COPY polish + 5-test lock |
+| 7 | 26c12ebf | R75 | [NORMAL] | T12P-1 outbox + Entry 44 ACK |
+| 8 | 7fbc5dba | T12P-2 | [NORMAL] | VerifyEmail already-verified redirect + COPY polish + 7-test lock |
+| 9 | 87bd36e2 | R76 | [NORMAL] | T12P-2 outbox + Entry 45 ACK |
+| 10 | 73ea47de | T12P-3 | [NORMAL] | CreateLeague join-corridor COPY polish + 10-test lock (auto-join + Tier-1 receive) |
+| 11 | 5adafed0 | R77 | [NORMAL] | T12P-3 outbox + Entry 46 ACK |
+| 12 | 5dbc3f21 | T12P-4 | [NORMAL] | LeagueDashboard landing corridor COPY polish + 3-test lock |
+| 13 | daadc378 | R78 | [NORMAL] | T12P-4 outbox + Entry 47 ACK |
+| 14 | aa2d78a3 | R79 / T12P-5 | [NORMAL] | T12P-5 OBSERVE-ONLY report (git-diff-zero on source) + Entry 48 ACK |
+| 15 | a2162d56 | T12P-5-followon | [NORMAL] (U7 copy license) | DraftRoom.tsx 6 "Failed to load" purges + 3-test lock |
+| 16 | 48b06daa | T12P-T | [NORMAL] | Offline integration test for auto-join corridor — campaign close |
+| 17 | 7eefffc9 | R80 | [NORMAL] | Campaign-close report + Entry 49 ACK |
+| 18 | 61d184f0 | Entry 50 rider | [NORMAL] (Entry 50 copy license) | DraftRoom.tsx :762 survivor + widened rule-not-instance test |
+
+## 2. T12P table (R80 tally verbatim)
+
+| Chunk | Commit | Tests added | Fix type |
+|---|---|---|---|
+| T12P-1 | cfe2967a | 5 | P0-candidate silent-dead-end + 18 COPY polish sites |
+| T12P-2 | 7fbc5dba | 7 | P0-candidate already-verified redirect + 3 COPY sites |
+| T12P-3 | 73ea47de | 10 | 5 COPY sites + Tier-1 receive contract lock |
+| T12P-4 | 5dbc3f21 | 3 | 2 COPY sites + landing edges |
+| T12P-5 | aa2d78a3 + a2162d56 | 3 | OBSERVE-ONLY report + Entry-49 6-site copy license |
+| T12P-T | 48b06daa | 4 | End-to-end integration test |
+| **Total** | **7 commits (+1 Entry-50 rider)** | **32 tests** | **2 P0-candidate fixes + 33 COPY_VOICE sites** |
+
+*33 not 32*: the Entry-50 rider added a seventh DraftRoom.tsx site (:762) that the original 6-site sweep + instance-list test missed. Full T12P suite post-rider: **93/93 passing** (unchanged; rider tightened an existing test, added no new suite files).
+
+## 3. P0 story (discovery → live approval → takeover → verify → confirm)
+
+**Discovery (23:20Z Aug 9, D6 audit → R61)**: Hostile-review audit found that `ProtectedRoute` unauthenticated branch dropped `pathname + search` on redirect to `/auth`. A signed-out invitee tapping a share link like `/create-league?code=ABC` would sign in and land on `/` with the code lost — the exact onboarding corridor the twelve walk on Aug 20.
+
+**Live approval (Aug 10 06:33Z / 12:33 AM MT)**: Garrett awake and browsing while architect drafted Entry 41. Explicit "**GARRETT-APPROVED-LIVE**" flag baked into commit message and Entry-41 title. Author-only rule waived for this single P0 because Garrett was watching.
+
+**Takeover-authoring (06:35Z – 07:25Z)**: Terminal stalled ~70 min post-R73 (scheduler wakes fired, no work landed — root cause unknown; architect diagnosed via mtime inspection). Architect took over authoring in the working tree, staging all four artifacts AUTHORED-UNRUN: `ProtectedRoute.tsx` (encoded redirect preservation + startsWith('/') guard rider); `ProtectedRoute.test.tsx` (4 tests — encoded redirect exact-match, round-trip, authenticated bypass, Auth.tsx guard-count ≥ 2); `Auth.tsx` rider retaining the guard; `docs/DESIGN_T2_REDIRECT_PARK.md` (Tier-2 design doc, no implementation).
+
+**Verify (07:25Z Aug 10)**: Terminal reconnected. Job: verify → test → tsc → commit. Full T12P baseline suite ran: **61/61 pass** matching architect's expected-57-plus-4 prediction exactly. R74 delivered as verification report.
+
+**Confirm (07:33Z, Entry 45)**: T12P-3 hostile pass attacked the fixed path via source-read tests locking auto-join's `?code` survival into `searchParams` on protected mount. **C3 GREEN**: end-to-end trace holds on all three delivery paths (password sign-in, already-authed, OAuth sessionStorage-stash). T12P-T integration test (48b06daa) then confirmed the shapes compose into observable behavior via a stubbed RPC layer.
+
+**Sequenced result**: the front door corridor the twelve walk on Aug 20 is now guarded by 15 tests (4 ProtectedRoute + 10 CreateLeague.autoJoin + 4 integration - 3 overlap = 15 unique), plus the source-read locks that prove all three redirect paths preserve the query param.
+
+## 4. GitHub Actions diagnosis + workflow patch (Entry 42)
+
+**Report** (Garrett live 07:05Z / 1:05 AM MT): "GitHub Actions failing constantly." Root cause identified by inspection of `.github/workflows/playoff-sync.yml`: cron `*/15 * * * *` firing 96 times/day year-round, but the underlying playoff sync only has meaningful work April – June. Off-season runs failed on empty data or missing NHL API endpoints, generating ~96 failure emails per day.
+
+**Patch** (64ef9199, architect-authored via takeover):
+- Cron changed to `*/15 * * 4-6 *` — only fires Apr / May / Jun.
+- Belt-and-suspenders "Offseason window guard" step added at top of workflow with an explicit month range check (7-3 = fail-fast skip). Guards against the case where GitHub schedules a run despite the cron restriction, or where a manual dispatch triggers the workflow off-season.
+- 5 downstream steps gated on the guard step's output.
+
+**Status**: patch is in the tree; Garrett un-disables the workflow after the next merge. Zero prod risk from the patch itself (workflow was already disabled/failing).
+
+## 5. Channel incidents (KI-048 evolution — three episodes → doctrine)
+
+**Incident #1 (recap from R63)**: append-to-file cache stall on `docs/ARCHITECT_INBOX.md`. Appends via `>>` didn't invalidate the terminal's file cache reliably. Architect's fix: write fresh-inode via `tmp + mv` for every new entry. Symptom observed in R70/R71/R72 heartbeat cycles — Entry 39 (posted via append) sat unseen through three re-arm cycles despite being on disk.
+
+**Incident #2 (this campaign, R73→R74 gap)**: **scheduler-silence** — 70-minute wake failure post-R73 with a loaded Entry-41 queue in the inbox. Wakes fired (visible in the ScheduleWakeup logs), but no work landed. Root cause unknown from the terminal side — likely a wake-fire-without-conversation-resume race in the runtime. Architect diagnosed by comparing inbox mtime (updated) vs outbox mtime (frozen).
+
+**Recovery** (architect's response to #2): rather than wait, architect took over authoring in the working tree per Entry 43 — staged all P0 + workflow-patch artifacts AUTHORED-UNRUN, wrote Entry 43 documenting the takeover, and left the terminal with a single specific job on next resume: "verify → test → tsc → commit." Executed cleanly in R74.
+
+**Doctrine born** (Entry 44, R74 ratification): **"45+ min scheduler-silence = presumed-stalled"** — architect's standing trigger for takeover-authoring under KI-048. The takeover pattern (author-in-tree → terminal verifies + commits) is the KI-048 recovery mode when the terminal is unresponsive to a time-sensitive queue.
+
+**Meta-lesson (Entry 50 correction + rider)**: instance-list tests are a shape of the same class of failure — they lock what you fixed, not what the rule is. The Entry-50 rider (this cycle) widens `DraftRoom.copyLock.test.tsx` test #1 from setError-scoped to file-wide, catching the :762 ternary fallback that survived the 6-site sweep. Standing rule going forward: **rule-wide first, narrow only with a comment explaining WHY**.
+
+## 6. Test inventory (post-campaign + rider)
+
+| File | Tests | Purpose |
+|---|---|---|
+| ProtectedRoute.test.tsx | 4 | P0 encoded-redirect + startsWith guard-count |
+| Auth.silentDeadEnd.test.tsx | 5 | T12P-1 dead-end fix + AuthCallback COPY conformance |
+| VerifyEmail.deadEnd.test.tsx | 7 | T12P-2 already-verified redirect + COPY invariants |
+| CreateLeague.autoJoin.test.tsx | 10 | T12P-3 auto-join corridor + Tier-1 receive |
+| LeagueDashboard.landing.test.tsx | 3 | T12P-4 landing edges |
+| DraftRoom.copyLock.test.tsx | 3 | T12P-5-followon + Entry-50 rider (rule-wide) |
+| CreateLeague.autoJoin.integration.test.tsx | 4 | T12P-T end-to-end integration |
+| **T12P subtotal** | **36 tests across 7 new files** | |
+| Prior baseline (Skeletons, ScoreCard, WinProbabilityBar, HockeyPlayerCard, WeeklySchedule, MatchupTotalBar, MobileRosterList, CitrusButton.focus, linkGraphIntegrity) | 57 | Day-shift + earlier B-slice locks |
+| **Full T12P run tally** | **93 tests / 16 files** | All passing |
+
+*(Note: R79 said "32 tests" — that was T12P chunk 1-T only, excluding the ProtectedRoute 4 which landed pre-T12P via the P0 takeover. R80 revised to correct rider addition. Final: T12P added 36 tests, campaign total is 32 in T12P-1..T + 4 in the pre-campaign P0.)*
+
+## 7. Dockets aggregate — new night entries
+
+### GARRETT-DECIDES
+- **DESIGN_T2_REDIRECT_PARK.md**: Tier-2 design doc awaits ratification (Entry 41 rider).
+
+### POST-TWELVE (night additions)
+- **userTeam null silent-drop** (T12P-4 probe 3): elevated to morning brief per Entry 48 — a fetch hiccup on first landing can read as "I didn't join" for a brand-new member. Fix requires return-contract change (getUserTeam distinguishing "no team" vs "fetch failed") + retry banner surface. Post-twelve.
+- **Draft Hiccup 22-toast sweep** (T12P-5 audit): ~10 "Please try again" survivors in DraftRoom.tsx commissioner-only toast descriptions (:1779, :2037, :2048, :2053, :2325, :2653, :2662, :3362, :3764, :3782). Entry-50 rider intentionally kept test #2 setError-scoped to avoid pulling this into rider scope. POST-TWELVE bulk sweep.
+- **CreateLeague + DraftRoom shadcn primitives** (T12P-3 / T12P-5): task #103 sibling for POST-TWELVE citrus2 sweep.
+- **AuthCallback loader → StormyLoading** (T12P-1): task #103 covers.
+- **Existing-email "sign in instead" inline door** (T12P-1): UX polish, docket.
+- **VerifyEmail: unverified signin loop button + post-success re-resend cooldown** (T12P-2): both post-twelve.
+- **Server RPC copy warming** (T12P-3): 5 refusal strings in `join_league_with_code` migration. SQL scope.
+- **Defensive isAlreadyMember block at CreateLeague :635-679** (T12P-3): dead code with current idempotent RPC. Remove post-twelve.
+- **Toast-after-navigate observability** (T12P-4): if router race eats the toast, user gets zero feedback. Add sentinel.
+- **Commissioner "Failed to save X" 8-site sweep + "Draft Hiccup" 22-toast sweep** (T12P-4/5): post-twelve commissioner-copy pass.
+- **RPC-error-propagation-through-throw sentinel** (T12P-T): the description-contains assertion in tests #2/#3 would fail if apiClient ever returned raw strings instead of Error objects. Sentinel is the test itself; no separate action.
+
+### SUNDAY-WALK / RUNTIME-VERIFY
+- **Draft transition race** (T12P-5 audit A): does DraftLobby show not_started → in_progress transition immediately or need refresh? Runtime verify item.
+- **isCommissioner default before auth resolved** (T12P-5 audit C): static read looks guarded; runtime verify to confirm invitee doesn't briefly see commissioner-only UI.
+
+## 8. INS-16 log (night's four instrument events)
+
+**INS-16 #1 (Entry 44 flagged)**: R64 compression critique — four commits crammed into one line in a heartbeat. Fixed by delivering full U8 findings report in R69 with per-item finding/rectification/status. Standing rule: verification claims get command+count evidence, not compressed summaries.
+
+**INS-16 #2 (channel append-stall)**: Entry 39 posted via append sat unseen for 3 heartbeat cycles (R70/R71/R72). Root cause: file cache doesn't invalidate on `>>` reliably. Architect switched all entries to `tmp + mv` fresh-inode writes. See §5 above.
+
+**INS-16 #3 (T12P-3 pre-commit regex catch)**: T12P-3 test-regex `["'`]([^"'`]+)["'`]` excluded ALL quote chars from message body, breaking on "Sign-in didn't complete" (apostrophe). Caught by the test itself before commit. Fixed with three per-delimiter alternatives. Transparency noted in commit body.
+
+**INS-16 #4 (Entry 50 rider — the biggest of the night)**: Architect's own Entry-50 "purged (0) ✓" claim was FALSE — posted before evidence gather. Actual re-run: `grep -c "Failed to load" DraftRoom.tsx → 1` (:762 survivor). Architect's self-rule effective now: **"gather FIRST, read, THEN post."** Terminal's mirror-rule from the same lesson: **"tests must lock the RULE, not the fixed instances."** Rider commit (61d184f0) demonstrates the mirror-rule fix by widening test #1 to file-wide, catching :762 (which the pre-commit fail-then-pass cycle confirmed).
+
+## 9. Meta patterns surfaced by the night
+
+- **Takeover-authoring is the KI-048 recovery mode.** Terminal-stalled + time-sensitive queue → architect authors AUTHORED-UNRUN in the tree; terminal verifies + commits. Two proven applications (Entry 41 P0 + Entry 42 workflow patch). Codified in Entry 44 as standing pattern.
+- **Rule-wide tests catch shape variants; instance-list tests lock only what's fixed.** Entry 50 rider is the first codified case. Standing rule: file-wide first, narrow only with a comment explaining the carve-out. Applied retroactively in the rider by widening test #1 while intentionally keeping test #2 narrow (with a comment naming the 10 docketed survivors).
+- **Exemplar-first authoring.** T12P-5's audit found `ConnectionBanner.tsx` (v2) matches COPY_VOICE canon on all 6 states. Pointer added to `COPY_VOICE.md` this cycle so future banner copy has a reference implementation, not just a spec.
+- **Discovery → live-approve → takeover → verify → confirm is a 5-step P0 pipeline.** All five steps left evidence in the tree (Entry-41 inbox, 7226efa8 commit with GARRETT-APPROVED-LIVE flag, R74 verification report, T12P-3 attack-the-fix tests, T12P-T end-to-end confirmation). Recoverable end-to-end without terminal-side memory.
+- **The rider is the register.** Entry 50's frame — "campaign remains CLOSED and ratified — this is a cleanup rider, not a reopening" — is the right shape for post-close corrections. The tally's honesty is preserved by adding a rider row, not by silently rewriting the ratified numbers.
+
+---
+
+**Night addendum complete.** Referenced by architect's morning close-out. The front door got fixed before anyone knocked; the register got honest about the seventh site the sweep missed.
