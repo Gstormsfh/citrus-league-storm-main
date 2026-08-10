@@ -247,6 +247,20 @@ N-2 is a `CREATE OR REPLACE FUNCTION` — no rollback migration is authored toda
 - `apps/web/package.json` scripts (`build` per repo root's `build:web` chain).
 - `docs/DEPLOY_RUNBOOK.md` for Firebase deploy commands.
 
+### C-PRE. THE LOOK GATE (added D7 2026-08-09 — read before C-0)
+
+**Group C deploys HEAD, and HEAD now includes the whole tarp day** (~15 ratified commits: section polish, scoreboard-family recolors, voice sweep, skeletons/loader — all tested, 31/31) **plus TWO GARRETT-GATED commits awaiting your eyes:**
+
+- `5f16a463` (U9 — CTA text: white → dark-on-orange, 107 sites, accessibility fix)
+- `83e811a3` (U9b+L-1 — hover brightens to orange-soft + one dark standardized, 40+17 sites)
+
+**Your 2-minute gate, BEFORE running C-0:** open the **citrus-design-direction** artifact (desktop sidebar) → §03 Interaction. The buttons there show exactly the gated look (dark text on laser orange; hover glows lighter).
+
+- **Like it** → run Group C as-is. The gated commits ship intentionally. Done.
+- **Don't like it** → paste the terminal this line first: `revert the gated lane per Entry 37` (it has the exact `git revert` pair staged). Then run C-0 normally.
+
+Either way the F28 browser pass afterward doubles as your visual acceptance of today's polish.
+
 ### C-0. Preflight — clean build
 
 ```powershell

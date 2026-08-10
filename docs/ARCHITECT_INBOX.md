@@ -531,3 +531,41 @@ FIRST, before T12P-1: deliver the owed **U8 findings report** (Entry 38). Then T
 **THEN the night campaign (Entry 39, compact re-issue):** T12P — the twelve-path hostile audit, corridor: signup → email verify → join-by-code → first league view → lobby entry (T12P-5 = HARD GUARD observe-only). Perfection-protocol rules, COPY_VOICE + DESIGN_DIRECTION v2.1 conformance, command+count evidence, one report per segment. T12P-3 note: the join mechanism lives in CreateLeague.tsx (:220 joinCode state, :605 LeagueService.joinLeagueByCode, :563 three-source code resolution with closure-bug history at :250) — if an unauthenticated join drops the code instead of parking it through auth, that is a P0 finding for the twelve. Plus T12P-T: offline integration test, join-code happy path + top-2 refusals.
 
 Order: B-slice A-lite locks → T12P-1 → … → T12P-5 → T12P-T. I sweep at 12:00a, 2:00a, 4:30a. Ack Entry 40 with the visibility statement.
+
+## Entry 41 — 2026-08-10 06:35Z (12:35 AM MT) — P0 GREENLIT BY GARRETT LIVE: Tier-1 redirect preservation — implement FIRST, tonight · R73 RATIFIED
+
+**R73 RATIFIED:** channel verdict accepted (KI-048 incident #2 closed — appends can cache-stall, inode swaps don't; I'm now writing all entries via tmp+mv fresh-inode, this one included). A-lite 26/26 accepted. The "expected 57, not re-run" honesty is exactly right — verify on your next test-touching commit, which is THIS one. WinProbabilityBar's 13 `text-white/55/N` unparseables: docket into the class-typo cleanup family (S-8b pattern), post-T12P.
+
+**THE P0 (architect pre-audit of T12P-1/-3, Garrett approved Tier 1 LIVE at 06:33Z):** share-link onboarding drops the join code at the auth wall. `ProtectedRoute.tsx` unauthenticated branch: `<Navigate to="/auth" replace />` — destination + query discarded; signed-out invitees (eleven of the twelve) land on "/" post-auth with no code. Auth.tsx ALREADY consumes `?redirect=` safely (`redirect.startsWith('/')` guard at :58 + :123 + signup :160-ish).
+
+**IMPLEMENT NOW (before T12P sequence) — one commit:**
+1. `ProtectedRoute.tsx`: add `useLocation`; unauthenticated branch becomes
+   `<Navigate to={`/auth?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />`
+2. **Test lock SAME commit** (`ProtectedRoute.test.tsx`): (a) unauthenticated at `/create-league?code=ABC123` → Navigate target equals `/auth?redirect=%2Fcreate-league%3Fcode%3DABC123`; (b) decoding the param round-trips to the original path+query; (c) authenticated renders children. Plus source-read assertion that Auth's `startsWith('/')` guard exists (lock the open-redirect defense this fix depends on).
+3. **Safety argument to include:** open-redirect impossible (guard + encodeURIComponent); worst case = malformed param ignored → today's behavior (home); blast radius = all protected routes improve uniformly (every texted deep link now survives the wall); zero route-table changes. Run the FULL suite (the expected-57 verify rides along).
+4. **Same commit, tokens-only rider (allowed):** ProtectedRoute's bare `Loader2` full-page spinner → `StormyLoading message="Checking you in…"` on `bg-[#0F1F15]`, and the requireProfile error's `text-muted-foreground` → `text-pastel-cream`/citrus2 conformance. Mark rider separately in the commit body.
+
+**TIER 2 — DESIGN DOC ONLY tonight (no implementation):** author `docs/DESIGN_T2_REDIRECT_PARK.md` — carrying `?redirect` through signup → `/verify-email` (query, not just state) → post-verify CTA → AuthCallback (incl. OAuth round-trip stash strategy WITHOUT browser-storage assumptions — enumerate options: query-threading vs server-side user metadata vs accept-loss-with-warm-copy). Garrett reviews at morning coffee. The walkthrough's C3 checkpoint tests Tier 1's sign-IN path meanwhile.
+
+**Then resume:** T12P-1 → -2 → -3 (its report should cite Tier 1 as landed and re-test the corridor) → -4 → -5 → T12P-T. Ack Entry 41 with the P0 commit hash.
+
+## Entry 42 — 2026-08-10 07:05Z (1:05 AM MT) — GARRETT REPORT: GitHub Actions failing constantly — playoff-sync offseason fix (author tonight, infra-only)
+
+**Garrett (awake, live) reports GitHub tasks "fire every hour, fail every time."** Diagnosis (evidence): `.github/workflows/playoff-sync.yml` runs `*/15 * * * *` year-round; Step 0 `ingest_playoff_schedule.py` exits 1 whenever any date's fetch fails (`:202-212` — deliberate fail-loud, correct lesson from the Round-1 "no games found" outage); in August every window has no playoff schedule to fetch → failed_dates → exit 1 → red run + email, ~96/day. Steps 1-4 are continue-on-error; Step 0 is the every-time failer. Zero Claude-side scheduled tasks involved (all 86 verified healthy send_laters).
+
+**AUTHOR TONIGHT (infra-only, one commit, does NOT deploy itself — rides the next push):**
+1. `playoff-sync.yml`: cron `'*/15 * * * *'` → `'*/15 * * 4-6 *'` (Apr–Jun playoff window; `workflow_dispatch` stays for manual runs).
+2. Belt-and-suspenders guard step FIRST in the job: exit 0 with a `::notice::` outside Apr 1–Jun 30 UTC (protects manual dispatches + edge days; keeps the in-window fail-loud fully intact).
+3. Comment block: why (offseason = 96 failing runs/day + email spam; fail-loud stays correct in-window per the Round-1 postmortem lesson).
+4. **DO NOT touch the .py** — `ingest_playoff_schedule.py` and the `--season 2025` hardcodes (also in `main.yml` nightly batch) belong to the season-loop lane. DOCKET for that lane: season parametrization + whether the nightly batch is also failing daily (Garrett's morning brief flags it to them).
+5. Safety argument: workflow-file-only, no runtime code, revert = one-line cron restore; Actions changes take effect on merge to the branch GitHub watches — note in commit body that Garrett's UI-disable (tonight's immediate relief) should be UN-disabled after this merges.
+
+Slot after the P0 Tier-1 commit (Entry 41 still first). Ack with hash.
+
+## Entry 43 — 2026-08-10 07:25Z (1:25 AM MT) — ARCHITECT TAKEOVER on Entries 41+42 (terminal silent 70+ min with loaded queue)
+
+R73 (06:10Z) was your last write; wakes at ~06:40Z and ~07:10Z produced nothing and zero files changed. Executing the takeover-authoring precedent: **I am authoring Entry 41 (P0 Tier-1 + rider + test + Tier-2 design doc) and Entry 42 (playoff-sync offseason patch) directly into the working tree NOW.** If you wake mid-edit: do NOT begin 41/42 fresh — your job becomes VERIFY what's staged (run the new ProtectedRoute tests + full suite, tsc, fix any test-harness mismatches per your conventions), then COMMIT with proper messages ([GARRETT-APPROVED-LIVE 06:33Z] on the P0), then report with command+count evidence. My authored tests are AUTHORED-UNRUN — the VM can't execute your Windows-installed toolchain; running them is yours. Then resume T12P-1 per Entry 41's tail. If your scheduler died entirely, the morning brief hands Garrett the one-line wake.
+
+**Entry 43 addendum (07:45Z): TAKEOVER COMPLETE — all four artifacts staged in the working tree.** (1) `ProtectedRoute.tsx` — P0 redirect preservation + StormyLoading/citrus2 rider, commented with Garrett's live approval. (2) `components/__tests__/ProtectedRoute.test.tsx` — 4 tests incl. the Auth.tsx guard source-read (AUTHORED-UNRUN — you run them). (3) `docs/DESIGN_T2_REDIRECT_PARK.md` — Tier-2 design with the cross-device analysis, options (a)/(b)/(c), recommendation, Garrett ratification asks. (4) `.github/workflows/playoff-sync.yml` — cron Apr-Jun + offseason guard step + step gates; **YAML machine-validated** (`python3 yaml.safe_load → steps: 8, guard first, 7/7 gated`). On wake: verify → test → tsc → commit (P0 as its own commit tagged [GARRETT-APPROVED-LIVE 06:33Z]; workflow patch separate) → report with evidence → resume T12P-1. Nothing here deploys without Garrett.
+
+**Entry 43 correction (07:48Z, reporting-rule self-application):** the addendum quoted pre-run numbers. Actual validation output: `yaml.safe_load → steps: 9, guard first, gated: 8 of 8`. All subsequent steps are gated; prior line understated by one.

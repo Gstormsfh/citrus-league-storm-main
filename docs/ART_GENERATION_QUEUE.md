@@ -159,3 +159,108 @@ I viewed the actual files (mascot-stormy, mascot-kiwi, scene-draft). The profile
 For ANY brief featuring an EXISTING character (Kiwi, Lemon, Pineapple, Stormy): attach the character's existing .webp from apps/web/public/mascots/ as the REFERENCE IMAGE in nano-banana and prompt "same character as reference, [new action/pose/scene]". Never regenerate a known character from text alone — reference-image conditioning is what keeps the cast consistent. New characters: generate from the master template, then that first accepted render becomes the character's permanent reference.
 
 Apply this addendum to every brief listed above; where a brief's embedded prompt conflicts with this profile, THIS profile wins.
+
+---
+
+## ARCHITECT PLACEMENT MAP + TONIGHT'S SESSION SCRIPT (D5, 2026-08-09 22:10Z)
+
+**Charter (Garrett, from the field): "ensure we use the caricatures we created and ONLY them. Create new ones for pages customized."** This section is both the map of what exists and the ready-to-run script for tonight's nano-banana session. Identity-locking rule applies to EVERY generation below: attach the named reference .webp as a nano-banana reference image; the prompt describes the scene, the reference carries the character.
+
+### A. Existing placements (shipped 16 — verified by repo grep, all in use)
+
+| Asset | Placed on | Verdict |
+|---|---|---|
+| scene-draft | Homepage, Features | ✓ correct |
+| scene-cup | Homepage, Features, DraftRoomV2 + CompletionMomentBanner (guard area — placed, leave), NHLPlayoffBracket | ✓ correct |
+| scene-squad | Homepage, About, Features, Pricing | ✓ |
+| scene-livescoring / scene-xg-model / scene-stormy-ai | Homepage (+Features/Pricing) | ✓ marketing set |
+| scene-pickem / scene-survivor / scene-confidence | Homepage, Features + their pool page | ✓ one scene per pool — good pattern |
+| scene-standings | Standings | ✓ |
+| scene-stormy-welcome | MascotScene component | ✓ |
+| mascot-stormy | StormyLoading (now on 6 routes post M-2), avatars | ✓ the workhorse |
+| mascot-kiwi / mascot-lemon / mascot-pineapple | MascotAvatar system | ✓ |
+| **mascot-kiwi-faab.jpg** | WaiverWire.tsx | ⚠ ONLY .jpg in the set, "faab" legacy name — VERIFY it matches the low-poly style; if it's pre-low-poly era, regenerate as `scene-waiver-kiwi.webp` (brief below as OPTIONAL #7) |
+
+### B. Gap table (pages with zero art, by twelve/beta impact)
+
+Auth/signup (THE TWELVE'S ENTRY PATH — highest), NotFound/404 (delight + shareable), GMOffice (Pineapple is the only mascot without a starring scene), Matchup bye/preseason state, LeagueDashboard timeline empty (covered by queued scene-league-quiet), Roster history (queued scene-roster-clean-slate), Standings preseason (queued scene-standings-preseason). Deliberately NO art: FreeAgents (dense tables — copy carries the empty state, art would fight density), News (copy carries), Admin (utility).
+
+### C. New briefs (4) — all use MASTER PROMPT TEMPLATE + reference-image lock
+
+### 1. scene-auth-welcome — target: Auth.tsx (THE TWELVE'S FRONT DOOR)
+
+- **Filename:** `scene-auth-welcome.webp` · 1024x1024 (hero slot, retina)
+- **Reference images:** mascot-stormy.webp + mascot-kiwi.webp + mascot-lemon.webp + mascot-pineapple.webp (all four — group shot)
+- **Prompt:**
+  ```
+  Stylized low-poly 3D group scene: four fruit-and-narwhal hockey mascots standing
+  together at the open door of a warm arena tunnel, waving the viewer in, ice
+  glowing beyond the tunnel mouth, soft faceted geometry with smooth shading,
+  Pixar-warm personality, all wearing sage-green hockey jerseys with cream trim
+  and orange-slice crest, warm key light with glowing peach rim light, deep
+  forest-green studio background with soft vignette and gentle ground shadow,
+  big expressive eyes, playful and confident, square 1:1 aspect, no text, no watermark
+  ```
+- **Mood note:** "your league is waiting for you" — invitation, not sales. This is the first pixel twelve real humans see on Aug 20.
+- **Integration:** Auth.tsx hero panel (desktop side panel / mobile top). Terminal wires post-landing.
+
+### 2. mascot-stormy-404 — target: NotFound.tsx
+
+- **Filename:** `mascot-stormy-404.webp` · 512x512
+- **Reference image:** mascot-stormy.webp
+- **Prompt:**
+  ```
+  Stylized low-poly 3D character render of a gray-blue narwhal hockey mascot
+  peering into an empty hockey net with a puzzled tilt, wooden hockey-stick tusk,
+  holding a folded rink map upside down, soft faceted geometry with smooth
+  shading, Pixar-warm personality, sage-green hockey jersey with cream trim and
+  orange-slice crest, warm key light with glowing peach rim light, deep
+  forest-green studio background with soft vignette and gentle ground shadow,
+  big expressive eyes, playful and confused, square 1:1 aspect, no text, no watermark
+  ```
+- **Mood note:** lost but charming — the 404 people screenshot. Copy pairs: "✦ Offsides / This page skated out of bounds."
+- **Integration:** NotFound.tsx center slot.
+
+### 3. scene-gm-office — target: GMOffice.tsx (Pineapple's star turn)
+
+- **Filename:** `scene-gm-office.webp` · 512x512
+- **Reference image:** mascot-pineapple.webp (number per reference — do not invent)
+- **Prompt:**
+  ```
+  Stylized low-poly 3D character render of a pineapple hockey mascot seated at a
+  general manager's desk reviewing a lineup card, tiny reading glasses, stack of
+  contracts and a vintage rotary phone, team whiteboard with magnetic pucks behind,
+  soft faceted geometry with smooth shading, Pixar-warm personality, sage-green
+  hockey jersey with cream trim and orange-slice crest, warm key light with glowing
+  peach rim light, deep forest-green studio background with soft vignette and gentle
+  ground shadow, big expressive eyes, shrewd and warm, square 1:1 aspect, no text, no watermark
+  ```
+- **Mood note:** the deal-maker. GMOffice header slot; also future trade-flow art.
+
+### 4. scene-matchup-preseason — target: Matchup.tsx (bye-week / no-matchup state)
+
+- **Filename:** `scene-matchup-preseason.webp` · 512x512
+- **Reference images:** mascot-kiwi.webp + mascot-lemon.webp
+- **Prompt:**
+  ```
+  Stylized low-poly 3D scene: kiwi and lemon hockey mascots crouched at center-ice
+  faceoff circle waiting for a puck drop that hasn't come yet, sticks ready, friendly
+  rivalry grins, empty stands softly lit behind, soft faceted geometry with smooth
+  shading, Pixar-warm personality, both wearing sage-green hockey jerseys with cream
+  trim and orange-slice crest, cream numbers 44 and 9, warm key light with glowing
+  peach rim light, deep forest-green studio background with soft vignette and gentle
+  ground shadow, big expressive eyes, playful and confident, square 1:1 aspect, no text, no watermark
+  ```
+- **Mood note:** anticipation — "the matchup is coming." Bye-week + preseason empty slot.
+
+### D. TONIGHT'S SESSION SCRIPT (order = impact; ~10 min total)
+
+1. scene-auth-welcome (4 refs) — the twelve's front door
+2. mascot-stormy-404 (1 ref) — the shareable one
+3. scene-standings-preseason (ref: mascot-kiwi) — brief above, U2 section
+4. scene-roster-clean-slate (ref: mascot-lemon) — brief above, U2 section
+5. scene-gm-office (ref: mascot-pineapple) — Pineapple's star turn
+6. scene-matchup-preseason (refs: kiwi+lemon)
+7. OPTIONAL scene-league-quiet (ref per its brief, night addendum) + verify mascot-kiwi-faab.jpg style-conformance (regenerate as scene-waiver-kiwi.webp only if it's pre-low-poly era)
+
+Save each output to `apps/web/public/mascots/<filename>` — the terminal wires integration slots after files land (all slots specified above; Auth wiring is a normal surface, no guard).
