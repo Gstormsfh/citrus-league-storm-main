@@ -76,7 +76,7 @@ const AuthCallback = () => {
         const hashErrorDescription = hashParams.get('error_description');
 
         if (hashError) {
-          fail(hashErrorDescription || hashError || 'Authentication failed. Please try again.');
+          fail(hashErrorDescription || hashError || "Sign-in didn't finish — head back and try again.");
           return;
         }
 
@@ -84,7 +84,7 @@ const AuthCallback = () => {
         const queryError = queryParams.get('error');
         const queryErrorDescription = queryParams.get('error_description');
         if (queryError) {
-          fail(queryErrorDescription || 'Authentication failed. Please try again.');
+          fail(queryErrorDescription || "Sign-in didn't finish — head back and try again.");
           return;
         }
 
@@ -107,10 +107,10 @@ const AuthCallback = () => {
 
         // ----- Timeout after 10 seconds -----
         timeoutId = setTimeout(() => {
-          fail('Sign-in timed out. Please try again.');
+          fail("Sign-in took too long — head back and try again.");
         }, 10000);
       } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : 'An error occurred during authentication.';
+        const errorMessage = err instanceof Error ? err.message : "Sign-in hit a snag — head back and try again.";
         fail(errorMessage);
       }
     };
@@ -136,9 +136,9 @@ const AuthCallback = () => {
               {status === 'loading' && <Loader2 className="h-5 w-5 animate-spin text-pastel-orange-soft" aria-hidden="true" />}
               {status === 'success' && <CheckCircle2 className="h-5 w-5 text-pastel-sage" aria-hidden="true" />}
               {status === 'error' && <XCircle className="h-5 w-5 text-pastel-orange" aria-hidden="true" />}
-              {status === 'loading' && 'Signing In'}
+              {status === 'loading' && 'Signing you in'}
               {status === 'success' && 'Welcome to Citrus'}
-              {status === 'error' && 'Sign-In Failed'}
+              {status === 'error' && "Sign-In Snag"}
             </CardTitle>
             <CardDescription className="text-white/60">{message}</CardDescription>
           </CardHeader>

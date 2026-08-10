@@ -64,23 +64,27 @@ const Auth = () => {
   };
 
   const getBetterErrorMessage = (errorMessage: string): string => {
+    // T12P-1 (Entry 39 hostile pass, 2026-08-10): warmed per COPY_VOICE
+    // rule 3 ("errors own the blame") — "please" removed, doors added
+    // where the fact isn't already a door. Auth-specific idioms
+    // preserved verbatim where they already met the bar.
     const lower = errorMessage.toLowerCase();
-    if (lower.includes('invalid login') || lower.includes('invalid credentials')) return 'Invalid email or password. Please check and try again.';
-    if (lower.includes('already registered') || lower.includes('already exists') || lower.includes('already in use')) return 'This email already has an account. Please sign in instead.';
-    if (lower.includes('email not confirmed') || lower.includes('email not verified')) return 'Please verify your email address. Check your inbox for the verification link.';
-    if (lower.includes('rate limit') || lower.includes('too many requests')) return 'Too many attempts. Please wait a few minutes before trying again.';
-    if (lower.includes('provider is not enabled') || lower.includes('unsupported provider')) return 'This sign-in method is not available yet. Please use email and password to sign in.';
-    if (lower.includes('signups not allowed') || lower.includes('signup is disabled')) return 'Sign-ups are temporarily disabled. Please try again later or contact support.';
-    if (lower.includes('validation_failed') || lower.includes('validation failed')) return 'Sign-up could not be completed. Please try again.';
+    if (lower.includes('invalid login') || lower.includes('invalid credentials')) return "That email + password combo didn't match. Double-check and try again.";
+    if (lower.includes('already registered') || lower.includes('already exists') || lower.includes('already in use')) return 'This email already has an account — sign in instead.';
+    if (lower.includes('email not confirmed') || lower.includes('email not verified')) return "Email not verified yet — check your inbox for the link.";
+    if (lower.includes('rate limit') || lower.includes('too many requests')) return "Too many tries in a row — take a few minutes, then have another go.";
+    if (lower.includes('provider is not enabled') || lower.includes('unsupported provider')) return "That sign-in method isn't hooked up yet — use email + password instead.";
+    if (lower.includes('signups not allowed') || lower.includes('signup is disabled')) return "New sign-ups are paused right now — try again later or ping support.";
+    if (lower.includes('validation_failed') || lower.includes('validation failed')) return "Sign-up didn't take — try that again.";
     if (lower.includes('password')) return errorMessage;
-    if (lower.includes('invalid email') || lower.includes('email format') || lower.includes('malformed email')) return 'Invalid email address. Please check and try again.';
+    if (lower.includes('invalid email') || lower.includes('email format') || lower.includes('malformed email')) return "That email doesn't look right — double-check and try again.";
     return errorMessage;
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!validateEmail(email)) { setError('Please enter a valid email address'); return; }
+    if (!validateEmail(email)) { setError("That email doesn't look right — try again."); return; }
     setLoading(true);
     const { error } = await signIn(email, password);
     if (error) {
@@ -96,8 +100,8 @@ const Auth = () => {
           const info = (await res.json())?.data || (await res.json());
           if (info?.exists && !info.has_password) {
             const oauthProviders = (info.providers || []).filter((p: string) => p !== 'email');
-            if (oauthProviders.includes('google')) { setError("This email was registered with Google. Click 'Sign in with Google' above to continue."); setLoading(false); return; }
-            if (oauthProviders.length > 0) { setError(`This email was registered with ${oauthProviders[0]}. Use that option above to sign in.`); setLoading(false); return; }
+            if (oauthProviders.includes('google')) { setError("This email signed up with Google — click 'Continue with Google' above."); setLoading(false); return; }
+            if (oauthProviders.length > 0) { setError(`This email signed up with ${oauthProviders[0]} — use that option above.`); setLoading(false); return; }
           }
         } catch { /* fall through */ }
       }
@@ -126,8 +130,14 @@ const Auth = () => {
       }
     } catch { /* fall through to safety timeout */ }
 
-    // Safety: if somehow we got here without a session, re-enable the button
+    // T12P-1 (Entry 39 hostile pass, 2026-08-10): fix silent dead-end.
+    // Previously this branch only re-enabled the button after 4s with zero
+    // user-visible feedback — a "signed in with no session and no error"
+    // path (which shouldn't happen, but the guard exists for a reason) left
+    // the user staring at a re-enabled button with no explanation.
+    // Now we surface an honest error so the user knows to retry / reach out.
     signInSafetyTimeoutRef.current = setTimeout(() => {
+      setError("Sign-in didn't complete — try again, or reach out if it keeps happening.");
       setLoading(false);
     }, 4000);
   };
@@ -135,10 +145,10 @@ const Auth = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!validateEmail(email)) { setError('Please enter a valid email address'); return; }
-    if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
-    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
-    if (!tosAccepted) { setError('Please accept the Terms of Service to continue'); return; }
+    if (!validateEmail(email)) { setError("That email doesn't look right — try again."); return; }
+    if (password.length < 8) { setError("Passwords need at least 8 characters — try a bit longer."); return; }
+    if (password !== confirmPassword) { setError("Those passwords don't match — try typing the second one again."); return; }
+    if (!tosAccepted) { setError("Check the Terms box to keep going."); return; }
     setLoading(true);
     try {
       const { data, error } = await signUp(email, password);
@@ -166,7 +176,7 @@ const Auth = () => {
         navigate('/verify-email', { state: { email }, replace: true });
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      const errorMessage = err instanceof Error ? err.message : "Sign-up hit a snag — try again in a moment.";
       setError(errorMessage);
       setLoading(false);
     }
@@ -177,24 +187,24 @@ const Auth = () => {
     setOauthLoading(provider);
     try {
       const { error } = await signInWithOAuth(provider);
-      if (error) { setError(error.message || `Failed to sign in with ${provider}.`); setOauthLoading(null); }
+      if (error) { setError(error.message || `Couldn't reach ${provider} — try again in a moment.`); setOauthLoading(null); }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      const errorMessage = err instanceof Error ? err.message : `Couldn't reach ${provider} — try again in a moment.`;
       setError(errorMessage);
       setOauthLoading(null);
     }
   };
 
   const handleForgotPassword = async () => {
-    if (!validateEmail(resetEmail)) { setError('Please enter a valid email address'); return; }
+    if (!validateEmail(resetEmail)) { setError("That email doesn't look right — try again."); return; }
     setError(null);
     setResetLoading(true);
     try {
       const { error } = await resetPassword(resetEmail);
-      if (error) setError(error.message || 'Failed to send reset email.');
+      if (error) setError(error.message || "Couldn't send that reset link — try again in a moment.");
       else setResetSuccess(true);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      const errorMessage = err instanceof Error ? err.message : "Couldn't send that reset link — try again in a moment.";
       setError(errorMessage);
     } finally { setResetLoading(false); }
   };
