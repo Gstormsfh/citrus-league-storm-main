@@ -249,6 +249,75 @@ class SupabaseRest:
       raise RuntimeError(f"Supabase select failed ({table}): {r.status_code} {r.text}")
     return r.json() if r.text else []
 
+  def select_exact(self, table: str, select: str = "*", filters: Optional[List[Filter]] = None,
+                   order: Optional[str] = None, limit: Optional[int] = None,
+                   offset: Optional[int] = None) -> List[dict]:
+    """Select with `Prefer: count=exact` and truncation guard (0E-XG-11 T2).
+
+    Sends `Prefer: count=exact`, reads the total row count from the
+    `Content-Range` response header, and RAISES if the number of rows
+    actually returned does not match the request-window's expected slice
+    of that total. The prior silent-truncation class ate the 2026-01
+    rescore (read 1,369 of 1,394 games, reported success) and the entire
+    audit-retention monitor.
+
+    RULES:
+    * If the caller requested a paged window (limit/offset set), the
+      returned row count must equal min(limit, total - offset). Anything
+      less means the transport dropped rows silently.
+    * If the caller did not specify limit/offset (full-table select),
+      the returned row count must equal the total from Content-Range.
+    * PostgREST caps unpaged responses at its own max-rows limit; use
+      paginated calls or explicit `limit=100000` for large scans.
+
+    Callers that iterate pages should combine with `_expected_total()`
+    below or simply loop until returned rows < requested limit.
+    """
+    qs = self._build_query(select=select, filters=filters, order=order, limit=limit, offset=offset)
+    url = f"{self.rest_base}/{table}"
+    if qs:
+      url = f"{url}?{qs}"
+    hdr = self._headers({"Prefer": "count=exact"})
+    r = self._request_with_retry("GET", url, headers=hdr, timeout=self.timeout_seconds)
+    if r.status_code >= 400:
+      raise RuntimeError(f"Supabase select_exact failed ({table}): {r.status_code} {r.text}")
+    rows: List[dict] = r.json() if r.text else []
+    # Content-Range: "0-999/12345" or "*/12345" (no rows) or "0-4/5"
+    cr = r.headers.get("Content-Range") or r.headers.get("content-range")
+    if not cr or "/" not in cr:
+      raise RuntimeError(
+        f"Supabase select_exact ({table}): missing/malformed Content-Range "
+        f"header ({cr!r}). Cannot verify row completeness — refusing to trust."
+      )
+    total_str = cr.split("/", 1)[1].strip()
+    if total_str == "*":
+      raise RuntimeError(
+        f"Supabase select_exact ({table}): PostgREST returned unbounded total "
+        f"(Content-Range={cr!r}). Cannot verify completeness."
+      )
+    try:
+      total_available = int(total_str)
+    except ValueError:
+      raise RuntimeError(
+        f"Supabase select_exact ({table}): Content-Range total is not int "
+        f"({cr!r})."
+      )
+    # Expected count for this window
+    off = int(offset or 0)
+    if limit is not None:
+      expected = min(int(limit), max(0, total_available - off))
+    else:
+      expected = max(0, total_available - off)
+    if len(rows) != expected:
+      raise RuntimeError(
+        f"Supabase select_exact ({table}): TRUNCATION detected — "
+        f"received {len(rows)} rows, Content-Range says {total_available} "
+        f"available with offset={off} limit={limit!r} → expected {expected}. "
+        f"filters={filters!r}. This is the 0E-XG-11 T2 silent-truncation "
+        f"class; refusing to return partial data."
+      )
+    return rows
+
   def upsert(self, table: str, rows: Union[dict, List[dict]], on_conflict: str) -> None:
     """
     Upsert rows with merge-duplicates resolution.
