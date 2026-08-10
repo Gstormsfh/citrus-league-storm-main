@@ -3706,3 +3706,99 @@ HARD GUARD honored throughout (git diff --name-only | grep draft = 0).
 Per Entry 41: **"Then resume: T12P-1 → -2 → -3 (its report should cite Tier 1 as landed and re-test the corridor) → -4 → -5 → T12P-T."** Next cycle begins T12P-1 (Signup + sign-in hostile audit on Auth.tsx + AuthCallback.tsx). T12P-3 will cite this commit hash (7226efa8) as the corridor-completion evidence.
 
 **End of R74. Takeover verified + committed as two separately-revertable commits per Entry 43. 61/61 tests pass. P0 lands the redirect preservation the twelve's onboarding depends on; workflow patch stops the 96-fails-per-day noise. Resuming T12P sequence.**
+
+---
+
+## R75 — Entry 44 ACK + T12P-1 committed (2026-08-10 07:20Z / 1:20 AM MT)
+
+### Entry 44 ACK
+
+R74 RATIFIED. Takeover→verify→commit pattern accepted as KI-048 recovery doctrine. Scheduler-silence-treat-as-presumed-stalled at 45+ min is now the standing trigger. Architect timestamp self-correction (~45 min fast) noted; file mtimes remain source of truth.
+
+### T12P-1 executed (cfe2967a)
+
+**P-a Flow audit** (all four states across Auth.tsx sign-in + sign-up + reset paths and AuthCallback.tsx):
+
+| State | Sign-in | Sign-up | Reset | Callback |
+|---|---|---|---|---|
+| Loading | ✅ button spinner + text | ✅ | ✅ | ✅ Loader2 (docketed for citrus2 sweep) |
+| Empty (idle) | ✅ form clean | ✅ | ✅ | N/A |
+| Error | ✅ AlertTriangle banner + typed handling | ✅ | ✅ | ✅ auto-redirect to /auth after 3s |
+| Success | ✅ setSession + navigate | ✅ session-or-verify branch | ✅ inline "Reset email sent" | ✅ setTimeout window.location.replace |
+
+**HOSTILE probes — enumerated unhandled rejections + dead ends**:
+
+1. **Wrong password**: `/api/auth/check-method` intercept correctly distinguishes OAuth-only accounts. ✓ door (redirects to OAuth CTA). Network failure on check-method → `catch { fall through }` → generic error. ✓ acceptable fallback.
+
+2. **Existing email on sign-up**: getBetterErrorMessage → "This email already has an account — sign in instead." Door is TEXT ONLY, not a button. Docketed for polish (inline `activeTab='signin'` switch).
+
+3. **Weak password**: client-side + PasswordStrength widget. ✓
+
+4. **Expired callback**: hashError/queryError → fail() → auto-redirect after 3s. ✓ door.
+
+5. **Rate limit**: getBetterErrorMessage catches "Too many attempts". ✓ door.
+
+6. **Session-race / setSession failure**: try/catch wraps setSession; falls through to safety timeout.
+
+**P0-CANDIDATE FINDING (silent dead-end) — FIXED THIS COMMIT:**
+
+Pre-fix `handleSignIn` safety timeout path (lines 130-132) was:
+```
+signInSafetyTimeoutRef.current = setTimeout(() => {
+  setLoading(false);  // ← ONLY reset loading, no error message
+}, 4000);
+```
+
+**Impact**: after Supabase edge-case (returns success + empty session), user sees spinning button → normal button with ZERO feedback for 4 full seconds. No retry prompt, no error, no explanation. Command: `grep -B2 -A2 "signInSafetyTimeoutRef.current = setTimeout" Auth.tsx (pre-fix) → shows no setError call inside`.
+
+**Fix**: setError inside the timeout callback surfacing "Sign-in didn't complete — try again, or reach out if it keeps happening." Locked by test #1 of `Auth.silentDeadEnd.test.tsx`.
+
+**P-b State polish + P-c COPY_VOICE conformance**:
+
+18 copy sites polished (13 in Auth.tsx + 5 in AuthCallback.tsx):
+- getBetterErrorMessage 9 branches warmed per rule 3 ("errors own the blame")
+- 4 client-side validation messages warmed (email/password/mismatch/ToS)
+- OAuth failure + password-reset failure warmed
+- 3 generic catch fallbacks contextualized
+- AuthCallback loading title: "Signing In" → "Signing you in" (rule 1 name-the-actor)
+- AuthCallback error title: "Sign-In Failed" → "Sign-In Snag" (banned "failed" per COPY_VOICE hard-bans)
+- AuthCallback fail() 3 default fallbacks warmed to door-offering copy
+
+**P-d offline-verifiable fixes only**: all changes are copy strings + one one-line `setError` addition. Zero backend calls modified. Zero routing changes.
+
+**P-e Test lock** (`Auth.silentDeadEnd.test.tsx`, 5 tests):
+1. Safety-timeout branch calls setError (not just setLoading)
+2. Error message names user action (retry / reach out door)
+3. AuthCallback error title = "Sign-In Snag" (banned "Failed" excluded)
+4. AuthCallback loading title = "Signing you in" (conversational)
+5. AuthCallback fail() default no longer contains "Authentication failed"
+
+Test-regex correction (INS-16-adjacent transparency): first-pass regex `["'`]([^"'`]+)["'`]` excluded ALL quote chars from message body, which broke on `"Sign-in didn't complete"` (apostrophe inside). Fixed to three per-delimiter alternatives before commit. Caught by the test itself pre-commit — no false-positive shipped.
+
+### Docketed T12P-1 findings (not this commit)
+
+- **AuthCallback loader → full StormyLoading replacement** — task #103 covers this file as POST-TWELVE.
+- **shadcn Card → CitrusCard** on AuthCallback — same task.
+- **Existing-email "sign in instead" inline door** — UX polish, docket.
+- **check-method network failure observability** — silent fallback to generic error is honest; docket if we want distinguishable logs.
+
+### Test / typecheck status
+
+- `npx vitest run [suite list] → 66 passed / 66 total` (61 prior + 5 new = 66 exact match)
+- Zero new tsc errors introduced.
+- HARD GUARD honored (verified via `git diff --name-only | grep draft = 0`).
+
+### Files changed this cycle
+
+```
+MOD: apps/web/src/pages/Auth.tsx (13 copy sites + dead-end fix)
+MOD: apps/web/src/pages/AuthCallback.tsx (5 copy sites)
+NEW: apps/web/src/pages/__tests__/Auth.silentDeadEnd.test.tsx (5 tests)
+MOD: docs/TERMINAL_OUTBOX.md (this R75)
+```
+
+### T12P queue standing
+
+Per Entry 39 order: **T12P-2 next** (Email verification corridor: VerifyEmail.tsx + resend path — expired links, double-clicks, already-verified re-entry). Architect ratification sweeps continue.
+
+**End of R75. Entry 44 ACK'd. T12P-1 shipped one P0-candidate fix (silent dead-end on sign-in) + 18 COPY_VOICE polish sites + 5-test lock. 66/66 tests pass. Corridor step 1 of 5 complete.**
