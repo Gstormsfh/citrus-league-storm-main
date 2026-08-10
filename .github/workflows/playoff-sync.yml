@@ -4,7 +4,7 @@ name: Playoff Sync (every 15 min)
 # player playoff stats, and pool standings current.
 on:
   schedule:
-    - cron: '*/15 * * * *'  # every 15 minutes
+    - cron: '*/15 * * 4-6 *'  # every 15 min, APRIL-JUNE ONLY (Entry 42: offseason runs failed loudly ~96x/day)
   workflow_dispatch:
 
 jobs:
@@ -12,15 +12,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      # ── Offseason guard (Entry 42, 2026-08-10) ──────────────────────
+      # The cron above already restricts scheduled runs to Apr-Jun; this
+      # guard additionally makes MANUAL dispatches honest in the offseason
+      # (green no-op with a notice instead of a guaranteed loud failure).
+      # In-window behavior is unchanged: Step 0 still fails loudly on
+      # ingest errors per the Round-1 postmortem lesson.
+      - name: Offseason window guard
+        id: window
+        run: |
+          M=$(date -u +%-m)
+          if [ "$M" -ge 4 ] && [ "$M" -le 6 ]; then
+            echo "in_window=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "in_window=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Offseason (month $M) — playoff sync sleeps July-March. Exiting green."
+          fi
 
-      - uses: actions/setup-python@v5
+      - if: steps.window.outputs.in_window == 'true'
+        uses: actions/checkout@v4
+
+      - if: steps.window.outputs.in_window == 'true'
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
           cache-dependency-path: 'data-pipeline/requirements.txt'
 
-      - run: pip install -r data-pipeline/requirements.txt
+      - if: steps.window.outputs.in_window == 'true'
+        run: pip install -r data-pipeline/requirements.txt
 
       # Step 0: Ingest playoff game schedule into nhl_games so the live
       # scraper (data_scraping_service.py) picks them up automatically.
@@ -32,6 +52,7 @@ jobs:
       # spins on "No games found in DB schedule" until someone notices
       # by hand. Fail the run loudly so GitHub emails about it.
       - name: Ingest playoff game schedule
+        if: steps.window.outputs.in_window == 'true'
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -42,6 +63,7 @@ jobs:
 
       # Step 1: Refresh bracket seeds + initial series rows (safe to re-run)
       - name: Ingest NHL playoff bracket
+        if: steps.window.outputs.in_window == 'true'
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -50,6 +72,7 @@ jobs:
 
       # Step 2: Link games to series, update wins, trigger pick scoring
       - name: Sync playoff series results
+        if: steps.window.outputs.in_window == 'true'
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -58,6 +81,7 @@ jobs:
 
       # Step 3: Rebuild player_playoff_stats from per-game stats (RPC call)
       - name: Aggregate player playoff stats
+        if: steps.window.outputs.in_window == 'true'
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -76,6 +100,7 @@ jobs:
       # scoring_settings (goals weighted X, hits weighted Y, etc.).
       # This is what keeps roster pool standings dynamic to commissioner settings.
       - name: Score playoff roster pools
+        if: steps.window.outputs.in_window == 'true'
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
