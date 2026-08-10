@@ -4842,3 +4842,76 @@ The local gate that shipped 4d69541f ran only vitest+tsc+build — that's the sa
 Branch is READY at `a38b2058` with ESLint-clean, gate-green state. Garrett's single-line master refspec push kicks CI re-run. On green: Entry 58 fresh-page reset GOES + Groups A/B re-confirm + F28 browser pass support.
 
 **End of R88. Entry 63 EXECUTED. CI failure diagnosed (eslint `no-constant-binary-expression` at DraftRoomV2:916, not lockfile), fixed (commit a38b2058), branch pushed. Master refspec push handed to Garrett per infra-command-handoff rule.**
+
+---
+
+## R89 — R88 paste banner WITHDRAWN (2nd today) · Entry 64/65 executed · READY-CANDIDATE (2026-08-10 18:04Z / 12:04 PM MT)
+
+# 🛑 R88's paste banner is WITHDRAWN 🛑
+
+R88 diagnosed only 1 of CI-#1440's 4 red jobs. Entry 64 (Garrett's screenshot evidence) surfaced 3 more red jobs my subset-gate never saw. R88 was premature — Garrett has been told to HOLD.
+
+**Per Entry 65 (new channel rule)**: PASTE banners to Garrett require ARCHITECT COUNTERSIGNATURE. This R89 is a READY-CANDIDATE — I present evidence; architect ratifies; the banner comes from architect.
+
+---
+
+### Entry 64 execution (all 6 steps)
+
+**Step 1 — Lint** (was CI's 2-error job): `npx eslint src/` → **0 errors, 14 warnings**. My Entry-63 fix at DraftRoomV2:916 landed; the "2" annotation was 1 real error + 1 job-failure line per Entry 65 prediction.
+
+**Step 2 — Server tsc** (was 4 baseline errors, promoted to now):
+- `systemFlags.ts:96` (docket #22 promoted): `structuredLogger.warn(event, ctx, err)` → sig is `warn(event, ctx?)`. Merged err into context. Docket #22 CLOSED.
+- `draftAdminRoutes.test.ts:28`: dead `diagnostic` interface field used `ReturnType<NonNullable<unknown> & {__t?:never}>` — invalid. Simplified to `unknown` (field is never read).
+- `draftAdminRoutes.test.ts:178`: `sentReq` declared `Promise<Response>` but arrow returned `Response|Promise<Response>`. Added `async`.
+- `draftRoutes.f14.test.ts:45`: vitest 4 widened `ReturnType<typeof vi.fn>` to `Mock<Procedure|Constructable>` (not callable). Explicit callable signature.
+
+**Server tsc: 4 → 0.** ✅
+
+**Step 3 — Server build**: `npx tsc` (emit mode) → exit 0. ✅
+
+**Step 4 — FULL web vitest** (was CI's failing suite, we'd only run 16-file subset):
+- Initial: 2 failures in `ConnectionBanner.test.tsx` — T11a link fix (2026-08-09) updated component copy from "Return/Back to dashboard" → "Sign in again" (`/auth`) and "Back to GM Office" (`/gm-office`); tests never got updated with the component.
+- Fix: updated tests to match actual current component behavior (T11a rationale preserved in test comments).
+- Re-run: **1684 passed / 1684 total (102 files).** ✅
+- Server tests FULL: **984 passed + 6 skipped / 990 (52 files).** ✅
+
+**Step 5 — NEW STANDING GATE (Entry 64 doctrine)**: local absorb gate = CI's EXACT job list. Subset gates RETIRED. Folded into R89 for worklog capture:
+```
+Gate = eslint + web tsc + server tsc (strict, ≤0 new) + web build + server build + FULL web vitest + FULL server tests
+```
+
+**Step 6 — Push**: `git push origin phase-4-5-implementation` → **82d681f6..d83fdeb9** ✅ pushed. Master refspec push NOT executed (Entry 65: no paste without architect countersignature).
+
+### Full gate results (Entry 64 step 5 standing gate — first application)
+
+| Check | Result | Baseline / target | Status |
+|---|---|---|---|
+| eslint `src/` | 0 errors, 14 warnings | ≤0 errors | ✅ |
+| Web tsc | 158 errors | ≤159 (was), 0 new | ✅ |
+| Server tsc | **0 errors** | strict ≤0 | ✅ (was 4, all fixed) |
+| Web build | 18s ✓ | exit 0 | ✅ |
+| Server build | exit 0 | exit 0 | ✅ (was failing on tsc) |
+| Web vitest FULL | **1684 passed / 1684 total** (102 files) | zero fail | ✅ (was 2 fail on ConnectionBanner) |
+| Server tests FULL | **984 pass + 6 skip / 990** (52 files) | zero fail | ✅ |
+
+### Docket closures + additions
+
+- **Docket #22 CLOSED** — systemFlags.ts:96 3-arg logger call fixed (F21-family observability bug landed via this cycle).
+- **New doctrine to worklog** (Entry 64 step 5): "Absorb gate = CI job list. Any absent check in local gate = potential false-green." Folded into next Entry 58 fresh-page cycle.
+- **INS-16 entry queued**: R88 paste-banner-before-confirming-all-CI-jobs was the 2nd premature banner today (Entry 65). Rule change: paste banners require architect countersignature.
+
+### Entry 60/61/62/64/65 ACK
+
+- **Entry 60**: MTB verification + CitrusButton fusion + DESIGN_DIRECTION v2.2 reconciliation docket → all accepted (previously ACK'd R88).
+- **Entry 61**: Worktree refspec-push doctrine + Data Freshness disable → accepted (previously ACK'd R88).
+- **Entry 62**: Push landed → CI died at 4 jobs, not just eslint. Diagnostic corrected this cycle.
+- **Entry 64**: Full-scope diagnosis + fix executed all 6 steps. Standing gate updated.
+- **Entry 65**: New paste-banner-countersignature rule ACCEPTED. R88 banner WITHDRAWN in this R89 opening. No paste-blocks will appear in my outputs without architect ratification.
+
+### READY-CANDIDATE status
+
+Branch `d83fdeb9` on `origin/phase-4-5-implementation`. Fast-forward-safe to master (0 behind / 300 ahead — one new commit past R88's a38b2058).
+
+**Awaiting architect ratification.** If ratified, architect issues the ⚡ paste banner to Garrett. Terminal will NOT stage a paste block until then.
+
+**End of R89. Entry 64 EXECUTED (all 6 steps). Full CI-mirror gate GREEN (eslint 0 · web tsc 158 · server tsc 0 · web build ✓ · server build ✓ · web vitest 1684/1684 · server tests 984+6/990). Commit d83fdeb9 pushed. R88 paste banner WITHDRAWN. READY-CANDIDATE per Entry 65 — awaiting architect countersignature.**
