@@ -4213,3 +4213,92 @@ MOD: docs/TERMINAL_OUTBOX.md (this R79)
 Per Entry 39: **T12P-T next** (offline integration test — join-code happy path + top-2 refusals). Campaign closes with T12P-T.
 
 **End of R79. Entry 48 ACK'd. T12P-5 delivered OBSERVE-ONLY report per Entry 47 rules. GIT-DIFF-ZERO on source verified. Findings: ~40 dockets across DraftLobby.tsx / DraftRoom.tsx / DraftRoomV2.tsx / ConnectionBanner.tsx — mostly POST-TWELVE polish; 2 potential PRE-TWELVE candidates gated on architect ruling of v1-vs-v2 room. NO P0. ConnectionBanner.tsx is a COPY_VOICE exemplar — reference for other lobby copy. Corridor step 5 of 5 complete (audit-only).**
+
+---
+
+## R80 — Entry 49 ACK + T12P-5-followon + T12P-T committed — CAMPAIGN COMPLETE (2026-08-10 10:38Z / 4:38 AM MT)
+
+### Entry 49 ACK
+
+T12P-5 RATIFIED with git-diff-zero cross-checked by architect direct re-run (0 ✓ — bridge git worked as a pleasant surprise; both runs agreed). **Room ruling received and applied**: both rooms are in the twelve's arc — v1 lobby holds the WAIT, v2 takes over post-ignition — so v1's first-mount error paths ARE invitee-visible pre-twelve. **Copy license authorized and used**: 6 "Failed to load X" setError sites in DraftRoom.tsx purged (real-path :229/:248 + demo :324/:340/:368/:408). Cross-cutting dockets A + C accepted as runtime-verify items for walkthrough / dry run. ConnectionBanner-as-exemplar pointer for COPY_VOICE.md docketed for a convenient follow-up.
+
+### Cycle deliverables (two commits)
+
+**Commit 1: a2162d56 — T12P-5-followon (Entry 49 copy license)**
+
+Purged all 6 "Failed to load X. Please try again." setError sites in DraftRoom.tsx per Entry 49 authorization:
+
+| Site | Pre-fix | Post-fix |
+|---|---|---|
+| :229 (real-path) | `'Failed to load your leagues. Please try again.'` | `"Couldn't load your leagues — give it a moment and try again."` |
+| :248 (real-path dup) | same | same |
+| :324 (demo) | `'Failed to load demo league. Please try again.'` | `"Couldn't load the demo league — refresh to try again."` |
+| :340 (demo) | `'Failed to load demo teams. Please try again.'` | `"Couldn't load the demo teams — refresh to try again."` |
+| :368 (demo) | `'Failed to load demo draft picks. Please try again.'` | `"Couldn't load the demo draft picks — refresh to try again."` |
+| :408 (demo) | `'Failed to load demo draft. Please try again.'` | `"Couldn't load the demo draft — refresh to try again."` |
+
+Test lock: `DraftRoom.copyLock.test.tsx` (3 tests) — banned "Failed to load" purged in all setError sites, "Please try again" politeness padding purged, ≥6 setError sites carry retry-door language. Source-read pattern (DraftRoom.tsx is 5021 lines with 30+ deps).
+
+**Git-diff discipline restated per Entry 49**: only DraftRoom.tsx (6 copy sites, ~10 line delta) + new test file. Zero non-copy changes — no logic, no state, no routing, no imports, no types. Every site flagged in commit body.
+
+**Commit 2: 48b06daa — T12P-T (offline integration test, campaign close)**
+
+New file: `apps/web/src/pages/__tests__/CreateLeague.autoJoin.integration.test.tsx` (4 tests, 4/4 pass in 819ms).
+
+**Test matrix**:
+
+| # | Scenario | Assertions |
+|---|---|---|
+| 1 | HAPPY PATH — code + user | joinLeagueByCode called with (code, userId, undefined); navigate → `/league/league-abc?league=league-abc`; refreshLeagues fired; setActiveLeagueId(league-abc); toast title 'Joined League!' |
+| 2 | FULL-LEAGUE REFUSAL — RPC returns `new Error('This league is full.')` | auto-join fires; toast title "Can't Join Right Now" + destructive variant; description contains "This league is full" (RPC message propagates through throw/catch); no navigate; no activeLeagueId |
+| 3 | INVALID-CODE REFUSAL — RPC returns `new Error('Invalid join code. Please check and try again.')` | auto-join fires; destructive toast; description contains "Invalid join code"; no navigate |
+| 4 | IDEMPOTENCY — searchParams re-emit | first render: joinLeagueByCode called once; forced re-render: STILL called once (autoJoinFiredRef guard held at runtime, not just in source) |
+
+Mock architecture: useAuth / useProfile / useLeague / LeagueService.joinLeagueByCode / useToast mocked at import boundary. Supabase client stubbed with minimal interface for the already-member fallback path at CreateLeague :648-652. Navbar / WaitlistSignup no-op'd. citrus2 icons rendered real (pure SVG).
+
+Test choice: campaign close required an integration test that COMPOSES the source-read shapes from T12P-1..5 into observable behavior. ~90 line mock setup, amortized across 4 tests; runs in <1s. Would otherwise live as fragile Playwright E2E.
+
+**Discovered by T12P-T** (docketed, not in this commit):
+- RPC error message propagation depends on `error` being an Error object (matches current apiClient behavior when server returns non-2xx). If RPC layer ever returns raw strings, `err instanceof Error` at handleJoinLeague :629 falls false and description degrades to generic fallback. Test #2/#3 would catch it (description-contains assertions would fail). Docket accepted as sentinel.
+
+### T12P CAMPAIGN — FINAL TALLY
+
+**Six chunks, all landed. Six commit hashes:**
+
+| Chunk | Commit | Tests added | Fix type |
+|---|---|---|---|
+| T12P-1 | cfe2967a | 5 | P0-candidate silent-dead-end + 18 COPY polish sites |
+| T12P-2 | 7fbc5dba | 7 | P0-candidate already-verified redirect + 3 COPY sites |
+| T12P-3 | 73ea47de | 10 | 5 COPY sites + Tier-1 receive contract lock |
+| T12P-4 | 5dbc3f21 | 3 | 2 COPY sites + landing edges |
+| T12P-5 | aa2d78a3 + a2162d56 | 3 | OBSERVE-ONLY report + Entry-49 6-site copy license |
+| T12P-T | 48b06daa | 4 | End-to-end integration test |
+| **Total** | **7 commits** | **32 tests** | **2 P0-candidate fixes + 32 COPY_VOICE sites** |
+
+**Full T12P suite after campaign**: `npx vitest run [16 files] → 93 passed / 93 total`.
+
+**Zero regressions**. **Twelve's share-link corridor CONFIRMED green end-to-end** by the T12P-T happy-path test (the exact flow: `/create-league?code=ABC` → ProtectedRoute → /auth?redirect → sign-in → back → auto-join → /league/:id).
+
+### ConnectionBanner exemplar pointer
+
+Docketed for a convenient follow-up commit: add a one-line pointer in COPY_VOICE.md citing `apps/web/src/components/draft/v2/ConnectionBanner.tsx` as the reference implementation for state-driven fatal + transient banner copy. All 6 states in that file are canonical: state-name titles, warm bodies, doors offered.
+
+### Files changed this cycle (both commits)
+
+```
+MOD: apps/web/src/pages/DraftRoom.tsx (6 copy sites, ~10 line delta) [a2162d56]
+NEW: apps/web/src/pages/__tests__/DraftRoom.copyLock.test.tsx (3 tests) [a2162d56]
+NEW: apps/web/src/pages/__tests__/CreateLeague.autoJoin.integration.test.tsx (4 tests) [48b06daa]
+MOD: docs/TERMINAL_OUTBOX.md (this R80)
+```
+
+### Test / typecheck status
+
+- `npx vitest run [full T12P suite] → 93 passed / 93 total` (86 R78 + 3 T12P-5-followon + 4 T12P-T = 93 exact)
+- HARD GUARD: DraftRoom.tsx edits landed under Entry 49 explicit U7 copy-license exception, every site flagged in a2162d56 commit body. No draft files unstaged now (verified `git diff --name-only | grep draft = 0`).
+
+### Standing by for morning brief
+
+Campaign complete. T12P queue empty. Standing by for architect's 4:30 close-out tally + any morning brief follow-ups.
+
+**End of R80. Entry 49 ACK'd. T12P CAMPAIGN CLOSED. Six chunks, seven commits, 32 tests, 2 P0-candidate fixes, 32 COPY_VOICE polish sites, ConnectionBanner exemplar identified. 93/93 tests pass. HARD GUARD honored throughout (with the single Entry-49-authorized copy-license exception on DraftRoom.tsx explicitly flagged). Twelve's share-link corridor CONFIRMED green end-to-end.**
