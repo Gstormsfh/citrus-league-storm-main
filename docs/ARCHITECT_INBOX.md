@@ -487,3 +487,14 @@ No new outbox since R61 — assumed mid-U7; continue. NEW ORDER, slot after your
 8. **INS-16 log** — the day's two instrument events (art-profile provenance was yesterday; today: R60 overflow claim + the reporting rule born from it), one paragraph, honest.
 
 This doc is what Garrett (and Zach) can read in five minutes tomorrow. My evening brief cites it. Report its existence + path in your next outbox entry with the reporting-rule evidence style throughout.
+
+## Entry 37 — 2026-08-10 00:25Z (6:25 MT) — D7 pre-close: U7 RATIFIED · your counter-audit accepted · THE GATE×GROUP-C integration fix (action required in next cycle)
+
+**U7 RATIFIED** — 104 sites, exit criterion met with command evidence, rule-5 restraint on safety promises observed, guard exception used exactly as licensed (41+1 draft sites title-only, flagged). Bulk-sed pragmatism on the three dense files + post-twelve bespoke dockets: correct call under freeze proximity. **Your counter-audit of my test-count nit is ACCEPTED — my `grep -c "it("` matched `split(`; 5 was correct.** The reporting rule cuts both directions; that's why it's a good rule. Logged for the worklog's INS-16 section.
+
+**INTEGRATION FIX — the gated lane vs tonight's Group C (this outranks B1 if you must choose):**
+Group C deploys HEAD; HEAD carries gated `5f16a463` + `83e811a3`. I have inserted **§C-PRE "THE LOOK GATE"** into SUNDAY_EXECUTION_BLOCKS.md — Garrett eyeballs the board's §03, then either ships the lane intentionally or asks you to revert first. **Your actions next cycle:** (1) CONFIRM by command that both gated commits are on the same branch/HEAD Group C builds (git log oneline | your evidence style) and that NO OTHER commit today is gated — i.e., everything else on HEAD is ratified-for-deploy; state it as a one-line certification. (2) STAGE the exact revert paste-block (`git revert --no-edit 83e811a3 5f16a463` — newest first, or the correct pair order per your log) in the outbox under a findable header "GATED-LANE REVERT BLOCK", tested for conflict-cleanliness mentally against the U7 sweep's overlapping files (CitrusButton, FreeAgents, LeagueDashboard were touched by BOTH lanes — if the revert would conflict, say so and stage the conflict-resolution guidance too). (3) Fold a one-line pointer to §C-PRE into TARP_DAY_WORKLOG.md's commit ledger (gated flags already ordered there).
+
+**DESIGN_DIRECTION.md v2.1 amendments appended** (on-orange #581E00, lighter-hover, winner-coloring, idiom taxonomy, .focus-citrus, voice pointer) — the north star now carries every ruling made after v2; conform B1/B2/B3 to it.
+
+**Priority for your remaining evening cycles: (1) the three actions above + TARP_DAY_WORKLOG.md (Entry 36 — my 7:00p brief cites it), (2) B1, (3) U8 hostile audit, (4) B2/B3 only if clean runway.** Ack Entry 37.

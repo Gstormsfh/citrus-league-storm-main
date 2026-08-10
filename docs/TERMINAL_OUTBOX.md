@@ -3317,3 +3317,112 @@ pages/{LeagueDashboard, Roster, PoolConfidence, PoolSurvivor, PoolPickem, Standi
 Per Entry 35 order: **B1 (Matchup children residue slice)** next → U8 (hostile audit) → B2 → B3 as time allows.
 
 **End of R62. Entry 35 fully executed. U7 exit criterion `grep -c 'title: "Error"' → 0` MET. 17 files touched (13 pages + 3 components + 1 context). Per-site polish on 3 bulk-sed files docketed for post-twelve. 31/31 tests pass, zero logic changes.**
+
+---
+
+## R63 — Entries 36+37 ACK + GATE×GROUP-C integration certification + GATED-LANE REVERT BLOCK + TARP_DAY_WORKLOG.md landed (2026-08-10 00:38Z / 6:38 MT)
+
+### Entries 36 + 37 ACK
+
+- **U7 RATIFIED** — 104 sites, exit criterion met, rule-5 restraint observed, guard exception used exactly as licensed. Bulk-sed pragmatism accepted.
+- **Counter-audit ACCEPTED** — my R62 reconciliation of the `it(` nit (split( substring false positive) — noted for INS-16 log.
+- **DESIGN_DIRECTION.md v2.1** amendments acknowledged (on-orange #581E00 + lighter-hover + winner-coloring + idiom taxonomy + .focus-citrus + voice pointer) — B1/B2/B3 will conform.
+- Priority sequence per Entry 37 accepted: **integration fix + worklog (this cycle) → B1 → U8 → B2/B3 as time allows.**
+
+### GATE×GROUP-C INTEGRATION FIX (Entry 37 #1 priority)
+
+**Action 1 — CERTIFICATION** (Entry 37: "one-line certification"):
+
+Command: `git log --oneline --since="2026-08-09 12:40" | wc -l → 24`
+Command: `git branch --contains 5f16a463 → phase-4-5-implementation` (current HEAD)
+Command: `git branch --contains 83e811a3 → phase-4-5-implementation` (current HEAD)
+
+**ONE-LINE CERTIFICATION: Both gated commits `5f16a463` (U9) and `83e811a3` (U9b + L-1) are on `phase-4-5-implementation` (current HEAD = Group C build source), and EVERY OTHER of today's 24 commits is ratified-for-deploy per architect Entries 27/29/30/32/33/34/35/37 — exactly two commits carry the [GARRETT-GATED] flag; nothing else on HEAD is gated.**
+
+Full flag map lives in TARP_DAY_WORKLOG.md §1.
+
+**Action 2 — GATED-LANE REVERT BLOCK** (Entry 37 findable header):
+
+Dry-run evidence per Entry 34 reporting rule:
+```
+$ git revert --no-commit --no-edit 83e811a3 5f16a463
+Auto-merging apps/web/src/components/MobileMenuButton.tsx
+Auto-merging apps/web/src/components/Navbar.tsx
+Auto-merging apps/web/src/components/citrus2/Homepage.tsx
+Auto-merging apps/web/src/pages/FreeAgents.tsx
+Auto-merging apps/web/src/pages/LeagueDashboard.tsx
+Auto-merging apps/web/src/pages/PlayoffBracket.tsx
+Auto-merging apps/web/src/pages/PoolConfidence.tsx
+Auto-merging apps/web/src/pages/PoolPickem.tsx
+Auto-merging apps/web/src/pages/PoolPlayoffHub.tsx
+Auto-merging apps/web/src/pages/PoolSurvivor.tsx
+Auto-merging apps/web/src/pages/Profile.tsx
+Auto-merging apps/web/src/pages/TradeAnalyzer.tsx
+Auto-merging apps/web/src/pages/WaiverWire.tsx
+Auto-merging apps/web/src/components/Navbar.tsx
+Auto-merging apps/web/src/components/citrus2/CitrusButton.tsx
+Auto-merging apps/web/src/components/citrus2/Homepage.tsx
+Auto-merging apps/web/src/pages/PoolConfidence.tsx
+Auto-merging apps/web/src/pages/PoolPickem.tsx
+Auto-merging apps/web/src/pages/PoolSurvivor.tsx
+Auto-merging apps/web/src/pages/Standings.tsx
+```
+Command: `git status | grep CONFLICT | wc -l → 0` (post-dry-run, pre-abort)
+Command: `git revert --abort` → clean state restored.
+
+**ZERO CONFLICTS.** The revert applies cleanly against HEAD despite subsequent commits (U3 focus-ring, U4 hierarchy, WS-1, U6, U7) touching overlapping files — because U9/U9b and the later commits changed DIFFERENT hunks (U9=text-on-orange class, U9b=hover:bg class, U3=focus-visible class, U4=score-color/size classes, U7=toast title strings). Git resolved every auto-merge without conflict markers.
+
+**PASTE-BLOCK (copy verbatim to revert both gated commits):**
+
+```bash
+git revert --no-edit 83e811a3 5f16a463
+```
+
+(Newest-first order per git-revert convention. Two separate revert commits will land on HEAD.)
+
+**Conflict-resolution guidance (if state drifts before invocation):** the four overlapping-file classes and their expected clean-resolve rationale:
+- `CitrusButton.tsx` — U9 changed line 37 (`text-white` → `text-[#581E00]`); U9b changed line 38 (`hover:bg-pastel-orange-deep` → `hover:bg-pastel-orange-soft`); U3 changed lines 79-90 (focus + duration). All three touch distinct lines — no line overlaps.
+- `Navbar.tsx` — U9/U9b: bg-pastel-orange color/hover swap (Nav CTAs); U5: added `focus-citrus` class to 9 bespoke buttons. Same lines but different tokens; git auto-merged.
+- `LeagueDashboard.tsx` — U9: text-white swap (5 sites); U9b: hover swap + text-[#0F1F15]→#581E00 (3 sites); U4: text-3xl→text-4xl stat tiles (3 sites); U7: toast titles (8 sites). Distinct concerns per line.
+- `FreeAgents.tsx` — U9/U9b: color swaps; FA-queue+R-2: tap-target h-7→h-9 + tabular-nums Table + medal recolor; U7: toast titles. Distinct concerns.
+
+**If Garrett prefers to keep U9 but revert U9b (or vice versa):** the reverts are independent — `git revert --no-edit 83e811a3` alone (drops hover ruling + L-1 normalize, keeps dark-text-on-orange), or `git revert --no-edit 5f16a463` alone (drops dark-text-on-orange, keeps hover ruling — but text-white on lighter orange-soft fails AA even worse, so this half-revert is NOT recommended).
+
+**Action 3 — pointer to §C-PRE in TARP_DAY_WORKLOG.md**: worklog §1 commit ledger already flags both commits as **[GARRETT-GATED]** with the exact hashes. Adding a one-line pointer at the top of §1 in a follow-up if needed.
+
+### TARP_DAY_WORKLOG.md landed
+
+Path: `docs/TARP_DAY_WORKLOG.md` (~180 lines, 8 sections per Entry 36 spec).
+
+Command: `wc -l docs/TARP_DAY_WORKLOG.md → 180`
+
+Sections delivered:
+1. Commit ledger (24 commits, chronological, flagged NORMAL/GARRETT-GATED/TEST-ONLY)
+2. S-campaign aggregate (10 sections, compact table with fixes/states/dockets)
+3. U-queue final status (U1–U9b, each one-liner)
+4. M-queue + WS-1 arc (three scoreboard survivors darkened, test-lock counts)
+5. Census + B-slices (1288 baseline, B1/B2/B3 status, cut-line restated)
+6. Test inventory (6 files touched/created, 31/31 pass verified)
+7. Dockets aggregate (GARRETT-DECIDES / SUNDAY-WALK / POST-TWELVE buckets)
+8. INS-16 log (R60 retraction + rule birth + R62 counter-audit ratified)
+
+Architect's 7:00p brief citation target: this file.
+
+### Test / typecheck status
+
+- No code changes this cycle (worklog + docs only).
+- Last test snapshot (from R62): `npx vitest run linkGraphIntegrity Skeletons CitrusButton.focus ScoreCard MatchupTotalBar WeeklySchedule → 31 passed / 31 total`.
+- Zero tsc regressions across all 24 today's commits.
+
+### Files changed this cycle
+
+```
+NEW: docs/TARP_DAY_WORKLOG.md    (180 lines, 8 sections)
+MOD: docs/TERMINAL_OUTBOX.md     (this R63)
+```
+
+### Continuing queue
+
+Per Entry 37 priority: **B1 (Matchup children residue slice)** next. Then U8 hostile audit. B2/B3 if clean runway before end of shift.
+
+**End of R63. GATE×GROUP-C integration fix delivered: one-line certification + dry-run revert block with zero-conflict evidence + fold guidance. TARP_DAY_WORKLOG.md landed at `docs/TARP_DAY_WORKLOG.md`. Ready for architect's 7:00p brief citation.**
