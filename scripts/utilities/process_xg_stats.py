@@ -329,6 +329,42 @@ def process_single_game_json(raw_json, game_id):
                 df_shots['xG_Value'] = XG_MODEL.predict_proba(X_predict)[:, 1]
             else:
                 df_shots['xG_Value'] = XG_MODEL.predict(X_predict)
+            # ── DO NOT RAISE THIS CEILING (2026-08-10, Garrett decision) ──
+            # This 0.6 clip looks arbitrary but it is currently the only thing
+            # limiting the blast radius of a leaking xG feature pipeline. Prod
+            # measurement on the 49 games routed through the sibling 0.95-clip
+            # path (data_acquisition.py:2208) showed goals piling up at the
+            # 0.95 ceiling with median 0.9500 and 79.8% >= 0.60, while
+            # non-goals stayed at median 0.0123 — a 77:1 separation that no
+            # shot-quality signal produces. Raising this clip turns
+            # calibration green (~+3%) but makes separation_ratio worse
+            # (~34.6 vs today's 22.4, band 2-6) and displays "94% expected"
+            # on ordinary goals. The clip goes when the model is fixed, not
+            # before.
+            #
+            # BOTH writer paths share the defect. Do NOT read this as
+            # "the other path (data_acquisition.py at 0.95) is fine." Prod
+            # measurement (2026-08-10): 4,248 shots through path B carry
+            # feature 22 == abs(angle) in 95.3% of rows and feature 15 ==
+            # distance in 100% of rows — identical to path A to three
+            # decimals. The 0.95-clip path leaks the same way; it just
+            # doesn't hit the 0.6 ceiling.
+            #
+            # Confirmed leak site: shot_angle_plus_rebound_speed (feat 22)
+            # is served ~33 (mean of folded |angle|) where the training
+            # frame had mean 2.453 — a 13x out-of-distribution feature
+            # value on every shot. arena_adjusted_shot_distance (feat 15)
+            # is served == distance verbatim (100% no-op) where training
+            # had a real Schuckers/Curro adjustment.
+            #
+            # Suspected mechanism: scripts/utilities/feature_calculations.py::
+            # apply_calculated_features_to_dataframe (line 373-465) writes
+            # both mutated values, called from process_xg_stats.py:239-243.
+            # Bypassing that function has NOT been proven sufficient — path
+            # B reaches the same broken values by some route (either
+            # calling the same helper elsewhere, or _extract_shots_from_game
+            # already fabricates them). The three-way diff drill
+            # scripts/drills/xg_three_way_diff.py settles that.
             df_shots['xG_Value'] = df_shots['xG_Value'].clip(lower=0.0, upper=0.6)
         else:
             raw_xg = XG_MODEL.predict_proba(X_predict)[:, 1]
