@@ -4585,3 +4585,65 @@ git push origin master
 - ⏳ **Architect adjustment needed** on the block shape given 38-file conflict surface — deferring to architect judgment before Garrett pastes
 
 **End of R84. Entries 54+55 addressed. 38-file merge conflict surface surfaced for architect adjustment before Garrett's paste. Entry 53 (MAC-READINESS section) deferred to next cycle.**
+
+---
+
+## R85 — Entry 56 ACK · LOOK GATE = KEEP · BLOCK-KEEP IS THE PASTE (2026-08-10 15:12Z / 9:12 AM MT) — GARRETT LIVE, PASTE-READY
+
+# ⚡ GARRETT: PASTE THIS BLOCK ⚡
+
+**LOOK GATE = KEEP** (Entry 56 confirmed). U9/U9b stay. **BLOCK-KEEP is operative.** Ready to paste.
+
+```bash
+# 1. Merge phase-4-5-implementation into master + push. Deploy runs on push.
+git fetch origin
+git checkout master
+git pull --ff-only origin master
+git merge phase-4-5-implementation
+# ⚠️ EXPECT MERGE CONFLICTS on ~38 files (branch's U9/U9b color sweep overlapping
+#    with master's 0F data-lane commits). Resolve each — for the color/hover
+#    conflicts, KEEP the branch side (U9/U9b approved). For any data-pipeline
+#    conflicts on files touched by both sides, prefer master's side unless
+#    branch adds test coverage. Then:
+git commit    # if merge needs the message written
+git push origin master
+
+# 2. Watch: https://github.com/Gstormsfh/citrus-league-storm/actions
+#    Look for "Production Deploy" workflow run — the CI gate does lint+tsc+build+deploy.
+#    This REPLACES manual Group C.
+```
+
+**After push completes green**: Groups A (engine) + B (migration) are Garrett's SEPARATE pastes per runbook.
+
+---
+
+### Entry 56 ACK
+
+Email diagnosis correction ACCEPTED. My branch-side read produced the plausible-but-wrong playoff-sync theory because that workflow was the visible target from my vantage point. Actual bleeder: **"Data Freshness SLA (hourly)"** — master-only workflow (dfb64f0 era), check-freshness job, ~51s fail, hourly, 2 annotations. Not on branch. Evidence beat theory — logged as INS-16 twin to Entry 50's rider (my "gather-first-then-post" mirror in a research direction rather than a claim direction).
+
+**LOOK GATE VERDICT: KEEP** — noted, hoisted, in Garrett's face at the top of this report. BLOCK-REVERT-FIRST from R84 is dead; delete from consideration.
+
+### Master-side commit enumeration (Entry 56 request)
+
+**191 master-side commits** grouped by lane (top 25 subject lines shown; all 0F-OPS data/pipeline/xG/security workstream — ZERO UI/component workstream overlap with the branch):
+
+- **Scheduler + rollover work**: `dfb64f0` gameplay-schedulers PR#291 · `190cc13e` waivers+standings+weekly · `2b75993` rollover+scheduler hourly monitors · `0b03f79` Oct-1 season literals · `d90dd2c` season helpers shared · `2d9d5db` player_directory season derivation
+- **Directory + timeouts**: `0d3cc1af` 20m timeout + bounded discovery · `7f2d8096` bare Optional typing killed daily cron since May
+- **Rosters + scraper hygiene**: `d8f8369` scheduled daily-roster snapshot writer · `5a743c2` ET timezone propagation · `e21d1b4` game_date always from nhl_games
+- **xG rescore lane (0E-XG-5 through 0E-XG-8)**: `1c3ed6b` rescore_xg_2025_recomputed · `1da4af2` train_xg_v4 · `28548c2` train/serve contract repair · `af95f3c` moat fetch + train_test_split · `78ca0d01` true moat-match gate · `e7b7bcb` 2025 in train + v3-honest baseline · `771997f1` _build_query preserves duplicate filters
+- **Security + org (0D-SEC/ORG)**: `983d013` default-privilege hardening + drift monitor · `e0181e0` schema table + moat column COMMENTs · `26ac33a` orphan-table parking + retention · `413eea2` anon write-door closure
+
+**Conflict surface prediction based on this list**: the 38 files from R84's merge-tree dry-run are dominated by branch's U9/U9b color sweep (44 files touched with `text-white → text-[#581E00]` + `hover:pastel-orange-deep → hover:pastel-orange-soft`) landing on master's 0F workstream that also touched some of those files (e.g., dashboards/pages that had data-lane injections). The overlap is largely orthogonal changes on the same lines — **most conflicts should be "both sides look right, pick both" mechanical merges**. Some may be true content collisions on files like `apps/web/tailwind.config.ts` (branch added tokens, master may too), `package-lock.json` (always conflicts on independent installs), `server/package.json` (dep additions on both sides). Guidance in the paste block: for color/hover → branch wins (U9/U9b approved); for data-pipeline → master wins unless branch adds coverage.
+
+### Docket updates from Entry 56
+
+- **Data Freshness SLA (hourly)** — Garrett doing UI disable. **DOCKET → season-loop lane**: re-enable at Sept data ramp OR month-gate it like our playoff-sync pattern (their call, their SLA semantics).
+- **playoff-sync patch (64ef9199)** — remains **good hygiene**, not the bleeder that was theorized. Zero regret on shipping it; the branch-side pattern (cron month-gate + belt/suspenders step) is now reference for the Data Freshness SLA docket above.
+
+### Standing by
+
+Report readiness = ✅. Both blocks were staged in R84; Entry 56 chose KEEP; the operative paste is hoisted at the top of this R85 output. Garrett reads the top of this window — the ⚡ callout is unmissable.
+
+**Speed matters** — I am NOT starting Entry 53 (MAC-READINESS) work this cycle to keep the terminal responsive to any adjustments Garrett needs mid-merge. Ready to help with conflict resolution guidance if Garrett hits a specific file. Standing by.
+
+**End of R85. Entry 56 ACK'd. LOOK GATE = KEEP. BLOCK-KEEP hoisted for Garrett. Master-side 191 commits enumerated (all 0F-OPS lane, zero UI overlap). Conflict guidance embedded in paste block. Entry 53 held.**
