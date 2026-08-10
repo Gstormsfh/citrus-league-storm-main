@@ -1093,7 +1093,19 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                     last_event_state['type_code'] = type_code
                     last_event_state['period'] = current_period
                 continue
-            
+
+            # ─── SHOOTOUT EXCLUSION (2026-08-10, Garrett measurement) ────────
+            # Shootout attempts are not shots in any xG sense (untimed
+            # penalty-shot format, no strength state, no rebound possibility).
+            # The bulk import CORRECTLY excluded them; our extraction wrote
+            # 791 rows for 2025 including 262 "goals" that inflated stored
+            # is_goal totals by 3%. Skip periodDescriptor.periodType == 'SO'
+            # at the SHOT-EVENT gate so no downstream code path can leak them
+            # into raw_shots.
+            _pd = play.get('periodDescriptor') or {}
+            if _pd.get('periodType') == 'SO':
+                continue
+
             # Process shot event (extract all the feature calculation logic)
             if not details:
                 continue
@@ -2533,7 +2545,16 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                         pass
                     
                     continue  # Skip feature extraction for non-shot events
-                
+
+                # ─── SHOOTOUT EXCLUSION (2026-08-10) ─────────────────────────
+                # See identical block near line 1095 in _extract_shots_from_game.
+                # Shootout attempts are not shots in any xG sense; skip them
+                # at the shot-event gate so no downstream code path can leak
+                # them into raw_shots.
+                _pd_ss = play.get('periodDescriptor') or {}
+                if _pd_ss.get('periodType') == 'SO':
+                    continue
+
                 # From here on, we're processing a shot event (505, 506, or 507)
                 if not details:
                     continue

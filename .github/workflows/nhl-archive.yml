@@ -163,12 +163,36 @@ jobs:
       - name: Preflight banner (season ${{ matrix.season }})
         run: |
           MANIFEST_COUNT=$(awk -F',' -v s='${{ matrix.season }}' 'NR>1 && $2==s' manifest.csv | wc -l)
+          FIRST_GID=$(awk -F',' -v s='${{ matrix.season }}' 'NR>1 && $2==s {print $1; exit}' manifest.csv)
           echo "=================================================="
           echo "  W3 extract — season ${{ matrix.season }}"
           echo "  manifest count: $MANIFEST_COUNT"
+          echo "  first game_id : $FIRST_GID"
           echo "  target table  : public.raw_shots_rebuild"
           echo "=================================================="
           echo "MANIFEST_COUNT=$MANIFEST_COUNT" >> $GITHUB_ENV
+          echo "FIRST_GID=$FIRST_GID" >> $GITHUB_ENV
+      # ── PRE-FLIGHT DRILL — refuse to write if the extractor can't parse ──
+      # Fetch one manifest game's raw JSON straight from the API into a
+      # local file, then run scripts/drills/xg_rebuild_extractor_drill.py
+      # against it. The drill uses a StubDB that raises on any write —
+      # this validates BOTH that the extractor code loads AND that it
+      # produces sane output on real data, without touching prod.
+      # If the drill fails, the extract job exits before writing anything.
+      - name: Pre-flight drill on first manifest game (no DB writes)
+        run: |
+          set -euo pipefail
+          if [ -z "${FIRST_GID:-}" ]; then
+            echo "no game_ids in manifest for this season — refusing" >&2
+            exit 2
+          fi
+          echo "  fetching game $FIRST_GID PBP from api-web.nhle.com ..."
+          curl -sS --fail --max-time 30 \
+            "https://api-web.nhle.com/v1/gamecenter/${FIRST_GID}/play-by-play" \
+            -o "drill_${FIRST_GID}.json"
+          echo "  running drill (StubDB; any write attempt fails the drill) ..."
+          python -u scripts/drills/xg_rebuild_extractor_drill.py \
+            "drill_${FIRST_GID}.json" "$FIRST_GID"
       - name: Extract shots for season ${{ matrix.season }} (ledger-gated)
         run: |
           python -u scripts/nhl_archive/extract_rebuild.py \

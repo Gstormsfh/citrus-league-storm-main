@@ -9,20 +9,26 @@ placeholder xG values using the currently-deployed model, and loads
 shots into public.raw_shots_rebuild (a shadow table Garrett creates
 before this job runs).
 
-Five ledger gates per season, ALL must pass or the job fails hard:
+Six ledger gates per season, ALL must pass or the job fails hard:
 
   games_extracted   expected = manifest count
                     actual   = distinct game_id in raw_shots_rebuild for season
-  goal_parity       expected = sum of typeCode==505 events in raw_json
+  goal_parity       expected = count(typeCode==505 events WHERE
+                                     periodDescriptor.periodType != 'SO')
                     actual   = count of is_goal=true rows in rebuild
-  score_diff_live   expected 55-80% of ALL shots nonzero (info+threshold)
-                    Post-R2 fix: score_differential should be populated on
-                    every shot regardless of outcome. Non-zero share reflects
-                    game state, not extraction bugs.
+                    tolerance ≤ 0.2%; residual game_ids logged to ledger note
+  score_diff_live   55-80% of shots nonzero (post-R2 pre-shot state)
   strength_sane     man-advantage share 13-17% (5v4 + 4v5 combined)
   geometry_signed   shot_x negative share 47-52%
-                    Verifies the extractor is emitting signed coordinates
-                    as the API serves them, not folded.
+  so_rows_in_rebuild expected = 0 (extractor-level SO exclusion). Even one
+                    shootout row in the rebuild is a leak — the extractor
+                    was patched to skip periodType=='SO' at the shot-event
+                    gate; this gate is belt-and-suspenders.
+
+PRE-FLIGHT: every W3 job first invokes
+scripts/drills/xg_rebuild_extractor_drill.py on the first manifest game.
+Drill failure → refuse to write. A pipeline that cannot pass its own
+drill does not get to write.
 
 Placeholder xG note: historical seasons are NOT displayed on any UI
 surface today; scoring them with the currently-deployed model produces
@@ -138,10 +144,12 @@ def main() -> int:
     db = SupabaseRest(url, key)
 
     total_shots = 0
-    total_goal_events = 0  # from raw_json typeCode==505 count
+    total_goal_events = 0  # from raw_json typeCode==505 count (non-SO)
+    total_goal_events_incl_so = 0  # informational
     total_extracted_goals = 0
     games_seen = 0
     games_extracted = 0
+    per_game_goal_diff: List[Dict[str, Any]] = []  # for residual logging
     batch: List[Dict[str, Any]] = []
     BATCH_SIZE = 500
 
@@ -169,10 +177,27 @@ def main() -> int:
         if not isinstance(raw_json, dict):
             continue
 
-        # Count typeCode==505 events in the raw plays array (goal parity source)
+        # Count typeCode==505 events in the raw plays array (goal parity source).
+        # EXCLUDE shootout attempts — the fixed extractor skips them at the
+        # shot-event gate (see data_acquisition.py "SHOOTOUT EXCLUSION"
+        # block), so goal_parity must compare non-SO 505 events only.
+        game_505_incl = 0
+        game_505_nonso = 0
         for play in raw_json.get("plays") or []:
-            if play.get("typeCode") == 505:
-                total_goal_events += 1
+            if play.get("typeCode") != 505:
+                continue
+            game_505_incl += 1
+            pdesc = (play.get("periodDescriptor") or {}).get("periodType")
+            if pdesc != "SO":
+                game_505_nonso += 1
+        total_goal_events += game_505_nonso
+        total_goal_events_incl_so += game_505_incl
+        # Track this game for residual reporting after extraction
+        per_game_goal_diff.append({
+            "game_id": game_id,
+            "raw_505_nonso": game_505_nonso,
+            "extracted_goals": 0,  # filled below after df is built
+        })
 
         try:
             shots = _extract_shots_from_game(raw_json, game_id, db)
@@ -193,10 +218,12 @@ def main() -> int:
         # Serialize each row to a dict matching raw_shots_rebuild schema.
         # For portability, we pass through only columns present in df.
         games_extracted += 1
+        game_extracted_goals = 0
         for _, row in df.iterrows():
             total_shots += 1
             if int(row.get("is_goal", 0) or 0) == 1:
                 total_extracted_goals += 1
+                game_extracted_goals += 1
             r = {k: (v.item() if hasattr(v, "item") else v)
                  for k, v in row.to_dict().items()
                  if not (isinstance(v, float) and (v != v))}
@@ -205,6 +232,9 @@ def main() -> int:
             batch.append(r)
             if len(batch) >= BATCH_SIZE:
                 _flush(force=True)
+        # Record extracted goals against this game for residual reporting
+        if per_game_goal_diff and per_game_goal_diff[-1]["game_id"] == game_id:
+            per_game_goal_diff[-1]["extracted_goals"] = game_extracted_goals
         if games_seen % 50 == 0:
             print(f"  [progress] games_seen={games_seen} extracted={games_extracted} "
                   f"shots={total_shots} goals={total_extracted_goals}", flush=True)
@@ -232,7 +262,7 @@ def main() -> int:
     record_audit(db, args.season, "games_extracted",
                  expected=args.manifest_count, actual=len(distinct_games))
 
-    # Gate 2: goal_parity
+    # Gate 2: goal_parity (non-SO only; extractor skips SO plays)
     print(f"[gate] counting is_goal=true rows in {REBUILD_TABLE} ...", flush=True)
     goals_in_rebuild = 0
     offset = 0
@@ -246,24 +276,40 @@ def main() -> int:
         if len(rows) < PAGE:
             break
         offset += PAGE
+    # Residual game_ids where per-game extracted goals != raw non-SO 505 count.
+    # Log to ledger note per Garrett's addendum — never silence.
+    residuals = [g for g in per_game_goal_diff
+                 if g["raw_505_nonso"] != g["extracted_goals"]]
+    residual_note = (
+        f"raw_505_nonso={total_goal_events} raw_505_incl_so={total_goal_events_incl_so} "
+        f"extracted={goals_in_rebuild} residual_games={len(residuals)}"
+    )
+    if residuals:
+        # Cap the note at reasonable size — first 25 game_ids with deltas.
+        details = ",".join(
+            f"{r['game_id']}({r['raw_505_nonso']}→{r['extracted_goals']})"
+            for r in residuals[:25]
+        )
+        residual_note = f"{residual_note} | first_residuals: {details}"
     record_audit(db, args.season, "goal_parity",
                  expected=total_goal_events, actual=goals_in_rebuild,
-                 note="raw_json typeCode==505 count vs is_goal=true rows")
+                 note=residual_note)
 
-    # Gates 3-5 require pulling a stat sample. Use a per-season aggregate
+    # Gates 3-6 require pulling a stat sample. Use a per-season aggregate
     # via SQL where possible; for now do a paginated scan on key columns.
-    print(f"[gate] scanning shot-level stats (score_diff_live / strength / geometry) ...",
+    print(f"[gate] scanning shot-level stats (score_diff_live / strength / geometry / SO) ...",
           flush=True)
     total = 0
     score_nonzero = 0
     man_advantage = 0
     x_negative = 0
     x_seen = 0
+    so_rows = 0  # gate #6: rows with period >= 5 in regular-season games
     offset = 0
     while True:
         rows = db.select_exact(
             REBUILD_TABLE,
-            select="score_differential,home_skaters_on_ice,away_skaters_on_ice,is_home_team,shot_x",
+            select="score_differential,home_skaters_on_ice,away_skaters_on_ice,is_home_team,shot_x,period,game_id",
             filters=[("game_id", "gte", lo), ("game_id", "lt", hi)],
             limit=PAGE, offset=offset,
         )
@@ -288,6 +334,18 @@ def main() -> int:
                         x_negative += 1
                 except Exception:
                     pass
+            # Gate #6: shootout leak detection. Regular-season games
+            # (game_id encodes gameType at index 5: 02=regular, 03=playoff)
+            # should have period ≤ 4 (OT). Any period ≥ 5 is a shootout row
+            # that escaped the extractor-level SO exclusion.
+            per = r.get("period")
+            gid = r.get("game_id")
+            try:
+                is_regular = str(gid)[4:6] == "02"
+                if is_regular and per is not None and int(per) >= 5:
+                    so_rows += 1
+            except Exception:
+                pass
         if len(rows) < PAGE:
             break
         offset += PAGE
@@ -312,6 +370,10 @@ def main() -> int:
     record_audit(db, args.season, "geometry_signed",
                  expected=None, actual=x_negative,
                  note=f"pct_x_negative={pct_x_negative}%  target 47-52%  x_seen={x_seen}")
+    # so_rows_in_rebuild: expected 0. Even one is a leak.
+    record_audit(db, args.season, "so_rows_in_rebuild",
+                 expected=0, actual=so_rows,
+                 note=f"regular-season rows with period>=5 (extractor should skip periodType=SO)")
 
     # Hard-fail if any gate outside the band
     failed_gates: List[str] = []
@@ -325,11 +387,16 @@ def main() -> int:
         failed_gates.append(
             f"games_extracted (got {len(distinct_games)} of {args.manifest_count})"
         )
-    # goal_parity is expected exact match; tolerate ±0.5% for extraction quirks
-    tol = max(1, int(total_goal_events * 0.005))
+    # goal_parity: tolerance ≤0.2% per Garrett's addendum (measured residual
+    # on 2025 was 13/1394 = 0.15% before extractor fix, so 0.2% leaves headroom).
+    tol = max(1, int(total_goal_events * 0.002))
     if abs(goals_in_rebuild - total_goal_events) > tol:
         failed_gates.append(
-            f"goal_parity (got {goals_in_rebuild} vs {total_goal_events}, tol ±{tol})"
+            f"goal_parity (got {goals_in_rebuild} vs {total_goal_events} non-SO 505, tol ±{tol})"
+        )
+    if so_rows != 0:
+        failed_gates.append(
+            f"so_rows_in_rebuild (found {so_rows} shootout rows; extractor should skip periodType=SO)"
         )
 
     if failed_gates:
