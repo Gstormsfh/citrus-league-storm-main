@@ -1018,10 +1018,24 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
         List of shot record dictionaries
     """
     all_shot_data = []
-    
+
     try:
         # Initialize tracking variables (same as scrape_pbp_and_process)
         previous_play = None
+        # ─── RUNNING SCORE STATE (2026-08-10 leak fix) ───────────────────────
+        # NHL PBP `details.homeScore/awayScore` are populated only on goal
+        # events (typeCode=505). Reading them off shot/miss events returned
+        # 0 for 100% of non-goals in prod (measured 2026-08-10), turning
+        # `score_differential` into a label proxy: 0 iff not-a-goal, ~80% of
+        # goals non-zero. That single feature accounted for the entire live
+        # xG leak (ablation: neutralising it moved separation 41.29 → 3.24,
+        # matching the rescore's 2.59). Fix: walk the running score across
+        # every play and pass the PRE-event value to shot rows regardless of
+        # outcome. Incremented AFTER shot emission on goal events, so the
+        # goal-scoring shot sees the score it was taken with, not the score
+        # it produced.
+        home_score_running = 0
+        away_score_running = 0
         # ─── TWO BUFFERS WITH DISTINCT PURPOSES — DO NOT MERGE ────────────────
         # previous_plays: SHOT-ONLY buffer (typeCodes 505/506/507).
         #   Used by find_pass_before_shot() and pass-context derivation logic.
@@ -1079,7 +1093,19 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                     last_event_state['type_code'] = type_code
                     last_event_state['period'] = current_period
                 continue
-            
+
+            # ─── SHOOTOUT EXCLUSION (2026-08-10, Garrett measurement) ────────
+            # Shootout attempts are not shots in any xG sense (untimed
+            # penalty-shot format, no strength state, no rebound possibility).
+            # The bulk import CORRECTLY excluded them; our extraction wrote
+            # 791 rows for 2025 including 262 "goals" that inflated stored
+            # is_goal totals by 3%. Skip periodDescriptor.periodType == 'SO'
+            # at the SHOT-EVENT gate so no downstream code path can leak them
+            # into raw_shots.
+            _pd = play.get('periodDescriptor') or {}
+            if _pd.get('periodType') == 'SO':
+                continue
+
             # Process shot event (extract all the feature calculation logic)
             if not details:
                 continue
@@ -1112,8 +1138,13 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
             assist2_player_id = details.get('assist2PlayerId')
             goalie_in_net_id = details.get('goalieInNetId')
             event_owner_team_id = details.get('eventOwnerTeamId')
-            away_score_at_event = details.get('awayScore', 0) or 0
-            home_score_at_event = details.get('homeScore', 0) or 0
+            # ─── PRE-EVENT SCORE — running state, not details fields ─────────
+            # See "RUNNING SCORE STATE" block at top of function. Reading
+            # details.get('awayScore'/'homeScore') here returns 0 on all
+            # non-goal events (only populated on typeCode=505 goal events)
+            # and produces the score_differential label-proxy leak.
+            away_score_at_event = away_score_running
+            home_score_at_event = home_score_running
             away_sog = details.get('awaySOG', 0) or 0
             home_sog = details.get('homeSOG', 0) or 0
             shot_type_raw = details.get('shotType', '')
@@ -1733,7 +1764,15 @@ def _extract_shots_from_game(raw_data, game_id, db_client):
                 last_event_state['time_in_seconds'] = current_time_seconds if current_time_seconds else None
                 last_event_state['type_code'] = type_code
                 last_event_state['period'] = period_number
-        
+                # ─── INCREMENT RUNNING SCORE AFTER emission ──────────────────
+                # The shot record just appended above captured the PRE-shot
+                # score. Now update the running state so the NEXT event sees
+                # the post-goal score.
+                if event_owner_team_id == home_team_id:
+                    home_score_running += 1
+                elif event_owner_team_id == away_team_id:
+                    away_score_running += 1
+
         # Update state for non-shot events (already done in loop, but ensure it's complete)
         # This is handled in the loop above
         
@@ -2462,7 +2501,14 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 'type_code': None,
                 'period': None
             }
-            
+            # ─── RUNNING SCORE STATE (2026-08-10 leak fix) ───────────────────
+            # See identical block in _extract_shots_from_game near line 1023.
+            # NHL details.homeScore/awayScore fire only on goal events, making
+            # score_differential a label proxy. Fix: walk running score across
+            # every play; increment AFTER shot emission for goals.
+            home_score_running = 0
+            away_score_running = 0
+
             for play in raw_data.get('plays', []):
                 type_code = play.get('typeCode')
                 details = play.get('details', {})
@@ -2499,7 +2545,16 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                         pass
                     
                     continue  # Skip feature extraction for non-shot events
-                
+
+                # ─── SHOOTOUT EXCLUSION (2026-08-10) ─────────────────────────
+                # See identical block near line 1095 in _extract_shots_from_game.
+                # Shootout attempts are not shots in any xG sense; skip them
+                # at the shot-event gate so no downstream code path can leak
+                # them into raw_shots.
+                _pd_ss = play.get('periodDescriptor') or {}
+                if _pd_ss.get('periodType') == 'SO':
+                    continue
+
                 # From here on, we're processing a shot event (505, 506, or 507)
                 if not details:
                     continue
@@ -2544,8 +2599,9 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 
                 # Team context
                 event_owner_team_id = details.get('eventOwnerTeamId')
-                away_score_at_event = details.get('awayScore', 0) or 0
-                home_score_at_event = details.get('homeScore', 0) or 0
+                # See "RUNNING SCORE STATE" block at loop init.
+                away_score_at_event = away_score_running
+                home_score_at_event = home_score_running
                 away_sog = details.get('awaySOG', 0) or 0
                 home_sog = details.get('homeSOG', 0) or 0
                 
@@ -2958,8 +3014,11 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 # Range: Negative = trailing, 0 = tied, Positive = leading
                 # Example: If team is down 2-1, score_differential = -1 (trailing by 1)
                 # Calculation: Get scores at time of event, determine shooting team, calculate difference
-                away_score_at_event = details.get('awayScore', 0) or 0
-                home_score_at_event = details.get('homeScore', 0) or 0
+                # 2026-08-10: use running score, not details.homeScore/awayScore —
+                # those keys are only populated on goal events and turn this
+                # feature into a label proxy. See loop-init block.
+                away_score_at_event = away_score_running
+                home_score_at_event = home_score_running
                 event_owner_team_id = details.get('eventOwnerTeamId')  # Which team is shooting
                 home_team_id = raw_data.get('homeTeam', {}).get('id')
                 # Calculate from shooting team's perspective
@@ -3543,7 +3602,15 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                     last_event_state['time_in_seconds'] = current_time_seconds if current_time_seconds else None
                     last_event_state['type_code'] = type_code
                     last_event_state['period'] = period_number
-            
+                    # ─── INCREMENT RUNNING SCORE AFTER emission ──────────────
+                    # The shot record just appended captured the PRE-shot
+                    # score. Now update so the NEXT event sees the post-goal
+                    # value. See loop-init RUNNING SCORE block.
+                    if event_owner_team_id == home_team_id:
+                        home_score_running += 1
+                    elif event_owner_team_id == away_team_id:
+                        away_score_running += 1
+
             games_processed += 1
             logger.info(f"  [OK] Processed {shots_in_game} shots from Game {game_id}")
             
