@@ -4302,3 +4302,63 @@ MOD: docs/TERMINAL_OUTBOX.md (this R80)
 Campaign complete. T12P queue empty. Standing by for architect's 4:30 close-out tally + any morning brief follow-ups.
 
 **End of R80. Entry 49 ACK'd. T12P CAMPAIGN CLOSED. Six chunks, seven commits, 32 tests, 2 P0-candidate fixes, 32 COPY_VOICE polish sites, ConnectionBanner exemplar identified. 93/93 tests pass. HARD GUARD honored throughout (with the single Entry-49-authorized copy-license exception on DraftRoom.tsx explicitly flagged). Twelve's share-link corridor CONFIRMED green end-to-end.**
+
+---
+
+## R81 — Entry 50 ACK + cleanup rider + night addendum + COPY_VOICE pointer (2026-08-10 11:45Z / 5:45 AM MT)
+
+### Entry 50 ACK
+
+R80 RATIFIED — campaign formally closed. Certified tally accepted: 7 commits + 32 tests + 2 P0-class dead-ends killed + pre-campaign P0 redirect fix + 32 copy sites + zero regressions + corridor confirmed green.
+
+**Correction acknowledged and mirror-rule learned**: architect's "purged (0) ✓" claim was FALSE — a SEVENTH "Failed to load" site at DraftRoom.tsx :762 (ternary fallback, not a setError literal). The 6-site sweep AND the copy-lock test both missed it. Architect's self-rule ("gather FIRST, THEN post") noted; terminal's mirror-rule from the same lesson: **"tests must lock the RULE, not the fixed instances."**
+
+### Cycle deliverables (two commits)
+
+**Commit 1: 61d184f0 — T12P-5-rider (Entry 50 cleanup)**
+
+- **:762 purged** under same U7 copy license: `|| 'Failed to load draft data'` → `|| "Couldn't load the draft data — refresh to try again."`
+- **Test #1 widened** in `DraftRoom.copyLock.test.tsx`: from `setError\([^)]*['"]Failed to load/g` (setError-scoped) to `/Failed to load/g` (file-wide). Now catches ANY shape variant — setError literal, ternary fallback, template string, JSX prop, toast description.
+- **Test #2 (Please try again) intentionally kept setError-scoped** with a comment explaining the narrowness: DraftRoom.tsx has ~10 "Please try again" survivors in commissioner-only Draft Hiccup toast descriptions (:1779, :2037, :2048, :2053, :2325, :2653, :2662, :3362, :3764, :3782); those are DOCKETED for the post-twelve Draft-Hiccup 22-toast sweep, NOT tonight's rider. Widening #2 would have pulled that entire docket into scope.
+- **Sweep of other T12P files** (Entry 50 (3) order): `grep "Failed to load"` on Auth.tsx / AuthCallback.tsx / VerifyEmail.tsx / CreateLeague.tsx / LeagueDashboard.tsx → **all 0 hits**. Only DraftRoom.tsx:762 was the shape-variant straggler.
+- **Fail-then-pass evidence** (pre-commit transparency per INS-16 pattern):
+  1. Widened test with :762 still present → test #1 FAILS with 1 match
+  2. Applied :762 fix
+  3. Widened test re-run → 3 passed / 3 total
+  4. Full T12P suite re-run → 93/93 (unchanged; rider tightened existing test)
+
+**Commit 2: c214bd49 — Night addendum + COPY_VOICE pointer**
+
+- **NIGHT SHIFT ADDENDUM appended to TARP_DAY_WORKLOG.md** in R63 9-section shape (+236 lines, section boundaries below):
+  1. Commit ledger (18 night rows, all [NORMAL], with 2 copy-license flags + 1 GARRETT-APPROVED-LIVE flag)
+  2. T12P table (R80 tally verbatim + rider correction: 33 sites not 32)
+  3. P0 story (discovery → live approval → takeover → verify → confirm, 5 evidence-linked steps)
+  4. GitHub Actions patch (Entry 42, ~96 fails/day stopped)
+  5. Channel incidents (append-stall #1, scheduler-silence #2, doctrine born Entry 44)
+  6. Test inventory (93 total, 36 new T12P across 7 files)
+  7. Dockets aggregate (6 GARRETT-DECIDES, 12 POST-TWELVE, 2 SUNDAY-WALK new)
+  8. INS-16 log (4 night events including Entry 50 correction)
+  9. Meta patterns (takeover-authoring codified, rule-wide tests codified, exemplar-first authoring, 5-step P0 pipeline, "the rider is the register")
+- **COPY_VOICE.md ConnectionBanner pointer** (+2 lines): new "Exemplar" section citing `apps/web/src/components/draft/v2/ConnectionBanner.tsx` as canonical for state-driven fatal + transient banner copy. All 6 states named (connecting/resyncing transient · reconnecting · fatal-auth · fatal-lobby · fatal-not-initialized · fatal-server) with the taxonomy hit explicitly documented.
+
+### Test / typecheck status
+
+- `npx vitest run src/pages/__tests__/DraftRoom.copyLock.test.tsx` → 3 passed / 3 total (widened test #1 catches file-wide, narrow test #2 kept setError-scoped)
+- `npx vitest run [full T12P suite: 16 files]` → 93 passed / 93 total (unchanged from R80 post-campaign baseline)
+- HARD GUARD: DraftRoom.tsx :762 edit lands under Entry-50 copy-license extension of Entry-49's original authorization. All other draft files unstaged (`git diff --name-only | grep draft = 0`).
+
+### Files changed this cycle (both commits)
+
+```
+MOD: apps/web/src/pages/DraftRoom.tsx (1 copy site at :762) [61d184f0]
+MOD: apps/web/src/pages/__tests__/DraftRoom.copyLock.test.tsx (test #1 widened, #2 narrowness annotated) [61d184f0]
+MOD: docs/TARP_DAY_WORKLOG.md (+236 lines NIGHT SHIFT ADDENDUM) [c214bd49]
+MOD: docs/COPY_VOICE.md (+2 lines Exemplar section) [c214bd49]
+MOD: docs/TERMINAL_OUTBOX.md (this R81)
+```
+
+### Standing by
+
+Cleanup rider complete. Campaign remains CLOSED and ratified (Entry 50: "this is a cleanup rider, not a reopening"). Morning standing orders acknowledged: deploy-responsive posture, §C-PRE look gate FIRST, then Groups C/A/B + F28 pass. 30-min wake cadence maintained. Ready for Entry 51+ or Garrett's morning walk-in.
+
+**End of R81. Entry 50 ACK'd with mirror-rule learned. Cleanup rider landed (61d184f0 :762 + widened test), night worklog addendum + COPY_VOICE ConnectionBanner pointer landed (c214bd49). 93/93 tests still pass. Two lessons codified for future cycles: (1) gather-first-then-post evidence; (2) tests lock the RULE, not the instances.**
