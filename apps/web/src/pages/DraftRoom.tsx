@@ -226,7 +226,7 @@ const DraftRoom = () => {
       const { leagues, error } = await LeagueService.getUserLeagues(user.id);
       
       if (error) {
-        setError('Failed to load your leagues. Please try again.');
+        setError("Couldn't load your leagues — give it a moment and try again.");
         setLoading(false);
         return;
       }
@@ -245,7 +245,7 @@ const DraftRoom = () => {
       newSearchParams.set('league', targetLeague.id);
       navigate(`/draft-room?${newSearchParams.toString()}`, { replace: true });
     } catch (error: unknown) {
-      setError('Failed to load your leagues. Please try again.');
+      setError("Couldn't load your leagues — give it a moment and try again.");
       setLoading(false);
     }
   }, [user, navigate, searchParams, activeLeagueId]);
@@ -321,7 +321,7 @@ const DraftRoom = () => {
 
         if (!leagueResponse.data) {
           logger.error('[DraftRoom] Error loading demo league: no data returned');
-          setError('Failed to load demo league. Please try again.');
+          setError("Couldn't load the demo league — refresh to try again.");
           setLoading(false);
           return;
         }
@@ -337,7 +337,7 @@ const DraftRoom = () => {
 
         if (!demoTeamsData || (demoTeamsData as unknown[]).length === 0) {
           logger.error('[DraftRoom] Error loading demo teams: no teams returned');
-          setError('Failed to load demo teams. Please try again.');
+          setError("Couldn't load the demo teams — refresh to try again.");
           setLoading(false);
           return;
         }
@@ -365,7 +365,7 @@ const DraftRoom = () => {
 
         if (picksError) {
           logger.error('[DraftRoom] Error loading demo draft picks:', picksError);
-          setError('Failed to load demo draft picks. Please try again.');
+          setError("Couldn't load the demo draft picks — refresh to try again.");
           setLoading(false);
           return;
         }
@@ -405,7 +405,7 @@ const DraftRoom = () => {
         return;
       } catch (error: unknown) {
         logger.error('[DraftRoom] Error loading demo draft:', error);
-        setError('Failed to load demo draft. Please try again.');
+        setError("Couldn't load the demo draft — refresh to try again.");
         setLoading(false);
         return;
       }
