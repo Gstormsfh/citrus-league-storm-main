@@ -4008,3 +4008,92 @@ MOD: docs/TERMINAL_OUTBOX.md (this R77)
 Per Entry 39 order: **T12P-4 next** (Landing — first league view for brand-new member). Corridor step 4 of 5.
 
 **End of R77. Entry 46 ACK'd. T12P-3 shipped 5 COPY_VOICE polish sites + 10-test lock (auto-join corridor + Tier-1 receive contract). NO P0 finding — the Tier-1 fix (7226efa8) works as designed; auto-join fires post-redirect on all three paths (password / already-authed / OAuth-stash). 83/83 tests pass. Corridor step 3 of 5 complete.**
+
+---
+
+## R78 — Entry 47 ACK + T12P-4 committed (2026-08-10 09:22Z / 3:22 AM MT)
+
+### Entry 47 ACK
+
+T12P-3 RATIFIED. C3 IS GREEN — the twelve's share-link corridor is CONFIRMED, not hoped. Both test-regex corrections caught pre-commit; the transparency pattern is working. All 4 dockets accepted. T12P-5's OBSERVE-ONLY-under-HARD-GUARD clarification noted for the next cycle: findings as dockets, zero edits, git-diff-zero claim required.
+
+### T12P-4 executed (5dbc3f21)
+
+**P-a Flow audit** (brand-new fantasy-league member landing on `/league/:leagueId`):
+
+Entry paths:
+- **A** (primary): Auto-join → `CreateLeague :628 routeToLeague` → `/league/${id}?league=${id}`
+- **B**: Home / GM Office league card click
+- **C**: Direct URL / bookmark
+
+States seen by a brand-new member:
+
+| Surface | Copy | Status |
+|---|---|---|
+| StormyLoading | "Loading your league…" | ✓ canonical M-2 |
+| Error card (leagueError) | title "Something went sideways." + kicker "✦ League not found" + msg | ✓ warm |
+| Wrong-league toast (:130-131) | title "Access Denied" + "You are not a member…" | ❌ FIXED |
+| setError catch-all (:229) | "Failed to load league data" | ❌ FIXED |
+| Header + status badge | "Not Started"/"Draft Live"/"Draft Complete" | ✓ state names |
+| Draft Room card | commissioner/member forks all warm | ✓ |
+| Your Squad card (userTeam) | "✦ Your Squad" + team + View Roster/GM Office | ✓ |
+| LeagueTimelineCard empty | "Quiet on the ice. New moments…" | ✓ warm |
+| Teams empty rink (:1691) | "✦ Empty rink / This league is still filling up. / Grab the join code from the Settings tab and send it to your league mates." | ✓ COPY_VOICE idiom exact |
+| Sidebar League pulse | "N of M teams in. Draft is on deck." | ✓ |
+
+**HOSTILE probes** (10 enumerated):
+
+1. **Wrong-league URL / stale share link** → toast fires with pre-fix walls. **FIXED this commit.**
+2. **Load-failure catch-all** (replica lag right after auto-join could produce this on first landing) → banned "Failed to". **FIXED this commit.**
+3. **userTeam null silent-drop** (probe 3): if `getUserTeam` swallows a network error at LeagueService.ts:554 and returns `{team: null, error}`, the "Your Squad" card silently doesn't render for a new member. **Failure mode: user thinks they didn't join.** DOCKETED — not "trivially safe" per Entry 39 rule (needs return-contract change + retry banner).
+4. **Empty rink** — COPY_VOICE-perfect idiom already shipped. NO CHANGE.
+5. **Draft not_started + commissioner vs member forks** — both warm.
+6. **Draft in_progress banner** — warm.
+7. **Draft completed** — warm.
+8. **Pool leagues** — redirect to /pool/... — correct.
+9. **Loading state** — StormyLoading canonical.
+10. **Missing leagueId at button click** (:1599) — warm defensive.
+
+**P0-CANDIDATE FINDING**: None. The landing corridor's user-visible copy is at bar in the load-bearing paths. The two edges (wrong-league toast, load-failure fallback) got polished this commit.
+
+**P-b/P-c COPY_VOICE polish (2 landing-corridor sites in-scope)**:
+
+- `:130-131` toast: `title: "Access Denied"` → `"Wrong League"` (state name per taxonomy); `"You are not a member of this league."` → `"This one's not on your list — check the invite link or pick one from GM Office."` (drops "You are not" wall; TWO doors — invite link + GM Office)
+- `:229` setError fallback: `'Failed to load league data'` → `"Couldn't load the league — refresh to try again."` (banned "Failed to" purged; retry door)
+
+**Out-of-scope commissioner copy** (8 sites in `handleSaveSettings` + `handleSimulateFill`): DOCKETED as post-twelve commissioner-copy sweep.
+
+**P-d offline-verifiable fixes only**: 2 copy strings. Zero routing/logic/state changes.
+
+**P-e Test lock** (`LeagueDashboard.landing.test.tsx`, 3 tests):
+
+1. Toast title "Access Denied" purged; "Wrong League" present
+2. "You are not a member" wall dropped; "check the invite link" door present
+3. setError banned "Failed to load league data" purged; "refresh to try again" retry door present
+
+### Docketed T12P-4 findings
+
+- **userTeam null silent-drop** (probe 3): failure mode = user thinks they didn't join. Post-twelve fix candidate: distinguish "genuinely no team" vs "fetch failed" and surface retry banner.
+- **Commissioner "Failed to save X" 8-site sweep** — post-twelve.
+- **:277 "Failed to simulate teams" toast title "Error Creating Teams"** — commissioner simulate-fill only. Post-twelve.
+- **Access-denied toast fires AFTER navigate** (:128 navigate; :129-134 toast) — intentional but if router race eats the toast, user gets zero feedback. Observability docket.
+
+### Test / typecheck status
+
+- `npx vitest run [full T12P suite] → 86 passed / 86 total` (83 prior + 3 new = 86 exact)
+- `npx tsc --noEmit -p tsconfig.app.json | grep LeagueDashboard → 0 lines`
+- HARD GUARD honored (`git diff --name-only | grep draft = 0`)
+
+### Files changed this cycle
+
+```
+MOD: apps/web/src/pages/LeagueDashboard.tsx (2 copy sites)
+NEW: apps/web/src/pages/__tests__/LeagueDashboard.landing.test.tsx (3 tests)
+MOD: docs/TERMINAL_OUTBOX.md (this R78)
+```
+
+### T12P queue standing
+
+Per Entry 39 + Entry 47: **T12P-5 next** (Lobby entry — HARD GUARD OBSERVE-ONLY, findings-as-dockets, zero edits, git-diff-zero claim required), then T12P-T (offline integration test: join happy path + top-2 refusals). Corridor step 5 of 5.
+
+**End of R78. Entry 47 ACK'd. T12P-4 shipped 2 COPY_VOICE polish sites + 3-test lock on the landing corridor edges. NO P0 finding — brand-new member sees a warm surface end-to-end. 86/86 tests pass. Corridor step 4 of 5 complete.**
