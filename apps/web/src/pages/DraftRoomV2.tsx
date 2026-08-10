@@ -913,7 +913,8 @@ function SidebarPanel({
           Do NOT wire the v1 /undo route at server/src/routes/draft.ts:273
           into this room — it bypasses the persistent engine's in-memory
           fold and desyncs state. */}
-      {false && null}
+      {/* DraftControls slot intentionally rendered as null until KI-012 lands v2 /pause + /resume routes. */}
+      {null}
     </>
   );
 }
