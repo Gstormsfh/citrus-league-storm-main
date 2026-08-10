@@ -3894,3 +3894,117 @@ MOD: docs/TERMINAL_OUTBOX.md (this R76)
 Per Entry 39 order + Entry 45 amendment: **T12P-3 next** (Join-by-code hostile on CreateLeague.tsx :220/:605/:563 — attack the Tier-1 fixed path: does auto-join fire post-redirect, does ?code survive into searchParams on protected mount, plus full-league / already-member / invalid-code / expired-invite refusals). Corridor step 3 of 5.
 
 **End of R76. Entry 45 ACK'd. T12P-2 shipped one P0-candidate fix (already-verified redirect) + 3 COPY_VOICE polish sites + 7-test lock. 73/73 tests pass. Corridor step 2 of 5 complete.**
+
+---
+
+## R77 — Entry 46 ACK + T12P-3 committed (2026-08-10 08:45Z / 2:45 AM MT)
+
+### Entry 46 ACK
+
+T12P-2 RATIFIED. email_confirmed_at gate + 10-probe inventory + docket rulings accepted. Entry 46's amendment threaded into T12P-3 as Tests #9 and #10: confirm ?redirect actually reaches handleSignIn's post-success navigate on BOTH the password and OAuth return paths, and report which path the twelve exercise in practice.
+
+### T12P-3 executed (73ea47de)
+
+**PRIMARY QUESTION (Entry 45 amendment): does auto-join actually fire post-redirect after the Tier-1 fix (7226efa8)? Does ?code survive into searchParams on protected mount?**
+
+**ANSWER: YES on both. Full corridor trace holds up end-to-end. NO P0 finding.**
+
+The receiving end of Tier-1's redirect (7226efa8) works as designed:
+
+```
+Step 1: /create-league?code=ABC  (signed-out user, invite link)
+Step 2: ProtectedRoute → /auth?redirect=%2Fcreate-league%3Fcode%3DABC
+        (encodes pathname + search; startsWith('/') guard kept)
+Step 3: Auth.tsx redirect delivery — THREE paths:
+   3a. handleSignIn success (Auth.tsx:124-128): reads
+       window.location.search, extracts redirect, navigates.
+   3b. Already-authenticated arrival (Auth.tsx:54-59):
+       same window.location.search read, same guard, same navigate.
+   3c. OAuth round-trip (Auth.tsx:44-51 → AuthCallback:48-58):
+       stash to sessionStorage BEFORE the OAuth handoff (Google
+       strips query params), read back on /auth/callback mount.
+Step 4: CreateLeague mounts inside ProtectedRoute. useSearchParams
+        parses the FRESH URL (post-navigate) and returns 'ABC'.
+Step 5: Effect at :243-255 fires: code + user + !autoJoinFiredRef
+        → autoJoinFiredRef.current = true → setTimeout(50ms) →
+        handleJoinLeague(code).
+Step 6: handleJoinLeague uses codeOverride, bypassing the
+        state-commit race (defensive triple-fallback at :562-568
+        preserved regardless).
+```
+
+**Which path the twelve exercise in practice**: overwhelmingly (3a) password sign-in — that's what most invitees will do when handed a share link. (3b) fires for the fraction who happen to be signed in already. (3c) only for Google OAuth users; the sessionStorage stash makes that path work despite Google's callback URL query-strip.
+
+**HOSTILE probes — enumerated refusal paths**:
+
+| Refusal | Reachable? | Current copy | Owner |
+|---|---|---|---|
+| Invalid join code | ✓ | "Invalid join code. Please check and try again." | server RPC |
+| Full league (teams >= max) | ✓ | "This league is full." (bare, no door) | server RPC |
+| Draft in-progress | ✓ (fantasy only) | "Cannot join — the draft is currently in progress." | server RPC |
+| Draft completed | ✓ (fantasy only) | "Cannot join — the draft has already been completed." | server RPC |
+| Already-member | ⚪ idempotent | RPC returns success + `already_member: true` — no refusal | N/A (design) |
+| Expired-invite | ⚪ N/A | Join codes don't expire in this system | — |
+| Not-authenticated | ⚪ defensive | "Not authenticated." | server RPC (unreachable via UI due to ProtectedRoute) |
+| Rate limit exceeded | ✓ | Passed through raw (LeagueService comment: "10 attempts/hour") | server RPC |
+
+All refusals reach the client via `setError(errorMessage)` + toast. Client-side fallbacks for "Failed to join league" purged this commit.
+
+**COPY_VOICE conformance** (5 join-corridor sites polished in-scope):
+
+- :551 `"You must be logged in to join a league"` → `"Sign in first, then jump into the league."` (rule 3 wall dropped)
+- :571 `"Join code is required"` → `"Add a join code first — check your invite link."` (offers door: invite link)
+- :612 `throw new Error("Failed to join league")` → `"Couldn't join that league — try again in a moment."` (banned "Failed" purged)
+- :629 `err.message : "Failed to join league"` → same warm string
+- :685 `title: "Error Joining League"` → `title: "Can't Join Right Now"` (banned "Error" title → state name per toast taxonomy)
+
+Server RPC copy (5 refusal strings) DOCKETED — SQL migration scope, post-twelve unless T12P-T uncovers a user-visible dead-end.
+
+**P-d offline-verifiable fixes only**: 5 copy string swaps. Zero routing/state/RPC changes.
+
+**P-e Test lock** (`CreateLeague.autoJoin.test.tsx`, 10 tests):
+
+Auto-join corridor (4 tests — C3-decides invariant):
+1. useEffect exists with `searchParams.get('code')` + user + `!autoJoinFiredRef` guard + `handleJoinLeague(code)` call
+2. `autoJoinFiredRef.current = true` set BEFORE setTimeout (idempotency)
+3. `handleJoinLeague` signature accepts `codeOverride?: string` (race bypass)
+4. Triple-fallback code resolution preserved
+
+COPY_VOICE conformance (4 tests):
+5. Banned "Failed to join" purged
+6. Toast title uses state-name "Can't Join Right Now"
+7. `setError("Join code is required")` purged (regex narrowed to setError call sites — pre-fix comment at :558 legitimately mentions the old string)
+8. Banned "You must be logged in to join" dropped
+
+Auth.tsx redirect delivery (2 tests — Entry 46 amendment):
+9. `handleSignIn` post-success `setTimeout` body reads `window.location.search` + `startsWith('/')` guard + `navigate()` (locks password sign-in path)
+10. `sessionStorage.setItem('citrus:postAuthRedirect')` present (locks OAuth stash)
+
+**Test-regex correction (INS-16-adjacent transparency)**: test #7 first-pass `not.toMatch(/["']Join code is required["']/)` false-fired on the descriptive comment at :558 ("Fixes the 'Join code is required' error…"). Narrowed to `setError\(\s*["']Join code is required["']/` so the history comment doesn't false-fail the ban. Caught pre-commit.
+
+### Docketed T12P-3 findings
+
+- **Server RPC copy warming (5 refusal strings)** — SQL migration. Post-twelve unless T12P-T reveals a user-visible dead-end.
+- **Defensive isAlreadyMember block at :635-679** — dead code with current idempotent RPC. Keep for now (safety net); remove post-twelve when we're certain no old server code paths remain.
+- **`navigate("/auth")` at :553 loses ?code context** — if the defensive `!user` branch ever fires, invite code is lost. Path unreachable today (ProtectedRoute + auto-join guard). If we ever expose /create-league unprotected, add the redirect param carry.
+- **CreateLeague shadcn primitives + text-muted-foreground/text-primary tokens** — POST-TWELVE citrus2 sweep candidate (analogous to task #103 for auth pages).
+
+### Test / typecheck status
+
+- `npx vitest run [full T12P suite] → 83 passed / 83 total` (73 prior + 10 new = 83 exact match)
+- `npx tsc --noEmit -p tsconfig.app.json | grep CreateLeague → 0 lines` (zero new tsc errors)
+- HARD GUARD honored (`git diff --name-only | grep draft = 0`).
+
+### Files changed this cycle
+
+```
+MOD: apps/web/src/pages/CreateLeague.tsx (5 copy sites)
+NEW: apps/web/src/pages/__tests__/CreateLeague.autoJoin.test.tsx (10 tests)
+MOD: docs/TERMINAL_OUTBOX.md (this R77)
+```
+
+### T12P queue standing
+
+Per Entry 39 order: **T12P-4 next** (Landing — first league view for brand-new member). Corridor step 4 of 5.
+
+**End of R77. Entry 46 ACK'd. T12P-3 shipped 5 COPY_VOICE polish sites + 10-test lock (auto-join corridor + Tier-1 receive contract). NO P0 finding — the Tier-1 fix (7226efa8) works as designed; auto-join fires post-redirect on all three paths (password / already-authed / OAuth-stash). 83/83 tests pass. Corridor step 3 of 5 complete.**
