@@ -4097,3 +4097,119 @@ MOD: docs/TERMINAL_OUTBOX.md (this R78)
 Per Entry 39 + Entry 47: **T12P-5 next** (Lobby entry — HARD GUARD OBSERVE-ONLY, findings-as-dockets, zero edits, git-diff-zero claim required), then T12P-T (offline integration test: join happy path + top-2 refusals). Corridor step 5 of 5.
 
 **End of R78. Entry 47 ACK'd. T12P-4 shipped 2 COPY_VOICE polish sites + 3-test lock on the landing corridor edges. NO P0 finding — brand-new member sees a warm surface end-to-end. 86/86 tests pass. Corridor step 4 of 5 complete.**
+
+---
+
+## R79 — Entry 48 ACK + T12P-5 OBSERVE-ONLY report (2026-08-10 10:00Z / 4:00 AM MT)
+
+### Entry 48 ACK
+
+T12P-4 RATIFIED. The no-P0 verdict as compounding-evidence framing is exactly right — this week's work stacked. Probe-3 (userTeam null silent-drop) elevation to Garrett's morning brief noted; ride on decision-docket, not fix queue. Access-denied-toast-after-navigate observability note accepted same bucket. **T12P-5 rules acknowledged: OBSERVE-ONLY, zero edits under any temptation including copy, findings land as dockets with file:line + severity, git-diff-zero claim required.**
+
+### T12P-5 GIT-DIFF-ZERO CLAIM
+
+**Explicit claim, per Entry 47 requirement**: `git diff --name-only apps server packages | wc -l = 0` verified after all reads. Only doc write this cycle is `docs/TERMINAL_OUTBOX.md` (this R79). Zero source-file edits. Zero test-file edits. Zero migration/config edits. Architect may re-run `git diff` to confirm.
+
+### T12P-5 executed (docs-only)
+
+**SCOPE**: what the invitee sees the FIRST time they enter the lobby from the "Enter Draft Lobby" button on LeagueDashboard (`:1605 navigate('/draft-room?league=${leagueId}')`) — which mounts `DraftRoom.tsx` (v1, 5021 lines) which embeds `DraftLobby.tsx` (component, 1186 lines). Also examined `DraftRoomV2.tsx` (v2, 919 lines) and `ConnectionBanner.tsx` for the v2-invitee case (Aug 20 twelve may land on v2 if F27 slice-1 ships in time).
+
+### P-a Flow audit (invitee-visible states)
+
+| Surface | State | Copy sample | Verdict |
+|---|---|---|---|
+| DraftLobby header (:287-296) | member-not-cmsr | "Waiting for the league commissioner to start the draft. Review the settings below." | ✓ warm |
+| Empty slots (:656-664) | teams < maxTeams | "Waiting for manager..." + "+ N more open spots" | ⚠️ bare, POST |
+| Waiting for Draft card (:1030-1053) | !isCmsr + !hasExistingDraft + !scheduledTime | title "Waiting for Draft" + "The commissioner will start the draft once all teams are ready. Stay in the lobby to join automatically." + animated pulse dots | ✓ warm |
+| Draft Scheduled card | !isCmsr + scheduledTime | "Draft Scheduled" + "The draft is scheduled. You'll be able to join the draft room when it starts." | ✓ warm (minor: "You'll be able") |
+| Draft In Progress card (:1004-1029) | !isCmsr + hasExistingDraft | "Draft In Progress" + "The draft is currently in progress. Click below to join the draft room." + "Join Draft Room" | ✓ warm |
+| "Not in this league?" (:1057) | always | "Not in this league?" + Create New League CTA | ✓ conversational |
+| ConnectionBanner v2 all states | connect flows | 4 fatal states + 3 transient — all state-name titles, warm bodies, retry doors | ✓ EXEMPLAR |
+| DR2 identity-failure (:319-343) | myTeamId re-resolve fail | "We can't identify your team in this draft." / "Couldn't verify your team — check your connection." | ✓ warm, doors |
+
+### P-b/P-c COPY_VOICE + DESIGN_DIRECTION v2.1 findings
+
+**All findings dockets — ZERO EDITS.** Format: `<file>:<line>` — **[severity]** — description.
+
+#### DraftLobby.tsx (component, 1186 lines)
+
+- **:257** — **POST-TWELVE** — toast title `"Team Didn't Remove"` + desc `"Couldn't remove that team: ${errorMessage}"` — commissioner-only path (delete-team). Copy is state-name-ish + owns blame; POST-TWELVE polish.
+- **:267-269** — **POST-TWELVE** — toast title `"Not enough teams"` + desc `"You need at least 4 teams to start the draft."` — commissioner-only. Desc has soft "You need" (rule 3 wall). POST polish → "Need at least 4 teams — invite some managers to fill the roster."
+- **:658** — **POST-TWELVE** — invitee-visible empty slot text `"Waiting for manager..."` — bare. Doesn't match COPY_VOICE empty-state idiom (✦ kicker + primary ≤8 words + context + verb). POST polish candidate: `"✦ Open slot"` + "Waiting for a manager to grab this seat." Not blocking.
+- **:1042** — **NO-ACTION** — invitee body "The commissioner will start the draft once all teams are ready. Stay in the lobby to join automatically." — warm, honest, matches taxonomy.
+- **:1155-1156** — **POST-TWELVE** — commissioner schedule-dialog toast `"Missing Information"` + `"Please select both a date and time."` — has "Please" (mild rule 4). POST polish → `"Missing a piece"` + "Pick both a date and a time to schedule."
+- **:1163-1164** — **POST-TWELVE** — commissioner schedule-dialog `"Invalid Time"` + `"Scheduled time must be in the future."` — "must be" mild rule 3 wall. POST polish → `"Time slipped by"` + "Pick a time later than now."
+- **:287** and multiple sites — **POST-TWELVE** — shadcn `text-primary`, `bg-primary`, `Card`/`Dialog`/`Alert` primitives. Task #103 sibling. POST citrus2 sweep on DraftLobby specifically.
+
+#### DraftRoom.tsx (v1 host, 5021 lines) — INVITEE-VISIBLE if v1 is the twelve's room
+
+- **:229** — **⚠️ PRE-TWELVE CANDIDATE** — `setError('Failed to load your leagues. Please try again.')` — banned "Failed" per COPY_VOICE hard-ban. **Invitee-visible on first mount if getUserLeagues fails.** Blocks entry.
+- **:248** — **⚠️ PRE-TWELVE CANDIDATE** — duplicate of :229 (same fallback fired from a second catch). Same severity.
+- **:324** — **⚠️ PRE-TWELVE (demo-only)** — `setError('Failed to load demo league. Please try again.')` — demo path, but same banned-word pattern.
+- **:340** — **⚠️ PRE-TWELVE (demo-only)** — `setError('Failed to load demo teams. Please try again.')`
+- **:368** — **⚠️ PRE-TWELVE (demo-only)** — `setError('Failed to load demo draft picks. Please try again.')`
+- **:408** — **⚠️ PRE-TWELVE (demo-only)** — `setError('Failed to load demo draft. Please try again.')`
+- **:424** — **POST-TWELVE** — `setError('No league ID provided. Please select a league.')` — defensive-only path (route param missing), unreachable from normal invitee flow. POST polish.
+- **:1752 / :1764 / :1779 / :1797 / :2005 / :2022 / :2037 / :2048 / :2053 / :2060 / :2308 / :2329 / :2576 / :2614 / :2625 / :2641 / :2653 / :2662 / :2742 / :2767 / :2842 / :2853 / :2870 / :2995 / :3058** — **POST-TWELVE** — `title: "Draft Hiccup"` toast pattern (22+ occurrences). Title itself is warm state-name ✓, but descriptions frequently contain banned "Failed to X" + "Please try again." Commissioner-only mostly (pick submission errors, undo, delete, prepare, start). POST-TWELVE bulk sweep candidate.
+- **:2067** — **NO-ACTION** — `title: "Not Your Turn"` + desc `"It's not your turn to draft!"` — CANONICAL per COPY_VOICE ✓. Already at bar.
+- **:2074** — **NO-ACTION** — `title: "Player Unavailable"` + `"This player has already been drafted!"` — state name ✓, owns fact.
+- **:3034-3035** — **POST-TWELVE** — `title: step === 'init' ? 'Failed to initialize draft' : 'Cannot start draft'` — banned "Failed" in the init branch. Commissioner-only. POST polish → `'Draft Setup Snagged'` / `'Draft Won't Start'` state names.
+
+#### DraftRoomV2.tsx (v2, 919 lines) — INVITEE-VISIBLE if v2 is the twelve's room
+
+- **:322** — **NO-ACTION** — identity-failure `"We can't identify your team in this draft."` + full contextual body + Reload door. ✓ warm.
+- **:334** — **NO-ACTION** — `"Couldn't verify your team — check your connection."` ✓ warm.
+- **:472** — **NO-ACTION** — inline transient "Waiting for draft state…" — fine.
+- **:595** — **NO-ACTION** — `toast.error("It's not your turn")` — state-name idiom ✓.
+- **:613** — **POST-TWELVE** — `toast.error('Invalid player')` — bare technical. Reachable if player.id fails Number.isFinite. POST polish → `"Player Locked"`-style state name + door.
+- **:640** — **NO-ACTION** — `"We couldn't confirm your pick — check the board"` — dangle-timer copy. ✓ warm.
+- **:680/:683** — **POST-TWELVE (server-copy)** — `toast.error(result.message)` passes raw server message through. Server-side COPY_VOICE sweep on submitPick.ts failure-mapping needed. Docket bucket: server-copy sweep.
+- **:691** — **POST-TWELVE** — `toast.error('Unexpected error')` — banned generic per rule 3 "errors own blame". Fallback for outer try/catch. POST polish → "Something snagged submitting that pick — try tapping Draft again."
+
+#### v2 ConnectionBanner.tsx (286 lines)
+
+- **All states audited — NO-ACTION** — this file is a COPY_VOICE EXEMPLAR. State-name titles ("Connection lost", "Connection appears stale", "Can't reach the draft server", "Waiting on your commissioner", "You're no longer authorized to access this draft", "This draft is no longer available"), warm bodies, doors offered (Retry/Reload/Sign-in-again/Back-to-GM-Office). Zero findings. Reference implementation for other lobby copy.
+
+### Cross-cutting hostile probes
+
+A. **Draft transition race** (draft flips not_started → in_progress while invitee sits in lobby). DraftLobby reads props (`hasExistingDraft`, `isDraftQueued`). Parent (DraftRoom.tsx) polls / subscribes to updates. Not clear from static read whether the invitee sees the transition IMMEDIATELY or needs a refresh. **DOCKET — observability follow-up** (would need render/live test to confirm).
+
+B. **Empty-slot count > actual invitee visibility**: DraftLobby :661-665 shows `+ N more open spots` for teams beyond first 3 unfilled. Copy is fine.
+
+C. **isCommissioner default when auth not resolved**: DraftLobby prop `isCommissioner: boolean` — no defaultValue. If parent (DraftRoom.tsx) computes it before user session resolves, invitee could briefly see commissioner-only UI. Static read shows parent guards on user before mount but WORTH VERIFYING at runtime. **DOCKET — observability**.
+
+D. **`Team.owner: string` values in DraftLobby**: not sampled in this pass but LeagueDashboard :1723 shows "User" literal. Would show up in Managers panel too. Already docketed in T12P-4 sibling.
+
+E. **Shadcn primitives across DraftLobby + DraftRoom.tsx**: `Card`, `Alert`, `Dialog`, `Button`, `Input`, `Label`, `Select`, `Separator`, `Tabs`, `Badge` — all shadcn. Task #103 covers auth pages; docket DraftLobby + DraftRoom for a sibling POST-TWELVE citrus2 sweep. **DOCKET — POST-TWELVE.**
+
+### P0 candidates (would need architect-ratified follow-on unguarded commit)
+
+**NONE.** The invitee-visible lobby paths are warm-enough or defensive-only. The closest thing to a P0 is the DraftRoom.tsx :229/:248 pair (banned "Failed to load your leagues" on invitee first-mount if getUserLeagues fails). Not a dead-end — setError is retryable, error card shows. Escalation is architect's call.
+
+### Pre-twelve-if-v1-is-the-room decision (needs architect ruling)
+
+**PRIMARY OPEN QUESTION for architect**: Which room mounts for the twelve — v1 (DraftRoom.tsx) or v2 (DraftRoomV2.tsx)?
+
+- If **v1**: PRE-TWELVE candidates = 6 "Failed to load X" setError sites at :229/:248/:324/:340/:368/:408 (2 real-path + 4 demo-only). Recommend a small unguarded copy commit for :229/:248 (the two invitee-visible real-path banners).
+- If **v2**: NO PRE-TWELVE candidates. All v2 lobby-adjacent copy is at bar (:322/:334/:595/:640 all warm; :613/:691 are POST polish).
+
+Deferring the ruling to architect. Ready to author a follow-on unguarded PRE-TWELVE copy commit (:229/:248 only, ≤4 lines, source-read test locking banned "Failed to load" absence) if directed. Zero-touch until then per HARD GUARD.
+
+### Test / typecheck status
+
+- No tests run this cycle (docs-only observation pass; no code touched).
+- `git diff --name-only apps server packages | wc -l → 0` (source diff zero, HARD GUARD honored).
+- Full T12P suite status carries from R78: 86/86 passing.
+
+### Files changed this cycle
+
+```
+MOD: docs/TERMINAL_OUTBOX.md (this R79)
+--- SOURCE FILES: zero changes ---
+```
+
+### T12P queue standing
+
+Per Entry 39: **T12P-T next** (offline integration test — join-code happy path + top-2 refusals). Campaign closes with T12P-T.
+
+**End of R79. Entry 48 ACK'd. T12P-5 delivered OBSERVE-ONLY report per Entry 47 rules. GIT-DIFF-ZERO on source verified. Findings: ~40 dockets across DraftLobby.tsx / DraftRoom.tsx / DraftRoomV2.tsx / ConnectionBanner.tsx — mostly POST-TWELVE polish; 2 potential PRE-TWELVE candidates gated on architect ruling of v1-vs-v2 room. NO P0. ConnectionBanner.tsx is a COPY_VOICE exemplar — reference for other lobby copy. Corridor step 5 of 5 complete (audit-only).**
