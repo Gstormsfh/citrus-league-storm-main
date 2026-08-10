@@ -1,0 +1,3 @@
+# Auto-request review on every PR. Becomes enforceable ("require review from
+# code owners") once branch protection is enabled on master.
+* @Gstormsfh

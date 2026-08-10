@@ -1,0 +1,60 @@
+name: Daily Roster Snapshot (fantasy_daily_rosters, TODAY only)
+
+# Task 1A. Materialises one fantasy_daily_rosters row per player, per
+# team-in-active-matchup, for TODAY, with source='scheduled_snapshot'.
+# Idempotent: existing rows for (team, matchup, player, roster_date) are
+# left untouched by the underlying UPSERT.
+#
+# Why 08:00 UTC: Mountain Time is UTC-7 (MDT) or UTC-6 (MST). 08:00 UTC =
+# 01:00 MDT / 02:00 MST — comfortably after the local-day rollover and
+# before any user is awake to edit their lineup. The scheduled_snapshot
+# row is written first; any subsequent user_edit for the same
+# (team, matchup, player, roster_date) key wins because the frontend path
+# DELETE+INSERTs its rows.
+#
+# Endpoint auth is a shared secret in the X-Scheduled-Secret header, not
+# a user JWT. The secret must be set as both a GitHub repo secret named
+# SCHEDULED_TRIGGER_SECRET and a Cloud Run env var of the same name.
+#
+# Coverage assertion: the server-side handler returns HTTP 500 if the
+# actual number of (team, matchup) pairs written differs from the expected
+# count from the active-matchup enumeration. GitHub emails the workflow
+# failure. Silent partial writes are the exact failure class this cron
+# exists to eliminate.
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/scheduled/roster-snapshot-today
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          SCHEDULED_TRIGGER_SECRET: ${{ secrets.SCHEDULED_TRIGGER_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE_URL:-}" ]; then
+            echo "API_BASE_URL secret not set" >&2
+            exit 1
+          fi
+          if [ -z "${SCHEDULED_TRIGGER_SECRET:-}" ]; then
+            echo "SCHEDULED_TRIGGER_SECRET secret not set" >&2
+            exit 1
+          fi
+          RESP=$(mktemp)
+          STATUS=$(curl -sS -o "$RESP" -w "%{http_code}" \
+            -X POST "${API_BASE_URL%/}/api/scheduled/roster-snapshot-today" \
+            -H "X-Scheduled-Secret: ${SCHEDULED_TRIGGER_SECRET}" \
+            -H "Content-Type: application/json" \
+            --max-time 240)
+          echo "HTTP $STATUS"
+          cat "$RESP"
+          echo
+          if [ "$STATUS" != "200" ]; then
+            echo "roster-snapshot-today failed (status $STATUS)" >&2
+            exit 1
+          fi

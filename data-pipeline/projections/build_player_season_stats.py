@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Roll up per-game stats into season totals
+# Last active: 2026-04-02
+# Invoked:     imported by nightly_projection_batch.py
+# Reads:       player_game_stats
+# Writes:      player_season_stats
+# ────────────────────────────────────────────────────────────
 """
 build_player_season_stats.py
 
@@ -111,10 +119,14 @@ def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, fl
     use_talent_adjusted = False
     
     logger.info(f"[build_player_season_stats] Fetching xG/xA from raw_shots (CACHE_VERSION={PROJECTION_CACHE_VERSION})...")
-    
+    # Live product path: filter raw_shots by the caller-supplied season.
+    # raw_shots is multi-season since phase 0c backfilled 2017-2024, so an
+    # unfiltered read would sum historical xG/xA into current-season totals.
+    season_filter = [("season", "eq", int(season))]
+
     # Try to determine which columns are available by testing first batch
     try:
-      test_batch = db.select("raw_shots", select="player_id,shooting_talent_adjusted_xg,xg_value,xa_value", limit=1, offset=0)
+      test_batch = db.select("raw_shots", select="player_id,shooting_talent_adjusted_xg,xg_value,xa_value", filters=season_filter, limit=1, offset=0)
       if test_batch and len(test_batch) > 0:
         if "shooting_talent_adjusted_xg" in test_batch[0]:
           use_talent_adjusted = True
@@ -126,16 +138,16 @@ def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, fl
     except Exception:
       # Fallback to basic columns
       try:
-        test_batch = db.select("raw_shots", select="player_id,xg_value,xa_value", limit=1, offset=0)
+        test_batch = db.select("raw_shots", select="player_id,xg_value,xa_value", filters=season_filter, limit=1, offset=0)
         select_cols = "player_id,xg_value,xa_value"
       except Exception:
         # Last resort: try old column names
         select_cols = "player_id,xg,xa"
-    
+
     # Fetch all rows with pagination
     while True:
       try:
-        rows = db.select("raw_shots", select=select_cols, limit=batch_size, offset=offset)
+        rows = db.select("raw_shots", select=select_cols, filters=season_filter, limit=batch_size, offset=offset)
       except Exception as e:
         logger.warning(f"[build_player_season_stats] Warning: Could not fetch xG/xA batch at offset {offset}: {e}")
         break

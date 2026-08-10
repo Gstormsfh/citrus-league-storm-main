@@ -209,7 +209,7 @@ const Auth = () => {
     } finally { setResetLoading(false); }
   };
 
-  const darkInputClass = 'bg-[#0F1F15] border-white/10 text-pastel-cream placeholder:text-white/35 focus-visible:ring-pastel-orange/40 focus-visible:border-pastel-orange/50 h-11';
+  const darkInputClass = 'bg-pastel-surface border-white/10 text-pastel-cream placeholder:text-white/35 focus-visible:ring-pastel-orange/40 focus-visible:border-pastel-orange/50 h-11';
 
   return (
     <DarkLayout>
@@ -258,7 +258,7 @@ const Auth = () => {
 
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-white/10" /></div>
-                  <div className="relative flex justify-center"><span className="bg-[#1A2A20] px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45">or with email</span></div>
+                  <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45">or with email</span></div>
                 </div>
 
                 <form onSubmit={handleSignIn} className="space-y-3">
@@ -287,7 +287,7 @@ const Auth = () => {
                             Forgot password?
                           </button>
                         </DialogTrigger>
-                        <DialogContent className="bg-[#1A2A20] border-white/10 text-pastel-cream">
+                        <DialogContent className="bg-pastel-surface-tile border-white/10 text-pastel-cream">
                           <DialogHeader>
                             <DialogTitle className="font-sans font-black text-[1.5rem] tracking-[-0.02em] text-pastel-cream">Reset <span className="text-pastel-orange">password</span></DialogTitle>
                             <DialogDescription className="text-white/65">Enter your email and we will send you a link to reset your password.</DialogDescription>
@@ -339,7 +339,7 @@ const Auth = () => {
 
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-white/10" /></div>
-                  <div className="relative flex justify-center"><span className="bg-[#1A2A20] px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45">or with email</span></div>
+                  <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45">or with email</span></div>
                 </div>
 
                 <form onSubmit={handleSignUp} className="space-y-3">

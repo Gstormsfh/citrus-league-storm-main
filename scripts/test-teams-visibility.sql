@@ -1,3 +1,11 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: UTILITY
+-- Purpose:     Verify team visibility under different RLS contexts
+-- Last active: 2025-12-17
+-- Invoked:     manual debugging
+-- Reads:       teams
+-- Writes:      stdout
+-- ────────────────────────────────────────────────────────────
 -- Test script to check if teams are visible to commissioners
 -- Run this in Supabase SQL Editor to debug RLS issues
 

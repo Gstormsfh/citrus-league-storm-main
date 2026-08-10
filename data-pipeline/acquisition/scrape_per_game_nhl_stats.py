@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Per-game stats scraper for batch backfill
+# Last active: 2026-03-03
+# Invoked:     manual catch-up + scripts/utilities/backfill_missing_shots.py
+# Reads:       NHL public API
+# Writes:      player_game_stats
+# ────────────────────────────────────────────────────────────
 """
 scrape_per_game_nhl_stats.py
 
@@ -811,17 +819,31 @@ def main():
     
     logger.info(f"Week: {week_start.isoformat()} (Mon) to {week_end.isoformat()} (Sun)")
     logger.info("")
-    
+
+    # ── STARTUP BANNER — resolved Supabase host, always logged BEFORE any
+    #    write. Prior state: the script silently used whatever .env was
+    #    loaded from CWD (load_dotenv() default), which is exactly how the
+    #    2026-08-XX backfill wrote 13,145 rows to STAGING instead of PROD
+    #    without any signal. Print the host so misfires cannot be silent.
+    from urllib.parse import urlparse
+    resolved_host = urlparse(SUPABASE_URL).hostname or SUPABASE_URL
+    logger.info("=" * 80)
+    logger.info(f"[BANNER] Supabase host    : {resolved_host}")
+    logger.info(f"[BANNER] Season           : {DEFAULT_SEASON}")
+    logger.info(f"[BANNER] Date range       : {week_start.isoformat()} .. {week_end.isoformat()}")
+    logger.info("=" * 80)
+    logger.info("")
+
     try:
         db = supabase_client()
         logger.info("[scrape_nhl_stats] Connected to Supabase")
     except Exception as e:
         logger.error(f"[scrape_nhl_stats] ERROR: Failed to connect: {e}")
         return 1
-    
+
     # Check for --missing-goalies flag
     missing_goalies_only = "--missing-goalies" in sys.argv
-    
+
     # Get games for this week
     if missing_goalies_only:
         logger.info(f"[scrape_nhl_stats] Finding games MISSING GOALIE DATA for {week_start} to {week_end}...")
@@ -832,7 +854,38 @@ def main():
         games = get_games_for_week(db, week_start, week_end)
         logger.info(f"[scrape_nhl_stats] Found {len(games)} games")
     logger.info("")
-    
+
+    # ── REFUSE-IF-EXCEEDS-EXPECTED gate. Caller sets CITRUS_MAX_GAMES_PER_RUN
+    #    to the count they expect for this invocation. If the resolved game
+    #    list is larger the script REFUSES to write — the 329-game misfire
+    #    proved that "silently doing more than asked" is the same silent-
+    #    failure class as everything else this week.
+    max_games_env = os.getenv("CITRUS_MAX_GAMES_PER_RUN")
+    if max_games_env is not None:
+        try:
+            max_games = int(max_games_env)
+        except ValueError:
+            logger.error(f"[BANNER] CITRUS_MAX_GAMES_PER_RUN={max_games_env!r} is not an int — refusing to run")
+            return 2
+        if len(games) > max_games:
+            logger.error("=" * 80)
+            logger.error(f"[REFUSE] game count {len(games)} > CITRUS_MAX_GAMES_PER_RUN={max_games}")
+            logger.error(f"[REFUSE] date range {week_start.isoformat()}..{week_end.isoformat()} resolved to {len(games)} games")
+            logger.error("[REFUSE] first 20 game_ids that WOULD be processed:")
+            for g in games[:20]:
+                logger.error(f"[REFUSE]   {g.get('game_id')} on {g.get('game_date')}  {g.get('away_team')}@{g.get('home_team')} [{g.get('status')}]")
+            logger.error("[REFUSE] refusing to write. Fix the date range, raise CITRUS_MAX_GAMES_PER_RUN, or omit the env to disable the gate.")
+            logger.error("=" * 80)
+            return 3
+
+    # Preview: always list the game_ids about to be processed, ONE line
+    # per game. This is the "which rows am I about to touch" signal we
+    # had no way to see before the misfire.
+    logger.info("[PREVIEW] games about to be processed:")
+    for g in games:
+        logger.info(f"[PREVIEW]   {g.get('game_id')} on {g.get('game_date')}  {g.get('away_team')}@{g.get('home_team')} [{g.get('status')}]")
+    logger.info("")
+
     if not games:
         logger.info("[scrape_nhl_stats] No games found for this week. Exiting.")
         return 0

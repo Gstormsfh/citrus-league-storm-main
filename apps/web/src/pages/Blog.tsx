@@ -116,7 +116,7 @@ const Blog = () => {
             </svg>
             <Input
               placeholder="Search articles..."
-              className="pl-10 bg-[#1A2A20] border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+              className="pl-10 bg-pastel-surface-tile border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -141,7 +141,7 @@ const Blog = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">
           {filteredPosts.map((post) => (
-            <Card key={post.id} className="overflow-hidden bg-[#1A2A20] border border-white/10 hover:border-pastel-orange/40 hover:-translate-y-0.5 transition-all">
+            <Card key={post.id} className="overflow-hidden bg-pastel-surface-tile border border-white/10 hover:border-pastel-orange/40 hover:-translate-y-0.5 transition-all">
               <div className="h-48 overflow-hidden bg-black/40">
                 <img
                   src={post.image}

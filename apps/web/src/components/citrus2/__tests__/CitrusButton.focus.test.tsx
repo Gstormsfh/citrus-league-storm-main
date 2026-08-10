@@ -25,7 +25,7 @@ describe('CitrusButton — focus ring (Entry 25 U3)', () => {
     expect(cls).toMatch(/focus-visible:ring-offset-2/);
     // Offset color pins to citrus2 page bg so the ring never fades into
     // a surrounding surface — see DESIGN_DIRECTION.md tokens table.
-    expect(cls).toMatch(/focus-visible:ring-offset-\[#0F1F15\]/);
+    expect(cls).toMatch(/focus-visible:ring-offset-pastel-surface/);
   });
 
   it('uses the "citrus-normal" (200ms) duration tier per U3 tokens', () => {
@@ -44,7 +44,7 @@ describe('CitrusButton — focus ring (Entry 25 U3)', () => {
     const link = container.querySelector('a');
     expect(link).toBeTruthy();
     expect(link!.className).toMatch(/focus-visible:ring-pastel-peach-deep/);
-    expect(link!.className).toMatch(/focus-visible:ring-offset-\[#0F1F15\]/);
+    expect(link!.className).toMatch(/focus-visible:ring-offset-pastel-surface/);
   });
 
   it('preserves the focus ring on the external anchor variant', () => {

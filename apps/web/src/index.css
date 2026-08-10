@@ -378,7 +378,7 @@
   }
   
   html {
-  background: #D4E8B8;
+  background: #0F1F15;
   }
 
   .dark html, html.dark {
@@ -388,7 +388,7 @@
   body {
   overflow-x: hidden;
   overflow-y: auto;
-  background: #D4E8B8;
+  background: #0F1F15;
   @apply text-citrus-forest font-sans corduroy-texture;
   margin: 0;
   padding: 0;
@@ -1747,6 +1747,11 @@
 html, body {
   overflow-y: auto !important;
   overflow-x: hidden !important;
+  /* Force vertical-pan on the document so nested horizontal carousels
+     (game-modes, news chips, draft tables, etc) can never trap a
+     vertical swipe. Carousels still get pan-x on themselves; this just
+     guarantees pan-y propagates back out to the document on Android. */
+  touch-action: pan-y !important;
 }
 
 #root {

@@ -111,7 +111,7 @@ const ResetPassword = () => {
       <DarkLayout>
         <Navbar />
         <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
-          <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
+          <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-pastel-cream">
                 <XCircle className="h-5 w-5 text-pastel-orange" aria-hidden="true" />
@@ -134,7 +134,7 @@ const ResetPassword = () => {
     <DarkLayout>
       <Navbar />
       <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
-        <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
+        <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-pastel-cream">Reset Your Password</CardTitle>
             <CardDescription className="text-white/60">Enter your new password below</CardDescription>

@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Fetch + insert NHL playoff game schedule
+# Last active: 2026-04-26
+# Invoked:     .github/workflows/playoff-sync.yml (cron */15 * * * *)
+# Reads:       NHL schedule API
+# Writes:      nhl_games
+# ────────────────────────────────────────────────────────────
 """
 ingest_playoff_schedule.py
 

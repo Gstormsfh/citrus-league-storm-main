@@ -18,9 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -111,7 +111,7 @@ jobs:
     environment: production
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check GCP credentials
         id: check-gcp
@@ -195,6 +195,51 @@ jobs:
             fi
           fi
 
+  # ── Deploy Supabase edge functions ──────────────────────────────────
+  # Runs in parallel with API + web deploys. The streaming Stormy chat
+  # function lives here. Deploy is a no-op when the secrets aren't set,
+  # so this step is safe to leave in even before secrets are configured.
+  #
+  # To enable: add SUPABASE_ACCESS_TOKEN (Personal Access Token) and
+  # SUPABASE_PROJECT_REF (project ref slug) as repo secrets.
+  deploy-functions:
+    name: Deploy Supabase Edge Functions
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check Supabase credentials
+        id: check-supa
+        run: |
+          if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_PROJECT_REF" ]; then
+            echo "has_creds=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_creds=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping edge function deploy — set SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF secrets to enable"
+          fi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Install Supabase CLI
+        if: steps.check-supa.outputs.has_creds == 'true'
+        run: |
+          curl -L https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz \
+            | sudo tar xz -C /usr/local/bin
+
+      - name: Deploy stormy-chat function
+        if: steps.check-supa.outputs.has_creds == 'true'
+        run: |
+          supabase functions deploy stormy-chat \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
   # ── Deploy frontend to Firebase Hosting ─────────────────────────────
   deploy:
     name: Deploy to Production
@@ -206,7 +251,7 @@ jobs:
       checks: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4

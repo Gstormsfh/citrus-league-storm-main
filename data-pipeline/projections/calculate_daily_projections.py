@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Compute daily fantasy projections (Citrus Projections 2.0 with Bayesian shrinkage + finishing talent)
+# Last active: 2026-04-02
+# Invoked:     imported by nightly_projection_batch.py
+# Reads:       player_season_stats, player_talent_metrics, league_averages, models/*.joblib
+# Writes:      player_projected_stats, projection_cache
+# ────────────────────────────────────────────────────────────
 """
 calculate_daily_projections.py
 
@@ -22,7 +30,6 @@ import signal
 import sys
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Optional, Tuple, Any
-from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 # Monte Carlo uncertainty propagation (Citrus Projections 3.1)
@@ -87,7 +94,11 @@ else:
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
-DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+from data_pipeline.utils.season_config import current_season as _current_season
+# Derived from today's date at import time; env override still honored for
+# manual backfills of historical seasons. The former hardcoded '2025'
+# fallback would have silently misfiled every 2026-10-01+ projection.
+DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON")) if os.getenv("CITRUS_DEFAULT_SEASON") else _current_season()
 
 # Cache version: Bump this whenever the projection data sources or model change.
 # This invalidates all cached projections from previous versions, forcing recalculation.
@@ -589,12 +600,15 @@ def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) ->
 
     actual_goals = float(player_stats[0].get("nhl_goals", 0))
     
-    # Get xG total from raw_shots (prefer shooting_talent_adjusted_xg)
+    # Get xG total from raw_shots (prefer shooting_talent_adjusted_xg).
+    # Live product path: filter by the caller's season. raw_shots is
+    # multi-season since phase 0c backfilled 2017-2024, so an unfiltered
+    # read would sum career xG into the current-season finishing-talent ratio.
     try:
         shots = db.select(
             "raw_shots",
             select="shooting_talent_adjusted_xg,flurry_adjusted_xg,xg_value",
-            filters=[("player_id", "eq", player_id)],
+            filters=[("player_id", "eq", player_id), ("season", "eq", season)],
             limit=10000  # Large limit to get all shots
         )
         

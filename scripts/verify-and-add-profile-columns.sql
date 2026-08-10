@@ -1,3 +1,11 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: UTILITY
+-- Purpose:     One-off SQL: verify + conditionally add profile columns
+-- Last active: 2025-12-17
+-- Invoked:     manual run via Supabase SQL Editor
+-- Reads:       profiles
+-- Writes:      profiles (DDL: ADD COLUMN if missing)
+-- ────────────────────────────────────────────────────────────
 -- Verify and add profile columns
 -- This script checks if columns exist and adds them if they don't
 

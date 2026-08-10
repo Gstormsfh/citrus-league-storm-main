@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Reconcile NHL official stats against PBP-derived stats; surface discrepancies
+# Last active: 2026-03-03
+# Invoked:     imported by run_daily_pbp_processing.py
+# Reads:       player_game_stats (nhl_* and citrus-derived columns)
+# Writes:      integrity_check_results
+# ────────────────────────────────────────────────────────────
 """
 reconcile_player_stats.py
 
@@ -28,7 +36,7 @@ import random
 import argparse
 import logging
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional, Tuple, Set, Any
+from typing import Dict, List, Optional, Tuple, Any
 from dotenv import load_dotenv
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _bootstrap  # noqa: F401

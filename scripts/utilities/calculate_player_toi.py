@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Compute per-player TOI splits by game situation (5v5, PP, PK)
+# Last active: 2026-01-08
+# Invoked:     imported by run_daily_pbp_processing.py
+# Reads:       player_shifts
+# Writes:      player_toi_by_situation
+# ────────────────────────────────────────────────────────────
 """
 calculate_player_toi.py
 Calculate Time On Ice (TOI) for each player by game situation (5v5, PP, PK).
@@ -25,6 +33,11 @@ from typing import Dict, List, Set, Optional, Tuple
 import time
 import sys
 from src.utils.citrus_request import citrus_request
+
+# Shared season constant — one source of truth for the data-pipeline.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "data-pipeline"))
+from data_pipeline.utils.season_config import CURRENT_SEASON  # noqa: E402
 
 # Load environment variables
 load_dotenv()
@@ -661,6 +674,9 @@ def get_game_ids_from_shots() -> List[int]:
             offset += batch_size
 
         # Fallback: if raw_nhl_data isn't available/populated, paginate raw_shots instead.
+        # Current-season only — raw_shots is multi-season since phase 0c
+        # backfilled 2017-2024; TOI wants the games this script's caller
+        # will actually re-fetch (current-season only via the daily scraper).
         if not game_ids:
             print("  WARNING: No games found in raw_nhl_data; falling back to raw_shots pagination...")
             offset = 0
@@ -669,6 +685,7 @@ def get_game_ids_from_shots() -> List[int]:
                 data = supabase.select(
                     'raw_shots',
                     select='game_id',
+                    filters=[('season', 'eq', CURRENT_SEASON)],
                     limit=batch_size,
                     offset=offset
                 )

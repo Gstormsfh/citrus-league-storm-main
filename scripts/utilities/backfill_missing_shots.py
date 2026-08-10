@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose:     Gap-fill helper: re-fetch shots for games missing from raw_shots
+# Last active: 2026-02-18
+# Invoked:     manual run when monitor_data_scraping flags gaps
+# Reads:       raw_nhl_data, NHL API
+# Writes:      raw_shots
+# ────────────────────────────────────────────────────────────
 """
 backfill_missing_shots.py
 
@@ -21,9 +29,15 @@ import sys
 import argparse
 from dotenv import load_dotenv
 
-# Add project root to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-from supabase_rest import SupabaseRest
+# Bootstrap data_pipeline package — file moved under scripts/utilities/ post-monorepo;
+# bare 'from supabase_rest' worked pre-monorepo but the file's now at
+# data-pipeline/utils/supabase_rest.py.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(_REPO_ROOT, "data-pipeline"))
+import _bootstrap  # noqa: F401
+
+from data_pipeline.utils.supabase_rest import SupabaseRest
+from data_pipeline.utils.season_config import CURRENT_SEASON
 
 load_dotenv()
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
@@ -46,11 +60,16 @@ def find_missing_shots(db):
             break
         offset += 1000
 
-    # Get all game_ids with shots
+    # Get all game_ids with shots — current season only. raw_shots is
+    # multi-season since phase 0c backfilled 2017-2024; a coverage helper
+    # that enumerated historical games would try to "fix" games the daily
+    # scraper never touched.
     shot_game_ids = set()
     offset = 0
     while True:
-        batch = db.select('raw_shots', select='game_id', limit=1000, offset=offset)
+        batch = db.select('raw_shots', select='game_id',
+                          filters=[('season', 'eq', CURRENT_SEASON)],
+                          limit=1000, offset=offset)
         if not batch:
             break
         shot_game_ids.update(g['game_id'] for g in batch)

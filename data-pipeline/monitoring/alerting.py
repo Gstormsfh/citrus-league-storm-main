@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Centralized alert dispatch (Discord webhook + log)
+# Last active: 2026-03-08
+# Invoked:     imported by check_data_freshness.py + verify_*.py
+# Reads:       (env vars — webhook URLs)
+# Writes:      Discord channel + stderr
+# ────────────────────────────────────────────────────────────
 """
 alerting.py — Alerting integration for the data pipeline.
 

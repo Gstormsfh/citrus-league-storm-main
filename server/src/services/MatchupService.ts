@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, CURRENT_SEASON, logger } from '@citrus/shared';
+import { COLUMNS, CURRENT_SEASON, logger, getTodayMST } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 
 /**
@@ -508,12 +508,19 @@ export class MatchupService {
 
     if (!finalLineup?.starters || finalLineup.starters.length === 0) return;
 
-    // Generate all dates in the matchup week
+    // Task 1B: refuse to fabricate rows for past dates. Historically this
+    // path was called from ensureMatchupRosters on every Matchup-page view
+    // and it happily materialised weeks of past dates from the CURRENT
+    // team_lineups — the exact defect the 9,353-row 2026-04-04 burst
+    // proved. Only today+future are eligible for backfill.
+    const today = getTodayMST();
     const dates: string[] = [];
     const start = new Date(weekStart + 'T00:00:00');
     const end = new Date(weekEnd + 'T00:00:00');
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      dates.push(d.toISOString().split('T')[0]);
+      const iso = d.toISOString().split('T')[0];
+      if (iso < today) continue;
+      dates.push(iso);
     }
 
     // Check which (player_id, roster_date) combos already exist
@@ -539,9 +546,9 @@ export class MatchupService {
       slot_type: string;
       slot_id: string | null;
       is_locked: boolean;
+      source: string;
     }> = [];
     const slotAssignments = finalLineup.slot_assignments || {};
-    const today = new Date().toISOString().split('T')[0];
 
     const addRows = (playerIds: number[] | string[], slotType: string, useSlot: boolean) => {
       for (const pid of playerIds || []) {
@@ -557,6 +564,11 @@ export class MatchupService {
             slot_type: slotType,
             slot_id: useSlot ? (slotAssignments[String(playerId)] || null) : null,
             is_locked: date < today, // Lock past dates
+            // Task 1B: label provenance. Every write from this path is
+            // reconstructed from the CURRENT team_lineups snapshot, not a
+            // point-in-time record of what the user actually had rostered
+            // on that date.
+            source: 'reconstructed',
           });
         }
       }
@@ -955,6 +967,156 @@ export class MatchupService {
       lastRun: recentResult.data?.updated_at || null,
       totalMatchups: matchupResult.count || 0,
       lockedDays: lockedResult.count || 0,
+    };
+  }
+
+  /**
+   * Task 1A: scheduled daily-roster snapshot for TODAY only.
+   *
+   * Walks every active matchup that spans today (week_start_date <= today
+   * <= week_end_date), enumerates each team, and materialises one
+   * fantasy_daily_rosters row per player from the CURRENT team_lineups —
+   * labelled source='scheduled_snapshot'. Idempotent: an existing row for
+   * (team, matchup, player, roster_date) with source='user_edit' or
+   * source='reconstructed' is left untouched by the ON CONFLICT clause;
+   * existing scheduled_snapshot rows for the same key that are still
+   * unlocked get their slot/lock state refreshed from the current lineup.
+   *
+   * Coverage assertion: the return value carries expected_team_matchups
+   * (from the active-matchup enumeration) and actual_team_matchups_written
+   * (from the actual UPSERT loop). The caller (route handler) must
+   * compare these and RAISE if they disagree — silent partial writes here
+   * are the exact defect this task exists to eliminate.
+   *
+   * Uses the admin client throughout because the cron entry point has no
+   * user JWT (bearer secret only).
+   */
+  async snapshotTodayForAllLeagues(): Promise<{
+    date: string;
+    expected_team_matchups: number;
+    actual_team_matchups_written: number;
+    leagues_touched: number;
+    rows_written: number;
+    errors: Array<{ team_id?: string; matchup_id?: string; league_id?: string; error: string }>;
+  }> {
+    const admin = getSupabaseAdmin();
+    const today = getTodayMST();
+
+    // 1. Enumerate every matchup that spans today, joining team ids +
+    //    league id in one round-trip.
+    const { data: matchups, error: mErr } = await admin
+      .from('matchups')
+      .select('id, league_id, team1_id, team2_id, week_start_date, week_end_date')
+      .lte('week_start_date', today)
+      .gte('week_end_date', today);
+    if (mErr) {
+      throw new Error(`[snapshotTodayForAllLeagues] enumerate matchups: ${mErr.message}`);
+    }
+    if (!matchups || matchups.length === 0) {
+      return {
+        date: today, expected_team_matchups: 0, actual_team_matchups_written: 0,
+        leagues_touched: 0, rows_written: 0, errors: [],
+      };
+    }
+
+    // Deduplicated set of (team, matchup) pairs we should touch
+    const pairs: Array<{ team_id: string; matchup_id: string; league_id: string }> = [];
+    for (const m of matchups as Array<{
+      id: string; league_id: string; team1_id: string | null; team2_id: string | null;
+    }>) {
+      for (const tid of [m.team1_id, m.team2_id]) {
+        if (!tid) continue;
+        pairs.push({ team_id: tid, matchup_id: m.id, league_id: m.league_id });
+      }
+    }
+    const expected_team_matchups = pairs.length;
+    const league_ids = new Set(pairs.map(p => p.league_id));
+
+    // 2. Prefetch current base lineups for every unique team in the set.
+    const uniqueTeamIds = [...new Set(pairs.map(p => p.team_id))];
+    const { data: lineups, error: lErr } = await admin
+      .from('team_lineups')
+      .select('team_id, league_id, starters, bench, ir, slot_assignments')
+      .in('team_id', uniqueTeamIds);
+    if (lErr) {
+      throw new Error(`[snapshotTodayForAllLeagues] read team_lineups: ${lErr.message}`);
+    }
+    const lineupByTeam = new Map<string, { starters: string[]; bench: string[]; ir: string[]; slot_assignments: Record<string, string> }>();
+    for (const l of (lineups || []) as Array<{
+      team_id: string; starters: unknown; bench: unknown; ir: unknown; slot_assignments: unknown;
+    }>) {
+      lineupByTeam.set(l.team_id, {
+        starters: ((l.starters as unknown[]) || []).map(String),
+        bench: ((l.bench as unknown[]) || []).map(String),
+        ir: ((l.ir as unknown[]) || []).map(String),
+        slot_assignments: (l.slot_assignments as Record<string, string>) || {},
+      });
+    }
+
+    // 3. For each (team, matchup) build a single UPSERT batch for today's
+    //    date and write with source='scheduled_snapshot'. Idempotency is
+    //    handled by ON CONFLICT — we do NOT DELETE first (unlike the
+    //    per-day user-edit path), because we must not overwrite a locked
+    //    row or a user_edit row that was already written today.
+    const rowsToWrite: Array<Record<string, unknown>> = [];
+    const errors: Array<{ team_id?: string; matchup_id?: string; league_id?: string; error: string }> = [];
+    let actual_team_matchups_written = 0;
+
+    for (const p of pairs) {
+      const lineup = lineupByTeam.get(p.team_id);
+      if (!lineup || (lineup.starters.length + lineup.bench.length + lineup.ir.length === 0)) {
+        errors.push({ ...p, error: 'no base team_lineups entry — nothing to snapshot' });
+        continue;
+      }
+      const addRows = (playerIds: string[], slotType: string) => {
+        for (const pid of playerIds) {
+          const playerId = parseInt(pid, 10);
+          if (isNaN(playerId)) continue;
+          rowsToWrite.push({
+            league_id: p.league_id,
+            team_id: p.team_id,
+            matchup_id: p.matchup_id,
+            player_id: playerId,
+            roster_date: today,
+            slot_type: slotType,
+            slot_id: slotType !== 'bench' ? (lineup.slot_assignments[pid] || null) : null,
+            is_locked: false,
+            locked_at: null,
+            source: 'scheduled_snapshot',
+          });
+        }
+      };
+      addRows(lineup.starters, 'active');
+      addRows(lineup.bench, 'bench');
+      addRows(lineup.ir, 'ir');
+      actual_team_matchups_written += 1;
+    }
+
+    // Single-batch UPSERT. ignoreDuplicates:true means a row that already
+    // exists for (team, matchup, player, roster_date) is left as-is —
+    // this preserves both is_locked=true rows AND user_edit / reconstructed
+    // rows that were written earlier for the same key.
+    let rows_written = 0;
+    if (rowsToWrite.length > 0) {
+      const { error: wErr } = await admin
+        .from('fantasy_daily_rosters')
+        .upsert(rowsToWrite, {
+          onConflict: 'team_id,matchup_id,player_id,roster_date',
+          ignoreDuplicates: true,
+        });
+      if (wErr) {
+        throw new Error(`[snapshotTodayForAllLeagues] upsert: ${wErr.message}`);
+      }
+      rows_written = rowsToWrite.length;
+    }
+
+    return {
+      date: today,
+      expected_team_matchups,
+      actual_team_matchups_written,
+      leagues_touched: league_ids.size,
+      rows_written,
+      errors,
     };
   }
 }

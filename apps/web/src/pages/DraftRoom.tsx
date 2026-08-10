@@ -3818,7 +3818,7 @@ const DraftRoom = () => {
 
   // ALWAYS render something - never return null
   return (
-    <div className="min-h-screen bg-[#0F1F15] relative touch-manipulation overflow-x-clip">
+    <div className="min-h-screen bg-pastel-surface relative touch-manipulation overflow-x-clip">
       {/* Realtime connection banner — surfaces when the draft-pick channel
           drops so users know their draft isn't silently stalled.
           'connected' is the quiescent state; we don't render anything. */}
@@ -3833,7 +3833,7 @@ const DraftRoom = () => {
         </div>
       )}
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
           <h1 className="text-lg font-bold text-pastel-cream">Draft Room</h1>
         </div>
@@ -3842,13 +3842,12 @@ const DraftRoom = () => {
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[1fr_340px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content - Scrollable - Appears first on mobile */}
             <div className="min-w-0 overflow-y-visible lg:overflow-y-auto lg:overflow-x-hidden lg:max-h-[calc(100dvh-7rem)] px-0 sm:px-2 lg:px-2 order-1 lg:order-1">
         {/* Loading State - Show if loading or auth is loading, but NOT for demo state */}
         {displayLoading && (
           <LoadingScreen
-            character="kiwi"
             message={authLoading ? 'Checking Authentication...' : !user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league' ? 'Redirecting to Login...' : 'Loading Draft Room...'}
           />
         )}
@@ -3942,7 +3941,7 @@ const DraftRoom = () => {
             )}
 
             {/* Sticky Draft Header - Mobile-first compact design */}
-            <div className="bg-[#1A2A20] border-b border-white/10 sticky top-0 z-30 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)]">
+            <div className="bg-pastel-surface-tile border-b border-white/10 sticky top-0 z-30 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)]">
               <div className="px-3 py-2 md:container md:mx-auto md:px-4 md:py-3">
                 {/* Row 1: Pick info + Timer + Action */}
                 <div className="flex items-center justify-between gap-2">
@@ -4481,7 +4480,7 @@ const DraftRoom = () => {
 
                         {/* Draft from selected player */}
                         {currentTeam?.owner_id === user?.id && selectedPlayer && (
-                          <Card className="p-4 border-2 border-pastel-orange/40 shadow-[0_16px_40px_-12px_rgba(255,168,87,0.25)] bg-[#1A2A20]">
+                          <Card className="p-4 border-2 border-pastel-orange/40 shadow-[0_16px_40px_-12px_rgba(255,168,87,0.25)] bg-pastel-surface-tile">
                             <div className="text-center mb-3">
                               <div className="text-lg font-bold">{selectedPlayer.full_name}</div>
                               <div className="text-xs text-white/55 flex items-center justify-center gap-2">
@@ -4638,7 +4637,7 @@ const DraftRoom = () => {
                   
                   {/* Prominent Draft Button - Only show when it's user's turn and player selected */}
                   {currentTeam?.owner_id === user?.id && selectedPlayer && (
-                    <Card className="p-6 border-2 border-pastel-orange/40 shadow-[0_16px_40px_-12px_rgba(255,168,87,0.25)] bg-[#1A2A20]">
+                    <Card className="p-6 border-2 border-pastel-orange/40 shadow-[0_16px_40px_-12px_rgba(255,168,87,0.25)] bg-pastel-surface-tile">
                       <div className="text-center mb-4">
                         <div className="text-xl font-bold mb-1">{selectedPlayer.full_name}</div>
                         <div className="text-sm text-white/55 flex items-center justify-center gap-2">
@@ -4741,7 +4740,7 @@ const DraftRoom = () => {
             {isCommissioner && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
               <>
                 {/* Mobile: Fixed bottom bar spanning full width */}
-                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#1A2A20] border-t border-white/10 shadow-[0_-2px_10px_rgba(0,0,0,0.5)] px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-pastel-surface-tile border-t border-white/10 shadow-[0_-2px_10px_rgba(0,0,0,0.5)] px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
                   <div className="flex items-center justify-center gap-2">
                     <span className="text-[10px] font-semibold text-destructive uppercase tracking-wide flex-shrink-0">Commish</span>
                     {/* Undo Last Pick */}
@@ -4786,7 +4785,7 @@ const DraftRoom = () => {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)] bg-[#1A2A20] ring-1 ring-white/10 text-pastel-cream h-10 px-4 text-sm"
+                      className="shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)] bg-pastel-surface-tile ring-1 ring-white/10 text-pastel-cream h-10 px-4 text-sm"
                       onClick={handleUndoLastPick}
                     >
                       <RotateCcw className="h-4 w-4 mr-2" />
@@ -4923,7 +4922,7 @@ const DraftRoom = () => {
                 renders on mobile beneath the main board. */}
             <aside className="w-full lg:hidden order-2 lg:order-1">
               <div className="space-y-4">
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                <div className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-3">
                     ✦ Draft tips
                   </div>
@@ -4939,7 +4938,7 @@ const DraftRoom = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && (activeLeagueId || leagueId) && (
               <aside className="hidden lg:block order-2">
-                <div className="lg:sticky lg:top-24 h-[calc(100dvh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100dvh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId || leagueId || ''} />
                 </div>
               </aside>

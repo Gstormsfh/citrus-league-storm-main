@@ -23,7 +23,7 @@ const STAMPS = [
 
 const TONE_BG: Record<string, string> = {
   sage: 'bg-pastel-sage-soft',
-  butter: 'bg-[#F4E5B8]',
+  butter: 'bg-pastel-butter',
   orange: 'bg-pastel-peach',
 };
 

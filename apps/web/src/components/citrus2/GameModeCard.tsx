@@ -40,7 +40,7 @@ export function GameModeCard({
   );
 
   return (
-    <div className="flex-shrink-0 w-[240px] sm:w-[260px] snap-start h-full">
+    <div className="flex-shrink-0 w-[240px] sm:w-[260px] snap-start">
       <GlowCard accent={accent} className="h-full">
         <article className="flex flex-col h-full overflow-hidden">
           {scene ? (
@@ -59,7 +59,7 @@ export function GameModeCard({
                 style={{ background: 'linear-gradient(to bottom, transparent 0%, #1A2A20 100%)' }}
               />
               {badge && (
-                <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-md font-jbmono text-[9px] tracking-wider uppercase font-bold ring-1 ${a.chip} backdrop-blur-md bg-[#0F1F15]/70`}>
+                <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-md font-jbmono text-[9px] tracking-wider uppercase font-bold ring-1 ${a.chip} backdrop-blur-md bg-pastel-surface/70`}>
                   {badge}
                 </span>
               )}
@@ -83,7 +83,7 @@ export function GameModeCard({
             <h3 className="font-sans font-bold text-[1.1rem] leading-snug text-pastel-cream mb-1.5">
               {label}
             </h3>
-            <p className="text-[12px] text-white/55 leading-snug mb-4 flex-grow">
+            <p className="text-[12px] text-white/55 leading-snug mb-4 flex-grow min-h-[80px] line-clamp-4">
               {sub}
             </p>
             {to ? <Link to={to} className="contents">{button}</Link> : button}

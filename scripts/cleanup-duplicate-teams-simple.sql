@@ -1,3 +1,12 @@
+-- CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+-- CATEGORY: DESTRUCTIVE
+-- Purpose:     Simpler variant of cleanup-duplicate-teams.sql
+-- Last active: 2025-12-17
+-- Invoked:     manual via Supabase SQL Editor; review before run
+-- Reads:       teams
+-- Writes:      teams (DELETE duplicates)
+-- Note:        RECOVERY: PITR.
+-- ────────────────────────────────────────────────────────────
 -- Simple script to clean up duplicate AI teams
 -- This will keep only ONE team per unique team name, deleting the rest
 -- Run this in Supabase SQL Editor

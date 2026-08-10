@@ -1,0 +1,148 @@
+name: Refresh Player Directory (daily)
+
+# Discovers and inserts new NHL players into player_directory daily.
+# Catches mid-season callups (debutants, AHL recalls, IR returns, trade
+# acquisitions) within 24h of their first appearance in raw_shots / rosters.
+#
+# Background — R7-2 baseline (2026-05-06) found 3 player_ids in raw_shots
+# with no player_directory entry: Porter Martone (PHI), Josh Samanski
+# (EDM), Alex Bump (PHI) — all 2025-26 NHL debutants whose first games
+# came after the last manual refresh on 2026-04-17. See:
+#   apps/web/docs/DATA_ORGANIZATION_AUDIT.md §10
+#
+# The script is idempotent (upsert with on_conflict=season,player_id) so
+# re-running daily is safe. Wall-clock is typically 5-10 minutes (32 team
+# rosters × 23 players each via the NHL API + raw_shots discovery scan).
+#
+# Cadence rationale:
+#   - Daily year-round is simpler than season-aware scheduling
+#   - The R7-3 freshness SLA matrix sets player_directory at 48h in-season
+#     / 168h offseason; daily comfortably beats both
+#   - NHL API load is trivial (~750 calls/run, well under any rate limit)
+on:
+  schedule:
+    - cron: '15 8 * * *'   # 08:15 UTC daily ≈ 02:15 MDT / 03:15 MST
+  workflow_dispatch:        # manual trigger for ad-hoc backfills
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    # Raised from 20 → 60 after the 2026-08-07 kill: the D-07 import fix
+    # let the script reach real work for the first time in 90 days, and
+    # the Aug/Sep dual-season ramp (2 seasons × 32 teams + per-player NHL
+    # API fetches) legitimately takes longer than 20 minutes on cold runs.
+    # With the season-scoped discovery scan + skip-existing + per-team
+    # incremental flush changes from #290, warm runs are well under
+    # 15 min; 60 is headroom for cold NHL API bursts and 429 retries.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'data-pipeline/requirements.txt'
+
+      - run: pip install -r data-pipeline/requirements.txt
+
+      # Season is intentionally NOT set in env. The script derives the
+      # target season(s) from the current date (Python mirror of the SQL
+      # get_nhl_season_year function). Aug/Sep runs populate BOTH the
+      # outgoing and incoming season so the first-of-October cron isn't
+      # the only chance to populate a brand-new season from scratch. Prior
+      # `CITRUS_DEFAULT_SEASON: '2025'` env hardcode is what kept the
+      # directory frozen at 2025 while the SQL joins pivoted to 2026 on
+      # 2026-10-01 — the silent zero-scoring failure this guard closes.
+      #
+      # PYTHONUNBUFFERED=1 + `python -u` force line-flushed stdout under
+      # GitHub Actions' non-tty log capture. Without them Python
+      # block-buffers 8 KiB before any print reaches the log — precisely
+      # why the 2026-08-07 kill showed only "Script starting..." across a
+      # 19m43s hang. Belt-and-suspenders: the script also calls
+      # sys.stdout.reconfigure(line_buffering=True) at module top.
+      - name: Refresh player_directory from rosters + raw_shots discovery
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PYTHONUNBUFFERED: '1'
+        run: python -u scripts/utilities/populate_player_directory.py
+
+      # Post-run assertion — Task 0F. Imports the SAME seasons_to_populate
+      # helper the writer uses, so writer and guard cannot drift. Fails on
+      # any season in the writer's list that has zero rows (the outgoing
+      # season on stable days; both outgoing AND incoming during Aug/Sep
+      # ramp). Also enforces a ≥ 700 row floor from Sep 1 for the incoming
+      # season (32 teams × ~23 players ≈ 736): a directory with 40 rows
+      # passes a "> 0" check and still zero-scores almost everyone. The
+      # prior "> 0" only check would have first fired on 2026-10-01 for a
+      # season that had no lead time to catch up — the exact bug this
+      # assertion exists to prevent.
+      - name: Assert player_directory populated for every writer-tracked season
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python -c "
+          import sys, os, datetime as dt
+          sys.path.insert(0, 'data-pipeline')
+          import _bootstrap
+          from data_pipeline.utils.supabase_rest import SupabaseRest
+          from data_pipeline.utils.season_config import (
+              seasons_to_populate, min_directory_rows_floor,
+          )
+          db = SupabaseRest(os.environ['VITE_SUPABASE_URL'], os.environ['SUPABASE_SERVICE_ROLE_KEY'])
+          today = dt.date.today()
+          seasons = seasons_to_populate(today)
+          print(f'today={today.isoformat()}  writer-tracked seasons={seasons}')
+          failures = []
+          for s in seasons:
+              rows = db.select('player_directory', select='player_id', filters=[('season','eq',s)], limit=1000)
+              n = len(rows) if rows else 0
+              # If we hit the 1000-row PostgREST cap we still need the real
+              # count — paginate.
+              if n >= 1000:
+                  offset = 1000
+                  while True:
+                      more = db.select('player_directory', select='player_id', filters=[('season','eq',s)], limit=1000, offset=offset)
+                      if not more:
+                          break
+                      n += len(more)
+                      if len(more) < 1000:
+                          break
+                      offset += 1000
+              floor = min_directory_rows_floor(today, s)
+              status = 'OK' if (n > 0 and n >= floor) else 'FAIL'
+              print(f'  season={s}  rows={n}  floor={floor}  {status}')
+              if n == 0:
+                  failures.append(f'season={s}: zero rows')
+              elif n < floor:
+                  failures.append(f'season={s}: {n} rows below floor {floor}')
+          if failures:
+              print('FAIL:')
+              for f in failures:
+                  print(f'  {f}')
+              sys.exit(1)
+          print('OK: all writer-tracked seasons populated above floor')
+          "
+
+      - name: Verify orphan count post-refresh
+        if: success()
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, 'data-pipeline')
+          import _bootstrap
+          from data_pipeline.monitoring.critical_table_checks import (
+              check_raw_shots_no_orphan_player_ids, supabase_client,
+          )
+          db = supabase_client()
+          result = check_raw_shots_no_orphan_player_ids(db)
+          print(f'orphan check: status={result.status} details={result.details}')
+          # Don't fail the workflow on WARN — just surface; persistent
+          # WARNs after the refresh indicate edge cases (IR/AHL/etc) that
+          # need separate investigation per audit §10.7.
+          "

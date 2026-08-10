@@ -124,6 +124,142 @@ class StormyServiceImpl {
     }
   }
 
+  /**
+   * Streaming variant of sendMessage. Token-by-token rendering instead of
+   * a 5–8 second silent wait followed by a wall of text. Calls onDelta
+   * for each `text_delta` chunk Anthropic sends. Returns the final
+   * accumulated response when the stream closes.
+   *
+   * Uses raw fetch instead of supabase.functions.invoke() because the
+   * supabase JS client buffers the entire response before resolving,
+   * which defeats the point of streaming.
+   */
+  async sendMessageStream(
+    message: string,
+    history: StormyMessage[],
+    context: StormyContext | undefined,
+    onDelta: (textChunk: string) => void,
+  ): Promise<StormyResponse> {
+    try {
+      // Auth + guest throttle (mirrors sendMessage)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        this.guestMessageCount++;
+        if (this.guestMessageCount > StormyServiceImpl.GUEST_LIMIT) {
+          return {
+            response: "",
+            error:
+              "Want more from Stormy? Sign up for a free account to get 3 questions per matchup week!",
+          };
+        }
+      }
+
+      const contextString = context
+        ? StormyServiceImpl.buildContextString(context)
+        : "";
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+      if (!supabaseUrl || !supabaseAnon) {
+        return { response: "", error: "Stormy is not configured." };
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token ?? supabaseAnon;
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/stormy-chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          apikey: supabaseAnon,
+        },
+        body: JSON.stringify({
+          message,
+          conversationHistory: history.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          context: contextString,
+        }),
+      });
+
+      // Error response: 429 (rate-limited), 500 (server), etc come back as JSON.
+      // Edge function MAY also still be running in non-streaming mode (until
+      // the SSE-streaming edge function deploys), in which case it returns
+      // a 200 with `{ response: "..." }` and Content-Type: application/json.
+      // We treat that as a successful one-shot reply: call onDelta with the
+      // whole string and return — same shape as if it had streamed.
+      const contentType = res.headers.get("content-type") || "";
+      if (!res.ok || contentType.includes("application/json")) {
+        try {
+          const body = await res.json();
+          if (res.ok && typeof body?.response === "string") {
+            // Non-streaming fallback path. Surface the full text via onDelta
+            // in one call so the UI still shows it correctly.
+            const text = body.response as string;
+            if (text) onDelta(text);
+            return { response: text, usage: body?.usage };
+          }
+          return { response: "", error: body?.error || `Stormy error (${res.status})` };
+        } catch {
+          return { response: "", error: `Stormy error (${res.status})` };
+        }
+      }
+
+      if (!res.body) {
+        return { response: "", error: "Stormy returned empty stream." };
+      }
+
+      // Parse Anthropic's SSE stream and surface each text_delta to the caller.
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullText = "";
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          // SSE events are separated by blank lines. Within an event, the
+          // payload line starts with "data: ". Anthropic emits one JSON
+          // object per data line. Process complete lines; keep the partial
+          // last line for the next chunk.
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const raw of lines) {
+            const line = raw.trim();
+            if (!line.startsWith("data:")) continue;
+            const payload = line.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+            try {
+              const evt = JSON.parse(payload);
+              if (evt?.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+                const t = String(evt.delta.text ?? "");
+                if (t) {
+                  fullText += t;
+                  onDelta(t);
+                }
+              }
+            } catch {
+              // Skip malformed events; keep streaming.
+            }
+          }
+        }
+      } finally {
+        try { reader.releaseLock(); } catch { /* ignore */ }
+      }
+
+      return { response: fullText };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong.";
+      return { response: "", error: msg };
+    }
+  }
+
   static buildContextString(ctx: StormyContext): string {
     const lines: string[] = [];
 
@@ -278,16 +414,53 @@ class StormyServiceImpl {
         const { PlayerService } = await import('@/services/PlayerService');
         const { playerApi } = await import('@/api/players');
 
-        const [playersData, lineupResult, rosProjectionsResult] = await Promise.allSettled([
+        // ── Advanced metrics: xG/60 + xG rating (skaters), GSAx (goalies) ─
+        // These exist in the DB but were never flowing to Stormy. Querying
+        // them in parallel with the main player fetch keeps the latency cost
+        // close to zero. Best-effort — failures here don't block context.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sb = supabase as unknown as any;
+        const talentPromise = (async () => {
+          try {
+            const { data } = await sb
+              .from('player_talent_metrics')
+              .select('player_id, xg_per_60, xg_rating')
+              .in('player_id', allNeededPlayerIds);
+            return (data ?? []) as Array<{ player_id: number; xg_per_60: number | null; xg_rating: string | null }>;
+          } catch { return []; }
+        })();
+        const gsaxPromise = (async () => {
+          try {
+            const { data } = await sb
+              .from('goalie_gsax_primary')
+              .select('goalie_id, regressed_gsax')
+              .in('goalie_id', allNeededPlayerIds);
+            return (data ?? []) as Array<{ goalie_id: number; regressed_gsax: number | null }>;
+          } catch { return []; }
+        })();
+
+        const [playersData, lineupResult, rosProjectionsResult, talentRows, gsaxRows] = await Promise.allSettled([
           PlayerService.getPlayersByIds(allNeededPlayerIds.map(String)),
           rosterApi.getLineup(leagueId, team.id),
           playerApi.getRosProjections(200),
+          talentPromise,
+          gsaxPromise,
         ]);
 
         // Build player lookup maps
         const playerMap = new Map(
           (playersData.status === 'fulfilled' ? playersData.value : []).map(p => [Number(p.id), p])
         );
+        const talentByPid = new Map<number, { xg_per_60: number | null; xg_rating: string | null }>();
+        if (talentRows.status === 'fulfilled') {
+          for (const r of talentRows.value) talentByPid.set(r.player_id, { xg_per_60: r.xg_per_60, xg_rating: r.xg_rating });
+        }
+        const gsaxByPid = new Map<number, number>();
+        if (gsaxRows.status === 'fulfilled') {
+          for (const r of gsaxRows.value) {
+            if (r.regressed_gsax != null) gsaxByPid.set(r.goalie_id, r.regressed_gsax);
+          }
+        }
 
         const lineupData = lineupResult.status === 'fulfilled'
           ? lineupResult.value.data as { starters?: string[]; bench?: string[]; ir?: string[] } | null
@@ -340,6 +513,10 @@ class StormyServiceImpl {
             if (isGoalie && (p.goalie_gp || 0) > 0) {
               line += ` ${p.goalie_gp}GP ${p.wins}W ${p.saves}SV ${p.goals_against}GA ${p.shutouts}SO`;
               if (p.save_percentage != null) line += ` ${Number(p.save_percentage).toFixed(3)}SV%`;
+              // GSAx (regressed goals saved above expected) — Bayesian-shrunk
+              // measure of true goaltending value vs an average NHL goalie.
+              const gsax = gsaxByPid.get(Number(p.id));
+              if (gsax != null) line += ` GSAx:${gsax >= 0 ? '+' : ''}${gsax.toFixed(1)}`;
             } else if (p.games_played > 0) {
               line += ` ${p.games_played}GP ${p.goals}G ${p.assists}A ${p.points}PTS`;
               const ppg = (p.points / p.games_played).toFixed(1);
@@ -347,6 +524,14 @@ class StormyServiceImpl {
               if ((p.ppp || 0) > 0) line += ` ${p.ppp}PPP`;
               if ((p.shp || 0) > 0) line += ` ${p.shp}SHP`;
               line += ` ${p.shots}SOG ${p.hits}HIT ${p.blocks}BLK ${p.pim}PIM`;
+              // xG/60 + tier rating — shot-quality signal. A 0.95 PPG player
+              // with xG/60 of 1.4 (Elite) is hot but sustainable; a 1.1 PPG
+              // player with xG/60 of 0.5 (Below Avg) is regression-prone.
+              const t = talentByPid.get(Number(p.id));
+              if (t?.xg_per_60 != null) {
+                line += ` xG/60:${Number(t.xg_per_60).toFixed(2)}`;
+                if (t.xg_rating) line += `[${t.xg_rating}]`;
+              }
             }
 
             // Injury status
@@ -396,8 +581,15 @@ class StormyServiceImpl {
                 if (isGoalie && (p.goalie_gp || 0) > 0) {
                   line += ` ${p.goalie_gp}GP ${p.wins}W`;
                   if (p.save_percentage != null) line += ` ${Number(p.save_percentage).toFixed(3)}SV%`;
+                  const gsax = gsaxByPid.get(Number(p.id));
+                  if (gsax != null) line += ` GSAx:${gsax >= 0 ? '+' : ''}${gsax.toFixed(1)}`;
                 } else if (p.games_played > 0) {
                   line += ` ${p.games_played}GP ${p.points}PTS ${(p.points / p.games_played).toFixed(1)}PPG`;
+                  const t = talentByPid.get(Number(p.id));
+                  if (t?.xg_per_60 != null) {
+                    line += ` xG/60:${Number(t.xg_per_60).toFixed(2)}`;
+                    if (t.xg_rating) line += `[${t.xg_rating}]`;
+                  }
                 }
                 matchupLines.push(line);
               });
@@ -567,6 +759,27 @@ class StormyServiceImpl {
       }
 
       // Build a human-readable bracket summary
+      // Tightness annotation per series — Stormy uses this to flag risk in
+      // bracket/confidence picks and to weight team longevity in roster pools.
+      const seriesTightness = (s: SeriesRow): { label: string; alive: boolean; needed: number } => {
+        const hi = s.high_seed_wins ?? 0;
+        const lo = s.low_seed_wins ?? 0;
+        const total = hi + lo;
+        if (s.series_status === 'completed') {
+          return { label: 'final', alive: false, needed: 0 };
+        }
+        const gap = Math.abs(hi - lo);
+        const leader = hi > lo ? 'high' : lo > hi ? 'low' : 'tied';
+        const needed = 4 - Math.max(hi, lo); // wins still needed by leader to clinch
+        if (total === 0) return { label: 'not started', alive: true, needed };
+        if (gap >= 3) return { label: `dominant ${hi}-${lo}`, alive: true, needed };
+        if (gap === 2) return { label: `${leader === 'tied' ? '' : leader + ' '}leading ${hi}-${lo}`.trim(), alive: true, needed };
+        // gap is 0 or 1 — tight
+        return { label: `TIGHT ${hi}-${lo}`, alive: true, needed };
+      };
+      const tightnessBySlot = new Map<number, ReturnType<typeof seriesTightness>>();
+      for (const s of series) tightnessBySlot.set(s.bracket_slot, seriesTightness(s));
+
       if (series.length > 0) {
         const seriesLines: string[] = [];
         const byRound = new Map<number, SeriesRow[]>();
@@ -638,13 +851,28 @@ class StormyServiceImpl {
           }
 
           const rosterLines: string[] = [];
+          // Track per-position counts + cumulative scoring inputs for the
+          // roster summary. Stormy uses these to flag underweight positions
+          // and frame "are you on track?" type questions with real numbers.
+          const slotCounts: Record<string, number> = {};
+          let totalGP = 0;
+          let totalGoals = 0;
+          let totalAssists = 0;
+          let totalPoints = 0;
+          let aliveCount = 0;
+          let eliminatedCount = 0;
+
           for (const pick of picks) {
             const p = playerById.get(pick.player_id);
             if (!p) continue;
             const s = statsById.get(pick.player_id);
             const teamAbbrev = p.team_abbrev ?? '?';
             const status = p.status && p.status !== 'ACT' ? ` [${p.status}]` : '';
-            const teamState = eliminated.has(teamAbbrev) ? ' ⚠️ELIMINATED' : '';
+            const isElim = eliminated.has(teamAbbrev);
+            const teamState = isElim ? ' ⚠️ELIMINATED' : (teamAbbrevAlive.has(teamAbbrev) ? ' ✓ALIVE' : '');
+            if (isElim) eliminatedCount++;
+            else if (teamAbbrevAlive.has(teamAbbrev)) aliveCount++;
+            slotCounts[pick.position_slot] = (slotCounts[pick.position_slot] ?? 0) + 1;
 
             let line = `${pick.position_slot} ${p.full_name} (${teamAbbrev})${status}${teamState}`;
             if (s) {
@@ -655,6 +883,10 @@ class StormyServiceImpl {
                 const ppg = ((s.points ?? 0) / s.games_played).toFixed(2);
                 line += ` (${ppg}PPG) ${s.shots ?? 0}SOG ${s.hits ?? 0}HIT ${s.blocks ?? 0}BLK`;
                 if ((s.ppp ?? 0) > 0) line += ` ${s.ppp}PPP`;
+                totalGP += s.games_played ?? 0;
+                totalGoals += s.goals ?? 0;
+                totalAssists += s.assists ?? 0;
+                totalPoints += s.points ?? 0;
               } else {
                 line += ` — 0GP (has not played yet)`;
               }
@@ -663,7 +895,71 @@ class StormyServiceImpl {
             }
             rosterLines.push(line);
           }
-          ctx.rosterSummary = `YOUR PLAYOFF ROSTER (${picks.length} players) — playoff-only stats:\n` + rosterLines.join('\n');
+
+          // Per-position balance + roster totals header
+          const balanceParts = Object.entries(slotCounts)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([slot, n]) => `${n}${slot}`);
+          const balance = balanceParts.join('/');
+          const headerStats = `${picks.length} players (${balance}) · ${aliveCount} alive · ${eliminatedCount} eliminated · totals so far: ${totalPoints}PTS (${totalGoals}G ${totalAssists}A across ${totalGP} skater GP)`;
+
+          ctx.rosterSummary = `YOUR PLAYOFF ROSTER — ${headerStats}\n` + rosterLines.join('\n');
+
+          // ── Top unrostered playoff scorers on still-alive teams ─────────
+          // Roster pools LOCK the roster at draft time — no add/drops, no
+          // waivers. So this list isn't for "swap X for Y" advice (the
+          // user can't); it's for context: "here are the top hot scorers
+          // you didn't draft, this is the production currently beating you."
+          // Useful for "how am I doing" analysis and for next-year draft
+          // prep. The system prompt enforces this framing.
+          try {
+            const { data: topData } = await sb
+              .from('player_playoff_stats')
+              .select('player_id, games_played, goals, assists, points, ppp, shots, hits, blocks, is_goalie, team_abbrev')
+              .gt('games_played', 1)
+              .order('points', { ascending: false })
+              .limit(80);
+            const topRows = (topData ?? []) as Array<PlayoffStatRow & { team_abbrev: string | null }>;
+
+            // Filter: not already rostered, alive team only.
+            const ownedIds = new Set(picks.map(pk => pk.player_id));
+            const candidates = topRows.filter(r => {
+              if (ownedIds.has(r.player_id)) return false;
+              const ta = r.team_abbrev ?? '';
+              return teamAbbrevAlive.has(ta);
+            });
+            // Re-rank by PPG (a 4-game player at 1.5 PPG is more interesting
+            // than an 8-game player at 0.8 PPG, even if total points look similar).
+            const ranked = candidates
+              .map(r => ({ row: r, ppg: (r.points ?? 0) / Math.max(1, r.games_played ?? 1) }))
+              .sort((a, b) => b.ppg - a.ppg)
+              .slice(0, 10);
+
+            if (ranked.length > 0) {
+              const namesRes = await sb
+                .from('player_directory')
+                .select('player_id, full_name, position')
+                .in('player_id', ranked.map(x => x.row.player_id));
+              const dir = (namesRes.data ?? []) as Array<{ player_id: number; full_name: string; position: string | null }>;
+              const dirById = new Map<number, { full_name: string; position: string | null }>();
+              for (const d of dir) dirById.set(d.player_id, { full_name: d.full_name, position: d.position });
+
+              const hotLines = ranked.map(({ row, ppg }) => {
+                const meta = dirById.get(row.player_id);
+                const nm = meta?.full_name ?? `Player ${row.player_id}`;
+                const pos = meta?.position ?? '?';
+                const ta = row.team_abbrev ?? '?';
+                if (row.is_goalie) {
+                  return `  ${nm} (${ta}, G) — ${row.games_played}GP ${row.wins ?? 0}W ${row.saves ?? 0}SV ${row.shutouts ?? 0}SO`;
+                }
+                return `  ${nm} (${ta}, ${pos}) — ${row.games_played}GP ${row.points ?? 0}PTS (${ppg.toFixed(2)}PPG) ${row.shots ?? 0}SOG ${row.hits ?? 0}HIT ${row.blocks ?? 0}BLK`;
+              });
+              ctx.extra = (ctx.extra ? ctx.extra + '\n\n' : '') +
+                `TOP UNROSTERED PLAYOFF SCORERS (alive teams, sorted by PPG, min 2 GP):\n${hotLines.join('\n')}`;
+            }
+          } catch {
+            // Hot-scorers list is best-effort — failure here doesn't block the rest.
+          }
         } else {
           ctx.rosterSummary = `User has NOT picked their playoff roster yet. Encourage them to build one.`;
         }
@@ -692,6 +988,21 @@ class StormyServiceImpl {
             if (s && s.series_status === 'completed') {
               const correct = p.is_correct ? '✓' : '✗';
               line += ` [${correct} — ${p.points_earned ?? 0} pts]`;
+            } else if (s) {
+              // Active or pending — annotate live tightness so Stormy can flag at-risk picks.
+              const t = tightnessBySlot.get(p.series_slot);
+              if (t) {
+                // If user's pick is currently TRAILING, flag it explicitly.
+                const userPickIsHigh = p.picked_team_id === s.high_seed_team_id;
+                const hi = s.high_seed_wins ?? 0;
+                const lo = s.low_seed_wins ?? 0;
+                let riskTag = `[${t.label}]`;
+                if (t.label !== 'final' && t.label !== 'not started') {
+                  const userTrailing = userPickIsHigh ? hi < lo : lo < hi;
+                  if (userTrailing) riskTag = `[⚠️ AT RISK — ${t.label}]`;
+                }
+                line += ` ${riskTag}`;
+              }
             }
             pickLines.push(line);
           }
@@ -716,15 +1027,39 @@ class StormyServiceImpl {
         }>;
 
         if (picks.length > 0) {
+          // Confidence values are 1..N — N is the count of picks (typically 15).
+          // Anything in the top third of the range is "high confidence" and
+          // therefore expensive if it busts.
+          const highConfThreshold = Math.ceil(picks.length * 0.66);
           const pickLines: string[] = [];
           for (const p of picks) {
+            const s = series.find(x => x.bracket_slot === p.series_slot);
             const pickedAbbrev = p.picked_team_id ? teamById.get(p.picked_team_id)?.abbreviation ?? `#${p.picked_team_id}` : 'TBD';
             let line = `  Series ${p.series_slot}: ${pickedAbbrev} @ confidence ${p.confidence_value}`;
-            if (p.is_correct === true) line += ` ✓ (${p.points_earned ?? 0} pts)`;
-            else if (p.is_correct === false) line += ` ✗`;
+            if (p.is_correct === true) {
+              line += ` ✓ (${p.points_earned ?? 0} pts)`;
+            } else if (p.is_correct === false) {
+              line += ` ✗`;
+            } else if (s) {
+              const t = tightnessBySlot.get(p.series_slot);
+              if (t) {
+                const userPickIsHigh = p.picked_team_id === s.high_seed_team_id;
+                const hi = s.high_seed_wins ?? 0;
+                const lo = s.low_seed_wins ?? 0;
+                const userTrailing = userPickIsHigh ? hi < lo : lo < hi;
+                const isHighConf = p.confidence_value >= highConfThreshold;
+                if (t.label !== 'final' && t.label !== 'not started' && userTrailing && isHighConf) {
+                  line += ` [🚨 HIGH-CONF AT RISK — ${t.label}]`;
+                } else if (t.label.startsWith('TIGHT') && isHighConf) {
+                  line += ` [⚠️ HIGH-CONF in tight series — ${t.label}]`;
+                } else if (t.label !== 'final' && t.label !== 'not started') {
+                  line += ` [${t.label}]`;
+                }
+              }
+            }
             pickLines.push(line);
           }
-          ctx.rosterSummary = `YOUR CONFIDENCE PICKS (1-${picks.length}):\n${pickLines.join('\n')}`;
+          ctx.rosterSummary = `YOUR CONFIDENCE PICKS (sorted high→low, total ${picks.length}):\n${pickLines.join('\n')}`;
         } else {
           ctx.rosterSummary = `User has NOT submitted confidence picks yet.`;
         }
@@ -732,7 +1067,7 @@ class StormyServiceImpl {
 
       // Pool-mode hint in extra so Stormy responds appropriately
       const mode = leagueType === 'playoff-roster-pool'
-        ? 'PLAYOFF ROSTER POOL — user builds a single playoff roster (players only). Winner = most fantasy points across the playoffs. Ask about MY roster, player swaps, hot playoff performers.'
+        ? 'PLAYOFF ROSTER POOL — user drafted a single locked playoff roster at the start. NO add/drops, NO waivers, NO trades — they keep their drafted roster the entire playoffs. Eliminated players stay on roster but score zero from here. Ask about MY roster, hot playoff performers (as missed-draft context, NOT as pickups), and matchup analysis.'
         : leagueType === 'playoff-bracket-pickem'
         ? 'PLAYOFF BRACKET PICKEM — user picks series winners across all 4 rounds. Winner = most correct picks (with round multipliers).'
         : 'PLAYOFF CONFIDENCE POOL — user assigns confidence values (1-15) to series picks. Winner = highest total from correct picks weighted by confidence.';

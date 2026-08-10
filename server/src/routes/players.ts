@@ -3,6 +3,7 @@ import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { createUserClient } from '../lib/supabase';
 import { PlayerService } from '../services/PlayerService';
+import { NhlPlayoffStateService } from '../services/NhlPlayoffStateService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
 import { logger, CURRENT_SEASON } from '@citrus/shared';
@@ -10,12 +11,25 @@ import { logger, CURRENT_SEASON } from '@citrus/shared';
 const playerRoutes = new Hono<Env>();
 
 // GET /api/players — Get all players with stats (primary endpoint)
+//
+// Query params:
+//   search           — text match on player name (overrides the rest)
+//   position         — filter by primary or eligible position (F/D/G/etc.)
+//   limit            — cap returned rows (max 1000)
+//   aliveTeamsOnly   — 'true' to restrict to NHL teams still alive in the
+//                      playoff bracket. Used by the playoff-roster-pool
+//                      draft so eliminated teams disappear from the
+//                      draftable pool dynamically as rounds progress.
+//   season           — season for the alive-teams lookup (defaults to
+//                      CURRENT_SEASON). Ignored unless aliveTeamsOnly=true.
 playerRoutes.get('/', authMiddleware, async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new PlayerService(supabase);
 
   const search = c.req.query('search');
   const position = c.req.query('position');
+  const aliveTeamsOnly = c.req.query('aliveTeamsOnly') === 'true';
+  const seasonParam = c.req.query('season');
   const rawLimit = parseInt(c.req.query('limit') || '0', 10);
   const limit = isNaN(rawLimit) ? 0 : Math.min(rawLimit, 1000);
 
@@ -35,6 +49,22 @@ playerRoutes.get('/', authMiddleware, async (c) => {
       p.position === position || p.eligible_positions?.includes(position)
     );
   }
+
+  if (aliveTeamsOnly) {
+    const season = seasonParam ? parseInt(seasonParam, 10) : CURRENT_SEASON;
+    const playoffSvc = new NhlPlayoffStateService(supabase);
+    const aliveAbbrevs = await playoffSvc.getAliveTeamAbbreviations(season);
+    // If the bracket isn't populated yet (pre-playoffs), aliveAbbrevs is
+    // empty — leave the list unfiltered rather than returning zero rows,
+    // since "no bracket" shouldn't mean "no players draftable".
+    if (aliveAbbrevs.length > 0) {
+      const aliveSet = new Set(aliveAbbrevs);
+      filtered = filtered.filter((p: { team?: string }) =>
+        p.team ? aliveSet.has(p.team) : false
+      );
+    }
+  }
+
   if (limit) {
     filtered = filtered.slice(0, limit);
   }

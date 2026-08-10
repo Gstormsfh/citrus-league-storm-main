@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Cron entrypoint for nightly projection refresh
+# Last active: 2026-03-03
+# Invoked:     .github/workflows/main.yml (cron 0 7 * * * — daily 7am UTC / 2am ET)
+# Reads:       raw_shots, player_season_stats, player_talent_metrics
+# Writes:      player_projected_stats, projection_cache
+# ────────────────────────────────────────────────────────────
 """
 CITRUS NIGHTLY PROJECTION BATCH
 ================================
@@ -92,7 +100,10 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 # Batch sizes for database operations
 UPSERT_BATCH_SIZE = 500
 FETCH_BATCH_SIZE = 1000
-DEFAULT_SEASON = 2025
+# DEFAULT_SEASON is imported from calculate_daily_projections (which now
+# derives from today's date via season_config.current_season). The prior
+# `DEFAULT_SEASON = 2025` redeclaration here shadowed the import and would
+# have kept the projection pipeline pinned to season=2025 forever.
 
 # Team ID to abbreviation mapping (NHL standard)
 TEAM_ABBREV_MAP = {

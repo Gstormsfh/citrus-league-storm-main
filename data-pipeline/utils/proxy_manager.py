@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     100-IP proxy rotation manager — picks healthy proxy per request
+# Last active: 2026-03-02
+# Invoked:     imported by citrus_request.py
+# Reads:       (proxy pool config)
+# Writes:      (returns proxy URL)
+# ────────────────────────────────────────────────────────────
 """
 proxy_manager.py - Enterprise-Grade Proxy Management for Citrus Scraping
 
@@ -36,30 +44,38 @@ class ProxyManager:
     """
     
     def __init__(self):
-        # SECURITY: No default values - credentials must be in environment
+        # Proxy creds are optional. If any are missing, run in direct (no-proxy)
+        # mode — the NHL public API doesn't need rotation for low-volume polling
+        # (every 15 min from a single CI runner is well under any rate limit).
+        # Crashing here is what silently broke the playoff cron from April 17
+        # onwards: the workflow doesn't pass these as env vars, so every NHL
+        # API call from cron was throwing ValueError before reaching the request.
         self.username = os.getenv("CITRUS_PROXY_USERNAME")
         self.password = os.getenv("CITRUS_PROXY_PASSWORD")
         self.api_url = os.getenv("CITRUS_PROXY_API_URL")
-        
-        # Validate required credentials are set
-        if not self.username or not self.password or not self.api_url:
-            raise ValueError(
-                "CITRUS_PROXY_USERNAME, CITRUS_PROXY_PASSWORD, and CITRUS_PROXY_API_URL "
-                "must be set in environment variables. See .env.example for template."
-            )
-        
+
+        creds_set = bool(self.username and self.password and self.api_url)
+        env_enabled = os.getenv("CITRUS_PROXY_ENABLED", "true").lower() == "true"
+
         self.proxy_list: List[str] = []
         self.proxy_cycle: Optional[itertools.cycle] = None
         self.cache_time: float = 0
         self.cache_ttl: int = 3600  # 1 hour in seconds
         self.lock = threading.Lock()
-        self.enabled = os.getenv("CITRUS_PROXY_ENABLED", "true").lower() == "true"
-        
-        # Initialize proxy list
-        if self.enabled:
-            self._refresh_proxy_list()
-        else:
-            logger.warning("[ProxyManager] Proxy rotation DISABLED via CITRUS_PROXY_ENABLED=false")
+        self.enabled = env_enabled and creds_set
+
+        if not self.enabled:
+            if not creds_set and env_enabled:
+                logger.warning(
+                    "[ProxyManager] Proxy creds missing (CITRUS_PROXY_USERNAME/"
+                    "PASSWORD/API_URL) — running in direct mode."
+                )
+            else:
+                logger.warning("[ProxyManager] Proxy rotation DISABLED via CITRUS_PROXY_ENABLED=false")
+            return
+
+        # Initialize proxy list when enabled
+        self._refresh_proxy_list()
     
     def _fetch_proxy_list_from_api(self) -> List[Dict]:
         """

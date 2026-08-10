@@ -11,8 +11,19 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Job-level env so every step sees the same Supabase + proxy creds.
+    # Proxy creds are optional — proxy_manager falls back to direct mode if
+    # missing (NHL public API, low-volume polling). This was the silent
+    # failure mode from April 17 onwards: proxy_manager raised ValueError
+    # on every request because the workflow didn't pass these through.
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      CITRUS_PROXY_USERNAME: ${{ secrets.CITRUS_PROXY_USERNAME }}
+      CITRUS_PROXY_PASSWORD: ${{ secrets.CITRUS_PROXY_PASSWORD }}
+      CITRUS_PROXY_API_URL: ${{ secrets.CITRUS_PROXY_API_URL }}
     steps:
-      # ── Offseason guard (Entry 42, 2026-08-10) ──────────────────────
+      # ── Offseason guard (Entry 42, 2026-08-10; re-applied on master's v5/v6 base per Entry 57) ──
       # The cron above already restricts scheduled runs to Apr-Jun; this
       # guard additionally makes MANUAL dispatches honest in the offseason
       # (green no-op with a notice instead of a guaranteed loud failure).
@@ -30,10 +41,10 @@ jobs:
           fi
 
       - if: steps.window.outputs.in_window == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - if: steps.window.outputs.in_window == 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -44,8 +55,15 @@ jobs:
 
       # Step 0: Ingest playoff game schedule into nhl_games so the live
       # scraper (data_scraping_service.py) picks them up automatically.
-      # Safe to re-run — uses upsert on game_id. Scans 7 days ahead to
-      # catch newly announced games.
+      # Safe to re-run — uses upsert on game_id.
+      #
+      # Window: 30 days back, 7 days forward. The forward portion catches
+      # newly-announced games; the backward portion is the safety net for
+      # any prior cron outage (e.g. the proxy_manager bug that took out
+      # April 17 → May 4) that left finished games un-ingested. Without
+      # this window, "today only" scans permanently miss any game that
+      # was completed during a cron outage, and the daemon RPC that
+      # derives series wins from nhl_games has nothing to count.
       #
       # NO continue-on-error here. If this step fails, every downstream
       # job operates on stale/missing schedule data and the live scraper
@@ -53,38 +71,26 @@ jobs:
       # by hand. Fail the run loudly so GitHub emails about it.
       - name: Ingest playoff game schedule
         if: steps.window.outputs.in_window == 'true'
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          START=$(date -d "today" +%Y-%m-%d)
+          START=$(date -d "30 days ago" +%Y-%m-%d)
           END=$(date -d "+7 days" +%Y-%m-%d)
           python data-pipeline/acquisition/ingest_playoff_schedule.py --start "$START" --end "$END" --season 2025
 
       # Step 1: Refresh bracket seeds + initial series rows (safe to re-run)
       - name: Ingest NHL playoff bracket
         if: steps.window.outputs.in_window == 'true'
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python data-pipeline/acquisition/ingest_nhl_playoff_bracket.py --season 2025
         continue-on-error: true
 
       # Step 2: Link games to series, update wins, trigger pick scoring
       - name: Sync playoff series results
         if: steps.window.outputs.in_window == 'true'
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python data-pipeline/acquisition/sync_playoff_results.py --season 2025
         continue-on-error: true
 
       # Step 3: Rebuild player_playoff_stats from per-game stats (RPC call)
       - name: Aggregate player playoff stats
         if: steps.window.outputs.in_window == 'true'
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           python -c "
           import os, sys
@@ -101,9 +107,6 @@ jobs:
       # This is what keeps roster pool standings dynamic to commissioner settings.
       - name: Score playoff roster pools
         if: steps.window.outputs.in_window == 'true'
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           python -c "
           import sys

@@ -4,10 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { X, Send, Minimize2, Maximize2, Loader2 } from 'lucide-react';
 import { Narwhal } from '@/components/icons/Narwhal';
-import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
+import { MascotAvatar } from '@/components/citrus2';
 import { StormyService, fetchLeagueContext, type StormyMessage, type StormyContext } from '@/services/StormyService';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -225,7 +224,7 @@ export const StormyChatBubble = () => {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed h-14 w-14 rounded-varsity shadow-[0_6px_0_rgba(27,48,34,0.2)] bg-gradient-to-br from-citrus-sage to-citrus-orange border-4 border-citrus-forest hover:scale-105 hover:-translate-y-1 transition-all z-[100] p-0 overflow-hidden"
+        className="fixed h-14 w-14 rounded-full bg-pastel-orange ring-2 ring-pastel-orange/30 shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)] hover:scale-105 hover:-translate-y-1 transition-all z-[100] p-0 overflow-hidden"
         style={{
           position: 'fixed',
           bottom: isMobile ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem)' : '1.5rem',
@@ -234,10 +233,8 @@ export const StormyChatBubble = () => {
           zIndex: 100,
         }}
       >
-        <div className="absolute inset-0 opacity-20 corduroy-texture pointer-events-none" />
-        <Narwhal className="h-7 w-7 text-[#E8EED9] relative z-10 pointer-events-none" />
-        <span className="absolute -top-1 -right-1 h-3 w-3 bg-citrus-sage rounded-full border-2 border-citrus-cream animate-pulse shadow-[0_0_8px_rgba(120,149,97,0.6)] pointer-events-none" />
-        <CitrusSparkle className="absolute top-1 left-1 w-3 h-3 text-[#E8EED9] opacity-70 pointer-events-none" />
+        <Narwhal className="h-7 w-7 text-pastel-cream relative z-10 pointer-events-none" />
+        <span className="absolute -top-1 -right-1 h-3 w-3 bg-pastel-sage rounded-full ring-2 ring-pastel-surface animate-pulse pointer-events-none" />
       </Button>
     );
   }
@@ -246,7 +243,7 @@ export const StormyChatBubble = () => {
 
   return (
     <Card
-      className={`fixed w-[calc(100vw-3rem)] md:w-[380px] shadow-[0_8px_0_rgba(27,48,34,0.2)] border-4 border-citrus-forest rounded-[2rem] overflow-hidden flex flex-col transition-all duration-300 bg-[#E8EED9]/60 backdrop-blur-sm corduroy-texture ${isMinimized ? 'h-[70px]' : 'h-[min(400px,60vh)]'}`}
+      className={`fixed w-[calc(100vw-3rem)] md:w-[440px] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10 border-0 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 bg-pastel-surface-tile ${isMinimized ? 'h-[70px]' : 'h-[min(640px,80vh)]'}`}
       style={{
         position: 'fixed',
         bottom: isMobile ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem)' : '1.5rem',
@@ -256,32 +253,27 @@ export const StormyChatBubble = () => {
       }}
     >
       {/* Header */}
-      <CardHeader className="p-4 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-peach/10 border-b-4 border-citrus-forest flex flex-row items-center justify-between shrink-0 relative">
-        <CitrusLeaf className="absolute top-2 right-20 w-8 h-8 text-citrus-sage opacity-10 rotate-12" />
-
-        <div className="flex items-center gap-3 relative z-10">
+      <CardHeader className="p-4 border-b border-white/10 flex flex-row items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="h-10 w-10 rounded-varsity bg-gradient-to-br from-citrus-sage to-citrus-orange border-3 border-citrus-forest flex items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]">
-              <Narwhal className="h-6 w-6 text-[#E8EED9]" />
-            </div>
-            <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-citrus-sage rounded-full border-2 border-citrus-cream shadow-[0_0_8px_rgba(120,149,97,0.6)]" />
+            <MascotAvatar id="stormy" size="md" ring />
+            <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-pastel-sage rounded-full ring-2 ring-pastel-surface-tile animate-pulse" />
           </div>
           <div>
-            <CardTitle className="text-base font-varsity font-black text-citrus-forest uppercase tracking-tight">
+            <CardTitle className="text-base font-calistoga text-pastel-cream">
               Stormy
             </CardTitle>
-            <p className="text-xs font-display text-citrus-charcoal flex items-center gap-1">
-              <CitrusSparkle className="h-3 w-3 text-citrus-orange" />
+            <p className="text-pastel-orange-soft font-jbmono text-[10px] tracking-[0.22em] uppercase font-bold">
               {isLoading ? 'Thinking...' : 'Powered by Claude'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 relative z-10">
-          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-citrus-sage/20 text-citrus-forest" onClick={() => setIsMinimized(!isMinimized)}>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/55 hover:text-pastel-cream hover:bg-white/5" onClick={() => setIsMinimized(!isMinimized)}>
             {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-citrus-peach/30 text-citrus-forest" onClick={() => setIsOpen(false)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/55 hover:text-pastel-cream hover:bg-white/5" onClick={() => setIsOpen(false)}>
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -290,7 +282,7 @@ export const StormyChatBubble = () => {
       {/* Chat Body */}
       {!isMinimized && (
         <>
-          <CardContent className="flex-1 p-0 overflow-hidden bg-[#E8EED9]/60 backdrop-blur-sm/50 relative">
+          <CardContent className="flex-1 p-0 overflow-hidden bg-pastel-surface-tile relative">
             <ScrollArea className="h-full p-4" ref={scrollRef}>
               <div className="space-y-4">
                 {messages.map((msg) => (
@@ -299,17 +291,13 @@ export const StormyChatBubble = () => {
                     className={`flex gap-2 ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
                   >
                     {msg.sender === 'stormy' && (
-                      <Avatar className="h-8 w-8 border-2 border-citrus-sage bg-gradient-to-br from-citrus-sage/20 to-citrus-orange/20 shadow-sm shrink-0">
-                        <AvatarFallback className="bg-transparent">
-                          <Narwhal className="h-4 w-4 text-citrus-forest" />
-                        </AvatarFallback>
-                      </Avatar>
+                      <MascotAvatar id="stormy" size="sm" ring className="shrink-0" />
                     )}
                     <div
-                      className={`max-w-[80%] p-3 rounded-2xl text-sm font-display shadow-sm whitespace-pre-wrap ${
+                      className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm whitespace-pre-wrap ${
                         msg.sender === 'user'
-                          ? 'bg-gradient-to-br from-citrus-orange to-citrus-peach text-[#E8EED9] font-medium rounded-tr-none border-2 border-citrus-orange'
-                          : 'bg-[#E8EED9]/60 backdrop-blur-sm border-2 border-citrus-sage/40 rounded-tl-none text-citrus-forest'
+                          ? 'bg-pastel-orange text-[#0F1F15] font-bold rounded-tr-none'
+                          : 'bg-white/5 border border-white/10 text-pastel-cream rounded-tl-none'
                       }`}
                     >
                       {msg.text}
@@ -320,14 +308,10 @@ export const StormyChatBubble = () => {
                 {/* Typing indicator */}
                 {isLoading && (
                   <div className="flex gap-2">
-                    <Avatar className="h-8 w-8 border-2 border-citrus-sage bg-gradient-to-br from-citrus-sage/20 to-citrus-orange/20 shadow-sm shrink-0">
-                      <AvatarFallback className="bg-transparent">
-                        <Narwhal className="h-4 w-4 text-citrus-forest" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="p-3 rounded-2xl rounded-tl-none border-2 border-citrus-sage/40 bg-[#E8EED9]/60 flex items-center gap-1.5">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-citrus-sage" />
-                      <span className="text-xs text-citrus-charcoal/60 font-display">Stormy is thinking...</span>
+                    <MascotAvatar id="stormy" size="sm" ring className="shrink-0" />
+                    <div className="p-3 rounded-2xl rounded-tl-none border border-white/10 bg-white/5 flex items-center gap-1.5">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-pastel-orange-soft" />
+                      <span className="text-white/55 font-jbmono text-[10px] tracking-[0.22em] uppercase">Stormy is thinking...</span>
                     </div>
                   </div>
                 )}
@@ -336,7 +320,7 @@ export const StormyChatBubble = () => {
           </CardContent>
 
           {/* Input */}
-          <CardFooter className="p-3 border-t-4 border-citrus-forest bg-[#E8EED9]/60 backdrop-blur-sm">
+          <CardFooter className="p-3 border-t border-white/10 bg-pastel-surface-tile">
             <form
               className="flex w-full items-center gap-2"
               onSubmit={(e) => {
@@ -348,7 +332,7 @@ export const StormyChatBubble = () => {
                 placeholder="Ask Stormy..."
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                className="flex-1 rounded-xl border-2 border-citrus-sage/40 bg-[#E8EED9]/60 backdrop-blur-sm/50 text-citrus-forest placeholder:text-citrus-charcoal/50 font-display focus:border-citrus-orange transition-all"
+                className="flex-1"
                 autoFocus
                 disabled={isLoading}
               />
@@ -356,12 +340,12 @@ export const StormyChatBubble = () => {
                 type="submit"
                 size="icon"
                 disabled={!inputValue.trim() || isLoading}
-                className="bg-gradient-to-br from-citrus-sage to-citrus-orange border-3 border-citrus-forest rounded-varsity shadow-patch hover:-translate-y-0.5 transition-all disabled:opacity-50"
+                className="bg-pastel-orange hover:bg-pastel-orange-soft text-[#0F1F15] rounded-md hover:-translate-y-0.5 transition-all disabled:opacity-50"
               >
                 {isLoading ? (
-                  <Loader2 className="h-4 w-4 text-[#E8EED9] animate-spin" />
+                  <Loader2 className="h-4 w-4 text-[#0F1F15] animate-spin" />
                 ) : (
-                  <Send className="h-4 w-4 text-[#E8EED9]" />
+                  <Send className="h-4 w-4 text-[#0F1F15]" />
                 )}
               </Button>
             </form>

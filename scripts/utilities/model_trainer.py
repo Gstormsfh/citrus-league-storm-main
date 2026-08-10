@@ -1,3 +1,11 @@
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Generic model trainer wrapper used by train_xg_v3.py
+# Last active: 2026-01-05
+# Invoked:     imported by train_xg_v3.py + train_xg_calibration.py
+# Reads:       (training CSVs)
+# Writes:      (.joblib model artifacts)
+# ────────────────────────────────────────────────────────────
 # model_trainer.py
 
 import pandas as pd

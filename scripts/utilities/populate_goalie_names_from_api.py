@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose:     Backfill goalie names into goalie_gsax / goalie_gar from NHL API
+# Last active: 2026-01-08
+# Invoked:     one-off; ran during initial goalie data load
+# Reads:       NHL public API
+# Writes:      goalie_gsax.goalie_name, goalie_gar.goalie_name
+# ────────────────────────────────────────────────────────────
 """
 Populate goalie names in raw_shots table by fetching from NHL API.
 This replaces dependency on staging data with our own data pull.
@@ -40,7 +48,10 @@ def fetch_goalie_name_from_api(goalie_id):
 def get_unique_goalie_ids():
     """Get unique goalie IDs from raw_shots that don't have names."""
     print("Fetching unique goalie IDs from raw_shots...")
-    
+
+    # Unfiltered scan is intentional (A4 per 0C-CONSUMER-SCOPING decision):
+    # raw_shots is multi-season since phase 0c; historical goalie IDs also
+    # get name-resolved here. Benign — the directory just gets more names.
     # Get all unique goalie_ids where goalie_name is NULL
     response = supabase.table('raw_shots').select('goalie_id').not_.is_('goalie_id', 'null').execute()
     df = pd.DataFrame(response.data)

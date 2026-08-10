@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose:     Populate league_averages table + verify (used as setup-era seeder)
+# Last active: 2026-01-05
+# Invoked:     manual run; pairs with populate_league_averages.py
+# Reads:       player_season_stats
+# Writes:      league_averages
+# ────────────────────────────────────────────────────────────
 """
 Populate league averages and verify everything is working correctly.
 """

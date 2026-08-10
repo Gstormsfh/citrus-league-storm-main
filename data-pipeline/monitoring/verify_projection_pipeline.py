@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     End-to-end verification of projection pipeline outputs
+# Last active: 2026-03-03
+# Invoked:     scheduled + post-deploy
+# Reads:       player_projected_stats, projection_cache
+# Writes:      alerts (no DB writes)
+# ────────────────────────────────────────────────────────────
 """
 Verify complete projection pipeline from DB to frontend
 """
@@ -14,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.citrus_request import citrus_request
+from data_pipeline.utils.season_config import current_season
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -42,7 +51,7 @@ response = citrus_request(
     headers=headers,
     params={
         'game_date': f'eq.{today}',
-        'season': 'eq.2025',
+        'season': f'eq.{current_season()}',
         'select': 'game_id,home_team,away_team'
     }
 )
@@ -65,7 +74,7 @@ response = citrus_request(
     headers=headers,
     params={
         'projection_date': f'eq.{today}',
-        'season': 'eq.2025',
+        'season': f'eq.{current_season()}',
         'select': 'player_id,game_id,total_projected_points,is_goalie',
         'limit': '1000'
     }

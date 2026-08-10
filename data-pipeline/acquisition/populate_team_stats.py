@@ -1,4 +1,12 @@
 #!/usr/bin/env python
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose:     Aggregate team defensive metrics from player_game_stats for matchup-difficulty calc
+# Last active: 2026-03-03
+# Invoked:     manual run; not in any workflow
+# Reads:       player_game_stats
+# Writes:      team_stats (RLS-disabled — see audit)
+# ────────────────────────────────────────────────────────────
 """
 Populate team_stats table with defensive metrics for matchup difficulty calculations.
 
@@ -15,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.supabase_rest import SupabaseRest
+from data_pipeline.utils.season_config import current_season
 
 # Initialize DB
 url = os.getenv("VITE_SUPABASE_URL")
@@ -22,7 +31,9 @@ raw_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 key = raw_key[raw_key.index("(")+1:raw_key.rindex(")")] if "(" in raw_key else raw_key.strip().strip('"')
 db = SupabaseRest(url, key)
 
-SEASON = 2025
+# Derived — prior hardcoded 2025 would have kept this manual aggregator
+# reading last season's games forever after 2026-10-01.
+SEASON = current_season()
 
 print("=" * 70)
 print("POPULATING TEAM STATS TABLE")
@@ -37,7 +48,7 @@ TEAMS = [
     "WSH", "WPG"
 ]
 
-print("Step 1: Fetching all NHL games for season 2025...")
+print(f"Step 1: Fetching all NHL games for season {SEASON}...")
 
 # Fetch all games for the season
 games_offset = 0

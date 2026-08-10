@@ -40,7 +40,7 @@ export function StormyWelcomeScene({ size = 'lg', className = '' }: SceneProps) 
   const sz = SIZE[size];
   return (
     <div
-      className={`relative overflow-hidden bg-[#0F1F15] rounded-3xl ring-1 ring-white/10 ${sz.container} ${sz.minHeight} ${className}`}
+      className={`relative overflow-hidden bg-pastel-surface rounded-3xl ring-1 ring-white/10 ${sz.container} ${sz.minHeight} ${className}`}
       role="img"
       aria-label="Stormy the narwhal floats among holographic stat panels in a dark hockey arena, welcoming you to Citrus."
     >
@@ -64,7 +64,7 @@ export function StormyWelcomeScene({ size = 'lg', className = '' }: SceneProps) 
 
       {/* Top-left eyebrow */}
       <div className="absolute top-5 left-5 sm:top-6 sm:left-6 z-10">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#0F1F15]/70 ring-1 ring-pastel-orange/40 backdrop-blur-md">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-pastel-surface/70 ring-1 ring-pastel-orange/40 backdrop-blur-md">
           <LivePulse size="xs" />
           <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold">
             Stormy · Assistant GM
@@ -74,7 +74,7 @@ export function StormyWelcomeScene({ size = 'lg', className = '' }: SceneProps) 
 
       {/* Top-right tagline */}
       <div className="absolute top-5 right-5 sm:top-6 sm:right-6 z-10 hidden sm:block">
-        <div className="px-3 py-1.5 rounded-md bg-[#0F1F15]/70 ring-1 ring-white/15 backdrop-blur-md">
+        <div className="px-3 py-1.5 rounded-md bg-pastel-surface/70 ring-1 ring-white/15 backdrop-blur-md">
           <span className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/65 font-bold">
             The Citrus Squad
           </span>

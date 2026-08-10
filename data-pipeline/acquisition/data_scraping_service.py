@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Long-running scraper service: parallel live sync + nightly PBP processing with 100-IP rotation
+# Last active: 2026-04-26
+# Invoked:     long-running daemon (Dockerized; deployed separately from web/api)
+# Reads:       NHL public API
+# Writes:      raw_nhl_data, raw_shots, player_game_stats, player_shifts_official
+# ────────────────────────────────────────────────────────────
 """
 data_scraping_service.py - THE TOTAL CITRUS ENGINE (MASTER EDITION)
 PARALLEL Live Sync + Automated Nightly PBP Processing (xG Audit).
@@ -421,25 +429,45 @@ def run_unified_loop() -> Tuple[str, int]:
             # on this same tick.
             if _try_self_heal_schedule(today):
                 try:
+                    # Re-query the SAME window the self-heal ingested ([today, today+7])
+                    # rather than the prior [yesterday, today] narrow window. The narrow
+                    # window produced a false-alarm warning on every NHL off-day: the
+                    # self-heal correctly populated future dates, but the re-query
+                    # couldn't see them and concluded "ingest reported success but query
+                    # empty → FK reject." The TEAM_ID_MAP blame was also misleading —
+                    # it's a single 68→59 Utah HC remap, irrelevant to most slates.
+                    # See ENGINEERING.md §12.16.
+                    window_dates = [
+                        (dt.date.fromisoformat(today) + dt.timedelta(days=d)).isoformat()
+                        for d in range(0, 8)
+                    ]
                     raw_games = db.select(
                         "nhl_games",
-                        filters=[("game_date", "in", [today, yesterday])],
+                        filters=[("game_date", "in", window_dates)],
                     ) or []
-                    games = [
+                    # `games` retains its today-only semantic for downstream cache and
+                    # per-game processing (line ~447 onwards treats this as today's slate).
+                    # Yesterday-stragglers are already handled by the primary path before
+                    # self-heal runs, so they don't need re-checking here.
+                    games = [g for g in raw_games if g.get("game_date") == today]
+                    # Success criterion is broader: any playable game anywhere in the
+                    # forward window. Off-days legitimately return empty for today but
+                    # the schedule is healthy if future dates are populated.
+                    playable_in_window = [
                         g for g in raw_games
-                        if g.get("game_date") == today
-                        or str(g.get("status", "")).lower() not in ("final", "off")
+                        if str(g.get("status", "")).lower() not in ("final", "off")
                     ]
-                    if games:
+                    if playable_in_window:
                         logger.info(
-                            f"[SELF-HEAL] Recovered {len(games)} games for {today} — "
-                            f"resuming normal processing."
+                            f"[SELF-HEAL] Recovered {len(playable_in_window)} playable game(s) "
+                            f"in {window_dates[0]}..{window_dates[-1]} "
+                            f"({len(games)} for {today}) — resuming normal processing."
                         )
                     else:
                         logger.warning(
-                            f"[SELF-HEAL] Ingest reported success but query still empty. "
-                            f"Likely an FK reject on a team_id not in TEAM_ID_MAP — "
-                            f"check the [SELF-HEAL] log lines above for `upsert failed`."
+                            f"[SELF-HEAL] Ingested but no playable games found in the "
+                            f"{window_dates[0]}..{window_dates[-1]} window — verify NHL "
+                            f"schedule API is returning the expected slate."
                         )
                 except Exception as e:
                     logger.error(f"[SELF-HEAL] Re-query after ingest failed: {e}")
@@ -477,11 +505,20 @@ def run_unified_loop() -> Tuple[str, int]:
     
     try:
         with ThreadPoolExecutor(max_workers=min(len(games), 20)) as executor:
-            # Submit all games for parallel processing
-            future_to_game = {
-                executor.submit(process_single_game, g['game_id'], g.get('game_date', today)): g
-                for g in games
-            }
+            # Submit all games for parallel processing. game_date comes from
+            # nhl_games; if a row lacks game_date SKIP it rather than fall
+            # back to today (Task D-03 — falling back to today is exactly
+            # how 22,082 rows got misdated).
+            future_to_game = {}
+            for g in games:
+                gd = g.get('game_date')
+                if not gd:
+                    logger.warning(
+                        f"[scraper] skipping game_id={g.get('game_id')} — "
+                        f"nhl_games row has no game_date; refusing to fall back to today"
+                    )
+                    continue
+                future_to_game[executor.submit(process_single_game, g['game_id'], gd)] = g
             
             # Collect results as they complete
             for future in as_completed(future_to_game):
@@ -787,38 +824,48 @@ def run_unified_loop() -> Tuple[str, int]:
                 _mark_job(db_client, "landing_trueup", date_str, "failed")
                 logger.error(f"{tag} LANDING Error: {e}")
 
-    # --- CATCH-UP: Check yesterday first (if any jobs missed) ---
+    # --- CATCH-UP: Check the last 7 days (any deferred days get re-attempted) ---
+    # Per ENGINEERING.md §12.14 (2026-05-12 incident): the prior 1-day lookback
+    # caused days deferred via the live_now>0 branch to roll off the window
+    # after 24h and never be re-attempted. Widened to 7 days so a deferred day
+    # gets a fresh attempt every off-hours run for a full week.
+    #
     # CRITICAL: skip catch-up when there were no games to process and when
     # there are LIVE games today. The catch-up iterates the NHL landing
     # endpoint for all 938 season players (~30 min), which blocks the
-    # main loop and starves live game polling. If yesterday had zero
-    # games in nhl_games, there's nothing to catch up — auto-mark the
-    # jobs complete and move on.
-    yesterday_str = (now - dt.timedelta(days=1)).strftime("%Y-%m-%d")
-    if not _job_completed(db, "landing_trueup", yesterday_str):
-        # Check if yesterday had any games at all
+    # main loop and starves live game polling. If a day had zero games in
+    # nhl_games, there's nothing to catch up — auto-mark the jobs complete
+    # and move on.
+    live_now = len([g for g in games if str(g.get("status", "")).lower() in ("live", "in_progress")])
+    yesterday_str = (now - dt.timedelta(days=1)).strftime("%Y-%m-%d")  # referenced below to gate today's pipeline
+    for days_back in range(1, 8):
+        catchup_str = (now - dt.timedelta(days=days_back)).strftime("%Y-%m-%d")
+        if _job_completed(db, "landing_trueup", catchup_str):
+            continue
+        # Check if this day had any games at all
         try:
-            y_games = db.select("nhl_games", select="game_id", filters=[("game_date", "eq", yesterday_str)], limit=1)
-            had_games = bool(y_games)
+            d_games = db.select("nhl_games", select="game_id", filters=[("game_date", "eq", catchup_str)], limit=1)
+            had_games = bool(d_games)
         except Exception:
             had_games = True  # if we can't check, be safe and run catch-up
 
-        # Check if any live games are running RIGHT NOW (on today's slate)
-        live_now = len([g for g in games if str(g.get("status", "")).lower() in ("live", "in_progress")])
-
         if not had_games:
-            logger.info(f"[CATCH-UP] Yesterday ({yesterday_str}) had no games — marking complete and skipping.")
+            logger.info(f"[CATCH-UP] {catchup_str} had no games — marking complete and skipping.")
             try:
-                _mark_job(db, "landing_trueup", yesterday_str)
-                _mark_job(db, "pbp_extraction", yesterday_str)
-                _mark_job(db, "ppp_sync", yesterday_str)
+                _mark_job(db, "landing_trueup", catchup_str)
+                _mark_job(db, "pbp_extraction", catchup_str)
+                _mark_job(db, "ppp_sync", catchup_str)
             except Exception as e:
-                logger.warning(f"[CATCH-UP] Failed to auto-mark: {e}")
+                logger.warning(f"[CATCH-UP] Failed to auto-mark {catchup_str}: {e}")
         elif live_now > 0:
-            logger.info(f"[CATCH-UP] Deferring yesterday catch-up — {live_now} live game(s) being polled. Will retry in off-hours.")
+            # live_now is a today-wide condition. If we're deferring this day, we'd defer
+            # any older day too — the catch-up pipeline's heaviness doesn't depend on
+            # which historical day is being processed. Break so we don't log N defer lines.
+            logger.info(f"[CATCH-UP] Deferring catch-up for {catchup_str} (and any older incomplete days) — {live_now} live game(s) being polled. Will retry in off-hours.")
+            break
         else:
-            logger.info(f"[CATCH-UP] Yesterday ({yesterday_str}) pipeline incomplete — running catch-up...")
-            _run_nightly_pipeline(db, yesterday_str, is_catchup=True)
+            logger.info(f"[CATCH-UP] {catchup_str} pipeline incomplete — running catch-up...")
+            _run_nightly_pipeline(db, catchup_str, is_catchup=True)
 
     # --- TODAY: Run nightly pipeline (no time-window restriction) ---
     today_str = now.strftime("%Y-%m-%d")

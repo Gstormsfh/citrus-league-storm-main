@@ -1,0 +1,26 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  // Files below are unreachable from the npm-workspace import graph but are
+  // NOT dead code — they are external entry points or manually-run tooling.
+  "ignore": [
+    // Deployed Supabase Edge Functions (Deno entry points; draft-autopick
+    // removal is scheduled separately as Phase 4.5 chunk 11g.9 / KI-009).
+    "supabase/functions/**",
+    // k6 load-test suite + provisioning, run per docs/DEPLOY_RUNBOOK.md.
+    "scripts/load-test/**",
+    // Staging environment tooling, run per docs/DRAFT_ENGINE_V2_PLAN.md.
+    "scripts/staging/**",
+    // One-off operational scripts, run manually via ts-node/tsx or the
+    // Supabase SQL console. Kept intentionally (2026-06-12 purge review).
+    "scripts/**",
+    // Manual perf benchmark for draft token issuance (Performance Mandate).
+    "server/scripts/bench-draft-token.ts"
+  ],
+  "workspaces": {
+    "apps/web": {
+      // Used by scripts/import-schedule-from-excel.ts (ignored above);
+      // declared here so the hoisted install keeps the script runnable.
+      "ignoreDependencies": ["xlsx", "@types/xlsx"]
+    }
+  }
+}

@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: UTILITY
+# Purpose:     Deep analysis: compare Citrus xG model vs MoneyPuck xG on overlapping shots
+# Last active: 2026-01-05
+# Invoked:     manual analytical run
+# Reads:       raw_shots, MoneyPuck CSVs
+# Writes:      (reports)
+# ────────────────────────────────────────────────────────────
 """
 Deep analysis of MoneyPuck's xG model using their own features.
 """
@@ -14,7 +22,9 @@ print("DEEP ANALYSIS: MONEYPUCK xG MODEL")
 print("=" * 80)
 
 # Load MoneyPuck data
-mp = pd.read_csv('data/moneypuck_shots_2025.csv.csv')
+# Path updated 2026-05-05 (R5 disposition): renamed from .csv.csv → .csv
+# (the doubled extension was a manual-download naming artifact, not a script bug).
+mp = pd.read_csv('data/moneypuck_shots_2025.csv')
 print(f"\nLoaded {len(mp):,} MoneyPuck shots")
 
 # Prepare MoneyPuck features to predict their own xG

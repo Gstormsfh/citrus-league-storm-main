@@ -84,7 +84,7 @@ const News = () => {
               placeholder="Search news..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 rounded-md bg-[#1A2A20] border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+              className="pl-9 rounded-md bg-pastel-surface-tile border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
             />
           </div>
         </div>
@@ -117,7 +117,7 @@ const News = () => {
 
         {/* No results */}
         {!loading && filtered.length === 0 && (
-          <Card className="p-12 text-center bg-[#1A2A20] border-white/10">
+          <Card className="p-12 text-center bg-pastel-surface-tile border-white/10">
             <CardContent className="flex flex-col items-center gap-4">
               <Newspaper className="h-12 w-12 text-pastel-orange-soft/60" aria-hidden="true" />
               <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">
@@ -152,7 +152,7 @@ const News = () => {
             rel="noopener noreferrer"
             className="block mb-8 group"
           >
-            <Card className="overflow-hidden bg-[#1A2A20] border-2 border-white/10 hover:border-pastel-orange/40 transition-all">
+            <Card className="overflow-hidden bg-pastel-surface-tile border-2 border-white/10 hover:border-pastel-orange/40 transition-all">
               <div className="md:flex">
                 {featured.imageUrl ? (
                   <div className="md:w-2/5 h-48 md:h-auto bg-black/40">
@@ -205,7 +205,7 @@ const News = () => {
                 rel="noopener noreferrer"
                 className="group"
               >
-                <Card className="h-full overflow-hidden bg-[#1A2A20] border border-white/10 hover:border-pastel-orange/40 hover:-translate-y-0.5 transition-all">
+                <Card className="h-full overflow-hidden bg-pastel-surface-tile border border-white/10 hover:border-pastel-orange/40 hover:-translate-y-0.5 transition-all">
                   {article.imageUrl ? (
                     <div className="h-40 bg-black/40">
                       <img

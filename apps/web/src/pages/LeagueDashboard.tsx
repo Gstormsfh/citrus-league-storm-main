@@ -512,7 +512,7 @@ const LeagueDashboard = () => {
 
     setProcessingWaivers(true);
     try {
-      const result = await WaiverService.processAllPendingWaivers();
+      const result = await WaiverService.processAllPendingWaivers(leagueId);
 
       if (!result.success) {
         toast({

@@ -31,7 +31,7 @@ export function BracketTile({
   isLive?: boolean;
 }) {
   return (
-    <div className="bg-[#1A2A20] border border-white/10 rounded-2xl p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+    <div className="bg-pastel-surface-tile border border-white/10 rounded-2xl p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
         <div>
           <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 font-bold flex items-center gap-2">

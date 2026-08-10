@@ -157,14 +157,14 @@ const GMOffice = () => {
   ]);
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream relative">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
       </div>
 
       {/* MOBILE: Compact sticky header */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">GM's Office</h1>
@@ -177,7 +177,7 @@ const GMOffice = () => {
           <div className={cn(
             "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
             userLeagueState === 'active-user' && activeLeagueId
-              ? "lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px]"
+              ? "lg:grid-cols-[200px_1fr_280px] xl:grid-cols-[220px_1fr_340px]"
               : "lg:grid-cols-[200px_1fr] xl:grid-cols-[220px_1fr]"
           )}>
             {/* Main Content - Appears first on mobile */}
@@ -232,7 +232,7 @@ const GMOffice = () => {
                   <div
                     role="status"
                     aria-live="polite"
-                    className="flex items-center justify-between gap-3 rounded-2xl ring-1 ring-pastel-orange/40 bg-[#1A2A20] px-4 py-3 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]"
+                    className="flex items-center justify-between gap-3 rounded-2xl ring-1 ring-pastel-orange/40 bg-pastel-surface-tile px-4 py-3 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <Trophy className="w-5 h-5 text-pastel-orange shrink-0" aria-hidden="true" />
@@ -272,7 +272,7 @@ const GMOffice = () => {
                     const ActionIcon = action.icon;
                     const cardInner = (
                       <div className={cn(
-                        "h-full relative overflow-hidden rounded-2xl bg-[#1A2A20] ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]",
+                        "h-full relative overflow-hidden rounded-2xl bg-pastel-surface-tile ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]",
                         isLocked
                           ? "opacity-50 cursor-not-allowed grayscale"
                           : "transition-all duration-300 hover:-translate-y-0.5 hover:ring-pastel-orange/40 hover:shadow-[0_24px_60px_-16px_rgba(255,168,87,0.25)] cursor-pointer",
@@ -303,7 +303,7 @@ const GMOffice = () => {
                               <ActionIcon className="h-7 w-7 text-pastel-orange" strokeWidth={1.75} />
                             </div>
                             {action.hasNewInsight && (
-                              <span className="absolute -top-1.5 -right-1.5 bg-pastel-orange ring-2 ring-[#1A2A20] text-[#0F1F15] text-[8px] font-jbmono uppercase tracking-[0.18em] font-bold px-1.5 py-0.5 rounded-md">
+                              <span className="absolute -top-1.5 -right-1.5 bg-pastel-orange ring-2 ring-pastel-surface-tile text-pastel-surface text-[8px] font-jbmono uppercase tracking-[0.18em] font-bold px-1.5 py-0.5 rounded-md">
                                 New
                               </span>
                             )}
@@ -400,7 +400,7 @@ const GMOffice = () => {
             {/* Right Sidebar - Notifications (hidden on mobile) - Extends to edge */}
             {userLeagueState === 'active-user' && activeLeagueId && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>
               </aside>

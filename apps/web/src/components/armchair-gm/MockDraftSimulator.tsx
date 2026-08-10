@@ -211,7 +211,8 @@ const MockDraftSimulator = () => {
   if (!draftStarted) {
     return (
       <div className="space-y-6">
-        <Card className="p-6 bg-white/80 border-2 border-citrus-sage/30">
+        {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
+        <Card className="p-6 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl bg-citrus-sage/20">
               <Trophy className="w-6 h-6 text-citrus-sage" />
@@ -284,7 +285,8 @@ const MockDraftSimulator = () => {
   return (
     <div className="space-y-4">
       {/* Draft Header */}
-      <Card className="p-4 bg-white/80 border-2 border-citrus-sage/30">
+      {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
+      <Card className="p-4 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <div className="flex items-center gap-2">
@@ -318,7 +320,8 @@ const MockDraftSimulator = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Available Players */}
         <div className="lg:col-span-2">
-          <Card className="p-3 bg-white/80 border-2 border-citrus-sage/30">
+          {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
+          <Card className="p-3 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest">
             <h3 className="font-bold text-sm mb-2 flex items-center gap-2">
               <Users className="w-4 h-4" />
               Available Players
@@ -386,7 +389,8 @@ const MockDraftSimulator = () => {
 
         {/* My Picks Sidebar */}
         <div>
-          <Card className="p-3 bg-white/80 border-2 border-citrus-sage/30 mb-4">
+          {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
+          <Card className="p-3 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest mb-4">
             <h3 className="font-bold text-sm mb-2">Your Roster ({myPicks.length})</h3>
             <div className="space-y-1">
               {myPicks.map(pick => {
@@ -406,7 +410,8 @@ const MockDraftSimulator = () => {
           </Card>
 
           {/* Draft Board Toggle */}
-          <Card className="p-3 bg-white/80 border-2 border-citrus-sage/30">
+          {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
+          <Card className="p-3 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest">
             <button
               onClick={() => setShowBoard(!showBoard)}
               className="flex items-center justify-between w-full text-sm font-bold"

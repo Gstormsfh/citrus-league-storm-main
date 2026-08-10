@@ -67,7 +67,7 @@ export const CitrusCard = forwardRef<HTMLDivElement, CitrusCardProps>(
           e.currentTarget.style.boxShadow = '0 0 0 0 transparent';
         }}
         className={cn(
-          'relative bg-[#1A2A20] rounded-2xl ring-1 transition-all duration-300 ease-out',
+          'relative bg-pastel-surface-tile rounded-2xl ring-1 transition-all duration-300 ease-out',
           ACCENT_RING[accent],
           PADDING[padding],
           interactive && 'cursor-pointer hover:-translate-y-0.5',

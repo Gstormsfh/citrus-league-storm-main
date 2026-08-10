@@ -51,10 +51,10 @@ export const ACCENT_CLASSES: Record<
     chip: 'bg-pastel-sage/15 text-pastel-sage-soft ring-pastel-sage/30',
   },
   butter: {
-    bg: 'bg-[#F4E5B8]/15',
-    ring: 'ring-[#F4E5B8]/40',
-    text: 'text-[#F4E5B8]',
-    chip: 'bg-[#F4E5B8]/10 text-[#F4E5B8] ring-[#F4E5B8]/30',
+    bg: 'bg-pastel-butter/15',
+    ring: 'ring-pastel-butter/40',
+    text: 'text-pastel-butter',
+    chip: 'bg-pastel-butter/10 text-pastel-butter ring-pastel-butter/30',
   },
   peach: {
     bg: 'bg-pastel-peach/20',

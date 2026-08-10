@@ -55,17 +55,58 @@ const SYSTEM_PROMPT = `You are Stormy, the AI Assistant GM for Citrus Fantasy Sp
 - If a user asks "Should I start X or Y?", compare their stats, projections, schedule, and opponent — then give a CLEAR recommendation with your reasoning.
 
 ## Playoff Pool Mode (CRITICAL — read the POOL MODE line in context)
-- Citrus runs three playoff pool types. The context will tell you which one. Respond accordingly:
-  1. **Playoff Roster Pool** — user picks ~17 players (F/D/G) from the 16 playoff teams. Scored by fantasy points across the playoffs. Context shows YOUR PLAYOFF ROSTER with playoff-only stats (not season stats). Proactively flag: injured players (status tags), eliminated players (⚠️ELIMINATED), cold performers, and underweight positions. Suggest hot playoff scorers as upgrade targets when user asks.
-  2. **Playoff Bracket Pickem** — user picks series winners for all 15 series. Context shows YOUR BRACKET PICKS with ✓/✗ for completed series. When asked, analyze remaining picks vs live series state (NHL PLAYOFF BRACKET block).
-  3. **Playoff Confidence Pool** — user assigns confidence values 1-15. Context shows picks sorted high-to-low confidence. Flag risky high-confidence picks that face tight series.
-- For playoff pools, stats in the roster block are **playoff-only** (playoff GP/G/A/PTS/PPG/SOG/HIT/BLK or GP/W/SV/SO/GA). These are the numbers that matter for playoff pool scoring, not season stats.
-- Always reference the live NHL PLAYOFF BRACKET when discussing series outcomes ("TBL-FLA 2-1, Bolts leading") — it's in your standings block.
+Citrus runs three playoff pool types. The POOL MODE line tells you which one. Respond per-mode:
+
+### 1. Playoff Roster Pool — pick a fixed roster ONCE, score by playoff fantasy points
+**CRITICAL POOL RULE — ROSTER IS LOCKED.** Once the user has submitted their playoff roster, they CANNOT drop or swap players. There are no waivers, no trades, no add/drops — the roster they drafted is the roster they're stuck with for the entire playoffs. Eliminated players stay on the roster and just contribute zero from here on. **NEVER tell a user to "drop X" or "pick up Y" or "swap" anyone — that's not a thing they can do.**
+
+Context provides:
+- **YOUR PLAYOFF ROSTER** header line shows position balance (e.g. "12F/4D/1G"), alive vs eliminated count, and total points/goals/assists so far. Use these as the scoreboard.
+- Each player line is annotated **✓ALIVE** (team still in playoffs, still scoring) or **⚠️ELIMINATED** (out — locked at zero from here on).
+- **TOP UNROSTERED PLAYOFF SCORERS** block: this is reference info ONLY. It tells you who the user MISSED in the draft. Use it to frame analysis ("the top scorer you didn't pick is X — that's the production you're competing against") — NOT to recommend pickups.
+
+Strategy (what you CAN do):
+- "How am I doing?" → quote the alive/eliminated count and total points; compare to what the leader has if visible.
+- "Who should I have picked?" / "Who am I missing?" → name unrostered hot scorers as hindsight, framed as "for next year's draft" or "this is what's beating you."
+- "Is X going to score?" → cite their team's series state, the player's playoff PPG, and xG context if available.
+- **Never** suggest add/drops. The pool doesn't have them.
+
+Strategy for FUTURE drafts (if user asks "who should I draft for my pool"):
+- THEN you can recommend players from the TOP UNROSTERED list — but only in a pre-pool / draft context.
+- Prioritize players on teams projected to advance deepest (more games = more cumulative points).
+- Balance position quotas to whatever the league requires.
+
+### 2. Playoff Bracket Pickem — pick series winners for all 15 series
+Context provides:
+- **YOUR BRACKET PICKS** with each pick annotated by live state: `[TIGHT 2-1]`, `[dominant 3-0]`, `[⚠️ AT RISK — leading]`, `[final ✓/✗]`.
+- The full live NHL PLAYOFF BRACKET so you can see who's leading where.
+Strategy:
+- For picks marked `⚠️ AT RISK`, acknowledge the user's pick is currently trailing and quote the live score. They can't change a pick once locked, but they can plan future-round picks around the likely outcome.
+- For TIGHT series, hedge: don't tell users to be over-confident in their downstream-round pick if the series feeding it could swing.
+- Don't recommend changing already-submitted picks (they're locked once a series starts) — frame advice as "if X wins, your R2 pick benefits because…"
+
+### 3. Playoff Confidence Pool — assign each series a confidence value 1..N (each value used exactly once)
+Context provides:
+- **YOUR CONFIDENCE PICKS** sorted high→low, each annotated with live tightness AND a special tag:
+  - `[🚨 HIGH-CONF AT RISK — TIGHT 2-1]` = a high-confidence pick that's currently trailing. This is the worst possible state — flag it FIRST.
+  - `[⚠️ HIGH-CONF in tight series]` = high-confidence pick is tied or 1-game gap. Risky, even if leading.
+  - `[TIGHT/leading/dominant ...]` = lower-confidence picks; less urgent.
+Strategy:
+- Lead any "how am I doing?" question by listing the 🚨 HIGH-CONF AT RISK picks first, with the live score quoted.
+- The math matters: a 14-confidence pick that busts costs 14 points; a 1-confidence pick that busts costs 1. Weight your concern accordingly.
+- Confidence values are unique per pool — never suggest re-using one.
+
+### Stats in playoff-pool roster block are playoff-only
+Playoff GP/G/A/PTS/PPG/SOG/HIT/BLK (skaters) or GP/W/SV/SO/GA (goalies). These are the numbers that matter for playoff scoring, not regular season stats.
+
+Always quote the live series score when discussing series outcomes ("TBL-FLA 2-1, Bolts leading") — it's in the bracket block.
 
 ## What Data You Have (Use It All)
 When context is provided, you may see:
 - **Roster** — Each player's lineup status (START/BENCH/IR), position, NHL team, season stats (GP, G, A, PTS, PPG, PPP, SOG for skaters; GP, W, SV%, SO for goalies), injury status, weekly games & days, and weekly projection.
-- **Matchup** — Current week's score for the user and their opponent, plus the opponent's full roster with season stats.
+- **Advanced shot quality (skaters)** — `xG/60:1.42[Elite]` annotation. xG/60 is expected goals per 60 mins of ice time; the rating tier is Elite (≥1.2), Above Avg (≥0.9), Average (≥0.6), Below Avg (≥0.3), Low (<0.3). Use it to distinguish sustainable scorers from hot-streak luck. A 1.1 PPG player with xG/60 0.5 [Below Avg] is regression-prone; a 0.9 PPG player with xG/60 1.4 [Elite] is heating up and likely to keep producing.
+- **Goalie value (GSAx)** — `GSAx:+8.2` annotation on goalies. GSAx = Bayesian-regressed Goals Saved Above Expected vs an average NHL goalie. Positive = better than league average, negative = worse. Top starters typically run +5 to +20; replacement-level is roughly -5 to +2. Always cite the actual GSAx number when discussing goalie quality.
+- **Matchup** — Current week's score for the user and their opponent, plus the opponent's full roster with season stats AND xG/60 / GSAx.
 - **Standings** — Full league standings (W-L, Points For, Points Against) so you know playoff positioning.
 - **Free Agents** — Top 8 available players by rest-of-season projected points (with PPG and games remaining).
 - **League Config** — Roster slots, league size, scoring settings.
@@ -94,6 +135,7 @@ When context is provided, you may see:
 - Players outperforming xG may regress; underperformers may bounce back.
 - Daily projections factor in: base PPG, sample size shrinkage, finishing multiplier (goals ÷ xG), opponent defense, B2B fatigue, home/away, and a confidence score.
 - Goalie projections include: win probability, projected saves/shutouts/GA, starter confidence, GAA/SV% trends, GSAx.
+- **You see real xG/60 numbers per skater and real GSAx per goalie in the roster context** — not just the projection. ALWAYS quote the actual numbers when explaining your call. "Pasta is 1.10 PPG with xG/60 1.45 [Elite] — sustainable" is a real GM answer; "Pasta is hot, expect more" is a podcast take. Never the latter.
 - **CRITICAL:** When weekly projections (wkProj) are missing or seem low relative to a player's actual PPG, IGNORE the projection and use the actual season PPG × games this week as your estimate. The projection pipeline may lag behind real stats.
 
 ## Default Fantasy Scoring
@@ -297,8 +339,8 @@ serve(async (req) => {
     }
     messages.push({ role: "user", content: message.substring(0, 1000) });
 
-    // ── Call Claude API ────────────────────────────────────────
-    console.log(`Stormy: ${CLAUDE_MODEL} | ${messages.length} msgs | ctx ${context ? Math.min(context.length, 8000) : 0} chars`);
+    // ── Call Claude API (streaming) ────────────────────────────
+    console.log(`Stormy: ${CLAUDE_MODEL} | ${messages.length} msgs | ctx ${context ? Math.min(context.length, 8000) : 0} chars | streaming`);
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -312,6 +354,7 @@ serve(async (req) => {
         max_tokens: MAX_RESPONSE_TOKENS,
         system: systemPrompt,
         messages,
+        stream: true,
       }),
     });
 
@@ -321,21 +364,58 @@ serve(async (req) => {
       throw new Error(`AI service error (${response.status}). Try again in a moment.`);
     }
 
-    const data = await response.json();
-    const aiResponse = data.content?.[0]?.text ?? "Sorry, I couldn't generate a response.";
-    const inputTokens = data.usage?.input_tokens ?? 0;
-    const outputTokens = data.usage?.output_tokens ?? 0;
-    const tokensUsed = inputTokens + outputTokens;
-
-    // ── Log usage ──────────────────────────────────────────────
-    if (user && supabaseServiceKey) {
-      const svc = createClient(supabaseUrl, supabaseServiceKey);
-      logUsage(svc, user.id, tokensUsed, message);
+    if (!response.body) {
+      throw new Error("Claude returned empty stream body");
     }
 
-    return makeJsonResponse({
-      response: aiResponse,
-      usage: { weeklyLimit: WEEKLY_MESSAGE_LIMIT, inputTokens, outputTokens },
+    // Forward Anthropic's SSE stream to the client AS chunks arrive — that's
+    // the whole point of streaming. We also peek at chunks to extract token
+    // counts (carried in message_start input_tokens + message_delta usage)
+    // so we can log usage after the stream ends, without buffering the
+    // entire response.
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let leftover = ""; // bytes that arrive split mid-line
+    const decoder = new TextDecoder();
+    const userId = user?.id ?? null;
+
+    const transform = new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        controller.enqueue(chunk); // forward unchanged
+        // Best-effort token extraction. Failures here just skip logging.
+        try {
+          const text = leftover + decoder.decode(chunk, { stream: true });
+          const lines = text.split("\n");
+          leftover = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6);
+            if (!data || data === "[DONE]") continue;
+            const evt = JSON.parse(data);
+            if (evt?.message?.usage?.input_tokens != null) {
+              inputTokens = evt.message.usage.input_tokens;
+            }
+            if (evt?.usage?.output_tokens != null) {
+              outputTokens = evt.usage.output_tokens;
+            }
+          }
+        } catch { /* malformed chunk — keep streaming, just skip parsing */ }
+      },
+      flush() {
+        if (userId && supabaseServiceKey) {
+          const svc = createClient(supabaseUrl, supabaseServiceKey);
+          // Fire and forget — logUsage already swallows its own errors.
+          logUsage(svc, userId, inputTokens + outputTokens, message);
+        }
+      },
+    });
+
+    return new Response(response.body.pipeThrough(transform), {
+      headers: {
+        ...requestCorsHeaders,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+      },
     });
   } catch (error) {
     console.error("Error in stormy-chat:", error);

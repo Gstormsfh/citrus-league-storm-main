@@ -9,7 +9,7 @@ const VARIANTS = [
     desc:
       "Section-by-section port of sleeper.com: top promo banner, year-stamped hero with floating UI card stack, horizontal game-mode carousel with player-count badges, Get-Started promos, Pick-Your-Way 4-col grid, testimonials, FAQ, multi-column footer with download CTAs.",
     accent: '#FF6B1A',
-    bg: 'from-[#0F1F15] to-[#1A2A20]',
+    bg: 'from-pastel-surface to-pastel-surface-tile',
     icon: Trophy,
   },
   {
@@ -19,7 +19,7 @@ const VARIANTS = [
     desc:
       "Sleeper.com structure on dark forest. Hero shows actual inline live game tile + league standings card (no projections). Horizontal carousel of game modes.",
     accent: '#FF8A3D',
-    bg: 'from-[#0F1F15] to-[#1A2A20]',
+    bg: 'from-pastel-surface to-pastel-surface-tile',
     icon: Activity,
   },
   {
@@ -39,7 +39,7 @@ const VARIANTS = [
     desc:
       "Dark forest hero on top (sport identity), cream dashboard tiles below (Stormy AI chat + league standings). Joined by a literal rink-board divider.",
     accent: '#84A57D',
-    bg: 'from-[#0F1F15] via-[#0F1F15] to-[#FFF8F0]',
+    bg: 'from-pastel-surface via-pastel-surface to-pastel-cream',
     icon: Activity,
   },
 ];
@@ -56,7 +56,7 @@ const PRIOR = [
 
 export default function PreviewIndex() {
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative overflow-x-hidden">
+    <div className="min-h-screen bg-pastel-surface text-pastel-cream relative overflow-x-hidden">
       {/* Atmospheric glow */}
       <div
         aria-hidden="true"
@@ -86,7 +86,7 @@ export default function PreviewIndex() {
             <Link
               to={`/preview-${v.slug}`}
               key={v.slug}
-              className="group block bg-[#1A2A20] ring-1 ring-white/10 rounded-[24px] p-5 hover:-translate-y-1 hover:ring-pastel-orange/40 transition-all"
+              className="group block bg-pastel-surface-tile ring-1 ring-white/10 rounded-[24px] p-5 hover:-translate-y-1 hover:ring-pastel-orange/40 transition-all"
             >
               <div
                 className={`aspect-[4/3] rounded-[18px] mb-5 bg-gradient-to-br ${v.bg} ring-1 ring-white/10 flex items-center justify-center relative overflow-hidden`}

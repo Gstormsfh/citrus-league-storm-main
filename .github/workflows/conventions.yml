@@ -1,0 +1,47 @@
+name: Conventions
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-title:
+    name: PR Title (Conventional Commits)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The PR title becomes the squash commit subject on master, so it must
+      # follow Conventional Commits (see CLAUDE.md "Commit Messages").
+      - name: Validate PR title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "PR title: $TITLE"
+          if ! printf '%s' "$TITLE" | grep -qE '^(feat|fix|refactor|perf|style|test|docs|build|ops|chore)(\([a-z0-9._-]+\))?!?: [a-z0-9]'; then
+            echo "::error::PR title must follow Conventional Commits: <type>(<scope>): <lowercase description>. Types: feat|fix|refactor|perf|style|test|docs|build|ops|chore. See CLAUDE.md."
+            exit 1
+          fi
+          if printf '%s' "$TITLE" | grep -qE '\.$'; then
+            echo "::error::PR title must not end with a period."
+            exit 1
+          fi
+
+  branch-name:
+    name: Branch Name (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Advisory only: auto-generated agent branches (claude/*) can't choose
+      # their names, and squash-merge keeps branch names out of history.
+      - name: Check branch naming convention
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          if ! printf '%s' "$BRANCH" | grep -qE '^(feat|fix|refactor|perf|style|test|docs|build|ops|chore)/[a-z0-9][a-z0-9._/-]*$'; then
+            echo "::warning::Branch '$BRANCH' does not follow the prefix/short-slug convention (see CLAUDE.md). Prefer feat|fix|refactor|perf|style|test|docs|build|ops|chore + /short-slug."
+          else
+            echo "Branch name OK: $BRANCH"
+          fi

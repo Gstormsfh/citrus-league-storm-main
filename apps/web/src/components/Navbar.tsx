@@ -139,9 +139,9 @@ const Navbar = () => {
       ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-[#0F1F15]/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-white/10">
+    <header className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-pastel-surface/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-white/10">
       {/* ===== ROW 1: Brand bar ===== */}
-      <div className="hidden lg:block bg-[#0F1F15] border-b border-white/5">
+      <div className="hidden lg:block bg-pastel-surface border-b border-white/5">
         <div className="w-full px-6 h-12 flex items-center justify-between">
           {/* Left: Logo + League switcher */}
           <div className="flex items-center gap-6">
@@ -182,7 +182,7 @@ const Navbar = () => {
                     <ChevronDown className="h-3.5 w-3.5 text-white/45" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-64 bg-[#1A2A20] border-white/10 text-pastel-cream">
+                <DropdownMenuContent align="start" className="w-64 bg-pastel-surface-tile border-white/10 text-pastel-cream">
                   <DropdownMenuLabel className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">
                     My Leagues ({userLeagues.length})
                   </DropdownMenuLabel>
@@ -258,7 +258,7 @@ const Navbar = () => {
                       <ChevronDown className="h-3.5 w-3.5 text-white/45 hidden xl:block" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48 bg-[#1A2A20] border-white/10 text-pastel-cream">
+                  <DropdownMenuContent align="end" className="w-48 bg-pastel-surface-tile border-white/10 text-pastel-cream">
                     <DropdownMenuLabel className="text-[13px] font-bold text-pastel-cream">{displayName}</DropdownMenuLabel>
                     <DropdownMenuSeparator className="bg-white/10" />
                     <DropdownMenuItem asChild className="text-pastel-cream focus:bg-white/5 focus:text-pastel-cream">
@@ -382,7 +382,7 @@ const Navbar = () => {
 
       {/* ===== MOBILE: Slide-in menu ===== */}
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-[#0F1F15]/98 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
+        <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-pastel-surface/98 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
           <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3">
             {/* League context + switcher */}
             {user && !leagueLoading && userLeagues.length === 0 && (
@@ -416,7 +416,7 @@ const Navbar = () => {
                       <ChevronDown className="h-3.5 w-3.5 text-white/45 flex-shrink-0" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-w-[320px] bg-[#1A2A20] border-white/10 text-pastel-cream">
+                  <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-w-[320px] bg-pastel-surface-tile border-white/10 text-pastel-cream">
                     <DropdownMenuLabel className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">
                       My Leagues ({userLeagues.length})
                     </DropdownMenuLabel>

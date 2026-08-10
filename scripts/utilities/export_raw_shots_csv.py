@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+# CATEGORY: ACTIVE
+# Purpose:     Export prod raw_shots to CSV for training / analysis (--training flag for xG v3)
+# Last active: 2026-02-18
+# Invoked:     manual operator run before training; documented in TRAINING_DATA_MANIFEST.md
+# Reads:       raw_shots
+# Writes:      data/shots_full_features_2025.csv
+# ────────────────────────────────────────────────────────────
 """
 export_raw_shots_csv.py
 
@@ -7,6 +15,11 @@ Exports the full `raw_shots` table from Supabase to a local CSV (batched/paginat
 Why this exists:
 - Avoids re-scraping NHL API (works entirely from Supabase)
 - Produces a stable "season snapshot" file for spreadsheets / comparisons
+
+NOTE: raw_shots is MULTI-SEASON since phase 0c (seasons 2017-2024
+backfilled alongside the current season). This exporter now emits the full
+historical corpus unless the caller adds a season filter. Consider slicing
+downstream if you specifically wanted a single-season snapshot.
 """
 
 from __future__ import annotations

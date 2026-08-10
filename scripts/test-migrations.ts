@@ -1,3 +1,11 @@
+// CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
+// CATEGORY: ACTIVE
+// Purpose:     End-to-end migration smoke test (npm run test-migrations)
+// Last active: 2026-01-17
+// Invoked:     package.json scripts; CI gate
+// Reads:       supabase/migrations/*.sql
+// Writes:      stdout
+// ────────────────────────────────────────────────────────────
 /**
  * Migration Test Suite
  * 

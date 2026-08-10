@@ -11,7 +11,7 @@ const GLOW_COLOR: Record<AccentName, string> = {
 const RING_COLOR: Record<AccentName, string> = {
   orange: 'hover:border-pastel-orange/60',
   sage: 'hover:border-pastel-sage/60',
-  butter: 'hover:border-[#F4E5B8]/60',
+  butter: 'hover:border-pastel-butter/60',
   peach: 'hover:border-pastel-peach/60',
 };
 
@@ -46,7 +46,7 @@ export function GlowCard({
 
   return (
     <div
-      className={`group relative bg-[#1A2A20] border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 ease-out hover:-translate-y-1 ${ring} ${className}`}
+      className={`group relative bg-pastel-surface-tile border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 ease-out hover:-translate-y-1 ${ring} ${className}`}
       style={{
         boxShadow: '0 0 0 0 transparent',
       }}

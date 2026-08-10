@@ -84,8 +84,8 @@ const baseClasses = cn(
   'disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 disabled:translate-y-0',
   // Focus ring per DESIGN_DIRECTION.md rule 4: peach family, 2px
   // offset 2, never suppressed. Warm peach-deep reads on both light
-  // and dark surfaces; #0F1F15 offset matches the citrus2 page bg.
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pastel-peach-deep focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F1F15]',
+  // and dark surfaces; pastel-surface offset matches the citrus2 page bg.
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pastel-peach-deep focus-visible:ring-offset-2 focus-visible:ring-offset-pastel-surface',
   'whitespace-nowrap',
 );
 
