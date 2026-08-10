@@ -91,34 +91,34 @@ export const WinProbabilityBar = ({
       <div className="mt-2">
         <div className="flex justify-between items-center mb-1">
           <div className="flex items-center gap-1">
-            <span className="font-varsity text-[9px] text-citrus-forest uppercase">
+            <span className="font-varsity text-[9px] text-pastel-cream uppercase">
               Win Prob
             </span>
             {hasSimulation && (
-              <Activity className="w-2.5 h-2.5 text-citrus-sage opacity-60" />
+              <Activity className="w-2.5 h-2.5 text-pastel-sage opacity-60" />
             )}
           </div>
-          <span className="font-display font-bold text-xs text-citrus-forest">
+          <span className="font-display font-bold text-xs text-pastel-cream">
             {displayProb}%
           </span>
         </div>
-        <div className="h-3 rounded-full overflow-hidden border border-citrus-forest bg-[#E8EED9]/50">
+        <div className="h-3 rounded-full overflow-hidden border border-white/10 bg-[#1A2A20]">
           <div className="flex h-full transition-all duration-700 ease-out">
             <div
-              className="bg-citrus-sage"
+              className="bg-pastel-sage"
               style={{ width: `${displayProb}%` }}
             />
-            <div className="bg-citrus-peach flex-grow" />
+            <div className="bg-pastel-sage/15 flex-grow" />
           </div>
         </div>
         {/* Compact simulation details */}
         {hasSimulation && (
           <div className="flex justify-between mt-1">
-            <span className="text-[8px] font-mono text-citrus-charcoal/50">
+            <span className="text-[8px] font-mono text-white/55/50">
               {simulation.team1Projected.toFixed(1)} vs{" "}
               {simulation.team2Projected.toFixed(1)} proj
             </span>
-            <span className="text-[8px] font-mono text-citrus-charcoal/50">
+            <span className="text-[8px] font-mono text-white/55/50">
               {simulation.nSims.toLocaleString()} sims
             </span>
           </div>
@@ -135,7 +135,7 @@ export const WinProbabilityBar = ({
       {/* Header row */}
       <div className="mb-2 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <span className="font-varsity text-xs text-citrus-forest uppercase">
+          <span className="font-varsity text-xs text-pastel-cream uppercase">
             Win Probability
           </span>
           {hasSimulation && (
@@ -147,21 +147,21 @@ export const WinProbabilityBar = ({
             </span>
           )}
           {isStale && (
-            <span className="text-[9px] font-mono text-citrus-charcoal/40">
+            <span className="text-[9px] font-mono text-white/55/40">
               updating...
             </span>
           )}
         </div>
-        <span className="font-display font-bold text-citrus-forest">
+        <span className="font-display font-bold text-pastel-cream">
           {displayProb}%
         </span>
       </div>
 
       {/* Win probability bar */}
-      <div className="h-8 rounded-full overflow-hidden border-3 border-citrus-forest bg-[#E8EED9]/50 backdrop-blur-sm shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]">
+      <div className="h-8 rounded-full overflow-hidden border-3 border-white/10 bg-[#1A2A20] backdrop-blur-sm shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]">
         <div className="flex h-full transition-all duration-700 ease-out">
           <div
-            className="bg-citrus-sage relative"
+            className="bg-pastel-sage relative"
             style={{ width: `${displayProb}%` }}
           >
             {/* Win percentage label inside the bar */}
@@ -172,7 +172,7 @@ export const WinProbabilityBar = ({
             )}
           </div>
           <div
-            className="bg-citrus-peach relative flex-grow"
+            className="bg-pastel-sage/15 relative flex-grow"
             style={{ width: `${100 - displayProb}%` }}
           >
             {/* Loss percentage label */}
@@ -189,59 +189,59 @@ export const WinProbabilityBar = ({
       {hasSimulation && (
         <div className="mt-3 grid grid-cols-3 gap-2">
           {/* Projected Points */}
-          <div className="bg-[#E8EED9]/40 rounded-lg px-2.5 py-1.5 border border-citrus-sage/20">
-            <div className="text-[9px] font-varsity text-citrus-charcoal/60 uppercase">
+          <div className="bg-[#1A2A20] rounded-lg px-2.5 py-1.5 border border-pastel-sage/20">
+            <div className="text-[9px] font-varsity text-white/55/60 uppercase">
               Projected
             </div>
-            <div className="font-mono text-xs text-citrus-forest">
+            <div className="font-mono text-xs text-pastel-cream">
               <span className="font-bold">
                 {simulation.team1Projected.toFixed(1)}
               </span>
-              <span className="text-citrus-charcoal/40 mx-1">vs</span>
+              <span className="text-white/55/40 mx-1">vs</span>
               <span className="font-bold">
                 {simulation.team2Projected.toFixed(1)}
               </span>
             </div>
-            <div className="text-[8px] font-mono text-citrus-charcoal/40">
+            <div className="text-[8px] font-mono text-white/55/40">
               ±{simulation.team1Std.toFixed(1)} / ±{simulation.team2Std.toFixed(1)}
             </div>
           </div>
 
           {/* Margin */}
-          <div className="bg-[#E8EED9]/40 rounded-lg px-2.5 py-1.5 border border-citrus-sage/20">
-            <div className="text-[9px] font-varsity text-citrus-charcoal/60 uppercase">
+          <div className="bg-[#1A2A20] rounded-lg px-2.5 py-1.5 border border-pastel-sage/20">
+            <div className="text-[9px] font-varsity text-white/55/60 uppercase">
               Margin
             </div>
             <div className="flex items-center gap-1">
               {simulation.marginMean > 0 ? (
-                <TrendingUp className="w-3 h-3 text-citrus-sage" aria-hidden="true" />
+                <TrendingUp className="w-3 h-3 text-pastel-sage" aria-hidden="true" />
               ) : (
-                <TrendingDown className="w-3 h-3 text-citrus-peach" />
+                <TrendingDown className="w-3 h-3 text-pastel-cream" />
               )}
-              <span className="font-mono text-xs font-bold text-citrus-forest">
+              <span className="font-mono text-xs font-bold text-pastel-cream">
                 {simulation.marginMean > 0 ? "+" : ""}
                 {simulation.marginMean.toFixed(1)}
               </span>
             </div>
-            <div className="text-[8px] font-mono text-citrus-charcoal/40">
+            <div className="text-[8px] font-mono text-white/55/40">
               ±{simulation.marginStd.toFixed(1)} std
             </div>
           </div>
 
           {/* Tail Risk */}
-          <div className="bg-[#E8EED9]/40 rounded-lg px-2.5 py-1.5 border border-citrus-sage/20">
-            <div className="text-[9px] font-varsity text-citrus-charcoal/60 uppercase">
+          <div className="bg-[#1A2A20] rounded-lg px-2.5 py-1.5 border border-pastel-sage/20">
+            <div className="text-[9px] font-varsity text-white/55/60 uppercase">
               Tail Risk
             </div>
-            <div className="font-mono text-[10px] text-citrus-forest space-y-0.5">
+            <div className="font-mono text-[10px] text-pastel-cream space-y-0.5">
               <div className="flex justify-between">
-                <span className="text-citrus-charcoal/50">Win 20+</span>
+                <span className="text-white/55/50">Win 20+</span>
                 <span className="font-bold">
                   {(simulation.pBlowoutWin * 100).toFixed(1)}%
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-citrus-charcoal/50">Lose 20+</span>
+                <span className="text-white/55/50">Lose 20+</span>
                 <span className="font-bold">
                   {(simulation.pBlowoutLoss * 100).toFixed(1)}%
                 </span>
@@ -254,11 +254,11 @@ export const WinProbabilityBar = ({
       {/* Simulation metadata */}
       {hasSimulation && (
         <div className="mt-2 flex justify-between items-center">
-          <span className="text-[8px] font-mono text-citrus-charcoal/30">
+          <span className="text-[8px] font-mono text-white/55/30">
             95% CI: ({(simulation.ci95[0] * 100).toFixed(1)}%,{" "}
             {(simulation.ci95[1] * 100).toFixed(1)}%)
           </span>
-          <span className="text-[8px] font-mono text-citrus-charcoal/30">
+          <span className="text-[8px] font-mono text-white/55/30">
             {simulation.nSims.toLocaleString()} Monte Carlo simulations
           </span>
         </div>

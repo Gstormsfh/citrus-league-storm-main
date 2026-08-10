@@ -244,7 +244,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         !isBench && positionColors,
         player.isToday && !isBench && 'ring-2 ring-primary/30',
         isBench && 'opacity-40 grayscale bg-muted/50 border-muted',
-        player.wasDropped && !isBench && 'border-citrus-orange/30 bg-citrus-orange/5 opacity-95'
+        player.wasDropped && !isBench && 'border-pastel-orange/30 bg-pastel-orange/5 opacity-95'
       )}
       onClick={() => onPlayerClick?.(player)}
     >
@@ -271,7 +271,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               {player.wasDropped ? (
                 <Badge 
                   variant="secondary"
-                  className="ml-1 text-[9px] px-1 py-0 border-citrus-orange/40 bg-citrus-orange/20 text-citrus-orange font-semibold"
+                  className="ml-1 text-[9px] px-1 py-0 border-pastel-orange/40 bg-pastel-orange/20 text-pastel-orange font-semibold"
                   title="Player was dropped but points still count from when they were in the lineup"
                 >
                   Dropped
@@ -307,7 +307,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     {/* Opponent logo + abbrev */}
                     <div className="flex items-center gap-0.5">
                       <img loading="lazy" decoding="async" src={logoUrl} alt={opponent || ''} className="w-3.5 h-3.5 object-contain" />
-                      <span className="text-[10px] font-display font-semibold text-citrus-charcoal/60">{opPrefix} {opponent}</span>
+                      <span className="text-[10px] font-display font-semibold text-white/60">{opPrefix} {opponent}</span>
                     </div>
                     {/* Live badge + score */}
                     {isLive && (
@@ -317,7 +317,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                       </span>
                     )}
                     {isLive && hasScores && (
-                      <span className="text-[10px] font-display font-bold text-citrus-forest">
+                      <span className="text-[10px] font-display font-bold text-pastel-cream">
                         {isHome
                           ? `${player.team} ${homeScore}-${awayScore}`
                           : `${player.team} ${awayScore}-${homeScore}`}
@@ -326,12 +326,12 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     )}
                     {/* Final badge + score */}
                     {isFinal && (
-                      <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none bg-citrus-charcoal/10 text-citrus-charcoal/60 border border-citrus-charcoal/20">
+                      <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none bg-white/10 text-white/60 border border-white/10/20">
                         F
                       </span>
                     )}
                     {isFinal && hasScores && (
-                      <span className="text-[10px] font-display font-semibold text-citrus-charcoal/60">
+                      <span className="text-[10px] font-display font-semibold text-white/60">
                         {isHome
                           ? `${homeScore}-${awayScore}`
                           : `${awayScore}-${homeScore}`}
@@ -339,7 +339,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     )}
                     {/* Scheduled: show game time */}
                     {!isLive && !isFinal && player.gameInfo?.time && (
-                      <span className="text-[10px] font-display text-citrus-charcoal/50">
+                      <span className="text-[10px] font-display text-white/50">
                         {player.gameInfo.time}
                       </span>
                     )}
@@ -410,9 +410,9 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                 
                 // Always show the indicator for dropped players (even if 0, to show they're being counted)
                 return (
-                  <div className="mt-1 text-[10px] font-semibold text-citrus-orange flex items-center gap-1">
+                  <div className="mt-1 text-[10px] font-semibold text-pastel-orange flex items-center gap-1">
                     <span className="inline-flex items-center">
-                      <span className="w-1.5 h-1.5 rounded-full bg-citrus-orange mr-1" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-pastel-orange mr-1" />
                       {contributingPoints > 0 
                         ? `${contributingPoints.toFixed(1)} ${pointsLabel}`
                         : 'Points counted from lineup'
@@ -459,7 +459,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
 
         {/* Game Logos Bar - HIDDEN ON MOBILE */}
         {player.games && Array.isArray(player.games) && player.games.length > 0 && player.team && (
-          <div className="hidden lg:block -mt-1 mb-0 px-0.5 py-0 bg-gradient-to-r from-citrus-sage/5 via-citrus-peach/5 to-citrus-sage/5 rounded border border-citrus-sage/20">
+          <div className="hidden lg:block -mt-1 mb-0 px-0.5 py-0 bg-gradient-to-r from-pastel-sage/5 via-pastel-sage/5 to-pastel-sage/5 rounded border border-pastel-sage/20">
             <GameLogosBar 
               games={player.games} 
               playerTeam={player.team}
@@ -472,21 +472,21 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         {!hasGameOnDate && !hasDailyStats ? (
           // CASE 1: NO GAME scheduled for this date AND no daily stats - Show "No game today"
           <div className="player-projection-bar-container">
-            <div className="w-full py-1 text-center font-display text-xs text-citrus-charcoal/60 bg-[#E8EED9]/50 backdrop-blur-sm/50 rounded border border-dashed border-citrus-sage/30 italic">
+            <div className="w-full py-1 text-center font-display text-xs text-white/60 bg-[#1A2A20] backdrop-blur-sm/50 rounded border border-dashed border-pastel-sage/30 italic">
               No game {isInDailyViewMode ? 'this day' : 'today'}
             </div>
           </div>
         ) : shouldShowDailyPoints ? (
           // CASE 2: Show daily total points (game is FINAL and data exists)
-          <div className="player-projection-bar-container relative bg-gradient-to-br from-citrus-sage/10 via-citrus-cream/30 to-citrus-peach/10 p-1 rounded border border-citrus-sage/30 shadow-sm">
+          <div className="player-projection-bar-container relative bg-gradient-to-br from-pastel-sage/10 via-white/30 to-pastel-sage/10 p-1 rounded border border-pastel-sage/30 shadow-sm">
             {/* Label - Varsity Badge Style - HIDDEN ON DESKTOP, SHOWN ON MOBILE */}
-            <div className="lg:hidden flex text-[8px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-sage/30 w-fit mx-auto">
-              <span className="w-1 h-1 rounded-full bg-citrus-sage animate-pulse" />
+            <div className="lg:hidden flex text-[8px] font-varsity font-bold text-pastel-cream uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#1A2A20] backdrop-blur-sm/70 px-1 py-0 rounded border border-pastel-sage/30 w-fit mx-auto">
+              <span className="w-1 h-1 rounded-full bg-pastel-sage animate-pulse" />
               Daily Points
             </div>
             {/* Label - Varsity Badge Style - HIDDEN ON MOBILE */}
-            <div className="hidden lg:flex text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-sage/30 w-fit">
-              <span className="w-1 h-1 rounded-full bg-citrus-sage animate-pulse" />
+            <div className="hidden lg:flex text-[7px] font-varsity font-bold text-pastel-cream uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#1A2A20] backdrop-blur-sm/70 px-1 py-0 rounded border border-pastel-sage/30 w-fit">
+              <span className="w-1 h-1 rounded-full bg-pastel-sage animate-pulse" />
               Daily Points
             </div>
             {/* Centered total above bar - Premium Badge - COMPACT */}
@@ -497,7 +497,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                   totalPoints={dailyTotalPoints}
                 />
               ) : (
-                <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
+                <span className="text-xs font-varsity font-black text-pastel-orange bg-pastel-sage/30 px-1.5 py-0.5 rounded border border-pastel-sage/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
                   {dailyTotalPoints.toFixed(1)} pts
                 </span>
               )}
@@ -513,17 +513,17 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     key={i}
                     className={`flex-1 h-2 rounded overflow-hidden transition-all duration-300
                       ${!isFilled && !isPartialFilled 
-                        ? 'border-2 border-dashed border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm/50' 
-                        : 'bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-sage/40'
+                        ? 'border-2 border-dashed border-pastel-sage/30 bg-[#1A2A20] backdrop-blur-sm/50' 
+                        : 'bg-[#1A2A20] backdrop-blur-sm border-2 border-pastel-sage/40'
                       }`}
                   >
                     {/* Actual points fill (green gradient) */}
                     {isFilled && (
-                      <div className="w-full h-full bg-gradient-to-br from-citrus-sage via-[#7CB518] to-citrus-sage shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)]" />
+                      <div className="w-full h-full bg-gradient-to-br from-pastel-sage via-[#7CB518] to-pastel-sage shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)]" />
                     )}
                     {isPartialFilled && (
                       <div 
-                        className="h-full bg-gradient-to-br from-citrus-sage/70 via-[#7CB518]/70 to-citrus-sage/70" 
+                        className="h-full bg-gradient-to-br from-pastel-sage/70 via-[#7CB518]/70 to-pastel-sage/70" 
                         style={{ width: `${dailyPartialChunk * 100}%` }}
                       />
                     )}
@@ -534,16 +534,16 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
           </div>
         ) : (
           // CASE 3: Show projection bar (game not final yet) - VARSITY SCOREBOARD - COMPACT
-          <div className="player-projection-bar-container relative bg-gradient-to-br from-citrus-peach/10 via-citrus-cream/30 to-citrus-sage/10 p-1 rounded border border-citrus-peach/40 shadow-sm">
+          <div className="player-projection-bar-container relative bg-gradient-to-br from-pastel-sage/10 via-white/30 to-pastel-sage/10 p-1 rounded border border-pastel-sage/40 shadow-sm">
             {/* Label - MOBILE */}
-            <div className="lg:hidden flex text-[8px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-peach/40 w-fit mx-auto">
-              <span className="w-1 h-1 rounded-full bg-citrus-orange animate-pulse" />
+            <div className="lg:hidden flex text-[8px] font-varsity font-bold text-pastel-cream uppercase tracking-wider mb-0.5 items-center gap-0.5 bg-[#1A2A20] backdrop-blur-sm/70 px-1 py-0 rounded border border-pastel-sage/40 w-fit mx-auto">
+              <span className="w-1 h-1 rounded-full bg-pastel-orange animate-pulse" />
               Projected
             </div>
             {/* Label + Confidence Badge - DESKTOP */}
-            <div className="hidden lg:flex text-[7px] font-varsity font-bold text-citrus-forest uppercase tracking-wider mb-0.5 items-center gap-1 w-full">
-              <div className="flex items-center gap-0.5 bg-[#E8EED9]/50 backdrop-blur-sm/70 px-1 py-0 rounded border border-citrus-peach/40 w-fit">
-                <span className="w-1 h-1 rounded-full bg-citrus-orange animate-pulse" />
+            <div className="hidden lg:flex text-[7px] font-varsity font-bold text-pastel-cream uppercase tracking-wider mb-0.5 items-center gap-1 w-full">
+              <div className="flex items-center gap-0.5 bg-[#1A2A20] backdrop-blur-sm/70 px-1 py-0 rounded border border-pastel-sage/40 w-fit">
+                <span className="w-1 h-1 rounded-full bg-pastel-orange animate-pulse" />
                 Projected
               </div>
               {/* Confidence label badge */}
@@ -562,19 +562,19 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               {hasProjection && isStarterConfirmed && dailyProjection ? (
                 isGoalie ? (
                   <GoalieProjectionTooltip projection={player.goalieProjection}>
-                    <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-citrus-forest transition-all">
+                    <span className="text-xs font-varsity font-black text-pastel-orange bg-pastel-sage/30 px-1.5 py-0.5 rounded border border-pastel-sage/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-pastel-cream transition-all">
                       {projectedPoints.toFixed(1)} pts
                     </span>
                   </GoalieProjectionTooltip>
                 ) : (
                   <ProjectionTooltip projection={player.daily_projection}>
-                    <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-citrus-forest transition-all">
+                    <span className="text-xs font-varsity font-black text-pastel-orange bg-pastel-sage/30 px-1.5 py-0.5 rounded border border-pastel-sage/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-pastel-cream transition-all">
                       {projectedPoints.toFixed(1)} pts
                     </span>
                   </ProjectionTooltip>
                 )
               ) : (
-                <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
+                <span className="text-xs font-varsity font-black text-pastel-orange bg-pastel-sage/30 px-1.5 py-0.5 rounded border border-pastel-sage/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
                   {showTBD
                     ? (isGoalie && !isStarterConfirmed ? 'Probable' : 'TBD')
                     : '0.0 pts'
@@ -585,7 +585,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             {/* Likely Range - "3.2 – 5.8 likely" (50% CI) - HIDDEN ON MOBILE */}
             {hasProjection && isStarterConfirmed && dailyProjection?.likely_low != null && dailyProjection?.likely_high != null && (
               <div className="hidden lg:flex justify-center mb-0.5">
-                <span className="text-[8px] font-display text-citrus-charcoal/50">
+                <span className="text-[8px] font-display text-white/50">
                   Likely: {dailyProjection.likely_low.toFixed(1)} – {dailyProjection.likely_high.toFixed(1)}
                 </span>
               </div>
@@ -593,13 +593,13 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             {/* Confidence Bar - gradient fill matching PlayerStatsModal style */}
             {hasProjection && isStarterConfirmed && dailyProjection?.dynamic_confidence != null ? (
               <div className="flex items-center gap-1 w-full">
-                <div className="flex-1 h-1.5 bg-citrus-sage/10 rounded-full overflow-hidden">
+                <div className="flex-1 h-1.5 bg-pastel-sage/10 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-citrus-sage to-citrus-orange rounded-full transition-all duration-500"
+                    className="h-full bg-gradient-to-r from-pastel-sage to-pastel-orange rounded-full transition-all duration-500"
                     style={{ width: `${Math.min(dailyProjection.dynamic_confidence * 100, 100)}%` }}
                   />
                 </div>
-                <span className="text-[8px] font-varsity font-black text-citrus-forest min-w-[20px] text-right">
+                <span className="text-[8px] font-varsity font-black text-pastel-cream min-w-[20px] text-right">
                   {Math.round(dailyProjection.dynamic_confidence * 100)}%
                 </span>
               </div>
@@ -613,16 +613,16 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                       key={i}
                       className={`flex-1 h-2 rounded overflow-hidden transition-all duration-300
                         ${!isFilled && !isPartial
-                          ? 'border-2 border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50'
-                          : 'bg-[#E8EED9]/50 backdrop-blur-sm border-2 border-citrus-peach/40'
+                          ? 'border-2 border-dashed border-pastel-sage/30 bg-[#1A2A20] backdrop-blur-sm/50'
+                          : 'bg-[#1A2A20] backdrop-blur-sm border-2 border-pastel-sage/40'
                         }`}
                     >
                       {isFilled && (
-                        <div className="w-full h-full bg-gradient-to-br from-citrus-orange via-citrus-peach to-citrus-orange shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)]" />
+                        <div className="w-full h-full bg-gradient-to-br from-pastel-orange via-pastel-sage to-pastel-orange shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)]" />
                       )}
                       {isPartial && (
                         <div
-                          className="h-full bg-gradient-to-br from-citrus-orange/70 via-citrus-peach/70 to-citrus-orange/70"
+                          className="h-full bg-gradient-to-br from-pastel-orange/70 via-pastel-sage/70 to-pastel-orange/70"
                           style={{ width: `${projectionPartialChunk * 100}%` }}
                         />
                       )}
@@ -635,7 +635,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                 {Array.from({ length: maxBarPoints }, (_, i) => (
                   <div
                     key={i}
-                    className="flex-1 h-2 rounded border border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50 animate-pulse"
+                    className="flex-1 h-2 rounded border border-dashed border-pastel-sage/30 bg-[#1A2A20] backdrop-blur-sm/50 animate-pulse"
                   />
                 ))}
               </div>
@@ -644,7 +644,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                 {Array.from({ length: maxBarPoints }, (_, i) => (
                   <div
                     key={i}
-                    className="flex-1 h-2 rounded border border-dashed border-citrus-peach/30 bg-[#E8EED9]/50 backdrop-blur-sm/50"
+                    className="flex-1 h-2 rounded border border-dashed border-pastel-sage/30 bg-[#1A2A20] backdrop-blur-sm/50"
                   />
                 ))}
               </div>
@@ -673,7 +673,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
       <div className="player-mobile-score lg:hidden">
         {!hasGameOnDate && !hasDailyStats ? (
           // No game today and no daily stats - show "No game" instead of 0.0
-          <span className="text-citrus-charcoal/50 text-[10px] font-semibold italic">
+          <span className="text-white/50 text-[10px] font-semibold italic">
             No game
           </span>
         ) : shouldShowDailyPoints && dailyTotalPoints > 0 ? (
@@ -685,41 +685,41 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                 totalPoints={dailyTotalPoints}
               />
             ) : (
-              <span className="text-citrus-sage font-black text-xs">
+              <span className="text-pastel-sage font-black text-xs">
                 {dailyTotalPoints.toFixed(1)}
               </span>
             )}
-            <span className="text-[8px] text-citrus-sage/70 font-semibold">Daily</span>
+            <span className="text-[8px] text-pastel-sage/70 font-semibold">Daily</span>
           </div>
         ) : shouldShowDailyPoints ? (
           // Has game that's final/live but 0 points
           <div className="flex flex-col items-end">
-            <span className="text-citrus-charcoal/60 font-bold text-xs">
+            <span className="text-white/60 font-bold text-xs">
               0.0
             </span>
-            <span className="text-[8px] text-citrus-charcoal/40 font-medium">Daily</span>
+            <span className="text-[8px] text-white/40 font-medium">Daily</span>
           </div>
         ) : hasProjection && projectedPoints > 0 ? (
           // Has upcoming game with projection - tappable to see breakdown
           <div className="flex flex-col items-end">
             {isGoalie ? (
               <GoalieProjectionTooltip projection={player.goalieProjection}>
-                <span className="text-citrus-orange font-black text-xs cursor-pointer">
+                <span className="text-pastel-orange font-black text-xs cursor-pointer">
                   {projectedPoints.toFixed(1)}
                 </span>
               </GoalieProjectionTooltip>
             ) : (
               <ProjectionTooltip projection={player.daily_projection}>
-                <span className="text-citrus-orange font-black text-xs cursor-pointer">
+                <span className="text-pastel-orange font-black text-xs cursor-pointer">
                   {projectedPoints.toFixed(1)}
                 </span>
               </ProjectionTooltip>
             )}
-            <span className="text-[8px] text-citrus-orange/70 font-semibold">Proj</span>
+            <span className="text-[8px] text-pastel-orange/70 font-semibold">Proj</span>
           </div>
         ) : (
           // Has game but no projection yet (TBD)
-          <span className="text-citrus-peach/80 text-[10px] font-semibold">
+          <span className="text-pastel-cream/80 text-[10px] font-semibold">
             TBD
           </span>
         )}
