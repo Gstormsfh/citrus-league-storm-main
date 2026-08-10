@@ -9,6 +9,13 @@
 // purge so future refactors can't reintroduce the banned "Failed to
 // load" pattern.
 //
+// Entry 50 amendment (2026-08-10 11:33Z): architect's re-run caught a
+// SEVENTH site at :762 (ternary fallback, not a setError literal) —
+// the original 6-site test locked the INSTANCE LIST, not the RULE.
+// Lesson: tests must lock the rule. All three assertions below
+// widened to file-wide scans (no more `setError\(` prefix — ANY
+// occurrence of the banned string fails).
+//
 // Room ruling per Entry 49: BOTH rooms are in the twelve's path — v1
 // DraftRoom.tsx holds the lobby (invitees WAIT here); v2 room takes
 // over post-ignition. So v1's first-mount error paths are
@@ -26,29 +33,37 @@ import { fileURLToPath } from 'node:url';
 const HERE = resolve(fileURLToPath(import.meta.url), '..');
 const DR_PATH = resolve(HERE, '..', 'DraftRoom.tsx');
 
-describe('DraftRoom.tsx — T12P-5-followon banned "Failed to load" purge (Entry 49)', () => {
+describe('DraftRoom.tsx — T12P-5-followon banned "Failed to load" purge (Entry 49 + Entry 50 rule-widening)', () => {
   const source = readFileSync(DR_PATH, 'utf8');
 
-  it('no setError call passes "Failed to load" copy anywhere in the file', () => {
-    // COPY_VOICE.md hard-ban list: naked "Failed to X" copy surfaced
-    // to users. Pre-fix: 6 sites all pattern-matched
-    // `'Failed to load X. Please try again.'`. Post-fix: warm copy
-    // ("Couldn't load X — give it a moment / refresh to try again.")
-    // owns blame per rule 3 and offers a door.
-    const setErrorFailedMatches = source.match(/setError\([^)]*['"]Failed to load/g);
-    expect(setErrorFailedMatches, 'expected zero setError sites containing "Failed to load"').toBeNull();
+  it('no "Failed to load" copy anywhere in the file (rule-wide ban, not instance-list)', () => {
+    // Entry 50 lesson: the pre-widening test matched only setError call
+    // sites and missed the ternary fallback at :762
+    // (`|| 'Failed to load draft data'`). Widening to file-wide catches
+    // ANY shape variant: setError literal, ternary fallback, template
+    // string, JSX prop, toast description — all banned per COPY_VOICE
+    // hard-ban list.
+    const bannedMatches = source.match(/Failed to load/g);
+    expect(
+      bannedMatches,
+      `expected zero "Failed to load" occurrences anywhere in file; found ${bannedMatches?.length ?? 0}`,
+    ).toBeNull();
   });
 
   it('no setError call passes "Please try again" politeness padding for load failures', () => {
-    // Companion ban: "Please try again" is rule 4 politeness padding
-    // (users just want doors — "try again in a moment" or "refresh to
-    // try again" is the shape). Only checking within setError call
-    // sites so we don't false-fail any comment or non-copy string.
+    // Entry 50 scope: widen ONLY "Failed to load" to rule-wide. The
+    // "Please try again" politeness padding survives in ~10 toast
+    // descriptions on commissioner-only Draft Hiccup paths (:1779,
+    // :2037, :2048, :2053, :2653, :2662, :3362, :3764, :3782) — those
+    // are DOCKETED for the post-twelve Draft-Hiccup 22-toast sweep,
+    // not tonight's cleanup rider. Keeping this assertion narrow to
+    // setError so the load-failure paths stay locked without pulling
+    // the whole Draft-Hiccup docket into rider scope.
     const setErrorPleaseTry = source.match(/setError\([^)]*['"][^'"]*Please try again[^'"]*['"]/g);
     expect(setErrorPleaseTry, 'expected zero setError sites containing "Please try again"').toBeNull();
   });
 
-  it('all six purged setError sites carry retry-door language', () => {
+  it('purged setError sites still carry retry-door language', () => {
     // Post-fix strings all contain "try again" as the door verb.
     // Count the door-bearing setError calls to make sure we didn't
     // accidentally strip the door while removing the ban.

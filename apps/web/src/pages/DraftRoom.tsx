@@ -759,7 +759,7 @@ const DraftRoom = () => {
 
     } catch (error: unknown) {
       logger.error('DraftRoom: Error loading draft data:', error);
-      const errorMessage = error instanceof Error ? error.message : (typeof error === 'string' ? error : JSON.stringify(error)) || 'Failed to load draft data';
+      const errorMessage = error instanceof Error ? error.message : (typeof error === 'string' ? error : JSON.stringify(error)) || "Couldn't load the draft data — refresh to try again.";
       setError(errorMessage);
       setLoading(false);
       // Ensure draftPhase is set even on error
