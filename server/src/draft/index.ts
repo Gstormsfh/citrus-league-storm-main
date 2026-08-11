@@ -652,6 +652,26 @@ lobbyRegistry.startIdleEvictionTimer();
 // env, or opts; 0 disables. Tests disable via vitest setup.
 lobbyRegistry.startClockLivenessScanner();
 
+// ENGINE-EAR v3 Slice 1 item 2 (E106, 2026-08-11): BOOT-SCAN
+// resumes in_progress + paused leagues on engine startup.
+//
+// Fires in the background (does NOT block the Hono/uWS listener
+// startup — the engine serves on port before boot-scan finishes so
+// clients can connect and force lazy-create in the meantime, which
+// is idempotent with getOrCreate's placeholder pattern).
+//
+// Entry 83 measured 4.7 dead minutes post-restart on fad02304;
+// this scan eliminates that dead window for in_progress drafts.
+// Skipped when EVENT_SUBSCRIPTION_DISABLED=1 (tests).
+if (process.env.EVENT_SUBSCRIPTION_DISABLED !== '1') {
+  void lobbyRegistry.performBootScan(supabaseAdmin).catch((err) => {
+    // Non-fatal — engine keeps serving. performBootScan itself
+    // logs per-league failures + a summary; this catch handles
+    // any final throw the method itself didn't swallow.
+    structuredLogger.error('registry.boot_scan_uncaught', {}, err);
+  });
+}
+
 // Phase 4.5 chunk 11g.10 sub-step 10b — mount engine-ops admin routes
 // at /api/admin/engine/* on the engine's Hono server.
 //
@@ -725,18 +745,85 @@ if (subscriptionDisabled) {
   subscriptionHandle = startEventSubscription({
     connectionString: dbUrl,
     dispatch: async (notification, notificationReceivedAtMs) => {
-      // Lobby-load forbidden on NOTIFY (resource-exhaustion protection).
-      // Unknown leagueId is silently ignored to prevent the attack
-      // vector of every external event firing a lobby load. Lobbies
-      // load lazily on WS connect; bootstrap catches up via
-      // snapshot+delta from chunk 11g.7 sub-step 7c.
-      const lobby = lobbyRegistry.get(notification.leagueId);
+      // ENGINE-EAR v3 Slice 1 item 1 (E106, 2026-08-11):
+      // NOTIFY-CREATES-LOBBY (client-independent ignition).
+      //
+      // Pre-Slice-1 defect: this dispatch called only `registry.get`
+      // and silently dropped every NOTIFY for a league with no
+      // in-memory lobby. Combined with LAZY lobby creation (only on
+      // WS client connect), this meant: commissioner ignites a
+      // draft → draft_started NOTIFY arrives → no lobby → dropped →
+      // no timer armed → no autopicks → dead draft until someone
+      // clicks join. Entry 82 (CSP-starved clients), Entry 83
+      // (post-restart 4.7-min dead window), Entry 88 (lazy-arm
+      // structural confirmation) all measured this class of stall.
+      //
+      // Fix: for `in_progress` / `paused` leagues, `getOrCreate` the
+      // lobby on NOTIFY. Ignition + subsequent events drive the
+      // engine without any client ever connecting — the twelve's
+      // "commissioner presses start, everyone's phone is slow"
+      // scenario now WORKS.
+      //
+      // Gating: check `leagues.draft_status` before creating. Only
+      // in_progress / paused warrant a lobby; not_started /
+      // completed / cancelled skip (no live timer needed). This is
+      // the resource-exhaustion protection the pre-Slice-1 comment
+      // guarded against — restricted, not blanket-forbidden.
+      //
+      // Idempotency: `getOrCreate` is safe under concurrent NOTIFY
+      // storms (its Promise-placeholder pattern ensures at-most-one
+      // construction per lobbyId). A subsequent client connect
+      // finds the already-created lobby.
+      let lobby = lobbyRegistry.get(notification.leagueId);
       if (!lobby) {
-        structuredLogger.debug(
-          'event_subscription.event_skipped_unknown_lobby',
-          { leagueId: notification.leagueId, seq: notification.seq },
-        );
-        return;
+        // Peek at draft_status before spinning up. Reads a single
+        // column via the admin client (bypasses RLS). Untyped-cast
+        // to skip the deep-instantiation trip on the wide leagues
+        // JSONB settings column (same pattern as boot-scan query).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const untypedFrom = supabaseAdmin.from as unknown as (t: string) => any;
+        try {
+          const { data: leagueRow, error: leagueErr } = await untypedFrom('leagues')
+            .select('draft_status')
+            .eq('id', notification.leagueId)
+            .maybeSingle();
+          if (leagueErr) {
+            structuredLogger.warn('event_subscription.notify_status_probe_failed', {
+              leagueId: notification.leagueId,
+              seq: notification.seq,
+              error: leagueErr.message,
+            });
+            return;
+          }
+          const status = (leagueRow as { draft_status?: string } | null)?.draft_status;
+          if (status !== 'in_progress' && status !== 'paused') {
+            structuredLogger.debug(
+              'event_subscription.notify_skipped_non_live_league',
+              {
+                leagueId: notification.leagueId,
+                seq: notification.seq,
+                draftStatus: status ?? '<unknown>',
+              },
+            );
+            return;
+          }
+          structuredLogger.info('event_subscription.notify_creates_lobby', {
+            leagueId: notification.leagueId,
+            seq: notification.seq,
+            draftStatus: status,
+          });
+          lobby = await lobbyRegistry.getOrCreate(
+            notification.leagueId,
+            notification.leagueId,
+          );
+        } catch (err) {
+          structuredLogger.error(
+            'event_subscription.notify_lobby_create_failed',
+            { leagueId: notification.leagueId, seq: notification.seq },
+            err,
+          );
+          return;
+        }
       }
       // Chunk 11g.10 sub-step 10c-1b: thread the NOTIFY receipt
       // timestamp into the LobbyManager so `external_event.applied`

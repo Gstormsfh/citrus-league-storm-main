@@ -114,6 +114,16 @@ import { createHash, randomUUID } from 'node:crypto';
  * chars + 4 hyphens; the column type is uuid so the format must
  * match Postgres' uuid parser).
  */
+/**
+ * ENGINE-EAR v3 Slice 1 item 6 (E106, 2026-08-11) — INSTANT-AUTOPICK
+ * arm window for on-clock teams with `owner_id IS NULL`. 2 seconds
+ * gives just enough headroom for the pick_submitted broadcast +
+ * client re-arm to land before the autopick fires (metronome
+ * measured at 74-75ms notify→broadcast in LOAD-1-NIGHT; ~2s covers
+ * the p99 with margin) while feeling "instant" to observers.
+ */
+const INSTANT_AUTOPICK_ARM_MS = 2_000;
+
 function md5UuidFromSeed(seed: string): string {
   const hex = createHash('md5').update(seed).digest('hex');
   return (
@@ -452,6 +462,31 @@ export class LobbyManager {
   // site under a null-check guard.
   private initialPickDeadline: Date | null;
   private readonly initialDraftState: string | null;
+
+  /**
+   * ENGINE-EAR v3 Slice 1 item 6 (E106, 2026-08-11) —
+   * INSTANT-AUTOPICK-FOR-UNOWNED-SEATS.
+   *
+   * Per-league team-owner cache, populated at init() from the
+   * `teams` table. Keyed by teamId; value is the owner's user UUID
+   * or null when the seat is unowned (fixture-drafted rig seats or
+   * post-league-creation seats not yet claimed by a real user).
+   *
+   * Consumed by `computeArmDeadlineForOnClockTeam`: when the on-clock
+   * team's owner is null, override the pick deadline to
+   * `now + INSTANT_AUTOPICK_ARM_MS` (~2s) so the autopick fires
+   * within a live-draft-feel window instead of the full pick clock.
+   *
+   * Discriminator (per R98 spec ratified in E106 without amendment):
+   * only truly-null owners fire instant. An owner who exists but is
+   * disconnected respects the full pick clock (their team is
+   * eligible to pick manually if they reconnect in time).
+   *
+   * Populated at init(). Empty until then — `computeArmDeadlineFor
+   * OnClockTeam` treats the missing-key case as "unknown, do not
+   * override" (fail-open toward the full pick clock).
+   */
+  private readonly teamOwners = new Map<string, string | null>();
 
   /**
    * Pre-flattened draft order — one slot per pick of the entire
@@ -910,6 +945,42 @@ export class LobbyManager {
       return;
     }
     await this.bootstrap();
+
+    // ENGINE-EAR v3 Slice 1 item 6 (E106, 2026-08-11): populate the
+    // team-owner cache for INSTANT-AUTOPICK. One-shot query at init;
+    // the cache is not invalidated during the draft (mid-draft owner
+    // changes are rare and would go through a separate flow). Query
+    // failures are non-fatal — the cache stays empty and
+    // `computeArmDeadlineForOnClockTeam` fail-opens to the full pick
+    // clock (silent-degrade to pre-Slice-1 behavior).
+    if (this.format === 'snake' || this.format === 'linear') {
+      try {
+        const { data: teamRows, error: teamErr } = await this.supabase
+          .from('teams')
+          .select('id, owner_id')
+          .eq('league_id', this.leagueId);
+        if (teamErr) {
+          structuredLogger.warn(
+            `[lobby] team_owner_cache_query_failed lobbyId=${this.lobbyId} error=${teamErr.message}`,
+          );
+        } else if (Array.isArray(teamRows)) {
+          for (const row of teamRows as Array<{ id: string; owner_id: string | null }>) {
+            this.teamOwners.set(row.id, row.owner_id ?? null);
+          }
+          const nullCount = Array.from(this.teamOwners.values()).filter(
+            (v) => v === null,
+          ).length;
+          structuredLogger.info(
+            `[lobby] team_owner_cache_populated lobbyId=${this.lobbyId} totalTeams=${this.teamOwners.size} unownedTeams=${nullCount}`,
+          );
+        }
+      } catch (err) {
+        structuredLogger.warn(
+          `[lobby] team_owner_cache_threw lobbyId=${this.lobbyId} error=${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
     this.initialized = true;
 
     // Step 6c: reconstruct timer state from `leagues.pick_deadline`.
@@ -976,7 +1047,13 @@ export class LobbyManager {
       this.pauseState === null &&
       this.initialPickDeadline !== null
     ) {
-      this.setPickDeadline(this.initialPickDeadline, 'pick');
+      // ENGINE-EAR v3 Slice 1 item 6 (E106): arm through the
+      // instant-autopick helper so ownerless seats fire fast on
+      // engine boot too (not just after normal pick advance).
+      this.setPickDeadline(
+        this.computeArmDeadlineForOnClockTeam(this.initialPickDeadline),
+        'pick',
+      );
     }
 
     // Chunk 11g.7 sub-step 7c: start the periodic snapshot timer
@@ -3548,7 +3625,16 @@ export class LobbyManager {
     ) {
       const parsed = new Date(rawDeadline);
       if (!Number.isNaN(parsed.getTime())) {
-        this.setPickDeadline(parsed, 'pick');
+        // ENGINE-EAR v3 Slice 1 item 6 (E106): route the RPC-set
+        // deadline through the instant-autopick helper so ownerless
+        // seats fire within ~2s instead of the full pick clock.
+        // The DB's pick_deadline column stays the RPC value; only
+        // the engine's local timer fires early. Client renders
+        // full countdown briefly then the autopick event lands.
+        this.setPickDeadline(
+          this.computeArmDeadlineForOnClockTeam(parsed),
+          'pick',
+        );
       } else {
         structuredLogger.warn(
           `[lobby] applyPickEvent pick_deadline unparseable ` +
@@ -4243,6 +4329,64 @@ export class LobbyManager {
    * No-op if `shutDown` is true (graceful-shutdown protection
    * against late-firing timers post-shutdown).
    */
+  /**
+   * ENGINE-EAR v3 Slice 1 item 6 (E106, 2026-08-11) — compute the
+   * arm deadline for the on-clock team, applying INSTANT-AUTOPICK
+   * when the seat's owner is null.
+   *
+   * Semantics:
+   *   - If the on-clock team's owner is null → override to
+   *     `now + INSTANT_AUTOPICK_ARM_MS` (2s). Autopick fires
+   *     within ~2s of the on-clock transition; ownerless seats
+   *     never drag the room.
+   *   - If the owner exists (any string value) → return
+   *     `rpcDeadline` unchanged. A logged-out owner respects the
+   *     full pick clock so they can reconnect and pick manually.
+   *   - If the team is not in `teamOwners` cache (unknown owner
+   *     state) → return `rpcDeadline` unchanged (fail-open toward
+   *     the full pick clock — the discriminator between "unowned"
+   *     and "unknown" is load-bearing).
+   *
+   * ONLY applies to snake/linear `'pick'` timers. Auction bid-window
+   * and nomination-window arms bypass this helper (auction has its
+   * own budget/nomination-order logic).
+   *
+   * Called from `applyPickEvent` (post-picksMade++ so the NEW
+   * on-clock team is at `draftOrder[picksMade]`) and from `init()`
+   * (post-replay, arming the initial deadline).
+   */
+  private computeArmDeadlineForOnClockTeam(rpcDeadline: Date): Date {
+    if (this.format !== 'snake' && this.format !== 'linear') {
+      return rpcDeadline;
+    }
+    if (this.picksMade >= this.draftOrder.length) {
+      return rpcDeadline;
+    }
+    const onClockTeamId = this.draftOrder[this.picksMade].teamId;
+    // `has` returns false when the cache doesn't know this team —
+    // fail-open to rpcDeadline (do NOT accidentally instant-autopick
+    // just because we forgot to populate the cache).
+    if (!this.teamOwners.has(onClockTeamId)) {
+      return rpcDeadline;
+    }
+    const owner = this.teamOwners.get(onClockTeamId);
+    if (owner !== null) {
+      return rpcDeadline;
+    }
+    // Ownerless seat → instant-autopick.
+    const instantDeadline = new Date(Date.now() + INSTANT_AUTOPICK_ARM_MS);
+    // If the RPC deadline is ALREADY earlier than the instant window
+    // (e.g., the timer fires immediately on a caught-up event), respect
+    // the earlier one — never delay a legitimately-due autopick.
+    if (rpcDeadline.getTime() < instantDeadline.getTime()) {
+      return rpcDeadline;
+    }
+    structuredLogger.info(
+      `[lobby] instant_autopick_arm lobbyId=${this.lobbyId} teamId=${onClockTeamId} armMs=${INSTANT_AUTOPICK_ARM_MS} rpcDeadlineOverridden=${rpcDeadline.toISOString()}`,
+    );
+    return instantDeadline;
+  }
+
   private setPickDeadline(
     deadline: Date,
     kind: 'pick' | 'bid_window' | 'nomination_window' = 'pick',
