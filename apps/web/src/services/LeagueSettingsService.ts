@@ -8,6 +8,17 @@
 import { leagueApi } from '@/api/leagues';
 import { logger } from '@/utils/logger';
 
+/** One row of the scoring catalog, with the multiplier in force for a league. */
+export interface ScoringCatalogEntry {
+  stat_key: string;
+  display_name: string;
+  applies_to: 'skater' | 'goalie';
+  default_multiplier: number;
+  is_core: boolean;
+  sort_order: number;
+  multiplier: number;
+}
+
 export const LeagueSettingsService = {
   /**
    * Update waiver/trade settings for a league (commissioner only)
@@ -48,6 +59,47 @@ export const LeagueSettingsService = {
       return { success: true, error: null };
     } catch (error) {
       logger.error('Error updating scoring settings:', error);
+      return { success: false, error };
+    }
+  },
+
+  /**
+   * Read the scoring catalog plus this league's effective multipliers.
+   *
+   * 35 stats, of which 23 became scoreable on 2026-08-11 and sit at 0 until a
+   * commissioner turns them on: plus/minus, PP and SH goals/assists split out,
+   * game winners, overtime goals, faceoffs, takeaways, giveaways, time on ice,
+   * goalie OT losses and saves by strength.
+   */
+  async getScoringRules(
+    leagueId: string,
+  ): Promise<{ stats: ScoringCatalogEntry[]; error: unknown }> {
+    try {
+      const data = (await leagueApi.getScoringRules(leagueId)) as {
+        stats?: ScoringCatalogEntry[];
+      };
+      return { stats: data?.stats ?? [], error: null };
+    } catch (error) {
+      logger.error('Error fetching scoring rules:', error);
+      return { stats: [], error };
+    }
+  },
+
+  /**
+   * Set scoring weights for a league (commissioner only).
+   *
+   * Send only the rules that changed. Unknown stat keys are rejected by the
+   * server rather than stored as a rule that could never score anything.
+   */
+  async updateScoringRules(
+    leagueId: string,
+    rules: Array<{ stat_key: string; multiplier: number }>,
+  ): Promise<{ success: boolean; error: unknown }> {
+    try {
+      await leagueApi.updateScoringRules(leagueId, rules);
+      return { success: true, error: null };
+    } catch (error) {
+      logger.error('Error updating scoring rules:', error);
       return { success: false, error };
     }
   },

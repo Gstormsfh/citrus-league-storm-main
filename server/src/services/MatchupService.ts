@@ -705,6 +705,28 @@ export class MatchupService {
       return { data: null, error: team2Result.error };
     }
 
+    // Persist the per-player audit trail behind this score.
+    //
+    // fantasy_matchup_lines is read by getMatchupScores() and by
+    // verify_matchup_scores(), and until 2026-08-11 nothing anywhere wrote it —
+    // so every matchup had a score with nothing behind it and the verifier could
+    // never pass. persist_matchup_lines is idempotent (it deletes and rewrites
+    // this matchup's lines) and is granted to service_role only, so it must go
+    // through the admin client.
+    //
+    // A failure here does NOT fail scoring: the score is still correct, we just
+    // lost the explanation. But it must be loud, because a silent miss is what
+    // let the table sit empty in the first place.
+    const { error: linesError } = await admin.rpc('persist_matchup_lines', {
+      p_matchup_id: matchupId,
+    });
+    if (linesError) {
+      logger.error(
+        '[calculateDailyMatchupScores] persist_matchup_lines failed — score is correct but its line items are now stale:',
+        linesError,
+      );
+    }
+
     // Log RPC results for debugging AI team scoring issues
     const team1Sum = (team1Result.data || []).reduce((s: number, r: { daily_score?: string | number }) => s + parseFloat(String(r.daily_score || 0)), 0);
     const team2Sum = (team2Result.data || []).reduce((s: number, r: { daily_score?: string | number }) => s + parseFloat(String(r.daily_score || 0)), 0);

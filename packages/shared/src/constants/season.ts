@@ -61,3 +61,23 @@ export function getHeadshotUrl(teamAbbrev: string | null | undefined, playerId: 
   if (!teamAbbrev || !playerId) return null;
   return `https://assets.nhle.com/mugs/nhl/${HEADSHOT_SEASON}/${teamAbbrev}/${playerId}.png`;
 }
+
+/**
+ * Number of REGULAR-SEASON games for a given NHL season.
+ *
+ * Mirrors the SQL `public.get_season_game_count(season)`. 2026-27 is an
+ * 84-game season; every earlier season in our data is 82.
+ *
+ * Kept as an explicit map rather than a derived rule because the NHL sets
+ * this per season by agreement, not by formula. A wrong value here does not
+ * throw — it silently zeroes every rest-of-season projection once a player
+ * passes the assumed game count, in the final week, when leagues are decided.
+ */
+const SEASON_GAME_COUNTS: Record<number, number> = {
+  2026: 84,
+};
+
+/** Regular-season game count for `season`. Defaults to 82. */
+export function getSeasonGameCount(season: number): number {
+  return SEASON_GAME_COUNTS[season] ?? 82;
+}

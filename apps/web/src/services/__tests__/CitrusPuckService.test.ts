@@ -24,9 +24,22 @@ vi.mock('@/utils/logger', () => ({
   },
 }));
 
-vi.mock('@/utils/seasonConstants', () => ({
-  CURRENT_SEASON: 2025,
+// Pin the season for determinism, but take everything else - notably
+// getSeasonGameCount - from the real module, so this mock cannot silently go
+// stale when a new export is added. A bare object literal here is what broke
+// when getSeasonGameCount was introduced.
+const { mockGetCurrentSeason } = vi.hoisted(() => ({
+  mockGetCurrentSeason: vi.fn(() => 2025),
 }));
+
+vi.mock('@/utils/seasonConstants', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/seasonConstants')>();
+  return {
+    ...actual,
+    CURRENT_SEASON: 2025,
+    getCurrentSeason: () => mockGetCurrentSeason(),
+  };
+});
 
 // =============================================================================
 // Import after mocks
@@ -386,6 +399,27 @@ describe('CitrusPuckService', () => {
       expect(result.games_played).toBeCloseTo(41);
       expect(result.I_F_goals).toBeCloseTo(20);
       expect(result.I_F_points).toBeCloseTo(50);
+    });
+
+    it('uses the 84-game count in an 84-game season (2026-27)', () => {
+      // The literal 82 that used to live here silently zeroed every
+      // rest-of-season projection once a player passed 82 GP - in the final
+      // week, when leagues are decided. This is the regression guard.
+      mockGetCurrentSeason.mockReturnValueOnce(2026);
+
+      const currentData = {
+        allSituation: {
+          games_played: 42,
+          I_F_goals: 21,
+          I_F_points: 42,
+        } as any,
+      };
+
+      const result = CitrusPuckService.projectRestOfSeason(null, currentData as any);
+
+      // 84 - 42 = 42 remaining, scaleFactor = 42/42 = 1
+      expect(result.games_played).toBeCloseTo(42);
+      expect(result.I_F_goals).toBeCloseTo(21);
     });
 
     it('returns empty object when dataCurrent is null', () => {
