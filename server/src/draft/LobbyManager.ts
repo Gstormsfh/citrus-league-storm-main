@@ -1047,13 +1047,12 @@ export class LobbyManager {
       this.pauseState === null &&
       this.initialPickDeadline !== null
     ) {
-      // ENGINE-EAR v3 Slice 1 item 6 (E106): arm through the
-      // instant-autopick helper so ownerless seats fire fast on
-      // engine boot too (not just after normal pick advance).
-      this.setPickDeadline(
-        this.computeArmDeadlineForOnClockTeam(this.initialPickDeadline),
-        'pick',
-      );
+      // ENGINE-EAR v3 Slice 1 item 6 (E106 + E113): route through
+      // armPickDeadline so ownerless seats fire fast on engine boot
+      // too (not just after normal pick advance). E113 introduced
+      // the wrapper as a single entry point after 3 unrouted sites
+      // were found in the field.
+      this.armPickDeadline(this.initialPickDeadline);
     }
 
     // Chunk 11g.7 sub-step 7c: start the periodic snapshot timer
@@ -1904,7 +1903,12 @@ export class LobbyManager {
         const nextDeadline = result.pick_deadline
           ? new Date(result.pick_deadline)
           : new Date(Date.now() + this.pickClockMs);
-        this.setPickDeadline(nextDeadline);
+        // E113 primary miss: this self-drive re-arm bypassed the
+        // instant-autopick helper on tag dcaeeeb9-draft (Item 6
+        // fired at init only, then reverted to the full 30s
+        // courtesy clock for picks 2..N). Routed through
+        // armPickDeadline as of E113.
+        this.armPickDeadline(nextDeadline);
       } else {
         // Draft completed. Clear timer + deadline; no team is on
         // the clock anymore, so getCurrentState should reflect
@@ -2941,7 +2945,10 @@ export class LobbyManager {
         if (didFlip && firstPickDeadline.length > 0) {
           const parsed = new Date(firstPickDeadline);
           if (!Number.isNaN(parsed.getTime())) {
-            this.setPickDeadline(parsed, 'pick');
+            // E113 primary miss: draft_started external apply also
+            // bypassed the instant-autopick helper on dcaeeeb9-draft.
+            // Routed through armPickDeadline as of E113.
+            this.armPickDeadline(parsed);
           }
         }
         break;
@@ -3036,7 +3043,10 @@ export class LobbyManager {
           if (typeof resumedDeadline === 'string' && resumedDeadline.length > 0) {
             const parsed = new Date(resumedDeadline);
             if (!Number.isNaN(parsed.getTime()) && this.draftStatus === 'in_progress') {
-              this.setPickDeadline(parsed, 'pick');
+              // E113: resume is a new on-clock transition — ownerless
+              // seats should get the instant-autopick treatment.
+              // Routed through armPickDeadline.
+              this.armPickDeadline(parsed);
             }
           }
         }
@@ -3054,6 +3064,14 @@ export class LobbyManager {
           if (typeof extendedDeadline === 'string' && extendedDeadline.length > 0) {
             const parsed = new Date(extendedDeadline);
             if (!Number.isNaN(parsed.getTime()) && this.draftStatus === 'in_progress') {
+              // E113 EXEMPT: draft_extended is commissioner-explicit
+              // "add time to the current pick's clock". Routing
+              // through armPickDeadline would silently shorten the
+              // extension back to the instant-autopick window for
+              // ownerless seats — defeating the extension. Extend
+              // semantics preserve the full RPC deadline for both
+              // owned and unowned seats. Direct setPickDeadline call
+              // is intentional; the test suite pins this exemption.
               this.setPickDeadline(parsed, 'pick');
             }
           }
@@ -3252,7 +3270,10 @@ export class LobbyManager {
             if (typeof resumedDeadline === 'string' && resumedDeadline.length > 0) {
               const parsed = new Date(resumedDeadline);
               if (!Number.isNaN(parsed.getTime()) && this.draftStatus === 'in_progress') {
-                this.setPickDeadline(parsed, 'pick');
+                // E113: same rationale as the sibling dispatcher —
+                // resume is a fresh on-clock transition, ownerless
+                // seats should get instant-autopick.
+                this.armPickDeadline(parsed);
               }
             }
           }
@@ -3272,6 +3293,11 @@ export class LobbyManager {
             if (typeof extendedDeadline === 'string' && extendedDeadline.length > 0) {
               const parsed = new Date(extendedDeadline);
               if (!Number.isNaN(parsed.getTime()) && this.draftStatus === 'in_progress') {
+                // E113 EXEMPT: same as the sibling dispatcher —
+                // draft_extended is commissioner-explicit time
+                // addition. Routing through armPickDeadline would
+                // undo the extension for ownerless seats. Direct
+                // setPickDeadline call is intentional.
                 this.setPickDeadline(parsed, 'pick');
               }
             }
@@ -3625,16 +3651,15 @@ export class LobbyManager {
     ) {
       const parsed = new Date(rawDeadline);
       if (!Number.isNaN(parsed.getTime())) {
-        // ENGINE-EAR v3 Slice 1 item 6 (E106): route the RPC-set
-        // deadline through the instant-autopick helper so ownerless
-        // seats fire within ~2s instead of the full pick clock.
-        // The DB's pick_deadline column stays the RPC value; only
-        // the engine's local timer fires early. Client renders
-        // full countdown briefly then the autopick event lands.
-        this.setPickDeadline(
-          this.computeArmDeadlineForOnClockTeam(parsed),
-          'pick',
-        );
+        // ENGINE-EAR v3 Slice 1 item 6 (E106 + E113): route through
+        // the armPickDeadline wrapper. Same effect as the pre-E113
+        // inline pattern (setPickDeadline + computeArmDeadlineForOnClockTeam)
+        // but funnels through the single entry point so future
+        // arm sites cannot bypass the helper silently. The DB's
+        // pick_deadline column stays the RPC value; only the
+        // engine's local timer fires early. Client renders full
+        // countdown briefly then the autopick event lands.
+        this.armPickDeadline(parsed);
       } else {
         structuredLogger.warn(
           `[lobby] applyPickEvent pick_deadline unparseable ` +
@@ -4385,6 +4410,46 @@ export class LobbyManager {
       `[lobby] instant_autopick_arm lobbyId=${this.lobbyId} teamId=${onClockTeamId} armMs=${INSTANT_AUTOPICK_ARM_MS} rpcDeadlineOverridden=${rpcDeadline.toISOString()}`,
     );
     return instantDeadline;
+  }
+
+  /**
+   * ENGINE-EAR v3 Slice 1 item 6 (E113) — SINGLE ENTRY POINT for
+   * arming a snake/linear pick deadline. Every call site that arms
+   * the pick timer for a snake or linear draft MUST route through
+   * this wrapper so `computeArmDeadlineForOnClockTeam` cannot be
+   * silently bypassed by a future arm site. E113 field evidence:
+   * only 2 of ~7 pick arm sites carried the helper on `dcaeeeb9-draft`
+   * → S1 field pass but S3 partial (instant-autopick fired on pick 1
+   * only; picks 2..N reverted to the full 30s courtesy clock).
+   *
+   * Wraps `setPickDeadline(deadline, 'pick')` with the instant-
+   * autopick helper — ownerless seats fire within
+   * INSTANT_AUTOPICK_ARM_MS instead of the full pick clock. When
+   * the on-clock team has an owner (or the cache is unpopulated,
+   * or rpcDeadline is already earlier than the instant window), the
+   * RPC value is honored unchanged (fail-open).
+   *
+   * EXEMPT PATHS (must NOT route through this wrapper — leave a
+   * comment at each exempt site + a test pinning the exemption):
+   * - `draft_extended` handlers (2 sites, one per dispatcher):
+   *   commissioner explicitly added time to the current pick's
+   *   clock; shortening it back to an instant-autopick window
+   *   would defeat the extension. Extend semantics preserve the
+   *   full RPC deadline for both owned and unowned seats.
+   * - `setPickDeadline(_, 'bid_window' | 'nomination_window')`:
+   *   auction paths use their own state machine and are outside
+   *   ENGINE-EAR v3 Slice 1 scope.
+   * - `handleStallScanner` recovery re-arm at ~line 4731:
+   *   scanner recovery restores the previous kind (which may be
+   *   auction). Recovery from a lost timer is not a fresh on-clock
+   *   transition — the instant-autopick benefit applies to the
+   *   NEXT normal pick, not to a re-arm of a stale deadline.
+   */
+  private armPickDeadline(rpcDeadline: Date): void {
+    this.setPickDeadline(
+      this.computeArmDeadlineForOnClockTeam(rpcDeadline),
+      'pick',
+    );
   }
 
   private setPickDeadline(
@@ -5383,7 +5448,11 @@ export class LobbyManager {
     }
     this.pauseState = null;
     const newDeadline = new Date(Date.now() + this.pickClockMs);
-    this.setPickDeadline(newDeadline);
+    // E113: resume is a fresh on-clock transition — ownerless
+    // seats should get instant-autopick. armPickDeadline's format
+    // guard makes it safe if this ever runs against an auction
+    // (the resume path here is snake/linear-only).
+    this.armPickDeadline(newDeadline);
     structuredLogger.info(
       `[lobby] resumed lobbyId=${this.lobbyId} newDeadline=${newDeadline.toISOString()}`,
     );

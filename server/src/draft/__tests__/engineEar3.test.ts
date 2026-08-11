@@ -677,3 +677,150 @@ describe('E111 draft_status enum-domain regression lock', () => {
     expect(DB_DRAFT_STATUS_ENUM as readonly string[]).not.toContain('paused');
   });
 });
+
+// ── E113 REGRESSION LOCKS: armPickDeadline wrapper routing ──────────
+
+describe('E113 armPickDeadline wrapper — single-entry-point regression lock', () => {
+  // FIELD FAILURE (E113, 2026-08-11 · league ada00009 S3 rig):
+  // Item 6 (instant-autopick for ownerless seats) fired on pick 1
+  // only, then reverted to the full 30s courtesy clock for picks
+  // 2..N. Architect source-read found `computeArmDeadlineForOnClockTeam`
+  // was wired at only 2 of ~7 pick-deadline arm sites: init (:1054)
+  // and applyPickEvent external-apply (:3635). The missing sites —
+  // :1907 (self-drive processSubmitPick step 6c), :2944 (draft_started
+  // external apply), and the 4 resume/extend re-arms — all bypassed
+  // the helper silently. Garrett's order was half-delivered.
+  //
+  // LESSON (INS-class, class-fix pattern): introduce a single private
+  // `armPickDeadline` wrapper so no future arm site can bypass the
+  // helper. Mirrors E109 (this-binding) and E111 (enum-domain)
+  // lesson-shaped class fixes.
+
+  it('LobbyManager exposes a private `armPickDeadline(rpcDeadline: Date): void` wrapper', () => {
+    // Signature-shape lock. If the wrapper's parameter type or
+    // return type drifts (e.g., someone adds a `kind` parameter
+    // to make it multi-purpose), the wrapper stops being the
+    // enforced single entry point.
+    expect(lobbyManagerSource).toMatch(
+      /private armPickDeadline\(rpcDeadline: Date\): void/,
+    );
+  });
+
+  it('armPickDeadline body invokes both computeArmDeadlineForOnClockTeam AND setPickDeadline(_, "pick")', () => {
+    // Anchor to the wrapper's method body so a future refactor
+    // that only calls setPickDeadline (skipping the helper) trips
+    // this lock. Multiline match covers the wrapper's typical
+    // formatting.
+    const wrapperBody = lobbyManagerSource.match(
+      /private armPickDeadline\(rpcDeadline: Date\): void \{[\s\S]{0,300}?\}/,
+    );
+    expect(wrapperBody).not.toBeNull();
+    if (!wrapperBody) return; // narrow for TS below
+    expect(wrapperBody[0]).toContain('computeArmDeadlineForOnClockTeam');
+    expect(wrapperBody[0]).toContain("'pick'");
+    expect(wrapperBody[0]).toContain('setPickDeadline');
+  });
+
+  it('at least 6 armPickDeadline call sites present (init + self-drive + draft_started + 2×resume + applyPickEvent)', () => {
+    // Positive count lock. If a future refactor accidentally
+    // drops one of the routed sites back to a raw setPickDeadline
+    // call, this count-based lock trips. Six sites is the E113
+    // routing floor (init, self-drive, draft_started apply,
+    // draft_resumed dispatcher A, draft_resumed dispatcher B,
+    // applyPickEvent). Additional wrapper invocations (e.g.
+    // resumeDraft) only push the count higher.
+    const callSites = lobbyManagerSource.match(/this\.armPickDeadline\(/g);
+    expect(callSites).not.toBeNull();
+    expect((callSites ?? []).length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('every `setPickDeadline(_, "pick")` call outside the wrapper is EXEMPT (draft_extended only)', () => {
+    // WALK-THE-FILE guard. Every raw `setPickDeadline(_, 'pick')`
+    // outside the wrapper's own single call is a potential bypass.
+    // Each exemption must carry an `E113 EXEMPT` marker within
+    // the 6 lines preceding the call — the wrapper's docstring
+    // enumerates the exempt classes (draft_extended in both
+    // dispatchers).
+    const lines = lobbyManagerSource.split('\n');
+    const violations: Array<{ line: number; text: string }> = [];
+    lines.forEach((line, idx) => {
+      // Look for direct `setPickDeadline(anything, 'pick')` calls,
+      // skipping the wrapper's own invocation + comments + the
+      // wrapper's docstring reference.
+      if (!/\.setPickDeadline\([^,]*,\s*['"]pick['"]\s*\)/.test(line)) return;
+      if (line.trim().startsWith('//') || line.trim().startsWith('*')) return;
+      // Look backwards up to 12 lines for the exempt marker.
+      // The draft_extended exempt sites carry a multi-line
+      // rationale block (7 comment lines) between the marker
+      // and the call — 12 lines is comfortable headroom.
+      const window = lines.slice(Math.max(0, idx - 12), idx).join('\n');
+      if (/E113 EXEMPT/.test(window)) return;
+      // Skip the wrapper's own call — check if the preceding 3
+      // lines contain "armPickDeadline" (the wrapper body).
+      const shortWindow = lines.slice(Math.max(0, idx - 3), idx).join('\n');
+      if (/armPickDeadline/.test(shortWindow)) return;
+      violations.push({ line: idx + 1, text: line.trim() });
+    });
+    expect(violations).toEqual([]);
+  });
+
+  it('draft_extended exempt sites carry the E113 EXEMPT marker (both dispatchers)', () => {
+    // Both dispatchers (applyEventDuringBootstrap-style + bootstrap
+    // switch) handle draft_extended. Both must document why the
+    // extend path bypasses the wrapper — commissioner explicitly
+    // added time, and shortening it back to the instant window
+    // for ownerless seats would defeat the extension.
+    const exemptMarkers = lobbyManagerSource.match(/E113 EXEMPT/g);
+    expect(exemptMarkers).not.toBeNull();
+    expect((exemptMarkers ?? []).length).toBeGreaterThanOrEqual(2);
+    // The exempt-cause vocabulary must mention "extended" or
+    // "extension" so future maintainers see the intent inline.
+    const exemptBlocks = lobbyManagerSource.match(
+      /E113 EXEMPT[\s\S]{0,400}?setPickDeadline\([^,]*,\s*['"]pick['"]\)/g,
+    );
+    expect(exemptBlocks).not.toBeNull();
+    (exemptBlocks ?? []).forEach((block) => {
+      expect(block).toMatch(/extend|extension/i);
+    });
+  });
+
+  it('primary E113 sites (self-drive + draft_started apply) route through the wrapper', () => {
+    // Anchor on the specific comment vocabulary added at the
+    // primary E113 miss sites. If a future refactor drops those
+    // sites back to raw setPickDeadline, the E113-specific comments
+    // remain but the wrapper call disappears — this lock catches
+    // the wrapper-call disappearance directly.
+    // Self-drive site (processSubmitPick step 6c): the E113
+    // comment mentions "self-drive re-arm bypassed"; the wrapper
+    // call comes right after.
+    expect(lobbyManagerSource).toMatch(
+      /self-drive re-arm bypassed[\s\S]{0,300}?this\.armPickDeadline\(nextDeadline\)/,
+    );
+    // draft_started apply site.
+    expect(lobbyManagerSource).toMatch(
+      /draft_started external apply also[\s\S]{0,300}?this\.armPickDeadline\(parsed\)/,
+    );
+  });
+
+  it('applyPickEvent external-apply site routes through the wrapper (not the inline pre-E113 pattern)', () => {
+    // applyPickEvent was correctly wired to the helper in E106,
+    // but the inline pattern `setPickDeadline(computeArmDeadlineFor...)`
+    // duplicated the wrapper's shape. E113 converts it to use the
+    // named wrapper for consistency + easier grep.
+    expect(lobbyManagerSource).not.toMatch(
+      /setPickDeadline\(\s*this\.computeArmDeadlineForOnClockTeam\(parsed\)\s*,\s*['"]pick['"]\s*\)/,
+    );
+  });
+
+  it('behavioral: armPickDeadline body preserves the helper→setPickDeadline sequence', () => {
+    // Grep-based behavioral proof: the wrapper's body must call
+    // computeArmDeadlineForOnClockTeam AND setPickDeadline in a
+    // single expression (the helper's return value flows directly
+    // into setPickDeadline). If a future refactor splits them
+    // (e.g., stores the result in a variable and then does
+    // something else in between), this lock trips.
+    expect(lobbyManagerSource).toMatch(
+      /this\.setPickDeadline\(\s*this\.computeArmDeadlineForOnClockTeam\(rpcDeadline\)\s*,\s*['"]pick['"]\s*,?\s*\)/,
+    );
+  });
+});
