@@ -5765,6 +5765,87 @@ Architect countersigns tag choice (`-eear3` vs `-draft`) + issues the deploy pas
 
 **End of R99. ENGINE-EAR v3 Slice 1 (items 1 + 2 + 6) EXECUTED per E106 amendment. Commit `dcaeeeb9` pushed. Full CI-mirror gate GREEN (server tsc clean, both builds clean, 1024 server + 1743 web tests all-pass). Acceptance rig authored (S1/S2/S3 scenarios). READY-CANDIDATE per Entry 65 — awaiting architect countersignature for engine deploy paste banner.**
 
+---
+
+## R100 — Entry 109 E109-HOTFIX (unbound-`.from` fix + regression guards) · READY-CANDIDATE (2026-08-11 20:00Z / 2:00 PM MDT)
+
+### Root cause acknowledged
+
+Field failure exactly as architect diagnosed: `const untypedFrom = supabaseAdmin.from as unknown as (t) => any` extracts the method as a free function. `this` is undefined at call time. supabase-js reads `this.rest` → TypeError. The Proxy at `server/src/lib/supabase.ts:40` makes accidental rebinding impossible. Two sites carried this defect:
+
+- **`server/src/draft/LobbyRegistry.ts:494`** — `performBootScan` boot query. **Item 2 DEAD** — surfaced as `registry.boot_scan_threw` in Garrett's fd67eb4d-draft boot log (scanned 0, resumed 0, durationMs 6).
+- **`server/src/draft/index.ts:784`** — NOTIFY status probe. **Item 1 DEAD** — silent, thrown inside a try/catch that surfaced as `notify_lobby_create_failed` or the probe warning. Same effect (no lobby created on NOTIFY when in_progress/paused), quieter failure mode.
+
+Item 6 (INSTANT-AUTOPICK) unaffected — uses `this.supabase.from(...)` directly, `this` bound naturally.
+
+### Fix (commit `4d496a40` on `phase-4-5-implementation`)
+
+Both sites: cast the RESULT of `.from()` not the method itself.
+
+Before (E109 anti-pattern, killed items 1 + 2):
+```ts
+const untypedFrom = supabaseAdmin.from as unknown as (t: string) => any;
+const { data, error } = await untypedFrom('leagues').select('id').in(...);
+```
+
+After (safe — `this` preserved by direct property access + invocation):
+```ts
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const { data, error } = await (supabaseAdmin.from('leagues') as any).select('id').in(...);
+```
+
+Applied verbatim at both call sites. Code comments call out the E109 lesson so future refactors don't reintroduce the pattern to dodge deep-instantiation.
+
+### Regression guards added (engineEar3.test.ts, +7 tests → 29 total)
+
+Per architect's directive that "a REAL-shaped stub whose `from` is defined on the prototype/object and throws if invoked unbound" is the strongest catch:
+
+1. **E109 REGRESSION GUARD stubs.** `makeAdminForBootScan` and new `makeAdminForNotifyStatusProbe` helpers rewritten with method-shorthand `.from(this: …, _table) { if (this === undefined) throw TypeError('…E109 regression') }`. Bare arrow-function stubs (the previous shape) masked the class of bug — the new shape throws exactly as real supabase-js does when `.from` is called unbound.
+2. **Source-shape anti-pattern bans (2 files).** Regex-locked against reintroduction of `const untypedFrom = …` or `const \w+ = supabaseAdmin.from as unknown` anywhere in `LobbyRegistry.ts` or `draft/index.ts`. Anchored to line-start (`^\s*const`, multiline flag) so the E109 lesson comment that mentions the anti-pattern by name doesn't false-positive.
+3. **Positive source-shape locks (2 files).** Regex pins the corrected shape `(supabaseAdmin.from('leagues') as any)` in both files — if a future refactor tries to hoist to a variable, the guard trips.
+4. **Behavioral test.** `performBootScan` against the `this`-dependent stub → resolves scanned=1 / resumed=1. Pre-fix: TypeError, returns `{0,0,0}`. Post-fix: green (as authored, and confirmed on the branch).
+5. **NOTIFY-probe path behavioral test.** Same-shape stub for the `select('draft_status').eq('id',…).maybeSingle()` chain — direct invocation proves the `(client.from(...) as any)` idiom works against a `this`-dependent client.
+6. **Sentinel test.** Confirms extracting `.from` off the stub DOES throw TypeError with the E109 regression message — proves the guard stub itself enforces the `this`-binding contract. If a future maintainer accidentally makes `.from` an arrow (rebreaking the guards silently), this sentinel goes red.
+
+All 5 pre-existing behavioral tests for `performBootScan` also now use the new `this`-dependent stub, so they would ALSO have caught this bug pre-ship. **Would-have-caught coverage: 12/12 tests exercising the boot-scan path now fail against the anti-pattern.**
+
+### Full CI-mirror gate (post-hotfix tree)
+
+| Step | Result | Delta |
+| --- | --- | --- |
+| eslint | 0 errors, 14 pre-existing warnings | unchanged |
+| server tsc | clean | unchanged |
+| web tsc | pre-existing warning-only errors | unchanged |
+| server build | clean | unchanged |
+| web build | 26.39s (dev-machine variance), PWA 124 entries | unchanged |
+| server vitest FULL | **1031 passed / 6 skipped / 0 failed** (55 files) | **+7 tests** (E109 regression guards) |
+| web vitest FULL | **1743 passed / 0 failed** (103 files, 46.27s) | unchanged |
+
+### Pin table (updated per E108 tag ruling + KNOWN-BAD tag)
+
+- **Previous-good** (holds): `0ecbe605-draft` @ `sha256:152b79912cea9d80cf5c3147beeba48957973f5d201d54bdc9a3d6c429768a32` (2026-08-08 pin).
+- **KNOWN-BAD interim** (do NOT roll back TO): `fd67eb4d-draft` @ `sha256:97e0ccd9…` — the initial Slice-1 build; boots but Items 1 + 2 are dead on it.
+- **Current-after-deploy** (proposed): `4d496a40-draft` (E109 hotfix on top of dcaeeeb9).
+- **Rollback**: SUNDAY_EXECUTION_BLOCKS.md §A-R three-command block, target = `0ecbe605-draft` (skip fd67eb4d-draft — bypass the interim; it is not a valid rollback target).
+
+### Proposed redeploy block
+
+§A-0 → §A-7 verbatim from SUNDAY_EXECUTION_BLOCKS.md. Image tag suffix `-draft` per E108 tag ruling. Build via `-f server/Dockerfile.draft-engine` (strike #2 invariant). Nine-item boot verification (plus tenth `event_subscription.watchdog_started`). Post-boot expectations THIS cycle add the previously-broken tags — architect's post-E108 checklist survives verbatim:
+
+**MUST see in boot log for hotfix proof:**
+- All standard nine (fingerprint / hono / uws / subscription / self_test / watchdog / registry.idle_eviction_timer_started / registry.clock_liveness_scanner_started / env checks).
+- `registry.boot_scan_started` — Item 2 hotfix live (pre-hotfix this fired then TypeError).
+- `registry.boot_scan_complete` — with resumed count reflecting any in_progress/paused rigs. **Zero TypeError line between started and complete** — that's the hotfix proof.
+- No `registry.boot_scan_threw` (this was the E109 signature — must be absent).
+
+**Zero A-R rollback pin change** from R99 — still `0ecbe605-draft`.
+
+### Standing by
+
+Architect countersigns SHA + issues redeploy paste banner. Post-deploy: architect runs S1/S2/S3 acceptance per E108 post-deploy plan (S1 zero-client ignition, S2 mid-cascade restart, S3 instant-autopick timing). If S1 flows autopicks and S3 measures ~2-3s ownerless spacing vs 31s courtesy clock, all three items are field-proven.
+
+**End of R100. E109 hotfix EXECUTED — 3 lines of production code + 7 regression-guard tests + 2 anti-pattern source locks. Commit `4d496a40` pushed. Full CI-mirror gate GREEN (server vitest 1031, +7 from R99's 1024). Pin table updated with fd67eb4d-draft marked KNOWN-BAD. READY-CANDIDATE per Entry 65 — awaiting architect countersignature for engine redeploy paste banner.**
+
 
 
 
