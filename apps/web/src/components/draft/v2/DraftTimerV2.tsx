@@ -72,6 +72,16 @@ interface DraftTimerV2Props {
    */
   clockOffsetMs: number;
   /**
+   * Entry 87 Fix C (CLOCK-DISPLAY-35) — the per-pick countdown
+   * window in seconds, extracted from the draft_started event.
+   * Authoritative upper bound on the rendered value: even if a
+   * stale deadline or an uncorrected clock skew would compute a
+   * higher `remainingSec`, the display is clamped to this cap. Null
+   * before draft_started has been observed; when null, no clamp is
+   * applied and the estimator-corrected raw value renders.
+   */
+  pickTimeLimitSec?: number | null;
+  /**
    * Tick cadence in milliseconds. Default 500. Tests may pass a
    * larger value to reduce re-render churn.
    */
@@ -84,6 +94,7 @@ export const DraftTimerV2 = memo(
     draftStatus,
     wsOpen,
     clockOffsetMs,
+    pickTimeLimitSec = null,
     tickMs = 500,
   }: DraftTimerV2Props) => {
     const [now, setNow] = useState(() => Date.now());
@@ -107,8 +118,18 @@ export const DraftTimerV2 = memo(
       const raw = adjustedDeadlineMs - now;
       // Clamp at 0 — never render a negative countdown. Autopick
       // frame arrives shortly after 0:00 hits.
-      return Math.max(0, Math.floor(raw / 1000));
-    }, [currentPickDeadline, clockOffsetMs, now]);
+      const nonNegative = Math.max(0, Math.floor(raw / 1000));
+      // Entry 87 Fix C — clamp to pick_time_limit_seconds when known.
+      // Server truth: a fresh pick's deadline is exactly N seconds
+      // from arm, so remaining can never exceed N by construction.
+      // Any value above N indicates client-side skew we couldn't
+      // fully correct or a stale deadline; the cap ensures the
+      // number Garrett sees is honest.
+      if (pickTimeLimitSec !== null && pickTimeLimitSec > 0) {
+        return Math.min(nonNegative, pickTimeLimitSec);
+      }
+      return nonNegative;
+    }, [currentPickDeadline, clockOffsetMs, now, pickTimeLimitSec]);
 
     // Hide entirely when there's no active deadline OR the draft
     // isn't in a state that can consume it.

@@ -4915,3 +4915,773 @@ Branch `d83fdeb9` on `origin/phase-4-5-implementation`. Fast-forward-safe to mas
 **Awaiting architect ratification.** If ratified, architect issues the ⚡ paste banner to Garrett. Terminal will NOT stage a paste block until then.
 
 **End of R89. Entry 64 EXECUTED (all 6 steps). Full CI-mirror gate GREEN (eslint 0 · web tsc 158 · server tsc 0 · web build ✓ · server build ✓ · web vitest 1684/1684 · server tests 984+6/990). Commit d83fdeb9 pushed. R88 paste banner WITHDRAWN. READY-CANDIDATE per Entry 65 — awaiting architect countersignature.**
+
+---
+
+## R90 — Entries 79 + 71 + 73 EXECUTED · READY-CANDIDATE (2026-08-10 19:20Z / 1:20 PM MT)
+
+### Entries 66-79 backlog ACK
+
+R89 RATIFIED (Entry 66); CI green + production deploy live (Entries 67-68); LOAD-1 workstream opened (Entry 69); staging via manual Group C paste (Entry 70); Homepage dup loading docket (Entry 71); .firebaserc safety docket (Entry 72); F28 walk started; MobileMenuButton /98 catch (Entry 73); commissioner-without-team docket + rig-league Garrett-seat write (Entry 74); LOBBY campaign 3-item findings PROPOSE-DON'T-EXECUTE (Entry 75); staging citrus-api STALE — 4-surface deploy map (Entry 76); 404 confirmed on T7 route (Entry 77); staging API deploy issued 5cca2ba0 → d7f0c776 pin (Entry 78); **Entry 79 F28 checkpoint-2 TRUE ROOT CAUSE: draftV2Start.ts:87 actor.kind='user' vs RPC-demanded 'commissioner'**.
+
+### This cycle executed (commit d05702a5)
+
+**Entry 79 — EXECUTE NOW (unblocks F28 walk):**
+
+- **`server/src/routes/draftV2Start.ts:87`**: `kind: 'user'` → `kind: 'commissioner'`. Comment at :82-85 rewritten to encode the TRUE contract per architect ("commissionerMiddleware verifies commissionership; the RPC's actor gate additionally requires kind='commissioner' for ignition — rig + route now agree").
+- **`server/src/__tests__/draftV2Start.test.ts`** (NEW, 1 test): seam-pin asserting `mockUserClientRpc` receives `p_actor.kind === 'commissioner'` + explicit `not.toBe('user')`. Any future regression fails client-side of the mock.
+
+**Entry 71 batch (Homepage dup loading, merge artifact):**
+- `apps/web/src/components/citrus2/Homepage.tsx:91`: removed `loading="lazy" decoding="async"` pair, kept `loading="eager"` (hero intent wins per U6 rule). Sweep confirmed 1 site only. Cleared TS17001 from web tsc baseline (159 → 157).
+
+**Entry 73 batch (invalid Tailwind opacity steps):**
+- `apps/web/src/components/MobileMenuButton.tsx:136`: `bg-[#0F1F15]/98` → `/95` (fixes transparent-menu Garrett caught live).
+- Sweep found 1 more: `apps/web/src/components/mobile/MobileBottomNav.tsx:72`: `bg-[#E8EED9]/98` → `/95` (same silent-class-drop bug on mobile-bottom-nav).
+- Verified `PreviewArena:109` and `PreviewBoards:51` `/85` usages — VALID step (Tailwind scale is 0/5/10/…/95/100; 85 is standard). No fix needed.
+
+### Full CI-mirror gate (Entry 64 standing gate)
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint `src/` | 0 errors, 14 warnings | ≤0 errors | ✅ |
+| Web tsc | **157** | ≤159 baseline (was 158) | ✅ (-1: Homepage TS17001 fix) |
+| Server tsc | **0** | strict ≤0 | ✅ |
+| Web build | 18s ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Server build | tsc emit exit 0 | exit 0 | ✅ |
+| Web vitest FULL | **1684 / 1684** (102 files) | zero fail | ✅ |
+| Server vitest FULL | **985 pass + 6 skip / 991** (52 files) | zero fail | ✅ (+1 new test: draftV2Start.test.ts) |
+
+### Rebuild block for Garrett (pin discipline per Entry 79 step 4)
+
+Same three commands from Entry 78's staging API deploy — new tag `server:d05702a5-t7a`. Pin table updated:
+- **Previous-good**: `server:5cca2ba090772d65445061599f102abbb7a09cef` (staging-setup era, months stale)
+- **Superseded** (F28 first press caught actor bug): `server:d7f0c776` (or d83fdeb9 if that was the deployed image)
+- **Current-after-deploy**: `server:d05702a5-t7a` (adds Entry 79 fix)
+- **Rollback**: one `gcloud run deploy citrus-api --image=<previous>`
+
+Per Entry 65: **NO PASTE BANNER** in this outbox. Terminal proposes READY; architect countersigns before Garrett runs the rebuild block.
+
+### Dockets from Entry 79 (same-week, not tonight)
+
+- (a) Route should map RPC-refusal strings to proper discriminators instead of `reason:unexpected`; `useStartDraftV2` should surface `details` when reason=unexpected — tonight's toast said nothing useful while the body knew everything.
+- (b) Demo-league 500 on new server (`GET /api/public/leagues/750f4e1a → 500 "Cannot coerce to single JSON object"`) — demo id constant vs staging data mismatch.
+- (c) GLOBAL-1: page-level scroll dead at mobile-width on desktop, app-wide (Garrett) — top-tier UX docket alongside LOBBY campaign.
+- (d) Ad-script CSP console noise cleanup.
+
+Plus Entry 74's docket: commissioner-without-team locked out of own league (membership gate should union commissioner_id OR team ownership) — post-twelve unless twelve-blocking.
+
+Plus Entry 75 LOBBY campaign 3-item proposals (LOBBY-1 flow, LOBBY-2 visual, LOBBY-3 nav) — propose-don't-execute per architect. Will draft mid-week after F28 walk completes.
+
+### Standing by
+
+Branch `d05702a5` on `origin/phase-4-5-implementation`. F28 walk unblocker ready to redeploy staging citrus-api on architect countersignature. Standing by for ratification + rebuild block issuance.
+
+**End of R90. Entries 79 (unblocks F28) + 71 + 73 EXECUTED. New draftV2Start.test seam-pin locks the contract. Full CI-mirror gate GREEN. Commit d05702a5 pushed. READY-CANDIDATE per Entry 65 — awaiting architect countersignature for rebuild block issuance.**
+
+## R91 — Entry 87 FLAWLESS-RUN TRIO EXECUTED · READY-CANDIDATE (2026-08-10 22:35Z / 4:35 PM MT)
+
+### Entries 89 + 90 ACK
+
+R90 pending countersignature; Entry 89 pre-cleared every adjudication pause; Entry 90 dissolved the morning fallback ("we can easily do this tonight. make the fix, and lets do this"). Order held: C → B → A straight through. Fix A's last unknown removed by Entry 90 DB evidence (draft_snapshots rows persist post-eviction — pure gate change, no rebuild architecture needed).
+
+### This cycle executed — full trio (per-fix diff summaries below)
+
+**Fix C — CLOCK-DISPLAY-35 / TIMER-1** (7 files, +2/+5/+3 tests):
+- **`apps/web/src/stores/draftClientStore.ts`**: new `pickTimeLimitSec: number | null` state field + selector `usePickTimeLimitSec`. Extraction helper `extractPickTimeLimitSec(events)` scans a buffered-event list for `kind: 'draft_started'` and returns its `pickTimeLimitSeconds`. Called from `setSnapshot` (initial snapshot's recentEvents), `applyEvent` (live event arrival), and `applyEvents` (resync batch). Reset to null on `reset()`.
+- **`apps/web/src/pages/DraftRoomV2.tsx`**: `onSnapshot` callback now seeds `updateOffset(Date.now(), serverMs)` from the last event's timestamp in `snapshot.recentEvents` — closes the pre-fix window where the estimator sat at `useState(0)` until the first onEvent fired. Threaded `clockOffsetMs` into `DraftRoomBody → MainTabs → OnClockActionBar`; read `pickTimeLimitSec` from store in `StickyHeader` and `MainTabs`, passed both to `DraftTimerV2` (via header) and `OnClockActionBar` (via tabs body).
+- **`apps/web/src/components/draft/v2/DraftTimerV2.tsx`**: new `pickTimeLimitSec?: number | null` prop; clamps `remainingSec = Math.min(nonNegative, pickTimeLimitSec)`. When null (pre-draft_started), clamp is skipped (existing render path preserved).
+- **`apps/web/src/components/draft/v2/OnClockActionBar.tsx`**: DR-3.1's "no clock-offset adjustment needed here" comment RETRACTED — that assumption was the root cause. New `clockOffsetMs?: number` prop applied to deadline (mirrors DraftTimerV2 math); new `pickTimeLimitSec?: number | null` prop caps rendered value.
+- **`apps/web/src/components/draft/v2/__tests__/DraftTimerV2.test.tsx`**: +5 clamp tests (raw>cap → clamped; raw<cap → untouched; null → no clamp; discriminant-lock for Garrett's 35s scenario; past-deadline still 0:00).
+- **`apps/web/src/components/draft/v2/__tests__/OnClockActionBar.test.tsx`**: +3 tests (clockOffsetMs applied; clamp works; agrees frame-for-frame with DraftTimerV2 for same tuple).
+- **`apps/web/src/stores/__tests__/draftClientStore.test.ts`**: +6 extraction tests (initial null; snapshot with draft_started; snapshot without; applyEvent; applyEvents batch; reset restores null).
+
+**Discriminant identified (per Entry 87 request)**: (a) EMA unseeded at mount was the ACTUAL cause on Garrett's PC ~5s slow. Fix is BOTH the seed (eliminates first-paint window) AND the clamp (belt to estimator's suspenders — display physically cannot exceed pick_time_limit_seconds no matter what).
+
+**Fix B — PLAYER-RES-1** (2 files rewired, +2 test-boundary stubs):
+- **`apps/web/src/hooks/usePreloadedPlayers.ts`** (rewritten): swapped `PlayerService.getAllPlayers()` (HTTP → /api/players → server cache) for direct `supabase.from('player_directory').eq('season', CURRENT_SEASON).range(0, 4999)`. Kept the ReadonlyMap<string, Player> shape and String(player_id) keys (contract unchanged). Row → Player mapping preserves existing Player type: id=String(player_id), name←full_name, position←normalizePosition(position_code), team←team_abbrev; stat fields default 0/null per Player interface. Dynamic `import('@/integrations/supabase/client')` inside useEffect (matches DraftRoomV2's apiClient pattern) so test collection doesn't trip the top-of-module env-var check.
+- **`apps/web/src/hooks/__tests__/usePreloadedPlayers.test.ts`** (rewritten): replaced PlayerService mock with a supabase fluent-chain rig (`from → select → eq → range → thenable`) using `mockReset` in beforeEach so per-test impls don't leak. +2 new assertions (queries player_directory + current-season filter shape; row → Player id-key mapping).
+- **`apps/web/src/pages/__tests__/DraftRoomV2.dr3.test.tsx` + `.f11.test.tsx` + `.test.tsx`**: added boundary stub `vi.mock('@/hooks/usePreloadedPlayers')` returning empty result, so downstream tests don't reach into supabase (severs the async chain that caused a batch-order-dependent act warning in DraftRoomV2.f11:287 after the initial rewire).
+
+**Consumer-grep receipts (INS-16 per architect ratification):**
+1. `v1Adapters.ts:100` `resolvePlayerDisplay` — `playersById.get(String(playerId))` where playerId is `number` from `entry.playerId`. ✓ new shape keys by String(numeric NHL id).
+2. `v1Adapters.ts:257` `toAvailablePlayers` — iterates map, drafted-set membership on `.id`. ✓ Player.id is String(numeric).
+3. `DraftRoomV2.tsx:611` `parseInt(player.id, 10)` — String(numeric) parses back cleanly.
+4. `DraftRoom.tsx` (legacy v1) has its OWN local `playersById` — NOT a consumer of this hook. Confirmed via grep (`grep -rn usePreloadedPlayers apps/web/src` → only DraftRoomV2 + test file).
+
+No dual-keying needed. No global Player type mutation. Contract preserved end-to-end.
+
+**Fix A — COMPLETED-ROOM-1** (server + client per architect-authored truth table, +13/+2 tests):
+
+**Server side:**
+- **`server/src/routes/drafts.ts:265-284`** (snapshot route only; discovery route unchanged): terminal statuses (`completed`) now serve 200 via existing `buildSnapshot`. Pre-fix `!CONNECTABLE.includes` gate rejected everything outside CONNECTABLE_DRAFT_STATUSES with 409. Comment cites Entry 90 DB evidence (draft_snapshots persist post-eviction, buildSnapshot reads durable draft_events + draft_picks_v2 regardless of lobby state) + notes that DraftStatus union today doesn't include 'cancelled' (packages/shared/types/league.ts:552) so TERMINAL_STATUSES is `['completed']` only; when 'cancelled' is added to the union, extend here. Client already accepts both. `not_started` still 409s.
+- **`server/src/__tests__/drafts.test.ts`**: +2 tests — draft_status=completed → 200 with DraftSnapshot; not_started still 409 (regression pin).
+
+**Client — types.ts:**
+- New event `discovery_refused_terminal { draftStatus }`.
+- New state `terminal_completed { draftStatus }`.
+- `ws_closed` event gains optional `lastKnownTerminalStatus` field (runner-annotated).
+
+**Client — reduce.ts (truth-table implementation, item-by-item):**
+- Item 1: `fetching_token + discovery_refused_terminal` → `terminal_completed` + `fetch_snapshot` effect. All OTHER discovery failures (401/403/500) continue to route through unchanged `token_fetch_failed` handler (line-for-line preserved).
+- Item 2: `handleWsClosed` — early check: if `event.lastKnownTerminalStatus !== undefined` → `terminal_completed` + `fetch_snapshot`, NO backoff. Also short-circuits close events when already in terminal_completed / fatal.
+- Item 3: no-ops in terminal_completed for `backoff_timer_fired`, `visibility_changed`, `network_changed` (new early-return in handleNetworkChanged; visibility already no-ops).
+- Item 3 cont: `connect_requested` in terminal_completed permits single re-discovery (state.kind added to the "or fatal" allow branch in handleConnectRequested).
+- Item 4: enter effect is `fetch_snapshot` (leagueId param filled by runner — same pattern as snapshot_required's fetch).
+
+**Client — runner.ts:**
+- New private `lastKnownTerminalStatus: 'completed' | 'cancelled' | null` field. Cleared on connect() / disconnect().
+- `ws.onmessage` observes: (1) snapshot frames with `stateSnapshot.draftStatus ∈ {completed, cancelled}`, (2) event frames with `kind === 'draft_completed'`. Sets `lastKnownTerminalStatus`.
+- `ws.onclose` annotates the `ws_closed` dispatch with `lastKnownTerminalStatus` when present.
+- `runFetchToken` catch inspects error shape: if `.status === 409 + .data.error.code === 'DRAFT_NOT_CONNECTABLE' + .data.error.status ∈ {completed, cancelled}` → dispatches `discovery_refused_terminal`; every other error goes through the existing `token_fetch_failed` path (401/403/5xx branches unchanged).
+
+**Client — UI surfaces:**
+- **`ConnectionBanner.tsx`**: added `case 'terminal_completed': return null;` alongside `idle` and `connected` (banner communicates LIVE connection state; a frozen board has no connection to lose).
+- **`DraftRoomV2.tsx`**: pre-fix `snapshot === null` branch now first checks `connectionState.kind === 'terminal_completed'` and shows a purpose-specific loader ("Draft completed. Loading final board…") while the snapshot fetch is in flight. Generic "Waiting for draft state…" reserved for genuine pre-first-snapshot waits.
+
+**Client — reduce.test.ts:** +13 truth-table tests covering all 6 architect-specified minimums plus edge cases: discovery-409-terminal → terminal_completed + snapshot + no backoff · same for cancelled discriminator · ws_closed with annotation → terminal_completed (Garrett Run 3 regression pin) · ws_closed WITHOUT annotation → reconnecting (unchanged path guard) · backoff_timer_fired no-op · visibility_changed no-op · network_changed(online) no-op · network_changed(offline) no-op · ws_closed no-op in terminal_completed · connect_requested → single re-discovery · 401/403/500 unchanged (three regression pins).
+
+### Fix C's CSP ride-along per Entry 87
+
+- **`apps/web/firebase.json`** already has `wss://draft-staging.citrusfantasysports.com` in `connect-src` (verified: `grep -c 'wss://draft-staging'` = 1/1 in both `apps/web/firebase.json` and root `firebase.json`). The apps/web copy shows as modified in git status — the architect-authored fix carried through the working tree from prior session. Included in this commit.
+
+### Full CI-mirror gate (Entry 64 standing gate)
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint web | 0 errors, 14 warnings | ≤0 errors | ✅ (unchanged pre-existing warnings) |
+| Web tsc | **157** | =157 baseline | ✅ (zero new errors, verified via git stash diff) |
+| Server tsc | **0** | strict ≤0 | ✅ (after cancelled→completed narrow) |
+| Web build | 12s ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Server build | tsc emit exit 0 | exit 0 | ✅ |
+| Web vitest FULL | **1713 / 1713** (102 files) | ≥1684 prior | ✅ (+29 new tests: 5 DraftTimerV2 + 3 OnClockActionBar + 6 store + 13 reduce + 2 usePreloadedPlayers) |
+| Server vitest FULL | **987 pass + 6 skip / 993** (53 files + 1 skip) | ≥985 prior | ✅ (+2 new tests: drafts.test.ts terminal + not_started pins) |
+
+### Rebuild block for Garrett (pending architect countersignature)
+
+Same three-command shape as Entry 78 / R90 (`gcloud run deploy citrus-api …`) — new tag suffix `-frt` (FlawlessRunTrio). Firebase Hosting deploy for the client trio uses the same `firebase deploy --only hosting` pattern from the -t7a cycle. Pin table proposed:
+- **Previous-good** (holds): `server:d05702a5-t7a` (Entry 79 fix, R90 deploy target)
+- **Superseded**: none for this cycle — R90 deploy hasn't happened yet per Entry 90 ordering, so d05702a5-t7a is still previous-good until the -frt image lands
+- **Current-after-deploy** (proposed): `server:<new-hash>-frt` (adds Fix A snapshot terminal-serve on top of d05702a5)
+- **Rollback**: one `gcloud run deploy citrus-api --image=<d05702a5-t7a>`
+
+Web hosting deploy carries Fix B + Fix C + the client half of Fix A + the CSP ride-along. All three fixes need both surfaces for full effect, but Fix C's clamp + seed and Fix B's swap are pure client — they land the moment hosting deploys. Fix A's terminal-serve requires the -frt server tag AND the client's terminal_completed routing (which the same hosting deploy carries).
+
+Per Entry 65: **NO PASTE BANNER** in this outbox. Terminal proposes READY; architect countersigns before Garrett runs the rebuild block.
+
+### Standing by
+
+Commit + branch push pending on architect countersignature of this READY-CANDIDATE. Once countersigned + Garrett has run tonight, Run 4 is the full five-checkpoint flawless run (CP1-4 covered by Fix C + Fix B; CP5 verifies by simply opening tonight's completed room — no redraft needed per Entry 89's incremental-deploy note).
+
+**End of R91. Entry 87 FLAWLESS-RUN TRIO (Fix C + Fix B + Fix A) executed against architect-ratified spec + truth table. Full CI-mirror gate GREEN (0 new tsc errors, +29 web tests, +2 server tests). Standing by for architect countersignature + rebuild block issuance.**
+
+## R92 — Entry 92 PLAYER-RES-1b EXECUTED · READY-CANDIDATE (2026-08-10 23:20Z / 5:20 PM MT)
+
+### Entries 91 + 92 ACK
+
+R91 COUNTERSIGNED — trio deployed, Run 4 executed on Garrett's screen. Entry 92 pre-ratified: PLAYER-RES-1b pagination patch on Fix B's rewire. Run 4 field evidence pinned the root cause (Regenda in-window / MacKinnon + McDavid out) to Supabase Data-API's 1000-row default cap silently truncating the 2035-row directory to an arbitrary physical-order subset. Client-only cycle per Entry 92.
+
+### This cycle executed
+
+**`apps/web/src/hooks/usePreloadedPlayers.ts`** — swapped the single `.range(0, 4999)` call for a page-loop:
+- Added `.order('player_id', { ascending: true })` to each iteration → deterministic paging, no overlap or gap.
+- `PAGE_SIZE = 1000` constant; loop calls `.range(offset, offset + PAGE_SIZE - 1)` until `rows.length < PAGE_SIZE` signals end-of-data.
+- Empty table case handled implicitly (first-iteration rows=0 < 1000 → break, no infinite loop).
+- Map contract untouched: `id = String(player_id)` keys, same Player shape, same lazy supabase import pattern.
+- Comment block cites Entry 92 root cause + Run 4 field evidence (Regenda / MacKinnon / McDavid) for future readers.
+
+**`apps/web/src/hooks/__tests__/usePreloadedPlayers.test.ts`** — extended the fluent-chain mock to include `.order` between `.eq` and `.range`, added `orderMock.mockClear()` to beforeEach, and appended **5 pagination pins**:
+1. `.order('player_id', { ascending: true })` called each iteration (shape lock).
+2. Short first page (rows < 1000) → single `.range(0, 999)` call, no second fetch.
+3. **Full first page (1000 rows) → second `.range(1000, 1999)` fires; map contains BOTH pages; MacKinnon (8477492) + McDavid (8478402) — the Run 4 regression pin — resolve from the second page.** Locks the exact bug that dropped stars from the browser map on live prod.
+4. Three-page directory (any-size expansion): third `.range(2000, 2999)` fires when second page also full.
+5. Empty first page (rows === 0) → exit loop immediately, no infinite spin.
+
+### Full CI-mirror gate (Entry 64 standing gate — web only per Entry 92 scope)
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint | 0 errors, 14 pre-existing warnings | ≤0 errors | ✅ (removed one unused-disable I added mid-cycle) |
+| Web tsc | **157** | =157 baseline | ✅ (zero new errors) |
+| Web build | 12.92s ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Web vitest FULL | **1718 / 1718** (102 files) | ≥1713 prior | ✅ (+5 new pagination pins) |
+| Server | untouched per Entry 92 scope | n/a | ✅ (not exercised — client-only patch) |
+
+### Deploy block for Garrett (per Entry 92: `npm run build` + hosting deploy, ~4 min)
+
+Web-only cycle — no citrus-api rebuild needed (server untouched). Pin table update proposed:
+- **Previous-good** (holds): `web:<hosting-commit>` from R91 trio deploy (whichever hosting build carried 0e73b70a).
+- **Current-after-deploy** (proposed): hosting build from the new commit (0e73b70a + this cycle).
+- **Rollback**: firebase hosting release-list + one `firebase hosting:clone` back to the prior release.
+
+Per Entry 65: **NO PASTE BANNER** in this outbox. Terminal proposes READY; architect countersigns before Garrett runs the hosting redeploy.
+
+### Standing by
+
+Commit + branch push pending on architect countersignature. Once countersigned + Garrett has redeployed hosting, next Run 4 refresh should show autopicked stars (MacKinnon, McDavid, etc.) with full names + positions + teams in History — the last visible blemish before the flawless five with real names.
+
+**End of R92. Entry 92 PLAYER-RES-1b EXECUTED. Directory fetch now paginates ≤1000-row windows with deterministic ordering — defeats the Supabase Data-API cap that dropped >1000th-row stars from the browser map on Run 4. Full web CI-mirror gate GREEN (+5 new tests locking the page-loop). Standing by for architect countersignature.**
+
+## R93 — Entry 99 COMPLETED-ROOM-2 EXECUTED · READY-CANDIDATE (2026-08-11 08:32Z / 2:32 AM MDT)
+
+### Entries 93-101 ACK
+
+R91 countersigned (E94) + trio deployed + Run 4 CP5 field-pass (E93) + Run 5 CERT + night close (E96) + LOAD-1-NIGHT full campaign closed clean (E97-101, 86 rig leagues, 86 drift-cert). E99 = pair fix for the LOAD-1-NIGHT witness-draft find. E100 = P0 platform-grade race, same-league contention rung. E80 = V1-FENCE, morning queue continuation.
+
+### This cycle executed (commit 25a68506)
+
+**E99 pair fix (b + c). Fix (a) engine serializer defers to ENGINE-EAR deploy batch per E99.**
+
+- **`server/src/routes/drafts.ts`** — snapshot route decoration. When `isTerminal` (draft_status='completed'), after buildSnapshot returns, override `snapshot.stateSnapshot.draftStatus` with the authoritative `leagues.draft_status` value. Idempotent when engine payload already agrees. Discovery route unchanged (still 409s for terminal).
+- **`apps/web/src/lib/draftClient/reduce.ts`** — `handleSnapshotFetched` now also accepts arrival from `terminal_completed` state. Pre-fix, handler no-op'd from anywhere except `snapshot_required`, so the delivered snapshot never reached the store and DraftRoomV2 sat on "Loading final board…" indefinitely. State stays terminal (no transition to `connected` — no live socket exists). Delivered snapshot's `stateSnapshot.draftStatus` overridden to the runner's terminal value (belt to server-side decoration's suspenders).
+- Tests: +4 reduce (terminal + snapshot_fetched with in_progress payload → stays terminal + deliver_snapshot with 'completed' patch; cancelled variant; snapshot_required path UNCHANGED regression pin; connected no-op regression pin) + 3 server drafts (completed+lying → override; in_progress+agrees → passthrough regression pin; completed+agrees → idempotent no-op).
+
+### Full CI-mirror gate
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint | 0 errors, 14 pre-existing warnings | ≤0 errors | ✅ |
+| Web tsc | **157** | =157 baseline | ✅ (zero new; caught + fixed one narrow-type slip mid-cycle) |
+| Server tsc | **0** | strict ≤0 | ✅ |
+| Web build | 12s ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Server build | tsc emit exit 0 | exit 0 | ✅ |
+| Web vitest FULL | **1722 / 1722** (102 files) | ≥1718 prior | ✅ (+4 reduce) |
+| Server vitest FULL | **990 pass + 6 skip / 996** (54 files) | ≥987 prior | ✅ (+3 drafts) |
+
+**Deploy block (proposed, awaits countersign):** hosting for the client half + citrus-api tag `-crm2` for the server half. Same 3-command pattern as E94's -crm1 predecessor. Previous-good server tag holds; rollback = one gcloud run deploy back.
+
+## R94 — Entry 100 IGNITION-RACE EXECUTED · READY-CANDIDATE (2026-08-11 08:XXZ)
+
+### This cycle executed
+
+**E100 fix order item 1 (start_draft_v2 row lock migration). Item 2 (submit_pick_v2 audit — see findings). Item 3 (regression tests — offline + deferred live). Item 4 (forensic league stays as fixture).**
+
+- **`supabase/migrations/20260811100000_start_draft_v2_row_lock.sql`** — new CREATE OR REPLACE FUNCTION migration. One-line change bounded to Step 2: `SELECT commissioner_id, draft_state, draft_status::text, league_size, settings … FROM public.leagues WHERE id = p_league_id FOR UPDATE`. Every other step byte-identical to the F27 original (`20260807000000_start_draft_v2.sql`). Migration header carries the full forensic ledger from E100 (four racers, seq 15/16/17 committed after seq 14 draft_completed, status regression). Rollback = re-apply F27 original via same harness.
+
+- **`scripts/proof/dryrun-apply-ignition-race-fix-checks.local.mjs`** — 29-check structural gate matching the F27 dryrun pattern. Locks the FOR UPDATE marker + positional ordering (FOR UPDATE precedes status checks + append_draft_event + Step 7 UPDATE) + full parity with every check the F27 dryrun asserts. **29/29 PASS locally.** F27's original dryrun still 43/43 PASS against its own file (both migrations coexist; new one applies last per timestamp order and overrides the function body).
+
+### submit_pick_v2 sibling-race AUDIT (E100 item 2) — findings
+
+**Belt PRESENT via storage constraint.** `draft_picks_v2` (foundation migration `20260425130000_draft_engine_v2_foundation.sql:108`) declares `PRIMARY KEY (league_id, pick_number)`. The AFTER INSERT trigger `tg_draft_events_project_pick` writes into `draft_picks_v2` in the pick's transaction; a duplicate pick_number for the same league raises `unique_violation` atomically, rolling back the whole transaction (draft_events INSERT + counter increment). The same-pick-number double-tap race (two fresh idem keys) CANNOT double-append — storage layer refuses.
+
+**Race trace (safe):**
+1. Two callers arrive with different idem keys for the same pick_number = N.
+2. Step 1 advisory locks (per-key) don't serialize them.
+3. Both read Step 2b `count(*) = N-1`; both compute `p_pick_number = N` → pass.
+4. Both read Step 2e `player not taken` → pass.
+5. Call A reaches Step 3 UPDATE → acquires leagues row lock → completes → trigger inserts draft_picks_v2 (league_id, pick_number=N).
+6. Call B blocks on leagues row lock. On unblock: UPDATE succeeds (counter goes to seq+2), draft_events INSERT succeeds, then the AFTER INSERT trigger tries to insert (league_id, pick_number=N) into draft_picks_v2 → unique_violation → whole B transaction rolls back atomically.
+
+**Suspenders (row-lock preflight in submit_pick_v2) — DOCKET, not this cycle.** Would give cleaner error semantics (refuse via `pick_out_of_order` at preflight instead of raising `unique_violation` from the trigger), but not required for correctness. Belt-only was E100's explicit fallback. If architect ratifies the suspender, mirrors the start_draft_v2 shape — same `FOR UPDATE` addition to submit_pick_v2's Step 2a leagues SELECT.
+
+### Regression tests
+
+**Offline (this cycle):** 29-check structural dryrun passes; the FOR UPDATE marker is machine-verified inside the migration body + positionally locked to fire before Rider 1 status checks + before append_draft_event + before Step 7 UPDATE.
+
+**Live regression (deferred to architect's rig lane per hand-off protocol):**
+- Concurrent-ignition: two sessions racing on the same league, 2nd must refuse via `draft_already_in_progress`.
+- Completed-league ignition refusal in the race window: 2nd caller lands after 1st has advanced to `draft_completed`, must refuse via `draft_already_completed`.
+- Forensic league `ada00006-…-01` from LOAD-1-NIGHT stays in `load1_leagues` tracking per E100 item 4.
+
+### Deploy block (proposed, hand-off per infra-command memory)
+
+Migration apply is architect/Garrett's action. Terminal DID NOT execute the apply — writing the .sql + dryrun is my lane per the durable memory rule. Proposed apply block (PowerShell):
+
+```powershell
+# 1. Structural gate (must pass 29/29 BEFORE apply)
+node scripts/proof/dryrun-apply-ignition-race-fix-checks.local.mjs
+
+# 2. Apply via the standard apply-migration harness (staging first, then prod after cert)
+node scripts/proof/apply-migration.local.mjs --file=supabase/migrations/20260811100000_start_draft_v2_row_lock.sql
+```
+
+**Rollback:** re-apply `20260807000000_start_draft_v2.sql` (F27 original) via the same harness. No data change; no downtime; CREATE OR REPLACE FUNCTION swap is transactional.
+
+Per Entry 65: **NO PASTE BANNER** in this outbox. Terminal proposes READY; architect countersigns before Garrett runs the apply block.
+
+### Standing by
+
+Commit d940a1f1 + 25a68506 (R92 + R93) on `phase-4-5-implementation`; this cycle's commit lands on top. E80 V1-FENCE lane next per morning queue. Standing by for architect countersignature on E99 + E100 deploy blocks.
+
+**End of R94. Entry 100 IGNITION-RACE fix migration + dryrun + audit findings shipped. 29/29 structural gate green. Standing by for architect countersignature.**
+
+## R95 — Entry 80 V1-FENCE EXECUTED · READY-CANDIDATE (2026-08-11 08:52Z)
+
+### This cycle executed
+
+**E80 order item 1 + belt (item 2). Items 3 + 5 docketed as follow-up.**
+
+- **`apps/web/src/pages/DraftRoom.tsx`** — restructured with a wrapper pattern. The exported `DraftRoom` component now:
+  1. Reads `leagueId` from searchParams.
+  2. Calls new `useV1Fence(leagueId)` hook which probes `supabase.from('draft_events').select('id').eq('league_id', leagueId).limit(1)` for any v2-era event.
+  3. Renders `<Navigate to="/draft-v2/…" replace>` immediately if `data.length > 0` — BEFORE any v1 draft state or effect can arm.
+  4. Renders a lightweight `data-testid="v1-fence-checking"` placeholder while the probe is in flight (belt: v1 body suppressed).
+  5. Mounts `DraftRoomInner` (the renamed legacy body, byte-identical) only in the `v1-safe` branch.
+- Wrapper pattern was REQUIRED — a hook-early-return inside the same component would violate React's hook-order rule with the ~200 downstream v1 hooks. This shape lets v1 useEffects only fire from the v1-safe mount.
+- Defensive fall-through to v1 on DB error (Entry 80 fence-not-block doctrine: fence's job is to catch v2-era leagues, not to block v1 on a transient DB error; T7 START-button fence is the other rail).
+- TS deep-instantiation workaround: the `draft_events` wide-JSONB column set trips TS's instantiation-depth cap on the .from → .select → .eq → .limit chain. Cast supabase.from via `unknown → (t) => any` for THIS probe only. Zero new tsc errors introduced (baseline 157 preserved).
+
+- **`apps/web/src/pages/__tests__/DraftRoom.v1Fence.test.tsx`** — 10 source-shape lock tests following DraftRoom.copyLock pattern (5100+ line file with 30+ deps makes full render tests impractical). Locks:
+  - `useV1Fence` hook declared at module scope
+  - Probe uses `draft_events` table (not a different table)
+  - Probe filters by `league_id` (not unfiltered scan — critical: unfiltered would misclassify every league in a shared DB as v2-era)
+  - Probe uses `.limit(1)` (existence check, not full scan)
+  - Three-state union (checking / v2-era / v1-safe) preserved
+  - v2-era renders `<Navigate to="/draft-v2/…" replace>` — target locked, `replace` locked
+  - Checking renders `data-testid="v1-fence-checking"` placeholder (v1 UI suppressed)
+  - Wrapper pattern locked: `DraftRoomInner` exists + mounted only from v1-safe branch (prevents future collapse to hook-early-return)
+  - Missing-leagueId falls through to v1-safe (legacy load-user-league path handles null)
+  - DB errors fall through to v1-safe with `[V1-FENCE]` log tag (fence-not-block doctrine locked)
+
+### Deferred (dockets)
+
+- **E80 item 3 (server-side v1 pick-write suspenders):** v1 pick writes go through `DraftService` which writes directly to v1 tables (`draft_picks`) via Supabase, not through a citrus-api route. A server-side refusal would require either: (a) DB-level RLS/trigger blocking `INSERT INTO draft_picks WHERE league has v2 events`, or (b) migrating v1 writes to a server route first. Client-side fence is sufficient for the observed defect class (Garrett's browser can no longer run the whole draft because the fence redirects before v1 mounts). Docketed.
+- **E80 item 5 (routing truth table):** LeagueDashboard.tsx:1605 + Matchup.tsx:5264 still `navigate('/draft-room?league=…')`. Not a defect: the fence catches these too — the /draft-room URL loads, the fence probes, the Navigate fires. Proposed truth-table upgrade: those consumers check league state first and route directly to /draft-v2 when v2-era to skip the fence roundtrip. Cosmetic (saves ~50ms per nav). Docketed.
+
+### Full CI-mirror gate
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint | 0 errors, 1 pre-existing warning (line-shifted from :1380 → :1488 due to fence insertion; identical warning content) | ≤0 errors | ✅ |
+| Web tsc | **157** | =157 baseline (zero new; fixed TS deep-instantiation slip mid-cycle via untypedFrom alias) | ✅ |
+| Server tsc | **0** | strict ≤0 | ✅ (server untouched) |
+| Web build | ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Server build | tsc emit exit 0 | exit 0 | ✅ |
+| Web vitest FULL | **1732 / 1732** (103 files) | ≥1722 prior | ✅ (+10 fence source-shape tests) |
+| Server vitest FULL | **990 pass + 6 skip / 996** (54 files) | =990 prior | ✅ (server untouched) |
+
+### Deploy block (proposed, hosting-only)
+
+Web-only cycle — no citrus-api or migration to apply. Same `firebase deploy --only hosting` pattern from prior cycles. Zero-risk deploy: fence is opt-in per-league (queries only on /draft-room mount), fall-through to v1 on any DB error preserves existing behavior.
+
+Per Entry 65: **NO PASTE BANNER** in this outbox. Terminal proposes READY; architect countersigns before Garrett runs the hosting deploy.
+
+### Standing by
+
+Three-fix chain complete: E99 (25a68506) + E100 (25a1acd7) + E80 (this commit) all shipped to `phase-4-5-implementation` with full CI-mirror gate green per fix. Awaiting architect countersignature on the deploy blocks.
+
+**End of R95. E80 V1-FENCE shipped. v1 DraftRoom now hard-fenced from v2-era leagues at mount time via draft_events probe. Full CI-mirror gate GREEN (+10 source-shape locks). Suspenders + route truth-table docketed for follow-up.**
+
+## R96 — Entry 103 F2b EXECUTED + SW-STALE-1 PROPOSAL · READY-CANDIDATE (2026-08-11 10:28Z)
+
+### Entry 102 + 103 ACK
+
+R93 + R94 + R95 all countersigned per E102. E100 migration applied by architect + race-fix field-proven live. E103 morning field verification found (F2b) terminal-room board still doesn't paint (recentEvents empty post-eviction) + fence-non-fire clouded by PWA SW mixed-chunk staleness (SW-STALE-1).
+
+### This cycle executed — E103 F2b (terminal-board fold fix)
+
+**Shape:** enrich the terminal snapshot response with authoritative `picks` array; client's `deriveFromSnapshot` synthesizes teamRosters + picksMade + draftStatus DIRECTLY from picks (bypasses recentEvents fold). Root-cause pin: engine lobby eviction post-completion leaves recentEvents empty; fold produces picksMade=0 + 'not_started'. Route enrichment + client picks-derive path together restore the terminal board render.
+
+- **`packages/shared/src/types/draftWire.ts`** — new exported `TerminalSnapshotPick` interface + optional `picks?: ReadonlyArray<TerminalSnapshotPick>` on `DraftSnapshot`. Undefined for live drafts (fold path unchanged); populated only by the HTTP snapshot route for terminal leagues.
+- **`server/src/routes/drafts.ts`** — after buildSnapshot + E99 decoration, when `isTerminal`:
+  1. Query `draft_picks_v2` with `.order('pick_number', asc)` for the league.
+  2. Left-join `teams` (batch `.in` on team_ids) for `team_name`.
+  3. Left-join `player_directory` (batch `.in` on player_ids + `.eq('season', CURRENT_SEASON)`) for `full_name`, `position_code`, `team_abbrev`.
+  4. Map to `TerminalSnapshotPick[]` and attach as `snapshot.picks`.
+  5. Non-fatal on any join/query failure — logs `snapshot.terminal.picks_enrichment_threw` and returns the base snapshot (client falls back to fold path, preserves E99's baseline improvement).
+- **`apps/web/src/lib/draftClient/deriveDraftState.ts`** — `deriveFromSnapshot` gate: when `snapshot.picks && snapshot.picks.length > 0`, route to new `deriveFromTerminalPicks` helper. Helper synthesizes:
+  - `teamRosters`: teamId → RosterEntry[] with `seq=pickNumber`, `isAutopick` propagated.
+  - `picksMade`: `picks.length`.
+  - `draftStatus`: prefers `stateSnapshot.draftStatus` when 'cancelled' (E99 decoration); else 'completed' when picksMade >= totalPicks; else 'in_progress' (defensive fallthrough).
+  - `foldedThroughSeq`: 0 (no draft_events consumed).
+  - `onClockTeamId`: null (terminal — no live pick).
+
+### Tests (+10)
+
+- **`server/src/__tests__/drafts.test.ts`** (+4): terminal + 3 picks → response.picks populated with joined names + isAutopick from actor.kind · missing joins → null names, pick still surfaces · zero picks → picks field absent (client falls to fold path) · in_progress league → NO picks enrichment (regression guard).
+- **`apps/web/src/lib/draftClient/__tests__/deriveDraftState.test.ts`** (+6): terminal snapshot + full picks projection → picksMade=36, draftStatus=completed, teamRosters populated with 3 picks/team ordered by pickNumber · cancelled variant → draftStatus=cancelled preserved from stateSnapshot decoration · in_progress defensive fallthrough → in_progress with picks<total · isAutopick badge propagates into RosterEntry · empty picks=[] → falls through to fold path · undefined picks (live snapshot) → fold path unchanged.
+
+### Header status source (E103 line item)
+
+E99's route decoration + E99 client patch of `stateSnapshot.draftStatus` = the authoritative status source. `describeStatus(derived.draftStatus, ...)` reads `derived.draftStatus` which now flows: route sets stateSnapshot.draftStatus='completed' → deriveFromTerminalPicks preserves it → StickyHeader renders "completed" (not "active — waiting for pick 1"). The `derived.picksMade` also matches picks.length, so header shows correct N/12 count.
+
+### Full CI-mirror gate
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint | 0 errors, 1 pre-existing warning | ≤0 errors | ✅ |
+| Web tsc | **157** | =157 baseline | ✅ (zero new) |
+| Server tsc | **0** | strict ≤0 | ✅ |
+| Web build | ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Server build | tsc emit exit 0 | exit 0 | ✅ |
+| Web vitest FULL | **1738 / 1738** (103 files) | ≥1732 prior | ✅ (+6 new deriveDraftState tests) |
+| Server vitest FULL | **994 pass + 6 skip / 1000** (54 files) | ≥990 prior | ✅ (+4 new drafts.test tests) |
+
+### Deploy block (proposed)
+
+Same 3-command shape as E99 (hosting + citrus-api). Terminal snapshot picks require BOTH the client picks-derive path (hosting) AND the server route enrichment (citrus-api). Neither alone suffices:
+- Client-only → picks always undefined → falls back to broken fold.
+- Server-only → picks arrive → client (pre-deploy) ignores the field → falls back to broken fold.
+
+Suggested tags:
+- Web hosting: same firebase deploy pattern.
+- Citrus-api: `<new-hash>-f2b` (F2b field-verification-2b).
+
+Per Entry 65: **NO PASTE BANNER** — architect countersigns before Garrett deploys.
+
+---
+
+## SW-STALE-1 PROPOSAL — PWA update strategy (docket for architect ratification)
+
+**Problem restatement (from E103):** workbox SW serves precached old chunks after deploys until hard refresh; returning PWA users can run MIXED old/new code indefinitely. Cost so far: three verification cycles across two nights (CSP, bundle, fence). Twelve will hit MID-WEEK deploys between signup day 1 and draft night — mixed-chunk staleness is a critical-path risk.
+
+**Current state (vite.config.ts:37):**
+- `VitePWA({ registerType: "autoUpdate", ... })`
+- Workbox `globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"]` (precaches app shell).
+- Runtime caching: Google Fonts (StaleWhileRevalidate/CacheFirst), Supabase (NetworkFirst).
+- **No explicit `skipWaiting` or `clientsClaim` in workbox config.**
+- **No navigateFallback + no NetworkFirst on index.html.**
+
+**Why the current setup fails post-deploy:**
+1. `autoUpdate` triggers the new SW to install in the background, but the old SW keeps controlling loaded clients until every client closes (default SW lifecycle). Long-lived tabs / installed PWAs never close → new SW stays "waiting" indefinitely.
+2. Old SW's precache contains the OLD `index.html` → serves it on refresh → old HTML references OLD chunk hashes still in precache → the user's request-graph never fetches new chunks.
+3. If NEW `index.html` DOES land (via cache miss on some new fetch pattern), it references NEW chunk hashes; those cache-miss and fetch fresh, and the browser now runs a mix of OLD (still-in-memory) modules and NEW modules loaded via lazy imports. This is the "mixed old/new chunks" symptom E103 observed.
+
+**Three fix options, ranked:**
+
+### Option A (RECOMMENDED): `registerType: 'autoUpdate'` + workbox `skipWaiting: true` + `clientsClaim: true` + NetworkFirst for HTML
+
+```ts
+VitePWA({
+  registerType: 'autoUpdate',
+  workbox: {
+    skipWaiting: true,        // NEW: new SW activates immediately, not "waiting"
+    clientsClaim: true,       // NEW: takes over open clients without waiting for close
+    navigateFallback: '/index.html',
+    navigateFallbackDenylist: [/^\/api\//],
+    runtimeCaching: [
+      // ... existing entries ...
+      {
+        // NEW: HTML always network-first so deploys visible on next navigation
+        urlPattern: ({ request }) => request.mode === 'navigate',
+        handler: 'NetworkFirst',
+        options: {
+          cacheName: 'html-shell',
+          networkTimeoutSeconds: 3,   // fall back to cache after 3s offline
+        },
+      },
+    ],
+  },
+})
+```
+
+**Pros:** zero user-facing UI changes; deploys land on next navigation transparently; existing SW pipeline preserved.
+**Cons:** in-flight tabs can briefly see mixed state during the SW's takeover window (< 1s); a lazy-import chunk that references a stale API contract could 404 mid-load. Mitigated by immediate `clientsClaim` cutover.
+**Blast radius:** all users; behavior change is "deploys visible faster." Zero data risk.
+
+### Option B: `registerType: 'prompt'` + in-app "New version available" toast
+
+```ts
+VitePWA({
+  registerType: 'prompt',
+  workbox: { /* unchanged */ },
+})
+
+// New: apps/web/src/lib/pwa/useServiceWorkerUpdatePrompt.ts
+import { useRegisterSW } from 'virtual:pwa-register/react';
+export function useServiceWorkerUpdatePrompt() {
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW();
+  // Return { needRefresh, accept: () => updateServiceWorker(true), dismiss: () => setNeedRefresh(false) }
+}
+
+// New: <UpdateAvailableToast /> component mounted in App.tsx
+// Renders a citrus2 toast when needRefresh; primary button reloads + activates new SW.
+```
+
+**Pros:** user-controlled; no risk of mid-session takeover breaking a live draft; matches Sleeper's model.
+**Cons:** user friction (must click); returning users who ignore the toast stay stale — SW-STALE-1 not fully closed for the passive user.
+**Blast radius:** ships a new UI surface (toast); needs design touch to match citrus2.
+
+### Option C (belt+suspenders): Option A + a manual "Check for updates" affordance in Settings
+
+Add a hidden-under-Settings "Check for updates" button that calls `registration.update()` + `updateServiceWorker(true)`. Fallback for the rare case where autoUpdate doesn't fire the update check quickly enough (Chrome heuristics can delay update checks by hours on unfocused tabs).
+
+**RECOMMENDED PATH:** Option A this week (small vite.config.ts diff + full CI-mirror gate; ~30 minutes to ship). Option B/C queued as post-twelve if Option A's takeover window causes any observed regressions.
+
+**Deploy-checklist line proposal** (append to `docs/RUNBOOKS/DEPLOY_CHECKLIST.md` or the Sunday-block runbook):
+
+> **After every hosting deploy that changes app-shell HTML/JS:** verify the SW picks up the change within one navigation cycle by (a) opening staging in an existing PWA-installed tab, (b) navigating to a different route without hard-refresh, (c) confirming DevTools > Application > Service Workers shows the new SW as "activated and running" within 5s. If the OLD SW is still "activated" after two navigations, fall back to the SW-STALE-1 in-app prompt path (Option B) — the user must manually reload.
+
+**Testing surface for Option A:** offline vitest for the useRegisterSW wire-up isn't practical (SW is browser-only). Manual test cookbook + hosting-deploy field verification is the gate — matches the current cookbook pattern for `firebase deploy --only hosting`.
+
+---
+
+### Standing by
+
+Commit + branch push pending on architect countersignature for E103 F2b + SW-STALE-1 shape ratification. Recommended: architect ratifies Option A + I execute in a follow-up cycle.
+
+**End of R96. E103 F2b EXECUTED (+10 tests, gate GREEN); SW-STALE-1 proposed with 3-option decision matrix + Option A recommendation + deploy-checklist line. Standing by for architect countersignature on both.**
+
+## R97 — Entry 104 BATCH (FENCE-2 + F2b + SW-STALE-1) · READY-CANDIDATE (2026-08-11 11:03Z)
+
+### Entry 104 ACK + batch composition
+
+Per E104: FENCE-2 (new) + F2b (already committed 8b2b1a02) + SW-STALE-1 (execution, was R96 proposal) = ONE cycle, ONE full gate, ONE deploy pair. F2b lives at `8b2b1a02` from the R96 cycle; this cycle adds FENCE-2 + SW-STALE-1 Option A code on top, runs the gate against the combined tree, and reports READY for the batch deploy of all three.
+
+### This cycle executed
+
+**E104 FENCE-2 (client-side supabase RLS probe → API era endpoint):**
+- **`server/src/routes/draftV2Era.ts` (NEW)** — `GET /api/draft/v2/league/:leagueId/era` → `{ v2Era: boolean }`. Service-role EXISTS on `draft_events` (bypasses RLS — client needs authoritative answer regardless of caller's league membership). Auth middleware only, no membership gate. UUID shape guard mirrors discovery/snapshot routes. `structuredLogger.error` on query failure with 500 response; `structuredLogger.debug` on success.
+- **`server/src/app.ts`** — wired at `/api/draft/v2` prefix, sibling of draftV2Start/Sync/Pick/Events routes.
+- **`apps/web/src/pages/DraftRoom.tsx`** — `useV1Fence` rewired from `supabase.from('draft_events')` client RLS to `apiClient.get('/api/draft/v2/league/:id/era')`. Response shape guard on `payload.v2Era` boolean; falls through to v1-safe on any unexpected shape or thrown error (Entry 80 fence-not-block doctrine preserved).
+- **Always-log doctrine (E104 line item)** — EVERY branch instrumented with `[V1-FENCE]` prefix: `!leagueId` early return, probe-start line, `v2Era=true` redirect, `v2Era=false` v1-safe, error fall-through. The morning spent proving a negative the fence could have printed; that class of silence is gone.
+- Effect dep list already includes `leagueId` (verified — null→value rewrite dance re-runs the probe naturally).
+
+**E104 SW-STALE-1 Option A (skipWaiting + clientsClaim + NetworkFirst HTML):**
+- **`apps/web/vite.config.ts`** — VitePWA workbox config:
+  - `skipWaiting: true` — new SW activates immediately, does NOT sit "waiting" until every open tab closes.
+  - `clientsClaim: true` — takes over already-open clients on activation.
+  - New runtime cache entry: HTML navigation requests (`request.mode === 'navigate' && !url.pathname.startsWith('/api/')`) served NetworkFirst with 3s network timeout + 1-day cache fallback. Deploys visible on next navigation without hard refresh.
+- **Trade-off preserved (architect-ratified in R96 Option A)**: a tab mid-lazy-import when clientsClaim fires can see a chunk 404 for the < 1s takeover window. Long-term suspender is Option B (in-app "New version available" toast) — docketed post-twelve.
+
+### Tests (+13 new)
+
+- **`server/src/__tests__/draftV2Era.test.ts` (NEW, +8):**
+  - 401 unauthenticated · 401 malformed Authorization header (real authMiddleware smoke)
+  - 200 with `v2Era: true` when draft_events has ≥1 row
+  - 200 with `v2Era: false` when draft_events has 0 rows
+  - 200 with `v2Era: false` on defensive `data: null` (empty result sets)
+  - 400 malformed leagueId (not a UUID)
+  - 500 service-role query error → SERVICE_UNAVAILABLE (defensive fall-through class)
+  - 200 auth-only: no membership check (fence needs answer regardless — non-member still gets authoritative boolean)
+- **`apps/web/src/pages/__tests__/DraftRoom.v1Fence.test.tsx` (+5):**
+  - E104 FENCE-2: fence probes `/api/draft/v2/league/:id/era` (not client-side supabase.from RLS)
+  - E104 FENCE-2: fence reads `v2Era` boolean from response payload
+  - E104 FENCE-2: fence does NOT probe `supabase.from('draft_events')` directly (regression pin — pre-E104 pattern must stay removed inside useV1Fence body)
+  - E104 always-log: `!leagueId` early return logs · probe-start logs · v2Era=true redirect logs · v2Era=false v1-safe logs · error fall-through logs
+- **`server/src/__tests__/drafts.test.ts`** — one-line fix: added `beforeEach` to the vitest import (E103 F2b's new describe block used it but the import lacked it; caught by server tsc during batch build).
+
+### Full CI-mirror gate
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint | 0 errors, 1 pre-existing warning (line-shifted, unchanged content) | ≤0 errors | ✅ |
+| Web tsc | **157** | =157 baseline | ✅ (zero new) |
+| Server tsc | **0** | strict ≤0 | ✅ (E103 import-miss fixed) |
+| Web build | ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Server build | tsc emit exit 0 | exit 0 | ✅ |
+| Web vitest FULL | **1743 / 1743** (103 files) | ≥1738 prior | ✅ (+5 fence tests) |
+| Server vitest FULL | **1002 pass + 6 skip / 1008** (55 files) | ≥994 prior | ✅ (+8 era tests) |
+
+### Batch deploy block (proposed)
+
+**Web hosting** carries the client half of ALL THREE fixes: F2b's picks-derive path (8b2b1a02) + FENCE-2's era-probe rewire + always-log (this commit) + SW-STALE-1 Option A workbox config (this commit).
+
+**Citrus-api** carries the server half of TWO: F2b's snapshot-route picks enrichment (8b2b1a02) + FENCE-2's era endpoint (this commit). Proposed tag `-fen2` per E104.
+
+Same 3-command shape as prior deploys (previous-good holds; rollback = one `gcloud run deploy` back).
+
+### SW-STALE-1 deploy-checklist line (proposed for the Sunday-block runbook)
+
+> **Post-hosting-deploy verification (SW-STALE-1 Option A):** open staging in an existing PWA-installed tab; navigate to a different route without hard refresh; confirm DevTools > Application > Service Workers shows the new SW as "activated and running" within 5s. If the OLD SW is still "activated" after two navigations, capture the SW registration state as evidence and file a SW-STALE-2 ticket — Option A's takeover contract failed and Option B (in-app "New version available" toast) becomes P0.
+
+### Standing by
+
+Commit + branch push pending on architect countersignature. Batch deploy of hosting + citrus-api `-fen2` covers F2b (8b2b1a02) + FENCE-2 (this commit) + SW-STALE-1 Option A (this commit) in one motion.
+
+**End of R97. E104 batch EXECUTED (FENCE-2 + SW-STALE-1 Option A + F2b riding through). Full CI-mirror gate GREEN (+13 new tests). Standing by for architect countersignature on the one-deploy-pair batch.**
+
+## R98 — MASTER MERGE PLAN (proposal) + ENGINE-EAR v3 (queued proposal) (2026-08-11 11:15Z)
+
+### E105 rider ACK
+
+Verification lap ALL-GREEN acknowledged: FENCE-2 field-PASS (b74552b7 redirect certified; the exact URL that hijacked Run 1 now bounces cleanly) · F2b field-PASS (12/12 · completed banner + ROSTERS ARE SET + full History with named picks + positions + team abbrevs on cold load; "Drafted By 77777777" is the known raw-team-id cosmetic docket) · SW-STALE-1 field-PASS (exactly one SW registration, new worker ACTIVE + CONTROLLING, no waiting worker). Morning fix arc CLOSED.
+
+This report proposes two things per E105's next-lanes order: **(1) the master merge plan** for the branch's 9 commits (execute pending countersign + Garrett's explicit go on the master push) and **(2) ENGINE-EAR v3** (queue-only; execute pending architect ratification of shape).
+
+---
+
+## PROPOSAL 1 — MASTER MERGE PLAN
+
+### Branch state (verified via `git log --oneline origin/master..phase-4-5-implementation`)
+
+Branch `phase-4-5-implementation` at `038e8e40` is **9 ahead / 1 behind** master (`1e84c79a`).
+
+| # | Commit | Subject | Deploys |
+|---|---|---|---|
+| 1 | d05702a5 | fix(F28 unblock + batch): draftV2Start actor kind=commissioner + Homepage dup loading + 2 invalid opacity steps (E79/71/73) | already-deployed (`-t7a`) |
+| 2 | 785e6f05 | docs(R90): Entries 79/71/73 EXECUTED — F28 unblocker + batch, READY-CANDIDATE | docs only |
+| 3 | 0e73b70a | feat(E87 FLAWLESS-RUN TRIO): Fix C + Fix B + Fix A per architect truth table | already-deployed (`-frt`) |
+| 4 | d940a1f1 | fix(E92 PLAYER-RES-1b): paginate player_directory fetch through Supabase 1000-row cap | already-deployed (hosting) |
+| 5 | 25a68506 | fix(E99 COMPLETED-ROOM-2): snapshot route decorate + reduce accepts terminal_completed snapshot | already-deployed (`-crm2` + hosting) |
+| 6 | 25a1acd7 | fix(E100 IGNITION-RACE): start_draft_v2 preflight row lock + submit_pick_v2 audit | migration already applied by architect |
+| 7 | 71148e07 | fix(E80 V1-FENCE): wrapper redirects v2-era leagues to /draft-v2 before v1 arms | already-deployed (hosting) |
+| 8 | 8b2b1a02 | fix(E103 F2b): route enriches terminal snapshot with picks + client derives from projection | rides in E104 deploy pair (this cycle) |
+| 9 | 038e8e40 | fix(E104 batch): FENCE-2 + SW-STALE-1 Option A | rides in E104 deploy pair (this cycle) |
+
+**All 9 shipments field-verified per prior R-countersignatures + E105 rider.** Merging to master closes the branch-vs-master divergence and puts the trunk in sync with production.
+
+### Behind-master delta (verified via `git log phase-4-5-implementation..origin/master`)
+
+**1 commit on master not on branch:** `1e84c79a feat(archive): 9-season official-log rebuild — R2 xG fix + truncation guard + nhl-archive workflow (#292)`
+
+**Files touched (verified via `git show --stat 1e84c79a`):**
+- `.github/workflows/nhl-archive.yml` (new)
+- `data-pipeline/acquisition/data_acquisition.py` (modified)
+- `data-pipeline/tests/test_supabase_rest_select_exact.py` (new)
+- `data-pipeline/utils/supabase_rest.py` (new)
+- `scripts/drills/xg_rebuild_extractor_drill.py` (new)
+- `scripts/nhl_archive/*` (new: 4 files)
+- `scripts/utilities/process_xg_stats.py` (new)
+
+### Predicted conflict surface: ZERO
+
+Branch's 9 commits touched:
+- `apps/web/**` (client trio + fence + pagination + F2b client + SW config)
+- `server/src/**` (drafts route + draftV2Start + draftV2Era + tests)
+- `supabase/migrations/**` (E100 row-lock migration + dryrun script)
+- `packages/shared/src/**` (TerminalSnapshotPick type addition)
+- `docs/TERMINAL_OUTBOX.md` (R-reports)
+- `apps/web/firebase.json` (E82 CSP ride-along)
+- `apps/web/vite.config.ts` (SW-STALE-1)
+
+Master's 1 commit touched:
+- `.github/workflows/**`, `data-pipeline/**`, `scripts/drills/**`, `scripts/nhl_archive/**`, `scripts/utilities/**`
+
+**Disjoint paths.** The reverse-merge should be a fast-forward on both sides at the file level — no auto-resolve heuristics needed. Contrast with Entry 57's 38-conflict reverse merge which occurred after ~2 weeks of parallel drift; this merge covers 1 commit of drift over 1 day.
+
+### Merge plan (reverse-merge doctrine per Entry 57)
+
+**Executable by me if architect countersigns + Garrett gives explicit go on the master push** (per user memory: high-blast-radius shared-state actions require explicit-go even in auto mode; branch push is my lane, master push per prior discipline).
+
+```bash
+# 1. Fetch latest master to be sure we're seeing the true tip
+git fetch origin master
+
+# 2. Reverse-merge master into branch (worktree topology: `git checkout master`
+#    is not possible in this worktree; merge into branch, then refspec-push).
+git merge origin/master --no-edit
+#    Expected: clean merge commit, ZERO conflicts based on disjoint-path
+#    analysis above. If any conflict surfaces, STOP-and-report — the doctrine
+#    is architect-adjudicates each per-class (Entry 57 pattern), never
+#    unilateral pick.
+
+# 3. Full CI-mirror gate on the merged tree (Entry 64 standing gate)
+npx eslint . --workspace=apps/web         # ≤ 0 errors, warnings unchanged
+cd apps/web && npx tsc --noEmit -p tsconfig.app.json   # 157 = 157 baseline
+cd /c/Users/garre/Documents/citrus-league-storm-phase45
+npm run build            # web build ✓
+npm run build:server     # server build ✓
+npm run test             # web vitest FULL (currently 1743/1743)
+npm run test:server      # server vitest FULL (currently 1002+6/1008)
+
+# 4. Push branch (my lane — normal push, no --force)
+git push origin phase-4-5-implementation
+
+# 5. Refspec push branch → master (HANDED OFF to Garrett per prior discipline —
+#    master push is a shared-infra prod action; user memory reserves it.)
+# GARRETT RUNS:
+git push origin phase-4-5-implementation:master
+
+# 6. Post-push verification (Garrett or architect confirms):
+#    - GitHub Actions runs on master pushed commit (must go green — CI is
+#      the second verification pass, catches anything the local gate missed).
+#    - master tip advances to the branch-tip hash (or a merge commit on top
+#      of it if the local merge produced one).
+```
+
+### Alternative pathway (safer, slower)
+
+Instead of local reverse-merge + refspec push, open a **GitHub PR** from `phase-4-5-implementation` → `master`:
+- Pros: GitHub's merge UI produces an auditable trail; CI runs on the merge preview; standard squash-or-merge choice.
+- Cons: loses the single-refspec-push atomicity; PR title/body prep is another artifact to author.
+
+**RECOMMEND local merge + refspec push** given the clean disjoint diff and prior Entry 57 doctrine — but ready to switch to PR mode on architect's word.
+
+### Rollback
+
+If master push introduces a regression (unlikely given the clean gate + field verifications):
+- `git revert 038e8e40..HEAD` on master creates a revert commit; single push restores prior state.
+- All 9 commits are additive — no schema drops, no config removes, no destructive migrations. E100's migration is idempotent CREATE OR REPLACE with prior-migration rollback documented.
+
+### Standing by
+
+Architect countersigns the shape; Garrett gives explicit go on the master push line. I execute steps 1–4 (merge + gate + branch push). Steps 5–6 handed off.
+
+---
+
+## PROPOSAL 2 — ENGINE-EAR v3 (queued, ratify shape before execute)
+
+### Anchor entries
+
+Entry 82 (RUN 2 double root cause) → Entry 83 (resurrection anatomy: client-connect drives lobby, not restart) → Entry 88 (engine log decode: lazy-arm confirmed structurally, idle-eviction NEW FIND). ENGINE-EAR v3 spec in Entry 88 is the seed; this proposal folds those findings + Garrett-ordered instant-autopick for unowned seats (per R91 tomorrow-queue).
+
+### Root problem
+
+Engine treats **client presence as ignition key**. A live draft with no connected clients has no lobby → no armed timer → no autopicks → dead draft. This is the "no audience → no ignition" disease. Every night this week burned a cycle proving one of its symptoms: CSP-starved clients (Entry 82), post-restart 4.7-min dead window (Entry 83), lazy-arm structural confirmation (Entry 88).
+
+### Fix shape (5 items, pre-ratified spec text from Entry 88 §ENGINE-EAR v3, terminal-authored precision below)
+
+**1. NOTIFY-creates-lobby (client-independent ignition — highest impact).**
+When the engine's LISTEN receives a `draft_started` NOTIFY for a `league_id` with no in-memory lobby, CREATE the lobby, run bootstrap replay, arm the pick timer, and start driving autopicks — WITHOUT waiting for a client connect. Location: `server/src/draft/LobbyManager.ts` or the LISTEN handler (chunk 11g.7-7e).
+- Contract: after `draft_started` NOTIFY commits, a lobby exists with armed timer within the notify→broadcast SLA already measured (74–75ms tonight).
+- Test: rig ignition with ZERO clients connected → seq 2 autopick fires exactly `pick_time_limit_seconds + 1s` after ignition.
+
+**2. Boot-scan resumes in_progress leagues.**
+On engine boot, enumerate `leagues WHERE draft_status = 'in_progress'` → init a lobby per league → arm pick timer from the current `pick_deadline`.
+- Contract: 4.7-min post-restart dead window (Entry 83) becomes < 5s.
+- Test: rig ignition, kill engine mid-cascade, restart, no client connects, autopicks resume within 5s.
+
+**3. Eviction guarantee.**
+Read `LobbyRegistry.evictLobbyIfIdle` (Entry 88 idle-eviction find at `idleEvictionMs:600000 connectionCount:0`). Determine if `draftStatus` gates eviction. Two ratifiable paths:
+- **(3a)** Add `draftStatus === 'in_progress'` guard → refuse eviction of live drafts.
+- **(3b)** Rely on fix #1 + fix #2 as safety net: eviction-safe because a NOTIFY (autopick trigger) or a client reconnect re-creates the lobby anyway.
+- Terminal recommendation: **(3a)** — explicit guard is cheaper than trusting recreation to re-arm on the exact pick tick. `(3b)` is the fallback if `(3a)` conflicts with the eviction policy's other invariants.
+
+**4. Watchdog invariant.**
+Extend the existing `event_subscription.watchdog_ok` line (Entry 88: `elapsedMs: 3-4` proves it's an end-to-end echo) to also assert: for every `leagues.draft_status = 'in_progress'` row, the `LobbyRegistry` has an entry with a non-null armed timer deadline. If not, log `watchdog.stall_detected` at ERROR + attempt lobby recreation.
+- Contract: any silent stall becomes visible within one watchdog cycle (60s).
+- Test: rig `in_progress` league whose lobby has been programmatically evicted → watchdog fires stall_detected + recreates lobby within 60s.
+
+**5. F23 DB-side deadline sweep (dead-man's switch).**
+Server-side query: `SELECT id FROM leagues WHERE draft_status = 'in_progress' AND pick_deadline < now() - interval '5 seconds'` on a 30s cadence. Any hit → force-emit an autopick via `submit_pick_v2(actor.kind='autopick')`. This is the last-line-of-defense against every prior class of stall (F23's original F-ticket).
+- Contract: no live draft can stall for more than 30s + 5s = 35s worst case, ever, from any cause.
+- Test: rig a `pick_deadline < now()` state without an armed lobby → sweep force-emits within 30s.
+
+**6. INSTANT-AUTOPICK FOR UNOWNED SEATS (Garrett-ordered per R91 queue).**
+When the on-clock team's `owner_id IS NULL` (or the owner has never connected in this draft), fire the autopick immediately (~0s) rather than waiting the full `pick_time_limit_seconds`. Rationale: the twelve will have late-joiners whose seats need to draft "at real-league pace" without dragging the room.
+- Contract: unowned-seat picks fire within 1s of becoming on-clock.
+- Test: rig with team[3].owner_id=NULL → on-clock transition to team[3] → autopick within 1s (not 30s).
+- Discriminator: distinguish "unowned" from "owner is offline but exists" — the latter respects full pick clock. Only truly-null owners fire instant.
+
+### Skip-unchanged-snapshot docket (E88 minor)
+
+Completed lobbies rewrite unchanged seq-14 snapshots every 30s until eviction. Small fix: `LobbyManager.persistSnapshot` checks `if (this.lastAppliedSeq === lastPersistedSeq) return;` before write. Docket for post-v3 or v3 ride-along.
+
+### Acceptance mode
+
+Standalone script (`scripts/proof/lifecycle-acceptance-engine-ear.local.mjs`, mirrors `lifecycle-acceptance-f27.local.mjs` pattern):
+1. Ignite via rig, connect NO client → assert autopicks flow (proves #1).
+2. Reboot engine mid-cascade, still no client → assert resume (proves #2).
+3. Programmatically evict in_progress lobby → assert watchdog recreates within 60s (proves #4).
+4. Set `pick_deadline < now()` without armed lobby → assert F23 sweep fires within 30s (proves #5).
+5. Rig with `owner_id=NULL` team on-clock → assert autopick within 1s (proves #6).
+
+### Blast radius + gating
+
+- All 6 items are additive server-side changes; zero DB migration required (except #5 if the sweep is a pg_cron job vs a server-side setInterval — architect ratifies).
+- Deploy target: citrus-api tag `-eear3` after full CI-mirror gate.
+- Rollback: revert PR restores lazy-arm; the diseases return but nothing else breaks.
+
+### Recommended slicing
+
+- **Slice 1 (highest impact, smallest diff):** Items #1 + #2 alone. Closes the entire "no audience → no ignition" disease class. ~half-day of code + tests + integration acceptance run. Suggest architect ratifies #1 shape first, execute in a follow-up cycle.
+- **Slice 2:** Items #3 + #4 (eviction guard + watchdog invariant). Defense-in-depth.
+- **Slice 3:** Items #5 + #6 (F23 sweep + instant-autopick). Belt-and-suspenders for the twelve.
+
+### Standing by
+
+Architect ratifies the v3 shape (or amendments per item). Terminal executes on countersignature. Given the twelve's 10-day countdown, Slice 1 should probably ship this week.
+
+---
+
+**End of R98. Master merge plan proposed (clean 9-commit absorb, zero-conflict prediction, refspec-push doctrine, execute pending countersign + Garrett master-push go). ENGINE-EAR v3 queued (6-item spec + acceptance mode + 3-slice recommendation, execute pending shape ratification). Morning fix arc closed per E105.**
+
+
+
+
+
+
+

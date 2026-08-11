@@ -692,3 +692,321 @@ describe('reduce — multi-step reconnect cycle', () => {
     expect(state.kind).toBe('connected');
   });
 });
+
+// ── Entry 87 Fix A (COMPLETED-ROOM-1, 2026-08-10) ───────────────────
+//
+// Truth-table verification per architect ratification (Entries 89 + 90):
+//   1. discovery-409-terminal → terminal_completed + snapshot effect + NO backoff
+//   2. ws_closed + lastKnownTerminalStatus → terminal_completed (regression
+//      pin for Garrett's Run 3 sighting: post-completion engine eviction
+//      → ws_closed → previously scheduled backoff → discovery-409-loop)
+//   3. terminal_completed: backoff_timer_fired / visibility_changed /
+//      network_changed → no-ops (draft is done; nothing to reconnect to)
+//   4. terminal_completed: connect_requested → single re-discovery
+//      (harmless re-entry; discovery will 409 again into this state)
+//   5. 401/403 discovery failures unchanged (route through fatal
+//      auth_failure, NOT the new terminal_completed state)
+//   6. ws_closed in terminal_completed → no-op (no double transition)
+
+describe('reduce — Entry 87 Fix A (COMPLETED-ROOM-1)', () => {
+  const terminalCompletedState = (
+    draftStatus: 'completed' | 'cancelled' = 'completed',
+  ): DraftClientState => ({
+    kind: 'terminal_completed',
+    draftStatus,
+  });
+
+  it('fetching_token + discovery_refused_terminal(completed) → terminal_completed + snapshot fetch, no backoff', () => {
+    const result = reduce(
+      fetchingTokenState(),
+      { type: 'discovery_refused_terminal', draftStatus: 'completed' },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('terminal_completed');
+    if (result.state.kind === 'terminal_completed') {
+      expect(result.state.draftStatus).toBe('completed');
+    }
+    // Truth-table item 4: fetch_snapshot is the ONLY effect (no
+    // schedule_backoff_timer, no fetch_token, no close_websocket).
+    expect(effectKinds(result.sideEffects)).toEqual(['fetch_snapshot']);
+  });
+
+  it('fetching_token + discovery_refused_terminal(cancelled) → terminal_completed with cancelled status', () => {
+    const result = reduce(
+      fetchingTokenState(),
+      { type: 'discovery_refused_terminal', draftStatus: 'cancelled' },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('terminal_completed');
+    if (result.state.kind === 'terminal_completed') {
+      expect(result.state.draftStatus).toBe('cancelled');
+    }
+    expect(effectKinds(result.sideEffects)).toEqual(['fetch_snapshot']);
+  });
+
+  it('connected + ws_closed with lastKnownTerminalStatus → terminal_completed (Garrett Run 3 pin)', () => {
+    // The exact bug on Run 3: engine evicts the completed lobby, ws
+    // closes with code 1006 (abnormal), and pre-fix reduce
+    // classified it as transient → scheduled backoff → discovery
+    // returned 409 → repeat forever. The runner now annotates the
+    // close with lastKnownTerminalStatus (set when it observed the
+    // draft_completed frame), and reduce routes to terminal.
+    const result = reduce(
+      connectedState(35),
+      {
+        type: 'ws_closed',
+        code: 1006,
+        reason: 'lobby_evicted',
+        lastKnownTerminalStatus: 'completed',
+      },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('terminal_completed');
+    if (result.state.kind === 'terminal_completed') {
+      expect(result.state.draftStatus).toBe('completed');
+    }
+    // Same fetch_snapshot pattern — the room needs the frozen board.
+    // No backoff.
+    expect(effectKinds(result.sideEffects)).toEqual(['fetch_snapshot']);
+  });
+
+  it('connected + ws_closed WITHOUT lastKnownTerminalStatus → reconnecting (unchanged path)', () => {
+    // Regression guard — a normal transient close on an in-progress
+    // draft must still schedule backoff. The terminal routing only
+    // activates when the annotation is present.
+    const result = reduce(
+      connectedState(),
+      { type: 'ws_closed', code: 1006, reason: 'network_flap' },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('reconnecting');
+    expect(effectKinds(result.sideEffects)).toEqual(['schedule_backoff_timer']);
+  });
+
+  it('terminal_completed + backoff_timer_fired → no-op', () => {
+    // Truth-table item 3: defensive against a stray timer callback
+    // that already fired before cancellation. Never re-enters
+    // fetching_token from a terminal draft.
+    const result = reduce(
+      terminalCompletedState(),
+      { type: 'backoff_timer_fired' },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('terminal_completed');
+    expect(result.sideEffects).toEqual([]);
+  });
+
+  it('terminal_completed + visibility_changed → no-op', () => {
+    const result = reduce(
+      terminalCompletedState(),
+      { type: 'visibility_changed', isVisible: true },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('terminal_completed');
+    expect(result.sideEffects).toEqual([]);
+  });
+
+  it('terminal_completed + network_changed(online) → no-op', () => {
+    const result = reduce(
+      terminalCompletedState(),
+      { type: 'network_changed', isOnline: true },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('terminal_completed');
+    expect(result.sideEffects).toEqual([]);
+  });
+
+  it('terminal_completed + network_changed(offline) → no-op', () => {
+    const result = reduce(
+      terminalCompletedState(),
+      { type: 'network_changed', isOnline: false },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('terminal_completed');
+    expect(result.sideEffects).toEqual([]);
+  });
+
+  it('terminal_completed + ws_closed → no-op (already terminal)', () => {
+    const result = reduce(
+      terminalCompletedState(),
+      { type: 'ws_closed', code: 1006, reason: 'anything' },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('terminal_completed');
+    expect(result.sideEffects).toEqual([]);
+  });
+
+  it('terminal_completed + connect_requested → single re-discovery permitted', () => {
+    // Explicit user retry — allowed. The discovery will 409 again
+    // and reduce will route right back to terminal_completed
+    // (harmless re-entry). Enables a manual "Try Again" affordance
+    // without automated retries.
+    const result = reduce(
+      terminalCompletedState(),
+      { type: 'connect_requested' },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('fetching_token');
+    expect(effectKinds(result.sideEffects)).toEqual(['fetch_token']);
+  });
+
+  it('fetching_token + token_fetch_failed(401) → fatal auth_failure (UNCHANGED)', () => {
+    // Regression guard — 401 must NOT route through the new
+    // terminal_completed branch. The state machine's existing
+    // auth_failure disposition still handles it.
+    const result = reduce(
+      fetchingTokenState(),
+      { type: 'token_fetch_failed', error: 'unauthorized', statusCode: 401 },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('fatal');
+    if (result.state.kind === 'fatal') {
+      expect(result.state.reason).toBe('auth_failure');
+    }
+  });
+
+  it('fetching_token + token_fetch_failed(403) → fatal auth_failure (UNCHANGED)', () => {
+    const result = reduce(
+      fetchingTokenState(),
+      { type: 'token_fetch_failed', error: 'forbidden', statusCode: 403 },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('fatal');
+    if (result.state.kind === 'fatal') {
+      expect(result.state.reason).toBe('auth_failure');
+    }
+  });
+
+  it('fetching_token + token_fetch_failed(500) → reconnecting (transient, UNCHANGED)', () => {
+    const result = reduce(
+      fetchingTokenState(),
+      { type: 'token_fetch_failed', error: 'server error', statusCode: 500 },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('reconnecting');
+    expect(effectKinds(result.sideEffects)).toEqual(['schedule_backoff_timer']);
+  });
+});
+
+// ── Entry 99 COMPLETED-ROOM-2 (2026-08-11) ──────────────────────────
+//
+// Client-side companion to the server-route draftStatus decoration.
+// LOAD-1-NIGHT witness draft: for a completed league, the engine
+// serializer returned `stateSnapshot.draftStatus='in_progress'` even
+// though the applied event stream includes draft_completed. Fix A's
+// terminal-completed path fetches the snapshot on entry, but the
+// pre-E99 reducer no-op'd on the arrival from anywhere except
+// `snapshot_required` — so the delivered snapshot never reached the
+// store and DraftRoomV2 sat on "Loading final board…" indefinitely.
+//
+// E99 (c): terminal_completed accepts snapshot_fetched. State stays
+// terminal (no transition to connected — no live socket). Snapshot
+// is delivered with stateSnapshot.draftStatus overridden to the
+// runner's known terminal value, so the store's derived state
+// trusts the routed terminality even when the payload's own status
+// still lies. Belt to the server-side decoration in drafts.ts.
+
+describe('reduce — Entry 99 COMPLETED-ROOM-2 (terminal_completed accepts snapshot_fetched)', () => {
+  function mkSnapshotWithStatus(
+    draftStatus: import('@citrus/shared').LobbyStatus,
+  ): import('@citrus/shared').DraftSnapshot {
+    return {
+      lobbyId: 'lobby-terminal',
+      format: 'snake',
+      recentEvents: [],
+      stateSnapshot: {
+        currentPickNumber: null,
+        currentRoundNumber: null,
+        onClockTeamId: null,
+        totalPicks: 12,
+        picksMade: 12,
+        draftStatus,
+        currentPickDeadline: null,
+      },
+    };
+  }
+
+  it('terminal_completed + snapshot_fetched(in_progress payload) → stays terminal_completed + delivers snapshot with draftStatus overridden to "completed"', () => {
+    // The exact E99 scenario: engine serializer lies (says in_progress),
+    // client's runner already knows the draft is completed (routed
+    // via discovery_refused_terminal). Client-side override forces
+    // the delivered payload to match reality.
+    const lyingPayload = mkSnapshotWithStatus('in_progress');
+    const result = reduce(
+      { kind: 'terminal_completed', draftStatus: 'completed' },
+      { type: 'snapshot_fetched', snapshot: lyingPayload },
+      noJitter,
+    );
+    // State unchanged — still terminal_completed. No transition to
+    // 'connected' (there is no live socket for a completed draft).
+    expect(result.state.kind).toBe('terminal_completed');
+    if (result.state.kind === 'terminal_completed') {
+      expect(result.state.draftStatus).toBe('completed');
+    }
+    // Exactly one deliver_snapshot side effect fires.
+    expect(effectKinds(result.sideEffects)).toEqual(['deliver_snapshot']);
+    // Delivered snapshot has draftStatus overridden to the runner's
+    // known terminal value — the render layer trusts this and shows
+    // the completion board.
+    const delivered = result.sideEffects[0];
+    if (delivered.kind === 'deliver_snapshot') {
+      expect(delivered.snapshot.stateSnapshot.draftStatus).toBe('completed');
+      // Rest of payload preserved (no other fields clobbered).
+      expect(delivered.snapshot.stateSnapshot.picksMade).toBe(12);
+      expect(delivered.snapshot.stateSnapshot.totalPicks).toBe(12);
+      expect(delivered.snapshot.lobbyId).toBe('lobby-terminal');
+    }
+  });
+
+  it('terminal_completed(cancelled) + snapshot_fetched → override to "cancelled"', () => {
+    // Same override applies for the cancelled variant of terminal.
+    const payload = mkSnapshotWithStatus('in_progress');
+    const result = reduce(
+      { kind: 'terminal_completed', draftStatus: 'cancelled' },
+      { type: 'snapshot_fetched', snapshot: payload },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('terminal_completed');
+    if (result.state.kind === 'terminal_completed') {
+      expect(result.state.draftStatus).toBe('cancelled');
+    }
+    const delivered = result.sideEffects[0];
+    if (delivered.kind === 'deliver_snapshot') {
+      expect(delivered.snapshot.stateSnapshot.draftStatus).toBe('cancelled');
+    }
+  });
+
+  it('snapshot_required + snapshot_fetched → connected (UNCHANGED pre-E99 path)', () => {
+    // Regression guard: the resync-too-old → snapshot-fetch → connected
+    // path (Fix A's original E87 shape) must not have changed. Only
+    // terminal_completed gets the new branch; snapshot_required
+    // continues to transition to `connected`.
+    const payload = mkSnapshotWithStatus('in_progress');
+    const result = reduce(
+      snapshotRequiredState(),
+      { type: 'snapshot_fetched', snapshot: payload },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('connected');
+    expect(effectKinds(result.sideEffects)).toEqual(['deliver_snapshot']);
+    // Payload NOT patched here — the snapshot_required path preserves
+    // the original stateSnapshot as-is (that path is for live drafts
+    // catching up post-eviction; the runner has no terminal
+    // knowledge to override with).
+    const delivered = result.sideEffects[0];
+    if (delivered.kind === 'deliver_snapshot') {
+      expect(delivered.snapshot.stateSnapshot.draftStatus).toBe('in_progress');
+    }
+  });
+
+  it('connected + snapshot_fetched → no-op (unchanged; unexpected arrival ignored)', () => {
+    const payload = mkSnapshotWithStatus('in_progress');
+    const result = reduce(
+      connectedState(),
+      { type: 'snapshot_fetched', snapshot: payload },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('connected');
+    expect(result.sideEffects).toEqual([]);
+  });
+});

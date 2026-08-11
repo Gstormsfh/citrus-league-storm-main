@@ -29,7 +29,12 @@ import { authMiddleware } from '../middleware/auth';
 import { createUserClient } from '../lib/supabase';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { issueDraftToken } from '../lib/draftToken';
-import { CONNECTABLE_DRAFT_STATUSES, type DraftStatus } from '@citrus/shared';
+import {
+  CONNECTABLE_DRAFT_STATUSES,
+  CURRENT_SEASON,
+  type DraftStatus,
+  type TerminalSnapshotPick,
+} from '@citrus/shared';
 import { logger, structuredLogger } from '@citrus/shared';
 import { buildSnapshot } from '../services/snapshotService';
 import { readSystemFlag } from '../lib/systemFlags';
@@ -250,7 +255,30 @@ draftsRoutes.get('/:draftId/snapshot', async (c) => {
     );
   }
 
-  if (!CONNECTABLE_DRAFT_STATUSES.includes(draftStatus)) {
+  // Entry 87 Fix A (COMPLETED-ROOM-1, 2026-08-10) — the snapshot
+  // route serves terminal-state drafts (`completed` today) as
+  // permanent league history. Rejecting completed drafts here forced
+  // the client into a discovery → 409 → backoff loop for every
+  // reconnect after the engine's lobby-eviction TTL kicked in
+  // post-completion (Garrett witnessed this on Run 3's finished
+  // league). The discovery route KEEPS its 409 for terminal states —
+  // there's no live connection to hand out — but the snapshot is
+  // always safe to reconstruct from the durable draft_events +
+  // draft_picks_v2 tables (Entry 90 DB evidence: draft_snapshots
+  // rows persist post-eviction, and buildSnapshot reads durable
+  // projection tables regardless of lobby state).
+  //
+  // Only `not_started` still 409s here — there's genuinely no
+  // snapshot to render until the first pick fires. The architect
+  // truth table names `cancelled` alongside `completed`, but the
+  // current DraftStatus union does not include `cancelled`
+  // (packages/shared/types/league.ts:552); when it's added, extend
+  // TERMINAL_STATUSES here to match. The client already accepts
+  // 'cancelled' in its terminal_completed state.
+  const TERMINAL_STATUSES: readonly DraftStatus[] = ['completed'];
+  const isConnectable = CONNECTABLE_DRAFT_STATUSES.includes(draftStatus);
+  const isTerminal = TERMINAL_STATUSES.includes(draftStatus);
+  if (!isConnectable && !isTerminal) {
     return c.json(
       {
         error: {
@@ -266,6 +294,139 @@ draftsRoutes.get('/:draftId/snapshot', async (c) => {
   let snapshot;
   try {
     snapshot = await buildSnapshot(leagueId, supabase);
+    // Entry 99 COMPLETED-ROOM-2 (2026-08-11) — dual-source-of-truth
+    // fix (b). LOAD-1-NIGHT witness draft found the engine serializer
+    // returns `stateSnapshot.draftStatus='in_progress'` for a
+    // completed league (lastAppliedSeq=14 including draft_completed,
+    // engine persistence log labels it completed, but the serializer's
+    // status field lies). Client's completion render waits for a
+    // terminal status the payload never asserts → hangs forever on
+    // "Loading final board…".
+    //
+    // Route-level decoration: when serving a terminal league, override
+    // `stateSnapshot.draftStatus` with the authoritative
+    // `leagues.draft_status` value. The engine serializer fix (a per
+    // Entry 99) rides the separate ENGINE-EAR deploy batch; this
+    // route override is the client-visible corrective in the morning
+    // hosting/API cycle. Belt to reduce.ts's own client-side override
+    // (E99 fix c) — either alone is sufficient; both together is
+    // defense-in-depth against future engine regressions.
+    if (snapshot && isTerminal && snapshot.stateSnapshot.draftStatus !== draftStatus) {
+      snapshot = {
+        ...snapshot,
+        stateSnapshot: {
+          ...snapshot.stateSnapshot,
+          draftStatus,
+        },
+      };
+    }
+
+    // Entry 103 F2b (2026-08-11) — enrich terminal snapshot with the
+    // authoritative picks projection. Morning field verification (E103)
+    // found that after E99's decoration landed, terminal rooms STILL
+    // rendered "0/12 picks made" — the engine had evicted the lobby
+    // post-completion so `snapshot.recentEvents` was empty; the
+    // client's derive-from-events fold produced picksMade=0 and
+    // teamRosters=Map(). Fix: query draft_picks_v2 (the trigger-
+    // maintained projection — spec §3.2, principle P6) directly and
+    // attach as `picks`. Client uses this as the authoritative source
+    // instead of unpacking event kinds — the projection IS the source
+    // of truth per architect ratification.
+    //
+    // Left-joins to teams (for team_name) and player_directory
+    // (current-season for full_name / position / team_abbrev). Missing
+    // joins render as `null` on the wire → `#<id>` fallbacks in the
+    // client v1Adapters pattern.
+    if (snapshot && isTerminal) {
+      try {
+        const { data: picksRows, error: picksErr } = await supabase
+          .from('draft_picks_v2')
+          .select('pick_number, round, team_id, player_id, picked_at, picked_by_actor')
+          .eq('league_id', leagueId)
+          .order('pick_number', { ascending: true });
+        if (picksErr) {
+          structuredLogger.warn(
+            'snapshot.terminal.picks_query_failed',
+            { draftId, userId, error: picksErr.message },
+          );
+        } else if (Array.isArray(picksRows) && picksRows.length > 0) {
+          const teamIds = Array.from(new Set(picksRows.map((r) => r.team_id as string)));
+          const playerIds = Array.from(new Set(picksRows.map((r) => r.player_id as number)));
+
+          const [{ data: teamRows }, { data: playerRows }] = await Promise.all([
+            supabase
+              .from('teams')
+              .select('id, team_name')
+              .in('id', teamIds),
+            supabase
+              .from('player_directory')
+              .select('player_id, full_name, position_code, team_abbrev')
+              .in('player_id', playerIds)
+              .eq('season', CURRENT_SEASON),
+          ]);
+
+          const teamNameById = new Map<string, string | null>();
+          for (const t of (teamRows ?? []) as Array<{ id: string; team_name: string | null }>) {
+            teamNameById.set(t.id, t.team_name ?? null);
+          }
+          const playerById = new Map<
+            number,
+            { full_name: string | null; position_code: string | null; team_abbrev: string | null }
+          >();
+          for (const p of (playerRows ?? []) as Array<{
+            player_id: number;
+            full_name: string | null;
+            position_code: string | null;
+            team_abbrev: string | null;
+          }>) {
+            playerById.set(p.player_id, {
+              full_name: p.full_name ?? null,
+              position_code: p.position_code ?? null,
+              team_abbrev: p.team_abbrev ?? null,
+            });
+          }
+
+          const picks: TerminalSnapshotPick[] = picksRows.map((r) => {
+            const rawRow = r as {
+              pick_number: number;
+              round: number;
+              team_id: string;
+              player_id: number;
+              picked_at: string;
+              picked_by_actor: { kind?: string } | null;
+            };
+            const p = playerById.get(rawRow.player_id);
+            const actorKind = rawRow.picked_by_actor?.kind;
+            return {
+              pickNumber: rawRow.pick_number,
+              roundNumber: rawRow.round,
+              teamId: rawRow.team_id,
+              teamName: teamNameById.get(rawRow.team_id) ?? null,
+              playerId: rawRow.player_id,
+              playerName: p?.full_name ?? null,
+              playerPosition: p?.position_code ?? null,
+              playerTeam: p?.team_abbrev ?? null,
+              pickedAt: rawRow.picked_at,
+              isAutopick: actorKind === 'autopick',
+            };
+          });
+
+          snapshot = { ...snapshot, picks };
+        }
+      } catch (enrichErr) {
+        // Enrichment failure is non-fatal — the terminal room still
+        // renders the E99-decorated header + CompletionMomentBanner
+        // via the existing derive path. Log for observability.
+        structuredLogger.warn(
+          'snapshot.terminal.picks_enrichment_threw',
+          {
+            draftId,
+            userId,
+            error: enrichErr instanceof Error ? enrichErr.message : String(enrichErr),
+          },
+        );
+      }
+    }
   } catch (err) {
     structuredLogger.error(
       'snapshot.endpoint.build_failed',

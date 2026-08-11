@@ -56,6 +56,8 @@ export function reduce(
       return handleTokenFetched(state, event);
     case 'token_fetch_failed':
       return handleTokenFetchFailed(state, event, randomFn);
+    case 'discovery_refused_terminal':
+      return handleDiscoveryRefusedTerminal(state, event);
     case 'ws_opened':
       return handleWsOpened(state, event);
     case 'ws_message':
@@ -89,7 +91,17 @@ export function reduce(
  * `connect_requested`.
  */
 function handleConnectRequested(state: DraftClientState): ReduceResult {
-  if (state.kind === 'idle' || state.kind === 'fatal') {
+  if (
+    state.kind === 'idle' ||
+    state.kind === 'fatal' ||
+    state.kind === 'terminal_completed'
+  ) {
+    // Entry 87 Fix A truth-table item 3 — explicit `connect_requested`
+    // from `terminal_completed` is permitted single re-discovery. The
+    // discovery route will 409 again and dispatch
+    // `discovery_refused_terminal` right back into this state (harmless
+    // re-entry). Enables an explicit user "Try Again" affordance
+    // without automated retries.
     return {
       state: { kind: 'fetching_token', attempt: 0 },
       sideEffects: [{ kind: 'fetch_token', draftId: '' }],
@@ -164,6 +176,35 @@ function handleTokenFetchFailed(
   }
   // Transient — back off and retry.
   return scheduleReconnect(state.attempt, event.error, randomFn);
+}
+
+/**
+ * Entry 87 Fix A (COMPLETED-ROOM-1) — truth-table items 1 + 4.
+ * Discovery returned 409 DRAFT_NOT_CONNECTABLE with a terminal
+ * (completed/cancelled) draft status. Transition to the dedicated
+ * `terminal_completed` state and fetch the snapshot so the room
+ * renders the frozen board rather than "Waiting for draft state…".
+ * No backoff scheduled.
+ *
+ * Only valid from `fetching_token` — other discovery states
+ * (idle/connecting/etc.) shouldn't receive this event, but the
+ * defensive no-op keeps the state machine silent on unexpected
+ * ordering.
+ */
+function handleDiscoveryRefusedTerminal(
+  state: DraftClientState,
+  event: Extract<DraftClientEvent, { type: 'discovery_refused_terminal' }>,
+): ReduceResult {
+  if (state.kind !== 'fetching_token') {
+    return noTransition(state);
+  }
+  return {
+    state: {
+      kind: 'terminal_completed',
+      draftStatus: event.draftStatus,
+    },
+    sideEffects: [{ kind: 'fetch_snapshot', leagueId: '' }],
+  };
 }
 
 function handleWsOpened(
@@ -315,6 +356,27 @@ function handleWsClosed(
   if (state.kind === 'idle') {
     return noTransition(state);
   }
+  // Terminal state — no more transitions from close events.
+  if (state.kind === 'terminal_completed' || state.kind === 'fatal') {
+    return noTransition(state);
+  }
+  // Entry 87 Fix A (COMPLETED-ROOM-1) — truth-table item 2. If the
+  // runner observed completion during this connection's lifetime
+  // (annotated on the close event), route directly to
+  // `terminal_completed` instead of scheduling backoff. This is the
+  // exact bug Garrett watched on Run 3: post-completion engine
+  // eviction → ws_closed → backoff → discovery-409-loop. The
+  // annotation makes the transition possible without additional
+  // state carried in the reduce union.
+  if (event.lastKnownTerminalStatus !== undefined) {
+    return {
+      state: {
+        kind: 'terminal_completed',
+        draftStatus: event.lastKnownTerminalStatus,
+      },
+      sideEffects: [{ kind: 'fetch_snapshot', leagueId: '' }],
+    };
+  }
 
   const disposition = classifyCloseCode(event.code, event.reason);
 
@@ -402,6 +464,34 @@ function handleSnapshotFetched(
   state: DraftClientState,
   event: Extract<DraftClientEvent, { type: 'snapshot_fetched' }>,
 ): ReduceResult {
+  // Entry 99 COMPLETED-ROOM-2 (2026-08-11) — client-side companion
+  // to the server route decoration. The Fix A path (E87) fetches a
+  // snapshot on entry to `terminal_completed`, but this handler
+  // previously no-op'd from every state except `snapshot_required` —
+  // so the delivered snapshot never reached the store and
+  // DraftRoomV2 sat on "Loading final board…" indefinitely.
+  //
+  // Fix: `terminal_completed` also accepts the arrival. State stays
+  // terminal (no transition to `connected` — there is no live socket
+  // for a completed draft). Snapshot is delivered with
+  // `stateSnapshot.draftStatus` overridden to the runner's known
+  // terminal value, so DraftRoomV2's derived state trusts the
+  // route-level terminality even if the payload's own status field
+  // still lies (engine serializer fix (a) lands on ENGINE-EAR deploy;
+  // this is the belt to that server-side fix's suspenders).
+  if (state.kind === 'terminal_completed') {
+    const patched: import('@citrus/shared').DraftSnapshot = {
+      ...event.snapshot,
+      stateSnapshot: {
+        ...event.snapshot.stateSnapshot,
+        draftStatus: state.draftStatus,
+      },
+    };
+    return {
+      state,
+      sideEffects: [{ kind: 'deliver_snapshot', snapshot: patched }],
+    };
+  }
   if (state.kind !== 'snapshot_required') {
     return noTransition(state);
   }
@@ -437,6 +527,12 @@ function handleSnapshotFetchFailed(
 }
 
 function handleBackoffTimerFired(state: DraftClientState): ReduceResult {
+  // Entry 87 Fix A truth-table item 3 — `backoff_timer_fired` is a
+  // no-op in terminal_completed. Defensive: the state machine
+  // cancels the backoff timer on entry to terminal_completed via the
+  // absence of a `schedule_backoff_timer` side effect, but a stray
+  // timer callback that already fired before cancellation could still
+  // land here.
   if (state.kind !== 'reconnecting') {
     return noTransition(state);
   }
@@ -457,6 +553,9 @@ function handleVisibilityChanged(
   // imperative call from the runner, not a state transition.
   // Forward-compat hook for chunk 11g.7's heartbeat / liveness
   // detection.
+  //
+  // Entry 87 Fix A truth-table item 3 confirms this: no-op in
+  // terminal_completed too (falls through here — no transition).
   return noTransition(state);
 }
 
@@ -465,6 +564,12 @@ function handleNetworkChanged(
   event: Extract<DraftClientEvent, { type: 'network_changed' }>,
   randomFn: RandomFn,
 ): ReduceResult {
+  // Entry 87 Fix A truth-table item 3 — no-op in terminal_completed
+  // (network changes don't matter for a finished draft; no
+  // reconnect to schedule or extend).
+  if (state.kind === 'terminal_completed') {
+    return noTransition(state);
+  }
   if (event.isOnline) {
     // Network came back. If we're reconnecting, fire the timer
     // immediately to retry; if connected, no-op (the WS will

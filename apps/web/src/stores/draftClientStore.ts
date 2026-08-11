@@ -119,6 +119,17 @@ interface DraftClientStoreState {
   observedLeftUserIds: Set<string>;
   /** Last error from the server's `error` wire message. */
   lastError: ErrorPayload | null;
+  /**
+   * Entry 87 Fix C (CLOCK-DISPLAY-35) — the per-pick countdown window
+   * in seconds, extracted from the `draft_started` event's
+   * `pickTimeLimitSeconds` payload. Authoritative upper bound on the
+   * timer render — clock skew, sniper drift, or a stale
+   * `currentPickDeadline` cannot cause the UI to display a value
+   * exceeding this cap. Null until a `draft_started` event has been
+   * observed (either in the initial snapshot's recentEvents or via a
+   * subsequent applyEvent call).
+   */
+  pickTimeLimitSec: number | null;
 
   /**
    * F14(b) (2026-08-03) — client-side identity-resolution failure state.
@@ -214,7 +225,24 @@ const initialState: Omit<
   observedLeftUserIds: new Set(),
   lastError: null,
   identityFailure: null,
+  pickTimeLimitSec: null,
 };
+
+// Entry 87 Fix C — pull pickTimeLimitSeconds out of a draft_started
+// event if one exists in the given event buffer. Returns null when
+// none present. The event is emitted exactly once per draft
+// lifecycle; scanning the buffer is O(n) but n is bounded by the
+// server-side ring buffer size.
+function extractPickTimeLimitSec(
+  events: ReadonlyArray<BufferedDraftEvent>,
+): number | null {
+  for (const evt of events) {
+    if (evt.kind === 'draft_started') {
+      return evt.pickTimeLimitSeconds;
+    }
+  }
+  return null;
+}
 
 export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
   ...initialState,
@@ -242,11 +270,19 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
         snapshot.presentUserIds !== undefined
           ? new Set<string>(snapshot.presentUserIds)
           : prev.presentUserIds;
+      // Entry 87 Fix C — seed pickTimeLimitSec from the snapshot's
+      // draft_started event if present. If the draft hasn't started
+      // yet (not_started snapshot) there won't be one; the applyEvent
+      // path picks it up when the event lands.
+      const nextPickTimeLimitSec =
+        extractPickTimeLimitSec(snapshot.recentEvents) ??
+        prev.pickTimeLimitSec;
       return {
         snapshot,
         derivedState: foldResult.state,
         lastFoldGaps: foldResult.gaps,
         presentUserIds: seededPresence,
+        pickTimeLimitSec: nextPickTimeLimitSec,
         // Reconcile any pending actions whose correlationIds appear
         // in the snapshot's recent events (path 2 / path 4 of the
         // reconciliation contract per `optimistic.ts`).
@@ -260,6 +296,11 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
   applyEvent: (event) =>
     set((prev) => {
       const next: Partial<DraftClientStoreState> = {};
+      // Entry 87 Fix C — capture pickTimeLimitSec from draft_started.
+      // Only overwrites when the event actually carries it (draft_started).
+      if (event.kind === 'draft_started') {
+        next.pickTimeLimitSec = event.pickTimeLimitSeconds;
+      }
       // Reconcile via broadcast match (path 1).
       if (
         event.kind === 'pick_submitted' ||
@@ -314,6 +355,12 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
   applyEvents: (events) =>
     set((prev) => {
       const next: Partial<DraftClientStoreState> = {};
+      // Entry 87 Fix C — capture pickTimeLimitSec if the resync batch
+      // contains the draft_started event (e.g., first-connect batch).
+      const timeLimitFromBatch = extractPickTimeLimitSec(events);
+      if (timeLimitFromBatch !== null) {
+        next.pickTimeLimitSec = timeLimitFromBatch;
+      }
       // DR-1b (2026-07-28): fold the batch onto the derived state.
       if (prev.derivedState !== null && events.length > 0) {
         const foldResult = foldEvents(prev.derivedState, events, prev.matrix);
@@ -424,6 +471,7 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
       observedLeftUserIds: new Set(),
       lastError: null,
       identityFailure: null,
+      pickTimeLimitSec: null,
     }),
 }));
 
@@ -480,4 +528,13 @@ export const useMyTeamId = () => useDraftClientStore((s) => s.myTeamId);
 /** F14(b) — expose identity-failure state to banner + control gates. */
 export const useIdentityFailure = () =>
   useDraftClientStore((s) => s.identityFailure);
+
+/**
+ * Entry 87 Fix C (CLOCK-DISPLAY-35) — per-pick countdown window
+ * (seconds) extracted from `draft_started`. Used by DraftTimerV2 and
+ * OnClockActionBar to clamp the rendered countdown so a stale
+ * deadline can never display a value exceeding the true window.
+ */
+export const usePickTimeLimitSec = () =>
+  useDraftClientStore((s) => s.pickTimeLimitSec);
 

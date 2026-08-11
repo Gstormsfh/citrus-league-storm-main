@@ -43,6 +43,33 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"],
         // Don't precache source maps or huge files
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3MB
+        // ── E104 SW-STALE-1 Option A (2026-08-11) ──────────────────
+        // skipWaiting + clientsClaim: the new SW activates
+        // immediately (does NOT sit "waiting" until every open tab
+        // closes) and claims control of already-open clients on
+        // activation. Combined with `registerType: "autoUpdate"`,
+        // hosting deploys land on the next navigation within one
+        // SW takeover window (< 1s typical).
+        //
+        // Motivation (E103 forensic chain): the pre-Option-A SW
+        // waited for every open tab/PWA to close before activating
+        // a new build; long-lived tabs never closed → new SW stayed
+        // waiting → users ran MIXED old/new chunks indefinitely
+        // (CSP, bundle, and fence verifications each burned a
+        // cycle debugging this). E104 field verification tab
+        // observed a `supabase-api` SW cache retroactively serving
+        // stale Supabase REST responses too — another
+        // client-side-read confounder for every read this week.
+        //
+        // Trade-off (accepted, ratified by architect): a tab in
+        // mid-lazy-import when clientsClaim fires can see a chunk
+        // 404 if the referenced hash is no longer served. Mitigated
+        // by the immediate takeover (< 1s) + fast reload path.
+        // Long-term suspender: SW-STALE-1 Option B (in-app "New
+        // version available" toast) is docketed for post-twelve if
+        // Option A's takeover window causes observed regressions.
+        skipWaiting: true,
+        clientsClaim: true,
         // Runtime caching for API calls and external resources
         runtimeCaching: [
           {
@@ -71,6 +98,22 @@ export default defineConfig(({ mode }) => ({
               cacheName: "supabase-api",
               expiration: { maxEntries: 100, maxAgeSeconds: 60 * 5 },
               networkTimeoutSeconds: 10,
+            },
+          },
+          {
+            // E104 SW-STALE-1 Option A — HTML navigation requests
+            // always network-first so deploys are visible on next
+            // navigation without a hard refresh. Falls back to
+            // cache after 3s offline so PWA still works when the
+            // network is dead. Denylist /api/ so API responses
+            // don't get treated as HTML navigations.
+            urlPattern: ({ request, url }) =>
+              request.mode === "navigate" && !url.pathname.startsWith("/api/"),
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "html-shell",
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 },
+              networkTimeoutSeconds: 3,
             },
           },
         ],

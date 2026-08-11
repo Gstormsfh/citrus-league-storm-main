@@ -79,12 +79,14 @@ draftV2StartRoutes.post(
       crypto.randomUUID();
 
     // Construct actor JSONB per F27 contract (start_draft_v2's p_actor).
-    // actor.kind='user' identifies commissioner-initiated ignition;
-    // start_draft_v2's Step 2 authorization checks (SECURITY DEFINER
-    // context) mirror submit_pick_v2's user-branch guard —
-    // commissionerMiddleware above provides the primary check.
+    // commissionerMiddleware above has verified commissionership; the
+    // RPC's actor gate additionally requires kind='commissioner' for
+    // ignition (defense-in-depth) — rig + route now agree. The prior
+    // 'user' value guessed the contract wrong; offline mocks let it
+    // survive until F28's first real press caught it (Entry 79,
+    // 2026-08-10).
     const actor = {
-      kind: 'user',
+      kind: 'commissioner',
       id: userId,
     };
 

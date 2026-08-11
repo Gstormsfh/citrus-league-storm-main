@@ -202,6 +202,28 @@ export class DraftClientRunner {
    */
   private lastGapResyncSinceSeq: number | null = null;
 
+  /**
+   * Entry 87 Fix A (COMPLETED-ROOM-1, 2026-08-10) — runner-tracked
+   * observation that this connection's draft has completed or been
+   * cancelled. Set when the runner observes:
+   *   - A `snapshot` wire message whose `stateSnapshot.draftStatus`
+   *     is 'completed' or 'cancelled'
+   *   - An `event` wire message of kind 'draft_completed'
+   *
+   * When present, the subsequent `ws_closed` dispatch is annotated
+   * with this value so the state machine routes to
+   * `terminal_completed` (no backoff loop) instead of scheduling
+   * reconnect. Cleared on `disconnect()` / new `connect()` so a
+   * stale value from a prior session never survives.
+   *
+   * Motivation: Garrett's Run 3 (2026-08-10) — post-completion
+   * engine lobby-eviction closed the WS; the client couldn't tell
+   * from the close alone that the underlying draft was done, so it
+   * scheduled backoff and looped discovery-409s against a route
+   * that correctly refused. This flag bridges the observation.
+   */
+  private lastKnownTerminalStatus: 'completed' | 'cancelled' | null = null;
+
   private readonly randomFn: RandomFn;
   private readonly fetchDiscovery: (draftId: string) => Promise<DraftServerDiscovery>;
   private readonly fetchSnapshot: (draftId: string) => Promise<DraftSnapshot>;
@@ -260,6 +282,9 @@ export class DraftClientRunner {
     this.callbacks = callbacks;
     this.lastSeenSeq = 0;
     this.lastGapResyncSinceSeq = null;
+    // Entry 87 Fix A — fresh session; a completed prior draft doesn't
+    // apply to a new connect() call.
+    this.lastKnownTerminalStatus = null;
     this.attachBrowserListeners();
     this.dispatch({ type: 'connect_requested' });
   }
@@ -276,6 +301,7 @@ export class DraftClientRunner {
     this.params = null;
     this.lastSeenSeq = 0;
     this.lastGapResyncSinceSeq = null;
+    this.lastKnownTerminalStatus = null;
   }
 
   /**
@@ -443,11 +469,40 @@ export class DraftClientRunner {
       const wsUrl = this.computeWsUrl(discovery, this.params.draftId);
       this.dispatch({ type: 'token_fetched', token: discovery.token, wsUrl });
     } catch (err) {
-      const errorObj = err as { message?: string; statusCode?: number };
+      // Entry 87 Fix A (COMPLETED-ROOM-1) — truth-table item 1.
+      // Inspect ApiError shape from apiClient: status 409 +
+      // body.error.code === 'DRAFT_NOT_CONNECTABLE' + body.error.status
+      // ∈ {completed, cancelled} → dispatch `discovery_refused_terminal`
+      // instead of `token_fetch_failed` so the state machine routes
+      // to `terminal_completed`. Every OTHER 409 subclass (system
+      // flag refusal 503, transient 5xx, unclassified errors) flows
+      // through `token_fetch_failed` unchanged — this narrows the
+      // terminal branch to just the "draft is done" case per
+      // architect ratification.
+      const errorObj = err as {
+        message?: string;
+        status?: number;
+        statusCode?: number;
+        data?: { error?: { code?: string; status?: string } };
+      };
+      const statusCode = errorObj.statusCode ?? errorObj.status;
+      const errorCode = errorObj.data?.error?.code;
+      const draftStatus = errorObj.data?.error?.status;
+      if (
+        statusCode === 409 &&
+        errorCode === 'DRAFT_NOT_CONNECTABLE' &&
+        (draftStatus === 'completed' || draftStatus === 'cancelled')
+      ) {
+        this.dispatch({
+          type: 'discovery_refused_terminal',
+          draftStatus,
+        });
+        return;
+      }
       this.dispatch({
         type: 'token_fetch_failed',
         error: errorObj.message ?? String(err),
-        statusCode: errorObj.statusCode,
+        statusCode,
       });
     }
   }
@@ -515,6 +570,26 @@ export class DraftClientRunner {
         this.watchdogLastPongAt = Date.now();
         return;
       }
+      // Entry 87 Fix A (COMPLETED-ROOM-1) — observe draft-completion
+      // signals BEFORE dispatch so a subsequent ws_closed can be
+      // annotated with lastKnownTerminalStatus. Two signal shapes:
+      //   1. `snapshot` frame with stateSnapshot.draftStatus in
+      //      {completed, cancelled} (occurs when a client connects
+      //      to an already-completed lobby before eviction, or when
+      //      the snapshot arrives right around completion time).
+      //   2. `event` frame of kind draft_completed (F26 emitter — the
+      //      completion moment itself).
+      if (parsed.type === 'snapshot') {
+        const status = parsed.payload.stateSnapshot.draftStatus;
+        if (status === 'completed' || status === 'cancelled') {
+          this.lastKnownTerminalStatus = status;
+        }
+      } else if (
+        parsed.type === 'event' &&
+        parsed.payload.kind === 'draft_completed'
+      ) {
+        this.lastKnownTerminalStatus = 'completed';
+      }
       this.dispatch({ type: 'ws_message', message: parsed });
       // Track the highest seq we've seen across reconnects.
       if (parsed.type === 'event' && parsed.seq > this.lastSeenSeq) {
@@ -535,6 +610,16 @@ export class DraftClientRunner {
         type: 'ws_closed',
         code: closeEvent.code,
         reason: closeEvent.reason,
+        // Entry 87 Fix A (COMPLETED-ROOM-1) — annotate the close with
+        // the tracked terminal status (if any) so reduce.handleWsClosed
+        // routes to `terminal_completed` instead of scheduling
+        // backoff. This is the exact bridge that stops Garrett's Run 3
+        // discovery-409-loop: engine evicts the completed lobby, WS
+        // closes, ws_closed arrives here with lastKnownTerminalStatus
+        // set from the draft_completed frame observed earlier.
+        ...(this.lastKnownTerminalStatus !== null
+          ? { lastKnownTerminalStatus: this.lastKnownTerminalStatus }
+          : {}),
       });
     };
   }
@@ -755,6 +840,13 @@ export async function defaultFetchDiscovery(draftId: string): Promise<DraftServe
   // Dynamic import — keeps test paths that pass their own
   // `fetchDiscovery` override from triggering the apiClient module
   // load (and its top-level Supabase env-var check).
+  //
+  // Entry 87 Fix A (COMPLETED-ROOM-1) — apiClient.get throws
+  // ApiError on 4xx/5xx with `.status` (number) and `.data` (body).
+  // We do NOT catch it here; the runner's runFetchToken catches and
+  // inspects the ApiError shape to distinguish DRAFT_NOT_CONNECTABLE
+  // (terminal) from other 409/5xx classes and dispatches
+  // `discovery_refused_terminal` for the terminal case.
   const { apiClient } = await import('@/api/client');
   const response = await apiClient.get<DraftServerDiscovery>(
     `/api/drafts/${encodeURIComponent(draftId)}/server`,

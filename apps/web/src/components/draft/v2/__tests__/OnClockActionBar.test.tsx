@@ -204,4 +204,82 @@ describe('OnClockActionBar', () => {
     );
     expect(screen.getByTestId('on-clock-countdown').textContent).toBe('—:—');
   });
+
+  // Entry 87 Fix C (CLOCK-DISPLAY-35) — the bar now consumes the
+  // shared clockOffsetMs estimator + pickTimeLimitSec clamp so its
+  // countdown matches DraftTimerV2's sticky-header timer.
+  describe('Entry 87 Fix C — clock-offset + pickTimeLimitSec clamp', () => {
+    it('applies clockOffsetMs to deadline (mirrors DraftTimerV2 math)', () => {
+      // Deadline is 30s from now. clockOffsetMs=+3000 means client
+      // is 3s ahead of server → adjusted deadline is +3s further out
+      // in client time → 33s remaining. formatCountdown → '0:33'.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'));
+      try {
+        render(
+          <OnClockActionBar
+            amIOnClock={true}
+            currentPickDeadline="2026-08-10T12:00:30.000Z"
+            clockOffsetMs={3000}
+            selectedPlayer={null}
+            onDraft={vi.fn()}
+            pickNumber={3}
+            roundNumber={1}
+          />,
+        );
+        expect(screen.getByTestId('on-clock-countdown').textContent).toBe('0:33');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('clamps rendered value to pickTimeLimitSec when raw exceeds it', () => {
+      // Deadline is 45s from now (raw); pickTimeLimitSec=30 caps at
+      // 30s → '0:30'.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'));
+      try {
+        render(
+          <OnClockActionBar
+            amIOnClock={true}
+            currentPickDeadline="2026-08-10T12:00:45.000Z"
+            pickTimeLimitSec={30}
+            selectedPlayer={null}
+            onDraft={vi.fn()}
+            pickNumber={3}
+            roundNumber={1}
+          />,
+        );
+        expect(screen.getByTestId('on-clock-countdown').textContent).toBe('0:30');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('agrees with DraftTimerV2 for the same (deadline, offset, cap) tuple', () => {
+      // Same scenario tested in DraftTimerV2's discriminant lock:
+      // 35s deadline, 0 offset, 30s cap → 0:30. The two components
+      // must render the same value frame-for-frame or the header +
+      // sticky bar will show conflicting countdowns.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'));
+      try {
+        render(
+          <OnClockActionBar
+            amIOnClock={true}
+            currentPickDeadline="2026-08-10T12:00:35.000Z"
+            clockOffsetMs={0}
+            pickTimeLimitSec={30}
+            selectedPlayer={null}
+            onDraft={vi.fn()}
+            pickNumber={3}
+            roundNumber={1}
+          />,
+        );
+        expect(screen.getByTestId('on-clock-countdown').textContent).toBe('0:30');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });

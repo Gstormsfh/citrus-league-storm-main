@@ -552,6 +552,38 @@ export interface AuctionStateSnapshot {
  * Chunk 11g.6 sub-step 6a adds `auctionState` for auction-format
  * lobbies; snake/linear leave it `undefined`.
  */
+/**
+ * Entry 103 F2b (2026-08-11) — one drafted pick in a terminal
+ * league's snapshot response. Populated ONLY by the HTTP snapshot
+ * route (`GET /api/drafts/:draftId/snapshot`) for terminal leagues
+ * (draft_status IN ('completed', 'cancelled')). The projection is
+ * queried from `draft_picks_v2` joined with `teams` and
+ * `player_directory` so the client can render the frozen board +
+ * history without unpacking event-log kinds.
+ *
+ * Live drafts (in_progress / paused / not_started) leave
+ * `DraftSnapshot.picks` undefined — those consumers derive the
+ * board from `recentEvents` via `deriveDraftState.foldEvents` per
+ * DR-1 F4 doctrine.
+ *
+ * `teamName` / `playerName` are nullable: the joined rows may be
+ * missing (post-purge team, retired player row). The client
+ * fallback path renders `#<id>` — matches the v1Adapters fallback
+ * behavior for consistency.
+ */
+export interface TerminalSnapshotPick {
+  pickNumber: number;
+  roundNumber: number;
+  teamId: string;
+  teamName: string | null;
+  playerId: number;
+  playerName: string | null;
+  playerPosition: string | null;
+  playerTeam: string | null;
+  pickedAt: string;
+  isAutopick: boolean;
+}
+
 export interface DraftSnapshot {
   lobbyId: string;
   format: DraftFormat;
@@ -574,6 +606,20 @@ export interface DraftSnapshot {
    * the snapshot is built, so the snapshot always includes self.
    */
   presentUserIds?: ReadonlyArray<string>;
+  /**
+   * Entry 103 F2b (2026-08-11) — authoritative picks projection for
+   * terminal leagues, populated by the HTTP snapshot route only.
+   * Undefined for live drafts and for the initial WS-delivered
+   * snapshot (which relies on recentEvents fold).
+   *
+   * When present, the client-side deriveFromSnapshot / setSnapshot
+   * path uses this as the authoritative pick source instead of
+   * folding recentEvents — engine lobby eviction post-completion
+   * leaves recentEvents empty for terminal reconnects, so the fold
+   * would otherwise render "0 / N picks made" for a completed room.
+   * Root cause + fix pre-ratified in inbox Entry 103.
+   */
+  picks?: ReadonlyArray<TerminalSnapshotPick>;
 }
 
 // ── Wire envelope ──────────────────────────────────────────────────
