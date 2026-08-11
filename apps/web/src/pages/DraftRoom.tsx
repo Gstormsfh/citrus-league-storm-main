@@ -98,11 +98,29 @@ enum DraftPhase {
 // fenced the legacy START button; this fence catches the RUNNING
 // machinery ever landing on a v2-era league at all.
 //
-// Guard shape (E80 order item 1): query `draft_events` for the
-// current leagueId. If ANY row exists, the league has had a v2-era
-// ignition (draft_started / pick / draft_completed) — v1 must not
-// touch it. Hard redirect via `<Navigate>` to `/draft-v2/:leagueId`
-// with `replace: true` so back-button doesn't reland here.
+// Guard shape (E80 order item 1 + E104 FENCE-2): probe the API
+// server for the current leagueId's v2-era status. If v2Era=true,
+// the league has had a v2-era ignition (draft_started / pick /
+// draft_completed) — v1 must not touch it. Hard redirect via
+// `<Navigate>` to `/draft-v2/:leagueId` with `replace: true` so
+// back-button doesn't reland here.
+//
+// E104 FENCE-2 rewire (2026-08-11): previously the probe hit
+// supabase.from('draft_events') via client-side RLS. Morning field
+// verification found the probe silently returned 0 rows on
+// session-restore race — supabase-js hadn't attached the session
+// yet on first mount, so RLS refused. The fence then silently
+// fell through to v1 for every v2-era league in that window.
+// Fix: probe the API server (`GET /api/draft/v2/league/:leagueId/era`
+// → `{ v2Era: boolean }`) which uses service-role EXISTS on
+// draft_events, immune to client session-restore timing because
+// authMiddleware validates the JWT before the handler runs.
+//
+// E104 always-log doctrine: EVERY branch logs. The morning spent
+// proving a negative the fence could have printed — checking,
+// v2-era detect, v1-safe fall-through, error fall-through, and the
+// !leagueId early return are all instrumented. `[V1-FENCE]` is the
+// stable log prefix for operator grep.
 //
 // Belt (E80 order item 2): the fence is a WRAPPER — the inner v1
 // DraftRoom body only mounts when `v1-safe`. No v1 useEffect fires,
@@ -123,52 +141,69 @@ function useV1Fence(leagueId: string | null): V1FenceState {
   const [state, setState] = useState<V1FenceState>({ kind: 'checking' });
   useEffect(() => {
     let cancelled = false;
+    // Always-log per E104 doctrine: the !leagueId early return
+    // used to be silent; now instrumented so a stale mount can be
+    // distinguished from a real probe.
     if (!leagueId) {
-      // No leagueId in URL — legacy load-user-league path handles the
-      // redirect itself. Don't block on the fence check.
+      logger.log('[V1-FENCE] no leagueId on mount; falling through to v1 (legacy load-user-league path handles redirect)');
       setState({ kind: 'v1-safe' });
       return;
     }
+    logger.log('[V1-FENCE] probing era endpoint', { leagueId });
     (async () => {
       try {
-        // Cast supabase.from() through `unknown` for THIS probe only.
-        // Supabase's generated Database types push the .from → .select
-        // → .eq → .limit inference chain past TS's instantiation-depth
-        // cap for the draft_events table (wide JSONB payload column
-        // trips the deep-instantiation check). The fence only needs
-        // {data, error} shape; the id column type is irrelevant to
-        // the existence check.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const untypedFrom = supabase.from as unknown as (t: string) => any;
-        const response = await untypedFrom('draft_events')
-          .select('id')
-          .eq('league_id', leagueId)
-          .limit(1);
+        // E104 FENCE-2 rewire: hit the API server (service-role
+        // EXISTS via authMiddleware) instead of client-side supabase
+        // RLS. The prior RLS probe was subject to a session-restore
+        // race on first mount — supabase-js hadn't attached the JWT
+        // yet, so `draft_events` (RLS: "commissioner or team owner")
+        // returned zero rows silently even for authenticated members.
+        const { apiClient } = await import('@/api/client');
+        const path = `/api/draft/v2/league/${encodeURIComponent(leagueId)}/era`;
+        const response = await apiClient.get<{ v2Era: boolean }>(path);
         if (cancelled) return;
-        if (response.error) {
-          // Query failure is defensive fall-through to v1: if we
-          // cannot verify the league's v2-era status, prefer not to
-          // silently redirect (the guard's job is to CATCH v2-era
-          // leagues, not to block v1 leagues on a transient DB
-          // error). The v1 path has other rails (T7 START fence).
-          logger.warn('[V1-FENCE] draft_events probe failed; falling through to v1', response.error);
+        // apiClient responses may have {data} envelope or return the
+        // payload at top level (both patterns exist in the codebase —
+        // see defaultFetchDiscovery in draftClient/runner.ts).
+        const payload =
+          response.data ?? (response as unknown as { v2Era?: boolean });
+        if (response.error !== undefined || typeof payload?.v2Era !== 'boolean') {
+          logger.warn(
+            '[V1-FENCE] era probe returned unexpected shape; falling through to v1',
+            { leagueId, response },
+          );
           setState({ kind: 'v1-safe' });
           return;
         }
-        if (Array.isArray(response.data) && response.data.length > 0) {
+        if (payload.v2Era) {
+          logger.log('[V1-FENCE] v2Era=true; redirecting to /draft-v2', { leagueId });
           setState({ kind: 'v2-era', leagueId });
           return;
         }
+        logger.log('[V1-FENCE] v2Era=false; mounting v1 body', { leagueId });
         setState({ kind: 'v1-safe' });
       } catch (err) {
         if (cancelled) return;
-        logger.warn('[V1-FENCE] unexpected error; falling through to v1', err);
+        // Query failure is defensive fall-through to v1: if we cannot
+        // verify the league's v2-era status, prefer not to silently
+        // redirect (the guard's job is to CATCH v2-era leagues, not
+        // to block v1 leagues on a transient error). The v1 path has
+        // other rails (T7 START fence). ALWAYS log per E104 doctrine.
+        logger.warn(
+          '[V1-FENCE] era probe threw; falling through to v1',
+          { leagueId, error: err instanceof Error ? err.message : String(err) },
+        );
         setState({ kind: 'v1-safe' });
       }
     })();
     return () => {
       cancelled = true;
     };
+    // E104: dep list includes leagueId so a null→value transition
+    // (URL rewrite dance: /draft-room mounts with no ?league=, then
+    // the load-user-league path rewrites to /draft-room?league=X)
+    // re-runs the probe. Pre-E104 the dep was already leagueId;
+    // this comment records the E104 verification that it's correct.
   }, [leagueId]);
   return state;
 }

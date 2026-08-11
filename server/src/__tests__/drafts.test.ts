@@ -12,7 +12,7 @@
  * league's UUID; the handler queries `leagues` by id and gates on
  * `draft_status` ∈ CONNECTABLE_DRAFT_STATUSES.
  */
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 const VALID_USER_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const VALID_DRAFT_ID = '00000000-0000-0000-0000-000000000001'; // = league_id

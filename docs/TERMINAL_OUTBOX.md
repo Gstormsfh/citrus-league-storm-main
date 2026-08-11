@@ -5414,6 +5414,76 @@ Commit + branch push pending on architect countersignature for E103 F2b + SW-STA
 
 **End of R96. E103 F2b EXECUTED (+10 tests, gate GREEN); SW-STALE-1 proposed with 3-option decision matrix + Option A recommendation + deploy-checklist line. Standing by for architect countersignature on both.**
 
+## R97 — Entry 104 BATCH (FENCE-2 + F2b + SW-STALE-1) · READY-CANDIDATE (2026-08-11 11:03Z)
+
+### Entry 104 ACK + batch composition
+
+Per E104: FENCE-2 (new) + F2b (already committed 8b2b1a02) + SW-STALE-1 (execution, was R96 proposal) = ONE cycle, ONE full gate, ONE deploy pair. F2b lives at `8b2b1a02` from the R96 cycle; this cycle adds FENCE-2 + SW-STALE-1 Option A code on top, runs the gate against the combined tree, and reports READY for the batch deploy of all three.
+
+### This cycle executed
+
+**E104 FENCE-2 (client-side supabase RLS probe → API era endpoint):**
+- **`server/src/routes/draftV2Era.ts` (NEW)** — `GET /api/draft/v2/league/:leagueId/era` → `{ v2Era: boolean }`. Service-role EXISTS on `draft_events` (bypasses RLS — client needs authoritative answer regardless of caller's league membership). Auth middleware only, no membership gate. UUID shape guard mirrors discovery/snapshot routes. `structuredLogger.error` on query failure with 500 response; `structuredLogger.debug` on success.
+- **`server/src/app.ts`** — wired at `/api/draft/v2` prefix, sibling of draftV2Start/Sync/Pick/Events routes.
+- **`apps/web/src/pages/DraftRoom.tsx`** — `useV1Fence` rewired from `supabase.from('draft_events')` client RLS to `apiClient.get('/api/draft/v2/league/:id/era')`. Response shape guard on `payload.v2Era` boolean; falls through to v1-safe on any unexpected shape or thrown error (Entry 80 fence-not-block doctrine preserved).
+- **Always-log doctrine (E104 line item)** — EVERY branch instrumented with `[V1-FENCE]` prefix: `!leagueId` early return, probe-start line, `v2Era=true` redirect, `v2Era=false` v1-safe, error fall-through. The morning spent proving a negative the fence could have printed; that class of silence is gone.
+- Effect dep list already includes `leagueId` (verified — null→value rewrite dance re-runs the probe naturally).
+
+**E104 SW-STALE-1 Option A (skipWaiting + clientsClaim + NetworkFirst HTML):**
+- **`apps/web/vite.config.ts`** — VitePWA workbox config:
+  - `skipWaiting: true` — new SW activates immediately, does NOT sit "waiting" until every open tab closes.
+  - `clientsClaim: true` — takes over already-open clients on activation.
+  - New runtime cache entry: HTML navigation requests (`request.mode === 'navigate' && !url.pathname.startsWith('/api/')`) served NetworkFirst with 3s network timeout + 1-day cache fallback. Deploys visible on next navigation without hard refresh.
+- **Trade-off preserved (architect-ratified in R96 Option A)**: a tab mid-lazy-import when clientsClaim fires can see a chunk 404 for the < 1s takeover window. Long-term suspender is Option B (in-app "New version available" toast) — docketed post-twelve.
+
+### Tests (+13 new)
+
+- **`server/src/__tests__/draftV2Era.test.ts` (NEW, +8):**
+  - 401 unauthenticated · 401 malformed Authorization header (real authMiddleware smoke)
+  - 200 with `v2Era: true` when draft_events has ≥1 row
+  - 200 with `v2Era: false` when draft_events has 0 rows
+  - 200 with `v2Era: false` on defensive `data: null` (empty result sets)
+  - 400 malformed leagueId (not a UUID)
+  - 500 service-role query error → SERVICE_UNAVAILABLE (defensive fall-through class)
+  - 200 auth-only: no membership check (fence needs answer regardless — non-member still gets authoritative boolean)
+- **`apps/web/src/pages/__tests__/DraftRoom.v1Fence.test.tsx` (+5):**
+  - E104 FENCE-2: fence probes `/api/draft/v2/league/:id/era` (not client-side supabase.from RLS)
+  - E104 FENCE-2: fence reads `v2Era` boolean from response payload
+  - E104 FENCE-2: fence does NOT probe `supabase.from('draft_events')` directly (regression pin — pre-E104 pattern must stay removed inside useV1Fence body)
+  - E104 always-log: `!leagueId` early return logs · probe-start logs · v2Era=true redirect logs · v2Era=false v1-safe logs · error fall-through logs
+- **`server/src/__tests__/drafts.test.ts`** — one-line fix: added `beforeEach` to the vitest import (E103 F2b's new describe block used it but the import lacked it; caught by server tsc during batch build).
+
+### Full CI-mirror gate
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint | 0 errors, 1 pre-existing warning (line-shifted, unchanged content) | ≤0 errors | ✅ |
+| Web tsc | **157** | =157 baseline | ✅ (zero new) |
+| Server tsc | **0** | strict ≤0 | ✅ (E103 import-miss fixed) |
+| Web build | ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Server build | tsc emit exit 0 | exit 0 | ✅ |
+| Web vitest FULL | **1743 / 1743** (103 files) | ≥1738 prior | ✅ (+5 fence tests) |
+| Server vitest FULL | **1002 pass + 6 skip / 1008** (55 files) | ≥994 prior | ✅ (+8 era tests) |
+
+### Batch deploy block (proposed)
+
+**Web hosting** carries the client half of ALL THREE fixes: F2b's picks-derive path (8b2b1a02) + FENCE-2's era-probe rewire + always-log (this commit) + SW-STALE-1 Option A workbox config (this commit).
+
+**Citrus-api** carries the server half of TWO: F2b's snapshot-route picks enrichment (8b2b1a02) + FENCE-2's era endpoint (this commit). Proposed tag `-fen2` per E104.
+
+Same 3-command shape as prior deploys (previous-good holds; rollback = one `gcloud run deploy` back).
+
+### SW-STALE-1 deploy-checklist line (proposed for the Sunday-block runbook)
+
+> **Post-hosting-deploy verification (SW-STALE-1 Option A):** open staging in an existing PWA-installed tab; navigate to a different route without hard refresh; confirm DevTools > Application > Service Workers shows the new SW as "activated and running" within 5s. If the OLD SW is still "activated" after two navigations, capture the SW registration state as evidence and file a SW-STALE-2 ticket — Option A's takeover contract failed and Option B (in-app "New version available" toast) becomes P0.
+
+### Standing by
+
+Commit + branch push pending on architect countersignature. Batch deploy of hosting + citrus-api `-fen2` covers F2b (8b2b1a02) + FENCE-2 (this commit) + SW-STALE-1 Option A (this commit) in one motion.
+
+**End of R97. E104 batch EXECUTED (FENCE-2 + SW-STALE-1 Option A + F2b riding through). Full CI-mirror gate GREEN (+13 new tests). Standing by for architect countersignature on the one-deploy-pair batch.**
+
+
 
 
 

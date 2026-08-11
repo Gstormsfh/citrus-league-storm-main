@@ -37,36 +37,46 @@ const HERE = resolve(fileURLToPath(import.meta.url), '..');
 const DR_PATH = resolve(HERE, '..', 'DraftRoom.tsx');
 const source = readFileSync(DR_PATH, 'utf8');
 
-describe('DraftRoom.tsx — E80 V1-FENCE (source-shape lock)', () => {
+describe('DraftRoom.tsx — E80 V1-FENCE + E104 FENCE-2 (source-shape lock)', () => {
   it('useV1Fence hook is declared at module scope', () => {
     // Not just any variable named useV1Fence — a proper function
     // declaration or `const useV1Fence = ` (must resemble a hook).
     expect(source).toMatch(/function useV1Fence\s*\(/);
   });
 
-  it('fence probes the draft_events table (not a different table)', () => {
-    // The load-bearing table name. Renaming the probe target would
-    // silently break the fence — a source-shape regression must fail
-    // here rather than at 2am on Draft Night. Pattern matches both
-    // `supabase.from('draft_events')` and the untyped-alias form
-    // `untypedFrom('draft_events')` used to work around TS
-    // deep-instantiation on the draft_events wide-JSONB column set.
-    expect(source).toMatch(/(?:supabase\.)?(?:untypedF|f)rom\(['"]draft_events['"]\)/);
+  it('E104 FENCE-2: fence probes the API era endpoint (not client-side supabase RLS)', () => {
+    // E104 rewire: client-side supabase.from('draft_events') RLS
+    // probe was subject to a session-restore race on first mount —
+    // supabase-js hadn't attached the session, so RLS returned zero
+    // rows silently for authenticated members and the fence fell
+    // through to v1. Fix: probe the API server (`GET /api/draft/v2/
+    // league/:leagueId/era` → `{v2Era: boolean}`), which uses
+    // service-role EXISTS immune to client session timing.
+    expect(source).toMatch(/\/api\/draft\/v2\/league\/\$\{encodeURIComponent\(leagueId\)\}\/era/);
   });
 
-  it('fence probe filters by league_id (not unfiltered scan)', () => {
-    // A .from('draft_events') without an .eq('league_id', …) would
-    // return ANY league's events, mis-classifying every v1 league
-    // that shares a DB with any completed v2 league (i.e., every
-    // real environment) as v2-era.
-    expect(source).toMatch(/\.eq\(['"]league_id['"],\s*leagueId\)/);
+  it('E104 FENCE-2: fence probe reads v2Era boolean from response', () => {
+    // Load-bearing shape: response.data.v2Era. Any refactor that
+    // renames the field or expects a different shape breaks the
+    // fence silently — machine-lock it.
+    expect(source).toMatch(/v2Era/);
+    expect(source).toMatch(/payload\?\.v2Era/);
   });
 
-  it('fence probe uses .limit(1) for existence check (not full scan)', () => {
-    // Fence only needs to know "does any row exist" — .limit(1) is
-    // the cheap probe. A missing limit would drag the entire event
-    // history on every mount for finished drafts.
-    expect(source).toMatch(/\.limit\(1\)/);
+  it('E104 FENCE-2: fence does NOT probe supabase.from(draft_events) directly (removed)', () => {
+    // Regression pin: the pre-E104 client-side RLS probe must
+    // stay removed. If a future refactor reintroduces
+    // `supabase.from('draft_events')` inside useV1Fence, the
+    // session-restore race returns.
+    // Extract useV1Fence body and assert absence.
+    const hookMatch = source.match(
+      /function useV1Fence[\s\S]*?^\}/m,
+    );
+    expect(hookMatch).not.toBeNull();
+    if (hookMatch) {
+      expect(hookMatch[0]).not.toMatch(/supabase\.from\(['"]draft_events['"]\)/);
+      expect(hookMatch[0]).not.toMatch(/untypedFrom\(['"]draft_events['"]\)/);
+    }
   });
 
   it('fence state includes checking / v2-era / v1-safe discriminants', () => {
@@ -121,5 +131,45 @@ describe('DraftRoom.tsx — E80 V1-FENCE (source-shape lock)', () => {
     // DB error. The T7 START-button fence catches the other rail.
     // Match on the fall-through logger tag or the setState pattern.
     expect(source).toMatch(/\[V1-FENCE\][\s\S]*setState\(\{ kind: 'v1-safe' \}\)/);
+  });
+
+  // ── E104 always-log doctrine ────────────────────────────────────
+  //
+  // Morning field verification (E104) spent hours proving a
+  // negative the fence could have printed. Post-E104: EVERY branch
+  // logs with the `[V1-FENCE]` prefix. Below assertions pin each
+  // branch's log surface so a future silent-fence regression fails
+  // here before it costs another verification cycle.
+
+  it('E104: !leagueId early return logs', () => {
+    // Pre-E104 this branch was silent; a stale mount looked
+    // indistinguishable from a real probe.
+    expect(source).toMatch(/\[V1-FENCE\][^]*no leagueId/i);
+  });
+
+  it('E104: probe-start log fires before the fetch', () => {
+    // Instrumentation: a probe-start line makes it possible to see
+    // "probe fired but no response" in the console vs "probe never
+    // fired at all" (the E103/E104 silent-fall-through defect).
+    expect(source).toMatch(/\[V1-FENCE\][^]*probing era endpoint/i);
+  });
+
+  it('E104: v2Era=true redirect log fires before setState', () => {
+    // The load-bearing branch: a v2-era detection must be visible
+    // in the console so a field observer can confirm the fence
+    // fired.
+    expect(source).toMatch(/\[V1-FENCE\][^]*v2Era=true/);
+  });
+
+  it('E104: v2Era=false v1-safe log fires', () => {
+    // The mundane branch — still logs so operators can distinguish
+    // "probe returned false" from "probe never returned".
+    expect(source).toMatch(/\[V1-FENCE\][^]*v2Era=false/);
+  });
+
+  it('E104: probe error log fires before defensive fall-through', () => {
+    // Any error path must log — the pre-E104 silent-catch was the
+    // exact defect class that made FENCE-2 necessary.
+    expect(source).toMatch(/\[V1-FENCE\][^]*era probe threw/i);
   });
 });
