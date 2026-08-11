@@ -5846,6 +5846,84 @@ Architect countersigns SHA + issues redeploy paste banner. Post-deploy: architec
 
 **End of R100. E109 hotfix EXECUTED — 3 lines of production code + 7 regression-guard tests + 2 anti-pattern source locks. Commit `4d496a40` pushed. Full CI-mirror gate GREEN (server vitest 1031, +7 from R99's 1024). Pin table updated with fd67eb4d-draft marked KNOWN-BAD. READY-CANDIDATE per Entry 65 — awaiting architect countersignature for engine redeploy paste banner.**
 
+---
+
+## R101 — Entry 111 E111-HOTFIX (draft_status enum-domain fix + value-domain guard class) · READY-CANDIDATE (2026-08-11 20:15Z / 2:15 PM MDT)
+
+### Root cause acknowledged
+
+E109 TypeError gone (architect's field verification confirmed). New failure at the same seam, one layer deeper — data model, not JavaScript. The Slice-1 boot-scan and its NOTIFY-guard sibling both queried `draft_status` for the literal `'paused'`, but `paused` is **NOT a member of the `draft_status` enum**:
+
+- DB enum per `supabase/migrations/20250101000001_create_leagues_teams_tables.sql` + `20260206000000_add_scheduled_draft_time.sql`:  **`('not_started', 'queued', 'in_progress', 'completed')`** — four values, no `paused`.
+- Pause lives on the OTHER column: `leagues.draft_state='paused'` (DraftServiceV2.ts:551 + LobbyManager.ts:5523 confirm).
+- Postgres 22P02 rejects the whole `.in(['in_progress', 'paused'])` list on the invalid literal → scan returns zero, resumes NOTHING → Item 2 inert on tag `7b10d48a-draft` (E109-fix build).
+- NOTIFY guard `status !== 'in_progress' && status !== 'paused'` was a dead branch (`status` from that probe can never be `'paused'`) but encoded the same wrong model.
+
+**Aggravator**: `packages/shared/src/types/league.ts:552` exports `DRAFT_STATUSES` erroneously **including** `'paused'` — a client-facing type-drift docket for another cycle. That mis-encoding is what let the invalid literal sail through 1031 offline tests: the mock stubs accepted any string as valid.
+
+### Fix (commit `a9204e31` on `phase-4-5-implementation`)
+
+Per architect's E111 minimal-edit ruling (Slice-1's contract only requires `in_progress` rehydration; paused-draft resume is a Slice-2+ decision requiring reading `draft_state` alongside):
+
+- **`server/src/draft/LobbyRegistry.ts:503`**: `.in('draft_status', ['in_progress', 'paused'])` → `.eq('draft_status', 'in_progress')`. Simpler + safer than `.in([…])` with a single element.
+- **`server/src/draft/index.ts:799`**: `if (status !== 'in_progress' && status !== 'paused')` → `if (status !== 'in_progress')`. Removes the dead branch that encoded the wrong data model.
+
+Both edits carry inline E111 lesson comments citing migration source of truth + the shared-type drift docket, so future maintainers can't accidentally reintroduce `'paused'` on this column.
+
+### Value-domain guard class added (engineEar3.test.ts, +7 tests → 36 total)
+
+Per architect E111 lesson-of-the-cycle: **"mocked DB stubs that accept arbitrary literals cannot catch enum-domain errors — any future filter on an enum column gets a value-domain assertion."** The R100 guard suite was source-shape + `this`-binding focused; E111 adds:
+
+1. **`DB_DRAFT_STATUS_ENUM` constant** — pinned to migration source of truth (`['not_started', 'queued', 'in_progress', 'completed']`) with citation to both migration files + a comment naming the shared-type drift so this test file is the authoritative offline-side pointer to what the DB actually rejects.
+2. **`makeAdminForBootScan` stub rewritten with Postgres-like enum enforcement.** Both `.eq(col, val)` and `.in(col, values)` return the exact Postgres 22P02 error shape (`{code: '22P02', message: 'invalid input value for enum draft_status: "…"'}`) when the value/list is not a subset of `DB_DRAFT_STATUS_ENUM`. Pre-E111 the stubs returned `{data: activeLeagues, error: null}` for any argument — that's precisely why 1031 tests were green while staging was 22P02.
+3. **Source-shape anti-pattern locks (2 files).** `.eq|.in('draft_status', …)` combined with `'paused'` literal — banned in both `LobbyRegistry.ts` and `draft/index.ts`. Regex is line-anchored + strips comment lines so the E111 lesson comments that mention the anti-pattern by name don't false-positive.
+4. **Positive shape lock.** `.eq('draft_status', 'in_progress')` pinned in `LobbyRegistry.ts` — regression detection if a future refactor widens back to `.in([…])`.
+5. **Behavioral proof.** `performBootScan` against the enum-aware stub with 2 in_progress rigs → resumed=2 / failed=0. Pre-fix (using `['in_progress', 'paused']`) the stub now fires 22P02 through `boot_scan_query_failed`, matching the exact staging error class-for-class.
+6. **Sentinels.** Two — E109 (extracting `.from` throws TypeError) + E111 (stub `.eq/.in` against `'paused'` returns 22P02 with correct code + message + wrapped literal). If a future maintainer accidentally degrades either guard (e.g. arrow-form `from`, or removes the enum-check), the sentinels flip red and the guards are proven dead-in-place.
+7. **Migration-source-of-truth pin.** `DB_DRAFT_STATUS_ENUM` contents asserted sorted-equal to `['completed', 'in_progress', 'not_started', 'queued']`. If a future migration adds a member (or if `'paused'` genuinely gets added), this test forces a conscious update rather than silent drift.
+
+**Would-have-caught coverage this cycle**: the enum-aware stub means every boot-scan behavioral test now fails against any invalid `draft_status` literal. Pre-fix, the code + stubs BOTH used the wrong literal and cancelled out. Post-fix, the stub is authoritative — any reintroduction of `'paused'` on this column trips at least four tests offline.
+
+### Full CI-mirror gate (post-hotfix tree)
+
+| Step | Result | Delta |
+| --- | --- | --- |
+| eslint | 0 errors, 14 pre-existing warnings | unchanged |
+| server tsc | clean | unchanged |
+| web tsc | pre-existing warning-only errors | unchanged |
+| server build | clean | unchanged |
+| web build | clean, PWA 124 entries | unchanged |
+| server vitest FULL | **1038 passed / 6 skipped / 0 failed** (55 files) | **+7 tests** (E111 value-domain guards) |
+| web vitest FULL | **1743 passed / 0 failed** (103 files) | unchanged |
+
+### Pin table (updated — second interim marked KNOWN-BAD)
+
+- **Previous-good** (holds): `0ecbe605-draft` @ `sha256:152b79912cea9d80cf5c3147beeba48957973f5d201d54bdc9a3d6c429768a32` (2026-08-08 pin).
+- **KNOWN-BAD interim #1** (do NOT roll back TO): `fd67eb4d-draft` @ `sha256:97e0ccd9…` — E109 TypeError, Items 1 + 2 dead.
+- **KNOWN-BAD interim #2** (do NOT roll back TO): `7b10d48a-draft` @ `sha256:326838e1…` — E111 enum-domain, Item 2 still inert (query returns 22P02).
+- **Current-after-deploy** (proposed): `a9204e31-draft`.
+- **Rollback**: SUNDAY_EXECUTION_BLOCKS.md §A-R three-command block, target = `0ecbe605-draft` (skip BOTH interim tags — bypass fd67eb4d-draft AND 7b10d48a-draft; neither is a valid rollback target).
+
+### Proposed redeploy block
+
+§A-0 → §A-7 verbatim from SUNDAY_EXECUTION_BLOCKS.md. Image tag suffix `-draft` per E108 tag ruling. Build via `-f server/Dockerfile.draft-engine` (strike #2 invariant). Nine-item boot verification + tenth `event_subscription.watchdog_started`.
+
+**MUST see in boot log for E111 hotfix proof (unchanged from E110/R100 expectations):**
+- All standard nine (fingerprint / hono / uws / subscription / self_test / watchdog / registry.idle_eviction_timer_started / registry.clock_liveness_scanner_started / env checks).
+- `registry.boot_scan_started` — Item 2 fires.
+- `registry.boot_scan_complete` — this time with real tallies (staging has in_progress rig leagues from E100 verify + LOAD1 residue). **Zero `boot_scan_query_failed` between started and complete** — that's the E111 hotfix proof.
+- Neither `registry.boot_scan_threw` (E109 signature) nor `registry.boot_scan_query_failed` (E111 signature) must appear.
+
+**Zero A-R rollback pin change** from R100 — still `0ecbe605-draft`. If a hypothetical E112 appears at redeploy, add `a9204e31-draft` to the KNOWN-BAD list — rollback path stays deterministic.
+
+### Standing by
+
+Architect countersigns SHA + issues redeploy paste banner. Post-deploy S1/S2/S3 acceptance per E110 plan should run cleanly now — the boot-scan should report actual resumes for the first time in the wild, and NOTIFY-creates-lobby should ignite Item 1 on any subsequent draft start.
+
+**Note per architect INS-class lesson (E111 line 1254)**: this is the second consecutive Slice-1 bug that only the deploy-and-watch loop caught. Recording that the deploy loop is earning its keep — the value-domain guard class ships with this cycle to close that class of gap going forward.
+
+**End of R101. E111 hotfix EXECUTED — 2 lines of production code (both filters/guards enum-corrected) + 7 value-domain regression guards + 2 anti-pattern source locks + Postgres-like stub upgrade. Commit `a9204e31` pushed. Full CI-mirror gate GREEN (server vitest 1038, +7 from R100's 1031). Pin table updated with 7b10d48a-draft marked KNOWN-BAD alongside fd67eb4d-draft. READY-CANDIDATE per Entry 65 — awaiting architect countersignature for engine redeploy paste banner.**
+
 
 
 
