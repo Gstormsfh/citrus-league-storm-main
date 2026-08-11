@@ -146,23 +146,51 @@ export function usePreloadedPlayers(): UsePreloadedPlayersResult {
         // DraftRoomV2 tests don't need env vars set to import the
         // page; the actual supabase.from call is behind vi.mock in
         // usePreloadedPlayers's own test rig).
+        //
+        // Entry 92 PLAYER-RES-1b (2026-08-10) — the Supabase Data-API
+        // caps ranged responses at 1000 rows by default (server-side
+        // clamp). Pre-patch, a single `.range(0, 4999)` call returned
+        // an arbitrary ~1000-row physical-order subset of the 2035-row
+        // player_directory. Run 4 field evidence: Regenda (early
+        // physical row) was in the window; MacKinnon + McDavid weren't,
+        // so autopicked stars rendered `#id / ? / -` fallbacks in
+        // History despite being present in the table with clean RLS.
+        //
+        // Fix: page through the directory in ≤1000-row windows via
+        // `.range(offset, offset+PAGE_SIZE-1)`, looping until a short
+        // page signals end-of-data. `.order('player_id', asc)` gives
+        // deterministic ordering so pages don't overlap or gap. Both
+        // fixes together also normalize the Players tab's default
+        // ordering (which previously led with fringe players — the
+        // physical-row order of the first ~1000 rows).
         const { supabase } = await import('@/integrations/supabase/client');
-        const { data, error: qErr } = await supabase
-          .from('player_directory')
-          .select(
-            'player_id, full_name, position_code, team_abbrev, jersey_number, headshot_url, is_goalie, eligible_positions',
-          )
-          .eq('season', CURRENT_SEASON)
-          .range(0, 4999);
-        if (cancelledRef.current) return;
-        if (qErr) {
-          throw new Error(qErr.message || 'player_directory query failed');
-        }
-        const rows = (data ?? []) as DirectoryRow[];
+        const PAGE_SIZE = 1000;
         const map = new Map<string, Player>();
-        for (const row of rows) {
-          const p = directoryRowToPlayer(row);
-          map.set(p.id, p);
+        let offset = 0;
+        while (true) {
+          const { data, error: qErr } = await supabase
+            .from('player_directory')
+            .select(
+              'player_id, full_name, position_code, team_abbrev, jersey_number, headshot_url, is_goalie, eligible_positions',
+            )
+            .eq('season', CURRENT_SEASON)
+            .order('player_id', { ascending: true })
+            .range(offset, offset + PAGE_SIZE - 1);
+          if (cancelledRef.current) return;
+          if (qErr) {
+            throw new Error(qErr.message || 'player_directory query failed');
+          }
+          const rows = (data ?? []) as DirectoryRow[];
+          for (const row of rows) {
+            const p = directoryRowToPlayer(row);
+            map.set(p.id, p);
+          }
+          // Short page → server has no more rows to return. Loop exits
+          // deterministically for any directory size ≥ 0 (including
+          // an empty table, which returns rows.length === 0 on the
+          // first iteration).
+          if (rows.length < PAGE_SIZE) break;
+          offset += PAGE_SIZE;
         }
         setPlayersById(map);
         setError(null);

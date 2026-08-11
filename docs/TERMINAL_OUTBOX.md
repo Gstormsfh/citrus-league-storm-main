@@ -5074,3 +5074,51 @@ Commit + branch push pending on architect countersignature of this READY-CANDIDA
 
 **End of R91. Entry 87 FLAWLESS-RUN TRIO (Fix C + Fix B + Fix A) executed against architect-ratified spec + truth table. Full CI-mirror gate GREEN (0 new tsc errors, +29 web tests, +2 server tests). Standing by for architect countersignature + rebuild block issuance.**
 
+## R92 — Entry 92 PLAYER-RES-1b EXECUTED · READY-CANDIDATE (2026-08-10 23:20Z / 5:20 PM MT)
+
+### Entries 91 + 92 ACK
+
+R91 COUNTERSIGNED — trio deployed, Run 4 executed on Garrett's screen. Entry 92 pre-ratified: PLAYER-RES-1b pagination patch on Fix B's rewire. Run 4 field evidence pinned the root cause (Regenda in-window / MacKinnon + McDavid out) to Supabase Data-API's 1000-row default cap silently truncating the 2035-row directory to an arbitrary physical-order subset. Client-only cycle per Entry 92.
+
+### This cycle executed
+
+**`apps/web/src/hooks/usePreloadedPlayers.ts`** — swapped the single `.range(0, 4999)` call for a page-loop:
+- Added `.order('player_id', { ascending: true })` to each iteration → deterministic paging, no overlap or gap.
+- `PAGE_SIZE = 1000` constant; loop calls `.range(offset, offset + PAGE_SIZE - 1)` until `rows.length < PAGE_SIZE` signals end-of-data.
+- Empty table case handled implicitly (first-iteration rows=0 < 1000 → break, no infinite loop).
+- Map contract untouched: `id = String(player_id)` keys, same Player shape, same lazy supabase import pattern.
+- Comment block cites Entry 92 root cause + Run 4 field evidence (Regenda / MacKinnon / McDavid) for future readers.
+
+**`apps/web/src/hooks/__tests__/usePreloadedPlayers.test.ts`** — extended the fluent-chain mock to include `.order` between `.eq` and `.range`, added `orderMock.mockClear()` to beforeEach, and appended **5 pagination pins**:
+1. `.order('player_id', { ascending: true })` called each iteration (shape lock).
+2. Short first page (rows < 1000) → single `.range(0, 999)` call, no second fetch.
+3. **Full first page (1000 rows) → second `.range(1000, 1999)` fires; map contains BOTH pages; MacKinnon (8477492) + McDavid (8478402) — the Run 4 regression pin — resolve from the second page.** Locks the exact bug that dropped stars from the browser map on live prod.
+4. Three-page directory (any-size expansion): third `.range(2000, 2999)` fires when second page also full.
+5. Empty first page (rows === 0) → exit loop immediately, no infinite spin.
+
+### Full CI-mirror gate (Entry 64 standing gate — web only per Entry 92 scope)
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint | 0 errors, 14 pre-existing warnings | ≤0 errors | ✅ (removed one unused-disable I added mid-cycle) |
+| Web tsc | **157** | =157 baseline | ✅ (zero new errors) |
+| Web build | 12.92s ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Web vitest FULL | **1718 / 1718** (102 files) | ≥1713 prior | ✅ (+5 new pagination pins) |
+| Server | untouched per Entry 92 scope | n/a | ✅ (not exercised — client-only patch) |
+
+### Deploy block for Garrett (per Entry 92: `npm run build` + hosting deploy, ~4 min)
+
+Web-only cycle — no citrus-api rebuild needed (server untouched). Pin table update proposed:
+- **Previous-good** (holds): `web:<hosting-commit>` from R91 trio deploy (whichever hosting build carried 0e73b70a).
+- **Current-after-deploy** (proposed): hosting build from the new commit (0e73b70a + this cycle).
+- **Rollback**: firebase hosting release-list + one `firebase hosting:clone` back to the prior release.
+
+Per Entry 65: **NO PASTE BANNER** in this outbox. Terminal proposes READY; architect countersigns before Garrett runs the hosting redeploy.
+
+### Standing by
+
+Commit + branch push pending on architect countersignature. Once countersigned + Garrett has redeployed hosting, next Run 4 refresh should show autopicked stars (MacKinnon, McDavid, etc.) with full names + positions + teams in History — the last visible blemish before the flawless five with real names.
+
+**End of R92. Entry 92 PLAYER-RES-1b EXECUTED. Directory fetch now paginates ≤1000-row windows with deterministic ordering — defeats the Supabase Data-API cap that dropped >1000th-row stars from the browser map on Run 4. Full web CI-mirror gate GREEN (+5 new tests locking the page-loop). Standing by for architect countersignature.**
+
+
