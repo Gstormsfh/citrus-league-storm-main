@@ -5924,6 +5924,118 @@ Architect countersigns SHA + issues redeploy paste banner. Post-deploy S1/S2/S3 
 
 **End of R101. E111 hotfix EXECUTED — 2 lines of production code (both filters/guards enum-corrected) + 7 value-domain regression guards + 2 anti-pattern source locks + Postgres-like stub upgrade. Commit `a9204e31` pushed. Full CI-mirror gate GREEN (server vitest 1038, +7 from R100's 1031). Pin table updated with 7b10d48a-draft marked KNOWN-BAD alongside fd67eb4d-draft. READY-CANDIDATE per Entry 65 — awaiting architect countersignature for engine redeploy paste banner.**
 
+---
+
+## R102 — Entry 113 E113-HOTFIX (armPickDeadline wrapper — Item 6 class-fix) · READY-CANDIDATE (2026-08-11 20:50Z / 2:50 PM MDT)
+
+### Root cause acknowledged + field-proof recognition
+
+🏆 **S1 PASS acknowledged and recorded**: architect's field verification on league ada00009 (12 ownerless seats, 30s clock, ZERO clients) proved Item 1 works — seq-1 draft_started 20:37:24.334 → seq-2 pick @ 20:37:27.106 (2.77s later, no clients connected). The Run-2 no-audience-no-ignition disease class is field-cured. Item 2 boot-scan mechanically green (census-correct on empty).
+
+⚠️ **S3 PARTIAL acknowledged**: seq-3 landed at +30.99s — full courtesy clock. Item 6 fired on pick 1 only, then reverted. Architect source-read identified the root: `computeArmDeadlineForOnClockTeam` was wired at only **2 of ~7** pick-deadline arm sites (init :1054 + applyPickEvent :3635). The missing sites — :1907 self-drive, :2944 draft_started apply, and 4 resume/extend re-arms — all bypassed the helper silently. Garrett's order was half-delivered.
+
+### Class fix (commit `71c285dd` on `phase-4-5-implementation`)
+
+Per E113 structural preference — mirrors E109/E111 lesson-shaped fixes: **introduce a single private `armPickDeadline` wrapper so no future arm site can bypass the helper.**
+
+```ts
+private armPickDeadline(rpcDeadline: Date): void {
+  this.setPickDeadline(
+    this.computeArmDeadlineForOnClockTeam(rpcDeadline),
+    'pick',
+  );
+}
+```
+
+Wrapper docstring enumerates:
+- **Contract**: single entry point for arming a snake/linear pick deadline. Every call site MUST route through here.
+- **Exempt paths** (with rationale + expected in-code marker `E113 EXEMPT`): `draft_extended` handlers, auction `bid_window`/`nomination_window` sites, and `handleStallScanner` recovery re-arm.
+
+### Routing decisions
+
+**7 sites routed through `armPickDeadline`:**
+
+| Line | Site | Rationale |
+| --- | --- | --- |
+| 1055 | init post-replay | E106 original wiring, converted to wrapper for consistency |
+| 1911 | processSubmitPick step 6c (self-drive) | **E113 PRIMARY MISS** — the one that made seq-3 fire at +30.99s |
+| 2951 | draft_started dispatcher apply | **E113 PRIMARY MISS** — first-pick deadline path |
+| 3049 | draft_resumed dispatcher A | Resume = fresh on-clock transition, ownerless seats deserve instant |
+| 3276 | draft_resumed dispatcher B (bootstrap-mode) | Same rationale as A |
+| 3662 | applyPickEvent external-apply | E106 original wiring, converted from inline pattern to wrapper |
+| 5455 | resumeDraft (commissioner-invoked) | Same rationale as dispatcher resume paths |
+
+**2 sites EXEMPT with inline `E113 EXEMPT` marker + rationale (both `draft_extended`):**
+
+| Line | Site | Reason for exemption |
+| --- | --- | --- |
+| 3075 | draft_extended dispatcher A | Commissioner explicitly added time; shortening it back to the instant window for ownerless seats would defeat the extension |
+| 3301 | draft_extended dispatcher B (bootstrap-mode) | Same rationale as A |
+
+**Skipped from routing (documented in wrapper docstring as outside E113 scope):**
+- `handleStallScanner` recovery re-arm (~:4796): dynamic `kind` (could be auction). Recovery from a lost timer is not a fresh on-clock transition; the instant-autopick benefit applies to the NEXT normal pick, not to re-arming a stale deadline.
+- All auction `setPickDeadline(_, 'bid_window' | 'nomination_window')` sites: auction has its own state machine, outside ENGINE-EAR v3 Slice 1 scope.
+
+### Test coverage additions (engineEar3.test.ts, +8 tests → 44 total)
+
+Following E113's "class-fix pattern mirrors E109/E111" — source-shape locks are the durable defense against future arm-site drift:
+
+1. **Wrapper signature lock.** `private armPickDeadline(rpcDeadline: Date): void` — signature drift catches (e.g., adding a `kind` parameter breaks the single-purpose invariant).
+2. **Wrapper body sequence lock.** The wrapper body must invoke BOTH `computeArmDeadlineForOnClockTeam` AND `setPickDeadline(_, 'pick')` in a single expression. Multi-line match (~300 chars); regression class = someone splitting the pipeline.
+3. **Positive count lock.** `this.armPickDeadline(` call sites: **≥6** (init, self-drive, draft_started apply, both resume dispatchers, applyPickEvent). Any drop back to raw `setPickDeadline` reduces the count.
+4. **WALK-THE-FILE guard (the strongest catch).** Every raw `setPickDeadline(_, 'pick')` call outside the wrapper's body is either (a) skipped because it's the wrapper's own call OR (b) preceded within 12 lines by an `E113 EXEMPT` marker. If a future contributor adds a new pick arm site without either routing through the wrapper or marking exempt, this guard trips.
+5. **Exempt-vocabulary lock.** Every `E113 EXEMPT` block must contain the word `extend` or `extension` — so the intent is inline (and drift-catches: if a future maintainer copy-pastes the marker for the wrong reason, they can't just borrow the vocabulary).
+6. **Primary-site anchor locks.** The two E113 primary miss sites (self-drive + draft_started apply) carry E113-specific comment vocabulary AND the wrapper call — mutual pin catches drift on either.
+7. **Applied-inline-pattern ban.** Raw `setPickDeadline(computeArmDeadlineForOnClockTeam(...), 'pick')` shape (the pre-E113 inline duplication) is banned — forces every consumer through the named wrapper for easier grep.
+
+**Would-have-caught coverage this cycle**: the WALK-THE-FILE guard would have surfaced 5 unwrapped `setPickDeadline(_, 'pick')` sites on the pre-E113 tree (self-drive, draft_started, both resume dispatchers, applyPickEvent's inline pattern). Post-fix: zero violations offline. This is the strongest offline class-catch available for the arm-site-bypass regression class.
+
+### Full CI-mirror gate (post-hotfix tree)
+
+| Step | Result | Delta |
+| --- | --- | --- |
+| eslint | 0 errors, 14 pre-existing warnings | unchanged |
+| server tsc | clean | unchanged |
+| web tsc | pre-existing warning-only errors | unchanged |
+| server build | clean | unchanged |
+| web build | clean, PWA 124 entries | unchanged |
+| server vitest FULL | **1046 passed / 6 skipped / 0 failed** (55 files) | **+8 tests** (E113 wrapper-routing guards) |
+| web vitest FULL | **1743 passed / 0 failed** (103 files) | unchanged |
+
+### Pin table (updated — third interim marked KNOWN-BAD)
+
+- **Previous-good** (holds): `0ecbe605-draft` @ `sha256:152b79912cea9d80cf5c3147beeba48957973f5d201d54bdc9a3d6c429768a32` (2026-08-08 pin).
+- **KNOWN-BAD interim #1** (do NOT roll back TO): `fd67eb4d-draft` — E109 TypeError, Items 1 + 2 dead.
+- **KNOWN-BAD interim #2** (do NOT roll back TO): `7b10d48a-draft` — E111 enum-domain, Item 2 inert (22P02).
+- **KNOWN-BAD interim #3** (do NOT roll back TO): `a9204e31-draft` — E113 partial, S1 PASS but Item 6 pick-1-only (5 unrouted arm sites).
+- **Current-after-deploy** (proposed): `71c285dd-draft`.
+- **Rollback**: SUNDAY_EXECUTION_BLOCKS.md §A-R three-command block, target = `0ecbe605-draft` (skip ALL THREE interim tags — none is a valid rollback target).
+
+### Proposed redeploy block
+
+§A-0 → §A-7 verbatim from SUNDAY_EXECUTION_BLOCKS.md. Image tag suffix `-draft` per E108 tag ruling. Build via `-f server/Dockerfile.draft-engine` (strike #2 invariant). Nine-item boot verification + tenth `event_subscription.watchdog_started`.
+
+**MUST see in boot log (unchanged from E110/R100/R101 expectations):**
+- All standard nine + `event_subscription.watchdog_started`.
+- `registry.boot_scan_started` + `registry.boot_scan_complete` (real tallies if in_progress rigs present; census-correct-zero otherwise).
+- Zero `boot_scan_threw` (E109 signature), zero `boot_scan_query_failed` (E111 signature).
+
+**E113 hotfix proof requires draft activity (not boot alone).** The wrapper routes silently at boot; the proof surfaces during a live draft:
+- On subsequent ownerless-seat picks (2..N in an unowned rig), expect `[lobby] instant_autopick_arm` log lines per pick.
+- Pick cadence should hold at ~2s throughout, not jump to the full pick_clock after pick 1.
+
+### Acceptance status (per E113)
+
+- **S1 ✅** — field-proven on `a9204e31-draft` (league ada00009). Wrapper routing preserves the S1 behavior. Re-run optional per architect.
+- **S2 opportunistic** — the E113 redeploy provides the natural restart-mid-draft rehearsal (if league ada00009 or another in_progress rig is live during deploy, the boot-scan should resume it within 5s of container start).
+- **S3 rerun REQUIRED** — S3 pick-cadence measurement on the fresh build. Expect: pick spacing ≈ 2-3s throughout the cascade (vs the +30.99s regression seen on `a9204e31-draft` after pick 1). If S3 measures ≈2-3s across all 12 picks, Item 6 is field-cured.
+
+### Standing by
+
+Architect countersigns SHA + issues redeploy paste banner. Post-deploy S3 rerun proves Item 6 class-fixed. Given the pattern of the last three cycles (each caught a different Slice-1 defect deploy-and-watch), consider this the arm-site-bypass class closed — the wrapper + WALK-THE-FILE guard mean any future arm-site regression trips offline before deploy.
+
+**End of R102. E113 hotfix EXECUTED — 1 new wrapper + 7 arm sites routed + 2 exempt sites documented + 8 wrapper-routing regression guards. Commit `71c285dd` pushed. Full CI-mirror gate GREEN (server vitest 1046, +8 from R101's 1038). Pin table updated with a9204e31-draft marked KNOWN-BAD alongside fd67eb4d-draft + 7b10d48a-draft. READY-CANDIDATE per Entry 65 — awaiting architect countersignature for engine redeploy paste banner.**
+
 
 
 
