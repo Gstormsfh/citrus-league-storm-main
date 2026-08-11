@@ -887,3 +887,126 @@ describe('reduce — Entry 87 Fix A (COMPLETED-ROOM-1)', () => {
     expect(effectKinds(result.sideEffects)).toEqual(['schedule_backoff_timer']);
   });
 });
+
+// ── Entry 99 COMPLETED-ROOM-2 (2026-08-11) ──────────────────────────
+//
+// Client-side companion to the server-route draftStatus decoration.
+// LOAD-1-NIGHT witness draft: for a completed league, the engine
+// serializer returned `stateSnapshot.draftStatus='in_progress'` even
+// though the applied event stream includes draft_completed. Fix A's
+// terminal-completed path fetches the snapshot on entry, but the
+// pre-E99 reducer no-op'd on the arrival from anywhere except
+// `snapshot_required` — so the delivered snapshot never reached the
+// store and DraftRoomV2 sat on "Loading final board…" indefinitely.
+//
+// E99 (c): terminal_completed accepts snapshot_fetched. State stays
+// terminal (no transition to connected — no live socket). Snapshot
+// is delivered with stateSnapshot.draftStatus overridden to the
+// runner's known terminal value, so the store's derived state
+// trusts the routed terminality even when the payload's own status
+// still lies. Belt to the server-side decoration in drafts.ts.
+
+describe('reduce — Entry 99 COMPLETED-ROOM-2 (terminal_completed accepts snapshot_fetched)', () => {
+  function mkSnapshotWithStatus(
+    draftStatus: import('@citrus/shared').LobbyStatus,
+  ): import('@citrus/shared').DraftSnapshot {
+    return {
+      lobbyId: 'lobby-terminal',
+      format: 'snake',
+      recentEvents: [],
+      stateSnapshot: {
+        currentPickNumber: null,
+        currentRoundNumber: null,
+        onClockTeamId: null,
+        totalPicks: 12,
+        picksMade: 12,
+        draftStatus,
+        currentPickDeadline: null,
+      },
+    };
+  }
+
+  it('terminal_completed + snapshot_fetched(in_progress payload) → stays terminal_completed + delivers snapshot with draftStatus overridden to "completed"', () => {
+    // The exact E99 scenario: engine serializer lies (says in_progress),
+    // client's runner already knows the draft is completed (routed
+    // via discovery_refused_terminal). Client-side override forces
+    // the delivered payload to match reality.
+    const lyingPayload = mkSnapshotWithStatus('in_progress');
+    const result = reduce(
+      { kind: 'terminal_completed', draftStatus: 'completed' },
+      { type: 'snapshot_fetched', snapshot: lyingPayload },
+      noJitter,
+    );
+    // State unchanged — still terminal_completed. No transition to
+    // 'connected' (there is no live socket for a completed draft).
+    expect(result.state.kind).toBe('terminal_completed');
+    if (result.state.kind === 'terminal_completed') {
+      expect(result.state.draftStatus).toBe('completed');
+    }
+    // Exactly one deliver_snapshot side effect fires.
+    expect(effectKinds(result.sideEffects)).toEqual(['deliver_snapshot']);
+    // Delivered snapshot has draftStatus overridden to the runner's
+    // known terminal value — the render layer trusts this and shows
+    // the completion board.
+    const delivered = result.sideEffects[0];
+    if (delivered.kind === 'deliver_snapshot') {
+      expect(delivered.snapshot.stateSnapshot.draftStatus).toBe('completed');
+      // Rest of payload preserved (no other fields clobbered).
+      expect(delivered.snapshot.stateSnapshot.picksMade).toBe(12);
+      expect(delivered.snapshot.stateSnapshot.totalPicks).toBe(12);
+      expect(delivered.snapshot.lobbyId).toBe('lobby-terminal');
+    }
+  });
+
+  it('terminal_completed(cancelled) + snapshot_fetched → override to "cancelled"', () => {
+    // Same override applies for the cancelled variant of terminal.
+    const payload = mkSnapshotWithStatus('in_progress');
+    const result = reduce(
+      { kind: 'terminal_completed', draftStatus: 'cancelled' },
+      { type: 'snapshot_fetched', snapshot: payload },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('terminal_completed');
+    if (result.state.kind === 'terminal_completed') {
+      expect(result.state.draftStatus).toBe('cancelled');
+    }
+    const delivered = result.sideEffects[0];
+    if (delivered.kind === 'deliver_snapshot') {
+      expect(delivered.snapshot.stateSnapshot.draftStatus).toBe('cancelled');
+    }
+  });
+
+  it('snapshot_required + snapshot_fetched → connected (UNCHANGED pre-E99 path)', () => {
+    // Regression guard: the resync-too-old → snapshot-fetch → connected
+    // path (Fix A's original E87 shape) must not have changed. Only
+    // terminal_completed gets the new branch; snapshot_required
+    // continues to transition to `connected`.
+    const payload = mkSnapshotWithStatus('in_progress');
+    const result = reduce(
+      snapshotRequiredState(),
+      { type: 'snapshot_fetched', snapshot: payload },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('connected');
+    expect(effectKinds(result.sideEffects)).toEqual(['deliver_snapshot']);
+    // Payload NOT patched here — the snapshot_required path preserves
+    // the original stateSnapshot as-is (that path is for live drafts
+    // catching up post-eviction; the runner has no terminal
+    // knowledge to override with).
+    const delivered = result.sideEffects[0];
+    if (delivered.kind === 'deliver_snapshot') {
+      expect(delivered.snapshot.stateSnapshot.draftStatus).toBe('in_progress');
+    }
+  });
+
+  it('connected + snapshot_fetched → no-op (unchanged; unexpected arrival ignored)', () => {
+    const payload = mkSnapshotWithStatus('in_progress');
+    const result = reduce(
+      connectedState(),
+      { type: 'snapshot_fetched', snapshot: payload },
+      noJitter,
+    );
+    expect(result.state.kind).toBe('connected');
+    expect(result.sideEffects).toEqual([]);
+  });
+});

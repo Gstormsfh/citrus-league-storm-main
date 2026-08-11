@@ -289,6 +289,32 @@ draftsRoutes.get('/:draftId/snapshot', async (c) => {
   let snapshot;
   try {
     snapshot = await buildSnapshot(leagueId, supabase);
+    // Entry 99 COMPLETED-ROOM-2 (2026-08-11) — dual-source-of-truth
+    // fix (b). LOAD-1-NIGHT witness draft found the engine serializer
+    // returns `stateSnapshot.draftStatus='in_progress'` for a
+    // completed league (lastAppliedSeq=14 including draft_completed,
+    // engine persistence log labels it completed, but the serializer's
+    // status field lies). Client's completion render waits for a
+    // terminal status the payload never asserts → hangs forever on
+    // "Loading final board…".
+    //
+    // Route-level decoration: when serving a terminal league, override
+    // `stateSnapshot.draftStatus` with the authoritative
+    // `leagues.draft_status` value. The engine serializer fix (a per
+    // Entry 99) rides the separate ENGINE-EAR deploy batch; this
+    // route override is the client-visible corrective in the morning
+    // hosting/API cycle. Belt to reduce.ts's own client-side override
+    // (E99 fix c) — either alone is sufficient; both together is
+    // defense-in-depth against future engine regressions.
+    if (snapshot && isTerminal && snapshot.stateSnapshot.draftStatus !== draftStatus) {
+      snapshot = {
+        ...snapshot,
+        stateSnapshot: {
+          ...snapshot.stateSnapshot,
+          draftStatus,
+        },
+      };
+    }
   } catch (err) {
     structuredLogger.error(
       'snapshot.endpoint.build_failed',

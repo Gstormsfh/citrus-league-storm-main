@@ -413,4 +413,113 @@ describe('Snapshot endpoint — chunk 11g.7 sub-step 7b', () => {
     const body = await res.json();
     expect(body.error.code).toBe('DRAFT_NOT_CONNECTABLE');
   });
+
+  // Entry 99 COMPLETED-ROOM-2 (2026-08-11) — dual-source-of-truth
+  // decoration. LOAD-1-NIGHT witness draft: for a completed league,
+  // the engine serializer's `stateSnapshot.draftStatus` field lies
+  // (says 'in_progress' despite lastAppliedSeq=14 including
+  // draft_completed). Client's completion loader waits for the
+  // terminal status the payload never asserts → hangs.
+  //
+  // Route-level decoration: when serving a terminal league, override
+  // `stateSnapshot.draftStatus` with the authoritative
+  // `leagues.draft_status`. Engine serializer fix (E99 a) rides the
+  // separate ENGINE-EAR deploy batch; this route override is the
+  // client-visible corrective in the morning hosting/API cycle.
+  it('200: draft_status="completed" + engine payload says in_progress → route overrides to "completed" (E99 b)', async () => {
+    mockLeague = { id: VALID_DRAFT_ID, draft_status: 'completed' };
+    mockLeagueError = null;
+    mockIsMember = true;
+    // Simulates the exact engine-serializer bug: draftStatus field
+    // in the snapshot payload is stale/lying.
+    mockSnapshot = {
+      lobbyId: VALID_DRAFT_ID,
+      format: 'snake',
+      recentEvents: [],
+      stateSnapshot: {
+        currentPickNumber: null,
+        currentRoundNumber: null,
+        onClockTeamId: null,
+        totalPicks: 12,
+        picksMade: 12,
+        draftStatus: 'in_progress', // ← engine lies
+        currentPickDeadline: null,
+      },
+    };
+    mockSnapshotError = null;
+
+    const res = await call();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    // The route decorated the payload from the authoritative league row.
+    expect(body.stateSnapshot.draftStatus).toBe('completed');
+    // Rest of payload preserved.
+    expect(body.stateSnapshot.picksMade).toBe(12);
+    expect(body.stateSnapshot.totalPicks).toBe(12);
+    expect(body.lobbyId).toBe(VALID_DRAFT_ID);
+  });
+
+  it('200: draft_status="in_progress" + engine payload agrees → no override, payload passes through', async () => {
+    // Regression guard: the override ONLY fires for terminal statuses.
+    // A live in-progress league whose payload agrees passes through
+    // unchanged (no accidental clobber).
+    mockLeague = { id: VALID_DRAFT_ID, draft_status: 'in_progress' };
+    mockLeagueError = null;
+    mockIsMember = true;
+    mockSnapshot = {
+      lobbyId: VALID_DRAFT_ID,
+      format: 'snake',
+      recentEvents: [],
+      stateSnapshot: {
+        currentPickNumber: 5,
+        currentRoundNumber: 1,
+        onClockTeamId: 'team-3',
+        totalPicks: 12,
+        picksMade: 4,
+        draftStatus: 'in_progress',
+        currentPickDeadline: '2026-08-11T12:00:30.000Z',
+      },
+    };
+    mockSnapshotError = null;
+
+    const res = await call();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.stateSnapshot.draftStatus).toBe('in_progress');
+    expect(body.stateSnapshot.picksMade).toBe(4);
+    expect(body.stateSnapshot.currentPickDeadline).toBe(
+      '2026-08-11T12:00:30.000Z',
+    );
+  });
+
+  it('200: draft_status="completed" + payload ALREADY says completed → override is a no-op passthrough', async () => {
+    // Post-ENGINE-EAR-deploy scenario: when the engine serializer
+    // eventually returns the correct value, the route override is
+    // an idempotent no-op. Nothing observable changes; test locks
+    // the shape so a future refactor doesn't accidentally break
+    // idempotency.
+    mockLeague = { id: VALID_DRAFT_ID, draft_status: 'completed' };
+    mockLeagueError = null;
+    mockIsMember = true;
+    mockSnapshot = {
+      lobbyId: VALID_DRAFT_ID,
+      format: 'snake',
+      recentEvents: [],
+      stateSnapshot: {
+        currentPickNumber: null,
+        currentRoundNumber: null,
+        onClockTeamId: null,
+        totalPicks: 12,
+        picksMade: 12,
+        draftStatus: 'completed',
+        currentPickDeadline: null,
+      },
+    };
+    mockSnapshotError = null;
+
+    const res = await call();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.stateSnapshot.draftStatus).toBe('completed');
+  });
 });

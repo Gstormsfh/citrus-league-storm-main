@@ -464,6 +464,34 @@ function handleSnapshotFetched(
   state: DraftClientState,
   event: Extract<DraftClientEvent, { type: 'snapshot_fetched' }>,
 ): ReduceResult {
+  // Entry 99 COMPLETED-ROOM-2 (2026-08-11) — client-side companion
+  // to the server route decoration. The Fix A path (E87) fetches a
+  // snapshot on entry to `terminal_completed`, but this handler
+  // previously no-op'd from every state except `snapshot_required` —
+  // so the delivered snapshot never reached the store and
+  // DraftRoomV2 sat on "Loading final board…" indefinitely.
+  //
+  // Fix: `terminal_completed` also accepts the arrival. State stays
+  // terminal (no transition to `connected` — there is no live socket
+  // for a completed draft). Snapshot is delivered with
+  // `stateSnapshot.draftStatus` overridden to the runner's known
+  // terminal value, so DraftRoomV2's derived state trusts the
+  // route-level terminality even if the payload's own status field
+  // still lies (engine serializer fix (a) lands on ENGINE-EAR deploy;
+  // this is the belt to that server-side fix's suspenders).
+  if (state.kind === 'terminal_completed') {
+    const patched: import('@citrus/shared').DraftSnapshot = {
+      ...event.snapshot,
+      stateSnapshot: {
+        ...event.snapshot.stateSnapshot,
+        draftStatus: state.draftStatus,
+      },
+    };
+    return {
+      state,
+      sideEffects: [{ kind: 'deliver_snapshot', snapshot: patched }],
+    };
+  }
   if (state.kind !== 'snapshot_required') {
     return noTransition(state);
   }
