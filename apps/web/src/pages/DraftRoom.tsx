@@ -87,7 +87,123 @@ enum DraftPhase {
   COMPLETED = 'completed'
 }
 
+// ─── E80 V1-FENCE (2026-08-11) ─────────────────────────────────────
+//
+// ⚠ P0 pre-TWELVE fix. F28 IGNITION Run 1 (Entry 80) surfaced that
+// v1's legacy client-side draft machinery ran an ENTIRE draft in
+// Garrett's browser after his refresh landed on an old
+// /draft-room?league= URL for a v2-era league: engine deaf → v1
+// rendered lobby → v1's autopick timer fired locally → v1 wrote 12
+// picks to v1 draft_picks tables → v1 flipped league status. T7
+// fenced the legacy START button; this fence catches the RUNNING
+// machinery ever landing on a v2-era league at all.
+//
+// Guard shape (E80 order item 1): query `draft_events` for the
+// current leagueId. If ANY row exists, the league has had a v2-era
+// ignition (draft_started / pick / draft_completed) — v1 must not
+// touch it. Hard redirect via `<Navigate>` to `/draft-v2/:leagueId`
+// with `replace: true` so back-button doesn't reland here.
+//
+// Belt (E80 order item 2): the fence is a WRAPPER — the inner v1
+// DraftRoom body only mounts when `v1-safe`. No v1 useEffect fires,
+// no v1 autopick timer arms, no v1 pick-write path activates while
+// the check is in flight or when v2-era is detected.
+//
+// Suspenders + route-table (E80 order items 3 + 5): docketed for
+// follow-up. LeagueDashboard:1605 and Matchup:5264 still navigate
+// to `/draft-room` — this fence catches them all until they're
+// updated. v1's pick-write server-side refusal is docketed; the
+// client-side fence is sufficient for the observed defect class.
+type V1FenceState =
+  | { kind: 'checking' }
+  | { kind: 'v2-era'; leagueId: string }
+  | { kind: 'v1-safe' };
+
+function useV1Fence(leagueId: string | null): V1FenceState {
+  const [state, setState] = useState<V1FenceState>({ kind: 'checking' });
+  useEffect(() => {
+    let cancelled = false;
+    if (!leagueId) {
+      // No leagueId in URL — legacy load-user-league path handles the
+      // redirect itself. Don't block on the fence check.
+      setState({ kind: 'v1-safe' });
+      return;
+    }
+    (async () => {
+      try {
+        // Cast supabase.from() through `unknown` for THIS probe only.
+        // Supabase's generated Database types push the .from → .select
+        // → .eq → .limit inference chain past TS's instantiation-depth
+        // cap for the draft_events table (wide JSONB payload column
+        // trips the deep-instantiation check). The fence only needs
+        // {data, error} shape; the id column type is irrelevant to
+        // the existence check.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const untypedFrom = supabase.from as unknown as (t: string) => any;
+        const response = await untypedFrom('draft_events')
+          .select('id')
+          .eq('league_id', leagueId)
+          .limit(1);
+        if (cancelled) return;
+        if (response.error) {
+          // Query failure is defensive fall-through to v1: if we
+          // cannot verify the league's v2-era status, prefer not to
+          // silently redirect (the guard's job is to CATCH v2-era
+          // leagues, not to block v1 leagues on a transient DB
+          // error). The v1 path has other rails (T7 START fence).
+          logger.warn('[V1-FENCE] draft_events probe failed; falling through to v1', response.error);
+          setState({ kind: 'v1-safe' });
+          return;
+        }
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          setState({ kind: 'v2-era', leagueId });
+          return;
+        }
+        setState({ kind: 'v1-safe' });
+      } catch (err) {
+        if (cancelled) return;
+        logger.warn('[V1-FENCE] unexpected error; falling through to v1', err);
+        setState({ kind: 'v1-safe' });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
+  return state;
+}
+
+// The exported top-level component: fence FIRST, mount v1 body only
+// when v1-safe. Any v2-era league gets a hard Navigate to /draft-v2
+// before any v1 draft state has a chance to arm.
 const DraftRoom = () => {
+  const [searchParams] = useSearchParams();
+  const leagueId = searchParams.get('league');
+  const fence = useV1Fence(leagueId);
+
+  if (fence.kind === 'v2-era') {
+    return (
+      <Navigate
+        to={`/draft-v2/${encodeURIComponent(fence.leagueId)}`}
+        replace
+      />
+    );
+  }
+  if (fence.kind === 'checking') {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center text-muted-foreground"
+        data-testid="v1-fence-checking"
+      >
+        Loading draft…
+      </div>
+    );
+  }
+  // v1-safe: mount the legacy body. All v1 useEffects fire from here.
+  return <DraftRoomInner />;
+};
+
+const DraftRoomInner = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();

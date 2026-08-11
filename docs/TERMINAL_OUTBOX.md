@@ -5204,5 +5204,63 @@ Commit d940a1f1 + 25a68506 (R92 + R93) on `phase-4-5-implementation`; this cycle
 
 **End of R94. Entry 100 IGNITION-RACE fix migration + dryrun + audit findings shipped. 29/29 structural gate green. Standing by for architect countersignature.**
 
+## R95 — Entry 80 V1-FENCE EXECUTED · READY-CANDIDATE (2026-08-11 08:52Z)
+
+### This cycle executed
+
+**E80 order item 1 + belt (item 2). Items 3 + 5 docketed as follow-up.**
+
+- **`apps/web/src/pages/DraftRoom.tsx`** — restructured with a wrapper pattern. The exported `DraftRoom` component now:
+  1. Reads `leagueId` from searchParams.
+  2. Calls new `useV1Fence(leagueId)` hook which probes `supabase.from('draft_events').select('id').eq('league_id', leagueId).limit(1)` for any v2-era event.
+  3. Renders `<Navigate to="/draft-v2/…" replace>` immediately if `data.length > 0` — BEFORE any v1 draft state or effect can arm.
+  4. Renders a lightweight `data-testid="v1-fence-checking"` placeholder while the probe is in flight (belt: v1 body suppressed).
+  5. Mounts `DraftRoomInner` (the renamed legacy body, byte-identical) only in the `v1-safe` branch.
+- Wrapper pattern was REQUIRED — a hook-early-return inside the same component would violate React's hook-order rule with the ~200 downstream v1 hooks. This shape lets v1 useEffects only fire from the v1-safe mount.
+- Defensive fall-through to v1 on DB error (Entry 80 fence-not-block doctrine: fence's job is to catch v2-era leagues, not to block v1 on a transient DB error; T7 START-button fence is the other rail).
+- TS deep-instantiation workaround: the `draft_events` wide-JSONB column set trips TS's instantiation-depth cap on the .from → .select → .eq → .limit chain. Cast supabase.from via `unknown → (t) => any` for THIS probe only. Zero new tsc errors introduced (baseline 157 preserved).
+
+- **`apps/web/src/pages/__tests__/DraftRoom.v1Fence.test.tsx`** — 10 source-shape lock tests following DraftRoom.copyLock pattern (5100+ line file with 30+ deps makes full render tests impractical). Locks:
+  - `useV1Fence` hook declared at module scope
+  - Probe uses `draft_events` table (not a different table)
+  - Probe filters by `league_id` (not unfiltered scan — critical: unfiltered would misclassify every league in a shared DB as v2-era)
+  - Probe uses `.limit(1)` (existence check, not full scan)
+  - Three-state union (checking / v2-era / v1-safe) preserved
+  - v2-era renders `<Navigate to="/draft-v2/…" replace>` — target locked, `replace` locked
+  - Checking renders `data-testid="v1-fence-checking"` placeholder (v1 UI suppressed)
+  - Wrapper pattern locked: `DraftRoomInner` exists + mounted only from v1-safe branch (prevents future collapse to hook-early-return)
+  - Missing-leagueId falls through to v1-safe (legacy load-user-league path handles null)
+  - DB errors fall through to v1-safe with `[V1-FENCE]` log tag (fence-not-block doctrine locked)
+
+### Deferred (dockets)
+
+- **E80 item 3 (server-side v1 pick-write suspenders):** v1 pick writes go through `DraftService` which writes directly to v1 tables (`draft_picks`) via Supabase, not through a citrus-api route. A server-side refusal would require either: (a) DB-level RLS/trigger blocking `INSERT INTO draft_picks WHERE league has v2 events`, or (b) migrating v1 writes to a server route first. Client-side fence is sufficient for the observed defect class (Garrett's browser can no longer run the whole draft because the fence redirects before v1 mounts). Docketed.
+- **E80 item 5 (routing truth table):** LeagueDashboard.tsx:1605 + Matchup.tsx:5264 still `navigate('/draft-room?league=…')`. Not a defect: the fence catches these too — the /draft-room URL loads, the fence probes, the Navigate fires. Proposed truth-table upgrade: those consumers check league state first and route directly to /draft-v2 when v2-era to skip the fence roundtrip. Cosmetic (saves ~50ms per nav). Docketed.
+
+### Full CI-mirror gate
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint | 0 errors, 1 pre-existing warning (line-shifted from :1380 → :1488 due to fence insertion; identical warning content) | ≤0 errors | ✅ |
+| Web tsc | **157** | =157 baseline (zero new; fixed TS deep-instantiation slip mid-cycle via untypedFrom alias) | ✅ |
+| Server tsc | **0** | strict ≤0 | ✅ (server untouched) |
+| Web build | ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Server build | tsc emit exit 0 | exit 0 | ✅ |
+| Web vitest FULL | **1732 / 1732** (103 files) | ≥1722 prior | ✅ (+10 fence source-shape tests) |
+| Server vitest FULL | **990 pass + 6 skip / 996** (54 files) | =990 prior | ✅ (server untouched) |
+
+### Deploy block (proposed, hosting-only)
+
+Web-only cycle — no citrus-api or migration to apply. Same `firebase deploy --only hosting` pattern from prior cycles. Zero-risk deploy: fence is opt-in per-league (queries only on /draft-room mount), fall-through to v1 on any DB error preserves existing behavior.
+
+Per Entry 65: **NO PASTE BANNER** in this outbox. Terminal proposes READY; architect countersigns before Garrett runs the hosting deploy.
+
+### Standing by
+
+Three-fix chain complete: E99 (25a68506) + E100 (25a1acd7) + E80 (this commit) all shipped to `phase-4-5-implementation` with full CI-mirror gate green per fix. Awaiting architect countersignature on the deploy blocks.
+
+**End of R95. E80 V1-FENCE shipped. v1 DraftRoom now hard-fenced from v2-era leagues at mount time via draft_events probe. Full CI-mirror gate GREEN (+10 source-shape locks). Suspenders + route truth-table docketed for follow-up.**
+
+
 
 
