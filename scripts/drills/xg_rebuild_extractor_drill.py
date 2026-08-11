@@ -40,7 +40,11 @@ def main():
     checks = [
         ('rows_extracted > 0',            len(df) > 0),
         ('goal_parity vs raw 505 non-SO', int(g.sum()) == n_505 or abs(int(g.sum()) - n_505) <= max(1, so_rows)),
-        ('score_diff live on non-goals',  (sd[~g] != 0).mean() >= 0.40),
+        # >=1 nonzero, NOT a percentage bar: a tie-heavy game legitimately sits
+        # near 0% nonzero (e.g. 2024020037: 8/85). This gate exists to catch
+        # the historical all-zero label-proxy bug, which any single nonzero
+        # non-goal disproves.
+        ('score_diff live on non-goals',  int((sd[~g] != 0).sum()) >= 1),
         ('strength populated',            df['home_skaters_on_ice'].notna().all() and df['away_skaters_on_ice'].notna().all()),
         ('ordering fields present',       df['sort_order'].notna().all() and df['event_id'].notna().all()),
     ]
