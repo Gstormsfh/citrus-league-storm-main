@@ -5483,6 +5483,203 @@ Commit + branch push pending on architect countersignature. Batch deploy of host
 
 **End of R97. E104 batch EXECUTED (FENCE-2 + SW-STALE-1 Option A + F2b riding through). Full CI-mirror gate GREEN (+13 new tests). Standing by for architect countersignature on the one-deploy-pair batch.**
 
+## R98 — MASTER MERGE PLAN (proposal) + ENGINE-EAR v3 (queued proposal) (2026-08-11 11:15Z)
+
+### E105 rider ACK
+
+Verification lap ALL-GREEN acknowledged: FENCE-2 field-PASS (b74552b7 redirect certified; the exact URL that hijacked Run 1 now bounces cleanly) · F2b field-PASS (12/12 · completed banner + ROSTERS ARE SET + full History with named picks + positions + team abbrevs on cold load; "Drafted By 77777777" is the known raw-team-id cosmetic docket) · SW-STALE-1 field-PASS (exactly one SW registration, new worker ACTIVE + CONTROLLING, no waiting worker). Morning fix arc CLOSED.
+
+This report proposes two things per E105's next-lanes order: **(1) the master merge plan** for the branch's 9 commits (execute pending countersign + Garrett's explicit go on the master push) and **(2) ENGINE-EAR v3** (queue-only; execute pending architect ratification of shape).
+
+---
+
+## PROPOSAL 1 — MASTER MERGE PLAN
+
+### Branch state (verified via `git log --oneline origin/master..phase-4-5-implementation`)
+
+Branch `phase-4-5-implementation` at `038e8e40` is **9 ahead / 1 behind** master (`1e84c79a`).
+
+| # | Commit | Subject | Deploys |
+|---|---|---|---|
+| 1 | d05702a5 | fix(F28 unblock + batch): draftV2Start actor kind=commissioner + Homepage dup loading + 2 invalid opacity steps (E79/71/73) | already-deployed (`-t7a`) |
+| 2 | 785e6f05 | docs(R90): Entries 79/71/73 EXECUTED — F28 unblocker + batch, READY-CANDIDATE | docs only |
+| 3 | 0e73b70a | feat(E87 FLAWLESS-RUN TRIO): Fix C + Fix B + Fix A per architect truth table | already-deployed (`-frt`) |
+| 4 | d940a1f1 | fix(E92 PLAYER-RES-1b): paginate player_directory fetch through Supabase 1000-row cap | already-deployed (hosting) |
+| 5 | 25a68506 | fix(E99 COMPLETED-ROOM-2): snapshot route decorate + reduce accepts terminal_completed snapshot | already-deployed (`-crm2` + hosting) |
+| 6 | 25a1acd7 | fix(E100 IGNITION-RACE): start_draft_v2 preflight row lock + submit_pick_v2 audit | migration already applied by architect |
+| 7 | 71148e07 | fix(E80 V1-FENCE): wrapper redirects v2-era leagues to /draft-v2 before v1 arms | already-deployed (hosting) |
+| 8 | 8b2b1a02 | fix(E103 F2b): route enriches terminal snapshot with picks + client derives from projection | rides in E104 deploy pair (this cycle) |
+| 9 | 038e8e40 | fix(E104 batch): FENCE-2 + SW-STALE-1 Option A | rides in E104 deploy pair (this cycle) |
+
+**All 9 shipments field-verified per prior R-countersignatures + E105 rider.** Merging to master closes the branch-vs-master divergence and puts the trunk in sync with production.
+
+### Behind-master delta (verified via `git log phase-4-5-implementation..origin/master`)
+
+**1 commit on master not on branch:** `1e84c79a feat(archive): 9-season official-log rebuild — R2 xG fix + truncation guard + nhl-archive workflow (#292)`
+
+**Files touched (verified via `git show --stat 1e84c79a`):**
+- `.github/workflows/nhl-archive.yml` (new)
+- `data-pipeline/acquisition/data_acquisition.py` (modified)
+- `data-pipeline/tests/test_supabase_rest_select_exact.py` (new)
+- `data-pipeline/utils/supabase_rest.py` (new)
+- `scripts/drills/xg_rebuild_extractor_drill.py` (new)
+- `scripts/nhl_archive/*` (new: 4 files)
+- `scripts/utilities/process_xg_stats.py` (new)
+
+### Predicted conflict surface: ZERO
+
+Branch's 9 commits touched:
+- `apps/web/**` (client trio + fence + pagination + F2b client + SW config)
+- `server/src/**` (drafts route + draftV2Start + draftV2Era + tests)
+- `supabase/migrations/**` (E100 row-lock migration + dryrun script)
+- `packages/shared/src/**` (TerminalSnapshotPick type addition)
+- `docs/TERMINAL_OUTBOX.md` (R-reports)
+- `apps/web/firebase.json` (E82 CSP ride-along)
+- `apps/web/vite.config.ts` (SW-STALE-1)
+
+Master's 1 commit touched:
+- `.github/workflows/**`, `data-pipeline/**`, `scripts/drills/**`, `scripts/nhl_archive/**`, `scripts/utilities/**`
+
+**Disjoint paths.** The reverse-merge should be a fast-forward on both sides at the file level — no auto-resolve heuristics needed. Contrast with Entry 57's 38-conflict reverse merge which occurred after ~2 weeks of parallel drift; this merge covers 1 commit of drift over 1 day.
+
+### Merge plan (reverse-merge doctrine per Entry 57)
+
+**Executable by me if architect countersigns + Garrett gives explicit go on the master push** (per user memory: high-blast-radius shared-state actions require explicit-go even in auto mode; branch push is my lane, master push per prior discipline).
+
+```bash
+# 1. Fetch latest master to be sure we're seeing the true tip
+git fetch origin master
+
+# 2. Reverse-merge master into branch (worktree topology: `git checkout master`
+#    is not possible in this worktree; merge into branch, then refspec-push).
+git merge origin/master --no-edit
+#    Expected: clean merge commit, ZERO conflicts based on disjoint-path
+#    analysis above. If any conflict surfaces, STOP-and-report — the doctrine
+#    is architect-adjudicates each per-class (Entry 57 pattern), never
+#    unilateral pick.
+
+# 3. Full CI-mirror gate on the merged tree (Entry 64 standing gate)
+npx eslint . --workspace=apps/web         # ≤ 0 errors, warnings unchanged
+cd apps/web && npx tsc --noEmit -p tsconfig.app.json   # 157 = 157 baseline
+cd /c/Users/garre/Documents/citrus-league-storm-phase45
+npm run build            # web build ✓
+npm run build:server     # server build ✓
+npm run test             # web vitest FULL (currently 1743/1743)
+npm run test:server      # server vitest FULL (currently 1002+6/1008)
+
+# 4. Push branch (my lane — normal push, no --force)
+git push origin phase-4-5-implementation
+
+# 5. Refspec push branch → master (HANDED OFF to Garrett per prior discipline —
+#    master push is a shared-infra prod action; user memory reserves it.)
+# GARRETT RUNS:
+git push origin phase-4-5-implementation:master
+
+# 6. Post-push verification (Garrett or architect confirms):
+#    - GitHub Actions runs on master pushed commit (must go green — CI is
+#      the second verification pass, catches anything the local gate missed).
+#    - master tip advances to the branch-tip hash (or a merge commit on top
+#      of it if the local merge produced one).
+```
+
+### Alternative pathway (safer, slower)
+
+Instead of local reverse-merge + refspec push, open a **GitHub PR** from `phase-4-5-implementation` → `master`:
+- Pros: GitHub's merge UI produces an auditable trail; CI runs on the merge preview; standard squash-or-merge choice.
+- Cons: loses the single-refspec-push atomicity; PR title/body prep is another artifact to author.
+
+**RECOMMEND local merge + refspec push** given the clean disjoint diff and prior Entry 57 doctrine — but ready to switch to PR mode on architect's word.
+
+### Rollback
+
+If master push introduces a regression (unlikely given the clean gate + field verifications):
+- `git revert 038e8e40..HEAD` on master creates a revert commit; single push restores prior state.
+- All 9 commits are additive — no schema drops, no config removes, no destructive migrations. E100's migration is idempotent CREATE OR REPLACE with prior-migration rollback documented.
+
+### Standing by
+
+Architect countersigns the shape; Garrett gives explicit go on the master push line. I execute steps 1–4 (merge + gate + branch push). Steps 5–6 handed off.
+
+---
+
+## PROPOSAL 2 — ENGINE-EAR v3 (queued, ratify shape before execute)
+
+### Anchor entries
+
+Entry 82 (RUN 2 double root cause) → Entry 83 (resurrection anatomy: client-connect drives lobby, not restart) → Entry 88 (engine log decode: lazy-arm confirmed structurally, idle-eviction NEW FIND). ENGINE-EAR v3 spec in Entry 88 is the seed; this proposal folds those findings + Garrett-ordered instant-autopick for unowned seats (per R91 tomorrow-queue).
+
+### Root problem
+
+Engine treats **client presence as ignition key**. A live draft with no connected clients has no lobby → no armed timer → no autopicks → dead draft. This is the "no audience → no ignition" disease. Every night this week burned a cycle proving one of its symptoms: CSP-starved clients (Entry 82), post-restart 4.7-min dead window (Entry 83), lazy-arm structural confirmation (Entry 88).
+
+### Fix shape (5 items, pre-ratified spec text from Entry 88 §ENGINE-EAR v3, terminal-authored precision below)
+
+**1. NOTIFY-creates-lobby (client-independent ignition — highest impact).**
+When the engine's LISTEN receives a `draft_started` NOTIFY for a `league_id` with no in-memory lobby, CREATE the lobby, run bootstrap replay, arm the pick timer, and start driving autopicks — WITHOUT waiting for a client connect. Location: `server/src/draft/LobbyManager.ts` or the LISTEN handler (chunk 11g.7-7e).
+- Contract: after `draft_started` NOTIFY commits, a lobby exists with armed timer within the notify→broadcast SLA already measured (74–75ms tonight).
+- Test: rig ignition with ZERO clients connected → seq 2 autopick fires exactly `pick_time_limit_seconds + 1s` after ignition.
+
+**2. Boot-scan resumes in_progress leagues.**
+On engine boot, enumerate `leagues WHERE draft_status = 'in_progress'` → init a lobby per league → arm pick timer from the current `pick_deadline`.
+- Contract: 4.7-min post-restart dead window (Entry 83) becomes < 5s.
+- Test: rig ignition, kill engine mid-cascade, restart, no client connects, autopicks resume within 5s.
+
+**3. Eviction guarantee.**
+Read `LobbyRegistry.evictLobbyIfIdle` (Entry 88 idle-eviction find at `idleEvictionMs:600000 connectionCount:0`). Determine if `draftStatus` gates eviction. Two ratifiable paths:
+- **(3a)** Add `draftStatus === 'in_progress'` guard → refuse eviction of live drafts.
+- **(3b)** Rely on fix #1 + fix #2 as safety net: eviction-safe because a NOTIFY (autopick trigger) or a client reconnect re-creates the lobby anyway.
+- Terminal recommendation: **(3a)** — explicit guard is cheaper than trusting recreation to re-arm on the exact pick tick. `(3b)` is the fallback if `(3a)` conflicts with the eviction policy's other invariants.
+
+**4. Watchdog invariant.**
+Extend the existing `event_subscription.watchdog_ok` line (Entry 88: `elapsedMs: 3-4` proves it's an end-to-end echo) to also assert: for every `leagues.draft_status = 'in_progress'` row, the `LobbyRegistry` has an entry with a non-null armed timer deadline. If not, log `watchdog.stall_detected` at ERROR + attempt lobby recreation.
+- Contract: any silent stall becomes visible within one watchdog cycle (60s).
+- Test: rig `in_progress` league whose lobby has been programmatically evicted → watchdog fires stall_detected + recreates lobby within 60s.
+
+**5. F23 DB-side deadline sweep (dead-man's switch).**
+Server-side query: `SELECT id FROM leagues WHERE draft_status = 'in_progress' AND pick_deadline < now() - interval '5 seconds'` on a 30s cadence. Any hit → force-emit an autopick via `submit_pick_v2(actor.kind='autopick')`. This is the last-line-of-defense against every prior class of stall (F23's original F-ticket).
+- Contract: no live draft can stall for more than 30s + 5s = 35s worst case, ever, from any cause.
+- Test: rig a `pick_deadline < now()` state without an armed lobby → sweep force-emits within 30s.
+
+**6. INSTANT-AUTOPICK FOR UNOWNED SEATS (Garrett-ordered per R91 queue).**
+When the on-clock team's `owner_id IS NULL` (or the owner has never connected in this draft), fire the autopick immediately (~0s) rather than waiting the full `pick_time_limit_seconds`. Rationale: the twelve will have late-joiners whose seats need to draft "at real-league pace" without dragging the room.
+- Contract: unowned-seat picks fire within 1s of becoming on-clock.
+- Test: rig with team[3].owner_id=NULL → on-clock transition to team[3] → autopick within 1s (not 30s).
+- Discriminator: distinguish "unowned" from "owner is offline but exists" — the latter respects full pick clock. Only truly-null owners fire instant.
+
+### Skip-unchanged-snapshot docket (E88 minor)
+
+Completed lobbies rewrite unchanged seq-14 snapshots every 30s until eviction. Small fix: `LobbyManager.persistSnapshot` checks `if (this.lastAppliedSeq === lastPersistedSeq) return;` before write. Docket for post-v3 or v3 ride-along.
+
+### Acceptance mode
+
+Standalone script (`scripts/proof/lifecycle-acceptance-engine-ear.local.mjs`, mirrors `lifecycle-acceptance-f27.local.mjs` pattern):
+1. Ignite via rig, connect NO client → assert autopicks flow (proves #1).
+2. Reboot engine mid-cascade, still no client → assert resume (proves #2).
+3. Programmatically evict in_progress lobby → assert watchdog recreates within 60s (proves #4).
+4. Set `pick_deadline < now()` without armed lobby → assert F23 sweep fires within 30s (proves #5).
+5. Rig with `owner_id=NULL` team on-clock → assert autopick within 1s (proves #6).
+
+### Blast radius + gating
+
+- All 6 items are additive server-side changes; zero DB migration required (except #5 if the sweep is a pg_cron job vs a server-side setInterval — architect ratifies).
+- Deploy target: citrus-api tag `-eear3` after full CI-mirror gate.
+- Rollback: revert PR restores lazy-arm; the diseases return but nothing else breaks.
+
+### Recommended slicing
+
+- **Slice 1 (highest impact, smallest diff):** Items #1 + #2 alone. Closes the entire "no audience → no ignition" disease class. ~half-day of code + tests + integration acceptance run. Suggest architect ratifies #1 shape first, execute in a follow-up cycle.
+- **Slice 2:** Items #3 + #4 (eviction guard + watchdog invariant). Defense-in-depth.
+- **Slice 3:** Items #5 + #6 (F23 sweep + instant-autopick). Belt-and-suspenders for the twelve.
+
+### Standing by
+
+Architect ratifies the v3 shape (or amendments per item). Terminal executes on countersignature. Given the twelve's 10-day countdown, Slice 1 should probably ship this week.
+
+---
+
+**End of R98. Master merge plan proposed (clean 9-commit absorb, zero-conflict prediction, refspec-push doctrine, execute pending countersign + Garrett master-push go). ENGINE-EAR v3 queued (6-item spec + acceptance mode + 3-slice recommendation, execute pending shape ratification). Morning fix arc closed per E105.**
+
+
 
 
 
