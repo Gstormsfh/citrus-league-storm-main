@@ -796,7 +796,14 @@ if (subscriptionDisabled) {
             return;
           }
           const status = (leagueRow as { draft_status?: string } | null)?.draft_status;
-          if (status !== 'in_progress' && status !== 'paused') {
+          // E111 lesson: `draft_status` enum has NO 'paused' value
+          // — `paused` lives on the OTHER column `leagues.draft_state`.
+          // Prior `status !== 'paused'` guard was a dead branch that
+          // encoded the wrong data model. Slice-1's contract only
+          // requires in_progress rehydration; paused-draft NOTIFY
+          // handling is a Slice-2+ decision (would require reading
+          // draft_state alongside).
+          if (status !== 'in_progress') {
             structuredLogger.debug(
               'event_subscription.notify_skipped_non_live_league',
               {

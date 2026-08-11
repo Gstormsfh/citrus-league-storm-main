@@ -116,9 +116,45 @@ function makeRegistry() {
 }
 
 /**
+ * DB enum `draft_status` values, per source of truth:
+ *   supabase/migrations/20250101000001_create_leagues_teams_tables.sql
+ *     → create type draft_status as enum ('not_started', 'in_progress', 'completed');
+ *   supabase/migrations/20260206000000_add_scheduled_draft_time.sql
+ *     → alter type draft_status add value 'queued' after 'not_started';
+ *
+ * E111 POINT OF CONFUSION: `packages/shared/src/types/league.ts` exports
+ * `DRAFT_STATUSES` that ADDITIONALLY includes 'paused'. That literal is
+ * NOT a DB enum member — `paused` lives on `leagues.draft_state`, a
+ * separate column. The client-side shared type carries a documented
+ * type-drift docket that is out of scope for this cycle; the DB is
+ * authoritative for anything the engine queries.
+ */
+const DB_DRAFT_STATUS_ENUM = [
+  'not_started',
+  'queued',
+  'in_progress',
+  'completed',
+] as const;
+
+/**
+ * Postgres 22P02 shape — the error the real DB returns when a query
+ * uses a non-member enum literal. Our value-domain-aware stubs raise
+ * this exact code + message so any regression that adds a bad literal
+ * (e.g. 'paused' on draft_status) fails offline the way the DB does.
+ */
+type PostgresEnumError = { code: '22P02'; message: string };
+
+function makeEnumInvalidError(column: string, value: string): PostgresEnumError {
+  return {
+    code: '22P02',
+    message: `invalid input value for enum ${column}: "${value}"`,
+  };
+}
+
+/**
  * Build a fake admin Supabase client whose fluent chain resolves to
- * the given rows for `leagues.select('id').in('draft_status', ...)`.
- * The boot-scan probe uses this exact chain.
+ * the given rows for the boot-scan query
+ * `leagues.select('id').eq('draft_status', 'in_progress')`.
  *
  * E109 REGRESSION GUARD: `.from` is defined with method-shorthand
  * (non-arrow) and reads `this._tag` — mirroring real supabase-js
@@ -127,14 +163,39 @@ function makeRegistry() {
  * with `this === undefined` (strict mode) and throws TypeError —
  * exactly the field failure E109 caught in production. Bare
  * arrow-function stubs mask this class of bug.
+ *
+ * E111 REGRESSION GUARD: both `.eq` and `.in` return a Postgres 22P02
+ * error when queried against `draft_status` with a value outside
+ * DB_DRAFT_STATUS_ENUM. Prior stub returned {data: activeLeagues,
+ * error: null} for ANY argument — that's exactly why the invalid
+ * `['in_progress', 'paused']` literal sailed through 1031 offline
+ * tests while the DB rejected it in staging.
  */
 function makeAdminForBootScan(
   activeLeagues: Array<{ id: string }>,
   probeError: { message: string } | null = null,
 ): SupabaseClient {
-  const inMethod = () =>
-    Promise.resolve({ data: activeLeagues, error: probeError });
-  const selectResult = { in: inMethod };
+  const eqMethod = (column: string, value: string) => {
+    if (column === 'draft_status' && !(DB_DRAFT_STATUS_ENUM as readonly string[]).includes(value)) {
+      return Promise.resolve({ data: null, error: makeEnumInvalidError(column, value) });
+    }
+    return Promise.resolve({ data: activeLeagues, error: probeError });
+  };
+  const inMethod = (column: string, values: readonly string[]) => {
+    if (column === 'draft_status') {
+      const invalid = values.find(
+        (v) => !(DB_DRAFT_STATUS_ENUM as readonly string[]).includes(v),
+      );
+      if (invalid !== undefined) {
+        return Promise.resolve({
+          data: null,
+          error: makeEnumInvalidError(column, invalid),
+        });
+      }
+    }
+    return Promise.resolve({ data: activeLeagues, error: probeError });
+  };
+  const selectResult = { eq: eqMethod, in: inMethod };
   const admin = {
     _tag: 'admin-stub-boot-scan',
     from(this: { _tag: string } | undefined, _table: string) {
@@ -186,22 +247,29 @@ describe('ENGINE-EAR v3 Slice 1 item 2 — LobbyRegistry.performBootScan', () =>
     expect(lobbyConfigLookup).not.toHaveBeenCalled();
   });
 
-  it('scans in_progress + paused leagues via .in("draft_status", ["in_progress", "paused"])', async () => {
-    // The probe filter is load-bearing: querying by a different
-    // predicate (e.g. `.eq('draft_status', 'in_progress')` alone)
-    // would leave paused leagues without a timer post-restart —
-    // regression class if a future refactor narrows the filter.
+  it('scans via .eq("draft_status", "in_progress") — the ONLY valid live-draft enum member', async () => {
+    // E111 fix pins the filter to the enum-valid literal. Prior
+    // shape was `.in('draft_status', ['in_progress', 'paused'])` —
+    // 'paused' is NOT a draft_status enum member (it lives on the
+    // OTHER column `draft_state`), and Postgres rejects the whole
+    // .in() list with 22P02. That regression class killed Item 2
+    // resume in the field on tag 7b10d48a-draft.
+    //
+    // Slice-1's contract explicitly covers `in_progress` only;
+    // paused-draft resume is a Slice-2+ decision (would require
+    // reading draft_state alongside).
     const { registry } = makeRegistry();
-    const inSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
-    const selectResult = { in: inSpy };
+    const eqSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
+    const selectResult = { eq: eqSpy };
     const admin = {
-      from: () => ({ select: () => selectResult }),
+      _tag: 'admin-stub-eq-spy',
+      from(this: { _tag: string } | undefined) {
+        if (this === undefined) throw new TypeError('unbound');
+        return { select: () => selectResult };
+      },
     } as unknown as SupabaseClient;
     await registry.performBootScan(admin);
-    expect(inSpy).toHaveBeenCalledWith(
-      'draft_status',
-      ['in_progress', 'paused'],
-    );
+    expect(eqSpy).toHaveBeenCalledWith('draft_status', 'in_progress');
   });
 
   it('scan of 3 active leagues → getOrCreate fires per league, resumed=3', async () => {
@@ -273,12 +341,17 @@ describe('ENGINE-EAR v3 Slice 1 item 1 — NOTIFY-creates-lobby (source-shape)',
     expect(indexTsSource).toMatch(/lobbyRegistry\.getOrCreate\(\s*notification\.leagueId,\s*notification\.leagueId,\s*\)/);
   });
 
-  it('dispatch gates on draft_status IN (in_progress, paused) before creating', () => {
-    // Resource-exhaustion protection: only in_progress/paused leagues
+  it('dispatch gates on draft_status === in_progress before creating', () => {
+    // Resource-exhaustion protection: only in_progress leagues
     // warrant lobby creation on NOTIFY. Other statuses skip. A
     // future refactor that drops the gate would create lobbies for
     // random NOTIFYs (unlikely but the guard is load-bearing).
-    expect(indexTsSource).toMatch(/status\s*!==\s*['"]in_progress['"]\s*&&\s*status\s*!==\s*['"]paused['"]/);
+    //
+    // E111 fix removed the `&& status !== 'paused'` clause — 'paused'
+    // is not a draft_status enum member (it lives on draft_state).
+    // Paused-draft NOTIFY handling is a Slice-2+ decision requiring
+    // reading draft_state alongside.
+    expect(indexTsSource).toMatch(/status\s*!==\s*['"]in_progress['"]/);
   });
 
   it('dispatch logs notify_creates_lobby when creating (observability)', () => {
@@ -484,5 +557,123 @@ describe('E109 unbound-`.from` extraction regression lock', () => {
     const extractedFrom = admin.from;
     expect(() => extractedFrom('leagues')).toThrow(TypeError);
     expect(() => extractedFrom('leagues')).toThrow(/E109 regression/);
+  });
+});
+
+// ── E111 REGRESSION LOCKS: enum-domain guard on draft_status ────────
+
+describe('E111 draft_status enum-domain regression lock', () => {
+  // FIELD FAILURE (E111, 2026-08-11): the Slice-1 boot-scan queried
+  //   .in('draft_status', ['in_progress', 'paused'])
+  // — but `paused` is NOT a member of the DB `draft_status` enum.
+  // Postgres rejected the whole list with 22P02, the scan returned
+  // zero rows, Item 2 resume-on-boot was still inert on
+  // 7b10d48a-draft (E109 fix worked — TypeError gone — but the query
+  // itself was invalid). The offline test suite was 1031-green
+  // because the stubs accepted any string as a valid enum literal.
+  //
+  // LESSON (INS-class per E111 line 1254): mocked DB stubs that
+  // accept arbitrary literals cannot catch enum-domain errors —
+  // offline tests were green twice while the query was invalid in
+  // staging. Any future filter on an enum column gets a value-domain
+  // assertion.
+
+  it('LobbyRegistry.ts boot-scan filter must not reference "paused" on draft_status', () => {
+    // Direct anti-pattern lock: the specific literal that produced
+    // the E111 field failure. The lock is line-anchored so the
+    // E111 lesson comment (which mentions 'paused' by name in the
+    // explanation) doesn't false-positive.
+    const scanLines = lobbyRegistrySource.split('\n');
+    const violatingLine = scanLines.find(
+      (line) =>
+        /\.(in|eq)\(\s*['"]draft_status['"]/.test(line) &&
+        /['"]paused['"]/.test(line),
+    );
+    expect(violatingLine).toBeUndefined();
+  });
+
+  it('draft/index.ts NOTIFY guard must not compare draft_status to "paused"', () => {
+    // Dead branch pre-fix (draft_status can never be 'paused'), but
+    // encoded the same wrong data model. Cleanup preserves the
+    // enum-domain invariant across the whole engine.
+    const notifyLines = indexTsSource.split('\n');
+    const violatingLine = notifyLines.find(
+      (line) =>
+        /status\s*!==?\s*['"]paused['"]/.test(line) &&
+        !line.trim().startsWith('//') &&
+        !line.trim().startsWith('*'),
+    );
+    expect(violatingLine).toBeUndefined();
+  });
+
+  it('boot-scan calls .eq (not .in) with a single in_progress literal', () => {
+    // Positive shape lock — the E111 fix chose .eq (simpler, safer)
+    // over .in with a single element. If a future refactor widens
+    // to `.in('draft_status', […])`, the lock trips; the E111 anti-
+    // pattern lock above then catches any 'paused' reintroduction.
+    expect(lobbyRegistrySource).toMatch(/\.eq\(['"]draft_status['"],\s*['"]in_progress['"]\)/);
+  });
+
+  it('stub rejects unknown draft_status literal via 22P02 (mimics Postgres)', async () => {
+    // Sentinel: the E111 REGRESSION GUARD stub must reject any
+    // draft_status value outside DB_DRAFT_STATUS_ENUM with the
+    // Postgres 22P02 error shape. If a future refactor of the
+    // stub accidentally accepts arbitrary strings, this sentinel
+    // goes red and the value-domain guards go blind.
+    const admin = makeAdminForBootScan([{ id: 'lg-x' }]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await (admin.from('leagues') as any)
+      .select('id')
+      .eq('draft_status', 'paused');
+    expect(result.error).not.toBeNull();
+    expect(result.error?.code).toBe('22P02');
+    expect(result.error?.message).toContain('invalid input value for enum draft_status');
+    expect(result.error?.message).toContain('"paused"');
+    expect(result.data).toBeNull();
+  });
+
+  it('stub .in method also rejects any unknown enum literal in the list', async () => {
+    // Belt-and-suspenders: exercises the .in overload that produced
+    // the original E111 field failure. If a future refactor
+    // reintroduces `.in('draft_status', ['in_progress', 'paused'])`,
+    // this behavioral test fails with the same 22P02 shape the DB
+    // returned in staging.
+    const admin = makeAdminForBootScan([{ id: 'lg-x' }]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await (admin.from('leagues') as any)
+      .select('id')
+      .in('draft_status', ['in_progress', 'paused']);
+    expect(result.error?.code).toBe('22P02');
+    expect(result.error?.message).toContain('"paused"');
+  });
+
+  it('performBootScan against the enum-aware stub → resumed=N for in_progress rigs', async () => {
+    // End-to-end behavioral proof: the corrected .eq filter reaches
+    // the stub with a valid enum literal, resolves cleanly, and
+    // resumes the returned leagues. Pre-fix (using ['in_progress',
+    // 'paused'] in the code), this test would have surfaced
+    // registry.boot_scan_query_failed with 22P02.
+    const { registry, lobbyConfigLookup } = makeRegistry();
+    const admin = makeAdminForBootScan([
+      { id: 'lg-live-1' },
+      { id: 'lg-live-2' },
+    ]);
+    const result = await registry.performBootScan(admin);
+    expect(result.scanned).toBe(2);
+    expect(result.resumed).toBe(2);
+    expect(result.failed).toBe(0);
+    expect(lobbyConfigLookup).toHaveBeenCalledTimes(2);
+  });
+
+  it('DB_DRAFT_STATUS_ENUM matches the migration source of truth exactly', () => {
+    // Pins the test-side enum constant to the DB migrations. If a
+    // future migration adds a value (e.g. 'paused' becomes real,
+    // or a new 'archived' member lands), this test forces a
+    // conscious update rather than silent drift.
+    expect([...DB_DRAFT_STATUS_ENUM].sort()).toEqual(
+      ['completed', 'in_progress', 'not_started', 'queued'].sort(),
+    );
+    // 'paused' is definitively NOT a draft_status member.
+    expect(DB_DRAFT_STATUS_ENUM as readonly string[]).not.toContain('paused');
   });
 });

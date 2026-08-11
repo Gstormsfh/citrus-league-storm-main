@@ -497,10 +497,27 @@ export class LobbyRegistry {
       // time → real supabase-js reads `this.rest` → TypeError. The
       // Proxy at server/src/lib/supabase.ts:40 makes accidental
       // rebinding impossible.
+      // E111 lesson: `draft_status` enum in the DB is
+      //   ('not_started', 'queued', 'in_progress', 'completed')
+      // per supabase/migrations/20250101000001 + 20260206000000
+      // — `paused` is NOT a member of this enum. Pause lives on the
+      // OTHER column `leagues.draft_state='paused'` (see
+      // DraftServiceV2.ts:551 + LobbyManager.ts:5523). A Postgres
+      // `.in()` list containing a non-member literal is rejected
+      // whole (22P02) — the scan then returns zero and resumes
+      // nothing. Slice-1 contract only requires `in_progress`
+      // rehydration; paused-drafts resume-via-boot-scan is a Slice-2+
+      // decision.
+      //
+      // NOTE: the shared type `DRAFT_STATUSES` at
+      // packages/shared/src/types/league.ts erroneously includes
+      // 'paused'; that is a client-facing type-drift docket for
+      // another cycle and is why the enum-domain mismatch survived
+      // 1031 offline tests.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabaseAdmin.from('leagues') as any)
         .select('id')
-        .in('draft_status', ['in_progress', 'paused']);
+        .eq('draft_status', 'in_progress');
       if (error) {
         structuredLogger.error(
           'registry.boot_scan_query_failed',
