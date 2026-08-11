@@ -159,7 +159,17 @@ def main() -> int:
             return
         if not force and len(batch) < BATCH_SIZE:
             return
-        db.upsert(REBUILD_TABLE, batch, on_conflict="game_id,event_id")
+        # PostgREST bulk upsert requires IDENTICAL keys on every object in the
+        # payload (PGRST102 "All object keys must match"). The NaN-stripping in
+        # the row serializer makes key sets vary per row, so normalize here:
+        # union of keys across the batch, missing keys -> None (=> SQL NULL).
+        # Never a fabricated value — absence stays NULL.
+        keys = set()
+        for r in batch:
+            keys.update(r.keys())
+        cols = sorted(keys)
+        uniform = [{k: r.get(k) for k in cols} for r in batch]
+        db.upsert(REBUILD_TABLE, uniform, on_conflict="game_id,event_id")
         batch = []
 
     for i, raw in enumerate(iter_season_raw(db, args.season)):
