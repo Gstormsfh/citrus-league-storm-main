@@ -777,13 +777,13 @@ if (subscriptionDisabled) {
       let lobby = lobbyRegistry.get(notification.leagueId);
       if (!lobby) {
         // Peek at draft_status before spinning up. Reads a single
-        // column via the admin client (bypasses RLS). Untyped-cast
-        // to skip the deep-instantiation trip on the wide leagues
-        // JSONB settings column (same pattern as boot-scan query).
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const untypedFrom = supabaseAdmin.from as unknown as (t: string) => any;
+        // column via the admin client (bypasses RLS). Cast the
+        // .from() *result* through `any` — extracting `.from` off
+        // the client loses `this`, and supabase-js reads `this.rest`
+        // (E109 lesson; same fix applied at LobbyRegistry.ts).
         try {
-          const { data: leagueRow, error: leagueErr } = await untypedFrom('leagues')
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: leagueRow, error: leagueErr } = await (supabaseAdmin.from('leagues') as any)
             .select('draft_status')
             .eq('id', notification.leagueId)
             .maybeSingle();

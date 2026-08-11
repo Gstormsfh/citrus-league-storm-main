@@ -31,8 +31,10 @@ import { generateDraftOrder } from '../draftOrderGenerator';
 const HERE = resolve(fileURLToPath(import.meta.url), '..');
 const INDEX_TS_PATH = resolve(HERE, '..', 'index.ts');
 const LOBBY_MANAGER_TS_PATH = resolve(HERE, '..', 'LobbyManager.ts');
+const LOBBY_REGISTRY_TS_PATH = resolve(HERE, '..', 'LobbyRegistry.ts');
 const indexTsSource = readFileSync(INDEX_TS_PATH, 'utf8');
 const lobbyManagerSource = readFileSync(LOBBY_MANAGER_TS_PATH, 'utf8');
+const lobbyRegistrySource = readFileSync(LOBBY_REGISTRY_TS_PATH, 'utf8');
 
 // ── Shared LobbyRegistry test scaffolding (matches LobbyRegistry.test.ts) ─
 
@@ -117,19 +119,60 @@ function makeRegistry() {
  * Build a fake admin Supabase client whose fluent chain resolves to
  * the given rows for `leagues.select('id').in('draft_status', ...)`.
  * The boot-scan probe uses this exact chain.
+ *
+ * E109 REGRESSION GUARD: `.from` is defined with method-shorthand
+ * (non-arrow) and reads `this._tag` — mirroring real supabase-js
+ * which reads `this.rest`. If a future refactor extracts `.from`
+ * off the client (`const untypedFrom = admin.from`) the call runs
+ * with `this === undefined` (strict mode) and throws TypeError —
+ * exactly the field failure E109 caught in production. Bare
+ * arrow-function stubs mask this class of bug.
  */
 function makeAdminForBootScan(
   activeLeagues: Array<{ id: string }>,
   probeError: { message: string } | null = null,
 ): SupabaseClient {
-  const stub: Record<string, unknown> = {};
   const inMethod = () =>
     Promise.resolve({ data: activeLeagues, error: probeError });
   const selectResult = { in: inMethod };
-  const selectMethod = () => selectResult;
-  const fromResult = { select: selectMethod };
-  stub.from = () => fromResult;
-  return stub as unknown as SupabaseClient;
+  const admin = {
+    _tag: 'admin-stub-boot-scan',
+    from(this: { _tag: string } | undefined, _table: string) {
+      if (this === undefined || this._tag === undefined) {
+        throw new TypeError(
+          "Cannot read properties of undefined (reading '_tag') — .from() called without `this` bound (E109 regression)",
+        );
+      }
+      return { select: () => selectResult };
+    },
+  };
+  return admin as unknown as SupabaseClient;
+}
+
+/**
+ * Same-shaped stub for the NOTIFY status-probe chain:
+ * `leagues.select('draft_status').eq('id', ...).maybeSingle()`.
+ * E109 regression guard identical to makeAdminForBootScan.
+ */
+function makeAdminForNotifyStatusProbe(
+  row: { draft_status: string } | null,
+  probeError: { message: string } | null = null,
+): SupabaseClient {
+  const maybeSingle = () => Promise.resolve({ data: row, error: probeError });
+  const eqResult = { maybeSingle };
+  const selectResult = { eq: () => eqResult };
+  const admin = {
+    _tag: 'admin-stub-notify-probe',
+    from(this: { _tag: string } | undefined, _table: string) {
+      if (this === undefined || this._tag === undefined) {
+        throw new TypeError(
+          "Cannot read properties of undefined (reading '_tag') — .from() called without `this` bound (E109 regression)",
+        );
+      }
+      return { select: () => selectResult };
+    },
+  };
+  return admin as unknown as SupabaseClient;
 }
 
 // ── Item 2: performBootScan behavioral tests ────────────────────────
@@ -347,5 +390,99 @@ describe('ENGINE-EAR v3 Slice 1 item 2 wiring — boot-scan called at startup', 
     // beyond performBootScan's own try/catch. Instrument pattern
     // per INS-class ledger: unexpected boot events must log.
     expect(indexTsSource).toMatch(/registry\.boot_scan_uncaught/);
+  });
+});
+
+// ── E109 REGRESSION LOCKS: unbound-`.from` extraction ban ───────────
+
+describe('E109 unbound-`.from` extraction regression lock', () => {
+  // FIELD FAILURE (E109, 2026-08-11): the Slice-1 initial cut used
+  //     const untypedFrom = supabaseAdmin.from as unknown as (t) => any;
+  //     const { data } = await untypedFrom('leagues').select(...)...
+  // to dodge TS deep-instantiation on the wide `leagues` type. That
+  // pattern extracts `.from` as a free function → `this` is undefined
+  // at call time → real supabase-js reads `this.rest` → TypeError.
+  // The Proxy at server/src/lib/supabase.ts:40 makes accidental
+  // rebinding impossible. Fix: cast the *result* of `.from()`, not
+  // the method itself. These locks pin the fix + prevent silent
+  // reintroduction of the anti-pattern anywhere in the engine.
+
+  it('LobbyRegistry.ts must not extract `.from` as a free function', () => {
+    // The specific anti-pattern that produced the E109 field failure.
+    // Regex anchored to line-start (with leading whitespace) so it
+    // only matches real assignments, not the E109 lesson comment
+    // that mentions the anti-pattern by name.
+    expect(lobbyRegistrySource).not.toMatch(/^\s*const\s+\w+\s*=\s*supabaseAdmin\.from\s+as\s+unknown/m);
+    expect(lobbyRegistrySource).not.toMatch(/^\s*const\s+untypedFrom\s*=/m);
+  });
+
+  it('LobbyRegistry.ts uses the safe (client.from(t) as any) pattern instead', () => {
+    // Positive lock on the corrected shape. `supabaseAdmin.from(...)`
+    // preserves `this` because it's a direct property access +
+    // invocation in the same expression.
+    expect(lobbyRegistrySource).toMatch(/\(supabaseAdmin\.from\(['"]leagues['"]\)\s+as\s+any\)/);
+  });
+
+  it('draft/index.ts must not extract `.from` as a free function', () => {
+    // Same anti-pattern at the NOTIFY status-probe site. Silent
+    // failure class because the throw fell through into a try/catch
+    // and would surface as `notify_lobby_create_failed` rather than
+    // a boot-fatal error — but the effect is the same: Item 1
+    // NOTIFY-creates-lobby doesn't fire.
+    expect(indexTsSource).not.toMatch(/const\s+\w+\s*=\s*supabaseAdmin\.from\s+as\s+unknown/);
+    expect(indexTsSource).not.toMatch(/const\s+untypedFrom\s*=/);
+  });
+
+  it('draft/index.ts uses the safe (client.from(t) as any) pattern instead', () => {
+    expect(indexTsSource).toMatch(/\(supabaseAdmin\.from\(['"]leagues['"]\)\s+as\s+any\)/);
+  });
+
+  // The behavioral tests below run against the LIVE `LobbyRegistry`
+  // code with a stub whose `.from` throws when called unbound. Before
+  // the fix they threw TypeError (matching the boot log). After the
+  // fix they resolve normally. The stub shape is documented at
+  // `makeAdminForBootScan` above — E109 REGRESSION GUARD comment.
+
+  it('performBootScan against a this-dependent stub client → resolves without TypeError', async () => {
+    const { registry } = makeRegistry();
+    const admin = makeAdminForBootScan([{ id: 'lg-alpha' }]);
+    // Pre-fix, this awaited call surfaced the fatal TypeError from
+    // the outer try/catch → the returned counts were {0, 0, 0} and
+    // structuredLogger.error('registry.boot_scan_threw', …) fired.
+    // Post-fix, scanned=1 + resumed=1.
+    const result = await registry.performBootScan(admin);
+    expect(result.scanned).toBe(1);
+    expect(result.resumed).toBe(1);
+    expect(result.failed).toBe(0);
+  });
+
+  it('NOTIFY status-probe path: same-shape stub does not TypeError', async () => {
+    // Mirrors the boot-scan test for the NOTIFY dispatch site.
+    // The path lives inside the event-subscription dispatch closure
+    // (index.ts), so this test only verifies the corrected pattern
+    // against a matching stub — the source-shape lock above catches
+    // reintroduction of the extraction anti-pattern. Direct
+    // invocation here proves the (client.from('leagues') as any)
+    // idiom doesn't throw against a `this`-dependent stub.
+    const admin = makeAdminForNotifyStatusProbe({ draft_status: 'in_progress' });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await (admin.from('leagues') as any)
+      .select('draft_status')
+      .eq('id', 'test-league')
+      .maybeSingle();
+    expect(result.data).toEqual({ draft_status: 'in_progress' });
+    expect(result.error).toBeNull();
+  });
+
+  it('sanity: extracting `.from` off the stub client DOES throw (guard is real)', () => {
+    // Confirms the E109 REGRESSION GUARD stub actually enforces the
+    // `this`-binding contract. If a future refactor of the stub
+    // helper accidentally makes `.from` an arrow function or
+    // pre-binds it, this test flips to green while the regression
+    // guards go blind — this sentinel catches that.
+    const admin = makeAdminForBootScan([]);
+    const extractedFrom = admin.from;
+    expect(() => extractedFrom('leagues')).toThrow(TypeError);
+    expect(() => extractedFrom('leagues')).toThrow(/E109 regression/);
   });
 });

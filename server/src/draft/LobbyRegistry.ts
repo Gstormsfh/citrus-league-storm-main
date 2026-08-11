@@ -485,14 +485,20 @@ export class LobbyRegistry {
     let failed = 0;
 
     try {
-      // Cast the fluent-chain through unknown for THIS query only —
+      // Cast the fluent-chain through `any` for THIS query only —
       // Supabase's generated Database types push the .from → .select
       // → .in inference chain deep enough to trip the instantiation
       // cap on the `leagues` type (wide settings JSONB). The scan
       // only needs id column.
+      //
+      // E109 lesson: cast the *result* of `.from()`, NOT the method
+      // itself. `const untypedFrom = supabaseAdmin.from` extracts
+      // the method as a free function → `this` is undefined at call
+      // time → real supabase-js reads `this.rest` → TypeError. The
+      // Proxy at server/src/lib/supabase.ts:40 makes accidental
+      // rebinding impossible.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const untypedFrom = supabaseAdmin.from as unknown as (t: string) => any;
-      const { data, error } = await untypedFrom('leagues')
+      const { data, error } = await (supabaseAdmin.from('leagues') as any)
         .select('id')
         .in('draft_status', ['in_progress', 'paused']);
       if (error) {
