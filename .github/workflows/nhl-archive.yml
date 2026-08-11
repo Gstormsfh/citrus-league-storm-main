@@ -1,0 +1,230 @@
+name: NHL Archive — 9-season official-log rebuild
+
+# Rebuild the xG data layer from the ONE audit-able source: NHL official
+# play-by-play. All nine seasons (2017-18 through 2025-26) fetched by our
+# pipeline, stored with content hashes, extracted by ONE extractor.
+# Every stage writes its own gate result to public.xg_rebuild_audit
+# BEFORE the next stage runs. A stage that cannot prove itself does not
+# proceed.
+#
+# See docs/PROD_CHANGE_LEDGER.md context and the CITRUS 9-SEASON REBUILD
+# brief (2026-08-10). Structural rule: no `supabase db push`; the shadow-
+# to-live swap is Garrett's manual DB-side transaction after all seasons
+# pass every gate.
+#
+# Job graph:
+#   manifest → fetch (matrix ×9) → extract (matrix ×9)
+#                              └→ playoff_stats_backfill (single, 2025)
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "yes" to confirm — this hits api-web.nhle.com ~11,900 times and writes to public.raw_nhl_data / raw_shots_rebuild'
+        required: true
+        type: string
+      seasons:
+        description: 'Season range (build_manifest --seasons)'
+        required: false
+        default: '2017-2026'
+        type: string
+      run_manifest:
+        description: 'Run W1 manifest job'
+        required: false
+        default: true
+        type: boolean
+      run_fetch:
+        description: 'Run W2 fetch matrix'
+        required: false
+        default: true
+        type: boolean
+      run_extract:
+        description: 'Run W3 extract matrix'
+        required: false
+        default: true
+        type: boolean
+      run_playoff_backfill:
+        description: 'Run W4 playoff-stats backfill (needs W2 for 2025)'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  # ── W1 ────────────────────────────────────────────────────────────────
+  manifest:
+    if: ${{ inputs.confirm == 'yes' && inputs.run_manifest }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      manifest_uploaded: ${{ steps.upload.outputs.artifact-id }}
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'data-pipeline/requirements.txt'
+      - run: pip install -r data-pipeline/requirements.txt
+      - name: Preflight banner
+        run: |
+          echo "=================================================="
+          echo "  9-SEASON OFFICIAL-LOG REBUILD — W1 manifest"
+          echo "  seasons: ${{ inputs.seasons }}"
+          echo "  confirm : ${{ inputs.confirm }}"
+          echo "=================================================="
+      - name: Build manifest (W1) + upsert 2026-27 schedule
+        run: |
+          python -u scripts/nhl_archive/build_manifest.py \
+            --seasons "${{ inputs.seasons }}" \
+            --out manifest.csv \
+            --upsert-2026
+      - name: Upload manifest.csv artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifest
+          path: manifest.csv
+          retention-days: 30
+
+  # ── W2 ────────────────────────────────────────────────────────────────
+  fetch:
+    if: ${{ inputs.confirm == 'yes' && inputs.run_fetch }}
+    needs: manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      # 9 parallel jobs — one per season. api-web.nhle.com handles this
+      # with our 0.5s rate limit per job (~2/s per season = 18/s total).
+      matrix:
+        season: [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PYTHONUNBUFFERED: '1'
+      CITRUS_PROXY_USERNAME: ${{ secrets.CITRUS_PROXY_USERNAME }}
+      CITRUS_PROXY_PASSWORD: ${{ secrets.CITRUS_PROXY_PASSWORD }}
+      CITRUS_PROXY_API_URL: ${{ secrets.CITRUS_PROXY_API_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'data-pipeline/requirements.txt'
+      - run: pip install -r data-pipeline/requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: manifest
+          path: .
+      - name: Preflight banner (season ${{ matrix.season }})
+        run: |
+          MANIFEST_ROWS=$(awk -F',' -v s='${{ matrix.season }}' 'NR>1 && $2==s' manifest.csv | wc -l)
+          echo "=================================================="
+          echo "  W2 fetch — season ${{ matrix.season }}"
+          echo "  manifest rows: $MANIFEST_ROWS"
+          echo "=================================================="
+      - name: Fetch official PBP + boxscore for season ${{ matrix.season }}
+        run: |
+          python -u scripts/nhl_archive/fetch_pbp.py \
+            --season ${{ matrix.season }} \
+            --manifest manifest.csv \
+            --rate-sleep 0.5
+
+  # ── W3 ────────────────────────────────────────────────────────────────
+  extract:
+    if: ${{ inputs.confirm == 'yes' && inputs.run_extract }}
+    needs: fetch
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        season: [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'data-pipeline/requirements.txt'
+      - run: pip install -r data-pipeline/requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: manifest
+          path: .
+      - name: Preflight banner (season ${{ matrix.season }})
+        run: |
+          MANIFEST_COUNT=$(awk -F',' -v s='${{ matrix.season }}' 'NR>1 && $2==s' manifest.csv | wc -l)
+          FIRST_GID=$(awk -F',' -v s='${{ matrix.season }}' 'NR>1 && $2==s {print $1; exit}' manifest.csv)
+          echo "=================================================="
+          echo "  W3 extract — season ${{ matrix.season }}"
+          echo "  manifest count: $MANIFEST_COUNT"
+          echo "  first game_id : $FIRST_GID"
+          echo "  target table  : public.raw_shots_rebuild"
+          echo "=================================================="
+          echo "MANIFEST_COUNT=$MANIFEST_COUNT" >> $GITHUB_ENV
+          echo "FIRST_GID=$FIRST_GID" >> $GITHUB_ENV
+      # ── PRE-FLIGHT DRILL — refuse to write if the extractor can't parse ──
+      # Fetch one manifest game's raw JSON straight from the API into a
+      # local file, then run scripts/drills/xg_rebuild_extractor_drill.py
+      # against it. The drill uses a StubDB that raises on any write —
+      # this validates BOTH that the extractor code loads AND that it
+      # produces sane output on real data, without touching prod.
+      # If the drill fails, the extract job exits before writing anything.
+      - name: Pre-flight drill on first manifest game (no DB writes)
+        run: |
+          set -euo pipefail
+          if [ -z "${FIRST_GID:-}" ]; then
+            echo "no game_ids in manifest for this season — refusing" >&2
+            exit 2
+          fi
+          echo "  fetching game $FIRST_GID PBP from api-web.nhle.com ..."
+          curl -sS --fail --max-time 30 \
+            "https://api-web.nhle.com/v1/gamecenter/${FIRST_GID}/play-by-play" \
+            -o "drill_${FIRST_GID}.json"
+          echo "  running drill (StubDB; any write attempt fails the drill) ..."
+          python -u scripts/drills/xg_rebuild_extractor_drill.py \
+            "drill_${FIRST_GID}.json" "$FIRST_GID"
+      - name: Extract shots for season ${{ matrix.season }} (ledger-gated)
+        run: |
+          python -u scripts/nhl_archive/extract_rebuild.py \
+            --season ${{ matrix.season }} \
+            --manifest-count "$MANIFEST_COUNT"
+
+  # ── W4 ────────────────────────────────────────────────────────────────
+  playoff_stats_backfill:
+    if: ${{ inputs.confirm == 'yes' && inputs.run_playoff_backfill }}
+    needs: fetch
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PYTHONUNBUFFERED: '1'
+      CITRUS_PROXY_USERNAME: ${{ secrets.CITRUS_PROXY_USERNAME }}
+      CITRUS_PROXY_PASSWORD: ${{ secrets.CITRUS_PROXY_PASSWORD }}
+      CITRUS_PROXY_API_URL: ${{ secrets.CITRUS_PROXY_API_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'data-pipeline/requirements.txt'
+      - run: pip install -r data-pipeline/requirements.txt
+      - name: Preflight banner
+        run: |
+          echo "=================================================="
+          echo "  W4 rider — playoff stats backfill (20 games)"
+          echo "=================================================="
+      - name: Backfill stats for the 20 missing playoff games
+        run: |
+          python -u scripts/nhl_archive/backfill_playoff_stats.py
