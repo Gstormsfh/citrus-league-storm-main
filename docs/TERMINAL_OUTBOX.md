@@ -4915,3 +4915,65 @@ Branch `d83fdeb9` on `origin/phase-4-5-implementation`. Fast-forward-safe to mas
 **Awaiting architect ratification.** If ratified, architect issues the ⚡ paste banner to Garrett. Terminal will NOT stage a paste block until then.
 
 **End of R89. Entry 64 EXECUTED (all 6 steps). Full CI-mirror gate GREEN (eslint 0 · web tsc 158 · server tsc 0 · web build ✓ · server build ✓ · web vitest 1684/1684 · server tests 984+6/990). Commit d83fdeb9 pushed. R88 paste banner WITHDRAWN. READY-CANDIDATE per Entry 65 — awaiting architect countersignature.**
+
+---
+
+## R90 — Entries 79 + 71 + 73 EXECUTED · READY-CANDIDATE (2026-08-10 19:20Z / 1:20 PM MT)
+
+### Entries 66-79 backlog ACK
+
+R89 RATIFIED (Entry 66); CI green + production deploy live (Entries 67-68); LOAD-1 workstream opened (Entry 69); staging via manual Group C paste (Entry 70); Homepage dup loading docket (Entry 71); .firebaserc safety docket (Entry 72); F28 walk started; MobileMenuButton /98 catch (Entry 73); commissioner-without-team docket + rig-league Garrett-seat write (Entry 74); LOBBY campaign 3-item findings PROPOSE-DON'T-EXECUTE (Entry 75); staging citrus-api STALE — 4-surface deploy map (Entry 76); 404 confirmed on T7 route (Entry 77); staging API deploy issued 5cca2ba0 → d7f0c776 pin (Entry 78); **Entry 79 F28 checkpoint-2 TRUE ROOT CAUSE: draftV2Start.ts:87 actor.kind='user' vs RPC-demanded 'commissioner'**.
+
+### This cycle executed (commit d05702a5)
+
+**Entry 79 — EXECUTE NOW (unblocks F28 walk):**
+
+- **`server/src/routes/draftV2Start.ts:87`**: `kind: 'user'` → `kind: 'commissioner'`. Comment at :82-85 rewritten to encode the TRUE contract per architect ("commissionerMiddleware verifies commissionership; the RPC's actor gate additionally requires kind='commissioner' for ignition — rig + route now agree").
+- **`server/src/__tests__/draftV2Start.test.ts`** (NEW, 1 test): seam-pin asserting `mockUserClientRpc` receives `p_actor.kind === 'commissioner'` + explicit `not.toBe('user')`. Any future regression fails client-side of the mock.
+
+**Entry 71 batch (Homepage dup loading, merge artifact):**
+- `apps/web/src/components/citrus2/Homepage.tsx:91`: removed `loading="lazy" decoding="async"` pair, kept `loading="eager"` (hero intent wins per U6 rule). Sweep confirmed 1 site only. Cleared TS17001 from web tsc baseline (159 → 157).
+
+**Entry 73 batch (invalid Tailwind opacity steps):**
+- `apps/web/src/components/MobileMenuButton.tsx:136`: `bg-[#0F1F15]/98` → `/95` (fixes transparent-menu Garrett caught live).
+- Sweep found 1 more: `apps/web/src/components/mobile/MobileBottomNav.tsx:72`: `bg-[#E8EED9]/98` → `/95` (same silent-class-drop bug on mobile-bottom-nav).
+- Verified `PreviewArena:109` and `PreviewBoards:51` `/85` usages — VALID step (Tailwind scale is 0/5/10/…/95/100; 85 is standard). No fix needed.
+
+### Full CI-mirror gate (Entry 64 standing gate)
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint `src/` | 0 errors, 14 warnings | ≤0 errors | ✅ |
+| Web tsc | **157** | ≤159 baseline (was 158) | ✅ (-1: Homepage TS17001 fix) |
+| Server tsc | **0** | strict ≤0 | ✅ |
+| Web build | 18s ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Server build | tsc emit exit 0 | exit 0 | ✅ |
+| Web vitest FULL | **1684 / 1684** (102 files) | zero fail | ✅ |
+| Server vitest FULL | **985 pass + 6 skip / 991** (52 files) | zero fail | ✅ (+1 new test: draftV2Start.test.ts) |
+
+### Rebuild block for Garrett (pin discipline per Entry 79 step 4)
+
+Same three commands from Entry 78's staging API deploy — new tag `server:d05702a5-t7a`. Pin table updated:
+- **Previous-good**: `server:5cca2ba090772d65445061599f102abbb7a09cef` (staging-setup era, months stale)
+- **Superseded** (F28 first press caught actor bug): `server:d7f0c776` (or d83fdeb9 if that was the deployed image)
+- **Current-after-deploy**: `server:d05702a5-t7a` (adds Entry 79 fix)
+- **Rollback**: one `gcloud run deploy citrus-api --image=<previous>`
+
+Per Entry 65: **NO PASTE BANNER** in this outbox. Terminal proposes READY; architect countersigns before Garrett runs the rebuild block.
+
+### Dockets from Entry 79 (same-week, not tonight)
+
+- (a) Route should map RPC-refusal strings to proper discriminators instead of `reason:unexpected`; `useStartDraftV2` should surface `details` when reason=unexpected — tonight's toast said nothing useful while the body knew everything.
+- (b) Demo-league 500 on new server (`GET /api/public/leagues/750f4e1a → 500 "Cannot coerce to single JSON object"`) — demo id constant vs staging data mismatch.
+- (c) GLOBAL-1: page-level scroll dead at mobile-width on desktop, app-wide (Garrett) — top-tier UX docket alongside LOBBY campaign.
+- (d) Ad-script CSP console noise cleanup.
+
+Plus Entry 74's docket: commissioner-without-team locked out of own league (membership gate should union commissioner_id OR team ownership) — post-twelve unless twelve-blocking.
+
+Plus Entry 75 LOBBY campaign 3-item proposals (LOBBY-1 flow, LOBBY-2 visual, LOBBY-3 nav) — propose-don't-execute per architect. Will draft mid-week after F28 walk completes.
+
+### Standing by
+
+Branch `d05702a5` on `origin/phase-4-5-implementation`. F28 walk unblocker ready to redeploy staging citrus-api on architect countersignature. Standing by for ratification + rebuild block issuance.
+
+**End of R90. Entries 79 (unblocks F28) + 71 + 73 EXECUTED. New draftV2Start.test seam-pin locks the contract. Full CI-mirror gate GREEN. Commit d05702a5 pushed. READY-CANDIDATE per Entry 65 — awaiting architect countersignature for rebuild block issuance.**
