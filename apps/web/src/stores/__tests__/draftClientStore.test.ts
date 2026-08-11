@@ -145,6 +145,70 @@ describe('draftClientStore — snapshot + events', () => {
     expect(after.snapshot?.stateSnapshot.currentPickDeadline).toBe(priorDeadline);
   });
 
+  // Entry 87 Fix C (CLOCK-DISPLAY-35) — the store must extract
+  // pickTimeLimitSeconds from the draft_started event (regardless of
+  // whether it arrives inside the initial snapshot's recentEvents,
+  // via applyEvent, or via applyEvents). Downstream UI (DraftTimerV2
+  // and OnClockActionBar) reads `pickTimeLimitSec` from
+  // `usePickTimeLimitSec()` and clamps its rendered countdown so a
+  // stale deadline can never display a value exceeding the true
+  // per-pick window.
+  describe('Entry 87 Fix C — pickTimeLimitSec extraction', () => {
+    const draftStartedEvent = (
+      seq = 1,
+      limit = 30,
+    ): BufferedDraftEvent => ({
+      kind: 'draft_started',
+      seq,
+      timestamp: '2026-08-10T00:00:00.000Z',
+      correlationId: 'ignition-1',
+      startedAt: '2026-08-10T00:00:00.000Z',
+      firstPickDeadline: '2026-08-10T00:00:30.000Z',
+      totalRounds: 12,
+      totalTeams: 12,
+      pickTimeLimitSeconds: limit,
+      draftFormat: 'snake',
+    });
+
+    it('initial state has pickTimeLimitSec = null (pre-draft_started)', () => {
+      expect(useDraftClientStore.getState().pickTimeLimitSec).toBeNull();
+    });
+
+    it('setSnapshot extracts pickTimeLimitSeconds from draft_started in recentEvents', () => {
+      const store = useDraftClientStore.getState();
+      store.setSnapshot(sampleSnapshot([draftStartedEvent(1, 30)]));
+      expect(useDraftClientStore.getState().pickTimeLimitSec).toBe(30);
+    });
+
+    it('setSnapshot leaves pickTimeLimitSec null when no draft_started present', () => {
+      const store = useDraftClientStore.getState();
+      store.setSnapshot(sampleSnapshot([samplePickEvent(1, 'idem-A')]));
+      expect(useDraftClientStore.getState().pickTimeLimitSec).toBeNull();
+    });
+
+    it('applyEvent captures pickTimeLimitSeconds when a draft_started event arrives', () => {
+      const store = useDraftClientStore.getState();
+      store.setSnapshot(sampleSnapshot([]));
+      store.applyEvent(draftStartedEvent(1, 45));
+      expect(useDraftClientStore.getState().pickTimeLimitSec).toBe(45);
+    });
+
+    it('applyEvents captures pickTimeLimitSeconds from a batch containing draft_started', () => {
+      const store = useDraftClientStore.getState();
+      store.setSnapshot(sampleSnapshot([]));
+      store.applyEvents([draftStartedEvent(1, 60), samplePickEvent(2, 'idem-A')]);
+      expect(useDraftClientStore.getState().pickTimeLimitSec).toBe(60);
+    });
+
+    it('reset restores pickTimeLimitSec to null', () => {
+      const store = useDraftClientStore.getState();
+      store.setSnapshot(sampleSnapshot([draftStartedEvent(1, 30)]));
+      expect(useDraftClientStore.getState().pickTimeLimitSec).toBe(30);
+      store.reset();
+      expect(useDraftClientStore.getState().pickTimeLimitSec).toBeNull();
+    });
+  });
+
   it('applyEvents reconciles multiple pending actions in one call', () => {
     const store = useDraftClientStore.getState();
     store.setSnapshot(sampleSnapshot([]));

@@ -48,6 +48,12 @@ export function ConnectionBanner({ onRetryNow }: ConnectionBannerProps) {
   switch (state.kind) {
     case 'idle':
     case 'connected':
+    case 'terminal_completed':
+      // Entry 87 Fix A (COMPLETED-ROOM-1) — the banner communicates
+      // LIVE connection state. A completed draft has no live
+      // connection to lose; showing a reconnecting banner over a
+      // frozen board would be dishonest. The room renders the
+      // completion moment + board/history via other surfaces.
       return null;
     case 'fetching_token':
     case 'connecting':

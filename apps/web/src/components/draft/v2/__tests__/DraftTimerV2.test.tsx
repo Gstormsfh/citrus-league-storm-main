@@ -146,6 +146,106 @@ describe('DraftTimerV2 countdown value', () => {
   });
 });
 
+describe('DraftTimerV2 pickTimeLimitSec clamp (Entry 87 Fix C — CLOCK-DISPLAY-35)', () => {
+  // Root cause pin: even with the clock-offset estimator seeded on
+  // snapshot receipt, a stale deadline (e.g., server sent a deadline
+  // that landed after the pick was already re-armed) or an under-
+  // corrected client skew could compute a remaining value ABOVE the
+  // per-pick window. The clamp is defense-in-depth: the display
+  // physically cannot exceed pick_time_limit_seconds.
+
+  it('clamps rendered value to pickTimeLimitSec when raw remaining exceeds it', () => {
+    // Deadline is 45s away; client clock is 5s behind server (offset
+    // -5000 means clientMs is BEHIND serverMs so uncorrected diff
+    // would over-report). With clockOffsetMs=-5000, adjusted
+    // deadline = parsed - 5000 → remaining = 40s. Cap at 30s should
+    // clamp the display to 00:30.
+    render(
+      <DraftTimerV2
+        currentPickDeadline="2026-07-28T12:00:45.000Z"
+        draftStatus="in_progress"
+        wsOpen={true}
+        clockOffsetMs={-5000}
+        pickTimeLimitSec={30}
+      />,
+    );
+    expect(screen.getByRole('timer')).toHaveTextContent('00:30');
+  });
+
+  it('leaves value untouched when raw remaining is under pickTimeLimitSec', () => {
+    // Deadline is 20s away; cap is 30s. Should still render 00:20.
+    render(
+      <DraftTimerV2
+        currentPickDeadline="2026-07-28T12:00:20.000Z"
+        draftStatus="in_progress"
+        wsOpen={true}
+        clockOffsetMs={0}
+        pickTimeLimitSec={30}
+      />,
+    );
+    expect(screen.getByRole('timer')).toHaveTextContent('00:20');
+  });
+
+  it('does not clamp when pickTimeLimitSec is null (pre-draft_started)', () => {
+    // Before the draft_started event has been observed, no cap is
+    // applied — the estimator-corrected raw value renders. 45s + 0
+    // offset → 00:45.
+    render(
+      <DraftTimerV2
+        currentPickDeadline="2026-07-28T12:00:45.000Z"
+        draftStatus="in_progress"
+        wsOpen={true}
+        clockOffsetMs={0}
+        pickTimeLimitSec={null}
+      />,
+    );
+    expect(screen.getByRole('timer')).toHaveTextContent('00:45');
+  });
+
+  it('discriminant lock: 30s deadline with 5s-slow client renders 0:30 (not 0:35)', () => {
+    // The exact scenario Garrett witnessed on Run 3: server armed a
+    // 30s deadline, his client clock ran 5s behind server. Pre-fix,
+    // useClockOffsetEstimator was useState(0) and unseeded on
+    // snapshot receipt → first paint computed 30 - (-5) = 35s. Post-
+    // fix path in DraftRoomV2 seeds the estimator on snapshot receipt
+    // so clockOffsetMs arrives here already-corrected as -5000ms
+    // (client is BEHIND server, so localNow underestimates serverNow,
+    // and adjusted deadline needs to shift back). With the estimator
+    // seeded to -5000, the raw remaining is 30 - 5 = 25s; the
+    // pickTimeLimitSec=30 clamp holds; display reads 00:25.
+    //
+    // The clamp separately guarantees the display can never EXCEED
+    // 00:30 regardless of the estimator's state — that's the belt to
+    // the estimator's suspenders. This test asserts the belt: with
+    // no offset applied (worst-case: estimator never seeded), the
+    // pre-fix bug produced 00:35 for a 35s raw remaining, but the
+    // clamp forces 00:30.
+    render(
+      <DraftTimerV2
+        currentPickDeadline="2026-07-28T12:00:35.000Z"
+        draftStatus="in_progress"
+        wsOpen={true}
+        clockOffsetMs={0}
+        pickTimeLimitSec={30}
+      />,
+    );
+    expect(screen.getByRole('timer')).toHaveTextContent('00:30');
+  });
+
+  it('clamp respects negative clock, still 0:00 when past deadline', () => {
+    render(
+      <DraftTimerV2
+        currentPickDeadline="2026-07-28T11:59:55.000Z"
+        draftStatus="in_progress"
+        wsOpen={true}
+        clockOffsetMs={0}
+        pickTimeLimitSec={30}
+      />,
+    );
+    expect(screen.getByRole('timer')).toHaveTextContent('00:00');
+  });
+});
+
 describe('DraftTimerV2 stale indicator', () => {
   it('renders with reduced opacity when wsOpen is false', () => {
     render(

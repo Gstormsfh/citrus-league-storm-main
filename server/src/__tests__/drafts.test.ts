@@ -365,4 +365,52 @@ describe('Snapshot endpoint — chunk 11g.7 sub-step 7b', () => {
     const body = await res.json();
     expect(body.error.code).toBe('NOT_FOUND');
   });
+
+  // Entry 87 Fix A (COMPLETED-ROOM-1, 2026-08-10) — snapshot route
+  // serves terminal (completed/cancelled) drafts. Pre-fix, the gate
+  // rejected everything outside CONNECTABLE_DRAFT_STATUSES with 409,
+  // which forced the client into a discovery → 409 → backoff loop
+  // for every reconnect after the engine's lobby-eviction TTL kicked
+  // in post-completion (Garrett witnessed on Run 3). The snapshot is
+  // permanent league history — always safe to serve from the durable
+  // draft_events + draft_picks_v2 tables via buildSnapshot.
+  it('200: draft_status="completed" → serves DraftSnapshot from durable state (Entry 87 Fix A)', async () => {
+    mockLeague = { id: VALID_DRAFT_ID, draft_status: 'completed' };
+    mockLeagueError = null;
+    mockIsMember = true;
+    mockSnapshot = {
+      lobbyId: VALID_DRAFT_ID,
+      format: 'snake',
+      recentEvents: [],
+      stateSnapshot: {
+        currentPickNumber: null,
+        currentRoundNumber: null,
+        onClockTeamId: null,
+        totalPicks: 12,
+        picksMade: 12,
+        draftStatus: 'completed',
+        currentPickDeadline: null,
+      },
+    };
+    mockSnapshotError = null;
+
+    const res = await call();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.stateSnapshot.draftStatus).toBe('completed');
+    expect(body.stateSnapshot.picksMade).toBe(12);
+  });
+
+  it('409: draft_status="not_started" still refuses (Entry 87 Fix A — only terminal statuses opened)', async () => {
+    // Regression pin: not_started is NOT a terminal status. There's
+    // no snapshot to render before the first pick fires. The gate
+    // still 409s to keep the client's pre-draft UI unchanged.
+    mockLeague = { id: VALID_DRAFT_ID, draft_status: 'not_started' };
+    mockLeagueError = null;
+    mockIsMember = true;
+    const res = await call();
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error.code).toBe('DRAFT_NOT_CONNECTABLE');
+  });
 });

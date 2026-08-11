@@ -250,7 +250,30 @@ draftsRoutes.get('/:draftId/snapshot', async (c) => {
     );
   }
 
-  if (!CONNECTABLE_DRAFT_STATUSES.includes(draftStatus)) {
+  // Entry 87 Fix A (COMPLETED-ROOM-1, 2026-08-10) — the snapshot
+  // route serves terminal-state drafts (`completed` today) as
+  // permanent league history. Rejecting completed drafts here forced
+  // the client into a discovery → 409 → backoff loop for every
+  // reconnect after the engine's lobby-eviction TTL kicked in
+  // post-completion (Garrett witnessed this on Run 3's finished
+  // league). The discovery route KEEPS its 409 for terminal states —
+  // there's no live connection to hand out — but the snapshot is
+  // always safe to reconstruct from the durable draft_events +
+  // draft_picks_v2 tables (Entry 90 DB evidence: draft_snapshots
+  // rows persist post-eviction, and buildSnapshot reads durable
+  // projection tables regardless of lobby state).
+  //
+  // Only `not_started` still 409s here — there's genuinely no
+  // snapshot to render until the first pick fires. The architect
+  // truth table names `cancelled` alongside `completed`, but the
+  // current DraftStatus union does not include `cancelled`
+  // (packages/shared/types/league.ts:552); when it's added, extend
+  // TERMINAL_STATUSES here to match. The client already accepts
+  // 'cancelled' in its terminal_completed state.
+  const TERMINAL_STATUSES: readonly DraftStatus[] = ['completed'];
+  const isConnectable = CONNECTABLE_DRAFT_STATUSES.includes(draftStatus);
+  const isTerminal = TERMINAL_STATUSES.includes(draftStatus);
+  if (!isConnectable && !isTerminal) {
     return c.json(
       {
         error: {

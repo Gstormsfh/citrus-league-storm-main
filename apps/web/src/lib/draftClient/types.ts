@@ -141,6 +141,34 @@ export type DraftClientState =
     }
   | {
       /**
+       * Entry 87 Fix A (COMPLETED-ROOM-1, 2026-08-10) — the draft
+       * has ended (completed or cancelled). Entered from:
+       *   - `discovery_refused_terminal` (discovery 409 with a
+       *     terminal draft status)
+       *   - `ws_closed` when the runner observed completion during
+       *     the connection lifetime (`lastKnownTerminalStatus`
+       *     annotated on the close event by the runner)
+       *
+       * On entry: no backoff scheduled. A `fetch_snapshot` side
+       * effect fires so the room can render the frozen board from
+       * durable state.
+       *
+       * In this state: `backoff_timer_fired`, `visibility_changed`,
+       * and `network_changed` are all no-ops (nothing to reconnect
+       * to — the draft is done). `connect_requested` permits a
+       * single re-discovery (harmless re-entry — the discovery
+       * route will 409 again and dispatch `discovery_refused_terminal`
+       * back into this state).
+       *
+       * The UX layer suppresses the ConnectionBanner while in this
+       * state and DraftRoomV2 renders board/history instead of
+       * "Waiting for draft state…".
+       */
+      kind: 'terminal_completed';
+      draftStatus: 'completed' | 'cancelled';
+    }
+  | {
+      /**
        * Terminal state. No more retries. Triggered by:
        *   - `auth_failure`: 401/403 from token discovery, or
        *     close codes 4001-4099 from the WS handshake (token
@@ -190,9 +218,44 @@ export type DraftClientEvent =
   | { type: 'disconnect_requested' }
   | { type: 'token_fetched'; token: string; wsUrl: string }
   | { type: 'token_fetch_failed'; error: string; statusCode?: number }
-  | { type: 'ws_opened'; sessionId: string }
+  | {
+      /**
+       * Entry 87 Fix A (COMPLETED-ROOM-1) — the discovery endpoint
+       * returned 409 DRAFT_NOT_CONNECTABLE with a terminal
+       * (completed/cancelled) draft status. The runner parses the
+       * 409 body and dispatches THIS event (not `token_fetch_failed`)
+       * so the state machine can route to `terminal_completed` — a
+       * dedicated no-retry state that renders the frozen board via
+       * the snapshot path rather than looping backoff against a
+       * discovery route that correctly refuses.
+       *
+       * All other 409 subclasses (system flag refusal 503, transient
+       * 5xx, unclassified errors) continue to flow through
+       * `token_fetch_failed` unchanged.
+       */
+      type: 'discovery_refused_terminal';
+      draftStatus: 'completed' | 'cancelled';
+    }
+  | {
+      type: 'ws_opened';
+      sessionId: string;
+    }
   | { type: 'ws_message'; message: DraftServerMessage }
-  | { type: 'ws_closed'; code: number; reason: string }
+  | {
+      type: 'ws_closed';
+      code: number;
+      reason: string;
+      /**
+       * Entry 87 Fix A (COMPLETED-ROOM-1) — runner-tracked
+       * observation that the draft has completed. When present and
+       * truthy, the state machine routes to `terminal_completed`
+       * instead of scheduling backoff. Set by the runner when it
+       * observes a snapshot with `draftStatus in {completed,
+       * cancelled}` or a `draft_completed` wire event; feeds
+       * ws_closed on the subsequent post-eviction close.
+       */
+      lastKnownTerminalStatus?: 'completed' | 'cancelled';
+    }
   | { type: 'ws_error'; error: string }
   | { type: 'snapshot_fetched'; snapshot: DraftSnapshot }
   | { type: 'snapshot_fetch_failed'; error: string }

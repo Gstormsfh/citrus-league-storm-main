@@ -83,6 +83,11 @@ vi.mock('sonner', () => ({
 // DR-3 (2026-07-29) — mock PlayerService so usePreloadedPlayers doesn't
 // hit the API in the wiring tests. Empty player list keeps the page
 // mounting non-blocking (adapters emit `#<id>` fallbacks throughout).
+// Entry 87 Fix B (2026-08-10): usePreloadedPlayers now queries
+// player_directory via supabase directly (not PlayerService), so we
+// also stub the hook itself here to sever the async chain that
+// previously caused act warnings when the dynamic supabase import
+// resolved after test teardown.
 const { getAllPlayersMock } = vi.hoisted(() => ({
   getAllPlayersMock: vi.fn(),
 }));
@@ -92,6 +97,13 @@ vi.mock('@/services/PlayerService', () => ({
     getPlayer: vi.fn(),
     getPlayersByIds: vi.fn(),
   },
+}));
+vi.mock('@/hooks/usePreloadedPlayers', () => ({
+  usePreloadedPlayers: () => ({
+    playersById: new Map(),
+    isLoading: false,
+    error: null,
+  }),
 }));
 
 // DR-3 (2026-07-29) — mock the v1 draft components so runner-wiring

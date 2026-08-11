@@ -28,10 +28,27 @@ export interface OnClockActionBarProps {
    *  returns null and renders nothing. */
   amIOnClock: boolean;
   /** ISO-8601 deadline for the current pick, from
-   *  `snapshot.stateSnapshot.currentPickDeadline`. The bar counts down
-   *  to this in local time (no clock-offset adjustment needed here;
-   *  the underlying deadline was set by the server RPC). */
+   *  `snapshot.stateSnapshot.currentPickDeadline`.
+   *
+   *  Entry 87 Fix C (CLOCK-DISPLAY-35): the original DR-3.1 comment
+   *  ("no clock-offset adjustment needed here") was wrong. Untreated,
+   *  the bar's countdown reads `deadline − localNow` with zero
+   *  correction for client-clock skew — on Garrett's PC that surfaced
+   *  as a 30s deadline rendering as 35s. Now we apply the estimator
+   *  offset (from useClockOffsetEstimator) and clamp to
+   *  pickTimeLimitSec, so the bar matches DraftTimerV2's display
+   *  frame-for-frame. */
   currentPickDeadline: string | null;
+  /** Entry 87 Fix C — rolling estimate of `clientMs - serverMs`.
+   *  Positive means the client clock runs ahead of the server. The
+   *  bar's countdown applies this offset to the deadline before
+   *  differencing against local now. Threaded from DraftRoomV2's
+   *  useClockOffsetEstimator (same instance DraftTimerV2 reads). */
+  clockOffsetMs?: number;
+  /** Entry 87 Fix C — per-pick countdown window in seconds, extracted
+   *  from draft_started. Upper-bound clamp on the rendered value.
+   *  Null before draft_started has been observed. */
+  pickTimeLimitSec?: number | null;
   /** Currently selected player in the pool (or null). Determines
    *  whether the Draft button is enabled and what name is displayed. */
   selectedPlayer: Player | null;
@@ -62,6 +79,8 @@ function formatCountdown(secondsRemaining: number): string {
 export function OnClockActionBar({
   amIOnClock,
   currentPickDeadline,
+  clockOffsetMs = 0,
+  pickTimeLimitSec = null,
   selectedPlayer,
   onDraft,
   pickNumber,
@@ -83,10 +102,20 @@ export function OnClockActionBar({
   const deadlineMs = currentPickDeadline
     ? new Date(currentPickDeadline).getTime()
     : null;
-  const secondsRemaining =
+  // Entry 87 Fix C — apply estimator offset (mirrors DraftTimerV2's
+  // math) so the bar's countdown matches the sticky-header timer
+  // and the true server deadline. Then clamp to pickTimeLimitSec so
+  // the display cannot exceed the per-pick window.
+  const rawRemainingSec =
     deadlineMs !== null && Number.isFinite(deadlineMs)
-      ? Math.max(0, Math.ceil((deadlineMs - nowMs) / 1000))
+      ? Math.max(0, Math.ceil((deadlineMs + clockOffsetMs - nowMs) / 1000))
       : null;
+  const secondsRemaining =
+    rawRemainingSec !== null &&
+    pickTimeLimitSec !== null &&
+    pickTimeLimitSec > 0
+      ? Math.min(rawRemainingSec, pickTimeLimitSec)
+      : rawRemainingSec;
 
   const urgent = secondsRemaining !== null && secondsRemaining <= 10;
   const barClass = urgent

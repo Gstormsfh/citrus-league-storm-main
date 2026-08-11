@@ -55,6 +55,7 @@ import {
   useMyTeamId,
   useIdentityFailure,
   usePendingActions,
+  usePickTimeLimitSec,
 } from '@/stores/draftClientStore';
 import { useMyTeamIdCrossCheck } from '@/hooks/useMyTeamIdCrossCheck';
 import {
@@ -158,6 +159,24 @@ export default function DraftRoomV2() {
       {
         onSnapshot: (snapshot) => {
           store.setSnapshot(snapshot);
+          // Entry 87 Fix C (CLOCK-DISPLAY-35) — seed the clock-offset
+          // estimator from the freshest server timestamp available in
+          // the snapshot's recentEvents ring buffer. Pre-fix root
+          // cause: useClockOffsetEstimator starts at useState(0) and
+          // was only fed by onEvent/onEvents, so the FIRST paint
+          // computed remaining = deadline − localNow with zero
+          // correction. On Garrett's PC (~5s slow vs server), a 30s
+          // deadline rendered as 35s until the first pick event
+          // seeded the EMA. Seeding here eliminates that first-paint
+          // window entirely.
+          if (snapshot.recentEvents.length > 0) {
+            const last =
+              snapshot.recentEvents[snapshot.recentEvents.length - 1];
+            const serverMs = new Date(last.timestamp).getTime();
+            if (Number.isFinite(serverMs)) {
+              updateOffset(Date.now(), serverMs);
+            }
+          }
           void fetchDraftOrderMatrix(
             leagueId,
             snapshot.stateSnapshot.totalPicks,
@@ -294,6 +313,7 @@ export default function DraftRoomV2() {
         teams={teams}
         playersById={playersById}
         playersLoading={playersLoading}
+        clockOffsetMs={clockOffsetMs}
       />
     </div>
   );
@@ -397,6 +417,7 @@ function StickyHeader({ onRetryNow, clockOffsetMs }: StickyHeaderProps) {
   const connectionState = useDraftConnectionState();
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
+  const pickTimeLimitSec = usePickTimeLimitSec();
   const wsOpen = connectionState.kind === 'connected';
 
   return (
@@ -411,6 +432,7 @@ function StickyHeader({ onRetryNow, clockOffsetMs }: StickyHeaderProps) {
               draftStatus={derived.draftStatus}
               wsOpen={wsOpen}
               clockOffsetMs={clockOffsetMs}
+              pickTimeLimitSec={pickTimeLimitSec}
             />
           </div>
           <div
@@ -444,6 +466,13 @@ interface DraftRoomBodyProps {
   teams: FetchedTeam[];
   playersById: ReadonlyMap<string, Player>;
   playersLoading: boolean;
+  /**
+   * Entry 87 Fix C — threaded from DraftRoomV2's estimator so
+   * OnClockActionBar reads the SAME offset instance that DraftTimerV2
+   * does. A second useClockOffsetEstimator call here would create a
+   * separate EMA that never receives updateOffset frames.
+   */
+  clockOffsetMs: number;
 }
 
 function DraftRoomBody({
@@ -451,11 +480,17 @@ function DraftRoomBody({
   teams,
   playersById,
   playersLoading,
+  clockOffsetMs,
 }: DraftRoomBodyProps) {
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
   const resolvedMyTeamId = useMyTeamId();
   const identityFailure = useIdentityFailure();
+  // Entry 87 Fix A (COMPLETED-ROOM-1) — read the runner state so
+  // the "waiting" branch can distinguish terminal_completed (draft
+  // is done; snapshot fetch in flight) from a genuine pre-first-
+  // snapshot wait.
+  const connectionState = useDraftConnectionState();
   // F14(b) (2026-08-03): when the client-side identity cross-check
   // has failed, refuse to render draft controls by forcing myTeamId
   // to null downstream. Every downstream gate already checks
@@ -467,6 +502,20 @@ function DraftRoomBody({
   const myTeamId = identityFailure !== null ? null : resolvedMyTeamId;
 
   if (snapshot === null || derived === null) {
+    // Entry 87 Fix A (COMPLETED-ROOM-1) — while the terminal-state
+    // snapshot fetch is in flight (state.kind === 'terminal_completed'
+    // triggers a fetch_snapshot side effect on entry), the room shows
+    // a completion-specific loader instead of the generic "Waiting
+    // for draft state…" copy. The generic copy on a completed draft
+    // reads as broken; being explicit that the draft is done and the
+    // board is loading matches the user's mental model.
+    if (connectionState.kind === 'terminal_completed') {
+      return (
+        <div className="text-muted-foreground" data-testid="draft-terminal-loading">
+          Draft {connectionState.draftStatus}. Loading final board…
+        </div>
+      );
+    }
     return (
       <div className="text-muted-foreground" data-testid="draft-loading">
         Waiting for draft state…
@@ -483,6 +532,7 @@ function DraftRoomBody({
           playersById={playersById}
           playersLoading={playersLoading}
           myTeamId={myTeamId}
+          clockOffsetMs={clockOffsetMs}
         />
       </div>
       <div className="hidden lg:block space-y-4">
@@ -505,6 +555,7 @@ interface MainTabsProps {
   playersById: ReadonlyMap<string, Player>;
   playersLoading: boolean;
   myTeamId: string | null;
+  clockOffsetMs: number;
 }
 
 function MainTabs({
@@ -513,9 +564,14 @@ function MainTabs({
   playersById,
   playersLoading,
   myTeamId,
+  clockOffsetMs,
 }: MainTabsProps) {
   const derived = useDerivedDraftState();
   const snapshot = useDraftSnapshot();
+  // Entry 87 Fix C — clamp source for OnClockActionBar's countdown.
+  // Same store selector StickyHeader reads for DraftTimerV2 so the
+  // sticky bar and the header timer agree frame-for-frame.
+  const pickTimeLimitSec = usePickTimeLimitSec();
   const pendingActions = usePendingActions();
   const [tab, setTab] = useState<'players' | 'board' | 'history'>('players');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -725,6 +781,8 @@ function MainTabs({
         <OnClockActionBar
           amIOnClock={amIOnClock}
           currentPickDeadline={snapshot?.stateSnapshot.currentPickDeadline ?? null}
+          clockOffsetMs={clockOffsetMs}
+          pickTimeLimitSec={pickTimeLimitSec}
           selectedPlayer={selectedPlayer}
           onDraft={handleDraftFromPool}
           pickNumber={derived?.currentPickNumber ?? null}

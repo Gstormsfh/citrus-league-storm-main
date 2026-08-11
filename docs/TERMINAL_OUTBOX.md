@@ -4977,3 +4977,100 @@ Plus Entry 75 LOBBY campaign 3-item proposals (LOBBY-1 flow, LOBBY-2 visual, LOB
 Branch `d05702a5` on `origin/phase-4-5-implementation`. F28 walk unblocker ready to redeploy staging citrus-api on architect countersignature. Standing by for ratification + rebuild block issuance.
 
 **End of R90. Entries 79 (unblocks F28) + 71 + 73 EXECUTED. New draftV2Start.test seam-pin locks the contract. Full CI-mirror gate GREEN. Commit d05702a5 pushed. READY-CANDIDATE per Entry 65 — awaiting architect countersignature for rebuild block issuance.**
+
+## R91 — Entry 87 FLAWLESS-RUN TRIO EXECUTED · READY-CANDIDATE (2026-08-10 22:35Z / 4:35 PM MT)
+
+### Entries 89 + 90 ACK
+
+R90 pending countersignature; Entry 89 pre-cleared every adjudication pause; Entry 90 dissolved the morning fallback ("we can easily do this tonight. make the fix, and lets do this"). Order held: C → B → A straight through. Fix A's last unknown removed by Entry 90 DB evidence (draft_snapshots rows persist post-eviction — pure gate change, no rebuild architecture needed).
+
+### This cycle executed — full trio (per-fix diff summaries below)
+
+**Fix C — CLOCK-DISPLAY-35 / TIMER-1** (7 files, +2/+5/+3 tests):
+- **`apps/web/src/stores/draftClientStore.ts`**: new `pickTimeLimitSec: number | null` state field + selector `usePickTimeLimitSec`. Extraction helper `extractPickTimeLimitSec(events)` scans a buffered-event list for `kind: 'draft_started'` and returns its `pickTimeLimitSeconds`. Called from `setSnapshot` (initial snapshot's recentEvents), `applyEvent` (live event arrival), and `applyEvents` (resync batch). Reset to null on `reset()`.
+- **`apps/web/src/pages/DraftRoomV2.tsx`**: `onSnapshot` callback now seeds `updateOffset(Date.now(), serverMs)` from the last event's timestamp in `snapshot.recentEvents` — closes the pre-fix window where the estimator sat at `useState(0)` until the first onEvent fired. Threaded `clockOffsetMs` into `DraftRoomBody → MainTabs → OnClockActionBar`; read `pickTimeLimitSec` from store in `StickyHeader` and `MainTabs`, passed both to `DraftTimerV2` (via header) and `OnClockActionBar` (via tabs body).
+- **`apps/web/src/components/draft/v2/DraftTimerV2.tsx`**: new `pickTimeLimitSec?: number | null` prop; clamps `remainingSec = Math.min(nonNegative, pickTimeLimitSec)`. When null (pre-draft_started), clamp is skipped (existing render path preserved).
+- **`apps/web/src/components/draft/v2/OnClockActionBar.tsx`**: DR-3.1's "no clock-offset adjustment needed here" comment RETRACTED — that assumption was the root cause. New `clockOffsetMs?: number` prop applied to deadline (mirrors DraftTimerV2 math); new `pickTimeLimitSec?: number | null` prop caps rendered value.
+- **`apps/web/src/components/draft/v2/__tests__/DraftTimerV2.test.tsx`**: +5 clamp tests (raw>cap → clamped; raw<cap → untouched; null → no clamp; discriminant-lock for Garrett's 35s scenario; past-deadline still 0:00).
+- **`apps/web/src/components/draft/v2/__tests__/OnClockActionBar.test.tsx`**: +3 tests (clockOffsetMs applied; clamp works; agrees frame-for-frame with DraftTimerV2 for same tuple).
+- **`apps/web/src/stores/__tests__/draftClientStore.test.ts`**: +6 extraction tests (initial null; snapshot with draft_started; snapshot without; applyEvent; applyEvents batch; reset restores null).
+
+**Discriminant identified (per Entry 87 request)**: (a) EMA unseeded at mount was the ACTUAL cause on Garrett's PC ~5s slow. Fix is BOTH the seed (eliminates first-paint window) AND the clamp (belt to estimator's suspenders — display physically cannot exceed pick_time_limit_seconds no matter what).
+
+**Fix B — PLAYER-RES-1** (2 files rewired, +2 test-boundary stubs):
+- **`apps/web/src/hooks/usePreloadedPlayers.ts`** (rewritten): swapped `PlayerService.getAllPlayers()` (HTTP → /api/players → server cache) for direct `supabase.from('player_directory').eq('season', CURRENT_SEASON).range(0, 4999)`. Kept the ReadonlyMap<string, Player> shape and String(player_id) keys (contract unchanged). Row → Player mapping preserves existing Player type: id=String(player_id), name←full_name, position←normalizePosition(position_code), team←team_abbrev; stat fields default 0/null per Player interface. Dynamic `import('@/integrations/supabase/client')` inside useEffect (matches DraftRoomV2's apiClient pattern) so test collection doesn't trip the top-of-module env-var check.
+- **`apps/web/src/hooks/__tests__/usePreloadedPlayers.test.ts`** (rewritten): replaced PlayerService mock with a supabase fluent-chain rig (`from → select → eq → range → thenable`) using `mockReset` in beforeEach so per-test impls don't leak. +2 new assertions (queries player_directory + current-season filter shape; row → Player id-key mapping).
+- **`apps/web/src/pages/__tests__/DraftRoomV2.dr3.test.tsx` + `.f11.test.tsx` + `.test.tsx`**: added boundary stub `vi.mock('@/hooks/usePreloadedPlayers')` returning empty result, so downstream tests don't reach into supabase (severs the async chain that caused a batch-order-dependent act warning in DraftRoomV2.f11:287 after the initial rewire).
+
+**Consumer-grep receipts (INS-16 per architect ratification):**
+1. `v1Adapters.ts:100` `resolvePlayerDisplay` — `playersById.get(String(playerId))` where playerId is `number` from `entry.playerId`. ✓ new shape keys by String(numeric NHL id).
+2. `v1Adapters.ts:257` `toAvailablePlayers` — iterates map, drafted-set membership on `.id`. ✓ Player.id is String(numeric).
+3. `DraftRoomV2.tsx:611` `parseInt(player.id, 10)` — String(numeric) parses back cleanly.
+4. `DraftRoom.tsx` (legacy v1) has its OWN local `playersById` — NOT a consumer of this hook. Confirmed via grep (`grep -rn usePreloadedPlayers apps/web/src` → only DraftRoomV2 + test file).
+
+No dual-keying needed. No global Player type mutation. Contract preserved end-to-end.
+
+**Fix A — COMPLETED-ROOM-1** (server + client per architect-authored truth table, +13/+2 tests):
+
+**Server side:**
+- **`server/src/routes/drafts.ts:265-284`** (snapshot route only; discovery route unchanged): terminal statuses (`completed`) now serve 200 via existing `buildSnapshot`. Pre-fix `!CONNECTABLE.includes` gate rejected everything outside CONNECTABLE_DRAFT_STATUSES with 409. Comment cites Entry 90 DB evidence (draft_snapshots persist post-eviction, buildSnapshot reads durable draft_events + draft_picks_v2 regardless of lobby state) + notes that DraftStatus union today doesn't include 'cancelled' (packages/shared/types/league.ts:552) so TERMINAL_STATUSES is `['completed']` only; when 'cancelled' is added to the union, extend here. Client already accepts both. `not_started` still 409s.
+- **`server/src/__tests__/drafts.test.ts`**: +2 tests — draft_status=completed → 200 with DraftSnapshot; not_started still 409 (regression pin).
+
+**Client — types.ts:**
+- New event `discovery_refused_terminal { draftStatus }`.
+- New state `terminal_completed { draftStatus }`.
+- `ws_closed` event gains optional `lastKnownTerminalStatus` field (runner-annotated).
+
+**Client — reduce.ts (truth-table implementation, item-by-item):**
+- Item 1: `fetching_token + discovery_refused_terminal` → `terminal_completed` + `fetch_snapshot` effect. All OTHER discovery failures (401/403/500) continue to route through unchanged `token_fetch_failed` handler (line-for-line preserved).
+- Item 2: `handleWsClosed` — early check: if `event.lastKnownTerminalStatus !== undefined` → `terminal_completed` + `fetch_snapshot`, NO backoff. Also short-circuits close events when already in terminal_completed / fatal.
+- Item 3: no-ops in terminal_completed for `backoff_timer_fired`, `visibility_changed`, `network_changed` (new early-return in handleNetworkChanged; visibility already no-ops).
+- Item 3 cont: `connect_requested` in terminal_completed permits single re-discovery (state.kind added to the "or fatal" allow branch in handleConnectRequested).
+- Item 4: enter effect is `fetch_snapshot` (leagueId param filled by runner — same pattern as snapshot_required's fetch).
+
+**Client — runner.ts:**
+- New private `lastKnownTerminalStatus: 'completed' | 'cancelled' | null` field. Cleared on connect() / disconnect().
+- `ws.onmessage` observes: (1) snapshot frames with `stateSnapshot.draftStatus ∈ {completed, cancelled}`, (2) event frames with `kind === 'draft_completed'`. Sets `lastKnownTerminalStatus`.
+- `ws.onclose` annotates the `ws_closed` dispatch with `lastKnownTerminalStatus` when present.
+- `runFetchToken` catch inspects error shape: if `.status === 409 + .data.error.code === 'DRAFT_NOT_CONNECTABLE' + .data.error.status ∈ {completed, cancelled}` → dispatches `discovery_refused_terminal`; every other error goes through the existing `token_fetch_failed` path (401/403/5xx branches unchanged).
+
+**Client — UI surfaces:**
+- **`ConnectionBanner.tsx`**: added `case 'terminal_completed': return null;` alongside `idle` and `connected` (banner communicates LIVE connection state; a frozen board has no connection to lose).
+- **`DraftRoomV2.tsx`**: pre-fix `snapshot === null` branch now first checks `connectionState.kind === 'terminal_completed'` and shows a purpose-specific loader ("Draft completed. Loading final board…") while the snapshot fetch is in flight. Generic "Waiting for draft state…" reserved for genuine pre-first-snapshot waits.
+
+**Client — reduce.test.ts:** +13 truth-table tests covering all 6 architect-specified minimums plus edge cases: discovery-409-terminal → terminal_completed + snapshot + no backoff · same for cancelled discriminator · ws_closed with annotation → terminal_completed (Garrett Run 3 regression pin) · ws_closed WITHOUT annotation → reconnecting (unchanged path guard) · backoff_timer_fired no-op · visibility_changed no-op · network_changed(online) no-op · network_changed(offline) no-op · ws_closed no-op in terminal_completed · connect_requested → single re-discovery · 401/403/500 unchanged (three regression pins).
+
+### Fix C's CSP ride-along per Entry 87
+
+- **`apps/web/firebase.json`** already has `wss://draft-staging.citrusfantasysports.com` in `connect-src` (verified: `grep -c 'wss://draft-staging'` = 1/1 in both `apps/web/firebase.json` and root `firebase.json`). The apps/web copy shows as modified in git status — the architect-authored fix carried through the working tree from prior session. Included in this commit.
+
+### Full CI-mirror gate (Entry 64 standing gate)
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint web | 0 errors, 14 warnings | ≤0 errors | ✅ (unchanged pre-existing warnings) |
+| Web tsc | **157** | =157 baseline | ✅ (zero new errors, verified via git stash diff) |
+| Server tsc | **0** | strict ≤0 | ✅ (after cancelled→completed narrow) |
+| Web build | 12s ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Server build | tsc emit exit 0 | exit 0 | ✅ |
+| Web vitest FULL | **1713 / 1713** (102 files) | ≥1684 prior | ✅ (+29 new tests: 5 DraftTimerV2 + 3 OnClockActionBar + 6 store + 13 reduce + 2 usePreloadedPlayers) |
+| Server vitest FULL | **987 pass + 6 skip / 993** (53 files + 1 skip) | ≥985 prior | ✅ (+2 new tests: drafts.test.ts terminal + not_started pins) |
+
+### Rebuild block for Garrett (pending architect countersignature)
+
+Same three-command shape as Entry 78 / R90 (`gcloud run deploy citrus-api …`) — new tag suffix `-frt` (FlawlessRunTrio). Firebase Hosting deploy for the client trio uses the same `firebase deploy --only hosting` pattern from the -t7a cycle. Pin table proposed:
+- **Previous-good** (holds): `server:d05702a5-t7a` (Entry 79 fix, R90 deploy target)
+- **Superseded**: none for this cycle — R90 deploy hasn't happened yet per Entry 90 ordering, so d05702a5-t7a is still previous-good until the -frt image lands
+- **Current-after-deploy** (proposed): `server:<new-hash>-frt` (adds Fix A snapshot terminal-serve on top of d05702a5)
+- **Rollback**: one `gcloud run deploy citrus-api --image=<d05702a5-t7a>`
+
+Web hosting deploy carries Fix B + Fix C + the client half of Fix A + the CSP ride-along. All three fixes need both surfaces for full effect, but Fix C's clamp + seed and Fix B's swap are pure client — they land the moment hosting deploys. Fix A's terminal-serve requires the -frt server tag AND the client's terminal_completed routing (which the same hosting deploy carries).
+
+Per Entry 65: **NO PASTE BANNER** in this outbox. Terminal proposes READY; architect countersigns before Garrett runs the rebuild block.
+
+### Standing by
+
+Commit + branch push pending on architect countersignature of this READY-CANDIDATE. Once countersigned + Garrett has run tonight, Run 4 is the full five-checkpoint flawless run (CP1-4 covered by Fix C + Fix B; CP5 verifies by simply opening tonight's completed room — no redraft needed per Entry 89's incremental-deploy note).
+
+**End of R91. Entry 87 FLAWLESS-RUN TRIO (Fix C + Fix B + Fix A) executed against architect-ratified spec + truth table. Full CI-mirror gate GREEN (0 new tsc errors, +29 web tests, +2 server tests). Standing by for architect countersignature + rebuild block issuance.**
+

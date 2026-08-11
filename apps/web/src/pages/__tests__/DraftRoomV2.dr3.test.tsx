@@ -121,6 +121,17 @@ vi.mock('@/components/draft/DraftQueue', () => ({
   DraftQueue: () => <div data-testid="mock-draft-queue" />,
 }));
 
+// Entry 87 Fix B (2026-08-10) — usePreloadedPlayers now queries
+// player_directory via supabase directly; stub the hook at its
+// boundary so tests don't need supabase env vars set and there's
+// no async chain to leak past test teardown.
+vi.mock('@/hooks/usePreloadedPlayers', () => ({
+  usePreloadedPlayers: () => ({
+    playersById: new Map(),
+    isLoading: false,
+    error: null,
+  }),
+}));
 const { getAllPlayersMock } = vi.hoisted(() => ({
   getAllPlayersMock: vi.fn(),
 }));
