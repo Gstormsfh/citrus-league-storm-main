@@ -51,4 +51,36 @@ jobs:
           CITRUS_ALERT_SLACK_WEBHOOK: ${{ secrets.CITRUS_ALERT_SLACK_WEBHOOK }}
           CITRUS_ALERT_PAGERDUTY_KEY: ${{ secrets.CITRUS_ALERT_PAGERDUTY_KEY }}
           CITRUS_ALERT_EMAIL: ${{ secrets.CITRUS_ALERT_EMAIL }}
-        run: python data-pipeline/monitoring/check_data_freshness.py
+        shell: bash
+        run: |
+          # WHY THIS IS NOT A BARE `python ...` CALL
+          #
+          # check_data_freshness.py exits 2 on FAIL, 1 on WARN, 0 clean. Running
+          # it bare meant a single WARN failed the job. In the offseason ~17
+          # tables are LEGITIMATELY stale (no games since July), so this workflow
+          # failed every hour, all summer, by design. On 2026-08-10 16:06 it
+          # reported pass=2 warning=17 fail=0 and still exited 1.
+          #
+          # It was subsequently DISABLED - which is the rational response to an
+          # alarm that cannot be satisfied, and left the repo with no freshness
+          # monitor at all. That is the same pathology as a security check that
+          # emitted 74 false errors a day: a monitor that cries wolf gets muted,
+          # and a muted monitor is worse than none because it still looks
+          # configured.
+          #
+          # WARN now annotates the run and is still written to
+          # integrity_check_results, where check_monitor_liveness() will notice
+          # if the rows stop arriving. Only a FAIL-tier (PAGE) breach fails the
+          # build.
+          set +e
+          python data-pipeline/monitoring/check_data_freshness.py
+          code=$?
+          set -e
+          if [ "$code" -ge 2 ]; then
+            echo "::error::Freshness FAIL-tier (PAGE) breach - exit $code"
+            exit "$code"
+          fi
+          if [ "$code" -eq 1 ]; then
+            echo "::warning::Freshness WARN-tier breaches present - logged to integrity_check_results, not failing the run"
+          fi
+          exit 0
