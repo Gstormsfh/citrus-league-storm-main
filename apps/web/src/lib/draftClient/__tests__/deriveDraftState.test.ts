@@ -1044,3 +1044,233 @@ describe('S7-Q1 — recovery via snapshot re-derive (proves the "server owns pic
     expect(finalTeamRoster?.length).toBeGreaterThan(0);
   });
 });
+
+// ── Entry 103 F2b (2026-08-11) — terminal snapshot picks derivation ─
+//
+// LOAD-1-NIGHT witness draft found that terminal rooms rendered
+// "0/N picks · waiting for pick 1" because engine lobby eviction
+// left snapshot.recentEvents empty and the fold produced picksMade=0.
+// Route now enriches terminal snapshots with `picks` (draft_picks_v2
+// projection); deriveFromSnapshot detects picks and synthesizes
+// teamRosters + picksMade + draftStatus directly from the projection.
+// The projection IS the source of truth per architect ratification —
+// no event-vocabulary unpacking needed.
+
+describe('deriveFromSnapshot — Entry 103 F2b (terminal picks projection)', () => {
+  function makeTerminalPick(
+    pickNumber: number,
+    slot: DraftOrderSlot,
+    playerId: number,
+    isAutopick = false,
+  ): import('@citrus/shared').TerminalSnapshotPick {
+    return {
+      pickNumber,
+      roundNumber: slot.round,
+      teamId: slot.teamId,
+      teamName: `Team ${slot.teamId}`,
+      playerId,
+      playerName: `Player ${playerId}`,
+      playerPosition: 'C',
+      playerTeam: 'BOS',
+      pickedAt: `2026-08-10T00:00:${String(pickNumber).padStart(2, '0')}.000Z`,
+      isAutopick,
+    };
+  }
+
+  it('terminal snapshot with empty recentEvents + full picks projection → picksMade=N, draftStatus=completed, teamRosters populated', () => {
+    // The exact E103 witnessed scenario: engine evicted the lobby,
+    // recentEvents is empty, but the route enriched the response
+    // with all 36 picks from draft_picks_v2. Pre-fix the fold would
+    // produce picksMade=0 + 'not_started'; post-fix the picks
+    // projection is consumed directly.
+    const picks = MATRIX_12x3.map((slot, i) =>
+      makeTerminalPick(i + 1, slot, 8478000 + i),
+    );
+    const terminalSnapshot: DraftSnapshot = {
+      lobbyId: 'lobby-terminal-e103',
+      format: 'snake',
+      recentEvents: [], // evicted lobby → empty
+      stateSnapshot: {
+        currentPickNumber: null,
+        currentRoundNumber: null,
+        onClockTeamId: null,
+        // Engine serializer's stale field — E99 decorates to
+        // 'completed' at the route; either value in the seed
+        // stateSnapshot should still resolve to completed via the
+        // picks-count check.
+        picksMade: 0,
+        draftStatus: 'completed',
+        totalPicks: 36,
+        currentPickDeadline: null,
+      },
+      picks,
+    };
+    const { state, gaps } = deriveFromSnapshot(terminalSnapshot, MATRIX_12x3);
+    expect(gaps).toEqual([]);
+    expect(state.picksMade).toBe(36);
+    expect(state.draftStatus).toBe('completed');
+    // teamRosters populated for every team.
+    expect(state.teamRosters.size).toBe(12);
+    // Each team has 3 picks (36 picks / 12 teams / snake).
+    for (const roster of state.teamRosters.values()) {
+      expect(roster.length).toBe(3);
+    }
+    // Rosters sorted by pickNumber ascending.
+    const team1 = state.teamRosters.get('team-1');
+    expect(team1?.[0].pickNumber).toBeLessThan(team1?.[1].pickNumber ?? 0);
+    // onClockTeamId is null for terminal (no live pick).
+    expect(state.onClockTeamId).toBeNull();
+    // foldedThroughSeq=0 — no draft_events were folded (picks projection
+    // bypasses the fold path).
+    expect(state.foldedThroughSeq).toBe(0);
+  });
+
+  it('terminal snapshot with partial picks (draft cancelled mid-draft) → picksMade=N < totalPicks, draftStatus=cancelled', () => {
+    // Cancelled variant: fewer picks than totalPicks. E99 decoration
+    // sets stateSnapshot.draftStatus='cancelled' at the route; the
+    // deriveFromSnapshot picks-path prefers that over the picks-count
+    // check (a cancelled league with picks < total is still cancelled,
+    // not in_progress).
+    const picks = MATRIX_12x3.slice(0, 5).map((slot, i) =>
+      makeTerminalPick(i + 1, slot, 8478000 + i),
+    );
+    const cancelledSnapshot: DraftSnapshot = {
+      lobbyId: 'lobby-cancelled',
+      format: 'snake',
+      recentEvents: [],
+      stateSnapshot: {
+        currentPickNumber: null,
+        currentRoundNumber: null,
+        onClockTeamId: null,
+        picksMade: 5,
+        draftStatus: 'cancelled', // E99 decoration
+        totalPicks: 36,
+        currentPickDeadline: null,
+      },
+      picks,
+    };
+    const { state } = deriveFromSnapshot(cancelledSnapshot, MATRIX_12x3);
+    expect(state.picksMade).toBe(5);
+    expect(state.draftStatus).toBe('cancelled');
+    expect(state.teamRosters.size).toBe(5);
+  });
+
+  it('terminal snapshot with picks < totalPicks + stateSnapshot=in_progress → in_progress (defensive fallthrough)', () => {
+    // Edge case: engine's stateSnapshot lies and route decoration
+    // hasn't landed. Picks < totalPicks + no 'completed'/'cancelled'
+    // signal → in_progress. This shape shouldn't happen in prod
+    // (route only enriches picks when isTerminal), but the derive
+    // must stay total.
+    const picks = MATRIX_12x3.slice(0, 5).map((slot, i) =>
+      makeTerminalPick(i + 1, slot, 8478000 + i),
+    );
+    const inProgressWithPicks: DraftSnapshot = {
+      lobbyId: 'lobby-defensive',
+      format: 'snake',
+      recentEvents: [],
+      stateSnapshot: {
+        currentPickNumber: null,
+        currentRoundNumber: null,
+        onClockTeamId: null,
+        picksMade: 5,
+        draftStatus: 'in_progress',
+        totalPicks: 36,
+        currentPickDeadline: null,
+      },
+      picks,
+    };
+    const { state } = deriveFromSnapshot(inProgressWithPicks, MATRIX_12x3);
+    expect(state.picksMade).toBe(5);
+    expect(state.draftStatus).toBe('in_progress');
+  });
+
+  it('isAutopick badge propagates from terminal picks into RosterEntry', () => {
+    const picks = [
+      makeTerminalPick(1, MATRIX_12x3[0], 8478000, false),
+      makeTerminalPick(2, MATRIX_12x3[1], 8478001, true),
+      makeTerminalPick(3, MATRIX_12x3[2], 8478002, false),
+    ];
+    const snap: DraftSnapshot = {
+      lobbyId: 'lobby-autopick',
+      format: 'snake',
+      recentEvents: [],
+      stateSnapshot: {
+        currentPickNumber: null,
+        currentRoundNumber: null,
+        onClockTeamId: null,
+        picksMade: 3,
+        draftStatus: 'completed',
+        totalPicks: 3,
+        currentPickDeadline: null,
+      },
+      picks,
+    };
+    const { state } = deriveFromSnapshot(snap, MATRIX_12x3);
+    const entry1 = state.teamRosters.get(MATRIX_12x3[0].teamId)?.[0];
+    const entry2 = state.teamRosters.get(MATRIX_12x3[1].teamId)?.[0];
+    const entry3 = state.teamRosters.get(MATRIX_12x3[2].teamId)?.[0];
+    expect(entry1?.isAutopick).toBeUndefined();
+    expect(entry2?.isAutopick).toBe(true);
+    expect(entry3?.isAutopick).toBeUndefined();
+  });
+
+  it('snapshot with picks=[] (empty projection) falls through to recentEvents fold (defensive)', () => {
+    // A terminal snapshot with picks=[] shouldn't happen (route only
+    // attaches picks when picksRows.length > 0), but the client must
+    // gracefully fall through to the fold path rather than
+    // synthesizing a picks=0 result and hiding a live in-progress
+    // fold. `deriveFromSnapshot` uses `snapshot.picks && length > 0`
+    // as the gate.
+    const events: BufferedDraftEvent[] = MATRIX_12x3.slice(0, 3).map(
+      (slot, i) => makePickEvent(i + 1, slot, 8478000 + i),
+    );
+    const emptyPicks: DraftSnapshot = {
+      lobbyId: 'lobby-empty-picks',
+      format: 'snake',
+      recentEvents: events,
+      stateSnapshot: {
+        currentPickNumber: null,
+        currentRoundNumber: null,
+        onClockTeamId: null,
+        picksMade: 3,
+        draftStatus: 'in_progress',
+        totalPicks: 36,
+        currentPickDeadline: null,
+      },
+      picks: [],
+    };
+    const { state } = deriveFromSnapshot(emptyPicks, MATRIX_12x3);
+    expect(state.picksMade).toBe(3);
+    expect(state.foldedThroughSeq).toBe(3);
+  });
+
+  it('snapshot WITHOUT picks field (live drafts unchanged) uses recentEvents fold', () => {
+    // Regression guard: live drafts don't send picks, so
+    // `snapshot.picks` is undefined. The gate must fall through
+    // to the fold path unchanged.
+    const events: BufferedDraftEvent[] = MATRIX_12x3.slice(0, 3).map(
+      (slot, i) => makePickEvent(i + 1, slot, 8478000 + i),
+    );
+    const liveSnapshot: DraftSnapshot = {
+      lobbyId: 'lobby-live',
+      format: 'snake',
+      recentEvents: events,
+      stateSnapshot: {
+        currentPickNumber: 4,
+        currentRoundNumber: 1,
+        onClockTeamId: 'team-4',
+        picksMade: 3,
+        draftStatus: 'in_progress',
+        totalPicks: 36,
+        currentPickDeadline: '2026-08-11T00:01:00.000Z',
+      },
+      // No picks field at all — undefined.
+    };
+    const { state } = deriveFromSnapshot(liveSnapshot, MATRIX_12x3);
+    expect(state.picksMade).toBe(3);
+    expect(state.draftStatus).toBe('in_progress');
+    expect(state.foldedThroughSeq).toBe(3);
+    // On-clock computed from matrix for in_progress + picksMade<total.
+    expect(state.onClockTeamId).toBe('team-4');
+  });
+});

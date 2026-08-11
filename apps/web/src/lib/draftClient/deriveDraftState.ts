@@ -457,11 +457,104 @@ export function foldEvents(
  *
  * Used by the store when a fresh snapshot lands (reset the derivation
  * and re-fold the snapshot's `recentEvents` array from scratch).
+ *
+ * Entry 103 F2b (2026-08-11): when `snapshot.picks` is present
+ * (terminal-league HTTP snapshot path), derive teamRosters +
+ * picksMade + draftStatus DIRECTLY from the authoritative picks
+ * projection, bypassing the recentEvents fold. Root cause: engine
+ * lobby eviction post-completion leaves recentEvents empty; the
+ * fold would produce picksMade=0 + draftStatus='not_started' →
+ * header renders "0/N picks · waiting for pick 1" instead of the
+ * completed board. The route enriches terminal responses with a
+ * `picks` array queried from `draft_picks_v2` (the trigger-
+ * maintained projection — spec §3.2, principle P6); this path
+ * consumes it directly per architect ratification: the projection
+ * IS the source of truth, not the event log.
  */
 export function deriveFromSnapshot(
   snapshot: DraftSnapshot,
   matrix: ReadonlyArray<DraftOrderSlot> | null,
 ): FoldResult {
   const seed = seedFromSnapshot(snapshot);
+  if (snapshot.picks && snapshot.picks.length > 0) {
+    return deriveFromTerminalPicks(snapshot, seed);
+  }
   return foldEvents(emptyDerivedState(seed), snapshot.recentEvents, matrix);
+}
+
+/**
+ * Entry 103 F2b — build a `DerivedDraftState` from the terminal
+ * snapshot's authoritative picks projection.
+ *
+ * Synthesizes the same shape `foldEvents` would produce from a
+ * complete pick_submitted event stream:
+ *   - `teamRosters`: teamId → RosterEntry[] in pick_number order,
+ *     with `seq` set to the pick_number itself (no draft_events
+ *     seqs are available; pick_number is a stable within-league
+ *     ordering key that satisfies RosterEntry's role in v1Adapters).
+ *   - `picksMade`: picks.length (one row per pick by draft_picks_v2's
+ *     PRIMARY KEY (league_id, pick_number) invariant).
+ *   - `draftStatus`: 'completed' when picksMade >= totalPicks, else
+ *     'in_progress' (matches foldEvents pick_submitted transitions).
+ *     Terminal-cancelled leagues carry draftStatus='cancelled' via
+ *     the route's E99 decoration through `snapshot.stateSnapshot`;
+ *     this helper seeds from picks-count and lets the store's
+ *     stateSnapshot patch (reduce.ts E99 fix c) override if needed
+ *     for cancelled variant.
+ *   - `foldedThroughSeq`: 0 — no draft_events were folded. Any
+ *     subsequent WS event would be a re-connection race (rare for
+ *     terminal leagues); the outer seq-contiguity check would
+ *     naturally treat it as a fresh fold starting from seq 1.
+ *   - `onClockTeamId`: always null for terminal (matches foldEvents
+ *     semantic for completed).
+ */
+function deriveFromTerminalPicks(
+  snapshot: DraftSnapshot,
+  seed: DerivationSeed,
+): FoldResult {
+  const picks = snapshot.picks ?? [];
+  const teamRosters = new Map<string, RosterEntry[]>();
+  for (const pick of picks) {
+    const roster = teamRosters.get(pick.teamId) ?? [];
+    roster.push({
+      seq: pick.pickNumber,
+      playerId: pick.playerId,
+      pickNumber: pick.pickNumber,
+      roundNumber: pick.roundNumber,
+      ...(pick.isAutopick ? { isAutopick: true } : {}),
+    });
+    teamRosters.set(pick.teamId, roster);
+  }
+  // Sort each team's roster by pickNumber to guarantee display order
+  // independent of the picks array's incoming order (which is
+  // route-guaranteed ASC but explicit here is cheaper than trusting).
+  for (const roster of teamRosters.values()) {
+    roster.sort((a, b) => a.pickNumber - b.pickNumber);
+  }
+  const picksMade = picks.length;
+  // Prefer the route-decorated stateSnapshot.draftStatus (E99 fix b)
+  // when it's terminal — the cancelled variant lives there. Fall
+  // through to computed status otherwise.
+  const stateSnapshotStatus = snapshot.stateSnapshot.draftStatus;
+  const draftStatus: LobbyStatus =
+    stateSnapshotStatus === 'cancelled'
+      ? 'cancelled'
+      : picksMade >= seed.totalPicks
+        ? 'completed'
+        : stateSnapshotStatus === 'completed'
+          ? 'completed'
+          : 'in_progress';
+  return {
+    state: {
+      currentPickNumber: null,
+      currentRoundNumber: null,
+      onClockTeamId: null,
+      picksMade,
+      totalPicks: seed.totalPicks,
+      draftStatus,
+      teamRosters,
+      foldedThroughSeq: 0,
+    },
+    gaps: [],
+  };
 }

@@ -5261,6 +5261,160 @@ Three-fix chain complete: E99 (25a68506) + E100 (25a1acd7) + E80 (this commit) a
 
 **End of R95. E80 V1-FENCE shipped. v1 DraftRoom now hard-fenced from v2-era leagues at mount time via draft_events probe. Full CI-mirror gate GREEN (+10 source-shape locks). Suspenders + route truth-table docketed for follow-up.**
 
+## R96 — Entry 103 F2b EXECUTED + SW-STALE-1 PROPOSAL · READY-CANDIDATE (2026-08-11 10:28Z)
+
+### Entry 102 + 103 ACK
+
+R93 + R94 + R95 all countersigned per E102. E100 migration applied by architect + race-fix field-proven live. E103 morning field verification found (F2b) terminal-room board still doesn't paint (recentEvents empty post-eviction) + fence-non-fire clouded by PWA SW mixed-chunk staleness (SW-STALE-1).
+
+### This cycle executed — E103 F2b (terminal-board fold fix)
+
+**Shape:** enrich the terminal snapshot response with authoritative `picks` array; client's `deriveFromSnapshot` synthesizes teamRosters + picksMade + draftStatus DIRECTLY from picks (bypasses recentEvents fold). Root-cause pin: engine lobby eviction post-completion leaves recentEvents empty; fold produces picksMade=0 + 'not_started'. Route enrichment + client picks-derive path together restore the terminal board render.
+
+- **`packages/shared/src/types/draftWire.ts`** — new exported `TerminalSnapshotPick` interface + optional `picks?: ReadonlyArray<TerminalSnapshotPick>` on `DraftSnapshot`. Undefined for live drafts (fold path unchanged); populated only by the HTTP snapshot route for terminal leagues.
+- **`server/src/routes/drafts.ts`** — after buildSnapshot + E99 decoration, when `isTerminal`:
+  1. Query `draft_picks_v2` with `.order('pick_number', asc)` for the league.
+  2. Left-join `teams` (batch `.in` on team_ids) for `team_name`.
+  3. Left-join `player_directory` (batch `.in` on player_ids + `.eq('season', CURRENT_SEASON)`) for `full_name`, `position_code`, `team_abbrev`.
+  4. Map to `TerminalSnapshotPick[]` and attach as `snapshot.picks`.
+  5. Non-fatal on any join/query failure — logs `snapshot.terminal.picks_enrichment_threw` and returns the base snapshot (client falls back to fold path, preserves E99's baseline improvement).
+- **`apps/web/src/lib/draftClient/deriveDraftState.ts`** — `deriveFromSnapshot` gate: when `snapshot.picks && snapshot.picks.length > 0`, route to new `deriveFromTerminalPicks` helper. Helper synthesizes:
+  - `teamRosters`: teamId → RosterEntry[] with `seq=pickNumber`, `isAutopick` propagated.
+  - `picksMade`: `picks.length`.
+  - `draftStatus`: prefers `stateSnapshot.draftStatus` when 'cancelled' (E99 decoration); else 'completed' when picksMade >= totalPicks; else 'in_progress' (defensive fallthrough).
+  - `foldedThroughSeq`: 0 (no draft_events consumed).
+  - `onClockTeamId`: null (terminal — no live pick).
+
+### Tests (+10)
+
+- **`server/src/__tests__/drafts.test.ts`** (+4): terminal + 3 picks → response.picks populated with joined names + isAutopick from actor.kind · missing joins → null names, pick still surfaces · zero picks → picks field absent (client falls to fold path) · in_progress league → NO picks enrichment (regression guard).
+- **`apps/web/src/lib/draftClient/__tests__/deriveDraftState.test.ts`** (+6): terminal snapshot + full picks projection → picksMade=36, draftStatus=completed, teamRosters populated with 3 picks/team ordered by pickNumber · cancelled variant → draftStatus=cancelled preserved from stateSnapshot decoration · in_progress defensive fallthrough → in_progress with picks<total · isAutopick badge propagates into RosterEntry · empty picks=[] → falls through to fold path · undefined picks (live snapshot) → fold path unchanged.
+
+### Header status source (E103 line item)
+
+E99's route decoration + E99 client patch of `stateSnapshot.draftStatus` = the authoritative status source. `describeStatus(derived.draftStatus, ...)` reads `derived.draftStatus` which now flows: route sets stateSnapshot.draftStatus='completed' → deriveFromTerminalPicks preserves it → StickyHeader renders "completed" (not "active — waiting for pick 1"). The `derived.picksMade` also matches picks.length, so header shows correct N/12 count.
+
+### Full CI-mirror gate
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint | 0 errors, 1 pre-existing warning | ≤0 errors | ✅ |
+| Web tsc | **157** | =157 baseline | ✅ (zero new) |
+| Server tsc | **0** | strict ≤0 | ✅ |
+| Web build | ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Server build | tsc emit exit 0 | exit 0 | ✅ |
+| Web vitest FULL | **1738 / 1738** (103 files) | ≥1732 prior | ✅ (+6 new deriveDraftState tests) |
+| Server vitest FULL | **994 pass + 6 skip / 1000** (54 files) | ≥990 prior | ✅ (+4 new drafts.test tests) |
+
+### Deploy block (proposed)
+
+Same 3-command shape as E99 (hosting + citrus-api). Terminal snapshot picks require BOTH the client picks-derive path (hosting) AND the server route enrichment (citrus-api). Neither alone suffices:
+- Client-only → picks always undefined → falls back to broken fold.
+- Server-only → picks arrive → client (pre-deploy) ignores the field → falls back to broken fold.
+
+Suggested tags:
+- Web hosting: same firebase deploy pattern.
+- Citrus-api: `<new-hash>-f2b` (F2b field-verification-2b).
+
+Per Entry 65: **NO PASTE BANNER** — architect countersigns before Garrett deploys.
+
+---
+
+## SW-STALE-1 PROPOSAL — PWA update strategy (docket for architect ratification)
+
+**Problem restatement (from E103):** workbox SW serves precached old chunks after deploys until hard refresh; returning PWA users can run MIXED old/new code indefinitely. Cost so far: three verification cycles across two nights (CSP, bundle, fence). Twelve will hit MID-WEEK deploys between signup day 1 and draft night — mixed-chunk staleness is a critical-path risk.
+
+**Current state (vite.config.ts:37):**
+- `VitePWA({ registerType: "autoUpdate", ... })`
+- Workbox `globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"]` (precaches app shell).
+- Runtime caching: Google Fonts (StaleWhileRevalidate/CacheFirst), Supabase (NetworkFirst).
+- **No explicit `skipWaiting` or `clientsClaim` in workbox config.**
+- **No navigateFallback + no NetworkFirst on index.html.**
+
+**Why the current setup fails post-deploy:**
+1. `autoUpdate` triggers the new SW to install in the background, but the old SW keeps controlling loaded clients until every client closes (default SW lifecycle). Long-lived tabs / installed PWAs never close → new SW stays "waiting" indefinitely.
+2. Old SW's precache contains the OLD `index.html` → serves it on refresh → old HTML references OLD chunk hashes still in precache → the user's request-graph never fetches new chunks.
+3. If NEW `index.html` DOES land (via cache miss on some new fetch pattern), it references NEW chunk hashes; those cache-miss and fetch fresh, and the browser now runs a mix of OLD (still-in-memory) modules and NEW modules loaded via lazy imports. This is the "mixed old/new chunks" symptom E103 observed.
+
+**Three fix options, ranked:**
+
+### Option A (RECOMMENDED): `registerType: 'autoUpdate'` + workbox `skipWaiting: true` + `clientsClaim: true` + NetworkFirst for HTML
+
+```ts
+VitePWA({
+  registerType: 'autoUpdate',
+  workbox: {
+    skipWaiting: true,        // NEW: new SW activates immediately, not "waiting"
+    clientsClaim: true,       // NEW: takes over open clients without waiting for close
+    navigateFallback: '/index.html',
+    navigateFallbackDenylist: [/^\/api\//],
+    runtimeCaching: [
+      // ... existing entries ...
+      {
+        // NEW: HTML always network-first so deploys visible on next navigation
+        urlPattern: ({ request }) => request.mode === 'navigate',
+        handler: 'NetworkFirst',
+        options: {
+          cacheName: 'html-shell',
+          networkTimeoutSeconds: 3,   // fall back to cache after 3s offline
+        },
+      },
+    ],
+  },
+})
+```
+
+**Pros:** zero user-facing UI changes; deploys land on next navigation transparently; existing SW pipeline preserved.
+**Cons:** in-flight tabs can briefly see mixed state during the SW's takeover window (< 1s); a lazy-import chunk that references a stale API contract could 404 mid-load. Mitigated by immediate `clientsClaim` cutover.
+**Blast radius:** all users; behavior change is "deploys visible faster." Zero data risk.
+
+### Option B: `registerType: 'prompt'` + in-app "New version available" toast
+
+```ts
+VitePWA({
+  registerType: 'prompt',
+  workbox: { /* unchanged */ },
+})
+
+// New: apps/web/src/lib/pwa/useServiceWorkerUpdatePrompt.ts
+import { useRegisterSW } from 'virtual:pwa-register/react';
+export function useServiceWorkerUpdatePrompt() {
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW();
+  // Return { needRefresh, accept: () => updateServiceWorker(true), dismiss: () => setNeedRefresh(false) }
+}
+
+// New: <UpdateAvailableToast /> component mounted in App.tsx
+// Renders a citrus2 toast when needRefresh; primary button reloads + activates new SW.
+```
+
+**Pros:** user-controlled; no risk of mid-session takeover breaking a live draft; matches Sleeper's model.
+**Cons:** user friction (must click); returning users who ignore the toast stay stale — SW-STALE-1 not fully closed for the passive user.
+**Blast radius:** ships a new UI surface (toast); needs design touch to match citrus2.
+
+### Option C (belt+suspenders): Option A + a manual "Check for updates" affordance in Settings
+
+Add a hidden-under-Settings "Check for updates" button that calls `registration.update()` + `updateServiceWorker(true)`. Fallback for the rare case where autoUpdate doesn't fire the update check quickly enough (Chrome heuristics can delay update checks by hours on unfocused tabs).
+
+**RECOMMENDED PATH:** Option A this week (small vite.config.ts diff + full CI-mirror gate; ~30 minutes to ship). Option B/C queued as post-twelve if Option A's takeover window causes any observed regressions.
+
+**Deploy-checklist line proposal** (append to `docs/RUNBOOKS/DEPLOY_CHECKLIST.md` or the Sunday-block runbook):
+
+> **After every hosting deploy that changes app-shell HTML/JS:** verify the SW picks up the change within one navigation cycle by (a) opening staging in an existing PWA-installed tab, (b) navigating to a different route without hard-refresh, (c) confirming DevTools > Application > Service Workers shows the new SW as "activated and running" within 5s. If the OLD SW is still "activated" after two navigations, fall back to the SW-STALE-1 in-app prompt path (Option B) — the user must manually reload.
+
+**Testing surface for Option A:** offline vitest for the useRegisterSW wire-up isn't practical (SW is browser-only). Manual test cookbook + hosting-deploy field verification is the gate — matches the current cookbook pattern for `firebase deploy --only hosting`.
+
+---
+
+### Standing by
+
+Commit + branch push pending on architect countersignature for E103 F2b + SW-STALE-1 shape ratification. Recommended: architect ratifies Option A + I execute in a follow-up cycle.
+
+**End of R96. E103 F2b EXECUTED (+10 tests, gate GREEN); SW-STALE-1 proposed with 3-option decision matrix + Option A recommendation + deploy-checklist line. Standing by for architect countersignature on both.**
+
+
 
 
 
