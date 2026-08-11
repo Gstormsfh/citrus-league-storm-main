@@ -5121,4 +5121,88 @@ Commit + branch push pending on architect countersignature. Once countersigned +
 
 **End of R92. Entry 92 PLAYER-RES-1b EXECUTED. Directory fetch now paginates ≤1000-row windows with deterministic ordering — defeats the Supabase Data-API cap that dropped >1000th-row stars from the browser map on Run 4. Full web CI-mirror gate GREEN (+5 new tests locking the page-loop). Standing by for architect countersignature.**
 
+## R93 — Entry 99 COMPLETED-ROOM-2 EXECUTED · READY-CANDIDATE (2026-08-11 08:32Z / 2:32 AM MDT)
+
+### Entries 93-101 ACK
+
+R91 countersigned (E94) + trio deployed + Run 4 CP5 field-pass (E93) + Run 5 CERT + night close (E96) + LOAD-1-NIGHT full campaign closed clean (E97-101, 86 rig leagues, 86 drift-cert). E99 = pair fix for the LOAD-1-NIGHT witness-draft find. E100 = P0 platform-grade race, same-league contention rung. E80 = V1-FENCE, morning queue continuation.
+
+### This cycle executed (commit 25a68506)
+
+**E99 pair fix (b + c). Fix (a) engine serializer defers to ENGINE-EAR deploy batch per E99.**
+
+- **`server/src/routes/drafts.ts`** — snapshot route decoration. When `isTerminal` (draft_status='completed'), after buildSnapshot returns, override `snapshot.stateSnapshot.draftStatus` with the authoritative `leagues.draft_status` value. Idempotent when engine payload already agrees. Discovery route unchanged (still 409s for terminal).
+- **`apps/web/src/lib/draftClient/reduce.ts`** — `handleSnapshotFetched` now also accepts arrival from `terminal_completed` state. Pre-fix, handler no-op'd from anywhere except `snapshot_required`, so the delivered snapshot never reached the store and DraftRoomV2 sat on "Loading final board…" indefinitely. State stays terminal (no transition to `connected` — no live socket exists). Delivered snapshot's `stateSnapshot.draftStatus` overridden to the runner's terminal value (belt to server-side decoration's suspenders).
+- Tests: +4 reduce (terminal + snapshot_fetched with in_progress payload → stays terminal + deliver_snapshot with 'completed' patch; cancelled variant; snapshot_required path UNCHANGED regression pin; connected no-op regression pin) + 3 server drafts (completed+lying → override; in_progress+agrees → passthrough regression pin; completed+agrees → idempotent no-op).
+
+### Full CI-mirror gate
+
+| Check | Result | vs baseline | Status |
+|---|---|---|---|
+| eslint | 0 errors, 14 pre-existing warnings | ≤0 errors | ✅ |
+| Web tsc | **157** | =157 baseline | ✅ (zero new; caught + fixed one narrow-type slip mid-cycle) |
+| Server tsc | **0** | strict ≤0 | ✅ |
+| Web build | 12s ✓ (PWA 124 entries) | exit 0 | ✅ |
+| Server build | tsc emit exit 0 | exit 0 | ✅ |
+| Web vitest FULL | **1722 / 1722** (102 files) | ≥1718 prior | ✅ (+4 reduce) |
+| Server vitest FULL | **990 pass + 6 skip / 996** (54 files) | ≥987 prior | ✅ (+3 drafts) |
+
+**Deploy block (proposed, awaits countersign):** hosting for the client half + citrus-api tag `-crm2` for the server half. Same 3-command pattern as E94's -crm1 predecessor. Previous-good server tag holds; rollback = one gcloud run deploy back.
+
+## R94 — Entry 100 IGNITION-RACE EXECUTED · READY-CANDIDATE (2026-08-11 08:XXZ)
+
+### This cycle executed
+
+**E100 fix order item 1 (start_draft_v2 row lock migration). Item 2 (submit_pick_v2 audit — see findings). Item 3 (regression tests — offline + deferred live). Item 4 (forensic league stays as fixture).**
+
+- **`supabase/migrations/20260811100000_start_draft_v2_row_lock.sql`** — new CREATE OR REPLACE FUNCTION migration. One-line change bounded to Step 2: `SELECT commissioner_id, draft_state, draft_status::text, league_size, settings … FROM public.leagues WHERE id = p_league_id FOR UPDATE`. Every other step byte-identical to the F27 original (`20260807000000_start_draft_v2.sql`). Migration header carries the full forensic ledger from E100 (four racers, seq 15/16/17 committed after seq 14 draft_completed, status regression). Rollback = re-apply F27 original via same harness.
+
+- **`scripts/proof/dryrun-apply-ignition-race-fix-checks.local.mjs`** — 29-check structural gate matching the F27 dryrun pattern. Locks the FOR UPDATE marker + positional ordering (FOR UPDATE precedes status checks + append_draft_event + Step 7 UPDATE) + full parity with every check the F27 dryrun asserts. **29/29 PASS locally.** F27's original dryrun still 43/43 PASS against its own file (both migrations coexist; new one applies last per timestamp order and overrides the function body).
+
+### submit_pick_v2 sibling-race AUDIT (E100 item 2) — findings
+
+**Belt PRESENT via storage constraint.** `draft_picks_v2` (foundation migration `20260425130000_draft_engine_v2_foundation.sql:108`) declares `PRIMARY KEY (league_id, pick_number)`. The AFTER INSERT trigger `tg_draft_events_project_pick` writes into `draft_picks_v2` in the pick's transaction; a duplicate pick_number for the same league raises `unique_violation` atomically, rolling back the whole transaction (draft_events INSERT + counter increment). The same-pick-number double-tap race (two fresh idem keys) CANNOT double-append — storage layer refuses.
+
+**Race trace (safe):**
+1. Two callers arrive with different idem keys for the same pick_number = N.
+2. Step 1 advisory locks (per-key) don't serialize them.
+3. Both read Step 2b `count(*) = N-1`; both compute `p_pick_number = N` → pass.
+4. Both read Step 2e `player not taken` → pass.
+5. Call A reaches Step 3 UPDATE → acquires leagues row lock → completes → trigger inserts draft_picks_v2 (league_id, pick_number=N).
+6. Call B blocks on leagues row lock. On unblock: UPDATE succeeds (counter goes to seq+2), draft_events INSERT succeeds, then the AFTER INSERT trigger tries to insert (league_id, pick_number=N) into draft_picks_v2 → unique_violation → whole B transaction rolls back atomically.
+
+**Suspenders (row-lock preflight in submit_pick_v2) — DOCKET, not this cycle.** Would give cleaner error semantics (refuse via `pick_out_of_order` at preflight instead of raising `unique_violation` from the trigger), but not required for correctness. Belt-only was E100's explicit fallback. If architect ratifies the suspender, mirrors the start_draft_v2 shape — same `FOR UPDATE` addition to submit_pick_v2's Step 2a leagues SELECT.
+
+### Regression tests
+
+**Offline (this cycle):** 29-check structural dryrun passes; the FOR UPDATE marker is machine-verified inside the migration body + positionally locked to fire before Rider 1 status checks + before append_draft_event + before Step 7 UPDATE.
+
+**Live regression (deferred to architect's rig lane per hand-off protocol):**
+- Concurrent-ignition: two sessions racing on the same league, 2nd must refuse via `draft_already_in_progress`.
+- Completed-league ignition refusal in the race window: 2nd caller lands after 1st has advanced to `draft_completed`, must refuse via `draft_already_completed`.
+- Forensic league `ada00006-…-01` from LOAD-1-NIGHT stays in `load1_leagues` tracking per E100 item 4.
+
+### Deploy block (proposed, hand-off per infra-command memory)
+
+Migration apply is architect/Garrett's action. Terminal DID NOT execute the apply — writing the .sql + dryrun is my lane per the durable memory rule. Proposed apply block (PowerShell):
+
+```powershell
+# 1. Structural gate (must pass 29/29 BEFORE apply)
+node scripts/proof/dryrun-apply-ignition-race-fix-checks.local.mjs
+
+# 2. Apply via the standard apply-migration harness (staging first, then prod after cert)
+node scripts/proof/apply-migration.local.mjs --file=supabase/migrations/20260811100000_start_draft_v2_row_lock.sql
+```
+
+**Rollback:** re-apply `20260807000000_start_draft_v2.sql` (F27 original) via the same harness. No data change; no downtime; CREATE OR REPLACE FUNCTION swap is transactional.
+
+Per Entry 65: **NO PASTE BANNER** in this outbox. Terminal proposes READY; architect countersigns before Garrett runs the apply block.
+
+### Standing by
+
+Commit d940a1f1 + 25a68506 (R92 + R93) on `phase-4-5-implementation`; this cycle's commit lands on top. E80 V1-FENCE lane next per morning queue. Standing by for architect countersignature on E99 + E100 deploy blocks.
+
+**End of R94. Entry 100 IGNITION-RACE fix migration + dryrun + audit findings shipped. 29/29 structural gate green. Standing by for architect countersignature.**
+
+
 
