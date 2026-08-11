@@ -5679,6 +5679,92 @@ Architect ratifies the v3 shape (or amendments per item). Terminal executes on c
 
 **End of R98. Master merge plan proposed (clean 9-commit absorb, zero-conflict prediction, refspec-push doctrine, execute pending countersign + Garrett master-push go). ENGINE-EAR v3 queued (6-item spec + acceptance mode + 3-slice recommendation, execute pending shape ratification). Morning fix arc closed per E105.**
 
+---
+
+## R99 — Entry 106 ENGINE-EAR v3 SLICE 1 EXECUTED · READY-CANDIDATE (2026-08-11 19:15Z / 1:15 PM MDT)
+
+### Executed per E106 amendment: items 1 + 2 + 6
+
+Post-merge commit `dcaeeeb9` on `phase-4-5-implementation` — pushed to origin. Slice 1 diff = 5 files, +1083 / -13.
+
+**Item 1 — NOTIFY-creates-lobby (client-independent ignition).**
+- File: `server/src/draft/index.ts` NOTIFY dispatch.
+- Change: when the LISTEN handler receives a payload whose `league_id` is not in `LobbyRegistry`, probe `leagues.draft_status`. If `in_progress` or `paused`, call `lobbyRegistry.getOrCreate(leagueId)` — the constructor runs bootstrap replay + arms the pick timer, driving autopicks with zero connected WS clients.
+- Always-log per E104 doctrine: `event_subscription.notify_creates_lobby` (success), `notify_skipped_non_live_league` (status guard), `notify_status_probe_failed` (DB query failure), `notify_lobby_create_failed` (constructor exception).
+- Contract satisfied: no-audience-no-ignition disease class dies at the entry point.
+
+**Item 2 — Boot-scan resume of `in_progress`/`paused` drafts.**
+- File: `server/src/draft/LobbyRegistry.ts` — new method `performBootScan(supabaseAdmin)`.
+- Query: `leagues.select('id').in('draft_status', ['in_progress', 'paused'])`. Sequential per-league `getOrCreate` with per-league try/catch failure isolation.
+- Structured logs: `registry.boot_scan_started` (with count), `registry.boot_scan_lobby_resumed` (per league), `registry.boot_scan_lobby_failed` (per league error), `registry.boot_scan_complete` (with resumed/failed tallies).
+- Wired in `server/src/draft/index.ts` post-registry construction: `void lobbyRegistry.performBootScan(supabaseAdmin).catch(...)`. Gated by `EVENT_SUBSCRIPTION_DISABLED !== '1'` — test / disabled-subscription modes skip the scan.
+- Contract satisfied: 4.7-min post-restart dead window from Entry 83 becomes < 5s (single query + N getOrCreate calls).
+
+**Item 6 — INSTANT-AUTOPICK for unowned seats (owner_id=NULL).**
+- File: `server/src/draft/LobbyManager.ts`.
+- New constant: `INSTANT_AUTOPICK_ARM_MS = 2_000` (~2s window — accommodates broadcast overhead + engine cascade).
+- New field: `private readonly teamOwners = new Map<string, string | null>()` — populated post-bootstrap in `init()` via `teams.select('id, owner_id').eq('league_id', leagueId)` inside a try/catch (fail-open on query failure).
+- New helper: `computeArmDeadlineForOnClockTeam(rpcDeadline: Date): Date`.
+  - Guards: only applies to `snake`/`linear` (auction uses its own state machine); returns `rpcDeadline` unchanged if teamOwners cache is unpopulated (fail-open); returns `rpcDeadline` unchanged if owner exists; returns `rpcDeadline` unchanged if it is already earlier than `now + 2s` (respect the tighter RPC deadline).
+  - Emits `[lobby] instant_autopick_arm` structured log on shortened deadline.
+- Applied at two arm sites:
+  - `init()` line ~979: `this.setPickDeadline(this.computeArmDeadlineForOnClockTeam(this.initialPickDeadline), 'pick')`.
+  - `applyPickEvent` line ~3551: `this.setPickDeadline(this.computeArmDeadlineForOnClockTeam(parsed), 'pick')`.
+- Discriminator satisfied per E106 spec: only `owner_id IS NULL` (truly-unowned) fires instant. "Owner exists but offline" respects full pick clock — the presence field is not consulted here.
+- Contract satisfied: unowned-seat autopicks fire within ~2s of on-clock transition, not the full `pick_time_limit_seconds` (typically 30s+).
+
+### Unit test coverage (all-green)
+
+- New file: `server/src/draft/__tests__/engineEar3.test.ts` — **22 tests, all pass** (515ms).
+  - 5 behavioral tests for `performBootScan` (empty query, `.in` filter shape, 3-league resume, per-league failure isolation, query error non-fatal).
+  - 5 source-shape tests for NOTIFY dispatch (getOrCreate presence, status-gate probe, 3 log tags per E104 always-log doctrine).
+  - 9 source-shape tests for INSTANT-AUTOPICK helper (constant value, method existence, fail-open on unknown, fail-open on owner-exists, earlier-rpc-deadline respected, format gate, cache-populate query shape, cache-populate log tags, non-fatal on error).
+  - 3 wiring tests (performBootScan called, EVENT_SUBSCRIPTION_DISABLED gate, uncaught error handling).
+- Source-shape locks use `readFileSync` + regex per the DraftRoom.copyLock.test.tsx pattern — pins the shape against future refactor drift without running the engine.
+
+### Acceptance rig (post-deploy proof, DB-observable)
+
+- New file: `scripts/proof/lifecycle-acceptance-engine-ear.local.mjs`.
+- Three scenarios, invoked separately:
+  - **S1** `--scenario=S1`: ignite fresh rig with ZERO WS clients, wait for autopick cascade + `draft_status=completed` within `12 × pick_time_limit_seconds + slack`. Proves item 1.
+  - **S2** `--scenario=S2`: ignite, wait for 3 picks to land, hand off engine-restart PowerShell block, resume + wait for completion. Proves item 2. Engine restart is HAND-OFF ONLY (`gcloud compute ssh … sudo docker restart …`) — never invoked from the script.
+  - **S3** `--scenario=S3`: verify all teams have `owner_id=NULL` (fixture-12 default), ignite, wait for cascade within `12 × (2s + slack)` window. Proves item 6.
+- Safety: whitelisted to `F27_NATIVE_LEAGUE_ID`; refuses pooled `SUPABASE_DB_URL`; no prod writes; cleanup reminder printed on exit.
+- Deferred to Slice 2/3: item 3 (eviction guard), item 4 (watchdog invariant), item 5 (F23 DB-side sweep).
+
+### CI-mirror gate result (post-merge tree)
+
+| Step | Result |
+| --- | --- |
+| eslint | **0 errors, 14 pre-existing warnings** (no new warnings from this cycle) |
+| server tsc | **clean** (no output) |
+| web tsc | pre-existing errors in unrelated files (Matchup/Playoff/Trade/Waiver services) — **CI treats web tsc as warning-only per strict-mode migration**: `|| echo "::warning::TypeScript found type errors — tracked for strict mode migration"` |
+| server build | **clean** |
+| web build | **12.56s, 124 PWA precache entries generated** |
+| server vitest FULL | **1024 passed / 6 skipped / 0 failed** (55 files, 4.12s) |
+| web vitest FULL | **1743 passed / 0 failed** (103 files, 30.68s) |
+
+All hard gates green. Web tsc warnings are inherited from master merge (no new errors introduced by this cycle).
+
+### Proposed pin table
+
+- **Previous-good**: `0ecbe605-draft` @ `sha256:152b79912cea9d80cf5c3147beeba48957973f5d201d54bdc9a3d6c429768a32` (per DEPLOY_PROTOCOL §4b, 2026-08-08 pin — SUNDAY_EXECUTION_BLOCKS.md §A-R).
+- **Superseded**: no interim engine deploy since `0ecbe605-draft`; this is the first engine cut since ratification of `E80/E99/E100/E103/E104` (those cycles were client + citrus-api only).
+- **Current-after-deploy** (proposed): `dcaeeeb9-eear3`.
+- **Rollback**: three-command `0ecbe605-draft` block from SUNDAY_EXECUTION_BLOCKS.md §A-R (retag → metadata revert → reset).
+
+### Proposed engine deploy block
+
+Uses SUNDAY_EXECUTION_BLOCKS.md §A-0 → §A-7 verbatim shape — image tag suffix `-eear3` in place of `-draft` (or `-draft` retained if architect prefers convention consistency — architect chooses). Pre-flight rollback pin capture per §A-0. Build via `-f server/Dockerfile.draft-engine` per INS §15.11. Nine-item boot verification harvest per §A-6 (with the tenth `event_subscription.watchdog_started`). Watchdog probe twice ~70s apart per §A-7.
+
+**No additional post-boot verification needed** beyond §A-6/§A-7 for correctness of Slice 1 changes — the log tags (`event_subscription.notify_creates_lobby`, `registry.boot_scan_*`, `[lobby] instant_autopick_arm`) will appear organically on real ignitions post-deploy. Acceptance script scenarios S1/S2/S3 are the machine-proof harness once the tag is running on staging.
+
+### Standing by
+
+Architect countersigns tag choice (`-eear3` vs `-draft`) + issues the deploy paste banner for Garrett to execute. Standing by for ratification.
+
+**End of R99. ENGINE-EAR v3 Slice 1 (items 1 + 2 + 6) EXECUTED per E106 amendment. Commit `dcaeeeb9` pushed. Full CI-mirror gate GREEN (server tsc clean, both builds clean, 1024 server + 1743 web tests all-pass). Acceptance rig authored (S1/S2/S3 scenarios). READY-CANDIDATE per Entry 65 — awaiting architect countersignature for engine deploy paste banner.**
+
 
 
 
