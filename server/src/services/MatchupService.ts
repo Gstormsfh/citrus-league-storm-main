@@ -678,16 +678,30 @@ export class MatchupService {
         : Promise.resolve(),
     ]);
 
-    // Call the RPC for each team in parallel using admin client
+    // Call the RPC for each team in parallel using admin client.
+    //
+    // _v2 is the data-driven scorer: it reads league_scoring_rules via
+    // get_effective_scoring_rules instead of the twelve categories that the
+    // legacy function hardcodes in its body. It was proven identical to the
+    // legacy function on 532 team-days with 0 mismatches and totals equal to
+    // the cent, so this switch is a no-op for every league that has not
+    // changed its scoring.
+    //
+    // It is NOT optional, because persist_matchup_lines below already scores
+    // through the rules table. Leaving the legacy call here means the moment a
+    // commissioner enables one of the 23 new categories, the stored score and
+    // its own line items disagree - measured at 173.700 stored vs 203.700 in
+    // the breakdown - so the scoreboard contradicts the box score and
+    // check_matchup_score_calibration (pg_cron job 28) fails every night.
     const [team1Result, team2Result] = await Promise.all([
-      admin.rpc('calculate_daily_matchup_scores', {
+      admin.rpc('calculate_daily_matchup_scores_v2', {
         p_matchup_id: matchupId,
         p_team_id: matchup.team1_id,
         p_week_start: matchup.week_start_date,
         p_week_end: matchup.week_end_date,
       }),
       matchup.team2_id
-        ? admin.rpc('calculate_daily_matchup_scores', {
+        ? admin.rpc('calculate_daily_matchup_scores_v2', {
             p_matchup_id: matchupId,
             p_team_id: matchup.team2_id,
             p_week_start: matchup.week_start_date,

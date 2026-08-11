@@ -36,6 +36,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import { ScoringRulesEditor } from '@/components/league/ScoringRulesEditor';
 import { TradeService } from '@/services/TradeService';
 import { extractFormatSettings, AVAILABLE_CATEGORIES, DEFAULT_ROSTER_SLOTS, type LeagueSettings } from '@/types/leagueTypes';
 import { logger } from '@/utils/logger';
@@ -66,12 +67,6 @@ const LeagueDashboard = () => {
     weeklyAddLimit: 0,
     seasonAddLimit: 0,
   });
-  
-  // Scoring settings state
-  const [scoringSettings, setScoringSettings] = useState<{
-    skater?: Record<string, number>;
-    goalie?: Record<string, number>;
-  }>({});
   
   // Draft settings state
   const [draftSettings, setDraftSettings] = useState({
@@ -165,11 +160,6 @@ const LeagueDashboard = () => {
         weeklyAddLimit: (leagueSettings.weeklyAddLimit as number) ?? 0,
         seasonAddLimit: (leagueSettings.seasonAddLimit as number) ?? 0,
       });
-      
-      // Update scoring settings from league data
-      if (leagueData.scoring_settings) {
-        setScoringSettings(leagueData.scoring_settings);
-      }
       
       // Update draft settings from league data
       setDraftSettings({
@@ -407,13 +397,12 @@ const LeagueDashboard = () => {
           }
         }
       } else if (activeSettingsTab === 'scoring') {
-        const { success, error: saveError } = await LeagueService.updateScoringSettings(
-          leagueId,
-          user.id,
-          scoringSettings
-        );
-        saved = success;
-        errorMessage = (saveError as Error)?.message || 'Failed to save scoring settings';
+        // ScoringRulesEditor owns this tab and saves itself. This button must not
+        // also write leagues.scoring_settings: that column is a mirror of
+        // league_scoring_rules now, and writing it from this component's state
+        // would push stale twelve-category values back over the commissioner's
+        // edit and then propagate them into the rules table via the sync trigger.
+        saved = true;
       } else if (activeSettingsTab === 'draft') {
         const { success, error: saveError } = await LeagueService.updateDraftSettings(
           leagueId,
@@ -955,163 +944,22 @@ const LeagueDashboard = () => {
                         
                         {/* Scoring Settings Tab */}
                         <TabsContent value="scoring" className="space-y-6 py-4">
-                          <div className="space-y-4">
-                            <div>
-                              <h3 className="text-lg font-semibold mb-2">Skater Scoring</h3>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <Label>Goals</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={scoringSettings.skater?.goals || 3}
-                                    onChange={(e) => setScoringSettings(prev => ({
-                                      ...prev,
-                                      skater: { ...prev.skater, goals: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Assists</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={scoringSettings.skater?.assists || 2}
-                                    onChange={(e) => setScoringSettings(prev => ({
-                                      ...prev,
-                                      skater: { ...prev.skater, assists: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Power Play Points</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={scoringSettings.skater?.power_play_points || 1}
-                                    onChange={(e) => setScoringSettings(prev => ({
-                                      ...prev,
-                                      skater: { ...prev.skater, power_play_points: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Shorthanded Points</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={scoringSettings.skater?.short_handed_points || 2}
-                                    onChange={(e) => setScoringSettings(prev => ({
-                                      ...prev,
-                                      skater: { ...prev.skater, short_handed_points: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Shots on Goal</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={scoringSettings.skater?.shots_on_goal || 0.4}
-                                    onChange={(e) => setScoringSettings(prev => ({
-                                      ...prev,
-                                      skater: { ...prev.skater, shots_on_goal: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Blocks</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={scoringSettings.skater?.blocks || 0.5}
-                                    onChange={(e) => setScoringSettings(prev => ({
-                                      ...prev,
-                                      skater: { ...prev.skater, blocks: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Hits</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={scoringSettings.skater?.hits || 0.2}
-                                    onChange={(e) => setScoringSettings(prev => ({
-                                      ...prev,
-                                      skater: { ...prev.skater, hits: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Penalty Minutes</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={scoringSettings.skater?.penalty_minutes || 0.5}
-                                    onChange={(e) => setScoringSettings(prev => ({
-                                      ...prev,
-                                      skater: { ...prev.skater, penalty_minutes: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div>
-                              <h3 className="text-lg font-semibold mb-2">Goalie Scoring</h3>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <Label>Wins</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={scoringSettings.goalie?.wins || 4}
-                                    onChange={(e) => setScoringSettings(prev => ({
-                                      ...prev,
-                                      goalie: { ...prev.goalie, wins: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Shutouts</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={scoringSettings.goalie?.shutouts || 3}
-                                    onChange={(e) => setScoringSettings(prev => ({
-                                      ...prev,
-                                      goalie: { ...prev.goalie, shutouts: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Saves</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={scoringSettings.goalie?.saves || 0.2}
-                                    onChange={(e) => setScoringSettings(prev => ({
-                                      ...prev,
-                                      goalie: { ...prev.goalie, saves: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Goals Against</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={scoringSettings.goalie?.goals_against || -1}
-                                    onChange={(e) => setScoringSettings(prev => ({
-                                      ...prev,
-                                      goalie: { ...prev.goalie, goals_against: parseFloat(e.target.value) || 0 }
-                                    }))}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
+                          {/*
+                            The full 35-stat catalog, replacing the twelve inputs that
+                            used to be hardcoded here. It writes league_scoring_rules
+                            through /api/leagues/:id/scoring-rules (commissioner
+                            guarded) and saves itself, so the dialog's Save button does
+                            not apply to this tab.
+
+                            leagues.scoring_settings is still written, but by
+                            sync_rules_to_scoring_settings_trg rather than by this
+                            screen: it is now a materialised mirror of the rules table,
+                            which is what keeps DraftRoom projections, the Matchup page
+                            and the playoff-pool scorer agreeing with the engine.
+                          */}
+                          {leagueId && (
+                            <ScoringRulesEditor leagueId={leagueId} canEdit={isCommissioner} />
+                          )}
                         </TabsContent>
                         
                         {/* Draft Settings Tab */}
