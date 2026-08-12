@@ -285,7 +285,7 @@ export const schemas = {
     waiver_process_time: z.string().optional(),
     waiver_period_hours: z.number().int().min(0).optional(),
     waiver_game_lock: z.boolean().optional(),
-    waiver_type: z.enum(['rolling', 'faab', 'reverse_standings']).optional(),
+    waiver_type: z.enum(['rolling', 'reverse_draft_order', 'faab', 'reverse_standings']).optional(),
     allow_trades_during_games: z.boolean().optional(),
   }),
 

@@ -332,7 +332,7 @@ const Profile = () => {
     waiver_process_time: '02:00:00',
     waiver_period_hours: 48,
     waiver_game_lock: true,
-    waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
+    waiver_type: 'rolling' as 'rolling' | 'reverse_draft_order' | 'faab' | 'reverse_standings',
     allow_trades_during_games: true,
   });
   const [commScoringSettings, setCommScoringSettings] = useState<{
@@ -1730,18 +1730,19 @@ const Profile = () => {
                                 </Label>
                                 <Select
                                   value={commWaiverSettings.waiver_type}
-                                  onValueChange={(value: 'rolling' | 'faab' | 'reverse_standings') => setCommWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
+                                  onValueChange={(value: 'rolling' | 'reverse_draft_order' | 'faab' | 'reverse_standings') => setCommWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
                                 >
                                   <SelectTrigger className="bg-white/5 border-white/10 text-pastel-cream focus:ring-pastel-orange/40">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="rolling">Rolling Priority</SelectItem>
+                                    <SelectItem value="rolling">Rolling Priority (Join Order)</SelectItem>
+                                    <SelectItem value="reverse_draft_order">Rolling Priority (Reverse Draft Order)</SelectItem>
                                     <SelectItem value="reverse_standings">Reverse Standings</SelectItem>
                                     <SelectItem value="faab">FAAB (Bidding)</SelectItem>
                                   </SelectContent>
                                 </Select>
-                                <p className="text-xs text-white/55">Rolling: Priority moves after claim. Reverse: Worst team gets priority.</p>
+                                <p className="text-xs text-white/55">Join Order: seeded by when teams joined. Reverse Draft Order: the last round-one pick holds waiver 1. Both roll — the claimant drops to the back. Reverse Standings: recomputed weekly, worst record first.</p>
                               </div>
 
                               <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
