@@ -355,6 +355,53 @@ describe('toV1Teams — DR-3.1 F9 filter (12-in-order + 1 spectator)', () => {
   });
 });
 
+describe('toAvailablePlayers — the draftable guard (PLAYER-POOL 2026-08-12)', () => {
+  // player_directory is an all-time index. 923 of 2,035 staging rows have no
+  // NHL club — Jagr, Chara, Thornton — and every one of them used to be
+  // draftable. A manager drafted three retired centres in a live test by
+  // clicking the top of the list.
+  it('excludes players with no NHL club', () => {
+    const players = new Map([
+      ['8466138', mkPlayer('8466138', { full_name: 'Joe Thornton', team: '' })],
+      ['8478402', mkPlayer('8478402', { full_name: 'Connor McDavid', team: 'EDM' })],
+    ]);
+    const ids = toAvailablePlayers(players, mkDerived()).map((p) => p.id);
+
+    expect(ids).toEqual(['8478402']);
+  });
+
+  it('treats whitespace-only club as no club', () => {
+    const players = new Map([['1', mkPlayer('1', { team: '   ' })]]);
+    expect(toAvailablePlayers(players, mkDerived())).toHaveLength(0);
+  });
+
+  it('keeps a rostered rookie who has no stats yet', () => {
+    // The guard is on CLUB, not on production — a prospect called up today
+    // must stay draftable.
+    const players = new Map([
+      ['9', mkPlayer('9', { full_name: 'Rookie', team: 'SJS', points: 0, games_played: 0 })],
+    ]);
+    expect(toAvailablePlayers(players, mkDerived()).map((p) => p.id)).toEqual(['9']);
+  });
+
+  it('still resolves the NAME of a drafted clubless player', () => {
+    // The asymmetry that makes this safe: filtering the pool must not blind
+    // the board. Filtering at the directory load would render this as
+    // `#8466138 / ? / -` on a finished roster.
+    const players = new Map([
+      ['8466138', mkPlayer('8466138', { full_name: 'Joe Thornton', team: '' })],
+    ]);
+    const pick = rosterEntryToDraftPick(
+      { seq: 1, playerId: 8466138, pickNumber: 1, roundNumber: 1 },
+      'team-1',
+      'Alpha',
+      players,
+    );
+
+    expect(pick.playerName).toBe('Joe Thornton');
+  });
+});
+
 describe('toAvailablePlayers', () => {
   it('filters drafted players out of the full player index', () => {
     const players = new Map([

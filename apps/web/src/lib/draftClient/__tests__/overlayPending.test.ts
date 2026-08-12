@@ -183,8 +183,10 @@ describe('overlayPendingPicks — clock safety', () => {
 
 describe('overlayPendingPicks — what the manager actually sees', () => {
   const players = new Map([
-    ['8478402', { id: '8478402', name: 'Connor McDavid' }],
-    ['8477492', { id: '8477492', name: 'Nathan MacKinnon' }],
+    // `team` is load-bearing: toAvailablePlayers excludes anyone without an
+    // NHL club (PLAYER-POOL 2026-08-12).
+    ['8478402', { id: '8478402', name: 'Connor McDavid', team: 'EDM' }],
+    ['8477492', { id: '8477492', name: 'Nathan MacKinnon', team: 'COL' }],
   ]) as unknown as ReadonlyMap<
     string,
     Parameters<typeof toAvailablePlayers>[0] extends ReadonlyMap<
