@@ -2,6 +2,7 @@ import { Context, Next } from 'hono';
 import { createClient, isAuthApiError, type AuthError } from '@supabase/supabase-js';
 import type { Env } from '../app';
 import { logger } from '@citrus/shared';
+import { verifyAccessTokenLocally } from '../lib/verifyAccessToken';
 
 // NOTE: env vars are read inside each middleware function (not at module scope)
 // because ESM import hoisting causes module-level code to run before .env is loaded.
@@ -56,6 +57,31 @@ export async function authMiddleware(c: Context<Env>, next: Next) {
 
   if (!token) {
     return c.json({ error: { code: 'AUTHENTICATION_REQUIRED', message: 'Empty Bearer token' } }, 401);
+  }
+
+  // ── PICK-LATENCY (2026-08-12) — local verification fast path ────────
+  //
+  // The token is a signed assertion of identity. Asking GoTrue to re-read
+  // it for us cost an HTTPS round trip on EVERY request, and the topology
+  // makes that expensive: Cloud Run runs in us-central1 (Iowa), both
+  // Supabase projects live in ca-central-1 (Montreal). ~1,500 km, before
+  // any actual work started.
+  //
+  // `lib/draftToken.ts` already established this pattern for the
+  // WebSocket-upgrade path in July — "a local HMAC check (no Supabase
+  // round-trip)". This brings the HTTP API in line with it.
+  //
+  // STRICTLY ADDITIVE: on any miss — no secret, wrong secret, asymmetric
+  // token, malformed, bad signature, expired, or an anon-key JWT — we fall
+  // through to the untouched getUser() path below, F15 taxonomy and all.
+  // The fast path can only ever succeed sooner; it can never reject anyone
+  // the old path would have accepted.
+  const local = await verifyAccessTokenLocally(token);
+  if (local.ok) {
+    c.set('userId', local.userId);
+    c.set('userToken', token);
+    await next();
+    return;
   }
 
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -148,17 +174,25 @@ export async function optionalAuthMiddleware(c: Context<Env>, next: Next) {
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
-  if (authHeader && authHeader.startsWith('Bearer ') && SUPABASE_URL && SUPABASE_ANON_KEY) {
+  if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
 
-    const { data: { user } } = await supabase.auth.getUser(token);
-    if (user) {
-      c.set('userId', user.id);
+    // Same fast path as authMiddleware; same fall-through on any miss.
+    const local = await verifyAccessTokenLocally(token);
+    if (local.ok) {
+      c.set('userId', local.userId);
       c.set('userToken', token);
+    } else if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (user) {
+        c.set('userId', user.id);
+        c.set('userToken', token);
+      }
     }
   }
 

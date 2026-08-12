@@ -115,8 +115,26 @@ const MobileBottomNav = () => {
     return location.pathname.startsWith(base);
   };
 
-  // Don't show on auth pages, draft room, or setup flows
-  const hideOnRoutes = ['/auth', '/profile-setup', '/verify-email', '/reset-password'];
+  // Don't show on auth pages, draft room, or setup flows.
+  //
+  // ARCHITECT 2026-08-11 (DESIGN_LOBBY_CAMPAIGN L4 / inbox E123). The comment
+  // above has claimed "draft room" since this file was written, but the array
+  // never contained a draft path. This component is mounted globally
+  // (App.tsx:251) and its wrapper is `fixed bottom-0 ... z-50 lg:hidden` over
+  // an h-16 row, so on EVERY viewport under 1024px a 65px opaque bar rendered
+  // across the bottom of the draft room. Verified live on staging at
+  // /draft-v2/ada00013-0000-4000-8000-000000000001 (innerWidth 958): nav
+  // present, rect height 65, z-index 50, covering the pick-history table, and
+  // offering "Create a playoff pool" to someone mid-draft.
+  //
+  // The three draft routes are App.tsx:199 (/draft-room), :200 (/draft) and
+  // :202 (/draft-v2/:leagueId/:draftId?). '/draft' alone would cover all three
+  // through startsWith and no other route in App.tsx begins with "draft";
+  // all three are listed anyway so this array stays greppable by route name.
+  const hideOnRoutes = [
+    '/auth', '/profile-setup', '/verify-email', '/reset-password',
+    '/draft', '/draft-v2', '/draft-room',
+  ];
   if (hideOnRoutes.some(route => location.pathname.startsWith(route))) {
     return null;
   }

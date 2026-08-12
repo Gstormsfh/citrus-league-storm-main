@@ -73,6 +73,7 @@ import {
   participatingTeamIdsFromMatrix,
   type FetchedTeam,
 } from '@/lib/draftClient/v1Adapters';
+import { overlayPendingPicks } from '@/lib/draftClient/overlayPending';
 import type { Player } from '@/services/PlayerService';
 
 export default function DraftRoomV2() {
@@ -169,7 +170,17 @@ export default function DraftRoomV2() {
           // deadline rendered as 35s until the first pick event
           // seeded the EMA. Seeding here eliminates that first-paint
           // window entirely.
-          if (snapshot.recentEvents.length > 0) {
+          // TIMER-1 / E121 — seed from the snapshot RESPONSE's server
+          // clock first. E104's event-based seed (below) cannot fire
+          // on a freshly-ignited draft: the engine's ring buffer holds
+          // pick events only, so `recentEvents` is EMPTY until the
+          // first pick lands — leaving the opening pick of every
+          // draft uncorrected (0:35 on a 30s clock for a slow device).
+          // `serverReceivedAtMs` is stamped by the snapshot fetcher
+          // from the HTTP Date header and is always present.
+          if (typeof snapshot.serverReceivedAtMs === 'number') {
+            updateOffset(Date.now(), snapshot.serverReceivedAtMs);
+          } else if (snapshot.recentEvents.length > 0) {
             const last =
               snapshot.recentEvents[snapshot.recentEvents.length - 1];
             const serverMs = new Date(last.timestamp).getTime();
@@ -516,6 +527,23 @@ function DraftRoomBody({
         </div>
       );
     }
+    // ARCHITECT 2026-08-12 (LOBBY-WAIT / inbox E124) — the same
+    // reasoning as the ConnectionBanner variant. "Waiting for draft
+    // state…" is engine vocabulary; a manager waiting on his
+    // commissioner should be told that in his own language, and the
+    // room should read as ready rather than broken.
+    if (
+      connectionState.kind === 'reconnecting' &&
+      connectionState.waitingForStart
+    ) {
+      return (
+        <div className="text-muted-foreground" data-testid="draft-waiting-for-start">
+          The draft hasn&apos;t started yet. This page will open on its own
+          as soon as your commissioner starts it — you don&apos;t need to
+          refresh.
+        </div>
+      );
+    }
     return (
       <div className="text-muted-foreground" data-testid="draft-loading">
         Waiting for draft state…
@@ -616,21 +644,39 @@ function MainTabs({
     () => participatingTeamIdsFromMatrix(matrix ?? null),
     [matrix],
   );
+  // PICK-LATENCY (2026-08-12) — optimistic render.
+  //
+  // `renderDerived` is `derived` plus any pick the user has submitted
+  // but the server has not yet confirmed. It feeds ONLY the four view
+  // adapters below, so the pool, board, rosters and history all update
+  // the instant the manager clicks Draft.
+  //
+  // Everything else on this page — amIOnClock, the countdown, the
+  // on-clock action bar, isDraftActive, the submit guards — deliberately
+  // keeps reading raw `derived`. The pick draws immediately; whose turn
+  // it is stays server-authoritative. See overlayPending.ts for why.
+  const renderDerived = useMemo(
+    () => overlayPendingPicks(derived, pendingActions),
+    [derived, pendingActions],
+  );
   const v1Teams = useMemo(
-    () => (derived ? toV1Teams(teams, derived, playersById, participatingTeamIds) : []),
-    [teams, derived, playersById, participatingTeamIds],
+    () =>
+      renderDerived
+        ? toV1Teams(teams, renderDerived, playersById, participatingTeamIds)
+        : [],
+    [teams, renderDerived, playersById, participatingTeamIds],
   );
   const draftHistory = useMemo(
-    () => (derived ? toDraftHistory(teams, derived, playersById) : []),
-    [teams, derived, playersById],
+    () => (renderDerived ? toDraftHistory(teams, renderDerived, playersById) : []),
+    [teams, renderDerived, playersById],
   );
   const draftedIds = useMemo(
-    () => (derived ? toDraftedPlayerIds(derived) : []),
-    [derived],
+    () => (renderDerived ? toDraftedPlayerIds(renderDerived) : []),
+    [renderDerived],
   );
   const availablePlayers = useMemo(
-    () => (derived ? toAvailablePlayers(playersById, derived) : []),
-    [playersById, derived],
+    () => (renderDerived ? toAvailablePlayers(playersById, renderDerived) : []),
+    [playersById, renderDerived],
   );
 
   // amIOnClock is computed once at the top of MainTabs (feeds alarm +
@@ -674,11 +720,17 @@ function MainTabs({
       // Capture the currentPickNumber we're submitting for; feeds the
       // F11 layer 2 disambiguate check on the pick_out_of_order path.
       const submittingForPickNumber = derived.currentPickNumber;
+      // PICK-LATENCY (2026-08-12): capture the pick slot at CLICK time.
+      // overlayPendingPicks places the optimistic entry at exactly these
+      // coordinates; reading them at render time instead would misplace
+      // the pick on any frame where the server has already advanced.
       useDraftClientStore.getState().recordPending({
         correlationId: attemptId,
         teamId: myTeamId,
         playerId: playerIdNum,
         submittedAt,
+        pickNumber: submittingForPickNumber,
+        roundNumber: derived.currentRoundNumber,
       });
       // Dangle-safety timer (DR-2 architect amendment) — see
       // submitPick.ts and the removed SubmitPickControl.
@@ -771,6 +823,31 @@ function MainTabs({
           totalPicks={derived?.totalPicks ?? 0}
           topPickTeamName={null}
           topPickPlayerName={null}
+          /*
+           * ARCHITECT 2026-08-12 (ROSTER-CTA / inbox E133). The banner's
+           * `rosterHref` defaults to a bare "/roster", and `Roster.tsx` has no
+           * :leagueId route param — it resolves the league from LeagueContext's
+           * `activeLeagueId` (Roster.tsx:218, :502). DraftRoomV2 reads its
+           * leagueId from the PATH and never calls setActiveLeagueId, so the
+           * context still points wherever it pointed before the user entered
+           * the room. Observed live: finishing a draft in league ada00018 and
+           * clicking "View your roster" landed on /roster?league=ada00015 —
+           * a different league entirely.
+           *
+           * Scoping the href with ?league=<id> routes through LeagueContext's
+           * existing "update active league when the URL param changes (with
+           * membership validation)" effect, which is the designed mechanism
+           * for exactly this. `CompletionMomentBanner` already declares the
+           * prop and its test already covers "parent may pass league-scoped
+           * variant" — the parent simply never did.
+           *
+           * The broader issue (the draft room not owning the active league at
+           * all, which also leaves the mobile nav and every league-scoped route
+           * pointing elsewhere for the duration of the draft) is a
+           * LeagueContext change and is written up as a proposal, not shipped
+           * here.
+           */
+          rosterHref={leagueId ? `/roster?league=${leagueId}` : undefined}
         />
       )}
 
@@ -847,6 +924,36 @@ function MainTabs({
             draftHistory={draftHistory}
             currentPick={derived?.currentPickNumber ?? 0}
             currentRound={derived?.currentRoundNumber ?? 0}
+            /*
+             * ARCHITECT 2026-08-12 (BOARD-ROUNDS / inbox E129). This prop was
+             * dropped in the v1 -> v2 port. `DraftBoard`'s signature defaults
+             * `totalRounds = 16` (DraftBoard.tsx:57) and computes
+             * `totalPicks = teams.length * totalRounds`, so without it the v2
+             * board showed EVERY league as a 16-round draft. Observed live on
+             * a 12x21 league that had finished: the board header read
+             * "252 of 192 picks made" — a denominator smaller than the
+             * numerator. In a live 21-round draft it would read
+             * "192 of 192 picks made" around pick 192 and stay there for the
+             * remaining 60 picks, which reads as "the draft is over" three
+             * quarters of the way through. v1 has always passed this
+             * (DraftRoom.tsx:4574, `league?.draft_rounds || ... || 21`).
+             *
+             * Deriving it from `derived.totalPicks` rather than from a league
+             * settings field is deliberate: `totalPicks` comes straight from
+             * `DraftSnapshot.stateSnapshot.totalPicks`, i.e. the ENGINE's own
+             * authoritative count, and it is the same value the header two
+             * hundred lines up already renders. Computing the board's
+             * denominator from it makes the two numbers agree by construction
+             * instead of by coincidence. `Math.round` (not ceil/floor) because
+             * totalPicks is always teams x rounds exactly; rounding only
+             * guards float noise. Falls back to the old 16 only when there are
+             * no teams to divide by, which is the pre-snapshot render.
+             */
+            totalRounds={
+              v1Teams.length > 0 && derived && derived.totalPicks > 0
+                ? Math.round(derived.totalPicks / v1Teams.length)
+                : undefined
+            }
             draftType="snake"
           />
         </TabsContent>

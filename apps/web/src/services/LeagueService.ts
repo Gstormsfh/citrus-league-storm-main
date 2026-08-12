@@ -334,6 +334,10 @@ export const LeagueService = {
         draft_rounds: draftRounds,
       });
       const data = response.data;
+      // ARCHITECT 2026-08-12 (LEAGUE-CACHE / inbox E126) — see the note in
+      // joinLeagueByCode. Creating a league changes the same membership the
+      // 'userLeagues' key caches, so the cache must not survive it.
+      leagueRequestCache.clear();
       return { league: data?.league || null, team: data?.team || null, error: null };
     } catch (error) {
       logger.error('Error creating league:', error);
@@ -377,6 +381,26 @@ async joinLeagueByCode(
 
     const response = await leagueApi.joinLeague({ joinCode: joinCode.trim(), teamName });
     const data = response.data;
+    // ARCHITECT 2026-08-12 (LEAGUE-CACHE / inbox E126). The user's league
+    // membership just changed, so every cached league read is now wrong.
+    // `getLeagueCachedOrFetch` holds RESOLVED PROMISES for LEAGUE_CACHE_TTL
+    // (30s) and nothing in the app was invalidating them: `clearLeagueCache`
+    // existed, its doc comment said "useful after mutations like
+    // joining/creating", and grep across apps/web found exactly one call
+    // site — inside its own unit test.
+    //
+    // The visible consequence: `CreateLeague.handleJoinLeague` does
+    // `await refreshLeagues()` immediately after a successful join, and
+    // that comment says in as many words that it exists because "users
+    // reported joined but got dumped in a different league / GM Office".
+    // With a live cache entry (near-certain — the list was fetched on mount
+    // seconds earlier) that refresh returned the PRE-JOIN list and the fix
+    // was a no-op for up to 30 seconds. Eleven managers will join by code
+    // within a few minutes of each other on draft night.
+    //
+    // Invalidating here rather than at the call site means every caller —
+    // present and future — is correct by default.
+    leagueRequestCache.clear();
     return {
       league: data?.league || null,
       team: data?.team || null,

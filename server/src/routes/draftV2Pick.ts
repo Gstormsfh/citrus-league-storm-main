@@ -132,12 +132,42 @@ draftV2PickRoutes.post(
 
       // Broadcast happens after the RPC commits. Errors here are
       // logged and counted inside broadcastEvent, never thrown.
-      await service.broadcastEvent({
-        admin:        supabaseAdmin,
-        leagueId,
-        eventId:      result.event_id,
-        wasDuplicate: result.was_duplicate,
-      });
+      //
+      // ARCHITECT 2026-08-12 (PICK-LATENCY / inbox E145) — NOT AWAITED.
+      // This await was costing every human pick a flat ~4 extra seconds,
+      // measured twice on staging: click -> durable ledger row took 1,837ms
+      // and 2,123ms, while the POST returned at 5,710ms and 5,966ms. Both
+      // response times sit just above BROADCAST_TIMEOUT_MS (5_000), which is
+      // the timeout firing, not the work taking that long.
+      //
+      // WHY THE SUBSCRIBE NEVER SUCCEEDS, AND WHY THAT IS FINE: the channel
+      // `draft_events_v2:<leagueId>` has ZERO subscribers. Grepping the web
+      // app for it returns only this publisher and its own unit test — the v2
+      // client receives events over the ENGINE's uWS WebSocket, never over
+      // Supabase Realtime. With nobody connected, the Realtime tenant shuts
+      // down between uses ("Stop tenant ... because of no connected users" in
+      // the realtime logs), so each publish cold-starts a tenant, fails to
+      // reach SUBSCRIBED inside 5s, and times out. Every human pick paid for
+      // a message no client was ever going to receive.
+      //
+      // Dropping the await returns the response as soon as the pick is
+      // durable. This cannot affect correctness: the RPC has already
+      // committed above, broadcastEvent returns void, swallows every error
+      // internally (see its three catch blocks), and nothing reads its
+      // result. The .catch is belt-and-braces against an unhandled rejection
+      // taking down the process — it should be unreachable.
+      //
+      // The broadcast itself looks vestigial and may be worth deleting
+      // outright, but that is a design decision, not a latency fix, and it
+      // is left for Garrett.
+      void service
+        .broadcastEvent({
+          admin:        supabaseAdmin,
+          leagueId,
+          eventId:      result.event_id,
+          wasDuplicate: result.was_duplicate,
+        })
+        .catch(() => { /* broadcastEvent never throws; see above */ });
 
       // Pick-event responses are NEVER cacheable (state-changing).
       c.header('Cache-Control', 'no-store');

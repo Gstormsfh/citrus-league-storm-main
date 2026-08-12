@@ -43,6 +43,21 @@ export interface PendingAction {
   optimisticState: OptimisticState;
   /** Set when `optimisticState === 'rolled_back'`. */
   rejectionReason?: string;
+  /**
+   * PICK-LATENCY (2026-08-12) — the pick slot this submission is for,
+   * captured at CLICK time so `overlayPendingPicks` can place the
+   * optimistic entry on the board at the right coordinates.
+   *
+   * Optional for backwards compatibility with existing callers and
+   * tests; the overlay falls back to derived `currentPickNumber` /
+   * `currentRoundNumber` when absent. Capturing at click time is
+   * strictly better than reading the live value at render time: the
+   * instant the server confirms, derived state advances, and a pending
+   * entry that outlives that frame by one tick would otherwise render
+   * at the NEXT pick's coordinates.
+   */
+  pickNumber?: number;
+  roundNumber?: number;
 }
 
 export interface PendingActionInput {
@@ -50,6 +65,9 @@ export interface PendingActionInput {
   teamId: string;
   playerId: number;
   submittedAt: number;
+  /** See `PendingAction.pickNumber`. */
+  pickNumber?: number;
+  roundNumber?: number;
 }
 
 /**
@@ -67,6 +85,8 @@ export function recordPendingAction(
     playerId: input.playerId,
     submittedAt: input.submittedAt,
     optimisticState: 'pending',
+    pickNumber: input.pickNumber,
+    roundNumber: input.roundNumber,
   });
   return next;
 }

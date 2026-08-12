@@ -2137,9 +2137,47 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
         chain.order = () => chain;
         chain.then = (resolve: (val: unknown) => void) =>
           resolve({
-            data: [{ player_id: playerId, total_projected_points: 99.9 }],
+            data: [
+              {
+                player_id: playerId,
+                total_projected_points: 99.9,
+                avg_points_per_game: 5.5,
+              },
+            ],
             error: null,
           });
+        return chain;
+      }
+      // E117: the draft-value ranking reads prior-season games played
+      // to weight per-game rate by durability. An empty result is a
+      // valid answer here (the strategy falls back to a default games
+      // estimate), so the mock returns [] rather than throwing.
+      if (table === 'player_season_stats') {
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = () => chain;
+        chain.then = (resolve: (val: unknown) => void) =>
+          resolve({ data: [], error: null });
+        return chain;
+      }
+      // E118 roster-shape guard: reads league rosterSlots config and
+      // player positions. Empty/default answers exercise the
+      // "no caps configured, nothing owned" path, which is what these
+      // timer tests care about (they assert the autopick FIRES).
+      if (table === 'leagues') {
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = () => chain;
+        chain.maybeSingle = () =>
+          Promise.resolve({ data: { settings: {} }, error: null });
+        return chain;
+      }
+      if (table === 'player_directory') {
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.in = () => chain;
+        chain.then = (resolve: (val: unknown) => void) =>
+          resolve({ data: [], error: null });
         return chain;
       }
       throw new Error(`unexpected table: ${table}`);

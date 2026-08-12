@@ -24,6 +24,30 @@ export const BACKOFF_MULTIPLIER = 2;
 export const JITTER_FACTOR = 0.2;
 
 /**
+ * ARCHITECT 2026-08-12 (LOBBY-WAIT / inbox E124). Poll interval used
+ * ONLY while discovery reports `draft_status = 'not_started'`.
+ *
+ * This case is categorically different from an error. Nothing is
+ * broken: the commissioner simply has not pressed START yet, and the
+ * manager is sitting in the room waiting for him. Two consequences
+ * follow, and they pull in opposite directions from the error curve:
+ *
+ *   1. It must NOT escalate. If a manager who opened the room ten
+ *      minutes early were on a 30s backoff at the moment of ignition,
+ *      he would stare at a dead screen for up to 30 seconds while the
+ *      other eleven were already picking. Responsiveness at ignition
+ *      is the whole point of the room.
+ *   2. It must not hammer. A flat ~1s retry (the pre-fix behaviour)
+ *      is 60 requests per minute per waiting client, every one of
+ *      them a 409 with a DB read behind it.
+ *
+ * 3s is the compromise: worst-case 3s of dead air after the
+ * commissioner starts, and a fifth of the request volume. Jittered
+ * like every other delay so twelve clients don't align on one tick.
+ */
+export const NOT_STARTED_POLL_MS = 3000;
+
+/**
  * Compute the backoff delay for the given retry attempt. `attempt`
  * is 0-indexed: attempt 0 is the FIRST reconnect (after the initial
  * connection failed), so the first retry waits ~1s, the second ~2s,
