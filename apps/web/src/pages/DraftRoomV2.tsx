@@ -178,15 +178,33 @@ export default function DraftRoomV2() {
           // draft uncorrected (0:35 on a 30s clock for a slow device).
           // `serverReceivedAtMs` is stamped by the snapshot fetcher
           // from the HTTP Date header and is always present.
+          //
+          // TIMER-2 (2026-08-12) — the event-timestamp fallback is GONE.
+          //
+          // It used to seed the estimator from
+          // `recentEvents[last].timestamp` whenever the Date header was
+          // unavailable — which is ALWAYS, because getResponseDateMs reads
+          // `response.headers` and the snapshot fetcher receives apiClient's
+          // parsed envelope, which has none. So this fallback ran on every
+          // single load.
+          //
+          // An event timestamp says WHEN A PICK HAPPENED, not what the
+          // server's clock reads now. Seeding from it means "offset = age of
+          // the last pick". Open a league 80s after the previous pick and the
+          // estimator concludes your clock runs 80s fast; the deadline is
+          // pushed 80s into the future; DraftTimerV2's
+          // `Math.min(remaining, pickTimeLimitSec)` then pins the display at
+          // the configured limit and THE CLOCK APPEARS FROZEN.
+          //
+          // Field-confirmed 2026-08-12: server had 520s remaining on a 600s
+          // clock, the browser showed a motionless 10:00. 520 + 80 = 600.
+          //
+          // With no seed the offset stays 0 and the countdown renders
+          // `deadline - localNow` — accurate to the device's real skew
+          // (measured at 1.8s on Garrett's machine, invisible on any clock).
+          // That is strictly better than a confidently wrong correction.
           if (typeof snapshot.serverReceivedAtMs === 'number') {
             updateOffset(Date.now(), snapshot.serverReceivedAtMs);
-          } else if (snapshot.recentEvents.length > 0) {
-            const last =
-              snapshot.recentEvents[snapshot.recentEvents.length - 1];
-            const serverMs = new Date(last.timestamp).getTime();
-            if (Number.isFinite(serverMs)) {
-              updateOffset(Date.now(), serverMs);
-            }
           }
           void fetchDraftOrderMatrix(
             leagueId,
@@ -202,11 +220,11 @@ export default function DraftRoomV2() {
           store.applyEvent(event);
         },
         onEvents: (events) => {
-          if (events.length > 0) {
-            const last = events[events.length - 1];
-            const serverMs = new Date(last.timestamp).getTime();
-            if (Number.isFinite(serverMs)) updateOffset(Date.now(), serverMs);
-          }
+          // TIMER-2 (2026-08-12) — deliberately does NOT seed the clock
+          // offset. This is the RESYNC path: the batch is history, and its
+          // last entry can be minutes old. Same defect as the snapshot
+          // fallback above — see the comment there. `onEvent` still seeds,
+          // and correctly, because a live frame genuinely just happened.
           store.applyEvents(events);
         },
         onPresence: (payload) => {

@@ -10,8 +10,8 @@
 //   - Stale indicator when wsOpen is false
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
-import { DraftTimerV2 } from '../DraftTimerV2';
+import { render, screen, act, fireEvent } from '@testing-library/react';
+import { DraftTimerV2, useClockOffsetEstimator } from '../DraftTimerV2';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -275,5 +275,98 @@ describe('DraftTimerV2 stale indicator', () => {
     const timer = screen.getByRole('timer');
     expect(timer.className).not.toContain('opacity-60');
     expect(timer.getAttribute('aria-label')).not.toContain('connection lost');
+  });
+});
+
+// ── TIMER-2 (2026-08-12) — the frozen draft clock ────────────────────
+//
+// Field report: a 600s clock showed a motionless "10:00" while the server
+// had 520s left. Cause: callers seeded the offset estimator from an EVENT
+// timestamp, so the "skew" became the age of the last pick (+80s). That
+// pushed the deadline into the future, and DraftTimerV2's
+// `Math.min(remaining, pickTimeLimitSec)` pinned the display at the cap.
+//
+// 520 + 80 = 600. The clock did not tick because it could not.
+describe('useClockOffsetEstimator — implausible readings are discarded', () => {
+  function Probe({ pairs }: { pairs: Array<[number, number]> }) {
+    const { offsetMs, updateOffset } = useClockOffsetEstimator();
+    return (
+      <div>
+        <button
+          onClick={() => pairs.forEach(([c, s]) => updateOffset(c, s))}
+          data-testid="feed"
+        >
+          feed
+        </button>
+        <span data-testid="offset">{Math.round(offsetMs)}</span>
+      </div>
+    );
+  }
+
+  it('ignores an 80-second reading — the exact value that froze the clock', () => {
+    const now = 1_700_000_000_000;
+    render(<Probe pairs={[[now, now - 80_000]]} />);
+    fireEvent.click(screen.getByTestId('feed'));
+    expect(screen.getByTestId('offset').textContent).toBe('0');
+  });
+
+  it('ignores a stale RESYNC batch reading (minutes old)', () => {
+    const now = 1_700_000_000_000;
+    render(<Probe pairs={[[now, now - 300_000]]} />);
+    fireEvent.click(screen.getByTestId('feed'));
+    expect(screen.getByTestId('offset').textContent).toBe('0');
+  });
+
+  it('still accepts a real device skew of a couple of seconds', () => {
+    // Garrett's machine measured 1.8s behind the server. That correction
+    // is legitimate and must survive the guard.
+    const now = 1_700_000_000_000;
+    render(<Probe pairs={[[now, now + 1_800]]} />);
+    fireEvent.click(screen.getByTestId('feed'));
+    expect(screen.getByTestId('offset').textContent).toBe('-1800');
+  });
+
+  it('a bad reading cannot poison a good one that follows', () => {
+    const now = 1_700_000_000_000;
+    render(<Probe pairs={[[now, now - 80_000], [now, now + 2_000]]} />);
+    fireEvent.click(screen.getByTestId('feed'));
+    // The 80s reading is dropped, so the 2s reading SEEDS the estimator
+    // rather than being blended into a poisoned average.
+    expect(screen.getByTestId('offset').textContent).toBe('-2000');
+  });
+});
+
+describe('DraftTimerV2 — the freeze, end to end', () => {
+  it('counts down instead of pinning at the cap when skew is sane', () => {
+    // 520s of real time left on a 600s clock: the number that was stuck.
+    const deadline = new Date(Date.now() + 520_000).toISOString();
+    render(
+      <DraftTimerV2
+        currentPickDeadline={deadline}
+        draftStatus="in_progress"
+        wsOpen
+        clockOffsetMs={0}
+        pickTimeLimitSec={600}
+      />,
+    );
+    const shown = screen.getByRole('timer').textContent ?? '';
+    expect(shown).toContain('08:4');      // ~08:40, NOT 10:00
+    expect(shown).not.toContain('10:00');
+  });
+
+  it('reproduces the freeze when a poisoned offset IS applied', () => {
+    // Documents the mechanism: +80s of bogus offset pins the display at
+    // the configured limit. This is what the guard now prevents upstream.
+    const deadline = new Date(Date.now() + 520_000).toISOString();
+    render(
+      <DraftTimerV2
+        currentPickDeadline={deadline}
+        draftStatus="in_progress"
+        wsOpen
+        clockOffsetMs={80_000}
+        pickTimeLimitSec={600}
+      />,
+    );
+    expect(screen.getByRole('timer').textContent).toContain('10:00');
   });
 });
