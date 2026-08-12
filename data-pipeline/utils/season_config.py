@@ -24,9 +24,37 @@ import datetime as _dt
 from typing import List, Optional, Tuple
 
 
-def _derive_from_today() -> int:
-    """Computed each call — mirrors the SQL get_nhl_season_year(today)."""
-    d = _dt.date.today()
+# ── SEPTEMBER OPENERS ────────────────────────────────────────────────
+# The Oct-1 month rule below is wrong whenever a season opens in September.
+# The 2026-27 season opens 2026-09-29, so on Sept 29 and Sept 30 the month
+# rule returns 2025 and the entire product -- projections, scoring, roster
+# locks, headshot URLs -- would think it is still last season for the first
+# two days of the year.
+#
+# It CANNOT simply be changed to `month >= 9`. September 2020 holds 1,000
+# player_game_stats rows and 2,093 shots from the COVID bubble, all correctly
+# filed under season 2019; a month>=9 rule would silently reclassify every one
+# of them to 2020. The schedule is the only ground truth, so the known season
+# starts are listed here and the calendar rule is kept for everything older.
+#
+# Mirrors `SELECT season, min(game_date) FROM nhl_games WHERE game_type='regular'
+# GROUP BY season`. Drift is caught by the check_season_boundary gate, which
+# compares get_nhl_season_year() against get_current_season() across the next
+# 180 days and fails when they disagree.
+SEASON_STARTS = {
+    2025: _dt.date(2025, 10, 7),
+    2026: _dt.date(2026, 9, 29),
+}
+
+
+def _derive_from_today(on: "_dt.date | None" = None) -> int:
+    """Computed each call. Mirrors the SQL public.get_current_season(): the most
+    recent known season start on or before the date, falling back to the
+    Oct-1 calendar rule for dates older than the schedule we ship."""
+    d = on or _dt.date.today()
+    for season in sorted(SEASON_STARTS, reverse=True):
+        if d >= SEASON_STARTS[season]:
+            return season
     return d.year if d.month >= 10 else d.year - 1
 
 
@@ -69,6 +97,14 @@ def live_season_filter(season: Optional[int] = None) -> Tuple[str, str, int]:
 
 def derive_nhl_season_year(d: _dt.date) -> int:
     """Python mirror of public.get_nhl_season_year (SQL, IMMUTABLE).
+
+    DO NOT "fix" this to handle September openers. It is deliberately the
+    CALENDAR rule and nothing else -- its whole job is to stay bit-for-bit
+    identical to the SQL function of the same name, which
+    test_nhl_season_year_parity.py enforces over PostgREST. The product-path
+    question "what season is it right now" is answered by current_season() /
+    _derive_from_today(), which consult SEASON_STARTS first and therefore get
+    2026-09-29 right.
 
     NHL seasons run Oct→Jun. Months 10-12 use the current year; months 1-9
     use the previous year. Any drift between this function and the SQL side

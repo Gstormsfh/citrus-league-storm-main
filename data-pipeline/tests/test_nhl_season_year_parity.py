@@ -28,8 +28,12 @@ from data_pipeline.utils.season_config import derive_nhl_season_year  # noqa: E4
 
 
 # Boundary dates chosen to cover:
-#   - Sep 29 / Sep 30: last two days of NHL year N-1 (still previous season)
-#   - Oct 1 / Oct 2:   first two days of NHL year N (season flip)
+#   - Sep 29 / Sep 30: the CALENDAR rule puts these in season N-1. That is what
+#     this test asserts, because both sides of the parity ARE the calendar rule.
+#     It is NOT what the product should believe: the 2026-27 season opens
+#     2026-09-29, and the product-path resolver handles that. See
+#     test_season_boundary.py. Do not "fix" this file to expect 2026.
+#   - Oct 1 / Oct 2:   first two days of NHL year N (calendar flip)
 #   - Dec 31 / Jan 1:  calendar year boundary WITHIN a single NHL season
 #   - Jun 30 / Jul 1:  postseason / offseason boundary WITHIN a single NHL season
 # Anything the Python side gets wrong on these dates directly maps to

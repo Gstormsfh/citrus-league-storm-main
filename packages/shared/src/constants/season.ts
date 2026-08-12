@@ -19,9 +19,37 @@
  *      CURRENT_SEASON.
  */
 
+/**
+ * Known NHL regular-season start dates, mirrored from
+ * `SELECT season, min(game_date) FROM nhl_games WHERE game_type='regular'`.
+ *
+ * The Oct-1 rule below is wrong whenever a season opens in September. The
+ * 2026-27 season opens 2026-09-29, so on Sept 29 and Sept 30 the plain rule
+ * returns 2025 and every season-dependent value in the app -- CURRENT_SEASON,
+ * SEASON_LABEL, HEADSHOT_SEASON, every stat query -- would be a year stale on
+ * opening night.
+ *
+ * It CANNOT simply become `month >= 8` (September). September 2020 holds real
+ * COVID-bubble games correctly filed under season 2019, and a September rule
+ * would reclassify them. The schedule is the only ground truth, so known starts
+ * are listed and the calendar rule is kept for everything older.
+ *
+ * Drift is caught by the check_season_boundary gate in the database.
+ */
+const SEASON_STARTS: ReadonlyArray<{ season: number; start: string }> = [
+  { season: 2026, start: '2026-09-29' },
+  { season: 2025, start: '2025-10-07' },
+];
+
 function _deriveNhlSeasonYear(d: Date = new Date()): number {
-  // Month is 0-indexed in JS; NHL season year starts in October (month
-  // 10 = index 9).
+  // Local calendar date as YYYY-MM-DD, so the comparison below is a plain
+  // string compare and never crosses a timezone boundary.
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  for (const { season, start } of SEASON_STARTS) {
+    if (iso >= start) return season;
+  }
+  // Older than any schedule we ship: month is 0-indexed in JS; the NHL season
+  // year starts in October (month 10 = index 9).
   return d.getMonth() >= 9 ? d.getFullYear() : d.getFullYear() - 1;
 }
 
