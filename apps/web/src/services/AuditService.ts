@@ -43,7 +43,11 @@ export const AuditService = {
     } catch (error) {
       // Fire-and-forget — never block user operations.
       // Use debug level for auth events (token may already be cleared during sign-out)
-      if (eventType === 'AUTH_LOGOUT' || eventType === 'AUTH_LOGIN') {
+      // AUTH_LOGOUT genuinely races the token being cleared, so it stays quiet.
+      // AUTH_LOGIN had no such excuse: it was downgraded alongside logout, which
+      // is why a 13.9% login capture rate (38 audit rows vs 274 real logins,
+      // Apr-Aug 2026) produced no visible signal for four months.
+      if (eventType === 'AUTH_LOGOUT') {
         logger.debug('[AuditService] Could not log event (expected during sign-out):', eventType);
       } else {
         logger.error('[AuditService] Failed to log event:', eventType, error);
