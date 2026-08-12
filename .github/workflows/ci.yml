@@ -31,6 +31,29 @@ jobs:
       - name: Run ESLint
         run: cd apps/web && npx eslint src/
 
+  pytest:
+    name: Python Tests (data-pipeline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'data-pipeline/requirements.txt'
+
+      - run: pip install -r data-pipeline/requirements.txt
+
+      # No pytest job existed before 2026-08-12, so data-pipeline/tests/ had
+      # never run in CI -- including the season-rollover parity test written
+      # specifically to stop opening night scoring every player zero. Tests
+      # that need live Supabase credentials skip themselves; the boundary
+      # tests in test_season_boundary.py need nothing and always run.
+      - name: Run data-pipeline tests
+        run: python -m pytest data-pipeline/tests -q
+
   typecheck:
     name: Type Check (Web)
     runs-on: ubuntu-latest
