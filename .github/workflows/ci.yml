@@ -68,8 +68,29 @@ jobs:
 
       - run: npm ci
 
-      - name: TypeScript compile check (web)
-        run: cd apps/web && npx tsc --noEmit -p tsconfig.app.json || echo "::warning::TypeScript found type errors — tracked for strict mode migration"
+      # Ratchet, not a gate. apps/web builds with `vite build`, which does not
+      # typecheck, so these errors ship. A bare `|| echo ::warning::` ran every
+      # build green and trained everyone to scroll past it — the same
+      # permanently-amber failure mode we removed from the DB monitors.
+      #
+      # This fails only when the count GOES UP, so the debt can be paid down
+      # incrementally without red-walling every PR on day one.
+      - name: TypeScript compile check (web) — ratchet
+        run: |
+          cd apps/web
+          BASELINE=$(cat .typecheck-baseline)
+          npx tsc --noEmit -p tsconfig.app.json 2>&1 | tee /tmp/tsc-web.log || true
+          COUNT=$(grep -c "error TS" /tmp/tsc-web.log || true)
+          COUNT=${COUNT:-0}
+          echo "type errors: $COUNT (baseline $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Web type errors rose from $BASELINE to $COUNT. New errors:"
+            grep "error TS" /tmp/tsc-web.log | head -40
+            exit 1
+          fi
+          if [ "$COUNT" -lt "$BASELINE" ]; then
+            echo "::notice::Web type errors fell from $BASELINE to $COUNT — lower apps/web/.typecheck-baseline to $COUNT to lock the win in."
+          fi
 
   typecheck-server:
     name: Type Check (Server)
