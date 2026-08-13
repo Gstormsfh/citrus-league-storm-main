@@ -46,6 +46,14 @@ jobs:
 
       - run: pip install -r data-pipeline/requirements.txt
 
+      # pytest is a CI-only dependency and is deliberately NOT in
+      # requirements.txt -- that file is installed by the production data
+      # pipeline workflows (main.yml, refresh-player-directory.yml) and should
+      # not carry test tooling. Installing it here is what makes the job below
+      # actually able to run: on its first execution it failed with
+      # "No module named pytest", i.e. the gate could not run at all.
+      - run: pip install pytest
+
       # No pytest job existed before 2026-08-12, so data-pipeline/tests/ had
       # never run in CI -- including the season-rollover parity test written
       # specifically to stop opening night scoring every player zero. Tests

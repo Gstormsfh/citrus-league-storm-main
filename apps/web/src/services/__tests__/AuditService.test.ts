@@ -96,13 +96,35 @@ describe('AuditService', () => {
       await expect(AuditService.log('AUTH_LOGIN')).resolves.toBeUndefined();
     });
 
-    it('logs debug message for auth events when API call fails', async () => {
+    it('logs AUTH_LOGOUT failures at debug - it genuinely races the token being cleared', async () => {
+      mockLogSecurityEvent.mockRejectedValue(new Error('Database connection lost'));
+
+      await AuditService.log('AUTH_LOGOUT');
+
+      expect(logger.debug).toHaveBeenCalledWith(
+        '[AuditService] Could not log event (expected during sign-out):',
+        'AUTH_LOGOUT'
+      );
+    });
+
+    it('logs AUTH_LOGIN failures at error, NOT debug', async () => {
+      // Regression guard, and the reason this test changed.
+      //
+      // AUTH_LOGIN used to be downgraded to debug alongside AUTH_LOGOUT. That is
+      // why a 13.9% login capture rate -- 38 audit rows against 274 real logins
+      // between April and August 2026 -- produced no visible signal for four
+      // months. AUTH_LOGOUT has a real excuse (the token may already be cleared);
+      // a login that fails to audit does not, and must be loud.
       mockLogSecurityEvent.mockRejectedValue(new Error('Database connection lost'));
 
       await AuditService.log('AUTH_LOGIN');
 
-      // Auth events use debug level (token may be cleared during sign-out)
-      expect(logger.debug).toHaveBeenCalledWith(
+      expect(logger.error).toHaveBeenCalledWith(
+        '[AuditService] Failed to log event:',
+        'AUTH_LOGIN',
+        expect.any(Error)
+      );
+      expect(logger.debug).not.toHaveBeenCalledWith(
         '[AuditService] Could not log event (expected during sign-out):',
         'AUTH_LOGIN'
       );
