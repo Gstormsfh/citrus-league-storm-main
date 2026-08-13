@@ -95,8 +95,16 @@ export const LineupService = {
     matchupId: string
   ): Promise<{ backfilledCount: number; error: unknown }> {
     try {
+// The API layer returns the transport envelope: server routes reply with
+// `ok(c, payload)` which serialises to `{ data: payload }`, and apiClient resolves
+// to that object. Reading `result.thing` therefore reads the envelope, not the
+// payload, and yields undefined every time -- which the `|| 0` / `?? true`
+// fallbacks then quietly converted into a plausible-looking answer.
+// Unwrap `.data` first. (canUpdateRosterForDate was the sharp one: `?? true`
+// turned a permanently-undefined read into a permanent "yes, you may edit".)
       const result = await rosterApi.backfillDailyRosters(leagueId, String(teamId), matchupId);
-      return { backfilledCount: result?.backfilledCount || 0, error: result?.error || null };
+      const payload = result?.data as { backfilledCount?: number } | undefined;
+      return { backfilledCount: payload?.backfilledCount || 0, error: result?.error || null };
     } catch (error) {
       logger.error('[backfillMissingDailyRosters] API error:', error);
       return { backfilledCount: 0, error };
@@ -113,10 +121,16 @@ export const LineupService = {
   }> {
     try {
       const result = await rosterApi.backfillAllMatchups(leagueId);
+      const payload = result?.data as
+        {
+          totalBackfilled?: number;
+          matchupsProcessed?: number;
+          errors?: Array<{ matchup?: string; team?: string; error: unknown }>;
+        } | undefined;
       return {
-        totalBackfilled: result?.totalBackfilled || 0,
-        matchupsProcessed: result?.matchupsProcessed || 0,
-        errors: result?.errors || [],
+        totalBackfilled: payload?.totalBackfilled || 0,
+        matchupsProcessed: payload?.matchupsProcessed || 0,
+        errors: payload?.errors || [],
       };
     } catch (error) {
       logger.error('[backfillAllMatchupsForLeague] API error:', error);
@@ -144,7 +158,8 @@ export const LineupService = {
       if (allPlayerIds.length === 0) return true;
 
       const result = await rosterApi.canUpdateRoster(dateStr, allPlayerIds);
-      return result?.canUpdate ?? true;
+      const payload = result?.data as { canUpdate?: boolean } | undefined;
+      return payload?.canUpdate ?? true;
     } catch (error) {
       logger.error('[canUpdateRosterForDate] API error:', error);
       return true; // On error, allow update (fail open)
@@ -271,7 +286,19 @@ export const LineupService = {
       if (fetchMissingPlayers && missingPlayerIds.length > 0) {
         const missingPlayers = await PlayerService.getPlayersByIds(missingPlayerIds);
 
-        missingPlayers.forEach((player: Player) => {
+        // PlayerService returns directory rows, which carry more than the Player
+        // interface describes (full_name AND name, gaa/svPct for goalies,
+        // fantasy_points, projected_points, team_abbreviation). The reads below were
+        // already written defensively for both shapes; this types what they read.
+        type MissingPlayerRow = Player & Partial<{
+          name: string;
+          gaa: number;
+          svPct: number;
+          fantasy_points: number;
+          projected_points: number;
+          team_abbreviation: string;
+        }>;
+        missingPlayers.forEach((player: MissingPlayerRow) => {
           const transformedPlayer = {
             id: player.id,
             name: player.full_name || player.name || 'Unknown Player',
@@ -354,12 +381,20 @@ export const LineupService = {
         return { lineup: null, error: null };
       }
 
+      // Unwrap the transport envelope — see the note on backfillMissingDailyRosters.
+      const payload = result.data as {
+        starters?: string[];
+        bench?: string[];
+        ir?: string[];
+        slot_assignments?: Record<string, string>;
+      } | undefined;
+
       return {
         lineup: {
-          starters: result.starters || [],
-          bench: result.bench || [],
-          ir: result.ir || [],
-          slotAssignments: result.slot_assignments || {},
+          starters: payload?.starters || [],
+          bench: payload?.bench || [],
+          ir: payload?.ir || [],
+          slotAssignments: payload?.slot_assignments || {},
         },
         error: null,
       };

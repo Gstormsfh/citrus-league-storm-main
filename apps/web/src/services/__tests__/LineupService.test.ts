@@ -9,6 +9,10 @@ vi.mock('@/api/rosters', () => ({
     saveLineup: vi.fn(),
     getLineup: vi.fn(),
     getDailyRoster: vi.fn(),
+    // NOTE: these resolve to the transport envelope { data: payload }, because
+    // that is what apiClient returns — server routes reply with ok(c, payload).
+    // Mocking the payload flat is what let LineupService read the wrong level
+    // and still pass.
     canUpdateRoster: vi.fn(),
     backfillDailyRosters: vi.fn(),
     backfillAllMatchups: vi.fn(),
@@ -197,7 +201,7 @@ describe('LineupService.canUpdateRosterForDate', () => {
   });
 
   it('returns true when API says roster can be updated', async () => {
-    mockRosterApi.canUpdateRoster.mockResolvedValue({ canUpdate: true });
+    mockRosterApi.canUpdateRoster.mockResolvedValue({ data: { canUpdate: true } });
 
     const result = await LineupService.canUpdateRosterForDate(
       'team-1',
@@ -210,7 +214,7 @@ describe('LineupService.canUpdateRosterForDate', () => {
   });
 
   it('returns false when API says roster cannot be updated', async () => {
-    mockRosterApi.canUpdateRoster.mockResolvedValue({ canUpdate: false });
+    mockRosterApi.canUpdateRoster.mockResolvedValue({ data: { canUpdate: false } });
 
     const result = await LineupService.canUpdateRosterForDate(
       'team-1',
@@ -338,7 +342,7 @@ describe('LineupService.loadDailyRoster', () => {
 describe('LineupService.backfillMissingDailyRosters', () => {
   it('returns result from API', async () => {
     mockRosterApi.backfillDailyRosters.mockResolvedValue({
-      backfilledCount: 5,
+      data: { backfilledCount: 5 },
       error: null,
     });
 
@@ -374,9 +378,7 @@ describe('LineupService.backfillMissingDailyRosters', () => {
 describe('LineupService.backfillAllMatchupsForLeague', () => {
   it('returns result from API', async () => {
     mockRosterApi.backfillAllMatchups.mockResolvedValue({
-      totalBackfilled: 10,
-      matchupsProcessed: 3,
-      errors: [],
+      data: { totalBackfilled: 10, matchupsProcessed: 3, errors: [] },
     });
 
     const result = await LineupService.backfillAllMatchupsForLeague('league-1');
@@ -495,10 +497,12 @@ describe('LineupService.saveLineup', () => {
 describe('LineupService.initializeTeamLineup', () => {
   it('returns lineup from API', async () => {
     mockRosterApi.initializeLineup.mockResolvedValue({
-      starters: ['101', '102'],
-      bench: ['201'],
-      ir: [],
-      slot_assignments: { '101': 'slot-C-1', '102': 'slot-LW-1' },
+      data: {
+        starters: ['101', '102'],
+        bench: ['201'],
+        ir: [],
+        slot_assignments: { '101': 'slot-C-1', '102': 'slot-LW-1' },
+      },
     });
 
     const result = await LineupService.initializeTeamLineup('team-1', 'league-1', [], 'user-1');
