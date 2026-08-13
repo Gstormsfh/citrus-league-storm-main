@@ -2,9 +2,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { accountApi } from '@/api/account';
 import { logger } from '@/utils/logger';
 
+/** One row per policy currently in force, from get_user_consent_status(). */
+export interface ConsentStatus {
+  policy_type: string;
+  required_version: string;
+  consented_version: string | null;
+  status: 'current' | 'outdated' | 'withdrawn' | 'never_given';
+  consented_at: string | null;
+  withdrawn_at: string | null;
+}
+
 /**
  * UserAccountService — centralized account management operations.
- * Handles password changes, data export, account deletion, and consent recording.
+ * Handles password changes, data export, account deletion, and consent.
  */
 export class UserAccountService {
   /**
@@ -64,6 +74,50 @@ export class UserAccountService {
    * Record user consent for a policy (ToS, privacy policy).
    * Fire-and-forget — never blocks the auth flow.
    */
+  /**
+   * Read what the user still owes: current | outdated | withdrawn | never_given.
+   *
+   * Unlike recordConsent this is NOT fire-and-forget. It drives what the UI shows,
+   * so a failure has to surface rather than render an empty, falsely-reassuring list.
+   */
+  static async getConsentStatus(): Promise<{ success: boolean; data?: ConsentStatus[]; error?: string }> {
+    try {
+      const res = await accountApi.getConsentStatus();
+      return { success: true, data: (res.data ?? []) as ConsentStatus[] };
+    } catch (error: unknown) {
+      logger.error('[UserAccountService] Failed to read consent status', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * GDPR Art. 7(3): withdrawing consent must be as easy as giving it.
+   * Omit version to withdraw every live version of the policy.
+   */
+  static async withdrawConsent(policyType: string, version?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await accountApi.withdrawConsent(policyType, version);
+      return { success: true };
+    } catch (error: unknown) {
+      logger.error('[UserAccountService] Failed to withdraw consent', policyType, error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * Re-grant consent from the profile page. Unlike the signup-path recordConsent
+   * below, this one reports failure: the user pressed a button and is owed an answer.
+   */
+  static async grantConsent(policyType: string, version: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await accountApi.recordConsent(policyType, version);
+      return { success: true };
+    } catch (error: unknown) {
+      logger.error('[UserAccountService] Failed to record consent', policyType, version, error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
   static async recordConsent(policyType: string, version: string): Promise<void> {
     try {
       await accountApi.recordConsent(policyType, version);
