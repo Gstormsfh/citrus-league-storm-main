@@ -200,12 +200,18 @@ class TestAlertManager:
         call_args = mock_send.call_args
         assert "stale" in call_args[0][0].lower()
 
-    @patch("monitoring.alerting.requests")
-    def test_slack_integration(self, mock_requests):
+    # alerting.py imports `requests` INSIDE _send_slack -- a deliberate lazy import
+    # so the dependency is only needed when Slack alerting is actually used. That
+    # means `monitoring.alerting.requests` does not exist as a module attribute, and
+    # the old patch target raised AttributeError before this test body ever ran.
+    # Patch the function at its source: the lazy import resolves sys.modules at call
+    # time, so it is still intercepted.
+    @patch("requests.post")
+    def test_slack_integration(self, mock_post):
         """Sends properly formatted Slack webhook payload."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_requests.post.return_value = mock_response
+        mock_post.return_value = mock_response
 
         manager = AlertManager()
         manager.slack_webhook = "https://hooks.slack.com/test"
@@ -215,7 +221,7 @@ class TestAlertManager:
             "details": {"key": "value"},
         })
         assert result is True
-        mock_requests.post.assert_called_once()
+        mock_post.assert_called_once()
 
 
 if __name__ == "__main__":

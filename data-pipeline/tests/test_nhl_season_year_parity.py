@@ -50,12 +50,30 @@ BOUNDARY_DATES = [
 ]
 
 
+# Placeholder credentials planted by other test modules. test_projection_logic.py
+# does os.environ.setdefault("VITE_SUPABASE_URL", "https://test.supabase.co") and
+# the matching SERVICE_ROLE_KEY at MODULE level, because the module it imports needs
+# them present at import time. pytest imports every test module during collection,
+# before any test runs, so those values are in the environment by the time this file
+# executes -- regardless of file order. The "are creds present?" guard below was
+# therefore satisfied by credentials that were never real, and these tests tried to
+# resolve test.supabase.co over the network. Eight of them failed that way on the
+# first CI run of this suite (2026-08-13).
+_PLACEHOLDER_URL_HOSTS = ("test.supabase.co", "example.supabase.co", "localhost")
+_PLACEHOLDER_KEY_PREFIXES = ("test-", "dummy-", "placeholder")
+
+
 def _live_supabase():
-    """Return a SupabaseRest client, or skip the test if creds are absent."""
+    """Return a SupabaseRest client, or skip when real credentials are absent."""
     url = os.environ.get("VITE_SUPABASE_URL")
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     if not url or not key:
         pytest.skip("VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required")
+    if any(h in url for h in _PLACEHOLDER_URL_HOSTS) or key.startswith(_PLACEHOLDER_KEY_PREFIXES):
+        pytest.skip(
+            "placeholder Supabase credentials leaked from another test module; "
+            "this parity test needs real ones"
+        )
     from data_pipeline.utils.supabase_rest import SupabaseRest
     return SupabaseRest(url, key)
 
