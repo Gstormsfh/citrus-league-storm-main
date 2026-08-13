@@ -187,10 +187,9 @@ export class PoolService {
   static async scorePickemWeek(
     leagueId: string,
     weekNumber: number,
-    gameResults: Array<{ game_id: string; winning_team: string }>,
   ): Promise<{ scored: number; error?: string }> {
     try {
-      const res = await poolApi.scorePickemWeek(leagueId, weekNumber, gameResults);
+      const res = await poolApi.scorePickemWeek(leagueId, weekNumber);
       return res.data as { scored: number };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -201,17 +200,9 @@ export class PoolService {
   static async scorePickemWeekATS(
     leagueId: string,
     weekNumber: number,
-    gameResults: Array<{
-      game_id: string;
-      home_team: string;
-      away_team: string;
-      home_score: number;
-      away_score: number;
-      status: string;
-    }>,
   ): Promise<{ scored: number; error?: string }> {
     try {
-      const res = await poolApi.scorePickemWeekATS(leagueId, weekNumber, gameResults);
+      const res = await poolApi.scorePickemWeekATS(leagueId, weekNumber);
       return res.data as { scored: number };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -260,10 +251,9 @@ export class PoolService {
   static async scoreSurvivorWeek(
     leagueId: string,
     weekNumber: number,
-    teamResults: Array<{ team: string; won: boolean }>,
   ): Promise<{ scored: number; error?: string }> {
     try {
-      const res = await poolApi.scoreSurvivorWeek(leagueId, weekNumber, teamResults);
+      const res = await poolApi.scoreSurvivorWeek(leagueId, weekNumber);
       return res.data as { scored: number };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -339,10 +329,9 @@ export class PoolService {
   static async scoreConfidenceWeek(
     leagueId: string,
     weekNumber: number,
-    gameResults: Array<{ game_id: string; winning_team: string }>,
   ): Promise<{ scored: number; error?: string }> {
     try {
-      const res = await poolApi.scoreConfidenceWeek(leagueId, weekNumber, gameResults);
+      const res = await poolApi.scoreConfidenceWeek(leagueId, weekNumber);
       return res.data as { scored: number };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

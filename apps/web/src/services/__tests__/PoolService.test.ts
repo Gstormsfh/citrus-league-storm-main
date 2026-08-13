@@ -150,57 +150,34 @@ describe('PoolService.getPickemPicks', () => {
 // Pick'em Scoring
 // =============================================================================
 
-describe('PoolService.scorePickemWeek', () => {
-  it('marks correct picks as true and incorrect as false', async () => {
-    mockPoolApi.scorePickemWeek.mockResolvedValue({
-      data: { scored: 2 },
-    });
+// =============================================================================
+// Pool scoring
+//
+// The client no longer sends game results. It sends the week and nothing else;
+// the server derives every winner from nhl_games. Sending results previously let
+// any league member decide their own picks were correct.
+// =============================================================================
 
-    const result = await PoolService.scorePickemWeek('league-1', 5, [
-      { game_id: 'g1', winning_team: 'TOR' },
-      { game_id: 'g2', winning_team: 'BOS' },
-    ]);
+describe('PoolService pool scoring', () => {
+  const cases: Array<[string, string]> = [
+    ['scorePickemWeek', 'scorePickemWeek'],
+    ['scorePickemWeekATS', 'scorePickemWeekATS'],
+    ['scoreSurvivorWeek', 'scoreSurvivorWeek'],
+    ['scoreConfidenceWeek', 'scoreConfidenceWeek'],
+  ];
 
-    expect(result.scored).toBe(2);
-    expect(mockPoolApi.scorePickemWeek).toHaveBeenCalledWith('league-1', 5, [
-      { game_id: 'g1', winning_team: 'TOR' },
-      { game_id: 'g2', winning_team: 'BOS' },
-    ]);
+  it.each(cases)('%s posts only the league and week', async (method, apiFn) => {
+    (mockPoolApi as any)[apiFn].mockResolvedValue({ data: { scored: 3 } });
+    const result = await (PoolService as any)[method]('league-1', 5);
+    expect((mockPoolApi as any)[apiFn]).toHaveBeenCalledWith('league-1', 5);
+    expect(result).toEqual({ scored: 3 });
   });
 
-  it('treats TIE as incorrect (industry standard)', async () => {
-    mockPoolApi.scorePickemWeek.mockResolvedValue({
-      data: { scored: 1 },
-    });
-
-    const result = await PoolService.scorePickemWeek('league-1', 5, [
-      { game_id: 'g1', winning_team: 'TIE' },
-    ]);
-
-    expect(result.scored).toBe(1);
-  });
-
-  it('treats POSTPONED as incorrect (industry standard)', async () => {
-    mockPoolApi.scorePickemWeek.mockResolvedValue({
-      data: { scored: 1 },
-    });
-
-    const result = await PoolService.scorePickemWeek('league-1', 5, [
-      { game_id: 'g1', winning_team: 'POSTPONED' },
-    ]);
-
-    expect(result.scored).toBe(1);
-  });
-
-  it('returns error when fetch fails', async () => {
-    mockPoolApi.scorePickemWeek.mockRejectedValue(new Error('Permission denied'));
-
-    const result = await PoolService.scorePickemWeek('league-1', 5, [
-      { game_id: 'g1', winning_team: 'TOR' },
-    ]);
-
+  it.each(cases)('%s returns the error message instead of throwing', async (method, apiFn) => {
+    (mockPoolApi as any)[apiFn].mockRejectedValue(new Error('Permission denied'));
+    const result = await (PoolService as any)[method]('league-1', 5);
     expect(result.scored).toBe(0);
-    expect(result.error).toContain('Permission denied');
+    expect(result.error).toBe('Permission denied');
   });
 });
 
@@ -232,24 +209,6 @@ describe('PoolService.submitSurvivorPick', () => {
   });
 });
 
-describe('PoolService.scoreSurvivorWeek', () => {
-  it('scores each selection correctly', async () => {
-    mockPoolApi.scoreSurvivorWeek.mockResolvedValue({
-      data: { scored: 2 },
-    });
-
-    const result = await PoolService.scoreSurvivorWeek('league-1', 5, [
-      { team: 'TOR', won: true },
-      { team: 'MTL', won: false },
-    ]);
-
-    expect(result.scored).toBe(2);
-    expect(mockPoolApi.scoreSurvivorWeek).toHaveBeenCalledWith('league-1', 5, [
-      { team: 'TOR', won: true },
-      { team: 'MTL', won: false },
-    ]);
-  });
-});
 
 // =============================================================================
 // Confidence Pool
@@ -297,37 +256,6 @@ describe('PoolService.submitConfidencePicks', () => {
   });
 });
 
-describe('PoolService.scoreConfidenceWeek', () => {
-  it('awards confidence_points for correct picks and 0 for incorrect', async () => {
-    mockPoolApi.scoreConfidenceWeek.mockResolvedValue({
-      data: { scored: 2 },
-    });
-
-    const result = await PoolService.scoreConfidenceWeek('league-1', 5, [
-      { game_id: 'g1', winning_team: 'TOR' },
-      { game_id: 'g2', winning_team: 'BOS' },
-    ]);
-
-    expect(result.scored).toBe(2);
-    expect(mockPoolApi.scoreConfidenceWeek).toHaveBeenCalledWith('league-1', 5, [
-      { game_id: 'g1', winning_team: 'TOR' },
-      { game_id: 'g2', winning_team: 'BOS' },
-    ]);
-  });
-
-  it('treats TIE and POSTPONED as 0 points (industry standard)', async () => {
-    mockPoolApi.scoreConfidenceWeek.mockResolvedValue({
-      data: { scored: 2 },
-    });
-
-    const result = await PoolService.scoreConfidenceWeek('league-1', 5, [
-      { game_id: 'g1', winning_team: 'TIE' },
-      { game_id: 'g2', winning_team: 'POSTPONED' },
-    ]);
-
-    expect(result.scored).toBe(2);
-  });
-});
 
 // =============================================================================
 // Survivor Used Teams
