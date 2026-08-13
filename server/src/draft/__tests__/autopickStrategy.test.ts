@@ -86,16 +86,36 @@ function makeMockSupabase(opts: MockProjections): SupabaseClient {
       return chain;
     }
     // E118: positions for cap accounting.
+    //
+    // AUTOPICK-TRUNCATION (2026-08-12) — two DIFFERENT query shapes hit
+    // this table and the mock must serve both:
+    //   a) the team's own picks .....  .select().in('player_id', owned)
+    //   b) the board-wide position map .select().order().range()  <- paged
+    //
+    // (b) used to be an unbounded .select() and silently truncated at
+    // PostgREST's 1,000-row default against a 2,035-row table. `range` is
+    // honoured here rather than ignored so the paging loop is genuinely
+    // exercised — a mock that returns everything regardless of range
+    // would pass a loop that pages wrongly.
     if (table === 'player_directory') {
+      const all = Object.entries(opts.positions ?? {}).map(([id, pos]) => ({
+        player_id: Number(id),
+        position_code: pos,
+      }));
       const chain: Record<string, unknown> = {};
+      let rangeFrom: number | null = null;
+      let rangeTo = 0;
       chain.select = () => chain;
       chain.in = () => chain;
+      chain.order = () => chain;
+      chain.range = (from: number, to: number) => {
+        rangeFrom = from;
+        rangeTo = to;
+        return chain;
+      };
       chain.then = (resolve: (val: unknown) => void) =>
         resolve({
-          data: Object.entries(opts.positions ?? {}).map(([id, pos]) => ({
-            player_id: Number(id),
-            position_code: pos,
-          })),
+          data: rangeFrom === null ? all : all.slice(rangeFrom, rangeTo + 1),
           error: null,
         });
       return chain;
@@ -109,15 +129,32 @@ function makeMockSupabase(opts: MockProjections): SupabaseClient {
       return chain;
     }
     // E117 draft-value ranking reads prior-season games played.
+    // AUTOPICK-TRUNCATION (2026-08-12) — now paged; see player_directory
+    // above for why range() is honoured rather than ignored. The error
+    // fixture must still short-circuit on the FIRST page, which is what
+    // pins that a read failure degrades to DEFAULT_EXPECTED_GAMES rather
+    // than looping.
     if (table === 'player_season_stats') {
+      const all = opts.seasonGames ?? [];
       const chain: Record<string, unknown> = {};
+      let rangeFrom: number | null = null;
+      let rangeTo = 0;
       chain.select = () => chain;
       chain.eq = () => chain;
+      chain.order = () => chain;
+      chain.range = (from: number, to: number) => {
+        rangeFrom = from;
+        rangeTo = to;
+        return chain;
+      };
       chain.then = (resolve: (val: unknown) => void) =>
         resolve(
           opts.seasonStatsError
             ? { data: null, error: opts.seasonStatsError }
-            : { data: opts.seasonGames ?? [], error: null },
+            : {
+                data: rangeFrom === null ? all : all.slice(rangeFrom, rangeTo + 1),
+                error: null,
+              },
         );
       return chain;
     }

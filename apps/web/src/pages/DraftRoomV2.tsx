@@ -1073,6 +1073,10 @@ function SidebarPanel({
           isDraftActive={derived?.draftStatus === 'in_progress'}
           isYourTurn={amIOnClock}
           leagueId={leagueId}
+          // QUEUE (2026-08-12) — enables server persistence. Null for a
+          // spectator or an unresolved identity, in which case DraftQueue
+          // stays on its previous localStorage-only path.
+          teamId={myTeamId}
           currentPick={derived?.currentPickNumber ?? undefined}
           totalPicks={derived?.totalPicks ?? undefined}
         />

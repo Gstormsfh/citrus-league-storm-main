@@ -4,6 +4,7 @@
  */
 
 import type { LeagueType } from '@/types/leagueTypes';
+import { LEAGUE_TYPE_LABELS } from '@citrus/shared';
 
 /** Returns true for pickem, survivor, confidence-pool, and all playoff pool leagues */
 export const isPoolLeague = (leagueType: string | undefined | null): boolean =>
@@ -13,6 +14,37 @@ export const isPoolLeague = (leagueType: string | undefined | null): boolean =>
 /** Returns true for any of the playoff-specific pool types */
 export const isPlayoffPoolLeague = (leagueType: string | undefined | null): boolean =>
   leagueType === 'playoff-bracket-pickem' || leagueType === 'playoff-confidence-pool' || leagueType === 'playoff-roster-pool';
+
+/**
+ * SEASON-AGNOSTIC (2026-08-13) — which league types the create-league
+ * picker offers, given the `?type` query param.
+ *
+ * This rule used to live inside CreateLeague's JSX as
+ * "only show playoff types (we're in playoff season)", with `?type=all`
+ * as a documented backdoor. That put the CALENDAR IN THE SOURCE: every
+ * turn of the season required a code change and a deploy, and until
+ * someone made it, nobody could create a season-long fantasy league at
+ * all. It is what blocked draft testing for THE TWELVE in August.
+ *
+ * Inverted here: the URL NARROWS, the default shows everything.
+ *
+ *   ?type=playoff  -> the three playoff formats only. Every playoff CTA
+ *                     (Navbar, MobileMenuButton, MobileBottomNav,
+ *                     NHLPlayoffBracket) already passes this, so the
+ *                     playoff funnel is untouched.
+ *   anything else  -> the full catalogue, Fantasy Hockey first.
+ *                     `?type=all` therefore keeps working unchanged.
+ *
+ * Extracted as a pure function specifically so this is pinned by a test.
+ * The cost of it silently regressing is "no one can create a league",
+ * which is not a thing that should be discoverable only by a founder
+ * trying to run a draft.
+ */
+export const visibleLeagueTypes = (typeParam: string | null | undefined): LeagueType[] => {
+  const all = Object.keys(LEAGUE_TYPE_LABELS) as LeagueType[];
+  if (typeParam === 'playoff') return all.filter((t) => isPlayoffPoolLeague(t));
+  return all;
+};
 
 /** Returns the correct frontend route for a pool league */
 export const getPoolRoute = (leagueType: string, leagueId: string, tab?: string): string => {

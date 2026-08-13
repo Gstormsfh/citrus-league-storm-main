@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { visibleLeagueTypes } from '@/utils/leagueTypeHelpers';
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   HockeyFooter,
@@ -141,7 +142,13 @@ const CreateLeague = () => {
 
   // ---- Core Settings ----
   const [leagueName, setLeagueName] = useState("");
-  const [leagueType, setLeagueType] = useState<LeagueType>("playoff-bracket-pickem");
+  // SEASON-AGNOSTIC (2026-08-13) — default to season-long fantasy.
+  //
+  // This was hard-coded to 'playoff-bracket-pickem' because the site was
+  // launched during the playoffs. `?type=playoff` still selects it, and
+  // every playoff CTA in the nav already passes that param, so the
+  // playoff funnel is unchanged.
+  const [leagueType, setLeagueType] = useState<LeagueType>("fantasy");
   const [scoringFormat, setScoringFormat] = useState<ScoringFormat>("h2h-points");
   const [draftType, setDraftType] = useState<DraftType>("snake");
   const [teamsCount, setTeamsCount] = useState("12");
@@ -721,8 +728,11 @@ const CreateLeague = () => {
             </p>
           </div>
 
-          {/* Testing Phase Banner — only for season-long fantasy */}
-          {searchParams.get('type') === 'all' && (
+          {/* Testing Phase Banner — season-long fantasy only.
+              SEASON-AGNOSTIC (2026-08-13): was gated on `?type=all`, which
+              meant it never rendered on the default page once season-long
+              became the default. Now it hides only on the playoff funnel. */}
+          {searchParams.get('type') !== 'playoff' && (
           <Alert className="mb-6 bg-pastel-orange/15 ring-1 ring-pastel-orange/40 border-0 text-pastel-cream rounded-2xl shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]">
             <Sparkles className="h-4 w-4 text-pastel-orange" />
             <AlertDescription className="text-pastel-cream">
@@ -776,18 +786,14 @@ const CreateLeague = () => {
                   {/* ======================================================== */}
                   <div>
                     <SectionHeader
-                      title={searchParams.get('type') === 'all' ? "Choose Your League Type" : "Choose Your Playoff Pool Format"}
-                      subtitle={searchParams.get('type') === 'all' ? "Select the format that fits your group" : "Pick how your playoff pool will work"}
+                      title={searchParams.get('type') === 'playoff' ? "Choose Your Playoff Pool Format" : "Choose Your League Type"}
+                      subtitle={searchParams.get('type') === 'playoff' ? "Pick how your playoff pool will work" : "Select the format that fits your group"}
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {(Object.keys(LEAGUE_TYPE_LABELS) as LeagueType[])
-                        .filter(type => {
-                          const isPlayoffType = type === 'playoff-bracket-pickem' || type === 'playoff-confidence-pool' || type === 'playoff-roster-pool';
-                          // ?type=all shows everything (backdoor for testing season-long)
-                          if (searchParams.get('type') === 'all') return true;
-                          // Default: only show playoff types (we're in playoff season)
-                          return isPlayoffType;
-                        })
+                      {/* SEASON-AGNOSTIC (2026-08-13) — the rule lives in
+                          `visibleLeagueTypes` (utils/leagueTypeHelpers) so it
+                          is pinned by a test rather than buried in JSX. */}
+                      {visibleLeagueTypes(searchParams.get('type'))
                         .map((type) => (
                         <button
                           key={type}

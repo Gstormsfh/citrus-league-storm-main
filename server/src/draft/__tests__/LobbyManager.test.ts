@@ -2152,10 +2152,15 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
       // to weight per-game rate by durability. An empty result is a
       // valid answer here (the strategy falls back to a default games
       // estimate), so the mock returns [] rather than throwing.
+      // AUTOPICK-TRUNCATION (2026-08-12) — this read is paged now
+      // (.order().range()), because unbounded it silently truncated at
+      // PostgREST's 1,000-row default. An empty first page ends the loop.
       if (table === 'player_season_stats') {
         const chain: Record<string, unknown> = {};
         chain.select = () => chain;
         chain.eq = () => chain;
+        chain.order = () => chain;
+        chain.range = () => chain;
         chain.then = (resolve: (val: unknown) => void) =>
           resolve({ data: [], error: null });
         return chain;
@@ -2172,10 +2177,16 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
           Promise.resolve({ data: { settings: {} }, error: null });
         return chain;
       }
+      // AUTOPICK-TRUNCATION (2026-08-12) — two shapes hit this table:
+      // the team's own picks (.in) and the board-wide position map,
+      // which is now paged (.order().range()). Serve both; an empty
+      // first page ends the paging loop.
       if (table === 'player_directory') {
         const chain: Record<string, unknown> = {};
         chain.select = () => chain;
         chain.in = () => chain;
+        chain.order = () => chain;
+        chain.range = () => chain;
         chain.then = (resolve: (val: unknown) => void) =>
           resolve({ data: [], error: null });
         return chain;

@@ -25,6 +25,50 @@ import { cn } from '@/lib/utils';
 import { Player } from '@/services/PlayerService';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
+import { supabase } from '@/integrations/supabase/client';
+
+/** A row of `draft_queues`. `position` is 1-based queue order. */
+interface QueueRow {
+  player_id: number;
+  position: number;
+}
+
+/**
+ * QUEUE (2026-08-12) — narrowly-typed view of the Supabase client.
+ *
+ * `draft_queues` and `set_draft_queue` are both absent from the
+ * generated types (`types.ts` declares `Functions: { [_ in never]:
+ * never }` and predates the v2 tables). Rather than widen the whole
+ * client to `any`, this describes exactly the two calls we make — same
+ * approach as the `player_season_stats` accessor in
+ * `usePreloadedPlayers`. Regenerating types would remove the need for
+ * it; that is a separate chore and not one to do days before a freeze.
+ */
+const queueClient = supabase as unknown as {
+  from: (table: 'draft_queues') => {
+    select: (cols: string) => {
+      eq: (
+        col: string,
+        val: string,
+      ) => {
+        order: (
+          col: string,
+          opts: { ascending: boolean },
+        ) => Promise<{
+          data: QueueRow[] | null;
+          error: { message?: string } | null;
+        }>;
+      };
+    };
+  };
+  rpc: (
+    fn: 'set_draft_queue',
+    args: { p_team_id: string; p_player_ids: number[] },
+  ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+};
+
+/** Debounce before persisting — a drag reorder fires many changes. */
+const QUEUE_SAVE_DEBOUNCE_MS = 600;
 
 interface DraftQueueProps {
   queue: string[]; // Array of player IDs
@@ -35,6 +79,17 @@ interface DraftQueueProps {
   isDraftActive: boolean;
   isYourTurn: boolean;
   leagueId?: string;
+  /**
+   * QUEUE (2026-08-12) — the manager's own team.
+   *
+   * OPTIONAL on purpose. `draft_queues` is keyed by team, and its RLS
+   * policy is `teams.owner_id = auth.uid()`, so server persistence is
+   * only possible when we know which team the viewer owns. When this is
+   * absent — the v1 draft room, or a spectator — the component keeps
+   * exactly its previous localStorage-only behaviour rather than
+   * degrading. That keeps v1 untouched by this change.
+   */
+  teamId?: string | null;
   currentPick?: number;
   totalPicks?: number;
 }
@@ -163,10 +218,22 @@ export const DraftQueue = ({
   isDraftActive,
   isYourTurn,
   leagueId,
+  teamId,
   currentPick,
   totalPicks
 }: DraftQueueProps) => {
   const { toast } = useToast();
+
+  /**
+   * Has the initial restore finished?
+   *
+   * THIS GUARD IS LOAD-BEARING. `queue` starts as `[]`, so without it
+   * the save effect below fires on first render and calls
+   * `set_draft_queue(teamId, [])` — which DELETES the queue the manager
+   * built before the draft, roughly 600ms after they open the room. The
+   * feature would have destroyed the very data it exists to protect.
+   */
+  const [hydrated, setHydrated] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -178,17 +245,58 @@ export const DraftQueue = ({
     })
   );
 
-  // Load queue from localStorage on mount
+  // ── QUEUE (2026-08-12) — restore: server first, localStorage second.
+  //
+  // Order matters. The server copy is the one the autopick engine reads,
+  // so it is authoritative. localStorage is now two things only: a
+  // MIGRATION source for managers who built a queue before this shipped,
+  // and a same-device cache if the server read fails. A manager who
+  // queues on their laptop now sees that queue on their phone.
   useEffect(() => {
-    if (leagueId) {
+    if (!leagueId) return;
+    let cancelled = false;
+
+    const restore = async () => {
+      if (teamId) {
+        try {
+          const { data, error } = await queueClient
+            .from('draft_queues')
+            .select('player_id, position')
+            .eq('team_id', teamId)
+            .order('position', { ascending: true });
+
+          if (cancelled) return;
+
+          if (error) {
+            logger.error(
+              '[DraftQueue] server queue read failed, falling back to local:',
+              new Error(error.message ?? 'unknown'),
+            );
+          } else if (data && data.length > 0) {
+            onQueueChange(data.map((r) => String(r.player_id)));
+            toast({
+              title: 'Queue Restored',
+              description: `Loaded ${data.length} players from your saved queue`,
+            });
+            setHydrated(true);
+            return;
+          }
+          // No server rows: fall through so a pre-existing local queue
+          // gets migrated up on the next save.
+        } catch (e) {
+          if (cancelled) return;
+          logger.error('[DraftQueue] server queue read threw:', e);
+        }
+      }
+
       const savedQueue = localStorage.getItem(`draft-queue-${leagueId}`);
       if (savedQueue) {
         try {
           const parsed = JSON.parse(savedQueue);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed) && parsed.length > 0 && !cancelled) {
             onQueueChange(parsed);
             toast({
-              title: "Queue Restored",
+              title: 'Queue Restored',
               description: `Loaded ${parsed.length} players from your saved queue`,
             });
           }
@@ -196,16 +304,69 @@ export const DraftQueue = ({
           logger.error('Error loading queue from localStorage:', e);
         }
       }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time restore from localStorage on mount; toast is stable
-  }, [leagueId]);
+      if (!cancelled) setHydrated(true);
+    };
 
-  // Save queue to localStorage whenever it changes
+    void restore();
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time restore per (league, team); toast/onQueueChange are stable
+  }, [leagueId, teamId]);
+
+  // ── QUEUE (2026-08-12) — persist.
+  //
+  // localStorage stays as a synchronous same-device cache (it survives a
+  // tab crash inside the debounce window). The server write is what the
+  // autopick engine actually consults.
   useEffect(() => {
-    if (leagueId && queue.length > 0) {
+    if (!leagueId) return;
+
+    if (queue.length > 0) {
       localStorage.setItem(`draft-queue-${leagueId}`, JSON.stringify(queue));
     }
-  }, [queue, leagueId]);
+
+    // See `hydrated` above — writing before the restore lands would
+    // erase the manager's queue with the empty initial state.
+    if (!teamId || !hydrated) return;
+
+    // `draft_queues.player_id` is INTEGER while the client carries ids as
+    // strings, and demo leagues use UUID player ids (KI-042). Anything
+    // non-numeric is dropped rather than sent — a bad cast here would
+    // either error the whole save or, worse, truncate a UUID to a valid-
+    // looking integer for the WRONG player.
+    const numeric: number[] = [];
+    for (const raw of queue) {
+      const n = Number(raw);
+      if (Number.isInteger(n) && n > 0) numeric.push(n);
+    }
+    if (numeric.length !== queue.length) {
+      logger.warn(
+        `[DraftQueue] dropped ${queue.length - numeric.length} non-numeric player id(s) from the server queue write`,
+      );
+    }
+
+    const handle = setTimeout(() => {
+      void (async () => {
+        try {
+          const { error } = await queueClient.rpc('set_draft_queue', {
+            p_team_id: teamId,
+            p_player_ids: numeric,
+          });
+          if (error) {
+            logger.error(
+              '[DraftQueue] queue save failed — autopick will fall back to projections:',
+              new Error(error.message ?? 'unknown'),
+            );
+          }
+        } catch (e) {
+          logger.error('[DraftQueue] queue save threw:', e);
+        }
+      })();
+    }, QUEUE_SAVE_DEBOUNCE_MS);
+
+    return () => clearTimeout(handle);
+  }, [queue, leagueId, teamId, hydrated]);
 
   const queuePlayers = queue
     .map(id => players.find(p => p.id === id))

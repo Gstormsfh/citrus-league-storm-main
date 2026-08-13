@@ -48,7 +48,23 @@ import { structuredLogger } from '@citrus/shared';
 
 /** Maximum events returned in the snapshot's ring buffer. Mirrors
  *  the engine's `EVENT_BUFFER_CAPACITY` from `LobbyManager.ts`. */
-const SNAPSHOT_EVENT_BUFFER_CAPACITY = 200;
+/**
+ * RECONNECT (2026-08-12) — raised from 200.
+ *
+ * This is the HTTP fallback a client uses when the engine's in-memory
+ * buffer cannot serve its `sinceSeq`. It carried the SAME 200-event cap
+ * as the engine, so it could not rescue the exact case it exists for: a
+ * 12 x 21 league emits ~253 events, and this returned the newest 200,
+ * leaving the client with a gap starting at seq 1 and a board it
+ * correctly refuses to render.
+ *
+ * 1000 is the ceiling worth having: it is also PostgREST's default
+ * `db-max-rows`, so asking for more would silently return 1000 anyway.
+ * That covers 12 teams x 83 rounds — far beyond any real league. A
+ * format that could exceed it would need a paged read here, not a
+ * bigger number; noted so the next person does not just raise it.
+ */
+const SNAPSHOT_EVENT_BUFFER_CAPACITY = 1000;
 
 /**
  * Build a `DraftSnapshot` for the given league by reading durable

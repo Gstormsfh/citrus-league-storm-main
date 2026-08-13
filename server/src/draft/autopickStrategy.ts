@@ -214,10 +214,39 @@ export const projectionsStrategy: AutopickStrategy = async ({
     return { ok: false, reason: 'no_eligible_players' };
   }
 
-  const { data: seasonRows, error: seasonErr } = await supabase
-    .from('player_season_stats')
-    .select('player_id, games_played, season')
-    .eq('season', DRAFT_VALUE_REFERENCE_SEASON);
+  // AUTOPICK-TRUNCATION (2026-08-12) — this read is now paged.
+  //
+  // It was a single unbounded select. `player_season_stats` holds 1,066
+  // rows for the reference season and PostgREST's default `db-max-rows`
+  // is 1,000, so ~66 players were silently dropped and fell back to
+  // DEFAULT_EXPECTED_GAMES — mis-ranking them. Worse, the query had no
+  // ORDER BY, so *which* 66 disappeared was arbitrary and could differ
+  // between calls.
+  //
+  // Same defect class as the client player pool fixed this morning, in a
+  // different file: nothing errors, the data is just quietly incomplete.
+  const seasonRows: Array<Record<string, unknown>> = [];
+  let seasonErr: { message?: string | null } | null = null;
+  {
+    const PAGE = 1000;
+    let offset = 0;
+    for (;;) {
+      const { data, error } = await supabase
+        .from('player_season_stats')
+        .select('player_id, games_played, season')
+        .eq('season', DRAFT_VALUE_REFERENCE_SEASON)
+        .order('player_id', { ascending: true })
+        .range(offset, offset + PAGE - 1);
+      if (error) {
+        seasonErr = error;
+        break;
+      }
+      const rows = (data ?? []) as Array<Record<string, unknown>>;
+      for (const r of rows) seasonRows.push(r);
+      if (rows.length < PAGE) break;
+      offset += PAGE;
+    }
+  }
   if (seasonErr) {
     // Non-fatal: fall back to DEFAULT_EXPECTED_GAMES for everyone,
     // which degrades to per-game ordering — the pre-E117 behaviour.
@@ -324,26 +353,47 @@ export const projectionsStrategy: AutopickStrategy = async ({
     }
   }
 
-  // Positions of every candidate on the board (one read; the board is
-  // ~1000 rows and this is a covered index lookup).
+  // AUTOPICK-TRUNCATION (2026-08-12) — this read is now paged.
+  //
+  // The original comment said "the board is ~1000 rows and this is a
+  // covered index lookup" — but the query never filtered to the board.
+  // It selected ALL of `player_directory`, which is 2,035 rows on
+  // staging (it is an all-time index, not a roster). Against PostgREST's
+  // 1,000-row default that returned an arbitrary, unordered half.
+  //
+  // The consequence was specific and silent: `positionByPlayer` is the
+  // only input to the roster-shape guard below, and a player missing
+  // from the map hits `positionCaps[pos] === undefined` and is treated
+  // as UNCAPPED. So roughly half the board bypassed the caps entirely —
+  // including G <= 2, the one the guard exists for. The guard looked
+  // present in code and was half-blind at runtime.
   const positionByPlayer = new Map<number, string>();
   {
-    const { data: dirRows, error: dirErr } = await supabase
-      .from('player_directory')
-      .select('player_id, position_code');
-    if (dirErr) {
-      structuredLogger.warn('autopick.roster_guard.directory_read_failed', {
-        leagueId,
-        message: dirErr.message ?? null,
-      });
-    } else {
-      for (const row of (dirRows ?? []) as Array<{
+    const PAGE = 1000;
+    let offset = 0;
+    for (;;) {
+      const { data: dirRows, error: dirErr } = await supabase
+        .from('player_directory')
+        .select('player_id, position_code')
+        .order('player_id', { ascending: true })
+        .range(offset, offset + PAGE - 1);
+      if (dirErr) {
+        structuredLogger.warn('autopick.roster_guard.directory_read_failed', {
+          leagueId,
+          message: dirErr.message ?? null,
+        });
+        break;
+      }
+      const rows = (dirRows ?? []) as Array<{
         player_id: number;
         position_code: string | null;
-      }>) {
+      }>;
+      for (const row of rows) {
         const pos = normalizePosition(row.position_code);
         if (pos) positionByPlayer.set(row.player_id, pos);
       }
+      if (rows.length < PAGE) break;
+      offset += PAGE;
     }
   }
 
@@ -412,13 +462,159 @@ export const projectionsStrategy: AutopickStrategy = async ({
 /**
  * Default chain shipped with chunk 11g.4 step 6c. Today: just
  * `projectionsStrategy`. Future enhancements (per
- * `PHASE_4_5_PROJECT_PLAN.md` Decision Log 2026-05-05):
- *   - `queueStrategy` (head of chain) — when `team_draft_queues`
- *     schema + UI ship, the user-defined per-team queue takes
- *     priority over projections.
- *   - `positionalStrategy` (tail) — roster-aware fallback that
- *     considers position needs after projections exhaust.
+/**
+ * QUEUE (2026-08-12) — the manager's own ranking, consulted first.
+ *
+ * Until today the draft queue was a lie of omission. `DraftQueue.tsx`
+ * wrote `localStorage['draft-queue-<leagueId>']` and **nothing on the
+ * server ever read it**. `draft_queues` existed, with correct RLS, and
+ * held zero rows. So the one moment a queue is FOR — the manager is
+ * away, their clock expires, autopick fires — was the one moment it did
+ * nothing. They got best-available instead of their guy.
+ *
+ * This is why the strategy chain exists, and the note above called it:
+ * "adding `queueStrategy` to the front of the array is a single line of
+ * code rather than a refactor." That held.
+ *
+ * ── Design decisions worth stating, because each could have gone the
+ *    other way ──
+ *
+ * 1. NO POSITION CAPS HERE. `projectionsStrategy` shapes an ABSENT
+ *    manager's roster with a G<=2-style guard, because a value ranking
+ *    left alone will hand someone twelve goalies. A queue is the
+ *    opposite situation: it is an explicit, ordered instruction the
+ *    manager typed in themselves. Overriding it with a cap would mean
+ *    silently not drafting the player they ranked #1. Yahoo, ESPN and
+ *    Sleeper all honour the queue as stated; so do we.
+ *
+ * 2. IT NEVER THROWS. Every failure path returns `ok: false`, which
+ *    hands control to `projectionsStrategy`. A malformed queue, an RLS
+ *    surprise, a dropped connection to Postgres — none of them may be
+ *    the reason a draft stalls. Degrading to best-available is a worse
+ *    pick; throwing is a dead clock, and a dead clock is how twelve
+ *    people end up standing around.
+ *
+ * 3. THE DRAFTED CHECK IS NOT OPTIONAL. A queue built before the draft
+ *    is stale within minutes — the top of it is exactly what everyone
+ *    else is also taking. Walking past already-drafted entries is the
+ *    common case, not an edge case.
+ *
+ * 4. It reads `draft_picks_v2` (the trigger-maintained projection), the
+ *    same source `projectionsStrategy` uses for its drafted set, so the
+ *    two strategies can never disagree about who is still available.
+ */
+export const queueStrategy: AutopickStrategy = async ({
+  leagueId,
+  teamId,
+  supabase,
+}) => {
+  const defer = (): AutopickResult => ({
+    ok: false,
+    reason: 'no_eligible_players',
+  });
+
+  try {
+    const { data: queueRows, error: queueErr } = await supabase
+      .from('draft_queues')
+      .select('player_id, position')
+      .eq('team_id', teamId)
+      .order('position', { ascending: true });
+
+    if (queueErr) {
+      // Logged at warn, not error: falling through to projections is a
+      // correct, complete outcome — the draft still advances on time.
+      structuredLogger.warn('autopick.queue.read_failed', {
+        leagueId,
+        teamId,
+        message: queueErr.message ?? null,
+      });
+      return defer();
+    }
+
+    const queued = (queueRows ?? []) as Array<{
+      player_id: number;
+      position: number;
+    }>;
+    if (queued.length === 0) {
+      // Overwhelmingly the common case. Deliberately not logged — on a
+      // 12-team board most managers never build a queue, and a log line
+      // per autopick per empty queue is noise that would bury the real
+      // events on draft night.
+      return defer();
+    }
+
+    const { data: draftedRows, error: draftedErr } = await supabase
+      .from('draft_picks_v2')
+      .select('player_id')
+      .eq('league_id', leagueId);
+
+    if (draftedErr) {
+      // Fail CLOSED for the queue specifically. Without a reliable
+      // drafted set we could hand back a player already on someone
+      // else's roster; submit_pick_v2 would reject it as `player_taken`
+      // and the autopick would fail outright. Deferring to projections,
+      // which does its own drafted lookup, is strictly safer.
+      structuredLogger.warn('autopick.queue.drafted_lookup_failed', {
+        leagueId,
+        teamId,
+        message: draftedErr.message ?? null,
+      });
+      return defer();
+    }
+
+    const drafted = new Set<number>();
+    for (const row of (draftedRows ?? []) as Array<{ player_id: number }>) {
+      const id = coerceToNumericPlayerId(row.player_id);
+      if (id !== null) drafted.add(id);
+    }
+
+    for (const entry of queued) {
+      const playerId = coerceToNumericPlayerId(entry.player_id);
+      if (playerId === null) continue;
+      if (drafted.has(playerId)) continue;
+
+      structuredLogger.info('autopick.queue.hit', {
+        leagueId,
+        teamId,
+        playerId,
+        queuePosition: entry.position,
+        queueLength: queued.length,
+      });
+      return { ok: true, playerId, source: 'queue' };
+    }
+
+    // The manager had a queue and every player in it is gone. Worth a
+    // log line — it is the signal that their prep was consumed, and on
+    // draft night it explains to them afterwards why they got a
+    // projections pick despite having queued.
+    structuredLogger.info('autopick.queue.exhausted', {
+      leagueId,
+      teamId,
+      queueLength: queued.length,
+    });
+    return defer();
+  } catch (err) {
+    structuredLogger.warn('autopick.queue.unexpected_error', {
+      leagueId,
+      teamId,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return defer();
+  }
+};
+
+/**
+ * The live chain. `queueStrategy` first — a manager's stated ranking
+ * outranks any model we have. `projectionsStrategy` catches everyone
+ * who did not queue, which on a real board is most of them.
+ *
+ * Still open for a future tail (see the chain-of-strategies note at the
+ * top of this file):
+ *   - `positionalStrategy` — roster-aware fallback once projections
+ *     exhaust. Not needed today: projectionsStrategy already carries a
+ *     roster-shape guard (E118).
  */
 export const DEFAULT_STRATEGIES: ReadonlyArray<AutopickStrategy> = [
+  queueStrategy,
   projectionsStrategy,
 ];

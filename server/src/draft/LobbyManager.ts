@@ -420,7 +420,58 @@ const IDEMPOTENCY_CACHE_MAX = 200;
  * correct behavior, not a bug. Noted here so nobody rediscovers it
  * as one.
  */
-const EVENT_BUFFER_CAPACITY = 200;
+/**
+ * RECONNECT (2026-08-12) — the ring buffer now sizes itself to the draft.
+ *
+ * It was a flat 200. The commissioner picks the round count on the night,
+ * and the default roster size is 21 (`LeagueService.ts:87`), so a 12-team
+ * league emits 12 x 21 + 1 = **253 events**. Eviction therefore began
+ * around pick 200 — round 17 of 21.
+ *
+ * What that cost, end to end: `getSnapshot()` sends `recentEvents` only,
+ * and the route attaches the authoritative `picks` array ONLY for terminal
+ * drafts (`routes/drafts.ts`, gated on `isTerminal`). So a mid-draft
+ * reconnect always takes the fold path — and `deriveDraftState` correctly
+ * refuses to fold a sequence with a hole, halting at the first gap. The
+ * manager's room then renders `picksMade = 0`, `draftStatus =
+ * 'not_started'`, empty rosters: **a blank board, mid-draft, in the last
+ * five rounds.** Three fallbacks that should have caught it all miss —
+ * the `too_old` resync reply, the HTTP snapshot (same cap, see
+ * `snapshotService.ts`), and the gap-resync escalation, which loops.
+ *
+ * Sizing from `draftOrder.length` rather than raising the constant is
+ * deliberate: Garrett sets rounds at draft time, so any fixed number is a
+ * guess that a future league silently outgrows. This way the buffer is
+ * correct for a 3-round test rig and a 25-round keeper league alike, and
+ * the failure mode cannot come back by configuration change.
+ *
+ * The floor keeps small/empty-order lobbies (auction pre-nomination,
+ * rigs mid-construction) at the previous behaviour. The headroom covers
+ * the non-pick lifecycle events — draft_started, paused/resumed,
+ * extended, completed — which are appended to the same buffer.
+ */
+const EVENT_BUFFER_MIN_CAPACITY = 200;
+const EVENT_BUFFER_HEADROOM = 64;
+
+export function eventBufferCapacityFor(totalPicks: number): number {
+  // Only non-finite input needs an explicit guard. Zero and negative
+  // draft orders are already handled by the floor below — Math.max
+  // returns EVENT_BUFFER_MIN_CAPACITY for anything under it — and a
+  // NaN/Infinity capacity would make the RingBuffer constructor throw.
+  //
+  // An earlier version also tested `totalPicks <= 0` here. Mutation
+  // testing showed that branch was unreachable in effect: flipping it to
+  // `< 0` changed no output for any input, because max() rescues both
+  // cases identically. Removed rather than papered over with a test that
+  // could not tell the two apart.
+  if (!Number.isFinite(totalPicks)) {
+    return EVENT_BUFFER_MIN_CAPACITY;
+  }
+  return Math.max(
+    EVENT_BUFFER_MIN_CAPACITY,
+    Math.ceil(totalPicks) + EVENT_BUFFER_HEADROOM,
+  );
+}
 
 /**
  * Backpressure threshold in bytes. Industry-standard floor for
@@ -694,8 +745,12 @@ export class LobbyManager {
 
   /**
    * Recent-events ring buffer backing chunk 11g.5's `last_seen_seq`
-   * resume protocol. Sized at `EVENT_BUFFER_CAPACITY` (~200) per
-   * the architecture doc. Eviction-aware semantics: clients whose
+   * resume protocol. Sized per-lobby by `eventBufferCapacityFor(
+   * draftOrder.length)` so the whole draft always fits — see that
+   * function for why a flat 200 blanked the board in late rounds.
+   * Assigned in the constructor (not as a field initializer) because
+   * it depends on `opts.draftOrder`; first use is in `init()`.
+   * Eviction-aware semantics: clients whose
    * `sinceSeq` references events the buffer no longer holds get a
    * `too_old` reply and fall back to a full snapshot resync from
    * Postgres; clients within the buffer's window get an incremental
@@ -706,7 +761,7 @@ export class LobbyManager {
    * event variants (`auction_bid_placed`, `auction_nomination_started`,
    * plus the system-generated variants like `auction_paused`).
    */
-  private readonly events = new RingBuffer<BufferedDraftEvent>(EVENT_BUFFER_CAPACITY);
+  private readonly events: RingBuffer<BufferedDraftEvent>;
 
   // ── Auction state (chunk 11g.6 sub-step 6a) ───────────────────────
 
@@ -872,6 +927,14 @@ export class LobbyManager {
     this.initialPickDeadline = opts.initialPickDeadline;
     this.initialDraftState = opts.initialDraftState;
     this.draftOrder = opts.draftOrder;
+
+    // RECONNECT (2026-08-12) — size the resume buffer to THIS draft.
+    // Must come after `this.draftOrder` is set and before `init()`,
+    // which is the first reader (`bufferSize=` in the init log line).
+    this.events = new RingBuffer<BufferedDraftEvent>(
+      eventBufferCapacityFor(opts.draftOrder.length),
+    );
+
     this.topicName = `draft:${opts.lobbyId}`;
 
     // Auction state (chunk 11g.6 sub-step 6a). `bidWindowMs` reuses
@@ -1062,7 +1125,7 @@ export class LobbyManager {
     this.startSnapshotTimer();
 
     structuredLogger.info(
-      `[lobby] init complete lobbyId=${this.lobbyId} format=${this.format} picksMade=${this.picksMade} status=${this.draftStatus} bufferSize=${this.events.size()} timerScheduled=${this.currentTimerHandle !== null} activeNomination=${this.currentNomination !== null}`,
+      `[lobby] init complete lobbyId=${this.lobbyId} format=${this.format} picksMade=${this.picksMade} status=${this.draftStatus} bufferSize=${this.events.size()} bufferCapacity=${eventBufferCapacityFor(this.draftOrder.length)} timerScheduled=${this.currentTimerHandle !== null} activeNomination=${this.currentNomination !== null}`,
     );
   }
 
