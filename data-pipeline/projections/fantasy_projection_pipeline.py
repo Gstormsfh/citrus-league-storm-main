@@ -1,11 +1,31 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
-# CATEGORY: ACTIVE
+# CATEGORY: UNWIRED — do not run without reading the note below
 # Purpose:     Top-level fantasy projection pipeline orchestrator (physical → fantasy translation)
 # Last active: 2026-03-08
-# Invoked:     imported by nightly_projection_batch.py + run_daily_projections.py
-# Reads:       projection_cache, leagues.scoring_settings
+# Invoked:     NOTHING. Verified 2026-08-12 across .github/workflows and all of
+#              data-pipeline: no workflow runs it and no module imports it. The
+#              previous header claimed "imported by nightly_projection_batch.py +
+#              run_daily_projections.py" — both of those import
+#              calculate_daily_projections instead. The stale ACTIVE label is the
+#              dangerous part: it invites someone to trust and run this.
+# Reads:       raw_shots  ← RETIRED. See note.
 # Writes:      fantasy_matchup_lines
+#
+# NOTE (2026-08-12): get_player_xg_per_game() reads public.raw_shots and prefers
+# shooting_talent_adjusted_xg. raw_shots is the retired third-party import whose
+# model leaks the target — 2025 goal/non-goal separation ratio 22.42 against a
+# real-world 3.09–3.61. The shipped model lives in public.nhl_shots.xg_sql
+# (shooter keyed as shooter_id, not player_id).
+#
+# This was NOT repointed, deliberately. nhl_shots has no talent-adjusted column,
+# and this file's own comments say talent-adjusted xG is required to stay
+# consistent with the GSAx baseline it feeds. Repointing would silently change the
+# quantity rather than its provenance. Since nothing runs this, changing its
+# meaning unreviewed is the worse risk.
+#
+# Before wiring this back up, decide which quantity calculate_team_xgf() actually
+# wants and source it from nhl_shots — do not restore the raw_shots read.
 # ────────────────────────────────────────────────────────────
 """
 fantasy_projection_pipeline.py
