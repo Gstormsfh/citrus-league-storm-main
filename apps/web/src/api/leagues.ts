@@ -7,18 +7,24 @@
 
 import { apiClient } from './client';
 import { createApiCache, CACHE_TTL } from './cache';
+// Type-only: erased at compile time, so this does not create a runtime import
+// cycle with LeagueService (which imports leagueApi). Typing the wire contract
+// here rather than casting at each call site means every consumer downstream
+// gets it for free -- these endpoints previously resolved to ApiResponse<unknown>,
+// so every read of .data.league / .data.id was a compile error in the services.
+import type { League, Team } from '@/services/LeagueService';
 
 const c = createApiCache();
 
 export const leagueApi = {
   /** Get all leagues for the authenticated user */
   getUserLeagues() {
-    return c.cached('leagues:user', () => apiClient.get('/api/leagues'), CACHE_TTL.MEDIUM);
+    return c.cached('leagues:user', () => apiClient.get<League[]>('/api/leagues'), CACHE_TTL.MEDIUM);
   },
 
   /** Get a specific league by ID */
   getLeague(leagueId: string) {
-    return c.cached(`leagues:${leagueId}`, () => apiClient.get(`/api/leagues/${leagueId}`), CACHE_TTL.MEDIUM);
+    return c.cached(`leagues:${leagueId}`, () => apiClient.get<League>(`/api/leagues/${leagueId}`), CACHE_TTL.MEDIUM);
   },
 
   /** Get fantasy season-complete state for a league */
@@ -52,7 +58,7 @@ export const leagueApi = {
    * 'already a member' error shown even though join succeeded. */
   joinLeague(params: { joinCode: string; teamName?: string }) {
     c.invalidate('leagues:');
-    return apiClient.post('/api/leagues/join', params, { retries: 0 });
+    return apiClient.post<{ league: League; team: Team }>('/api/leagues/join', params, { retries: 0 });
   },
 
   /** Update league settings (commissioner only) */

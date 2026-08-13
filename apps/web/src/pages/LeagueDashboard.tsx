@@ -388,7 +388,7 @@ const LeagueDashboard = () => {
         if (saved) {
           const { weeklyAddLimit = 0, seasonAddLimit = 0 } = waiverSettings;
           const leagueResponse = await leagueApi.getLeague(leagueId);
-          const currentLeague = leagueResponse.data as Record<string, unknown> | undefined;
+          const currentLeague = leagueResponse.data;
           if (currentLeague) {
             const currentSettings = (currentLeague.settings as LeagueSettings) || {};
             await leagueApi.updateSettings(leagueId, {
@@ -446,7 +446,7 @@ const LeagueDashboard = () => {
       } else if (activeSettingsTab === 'playoffs') {
         // Save playoff settings into the JSONB settings column
         const leagueResponse = await leagueApi.getLeague(leagueId);
-        const currentLeague = leagueResponse.data as Record<string, unknown> | undefined;
+        const currentLeague = leagueResponse.data;
         if (currentLeague) {
           const currentSettings = (currentLeague.settings as LeagueSettings) || {};
           const { error: playoffErr } = await leagueApi.updateSettings(leagueId, {

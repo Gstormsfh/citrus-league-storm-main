@@ -336,9 +336,10 @@ export class WaiverService {
 
       // If the server returned rostered IDs, filter them out
       // Otherwise fall back to showing all players (server will validate on add)
-      if (teamWaivers?.rosteredPlayerIds) {
+      const waiverPayload = teamWaivers as { rosteredPlayerIds?: string[] } | undefined;
+      if (waiverPayload?.rosteredPlayerIds) {
         const rosteredPlayerIds = new Set<string>(
-          (teamWaivers.rosteredPlayerIds as string[]).map(String)
+          waiverPayload.rosteredPlayerIds.map(String)
         );
         players = players.filter(p => !rosteredPlayerIds.has(String(p.id)));
       }
@@ -470,7 +471,8 @@ export class WaiverService {
   }> {
     try {
       const { data } = await apiClient.get('/api/waivers/processing-status');
-      return { leagues: data?.leagues || [] };
+      const payload = data as { leagues?: any[] } | undefined;
+      return { leagues: payload?.leagues || [] };
     } catch (error: unknown) {
       logger.error('[WaiverService] Error getting waiver status:', error);
       return { leagues: [], error: error instanceof Error ? error.message : String(error) };

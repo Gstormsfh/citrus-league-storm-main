@@ -50,14 +50,15 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const { data, error } = await NotificationService.getNotifications(leagueId, userId);
 
       if (error) {
-        // Handle different error types
+        // NotificationService returns its error untyped; describe what we read.
+        const err = error as { code?: number; message?: string };
         let errorMessage = 'Failed to load notifications';
-        if (error.code === 401) {
+        if (err.code === 401) {
           errorMessage = 'Please sign in to view notifications';
-        } else if (error.code === 403) {
+        } else if (err.code === 403) {
           errorMessage = 'You do not have access to this league';
-        } else if (error.message) {
-          errorMessage = error.message;
+        } else if (err.message) {
+          errorMessage = err.message;
         }
 
         set((state) => {
