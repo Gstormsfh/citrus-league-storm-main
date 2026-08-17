@@ -167,6 +167,22 @@ describe('AccountService', () => {
       });
       expect(result.success).toBe(true);
     });
+
+    // Regression: record_user_consent did not exist in the database until
+    // 2026-08-12. supabase-js RETURNS that error rather than throwing, and this
+    // method discarded it and reported success on all 72 signups. Consent is
+    // GDPR Art. 7 evidence -- a failure must never read as a success.
+    it('reports failure when the consent RPC rejects', async () => {
+      mockSupabase.rpc = vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: '42883', message: 'function record_user_consent does not exist' },
+      });
+
+      const result = await service.recordConsent('privacy_policy', '2026-01-13');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('function record_user_consent does not exist');
+    });
   });
 
   describe('logSecurityEvent', () => {
@@ -182,6 +198,21 @@ describe('AccountService', () => {
         p_severity: 'INFO',
       });
       expect(result.success).toBe(true);
+    });
+
+    // Regression: the audit path reported success unconditionally, so a
+    // rejected write (bad event_type, revoked grant, dead connection) looked
+    // identical to a successful one all the way back to the browser.
+    it('reports failure when the audit RPC rejects', async () => {
+      mockSupabase.rpc = vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: '23514', message: 'violates check constraint "security_audit_log_event_type_check"' },
+      });
+
+      const result = await service.logSecurityEvent('NOT_A_REAL_EVENT', null, {}, 'INFO');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('security_audit_log_event_type_check');
     });
 
     it('defaults severity to INFO', async () => {

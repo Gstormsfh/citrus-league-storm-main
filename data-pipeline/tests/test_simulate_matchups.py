@@ -22,6 +22,9 @@ from unittest.mock import MagicMock, patch
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# the module under test lives in scoring/, which is not a package on sys.path
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scoring'))
 import _bootstrap  # noqa: F401
 
 from simulate_matchups import (

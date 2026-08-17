@@ -15,7 +15,7 @@ import { ScoreCard } from "@/components/matchup/ScoreCard";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { DailyRosters } from "@/components/matchup/DailyRosters";
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
-import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import { getCurrentSeason } from '@/utils/seasonConstants';
 import LeagueNotifications from "@/components/matchup/LeagueNotifications";
 import { MatchupSidebar } from "@/components/matchup/MatchupSidebar";
 import { Button } from "@/components/ui/button";
@@ -2449,7 +2449,7 @@ const Matchup = () => {
         setSelectedPlayer(toHockeyPlayer(player, seasonStats));
       } else {
         // Fallback: try to fetch directly via API
-        const statsRes = await playerApi.getPlayerStats(String(player.id), CURRENT_SEASON);
+        const statsRes = await playerApi.getPlayerStats(String(player.id), getCurrentSeason());
         const seasonStatsData = statsRes?.data;
 
         if (seasonStatsData) {
@@ -3343,7 +3343,6 @@ const Matchup = () => {
     (currentMatchup.status === 'in_progress' || currentMatchup.status === 'completed') &&
     (parseFloat(String(currentMatchup.team1_score)) > 0 || parseFloat(String(currentMatchup.team2_score)) > 0);
   
-
 
   // Load real matchup data for logged-in users with leagues
   useEffect(() => {
@@ -4952,7 +4951,6 @@ const Matchup = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [league?.id, currentMatchup?.id, currentMatchup?.week_start_date, currentMatchup?.week_end_date, currentMatchup?.status, userLeagueState, fetchAllDailyStats]);
 
-
   // Handle week selection - updates URL which triggers data reload
   // Works for both logged-in users and guests
   const handleWeekChange = useCallback((weekNumber: number) => {
@@ -4975,7 +4973,6 @@ const Matchup = () => {
     // Use window.location to avoid React Router navigation loops
     window.location.href = `/matchup/${urlLeagueId}/${urlWeekId}`;
   }, [league?.id, userTeam?.id, urlLeagueId, urlWeekId]);
-
 
   // =============================================================================
   // SIMPLIFIED LOADING STATE - One-way gate prevents flash/cycling

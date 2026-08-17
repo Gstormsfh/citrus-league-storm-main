@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { logger } from '@citrus/shared';
 
 /**
  * AuditService — Server-side security audit logging with DI Supabase client.
@@ -35,14 +36,36 @@ export class AuditService {
     severity: Severity = 'INFO',
   ) {
     try {
-      await this.supabase.rpc('log_security_event', {
+      // supabase-js RETURNS its error rather than throwing, so the bare
+      // `catch {}` that used to be here caught nothing: every rejected audit
+      // write vanished without a trace. That is how security_audit_log went
+      // 51 days without a row and nothing noticed. Fire-and-forget still
+      // means never block the caller — it does not mean never say anything.
+      const { error } = await this.supabase.rpc('log_security_event', {
         p_event_type: eventType,
         p_league_id: leagueId || null,
         p_details: details || {},
         p_severity: severity,
       });
-    } catch {
-      // Silent fail — audit logging should never block operations
+      if (error) {
+        logger.error('[AuditService] SOC2 audit write REJECTED', {
+          eventType,
+          severity,
+          leagueId: leagueId || null,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
+      }
+    } catch (err) {
+      // Still never rethrow: audit logging must not break a user operation.
+      logger.error('[AuditService] SOC2 audit write THREW', {
+        eventType,
+        severity,
+        leagueId: leagueId || null,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

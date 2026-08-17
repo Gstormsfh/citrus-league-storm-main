@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { CURRENT_SEASON, logger } from '@citrus/shared';
+import { getCurrentSeason, logger } from '@citrus/shared';
 
 /**
  * Determines whether a fantasy league's season is complete and rosters
@@ -70,7 +70,7 @@ export class SeasonStateService {
         .from('playoff_brackets')
         .select('id, status')
         .eq('league_id', leagueId)
-        .eq('season', CURRENT_SEASON)
+        .eq('season', getCurrentSeason())
         .maybeSingle();
 
       if (!bracket) {

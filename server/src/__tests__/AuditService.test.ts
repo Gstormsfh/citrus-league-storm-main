@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { logger } from '@citrus/shared';
 import { AuditService } from '../services/AuditService';
 import { createMockSupabase } from './helpers';
 
@@ -38,11 +39,31 @@ describe('AuditService', () => {
       });
     });
 
-    it('silently fails on RPC error (fire-and-forget)', async () => {
+    it('does not throw when the RPC promise rejects (fire-and-forget)', async () => {
+      const spy = vi.spyOn(logger, 'error').mockImplementation(() => undefined as never);
       mockSupabase.rpc = vi.fn().mockRejectedValue(new Error('Network error'));
 
-      // Should not throw
       await expect(service.log('AUTH_LOGIN')).resolves.toBeUndefined();
+      expect(spy).toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    // THE regression. supabase-js RETURNS a Postgres error rather than
+    // throwing, so the old bare `catch {}` never ran and every rejected audit
+    // write disappeared. Fire-and-forget must mean "never block", not "never
+    // tell anyone".
+    it('does not throw but DOES log when the RPC returns an error', async () => {
+      const spy = vi.spyOn(logger, 'error').mockImplementation(() => undefined as never);
+      mockSupabase.rpc = vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: '42501', message: 'permission denied for function log_security_event' },
+      });
+
+      await expect(service.log('AUTH_LOGIN')).resolves.toBeUndefined();
+
+      expect(spy).toHaveBeenCalled();
+      expect(JSON.stringify(spy.mock.calls[0])).toContain('42501');
+      spy.mockRestore();
     });
 
     it('passes null league_id when not provided', async () => {

@@ -212,6 +212,36 @@ describe('DemoLeagueService', () => {
   // initializeDemoLeague
   // ---------------------------------------------------------------------------
   describe('initializeDemoLeague', () => {
+    // 2026-08-12, ledger 342. leagues.commissioner_id is NOT NULL, and this
+    // insert passed `commissioner_id: null` with the comment "No owner - system
+    // league", so the demo league could never be seeded. Every mocked test in
+    // this file passed anyway, because a mock accepts any payload -- which is
+    // exactly why this one asserts the PAYLOAD rather than the return value.
+    it('never sends a null commissioner_id when creating the league', async () => {
+      mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-user-1' } }, error: null });
+
+      const leaguesChain = createChainMock();
+      leaguesChain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null }); // does not exist yet
+      leaguesChain.single = vi.fn().mockResolvedValue({
+        data: { id: DEMO_LEAGUE_ID }, error: null,
+      });
+      (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) =>
+        table === 'leagues' ? leaguesChain : createChainMock()
+      );
+
+      await DemoLeagueService.initializeDemoLeague();
+
+      const insertCall = leaguesChain.insert.mock.calls.find(
+        (c: unknown[]) => c[0] && typeof c[0] === 'object' && 'name' in (c[0] as object)
+      );
+      expect(insertCall, 'expected a leagues insert to have been attempted').toBeTruthy();
+
+      const payload = insertCall![0] as Record<string, unknown>;
+      expect(payload.commissioner_id).toBeDefined();
+      expect(payload.commissioner_id).not.toBeNull();
+      expect(payload.commissioner_id).toBe('auth-user-1');
+    });
+
     it('returns error when user is not authenticated', async () => {
       mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 

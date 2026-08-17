@@ -237,7 +237,7 @@ export class LeagueService {
       waiver_process_time?: string;
       waiver_period_hours?: number;
       waiver_game_lock?: boolean;
-      waiver_type?: 'rolling' | 'faab' | 'reverse_standings';
+      waiver_type?: 'rolling' | 'reverse_draft_order' | 'faab' | 'reverse_standings';
       allow_trades_during_games?: boolean;
     },
   ) {

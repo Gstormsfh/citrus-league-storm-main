@@ -1,7 +1,7 @@
 // src/services/CitrusPuckService.ts
 
 import { CitrusPuckPlayerData, AggregatedPlayerData, Situation } from "@/types/citruspuck";
-import { CURRENT_SEASON, getCurrentSeason, getSeasonGameCount } from "@/utils/seasonConstants";
+import { getCurrentSeason, getSeasonGameCount } from "@/utils/seasonConstants";
 import { logger } from '@/utils/logger';
 import { playerApi } from '@/api/players';
 
@@ -277,8 +277,8 @@ export const CitrusPuckService = {
     restOfSeason: CitrusPuckPlayerData;
   }> {
     const [dataPrior, dataCurrent] = await Promise.all([
-      this.getAggregatedPlayerData(playerId, CURRENT_SEASON - 1, position),
-      this.getAggregatedPlayerData(playerId, CURRENT_SEASON, position)
+      this.getAggregatedPlayerData(playerId, getCurrentSeason() - 1, position),
+      this.getAggregatedPlayerData(playerId, getCurrentSeason(), position)
     ]);
 
     if (!dataCurrent) {

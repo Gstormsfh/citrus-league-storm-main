@@ -26,8 +26,17 @@ vi.mock('@/api/rosters', () => ({
   },
 }));
 
-vi.mock('@/utils/seasonConstants', () => ({
-  CURRENT_SEASON: '20252026',
+// Partial mocks of this module are fragile: 12 of the 13 web test files that
+// mock @/utils/seasonConstants omit getCurrentSeason, so any service that
+// starts calling it gets `undefined is not a function` and fails with
+// assertion noise rather than a clear error. importOriginal keeps the real
+// exports and overrides only what this suite needs.
+//
+// The prior mock also supplied CURRENT_SEASON: '20252026' — a string in the
+// HEADSHOT_SEASON format. The real export is a number (2025). No assertion
+// referenced it, so it never mattered, but it was never right either.
+vi.mock('@/utils/seasonConstants', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/seasonConstants')>()),
 }));
 
 vi.mock('@/utils/logger', () => ({

@@ -200,7 +200,7 @@ const CreateLeague = () => {
     waiver_process_time: '02:00:00',
     waiver_period_hours: 48,
     waiver_game_lock: true,
-    waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
+    waiver_type: 'rolling' as 'rolling' | 'reverse_draft_order' | 'faab' | 'reverse_standings',
     allow_trades_during_games: true,
     faab_budget: 100,
   });
@@ -1806,11 +1806,12 @@ const CreateLeague = () => {
                           <Label>Waiver Type</Label>
                           <Select
                             value={waiverSettings.waiver_type}
-                            onValueChange={(value: 'rolling' | 'faab' | 'reverse_standings') => setWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
+                            onValueChange={(value: 'rolling' | 'reverse_draft_order' | 'faab' | 'reverse_standings') => setWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
                           >
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="rolling">Rolling Priority</SelectItem>
+                              <SelectItem value="rolling">Rolling Priority (Join Order)</SelectItem>
+                              <SelectItem value="reverse_draft_order">Rolling Priority (Reverse Draft Order)</SelectItem>
                               <SelectItem value="reverse_standings">Reverse Standings</SelectItem>
                               <SelectItem value="faab">FAAB (Bidding)</SelectItem>
                             </SelectContent>

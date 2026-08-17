@@ -121,11 +121,14 @@ adminRoutes.get('/leagues', async (c) => {
 });
 
 // GET /api/admin/audit-log — View security audit log
+// public.audit_log has never existed in this database; this endpoint returned an
+// error on every call since it was written. The table is security_audit_log,
+// which carries exactly the columns COLUMNS.AUDIT_LOG asks for.
 adminRoutes.get('/audit-log', async (c) => {
   const limit = Math.min(500, Math.max(1, parseInt(c.req.query('limit') || '100', 10)));
 
   const { data, error } = await supabaseAdmin
-    .from('audit_log')
+    .from('security_audit_log')
     .select(COLUMNS.AUDIT_LOG)
     .order('created_at', { ascending: false })
     .limit(limit);

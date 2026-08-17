@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS } from '@citrus/shared';
+import { COLUMNS, logger } from '@citrus/shared';
 
 export class AccountService {
   private supabase: SupabaseClient;
@@ -39,17 +39,43 @@ export class AccountService {
     return { success: true };
   }
 
+  /**
+   * Record a GDPR Art. 7 consent grant.
+   *
+   * public.record_user_consent did not exist until 2026-08-12, and .rpc()
+   * returns its error instead of throwing, so this method discarded the error
+   * and reported success on every one of 72 signups. Consent is legal
+   * evidence: if it did not persist, say so.
+   */
   async recordConsent(policyType: string, version: string) {
-    await this.supabase.rpc('record_user_consent', { p_policy_type: policyType, p_version: version });
-    return { success: true };
+    const { error } = await this.supabase.rpc('record_user_consent', {
+      p_policy_type: policyType,
+      p_version: version,
+    });
+    if (error) {
+      logger.error('[AccountService] GDPR consent record REJECTED', {
+        policyType, version, code: error.code, message: error.message,
+      });
+      return { success: false as const, error: error.message };
+    }
+    return { success: true as const };
   }
 
   async logSecurityEvent(eventType: string, leagueId: string | null, details: Record<string, unknown>, severity: string = 'INFO') {
-    await this.supabase.rpc('log_security_event', {
+    const { error } = await this.supabase.rpc('log_security_event', {
       p_event_type: eventType, p_league_id: leagueId || null,
       p_details: details || {}, p_severity: severity,
     });
-    return { success: true };
+    if (error) {
+      // Loud but non-blocking. The caller still returns 200 so audit logging
+      // can never break a user-facing path; check_audit_trail_integrity is the
+      // outside observer that catches sustained failure.
+      logger.error('[AccountService] SOC2 audit write REJECTED', {
+        eventType, severity, leagueId, code: error.code, message: error.message,
+      });
+      return { success: false as const, error: error.message };
+    }
+    return { success: true as const };
   }
 
   /**

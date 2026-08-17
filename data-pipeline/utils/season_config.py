@@ -24,10 +24,50 @@ import datetime as _dt
 from typing import List, Optional, Tuple
 
 
+# Seasons that open BEFORE October, keyed by season year.
+#
+# The month rule below encodes "NHL seasons start in October". True of every
+# season this pipeline has ever processed, and false for the next one: 2026-27
+# opens 2026-09-29 and plays 8 regular-season games before October 1. Without
+# this map the whole Python pipeline targets season 2025 on opening night and
+# the day after -- calculate_daily_projections, fantasy_projection_pipeline,
+# nightly_projection_batch and populate_team_stats all take their season from
+# current_season(), and live_season_filter() would filter raw_shots to 2025
+# while the rows arriving are 2026. The failure is silent: a season filter that
+# matches nothing looks exactly like a night with no data.
+#
+# Explicit map rather than a derived rule, and the same shape as
+# SEASON_START_DATES in packages/shared/src/constants/season.ts and the
+# schedule-derived public.get_current_season() in SQL. The NHL sets this per
+# season by agreement.
+SEASON_START_DATES = {
+    2026: _dt.date(2026, 9, 29),
+}
+
+
+def season_start_date(season: int) -> _dt.date:
+    """First regular-season game date for `season`, Oct 1 unless overridden."""
+    return SEASON_START_DATES.get(season, _dt.date(season, 10, 1))
+
+
+def current_nhl_season(d: _dt.date) -> int:
+    """The season number in effect on date `d`, honouring early season starts.
+
+    Python companion to SQL public.get_current_season(date). Use this for
+    "which season am I reading or writing". Use derive_nhl_season_year() only
+    where the pure calendar rule is what you want -- it is kept as the exact
+    mirror of the IMMUTABLE SQL get_nhl_season_year(date).
+    """
+    by_calendar = d.year if d.month >= 10 else d.year - 1
+    start = SEASON_START_DATES.get(by_calendar + 1)
+    if start is not None and d >= start:
+        return by_calendar + 1
+    return by_calendar
+
+
 def _derive_from_today() -> int:
-    """Computed each call — mirrors the SQL get_nhl_season_year(today)."""
-    d = _dt.date.today()
-    return d.year if d.month >= 10 else d.year - 1
+    """Computed each call. Honours early season starts via current_nhl_season."""
+    return current_nhl_season(_dt.date.today())
 
 
 # CURRENT_SEASON is derived at IMPORT TIME from today's date. This closes
@@ -93,8 +133,15 @@ def seasons_to_populate(today: _dt.date) -> List[int]:
     (populate_player_directory.py) and the workflow assertion. Do not
     duplicate the logic elsewhere; import from here.
     """
-    current = derive_nhl_season_year(today)
-    if today.month in (8, 9):
+    # The ramp exists because opening night must not depend on a single
+    # first-of-October cron run. "Imminent" is a property of the SCHEDULE, not
+    # of the month: with a Sept 29 opener, a month test still reads true on
+    # Sept 29 and 30 -- AFTER the season has started -- and would have asked
+    # this job to populate hundreds of rows for a season (current + 1) that is
+    # over a year away, while min_directory_rows_floor demanded 700 of them.
+    current = current_nhl_season(today)
+    days_to_next = (season_start_date(current + 1) - today).days
+    if 0 < days_to_next <= 60:
         return [current, current + 1]
     return [current]
 
@@ -118,9 +165,12 @@ def min_directory_rows_floor(today: _dt.date, season: int) -> int:
         ramp for the incoming season (camps have not yet begun; partial
         roster is normal) and historical seasons prior to the current one.
     """
-    current = derive_nhl_season_year(today)
+    current = current_nhl_season(today)
     if season == current:
         return 700
-    if today.month == 9 and season == current + 1:
+    # Same reasoning as seasons_to_populate: gate on how close the next season
+    # actually is, not on the calendar month.
+    days_to_next = (season_start_date(current + 1) - today).days
+    if season == current + 1 and 0 < days_to_next <= 30:
         return 700
     return 0

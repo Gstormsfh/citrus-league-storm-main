@@ -10,6 +10,13 @@ numpy==1.26.4
 pandas==2.2.3
 scikit-learn==1.5.2
 xgboost==2.1.3
+# 2026-08-12: six modules import scipy at module load -- projection_uncertainty,
+# audit_projection_accuracy, quantify_monte_carlo_impact, quantify_uncertainty_impact,
+# simulate_matchups and the tests that import them -- and it was never listed here.
+# Any environment built from this file could not run them, and the python-tests CI
+# job failed at COLLECTION with ModuleNotFoundError. 1.13.1 has a cp310 manylinux
+# wheel (CI pins Python 3.10) and resolves against numpy 1.26.4 / scikit-learn 1.5.2.
+scipy==1.13.1
 
 # HTTP / Networking
 urllib3==2.2.3

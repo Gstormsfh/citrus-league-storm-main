@@ -461,10 +461,48 @@ def main() -> int:
             "results": results,
         }, indent=2, default=str))
 
-    if counts[STATUS_FAIL] > 0:
+    return exit_code_for(results)
+
+
+def exit_code_for(results: List[Dict[str, Any]]) -> int:
+    """Map a run's results to a process exit code.
+
+    THE CONTRACT, because the caller depends on it and it is not obvious:
+
+        2  a PAGE-severity table breached its threshold. Wake someone.
+        1  something breached, but only WARN-severity tables. Annotate, do not fail.
+        0  everything inside threshold.
+
+    status and severity are different axes and conflating them is what broke
+    this. status is "how stale is it" (pass/warning/fail vs the table's own
+    threshold). severity is "how much do we care" (page/warn), declared per
+    table in freshness_sla.py.
+
+    The previous version returned 2 on ANY status=fail. That meant
+    player_talent_metrics -- explicitly severity=warn, rationale "Talent moves
+    slowly; weekly cadence acceptable year-round" -- could redden the hourly
+    build on its own, which is exactly what it did on 2026-08-11 20:03 UTC. An
+    hourly alarm that fires for a table nobody agreed to be paged about is an
+    alarm that gets muted, and this workflow has already been disabled once for
+    precisely that reason.
+
+    Only three SLAs are PAGE tier: fantasy_daily_rosters and
+    matchup_scoring_snapshots (both regular_season_only, so they correctly skip
+    out of season) and one more. If a PAGE table goes stale, the build fails and
+    should.
+    """
+    page_failures = [
+        r for r in results
+        if r.get("status") == STATUS_FAIL and r.get("severity") == SEVERITY_PAGE
+    ]
+    if page_failures:
+        for r in page_failures:
+            print(f"PAGE-tier breach: {r.get('table')} ({r.get('timestamp_column')})")
         return 2
-    if counts[STATUS_WARN] > 0:
+
+    if any(r.get("status") in (STATUS_FAIL, STATUS_WARN) for r in results):
         return 1
+
     return 0
 
 
