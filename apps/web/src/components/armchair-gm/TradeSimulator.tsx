@@ -225,7 +225,7 @@ export default function TradeSimulator() {
         {hasTrade && (
           <button
             onClick={handleSaveTrade}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-citrus-sage/30 bg-white/60 hover:bg-citrus-sage/10 transition-colors text-xs font-display font-bold text-citrus-forest"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-citrus-sage/30 bg-pastel-surface-tile hover:bg-citrus-sage/10 transition-colors text-xs font-display font-bold text-pastel-cream"
           >
             <Save className="w-3.5 h-3.5 text-citrus-sage" />
             Save Scenario
@@ -237,8 +237,8 @@ export default function TradeSimulator() {
             className={cn(
               "flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 transition-colors text-xs font-display font-bold",
               showSaved
-                ? "border-citrus-sage bg-citrus-sage/20 text-citrus-forest"
-                : "border-citrus-sage/30 bg-white/60 hover:bg-citrus-sage/10 text-citrus-forest"
+                ? "border-citrus-sage bg-citrus-sage/20 text-pastel-cream"
+                : "border-citrus-sage/30 bg-pastel-surface-tile hover:bg-citrus-sage/10 text-pastel-cream"
             )}
           >
             <FolderOpen className="w-3.5 h-3.5 text-citrus-sage" />
@@ -249,20 +249,20 @@ export default function TradeSimulator() {
 
       {/* Saved Trades Panel */}
       {showSaved && savedTrades.length > 0 && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="bg-pastel-surface-tile rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="px-4 py-2.5 bg-gradient-to-r from-citrus-sage/15 to-citrus-sage/5 border-b border-citrus-sage/20">
-            <span className="text-[10px] text-citrus-charcoal/60 uppercase font-display font-bold tracking-wider">Saved Trade Scenarios</span>
+            <span className="text-[10px] text-white/65 uppercase font-display font-bold tracking-wider">Saved Trade Scenarios</span>
           </div>
           {savedTrades.map(trade => (
             <div key={trade.id} className="flex items-center gap-2 px-4 py-2.5 border-b border-citrus-sage/10 hover:bg-citrus-sage/5 transition-colors">
-              <Clock className="w-3.5 h-3.5 text-citrus-charcoal/40 flex-shrink-0" />
+              <Clock className="w-3.5 h-3.5 text-white/50 flex-shrink-0" />
               <button onClick={() => handleLoadTrade(trade)} className="flex-1 text-left min-w-0">
-                <div className="font-display font-bold text-[11px] text-citrus-forest truncate">{trade.name}</div>
-                <div className="text-[9px] text-citrus-charcoal/40 font-display">
+                <div className="font-display font-bold text-[11px] text-pastel-cream truncate">{trade.name}</div>
+                <div className="text-[9px] text-white/50 font-display">
                   {new Date(trade.timestamp).toLocaleDateString()} {new Date(trade.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </button>
-              <button onClick={() => handleDeleteTrade(trade.id)} className="p-1 rounded-lg hover:bg-red-100 transition-colors">
+              <button onClick={() => handleDeleteTrade(trade.id)} className="p-1 rounded-lg hover:bg-red-500/20 transition-colors">
                 <Trash2 className="w-3 h-3 text-red-400" />
               </button>
             </div>
@@ -272,10 +272,10 @@ export default function TradeSimulator() {
 
       {/* Instructions */}
       {!teamA && !teamB && !showSaved && (
-        <div className="text-center py-8 bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-dashed border-citrus-sage/40">
-          <ArrowLeftRight className="w-10 h-10 text-citrus-sage/50 mx-auto mb-3" />
-          <h3 className="font-varsity text-lg text-citrus-forest mb-1">Trade Simulator</h3>
-          <p className="text-sm text-citrus-charcoal/60 font-display max-w-md mx-auto">
+        <div className="text-center py-8 bg-pastel-surface-tile rounded-2xl border-2 border-dashed border-citrus-sage/40">
+          <ArrowLeftRight className="w-10 h-10 text-citrus-sage/75 mx-auto mb-3" />
+          <h3 className="font-varsity text-lg text-pastel-cream mb-1">Trade Simulator</h3>
+          <p className="text-sm text-white/65 font-display max-w-md mx-auto">
             Select two teams below to start building a trade. See real-time cap impact, trade clause warnings, and salary retention options.
           </p>
         </div>
@@ -333,7 +333,7 @@ export default function TradeSimulator() {
 
       {/* Trade Summary */}
       {hasTrade && impact && dataA && dataB && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="bg-pastel-surface-tile rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="px-4 md:px-6 py-3 bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest border-b-2 border-citrus-sage/30 flex items-center justify-between">
             <h3 className="font-varsity text-lg text-citrus-cream flex items-center gap-2">
               <ArrowLeftRight className="w-5 h-5" />
@@ -380,16 +380,16 @@ export default function TradeSimulator() {
             {/* Trade Status */}
             <div className="flex flex-col gap-2">
               {impact.teamA.spaceAfter >= 0 && impact.teamB.spaceAfter >= 0 ? (
-                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-50 border-2 border-green-200">
-                  <Check className="w-5 h-5 text-green-600" />
-                  <span className="text-sm font-display font-bold text-green-700">
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 border-2 border-emerald-400/40">
+                  <Check className="w-5 h-5 text-emerald-400" />
+                  <span className="text-sm font-display font-bold text-emerald-300">
                     Trade is cap compliant for both teams
                   </span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 border-2 border-red-200">
-                  <X className="w-5 h-5 text-red-600" />
-                  <span className="text-sm font-display font-bold text-red-700">
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/15 border-2 border-red-400/40">
+                  <X className="w-5 h-5 text-red-400" />
+                  <span className="text-sm font-display font-bold text-red-300">
                     Trade puts {impact.teamA.spaceAfter < 0 ? dataA.teamName : dataB.teamName} over the cap
                   </span>
                 </div>
@@ -397,9 +397,9 @@ export default function TradeSimulator() {
 
               {/* Clause warnings */}
               {clauseWarnings.map((w, i) => (
-                <div key={i} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 border border-amber-200">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                  <span className="text-xs font-display text-amber-700">{w}</span>
+                <div key={i} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-400/40">
+                  <AlertTriangle className="w-4 h-4 text-amber-300 flex-shrink-0" />
+                  <span className="text-xs font-display text-amber-200">{w}</span>
                 </div>
               ))}
             </div>
@@ -437,7 +437,7 @@ function TradePanel({
   const [imgErr, setImgErr] = useState(false);
 
   return (
-    <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden flex flex-col">
+    <div className="bg-pastel-surface-tile rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden flex flex-col">
       {/* Team Header */}
       <button
         onClick={onTogglePicker}
@@ -447,21 +447,21 @@ function TradePanel({
           <img loading="lazy" decoding="async" src={teamInfo.logoUrl} alt={teamInfo.abbrev} className="w-8 h-8 object-contain" onError={() => setImgErr(true)} />
         ) : (
           <div className="w-8 h-8 rounded-full bg-citrus-sage/20 flex items-center justify-center">
-            <Shield className="w-4 h-4 text-citrus-sage/60" />
+            <Shield className="w-4 h-4 text-citrus-sage/80" />
           </div>
         )}
         <div className="flex-1 text-left">
-          <div className="text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">{label}</div>
-          <div className="font-varsity text-base text-citrus-forest">
+          <div className="text-[10px] text-white/55 uppercase font-display font-bold tracking-wider">{label}</div>
+          <div className="font-varsity text-base text-pastel-cream">
             {teamInfo ? teamInfo.fullName : 'Select a team'}
           </div>
         </div>
-        <ChevronDown className={cn("w-4 h-4 text-citrus-charcoal/40 transition-transform", showPicker && "rotate-180")} />
+        <ChevronDown className={cn("w-4 h-4 text-white/50 transition-transform", showPicker && "rotate-180")} />
       </button>
 
       {/* Team Picker Dropdown */}
       {showPicker && (
-        <div className="p-2 border-b-2 border-citrus-sage/20 bg-citrus-cream/30 max-h-48 overflow-y-auto">
+        <div className="p-2 border-b-2 border-citrus-sage/20 bg-white/5 max-h-48 overflow-y-auto">
           <div className="grid grid-cols-4 gap-1">
             {NHL_TEAMS.filter(t => t.abbrev !== otherTeam).map(t => (
               <button
@@ -475,7 +475,7 @@ function TradePanel({
                 )}
               >
                 <img loading="lazy" decoding="async" src={t.logoUrl} alt={t.abbrev} className="w-6 h-6 object-contain" />
-                <span className="text-[8px] font-varsity text-citrus-forest">{t.abbrev}</span>
+                <span className="text-[8px] font-varsity text-pastel-cream">{t.abbrev}</span>
               </button>
             ))}
           </div>
@@ -494,22 +494,22 @@ function TradePanel({
               {/* Search */}
               <div className="px-3 py-2 border-b border-citrus-sage/20">
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-citrus-charcoal/40" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/50" />
                   <input
                     type="text"
                     placeholder="Search players..."
                     value={search}
                     onChange={e => onSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-citrus-sage/30 bg-white/60 text-xs font-display text-citrus-forest placeholder:text-citrus-charcoal/40 focus:outline-none focus:border-citrus-sage transition-all"
+                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-citrus-sage/30 bg-pastel-surface-tile text-xs font-display text-pastel-cream placeholder:text-white/50 focus:outline-none focus:border-citrus-sage transition-all"
                   />
                 </div>
               </div>
 
               {/* Retention slider */}
-              <div className="px-3 py-2 border-b border-citrus-sage/20 bg-citrus-cream/20">
+              <div className="px-3 py-2 border-b border-citrus-sage/20 bg-white/[0.03]">
                 <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-citrus-charcoal/50 flex-shrink-0" />
-                  <span className="text-[9px] text-citrus-charcoal/60 font-display font-bold uppercase tracking-wider flex-shrink-0">Retain</span>
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-white/55 flex-shrink-0" />
+                  <span className="text-[9px] text-white/65 font-display font-bold uppercase tracking-wider flex-shrink-0">Retain</span>
                   <input
                     type="range"
                     min={0}
@@ -519,14 +519,14 @@ function TradePanel({
                     onChange={e => onRetention(Number(e.target.value))}
                     className="flex-1 h-1.5 accent-citrus-sage"
                   />
-                  <span className="text-xs font-varsity text-citrus-forest w-8 text-right">{retention}%</span>
+                  <span className="text-xs font-varsity text-pastel-cream w-8 text-right">{retention}%</span>
                 </div>
               </div>
 
               {/* Player list */}
               <div className="flex-1 max-h-80 overflow-y-auto">
                 {players.length === 0 ? (
-                  <div className="text-center py-8 text-xs text-citrus-charcoal/50 font-display">No players found</div>
+                  <div className="text-center py-8 text-xs text-white/55 font-display">No players found</div>
                 ) : (
                   players.map(p => (
                     <TradePlayerRow
@@ -543,10 +543,10 @@ function TradePanel({
               {/* Selected count */}
               {selected.size > 0 && (
                 <div className="px-3 py-2 bg-citrus-sage/15 border-t-2 border-citrus-sage/30 flex items-center justify-between">
-                  <span className="text-[10px] font-display font-bold text-citrus-forest uppercase tracking-wider">
+                  <span className="text-[10px] font-display font-bold text-pastel-cream uppercase tracking-wider">
                     {selected.size} player{selected.size !== 1 ? 's' : ''} selected
                   </span>
-                  <span className="font-varsity text-sm text-citrus-forest">
+                  <span className="font-varsity text-sm text-pastel-cream">
                     {formatCap(players.filter(p => selected.has(p.playerId)).reduce((s, p) => s + p.capHit, 0))}
                   </span>
                 </div>
@@ -584,9 +584,9 @@ function TradePlayerRow({
       {/* Checkbox */}
       <div className={cn(
         "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
-        isSelected ? "bg-citrus-sage border-citrus-sage" : "border-citrus-charcoal/30"
+        isSelected ? "bg-citrus-sage border-citrus-sage" : "border-white/20"
       )}>
-        {isSelected && <Check className="w-3 h-3 text-white" />}
+        {isSelected && <Check className="w-3 h-3 text-pastel-surface" />}
       </div>
 
       {/* Player Avatar */}
@@ -594,36 +594,36 @@ function TradePlayerRow({
 
       {/* Name + Position */}
       <div className="flex-1 min-w-0">
-        <div className="font-display font-bold text-[11px] text-citrus-forest truncate">{player.name}</div>
+        <div className="font-display font-bold text-[11px] text-pastel-cream truncate">{player.name}</div>
         <div className="flex items-center gap-1">
-          <Badge className="bg-citrus-sage/20 text-citrus-forest text-[7px] h-3.5 px-1 font-varsity border border-citrus-sage/40">
+          <Badge className="bg-citrus-sage/20 text-pastel-cream text-[7px] h-3.5 px-1 font-varsity border border-citrus-sage/40">
             {player.position}
           </Badge>
           {player.clause && (
             <Badge className={cn(
               "text-[6px] h-3 px-1 border",
-              player.clause === 'NMC' ? "bg-red-100 text-red-700 border-red-200" :
-              player.clause === 'NTC' ? "bg-orange-100 text-orange-700 border-orange-200" :
-              "bg-amber-100 text-amber-700 border-amber-200"
+              player.clause === 'NMC' ? "bg-red-500/20 text-red-300 border-red-400/40" :
+              player.clause === 'NTC' ? "bg-orange-500/20 text-orange-300 border-orange-200" :
+              "bg-amber-500/20 text-amber-200 border-amber-400/40"
             )}>
               {player.clause}
             </Badge>
           )}
           {player.rosterStatus !== 'NHL' && (
-            <Badge className="bg-slate-500 text-white text-[6px] h-3 px-1">{player.rosterStatus}</Badge>
+            <Badge className="bg-slate-600 text-white text-[6px] h-3 px-1">{player.rosterStatus}</Badge>
           )}
         </div>
       </div>
 
       {/* Cap Hit */}
       <div className="text-right flex-shrink-0">
-        <div className="font-varsity text-xs text-citrus-forest">{formatCap(player.capHit)}</div>
+        <div className="font-varsity text-xs text-pastel-cream">{formatCap(player.capHit)}</div>
         {retentionPct > 0 && (
-          <div className="text-[8px] text-citrus-charcoal/50 font-display">
+          <div className="text-[8px] text-white/55 font-display">
             net {formatCap(effectiveCap)}
           </div>
         )}
-        <div className="text-[8px] text-citrus-charcoal/50 font-display">
+        <div className="text-[8px] text-white/55 font-display">
           {player.yearsRemaining}yr &middot; {player.expiryStatus}
         </div>
       </div>
@@ -653,25 +653,25 @@ function TradeSummaryCard({
   const capDelta = capAfter - capBefore;
 
   return (
-    <div className="bg-citrus-cream/40 rounded-xl border-2 border-citrus-sage/20 p-4">
+    <div className="bg-white/5 rounded-xl border-2 border-citrus-sage/20 p-4">
       {/* Team header */}
       <div className="flex items-center gap-2 mb-3">
         {!imgErr ? (
           <img loading="lazy" decoding="async" src={logoUrl} alt={teamName} className="w-8 h-8 object-contain" onError={() => setImgErr(true)} />
         ) : (
-          <Shield className="w-8 h-8 text-citrus-sage/50" />
+          <Shield className="w-8 h-8 text-citrus-sage/75" />
         )}
-        <span className="font-varsity text-base text-citrus-forest">{teamName}</span>
+        <span className="font-varsity text-base text-pastel-cream">{teamName}</span>
       </div>
 
       {/* Receives */}
       {receives.length > 0 && (
         <div className="mb-2">
-          <div className="text-[9px] text-green-700 uppercase font-display font-bold tracking-wider mb-1">Acquires</div>
+          <div className="text-[9px] text-emerald-300 uppercase font-display font-bold tracking-wider mb-1">Acquires</div>
           {receives.map(p => (
             <div key={p.playerId} className="flex items-center justify-between py-0.5">
-              <span className="text-xs font-display text-citrus-forest">{p.name} <span className="text-citrus-charcoal/50">({p.position})</span></span>
-              <span className="text-xs font-varsity text-green-700">+{formatCap(p.capHit)}</span>
+              <span className="text-xs font-display text-pastel-cream">{p.name} <span className="text-white/55">({p.position})</span></span>
+              <span className="text-xs font-varsity text-emerald-300">+{formatCap(p.capHit)}</span>
             </div>
           ))}
         </div>
@@ -680,11 +680,11 @@ function TradeSummaryCard({
       {/* Sends */}
       {sends.length > 0 && (
         <div className="mb-3">
-          <div className="text-[9px] text-red-700 uppercase font-display font-bold tracking-wider mb-1">Sends</div>
+          <div className="text-[9px] text-red-300 uppercase font-display font-bold tracking-wider mb-1">Sends</div>
           {sends.map(p => (
             <div key={p.playerId} className="flex items-center justify-between py-0.5">
-              <span className="text-xs font-display text-citrus-forest">{p.name} <span className="text-citrus-charcoal/50">({p.position})</span></span>
-              <span className="text-xs font-varsity text-red-600">-{formatCap(p.capHit)}</span>
+              <span className="text-xs font-display text-pastel-cream">{p.name} <span className="text-white/55">({p.position})</span></span>
+              <span className="text-xs font-varsity text-red-400">-{formatCap(p.capHit)}</span>
             </div>
           ))}
         </div>
@@ -692,7 +692,7 @@ function TradeSummaryCard({
 
       {/* Retention */}
       {retainLabel && retained > 0 && (
-        <div className="px-2 py-1 mb-3 rounded-lg bg-amber-50 border border-amber-200 text-[9px] font-display text-amber-700">
+        <div className="px-2 py-1 mb-3 rounded-lg bg-amber-500/15 border border-amber-400/40 text-[9px] font-display text-amber-200">
           {retainLabel} salary ({formatCap(retained)} dead cap)
         </div>
       )}
@@ -700,22 +700,22 @@ function TradeSummaryCard({
       {/* Cap Impact */}
       <div className="border-t border-citrus-sage/20 pt-3 space-y-1.5">
         <div className="flex justify-between text-xs">
-          <span className="font-display text-citrus-charcoal/60">Cap Before</span>
-          <span className="font-varsity text-citrus-charcoal">{formatCapFull(capBefore)}</span>
+          <span className="font-display text-white/65">Cap Before</span>
+          <span className="font-varsity text-pastel-cream">{formatCapFull(capBefore)}</span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="font-display text-citrus-charcoal/60">Cap After</span>
-          <span className="font-varsity text-citrus-charcoal">{formatCapFull(capAfter)}</span>
+          <span className="font-display text-white/65">Cap After</span>
+          <span className="font-varsity text-pastel-cream">{formatCapFull(capAfter)}</span>
         </div>
         <div className="flex justify-between text-xs font-bold">
-          <span className="font-display text-citrus-charcoal/60">Net Change</span>
-          <span className={cn("font-varsity", capDelta > 0 ? "text-red-600" : "text-green-600")}>
+          <span className="font-display text-white/65">Net Change</span>
+          <span className={cn("font-varsity", capDelta > 0 ? "text-red-400" : "text-emerald-400")}>
             {capDelta > 0 ? '+' : ''}{formatCap(capDelta)}
           </span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="font-display font-bold text-citrus-forest">Cap Space</span>
-          <span className={cn("font-varsity font-bold", spaceAfter < 0 ? "text-red-600" : "text-green-600")}>
+          <span className="font-display font-bold text-pastel-cream">Cap Space</span>
+          <span className={cn("font-varsity font-bold", spaceAfter < 0 ? "text-red-400" : "text-emerald-400")}>
             {formatCap(spaceAfter)}
           </span>
         </div>

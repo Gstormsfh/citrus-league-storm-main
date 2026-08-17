@@ -6,6 +6,7 @@
  * and returns the AI response with usage tracking.
  */
 
+import { userMessage } from '@/lib/userMessage';
 import { supabase } from "@/integrations/supabase/client";
 import {
   getFirstWeekStartDate,
@@ -116,7 +117,7 @@ class StormyServiceImpl {
       };
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "Something went wrong.";
+        userMessage(err, "Something went wrong.");
       return {
         response: "",
         error: msg,
@@ -255,7 +256,7 @@ class StormyServiceImpl {
 
       return { response: fullText };
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Something went wrong.";
+      const msg = userMessage(err, "Something went wrong.");
       return { response: "", error: msg };
     }
   }

@@ -14,6 +14,7 @@
  * trade ideas, schedule advantage).
  */
 
+import { userMessage } from '@/lib/userMessage';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -180,7 +181,7 @@ export default function StormyDemo() {
         setContextLoaded(true);
       } catch (err) {
         if (!cancelled) {
-          setContextError(err instanceof Error ? err.message : 'Failed to load league');
+          setContextError(userMessage(err, 'Failed to load league'));
           setContextLoaded(true);
         }
       }

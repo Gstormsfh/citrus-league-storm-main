@@ -227,7 +227,14 @@ export const StormyChatBubble = () => {
         className="fixed h-14 w-14 rounded-full bg-pastel-orange ring-2 ring-pastel-orange/30 shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)] hover:scale-105 hover:-translate-y-1 transition-all z-[100] p-0 overflow-hidden"
         style={{
           position: 'fixed',
-          bottom: isMobile ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem)' : '1.5rem',
+          // --citrus-consent-h is published by CookieConsent while the cookie
+          // banner is on screen (0px otherwise). Without it this button sat on
+          // top of the banner's text: 56x45px of overlap on mobile, 56x49 on
+          // desktop, with elementFromPoint over the consent copy returning this
+          // button. Verified fixed by the same probe.
+          bottom: isMobile
+            ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem + var(--citrus-consent-h, 0px))'
+            : 'calc(1.5rem + var(--citrus-consent-h, 0px))',
           right: isMobile ? '1rem' : 'auto',
           left: isMobile ? 'auto' : '1.5rem',
           zIndex: 100,

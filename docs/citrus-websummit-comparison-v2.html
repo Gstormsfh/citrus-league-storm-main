@@ -1,0 +1,1716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Citrus &middot; The Fantasy Hockey Disruption &middot; Web Summit 2026</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #07090D;
+    --bg-2: #0B0F14;
+    --surface: #11161E;
+    --surface-2: #1A222C;
+    --border: #232C39;
+    --border-soft: #1A222C;
+    --text: #ECF2F8;
+    --muted: #8B949E;
+    --dim: #4A5462;
+    --orange: #FF6B00;
+    --orange-soft: #FF8A3D;
+    --orange-glow: rgba(255,107,0,0.5);
+    --yellow: #FFB800;
+    --green: #00D26A;
+    --blue: #5BB6FF;
+    --purple: #C49DFF;
+    --red: #FF5C5C;
+    --teal: #3FB9B0;
+    --pink: #FF7AB6;
+    --ice: #DDF1FF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(255,107,0,0.14) 0%, transparent 35%),
+      radial-gradient(circle at 90% 20%, rgba(255,122,182,0.10) 0%, transparent 40%),
+      radial-gradient(circle at 50% 100%, rgba(196,157,255,0.10) 0%, transparent 50%);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size: 40px 40px;
+    z-index: 0;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse at center, black 40%, transparent 85%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 85%);
+  }
+
+  /* =========== NAV =========== */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(7,9,13,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .nav-inner {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+  }
+  .nav-brand .dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--orange), var(--pink));
+    box-shadow: 0 0 16px var(--orange-glow);
+  }
+  .nav-brand .mark {
+    background: linear-gradient(135deg, var(--orange), var(--pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .nav-links {
+    display: flex;
+    gap: 28px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .nav-links a:hover { color: var(--text); }
+  .nav-cta {
+    padding: 8px 18px;
+    border-radius: 100px;
+    background: linear-gradient(135deg, var(--orange), var(--pink));
+    color: #07090D !important;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .nav-cta:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(255,107,0,0.35);
+  }
+  @media (max-width: 720px) {
+    .nav-links { display: none; }
+  }
+
+  /* =========== CONTAINER =========== */
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 0 32px 60px;
+  }
+
+  /* =========== HERO =========== */
+  .hero {
+    text-align: center;
+    padding: 120px 0 100px;
+    position: relative;
+  }
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 22px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, rgba(255,107,0,0.14), rgba(255,122,182,0.10), rgba(196,157,255,0.10));
+    border: 1px solid rgba(255,107,0,0.30);
+    color: var(--orange);
+    margin-bottom: 36px;
+  }
+  .hero-eyebrow .pulse {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--orange);
+    box-shadow: 0 0 12px var(--orange-glow);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.85); }
+  }
+
+  .hero h1 {
+    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    font-size: clamp(48px, 8vw, 108px);
+    font-weight: 700;
+    line-height: 0.96;
+    letter-spacing: -3px;
+    margin-bottom: 30px;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .hero h1 .grad-1 {
+    background: linear-gradient(135deg, var(--orange) 0%, var(--pink) 60%, var(--purple) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero h1 .strike {
+    text-decoration: line-through;
+    text-decoration-color: rgba(255,92,92,0.6);
+    text-decoration-thickness: 4px;
+    color: var(--muted);
+  }
+  .hero .sub {
+    font-size: clamp(16px, 1.6vw, 22px);
+    color: var(--muted);
+    max-width: 800px;
+    margin: 0 auto 50px;
+    line-height: 1.55;
+  }
+  .hero .sub strong { color: var(--text); font-weight: 600; }
+
+  .hero-cta-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .btn {
+    padding: 14px 28px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid transparent;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--orange), var(--pink));
+    color: #07090D !important;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(255,107,0,0.4);
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text) !important;
+    border-color: var(--border);
+  }
+  .btn-secondary:hover {
+    background: var(--surface);
+    border-color: var(--muted);
+  }
+
+  /* =========== ANIMATED STAT BAR =========== */
+  .hero-stats {
+    margin-top: 70px;
+    padding: 24px 0;
+    border-top: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 30px;
+  }
+  .hstat { text-align: center; }
+  .hstat .n {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -1px;
+  }
+  .hstat .lbl {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-top: 8px;
+    font-weight: 600;
+  }
+  @media (max-width: 720px) {
+    .hstat .n { font-size: 22px; }
+  }
+
+  /* =========== SECTION SCAFFOLD =========== */
+  .sect {
+    margin-bottom: 100px;
+    position: relative;
+  }
+  .sect-head {
+    text-align: center;
+    margin-bottom: 60px;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .sect-tag {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    background: rgba(255,255,255,0.04);
+    color: var(--muted);
+    margin-bottom: 18px;
+    border: 1px solid var(--border-soft);
+  }
+  .sect-head h2 {
+    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    font-size: clamp(32px, 5vw, 56px);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -1.5px;
+    margin-bottom: 16px;
+  }
+  .sect-head h2 .accent { color: var(--orange); }
+  .sect-head h2 .accent-2 { color: var(--pink); }
+  .sect-head h2 .accent-3 { color: var(--purple); }
+  .sect-head p {
+    font-size: clamp(15px, 1.4vw, 19px);
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .sect-head p strong { color: var(--text); font-weight: 600; }
+
+  /* =========== WHISPER TEST =========== */
+  .whispers {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+  }
+  @media (max-width: 1100px) { .whispers { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .whispers { grid-template-columns: 1fr; } }
+  .whisper {
+    padding: 28px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 18px;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.3s, border-color 0.3s;
+  }
+  .whisper:hover { transform: translateY(-4px); border-color: var(--border); }
+  .whisper.citrus {
+    background: linear-gradient(160deg, rgba(255,107,0,0.08), var(--surface) 70%);
+    border-color: rgba(255,107,0,0.4);
+    box-shadow: 0 0 0 1px rgba(255,107,0,0.12), 0 20px 48px rgba(255,107,0,0.12);
+  }
+  .whisper-logo {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .whisper.yahoo .whisper-logo { color: #9C7BFF; }
+  .whisper.espn .whisper-logo { color: #E63946; }
+  .whisper.sleeper .whisper-logo { color: #FFA800; }
+  .whisper.citrus .whisper-logo {
+    background: linear-gradient(135deg, var(--orange), var(--pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .whisper-line {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 20px;
+    line-height: 1.35;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 18px;
+    letter-spacing: -0.3px;
+  }
+  .whisper.citrus .whisper-line { color: var(--text); font-weight: 600; }
+  .whisper-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-soft);
+    display: flex;
+    justify-content: space-between;
+  }
+  .whisper.citrus .whisper-meta { border-top-color: rgba(255,107,0,0.2); color: var(--orange); }
+
+  /* =========== PRODUCT SURFACES =========== */
+  .surfaces {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  @media (max-width: 900px) { .surfaces { grid-template-columns: 1fr; } }
+  .surface {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  .surface:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  }
+  .surface-head {
+    padding: 22px 26px;
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .surface-head .lbl {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--orange);
+    margin-bottom: 6px;
+  }
+  .surface-head h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+  }
+  .surface-head .pill {
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 100px;
+    background: rgba(0,210,106,0.12);
+    color: var(--green);
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+  .surface-body { padding: 26px; }
+
+  /* mock app surface elements */
+  .app-card {
+    background: var(--bg-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    padding: 18px;
+  }
+  .app-card + .app-card { margin-top: 12px; }
+
+  .app-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .app-row + .app-row { margin-top: 10px; }
+  .app-row .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+  .app-row .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px; }
+
+  .avatar-mini {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(255,107,0,0.3), rgba(255,122,182,0.3));
+    border: 1px solid rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 12px; font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+  }
+
+  /* Win prob bar */
+  .winprob-bar {
+    height: 22px;
+    border-radius: 100px;
+    background: var(--surface-2);
+    overflow: hidden;
+    display: flex;
+    margin: 10px 0;
+    border: 1px solid var(--border-soft);
+  }
+  .winprob-bar .left {
+    background: linear-gradient(90deg, var(--orange), var(--orange-soft));
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 800;
+    color: #07090D;
+  }
+  .winprob-bar .right {
+    flex: 1;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  /* Distribution chart */
+  .dist-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 80px;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--border-soft);
+    position: relative;
+  }
+  .dist-chart .bar {
+    flex: 1;
+    background: linear-gradient(180deg, var(--orange), rgba(255,107,0,0.15));
+    border-radius: 3px 3px 0 0;
+    transition: opacity 0.3s;
+  }
+  .dist-chart .bar.peak {
+    background: linear-gradient(180deg, var(--pink), rgba(255,122,182,0.15));
+  }
+  .dist-chart-x {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 0.5px;
+  }
+
+  /* Tier */
+  .tier {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--surface-2);
+  }
+  .tier + .tier { margin-top: 8px; }
+  .tier .rank {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: 13px;
+    width: 24px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .tier .who {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .tier .who .sub {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 1px;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tier .val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+  }
+  .tier .val .grade {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--green);
+    text-transform: uppercase;
+  }
+  .tier.hot {
+    background: linear-gradient(135deg, rgba(255,107,0,0.06), var(--surface-2));
+    border: 1px solid rgba(255,107,0,0.2);
+  }
+  .tier.hot .rank { color: var(--orange); }
+
+  /* Donut */
+  .donut-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .donut {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background:
+      conic-gradient(
+        var(--green) 0deg 252deg,
+        var(--surface-2) 252deg 360deg
+      );
+    position: relative;
+    flex-shrink: 0;
+  }
+  .donut::before {
+    content: '';
+    position: absolute;
+    inset: 12px;
+    border-radius: 50%;
+    background: var(--surface);
+  }
+  .donut .donut-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .donut .donut-text .pct {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--green);
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .donut .donut-text .lbl2 {
+    font-size: 8px;
+    color: var(--muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+
+  .legend {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+  }
+  .legend-item .sw { width: 10px; height: 10px; border-radius: 3px; }
+  .legend-item .lbl3 { color: var(--muted); font-size: 11px; }
+  .legend-item .vv { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; }
+
+  /* Range pill */
+  .range-pill {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--surface-2);
+    border-radius: 12px;
+    border: 1px solid var(--border-soft);
+  }
+  .range-pill .big {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    line-height: 1;
+    color: var(--orange);
+  }
+  .range-pill .ci {
+    flex: 1;
+  }
+  .range-pill .ci-lbl {
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+  .range-pill .ci-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    margin-top: 3px;
+  }
+  .range-pill .conf {
+    text-align: right;
+  }
+  .range-pill .conf .lvl {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .range-pill .conf .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* =========== THREE QUESTIONS =========== */
+  .qrow {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 32px;
+    padding: 36px 0;
+    border-bottom: 1px solid var(--border-soft);
+    align-items: center;
+  }
+  @media (max-width: 900px) { .qrow { grid-template-columns: 1fr; gap: 20px; } }
+  .qrow:last-child { border-bottom: none; }
+  .qrow .qnum {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--orange);
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+  .qrow .qq {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+    margin-bottom: 12px;
+  }
+  .qrow .qsub {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .qrow .answers {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 1100px) { .qrow .answers { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .qrow .answers { grid-template-columns: 1fr; } }
+  .ans {
+    padding: 16px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .ans .who2 {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .ans .says {
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text);
+  }
+  .ans .says.empty {
+    color: var(--dim);
+    font-style: italic;
+    font-size: 12px;
+  }
+  .ans.citrus {
+    background: linear-gradient(135deg, rgba(255,107,0,0.06), var(--surface));
+    border-color: rgba(255,107,0,0.35);
+  }
+  .ans.citrus .who2 { color: var(--orange); }
+  .ans.citrus .says { color: var(--text); font-weight: 500; }
+  .ans.citrus .says strong {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--orange);
+    font-weight: 800;
+  }
+
+  /* =========== DATA PIPELINE =========== */
+  .pipeline {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 40px;
+    overflow: hidden;
+    position: relative;
+  }
+  .pipeline-flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .stage {
+    flex: 1;
+    min-width: 180px;
+    padding: 20px 18px;
+    position: relative;
+  }
+  .stage + .stage {
+    border-left: 1px dashed var(--border);
+  }
+  .stage .stage-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .stage .stage-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    margin-bottom: 6px;
+  }
+  .stage .stage-desc {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .stage .stage-num.s1 { background: rgba(91,182,255,0.15); color: var(--blue); border-color: rgba(91,182,255,0.3); }
+  .stage .stage-num.s2 { background: rgba(63,185,176,0.15); color: var(--teal); border-color: rgba(63,185,176,0.3); }
+  .stage .stage-num.s3 { background: rgba(196,157,255,0.15); color: var(--purple); border-color: rgba(196,157,255,0.3); }
+  .stage .stage-num.s4 { background: rgba(255,122,182,0.15); color: var(--pink); border-color: rgba(255,122,182,0.3); }
+  .stage .stage-num.s5 { background: rgba(255,107,0,0.15); color: var(--orange); border-color: rgba(255,107,0,0.3); }
+  .stage .stage-num.s6 { background: rgba(0,210,106,0.15); color: var(--green); border-color: rgba(0,210,106,0.3); }
+  .stage .stage-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border-soft);
+    letter-spacing: 0.5px;
+  }
+
+  /* =========== BIG NUMBER STRIP =========== */
+  .bignums {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+  }
+  @media (max-width: 900px) { .bignums { grid-template-columns: repeat(2, 1fr); } }
+  .bignum {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 18px;
+    padding: 30px 24px;
+    text-align: center;
+    transition: border-color 0.3s, transform 0.3s;
+  }
+  .bignum:hover { border-color: var(--border); transform: translateY(-3px); }
+  .bignum .v {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 52px;
+    font-weight: 900;
+    letter-spacing: -2px;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--orange), var(--pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .bignum .lb {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-top: 10px;
+    font-weight: 600;
+  }
+  .bignum .vs {
+    font-size: 10px;
+    color: var(--dim);
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border-soft);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.4px;
+  }
+  .bignum .vs strong { color: var(--red); font-weight: 700; }
+
+  /* =========== CTA =========== */
+  .cta {
+    margin-top: 80px;
+    background:
+      radial-gradient(ellipse at 80% 30%, rgba(255,122,182,0.10), transparent 60%),
+      radial-gradient(ellipse at 20% 80%, rgba(196,157,255,0.10), transparent 60%),
+      linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+    border: 1px solid rgba(255,107,0,0.25);
+    border-radius: 28px;
+    padding: 56px;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 48px;
+    align-items: center;
+    overflow: hidden;
+    position: relative;
+  }
+  @media (max-width: 900px) {
+    .cta { grid-template-columns: 1fr; padding: 36px 28px; gap: 32px; }
+  }
+  .cta::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 0% 0%, rgba(255,107,0,0.12) 0%, transparent 30%);
+    pointer-events: none;
+  }
+  .cta-text { position: relative; z-index: 1; }
+  .cta h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+  }
+  .cta h2 .accent {
+    background: linear-gradient(135deg, var(--orange), var(--pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .cta p {
+    font-size: 16px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 28px;
+  }
+  .cta p strong { color: var(--text); }
+
+  .qrbox {
+    background: white;
+    padding: 20px;
+    border-radius: 24px;
+    width: 240px;
+    margin-left: auto;
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+  }
+  @media (max-width: 900px) {
+    .qrbox { margin: 0 auto; }
+  }
+  .qrbox .qr-svg {
+    width: 200px;
+    height: 200px;
+    display: block;
+  }
+  .qrbox .qr-cap {
+    text-align: center;
+    margin-top: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #07090D;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* =========== FOOTER =========== */
+  .footer {
+    margin-top: 80px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border-soft);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .footer .left, .footer .right {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .footer .url {
+    color: var(--orange);
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .footer .url:hover { text-decoration: underline; }
+
+  @media print {
+    body::before, body::after { display: none; }
+    .surface:hover, .bignum:hover, .whisper:hover { transform: none; box-shadow: none; }
+    body { background: white; color: black; }
+  }
+</style>
+</head>
+<body>
+
+<!-- =========== NAV =========== -->
+<div class="nav">
+  <div class="nav-inner">
+    <a class="nav-brand" href="index.html" style="text-decoration:none; color:inherit;">
+      <span class="dot"></span>
+      <span class="mark">Citrus</span>
+    </a>
+    <div class="nav-links">
+      <a href="#whispers">The 4-Liner</a>
+      <a href="#surfaces">Product</a>
+      <a href="#questions">3 Questions</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="#proof">Proof</a>
+    </div>
+    <a class="nav-cta" href="https://citrus-fantasy-sports.web.app" target="_blank" rel="noopener">Try It Live</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- =========== HERO =========== -->
+  <div class="hero">
+    <div class="hero-eyebrow">
+      <span class="pulse"></span>
+      Web Summit 2026 &middot; Lisbon &middot; Nov 4-7
+    </div>
+    <h1>
+      <span class="strike">Fantasy hockey</span><br>
+      <span class="grad-1">A quant desk in your pocket.</span>
+    </h1>
+    <p class="sub">
+      Yahoo and ESPN show you one number. Sleeper doesn&rsquo;t even cover the NHL. <strong>Citrus runs 10,000 Monte Carlo simulations with Student-t copula correlations on every matchup, every night</strong> &mdash; the same techniques quant desks use for portfolio risk, shipped to your phone in 30 seconds.
+    </p>
+    <div class="hero-cta-row">
+      <a class="btn btn-primary" href="https://citrus-fantasy-sports.web.app" target="_blank" rel="noopener">
+        Open the App &rarr;
+      </a>
+      <a class="btn btn-secondary" href="#surfaces">See the Product</a>
+    </div>
+
+    <div class="hero-stats">
+      <div class="hstat"><div class="n" style="color:var(--orange)">10,000</div><div class="lbl">MC Sims / Matchup</div></div>
+      <div class="hstat"><div class="n" style="color:var(--pink)">31</div><div class="lbl">xG Features</div></div>
+      <div class="hstat"><div class="n" style="color:var(--purple)">863K</div><div class="lbl">Training Shots</div></div>
+      <div class="hstat"><div class="n" style="color:var(--teal)">0.817</div><div class="lbl">Model AUC-ROC</div></div>
+      <div class="hstat"><div class="n" style="color:var(--green)">30s</div><div class="lbl">Live Data Freshness</div></div>
+      <div class="hstat"><div class="n" style="color:var(--blue)">0.054</div><div class="lbl">Brier Score</div></div>
+    </div>
+  </div>
+
+  <!-- =========== THE 4-LINER (WHISPER TEST) =========== -->
+  <div class="sect" id="whispers">
+    <div class="sect-head">
+      <div class="sect-tag">The 4-Liner</div>
+      <h2>What each platform <span class="accent">whispers in your ear</span> on Tuesday night.</h2>
+      <p>Same player. Same matchup. Read what each app actually tells the user before they hit lock-in.</p>
+    </div>
+
+    <div class="whispers">
+      <div class="whisper yahoo">
+        <div>
+          <div class="whisper-logo">Yahoo Fantasy</div>
+          <div class="whisper-line">&ldquo;Project: 12.5 pts.&rdquo;</div>
+        </div>
+        <div class="whisper-meta">
+          <span>1 number</span><span>Weekly update</span>
+        </div>
+      </div>
+
+      <div class="whisper espn">
+        <div>
+          <div class="whisper-logo">ESPN Fantasy</div>
+          <div class="whisper-line">&ldquo;Project: 12.1 pts.<br>Matchup: 5/10.&rdquo;</div>
+        </div>
+        <div class="whisper-meta">
+          <span>2 numbers</span><span>~5min delay</span>
+        </div>
+      </div>
+
+      <div class="whisper sleeper">
+        <div>
+          <div class="whisper-logo">Sleeper</div>
+          <div class="whisper-line" style="color:var(--dim); font-style:italic;">&mdash; silence &mdash;<br><span style="font-size:13px; color:var(--muted); font-style:normal;">No NHL projections engine</span></div>
+        </div>
+        <div class="whisper-meta">
+          <span style="color:var(--red);">Football-first</span><span>NFL/NBA only</span>
+        </div>
+      </div>
+
+      <div class="whisper citrus">
+        <div>
+          <div class="whisper-logo">Citrus</div>
+          <div class="whisper-line">&ldquo;73.4% to win. He&rsquo;ll land 8.1-18.4 pts at 95% confidence. 12% chance of a 1.5&times; ceiling night. His linemate boosts him by 0.60 correlation.&rdquo;</div>
+        </div>
+        <div class="whisper-meta">
+          <span>Full distribution</span><span>30s live &middot; Calibrated</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========== PRODUCT SURFACES =========== -->
+  <div class="sect" id="surfaces">
+    <div class="sect-head">
+      <div class="sect-tag">The Product</div>
+      <h2>What it looks like <span class="accent-2">in the actual app.</span></h2>
+      <p>Four real surfaces. Same math, four different decisions: lineup, draft, matchup, season.</p>
+    </div>
+
+    <div class="surfaces">
+
+      <!-- ============ SURFACE 1: PLAYER PROJECTION ============ -->
+      <div class="surface">
+        <div class="surface-head">
+          <div>
+            <div class="lbl">Surface 01 &middot; Lineup Decision</div>
+            <h3>Player Projection Card</h3>
+          </div>
+          <div class="pill">Live</div>
+        </div>
+        <div class="surface-body">
+
+          <div class="app-card">
+            <div class="app-row" style="margin-bottom:14px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div class="avatar-mini">F1</div>
+                <div>
+                  <div style="font-size:14px; font-weight:700;">Forward A &middot; 1st Line C</div>
+                  <div style="font-size:11px; color:var(--muted); font-family:'JetBrains Mono', monospace;">EDM vs CGY &middot; Tue 7:00 PM &middot; O/U 6.5</div>
+                </div>
+              </div>
+              <div class="pill" style="background:rgba(255,107,0,0.12); color:var(--orange);">A+ Tier</div>
+            </div>
+
+            <div class="range-pill">
+              <div class="big">12.8</div>
+              <div class="ci">
+                <div class="ci-lbl">90% Confidence Interval</div>
+                <div class="ci-val">8.1 &mdash; 18.4 pts</div>
+              </div>
+              <div class="conf">
+                <div class="lvl">High</div>
+                <div class="num">0.78</div>
+              </div>
+            </div>
+
+            <div style="margin-top:14px;">
+              <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-weight:600; margin-bottom:6px;">10,000 Outcome Distribution</div>
+              <div class="dist-chart">
+                <div class="bar" style="height:6%"></div>
+                <div class="bar" style="height:12%"></div>
+                <div class="bar" style="height:22%"></div>
+                <div class="bar" style="height:38%"></div>
+                <div class="bar" style="height:58%"></div>
+                <div class="bar peak" style="height:88%"></div>
+                <div class="bar peak" style="height:96%"></div>
+                <div class="bar peak" style="height:80%"></div>
+                <div class="bar" style="height:62%"></div>
+                <div class="bar" style="height:42%"></div>
+                <div class="bar" style="height:26%"></div>
+                <div class="bar" style="height:14%"></div>
+                <div class="bar" style="height:8%"></div>
+                <div class="bar" style="height:4%"></div>
+              </div>
+              <div class="dist-chart-x">
+                <span>0</span><span>5</span><span>10</span><span>15</span><span>20+</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="app-card" style="margin-top:14px;">
+            <div class="app-row">
+              <span class="k">Upside Probability (&gt; 1.5&times;)</span>
+              <span class="v" style="color:var(--pink);">12.1%</span>
+            </div>
+            <div class="app-row">
+              <span class="k">Floor Probability (&lt; 0.5&times;)</span>
+              <span class="v" style="color:var(--blue);">8.7%</span>
+            </div>
+            <div class="app-row">
+              <span class="k">Opponent DDR</span>
+              <span class="v">1.14&times; boost</span>
+            </div>
+            <div class="app-row">
+              <span class="k">Vegas O/U Scaling</span>
+              <span class="v">1.08&times;</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ SURFACE 2: MATCHUP ENGINE ============ -->
+      <div class="surface">
+        <div class="surface-head">
+          <div>
+            <div class="lbl">Surface 02 &middot; Weekly Matchup</div>
+            <h3>Matchup Engine</h3>
+          </div>
+          <div class="pill">10K Sims</div>
+        </div>
+        <div class="surface-body">
+
+          <div class="app-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <div>
+                <div style="font-size:12px; color:var(--muted); font-family:'JetBrains Mono', monospace; letter-spacing:0.5px;">YOUR TEAM</div>
+                <div style="font-size:15px; font-weight:700; margin-top:2px;">Citrus Squeezers</div>
+              </div>
+              <div style="font-family:'JetBrains Mono', monospace; font-weight:800; font-size:14px; color:var(--muted);">vs</div>
+              <div style="text-align:right;">
+                <div style="font-size:12px; color:var(--muted); font-family:'JetBrains Mono', monospace; letter-spacing:0.5px;">OPPONENT</div>
+                <div style="font-size:15px; font-weight:700; margin-top:2px;">Slap Shot Crew</div>
+              </div>
+            </div>
+
+            <div class="winprob-bar">
+              <div class="left" style="width:64.2%;">64.2% WIN</div>
+              <div class="right">35.8%</div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; padding-top:6px;">
+              <div style="font-size:10px; color:var(--muted); font-family:'JetBrains Mono', monospace; letter-spacing:0.5px;">95% CI: 58.6% &mdash; 69.7%</div>
+              <div style="font-size:10px; color:var(--green); font-weight:700; text-transform:uppercase; letter-spacing:0.8px;">Solid Edge</div>
+            </div>
+
+            <div style="margin-top:18px;">
+              <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-weight:600; margin-bottom:6px;">Margin Distribution &middot; 10K Sims</div>
+              <div class="dist-chart">
+                <div class="bar" style="height:3%; background:linear-gradient(180deg, var(--red), rgba(255,92,92,0.2));"></div>
+                <div class="bar" style="height:8%; background:linear-gradient(180deg, var(--red), rgba(255,92,92,0.2));"></div>
+                <div class="bar" style="height:16%; background:linear-gradient(180deg, var(--red), rgba(255,92,92,0.2));"></div>
+                <div class="bar" style="height:30%; background:linear-gradient(180deg, var(--yellow), rgba(255,184,0,0.2));"></div>
+                <div class="bar" style="height:48%; background:linear-gradient(180deg, var(--yellow), rgba(255,184,0,0.2));"></div>
+                <div class="bar" style="height:74%"></div>
+                <div class="bar peak" style="height:96%"></div>
+                <div class="bar peak" style="height:88%"></div>
+                <div class="bar" style="height:68%"></div>
+                <div class="bar" style="height:46%"></div>
+                <div class="bar" style="height:28%; background:linear-gradient(180deg, var(--green), rgba(0,210,106,0.2));"></div>
+                <div class="bar" style="height:14%; background:linear-gradient(180deg, var(--green), rgba(0,210,106,0.2));"></div>
+                <div class="bar" style="height:6%; background:linear-gradient(180deg, var(--green), rgba(0,210,106,0.2));"></div>
+                <div class="bar" style="height:2%; background:linear-gradient(180deg, var(--green), rgba(0,210,106,0.2));"></div>
+              </div>
+              <div class="dist-chart-x">
+                <span>-30</span><span>-15</span><span>0</span><span>+15</span><span>+30</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="app-card" style="margin-top:14px;">
+            <div class="app-row">
+              <span class="k">Likely Score Range (p25-p75)</span>
+              <span class="v">128 &mdash; 162 pts</span>
+            </div>
+            <div class="app-row">
+              <span class="k">Blowout Risk (margin &gt; 20)</span>
+              <span class="v" style="color:var(--purple);">18.4%</span>
+            </div>
+            <div class="app-row">
+              <span class="k">Tie Probability</span>
+              <span class="v" style="color:var(--muted);">2.1%</span>
+            </div>
+            <div class="app-row">
+              <span class="k">Brier Calibration</span>
+              <span class="v" style="color:var(--green);">Excellent (0.087)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ SURFACE 3: DRAFT BOARD ============ -->
+      <div class="surface">
+        <div class="surface-head">
+          <div>
+            <div class="lbl">Surface 03 &middot; Draft Day</div>
+            <h3>Live Draft Assistant</h3>
+          </div>
+          <div class="pill">&lt; 300ms</div>
+        </div>
+        <div class="surface-body">
+          <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; font-weight:600; margin-bottom:10px;">
+            Round 3 &middot; Pick 27 &middot; You&rsquo;re on the clock
+          </div>
+
+          <div class="tier hot">
+            <div class="rank">27</div>
+            <div class="who">
+              Forward C &middot; LW
+              <div class="sub">Tier 2 &middot; ADP 29.4 &middot; Citrus rank 22</div>
+            </div>
+            <div class="val">
+              4.7 VOR
+              <div class="grade">Steal</div>
+            </div>
+          </div>
+          <div class="tier">
+            <div class="rank">28</div>
+            <div class="who">
+              Forward D &middot; C
+              <div class="sub">Tier 2 &middot; ADP 31.2 &middot; Citrus rank 26</div>
+            </div>
+            <div class="val">
+              4.2 VOR
+              <div class="grade" style="color:var(--yellow);">Value</div>
+            </div>
+          </div>
+          <div class="tier">
+            <div class="rank">29</div>
+            <div class="who">
+              Defenseman A &middot; D
+              <div class="sub">Tier 2 &middot; ADP 27.8 &middot; Citrus rank 35</div>
+            </div>
+            <div class="val">
+              3.1 VOR
+              <div class="grade" style="color:var(--red);">Reach</div>
+            </div>
+          </div>
+          <div class="tier">
+            <div class="rank">30</div>
+            <div class="who">
+              Goalie A &middot; G
+              <div class="sub">Tier 3 &middot; ADP 33.4 &middot; Citrus rank 31</div>
+            </div>
+            <div class="val">
+              2.9 VOR
+              <div class="grade" style="color:var(--muted);">Even</div>
+            </div>
+          </div>
+
+          <div class="app-card" style="margin-top:14px;">
+            <div class="app-row">
+              <span class="k">Your Roster Need</span>
+              <span class="v" style="color:var(--orange);">LW / RW (2 slots)</span>
+            </div>
+            <div class="app-row">
+              <span class="k">Best Position-Adjusted Pick</span>
+              <span class="v" style="color:var(--green);">Forward C (Steal)</span>
+            </div>
+            <div class="app-row">
+              <span class="k">Projected Season Boost</span>
+              <span class="v">+12.4 pts</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ SURFACE 4: SEASON SIMULATOR ============ -->
+      <div class="surface">
+        <div class="surface-head">
+          <div>
+            <div class="lbl">Surface 04 &middot; Season Outlook</div>
+            <h3>Season Simulator</h3>
+          </div>
+          <div class="pill">Full Year MC</div>
+        </div>
+        <div class="surface-body">
+
+          <div class="app-card">
+            <div class="donut-row">
+              <div class="donut">
+                <div class="donut-text">
+                  <div class="pct">70%</div>
+                  <div class="lbl2">Playoffs</div>
+                </div>
+              </div>
+              <div class="legend">
+                <div class="legend-item">
+                  <span class="sw" style="background:var(--green);"></span>
+                  <span class="lbl3">Make Playoffs</span>
+                  <span class="vv" style="color:var(--green);">70.2%</span>
+                </div>
+                <div class="legend-item">
+                  <span class="sw" style="background:var(--pink);"></span>
+                  <span class="lbl3">Win Division</span>
+                  <span class="vv" style="color:var(--pink);">28.4%</span>
+                </div>
+                <div class="legend-item">
+                  <span class="sw" style="background:var(--orange);"></span>
+                  <span class="lbl3">Reach Final</span>
+                  <span class="vv" style="color:var(--orange);">14.6%</span>
+                </div>
+                <div class="legend-item">
+                  <span class="sw" style="background:var(--purple);"></span>
+                  <span class="lbl3">Win Championship</span>
+                  <span class="vv" style="color:var(--purple);">8.3%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="app-card" style="margin-top:14px;">
+            <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-weight:600; margin-bottom:10px;">
+              Final Standing Distribution (10K Season Sims)
+            </div>
+            <div class="dist-chart" style="height:60px;">
+              <div class="bar" style="height:18%"></div>
+              <div class="bar" style="height:34%"></div>
+              <div class="bar peak" style="height:58%"></div>
+              <div class="bar peak" style="height:92%"></div>
+              <div class="bar peak" style="height:78%"></div>
+              <div class="bar" style="height:48%"></div>
+              <div class="bar" style="height:28%"></div>
+              <div class="bar" style="height:14%"></div>
+              <div class="bar" style="height:8%"></div>
+              <div class="bar" style="height:4%"></div>
+            </div>
+            <div class="dist-chart-x">
+              <span>1st</span><span>3rd</span><span>5th</span><span>7th</span><span>10th</span>
+            </div>
+            <div class="app-row" style="margin-top:14px;">
+              <span class="k">Most Likely Final Position</span>
+              <span class="v" style="color:var(--orange);">3rd Place (24.8%)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =========== 3 QUESTIONS =========== -->
+  <div class="sect" id="questions">
+    <div class="sect-head">
+      <div class="sect-tag">The 3 Questions</div>
+      <h2>The three questions every fantasy manager asks. <span class="accent-3">We&rsquo;re the only ones answering them.</span></h2>
+      <p>Lineup. Matchup. Playoffs. Three decisions every week &mdash; and what each platform tells you about each one.</p>
+    </div>
+
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:24px; padding:0 36px;">
+
+      <div class="qrow">
+        <div>
+          <div class="qnum">QUESTION 01</div>
+          <div class="qq">&ldquo;What&rsquo;s his realistic range tonight?&rdquo;</div>
+          <div class="qsub">You&rsquo;re deciding between two flex skaters. You want to know upside and floor &mdash; not a single fragile number.</div>
+        </div>
+        <div class="answers">
+          <div class="ans"><div class="who2">Yahoo</div><div class="says">&ldquo;12.5 pts.&rdquo;</div></div>
+          <div class="ans"><div class="who2">ESPN</div><div class="says">&ldquo;12.1 pts. Matchup 5/10.&rdquo;</div></div>
+          <div class="ans"><div class="who2">Sleeper</div><div class="says empty">No NHL data</div></div>
+          <div class="ans citrus">
+            <div class="who2">Citrus</div>
+            <div class="says"><strong>8.1 &mdash; 18.4 pts</strong> at 95% CI. <strong>12%</strong> ceiling night.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="qrow">
+        <div>
+          <div class="qnum">QUESTION 02</div>
+          <div class="qq">&ldquo;Am I winning this matchup or do I need to swing?&rdquo;</div>
+          <div class="qsub">Saturday morning. You&rsquo;re behind 4 pts but have a streamer slot open. Should you gamble?</div>
+        </div>
+        <div class="answers">
+          <div class="ans"><div class="who2">Yahoo</div><div class="says empty">Sum of projections only</div></div>
+          <div class="ans"><div class="who2">ESPN</div><div class="says empty">Sum of projections only</div></div>
+          <div class="ans"><div class="who2">Sleeper</div><div class="says empty">N/A</div></div>
+          <div class="ans citrus">
+            <div class="who2">Citrus</div>
+            <div class="says"><strong>64.2% win prob</strong>, CI <strong>58.6-69.7%</strong>, Brier-calibrated.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="qrow">
+        <div>
+          <div class="qnum">QUESTION 03</div>
+          <div class="qq">&ldquo;What are my real playoff odds?&rdquo;</div>
+          <div class="qsub">You&rsquo;re 7-4 but the schedule gets nasty. Are you punting or pushing for that 4-for-1 trade?</div>
+        </div>
+        <div class="answers">
+          <div class="ans"><div class="who2">Yahoo</div><div class="says empty">No season simulator</div></div>
+          <div class="ans"><div class="who2">ESPN</div><div class="says">&ldquo;Playoff Machine&rdquo; (manual)</div></div>
+          <div class="ans"><div class="who2">Sleeper</div><div class="says empty">N/A</div></div>
+          <div class="ans citrus">
+            <div class="who2">Citrus</div>
+            <div class="says"><strong>70.2%</strong> playoffs, <strong>8.3%</strong> championship, full standings distribution.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =========== PIPELINE =========== -->
+  <div class="sect" id="pipeline">
+    <div class="sect-head">
+      <div class="sect-tag">The Pipeline</div>
+      <h2>From the NHL faceoff dot <span class="accent">to your phone</span>, in 30 seconds.</h2>
+      <p>Six stages, fully owned, end-to-end. Every layer compounds the next.</p>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipeline-flow">
+        <div class="stage">
+          <div class="stage-num s1">01</div>
+          <div class="stage-title">Raw Ingestion</div>
+          <div class="stage-desc">NHL play-by-play, shot coords, shifts, zone entries. 100-IP proxy rotation. Never rate-limited.</div>
+          <div class="stage-meta">863K shots &middot; 7 seasons</div>
+        </div>
+        <div class="stage">
+          <div class="stage-num s2">02</div>
+          <div class="stage-title">Feature Engineering</div>
+          <div class="stage-desc">31-feature xG extractor &mdash; geometry, context, 10-feature pass module, sequence, rebound.</div>
+          <div class="stage-meta">Pass MOAT &middot; Royal road</div>
+        </div>
+        <div class="stage">
+          <div class="stage-num s3">03</div>
+          <div class="stage-title">xG v3 Model</div>
+          <div class="stage-desc">XGBoost gradient boosted. AUC 0.817, Brier 0.054. Bayesian finishing posterior on top.</div>
+          <div class="stage-meta">Daily retrain &middot; Calibrated</div>
+        </div>
+        <div class="stage">
+          <div class="stage-num s4">04</div>
+          <div class="stage-title">Correlation Mining</div>
+          <div class="stage-desc">Shift overlap + assist chains + Kendall&rsquo;s &tau; co-movement. Three independent signals.</div>
+          <div class="stage-meta">Data-mined, not heuristic</div>
+        </div>
+        <div class="stage">
+          <div class="stage-num s5">05</div>
+          <div class="stage-title">Monte Carlo Engine</div>
+          <div class="stage-desc">10K sims, Student-t copula (&nu;=5), Cholesky-decomposed stat matrix, antithetic variates.</div>
+          <div class="stage-meta">10K&times; per matchup</div>
+        </div>
+        <div class="stage">
+          <div class="stage-num s6">06</div>
+          <div class="stage-title">Your Phone</div>
+          <div class="stage-desc">Hono API, PostgreSQL with RLS, React frontend. 30s live updates, sub-second renders.</div>
+          <div class="stage-meta">PWA &middot; Mobile-first</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========== PROOF / BIG NUMBERS =========== -->
+  <div class="sect" id="proof">
+    <div class="sect-head">
+      <div class="sect-tag">The Proof</div>
+      <h2>The numbers nobody else can put on a slide.</h2>
+      <p>Each one represents months of work &mdash; and a category competitors aren&rsquo;t even running in.</p>
+    </div>
+
+    <div class="bignums">
+      <div class="bignum">
+        <div class="v">10,000</div>
+        <div class="lb">MC Sims / Matchup</div>
+        <div class="vs">Yahoo: <strong>0</strong> &middot; ESPN: <strong>0</strong></div>
+      </div>
+      <div class="bignum">
+        <div class="v">31</div>
+        <div class="lb">xG Features</div>
+        <div class="vs">MoneyPuck: ~20 &middot; NST: ~5</div>
+      </div>
+      <div class="bignum">
+        <div class="v">0.817</div>
+        <div class="lb">Model AUC-ROC</div>
+        <div class="vs">NST baseline: ~0.74</div>
+      </div>
+      <div class="bignum">
+        <div class="v">0.054</div>
+        <div class="lb">Brier Score</div>
+        <div class="vs">No competitor reports one</div>
+      </div>
+      <div class="bignum">
+        <div class="v">863K</div>
+        <div class="lb">Training Shots</div>
+        <div class="vs">Full PBP, 7 seasons</div>
+      </div>
+      <div class="bignum">
+        <div class="v">30s</div>
+        <div class="lb">Live Data Freshness</div>
+        <div class="vs">Yahoo: <strong>2-5 min</strong></div>
+      </div>
+      <div class="bignum">
+        <div class="v">14</div>
+        <div class="lb">Uncertainty Columns</div>
+        <div class="vs">Mean, CI, skew, upside, floor</div>
+      </div>
+      <div class="bignum">
+        <div class="v">45+</div>
+        <div class="lb">RLS Policies</div>
+        <div class="vs">Zero cross-league leakage</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========== CTA =========== -->
+  <div class="cta">
+    <div class="cta-text">
+      <div style="font-size:11px; font-weight:800; letter-spacing:2.5px; text-transform:uppercase; color:var(--orange); margin-bottom:14px;">Web Summit 2026 &middot; Booth Visit</div>
+      <h2>Scan and play <span class="accent">the most technically advanced fantasy hockey platform ever built.</span></h2>
+      <p>
+        Open the live app, draft a team in our demo lobby, and watch the math we just walked you through running in real time. <strong>If you&rsquo;re a hockey fan, you&rsquo;ve never seen your team like this.</strong>
+      </p>
+      <div class="hero-cta-row" style="margin-top:8px; justify-content:flex-start;">
+        <a class="btn btn-primary" href="https://citrus-fantasy-sports.web.app" target="_blank" rel="noopener">
+          Try Citrus Live &rarr;
+        </a>
+        <a class="btn btn-secondary" href="mailto:hello@citrusfantasy.com">
+          Partnerships
+        </a>
+      </div>
+    </div>
+
+    <div class="qrbox">
+      <!-- Decorative QR placeholder &mdash; swap in your real QR PNG before printing -->
+      <svg class="qr-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="200" fill="#fff"/>
+        <!-- corner finders -->
+        <g fill="#07090D">
+          <rect x="10" y="10" width="40" height="40"/>
+          <rect x="18" y="18" width="24" height="24" fill="#fff"/>
+          <rect x="24" y="24" width="12" height="12"/>
+
+          <rect x="150" y="10" width="40" height="40"/>
+          <rect x="158" y="18" width="24" height="24" fill="#fff"/>
+          <rect x="164" y="24" width="12" height="12"/>
+
+          <rect x="10" y="150" width="40" height="40"/>
+          <rect x="18" y="158" width="24" height="24" fill="#fff"/>
+          <rect x="24" y="164" width="12" height="12"/>
+        </g>
+        <!-- random data modules to make it feel QR-shaped -->
+        <g fill="#07090D">
+          <rect x="60" y="14" width="6" height="6"/><rect x="72" y="14" width="6" height="6"/>
+          <rect x="84" y="14" width="6" height="6"/><rect x="102" y="14" width="6" height="6"/>
+          <rect x="120" y="14" width="6" height="6"/><rect x="132" y="14" width="6" height="6"/>
+          <rect x="60" y="26" width="6" height="6"/><rect x="78" y="26" width="6" height="6"/>
+          <rect x="96" y="26" width="6" height="6"/><rect x="108" y="26" width="6" height="6"/>
+          <rect x="126" y="26" width="6" height="6"/><rect x="138" y="26" width="6" height="6"/>
+          <rect x="66" y="38" width="6" height="6"/><rect x="84" y="38" width="6" height="6"/>
+          <rect x="102" y="38" width="6" height="6"/><rect x="120" y="38" width="6" height="6"/>
+          <rect x="132" y="38" width="6" height="6"/>
+          <rect x="60" y="60" width="6" height="6"/><rect x="78" y="60" width="6" height="6"/>
+          <rect x="90" y="60" width="6" height="6"/><rect x="108" y="60" width="6" height="6"/>
+          <rect x="120" y="60" width="6" height="6"/><rect x="138" y="60" width="6" height="6"/>
+          <rect x="156" y="60" width="6" height="6"/><rect x="174" y="60" width="6" height="6"/>
+          <rect x="60" y="72" width="6" height="6"/><rect x="72" y="72" width="6" height="6"/>
+          <rect x="96" y="72" width="6" height="6"/><rect x="114" y="72" width="6" height="6"/>
+          <rect x="132" y="72" width="6" height="6"/><rect x="150" y="72" width="6" height="6"/>
+          <rect x="168" y="72" width="6" height="6"/><rect x="180" y="72" width="6" height="6"/>
+          <rect x="14" y="60" width="6" height="6"/><rect x="32" y="60" width="6" height="6"/>
+          <rect x="14" y="72" width="6" height="6"/><rect x="26" y="72" width="6" height="6"/>
+          <rect x="38" y="72" width="6" height="6"/>
+          <rect x="14" y="84" width="6" height="6"/><rect x="26" y="84" width="6" height="6"/>
+          <rect x="44" y="84" width="6" height="6"/>
+          <rect x="60" y="84" width="6" height="6"/><rect x="78" y="84" width="6" height="6"/>
+          <rect x="90" y="84" width="6" height="6"/><rect x="108" y="84" width="6" height="6"/>
+          <rect x="126" y="84" width="6" height="6"/><rect x="144" y="84" width="6" height="6"/>
+          <rect x="162" y="84" width="6" height="6"/><rect x="180" y="84" width="6" height="6"/>
+          <rect x="60" y="96" width="6" height="6"/><rect x="72" y="96" width="6" height="6"/>
+          <rect x="90" y="96" width="6" height="6"/><rect x="108" y="96" width="6" height="6"/>
+          <rect x="126" y="96" width="6" height="6"/><rect x="144" y="96" width="6" height="6"/>
+          <rect x="156" y="96" width="6" height="6"/><rect x="174" y="96" width="6" height="6"/>
+          <rect x="14" y="96" width="6" height="6"/><rect x="32" y="96" width="6" height="6"/>
+          <rect x="14" y="108" width="6" height="6"/><rect x="38" y="108" width="6" height="6"/>
+          <rect x="60" y="108" width="6" height="6"/><rect x="84" y="108" width="6" height="6"/>
+          <rect x="96" y="108" width="6" height="6"/><rect x="114" y="108" width="6" height="6"/>
+          <rect x="132" y="108" width="6" height="6"/><rect x="150" y="108" width="6" height="6"/>
+          <rect x="168" y="108" width="6" height="6"/>
+          <rect x="14" y="120" width="6" height="6"/><rect x="32" y="120" width="6" height="6"/>
+          <rect x="44" y="120" width="6" height="6"/>
+          <rect x="60" y="120" width="6" height="6"/><rect x="78" y="120" width="6" height="6"/>
+          <rect x="90" y="120" width="6" height="6"/><rect x="108" y="120" width="6" height="6"/>
+          <rect x="120" y="120" width="6" height="6"/><rect x="138" y="120" width="6" height="6"/>
+          <rect x="156" y="120" width="6" height="6"/><rect x="174" y="120" width="6" height="6"/>
+          <rect x="14" y="132" width="6" height="6"/><rect x="38" y="132" width="6" height="6"/>
+          <rect x="60" y="132" width="6" height="6"/><rect x="72" y="132" width="6" height="6"/>
+          <rect x="90" y="132" width="6" height="6"/><rect x="102" y="132" width="6" height="6"/>
+          <rect x="120" y="132" width="6" height="6"/><rect x="132" y="132" width="6" height="6"/>
+          <rect x="150" y="132" width="6" height="6"/><rect x="174" y="132" width="6" height="6"/>
+          <rect x="60" y="156" width="6" height="6"/><rect x="78" y="156" width="6" height="6"/>
+          <rect x="96" y="156" width="6" height="6"/><rect x="114" y="156" width="6" height="6"/>
+          <rect x="126" y="156" width="6" height="6"/><rect x="144" y="156" width="6" height="6"/>
+          <rect x="162" y="156" width="6" height="6"/><rect x="180" y="156" width="6" height="6"/>
+          <rect x="60" y="168" width="6" height="6"/><rect x="72" y="168" width="6" height="6"/>
+          <rect x="90" y="168" width="6" height="6"/><rect x="108" y="168" width="6" height="6"/>
+          <rect x="120" y="168" width="6" height="6"/><rect x="138" y="168" width="6" height="6"/>
+          <rect x="156" y="168" width="6" height="6"/><rect x="174" y="168" width="6" height="6"/>
+          <rect x="60" y="180" width="6" height="6"/><rect x="84" y="180" width="6" height="6"/>
+          <rect x="102" y="180" width="6" height="6"/><rect x="114" y="180" width="6" height="6"/>
+          <rect x="132" y="180" width="6" height="6"/><rect x="150" y="180" width="6" height="6"/>
+          <rect x="168" y="180" width="6" height="6"/>
+        </g>
+        <!-- center logo overlay -->
+        <g>
+          <circle cx="100" cy="100" r="18" fill="#fff"/>
+          <circle cx="100" cy="100" r="14" fill="#FF6B00"/>
+          <text x="100" y="106" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" font-weight="900" fill="#fff">C</text>
+        </g>
+      </svg>
+      <div class="qr-cap">Scan &mdash; Try Live</div>
+    </div>
+  </div>
+
+  <!-- =========== FOOTER =========== -->
+  <div class="footer">
+    <div class="left">
+      <strong style="color:var(--text);">Citrus Fantasy Sports</strong> &middot; <a class="url" href="https://citrus-fantasy-sports.web.app">citrus-fantasy-sports.web.app</a>
+    </div>
+    <div class="right">
+      Web Summit 2026 &middot; Lisbon &middot; <a class="url" href="index.html">All Decks</a>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

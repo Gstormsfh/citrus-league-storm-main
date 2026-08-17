@@ -76,17 +76,17 @@ export const TeamCard = ({ title, starters, bench, gradientClass, slotAssignment
     const pos = normalizePosition(position);
     const styles: Record<string, { bg: string; border: string; text: string }> = {
       'C': {
-        bg: 'md:bg-fantasy-primary/3 bg-fantasy-primary/10',
+        bg: 'md:bg-fantasy-primary/[0.03] bg-fantasy-primary/10',
         border: 'md:border-l-[1px] border-l-4 md:border-fantasy-primary/40 border-fantasy-primary',
         text: 'text-fantasy-primary'
       },
       'LW': {
-        bg: 'md:bg-fantasy-secondary/3 bg-fantasy-secondary/10',
+        bg: 'md:bg-fantasy-secondary/[0.03] bg-fantasy-secondary/10',
         border: 'md:border-l-[1px] border-l-4 md:border-fantasy-secondary/40 border-fantasy-secondary',
         text: 'text-fantasy-secondary'
       },
       'RW': {
-        bg: 'md:bg-fantasy-tertiary/3 bg-fantasy-tertiary/10',
+        bg: 'md:bg-fantasy-tertiary/[0.03] bg-fantasy-tertiary/10',
         border: 'md:border-l-[1px] border-l-4 md:border-fantasy-tertiary/40 border-fantasy-tertiary',
         text: 'text-fantasy-tertiary'
       },

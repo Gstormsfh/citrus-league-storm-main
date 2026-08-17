@@ -18,9 +18,9 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
   const [capPopoverOpen, setCapPopoverOpen] = useState(false);
 
   return (
-    <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
+    <div className="bg-pastel-surface-tile rounded-2xl border-2 border-pastel-sage/30 shadow-varsity overflow-hidden">
       {/* Team Header */}
-      <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-sage/20 border-b-2 border-citrus-sage/30">
+      <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 bg-gradient-to-r from-pastel-sage/20 via-pastel-sage/10 to-pastel-sage/20 border-b-2 border-pastel-sage/30">
         <div className="flex items-center gap-3 sm:gap-4">
           <img
             src={data.logoUrl}
@@ -28,18 +28,18 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
             className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 object-contain drop-shadow-md"
           />
           <div className="flex-1 min-w-0">
-            <h2 className="font-varsity text-lg sm:text-xl md:text-2xl text-citrus-forest tracking-tight truncate">
+            <h2 className="font-varsity text-lg sm:text-xl md:text-2xl text-pastel-cream tracking-tight truncate">
               {data.teamName}
             </h2>
-            <p className="text-[10px] sm:text-xs text-citrus-charcoal/60 font-display">
+            <p className="text-[10px] sm:text-xs text-white/60 font-display">
               {data.conference} &middot; {data.division}
             </p>
           </div>
           <div className="hidden md:block text-right">
-            <div className="text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">
+            <div className="text-[10px] text-white/55 uppercase font-display font-bold tracking-wider">
               2025-26 Cap
             </div>
-            <div className="font-varsity text-lg text-citrus-charcoal">
+            <div className="font-varsity text-lg text-pastel-cream">
               {formatCap(SALARY_CAP_2025_26)}
             </div>
           </div>
@@ -51,20 +51,20 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
         {/* Numbers Row */}
         <div className="flex items-end justify-between mb-2">
           <div>
-            <div className="text-[9px] sm:text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">
+            <div className="text-[9px] sm:text-[10px] text-white/55 uppercase font-display font-bold tracking-wider">
               Projected Cap Hit
             </div>
-            <div className="font-varsity text-base sm:text-lg md:text-xl text-citrus-forest">
+            <div className="font-varsity text-base sm:text-lg md:text-xl text-pastel-cream">
               {formatCapFull(data.projectedCapHit)}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[9px] sm:text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">
+            <div className="text-[9px] sm:text-[10px] text-white/55 uppercase font-display font-bold tracking-wider">
               Cap Space
             </div>
             <div className={cn(
               "font-varsity text-base sm:text-lg md:text-xl",
-              isOverCap ? "text-red-600" : isNearCap ? "text-amber-600" : "text-citrus-sage"
+              isOverCap ? "text-red-400" : isNearCap ? "text-amber-300" : "text-pastel-sage"
             )}>
               {isOverCap ? '-' : ''}{formatCapFull(Math.abs(data.capSpace))}
             </div>
@@ -74,7 +74,7 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
         {/* Visual Cap Bar */}
         {(() => {
           const barContent = (
-            <div className="relative h-6 md:h-8 bg-citrus-cream rounded-full overflow-hidden border-2 border-dashed border-citrus-sage/40 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] cursor-help">
+            <div className="relative h-6 md:h-8 bg-pastel-surface rounded-full overflow-hidden border-2 border-dashed border-pastel-sage/40 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] cursor-help">
               <div
                 className={cn(
                   "absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out",
@@ -82,7 +82,7 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
                     ? "bg-gradient-to-r from-red-500 via-red-400 to-red-500"
                     : isNearCap
                     ? "bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400"
-                    : "bg-gradient-to-r from-citrus-sage via-[#7CB518] to-citrus-sage"
+                    : "bg-gradient-to-r from-pastel-sage via-[#7CB518] to-pastel-sage"
                 )}
                 style={{ width: `${capUsedPercent}%` }}
               >
@@ -100,7 +100,7 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className={cn(
                   "font-varsity text-[10px] md:text-xs font-bold tracking-wider drop-shadow-sm",
-                  capUsedPercent > 50 ? "text-white" : "text-citrus-forest"
+                  capUsedPercent > 50 ? "text-pastel-surface" : "text-pastel-cream"
                 )}>
                   {capUsedPercent.toFixed(1)}% USED
                 </span>
@@ -184,12 +184,12 @@ function QuickStat({
     <div className={cn(
       "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border-2 transition-colors",
       warning
-        ? "bg-red-50/50 border-red-200 text-red-700"
-        : "bg-citrus-sage/10 border-citrus-sage/30 text-citrus-forest"
+        ? "bg-red-500/15 border-red-400/45 text-red-300"
+        : "bg-pastel-sage/12 border-pastel-sage/35 text-pastel-cream"
     )}>
       <div className={cn(
         "p-1 sm:p-1.5 rounded-lg flex-shrink-0",
-        warning ? "bg-red-100" : "bg-citrus-sage/20"
+        warning ? "bg-red-500/25" : "bg-pastel-sage/20"
       )}>
         {icon}
       </div>

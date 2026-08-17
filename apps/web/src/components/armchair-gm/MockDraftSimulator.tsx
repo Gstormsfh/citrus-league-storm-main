@@ -24,10 +24,10 @@ const MOCK_TEAM_NAMES = [
 
 const POSITION_COLORS: Record<string, string> = {
   C: 'bg-primary/10 text-primary border-primary/30',
-  LW: 'bg-blue-500/10 text-blue-700 border-blue-500/30',
+  LW: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
   RW: 'bg-purple-500/10 text-purple-700 border-purple-500/30',
   D: 'bg-slate-500/10 text-slate-700 border-slate-500/30',
-  G: 'bg-amber-500/10 text-amber-700 border-amber-500/30',
+  G: 'bg-amber-500/10 text-amber-200 border-amber-500/30',
 };
 
 /**
@@ -212,23 +212,23 @@ const MockDraftSimulator = () => {
     return (
       <div className="space-y-6">
         {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
-        <Card className="p-6 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest">
+        <Card className="p-6 bg-pastel-surface-high ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-pastel-cream">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl bg-citrus-sage/20">
               <Trophy className="w-6 h-6 text-citrus-sage" />
             </div>
             <div>
-              <h2 className="font-varsity text-xl text-citrus-forest">Mock Draft Simulator</h2>
-              <p className="text-xs text-muted-foreground">Practice your draft strategy with real player data</p>
+              <h2 className="font-varsity text-xl text-pastel-cream">Mock Draft Simulator</h2>
+              <p className="text-xs text-white/65">Practice your draft strategy with real player data</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Number of Teams</label>
+              <label className="text-xs font-medium text-white/65 mb-1 block">Number of Teams</label>
               <Select value={String(numTeams)} onValueChange={v => setNumTeams(Number(v))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="bg-pastel-surface border-pastel-sage/30 text-pastel-cream"><SelectValue /></SelectTrigger>
+                <SelectContent className="bg-pastel-surface-tile border-pastel-sage/30 text-pastel-cream">
                   {[8, 10, 12, 14].map(n => (
                     <SelectItem key={n} value={String(n)}>{n} Teams</SelectItem>
                   ))}
@@ -236,10 +236,10 @@ const MockDraftSimulator = () => {
               </Select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Rounds</label>
+              <label className="text-xs font-medium text-white/65 mb-1 block">Rounds</label>
               <Select value={String(numRounds)} onValueChange={v => setNumRounds(Number(v))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="bg-pastel-surface border-pastel-sage/30 text-pastel-cream"><SelectValue /></SelectTrigger>
+                <SelectContent className="bg-pastel-surface-tile border-pastel-sage/30 text-pastel-cream">
                   {[10, 12, 15, 18, 21].map(n => (
                     <SelectItem key={n} value={String(n)}>{n} Rounds</SelectItem>
                   ))}
@@ -247,20 +247,20 @@ const MockDraftSimulator = () => {
               </Select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Draft Type</label>
+              <label className="text-xs font-medium text-white/65 mb-1 block">Draft Type</label>
               <Select value={draftType} onValueChange={v => setDraftType(v as 'snake' | 'linear')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="bg-pastel-surface border-pastel-sage/30 text-pastel-cream"><SelectValue /></SelectTrigger>
+                <SelectContent className="bg-pastel-surface-tile border-pastel-sage/30 text-pastel-cream">
                   <SelectItem value="snake">Snake</SelectItem>
                   <SelectItem value="linear">Linear</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Your Draft Position</label>
+              <label className="text-xs font-medium text-white/65 mb-1 block">Your Draft Position</label>
               <Select value={String(userTeamIndex)} onValueChange={v => setUserTeamIndex(Number(v))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="bg-pastel-surface border-pastel-sage/30 text-pastel-cream"><SelectValue /></SelectTrigger>
+                <SelectContent className="bg-pastel-surface-tile border-pastel-sage/30 text-pastel-cream">
                   {Array.from({ length: numTeams }, (_, i) => (
                     <SelectItem key={i} value={String(i)}>Pick #{i + 1}</SelectItem>
                   ))}
@@ -272,7 +272,7 @@ const MockDraftSimulator = () => {
           <Button
             onClick={startDraft}
             disabled={loading}
-            className="w-full bg-citrus-sage hover:bg-citrus-sage/90 text-white font-bold"
+            className="w-full bg-citrus-sage hover:bg-citrus-sage/90 text-pastel-surface font-bold"
           >
             <Play className="w-4 h-4 mr-2" />
             {loading ? 'Loading Players...' : 'Start Mock Draft'}
@@ -286,17 +286,17 @@ const MockDraftSimulator = () => {
     <div className="space-y-4">
       {/* Draft Header */}
       {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
-      <Card className="p-4 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest">
+      <Card className="p-4 bg-pastel-surface-high ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-pastel-cream">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <div className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-citrus-sage" />
-              <h2 className="font-varsity text-lg text-citrus-forest">Mock Draft</h2>
+              <h2 className="font-varsity text-lg text-pastel-cream">Mock Draft</h2>
               <Badge variant="outline" className="text-[10px]">
                 {draftType === 'snake' ? 'Snake' : 'Linear'} • {numTeams} teams • {numRounds} rounds
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-xs text-white/65 mt-0.5">
               {isDraftComplete
                 ? 'Draft Complete!'
                 : `Round ${currentPickInfo.round} • Pick ${currentPickInfo.pick} • ${isUserPick ? 'YOUR PICK' : `${MOCK_TEAM_NAMES[currentPickInfo.teamIndex] || 'AI'} on the clock`}`
@@ -321,7 +321,7 @@ const MockDraftSimulator = () => {
         {/* Available Players */}
         <div className="lg:col-span-2">
           {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
-          <Card className="p-3 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest">
+          <Card className="p-3 bg-pastel-surface-high ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-pastel-cream">
             <h3 className="font-bold text-sm mb-2 flex items-center gap-2">
               <Users className="w-4 h-4" />
               Available Players
@@ -361,7 +361,7 @@ const MockDraftSimulator = () => {
                               : pos}
                           </Badge>
                         </td>
-                        <td className="px-2 py-1.5 text-center text-muted-foreground">{player.team}</td>
+                        <td className="px-2 py-1.5 text-center text-white/65">{player.team}</td>
                         <td className="px-2 py-1.5 text-center font-bold">{player.points}</td>
                         <td className="px-2 py-1.5 text-center">{player.goals}</td>
                         <td className="px-2 py-1.5 text-center">{player.assists}</td>
@@ -390,7 +390,7 @@ const MockDraftSimulator = () => {
         {/* My Picks Sidebar */}
         <div>
           {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
-          <Card className="p-3 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest mb-4">
+          <Card className="p-3 bg-pastel-surface-high ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-pastel-cream mb-4">
             <h3 className="font-bold text-sm mb-2">Your Roster ({myPicks.length})</h3>
             <div className="space-y-1">
               {myPicks.map(pick => {
@@ -399,19 +399,19 @@ const MockDraftSimulator = () => {
                   <div key={pick.overall} className="flex items-center gap-2 text-xs bg-muted/20 rounded px-2 py-1.5">
                     <Badge variant="outline" className={cn("text-[9px] px-1 flex-shrink-0", POSITION_COLORS[pos])}>{pos}</Badge>
                     <span className="font-medium truncate">{pick.player.full_name}</span>
-                    <span className="text-muted-foreground flex-shrink-0 ml-auto">R{pick.round}</span>
+                    <span className="text-white/65 flex-shrink-0 ml-auto">R{pick.round}</span>
                   </div>
                 );
               })}
               {myPicks.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-3">No picks yet</p>
+                <p className="text-xs text-white/65 text-center py-3">No picks yet</p>
               )}
             </div>
           </Card>
 
           {/* Draft Board Toggle */}
           {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
-          <Card className="p-3 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest">
+          <Card className="p-3 bg-pastel-surface-high ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-pastel-cream">
             <button
               onClick={() => setShowBoard(!showBoard)}
               className="flex items-center justify-between w-full text-sm font-bold"
@@ -432,15 +432,15 @@ const MockDraftSimulator = () => {
                         isMyPick ? "bg-primary/10 font-medium" : "bg-muted/10"
                       )}
                     >
-                      <span className="text-muted-foreground w-6 flex-shrink-0">#{pick.overall}</span>
+                      <span className="text-white/65 w-6 flex-shrink-0">#{pick.overall}</span>
                       <Badge variant="outline" className={cn("text-[8px] px-0.5", POSITION_COLORS[pos])}>{pos}</Badge>
                       <span className="truncate">{pick.player.full_name}</span>
-                      <span className="text-muted-foreground flex-shrink-0 ml-auto">{pick.teamName}</span>
+                      <span className="text-white/65 flex-shrink-0 ml-auto">{pick.teamName}</span>
                     </div>
                   );
                 })}
                 {picks.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-3">Draft not started</p>
+                  <p className="text-xs text-white/65 text-center py-3">Draft not started</p>
                 )}
               </div>
             )}

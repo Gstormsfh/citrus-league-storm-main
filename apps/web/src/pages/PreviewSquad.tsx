@@ -192,7 +192,7 @@ export default function PreviewSquad() {
           {SQUAD.map((s, i) => (
             <article
               key={s.name}
-              className={`${TONE_BG[s.tone]} rounded-[20px] p-5 ring-1 ring-pastel-forest/8 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-12px_rgba(27,48,34,0.18)] transition-all`}
+              className={`${TONE_BG[s.tone]} rounded-[20px] p-5 ring-1 ring-pastel-forest/[0.08] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-12px_rgba(27,48,34,0.18)] transition-all`}
             >
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-12 h-12 rounded-full bg-white ring-2 ring-pastel-forest/10 flex items-center justify-center font-jbmono text-[12px] font-bold text-pastel-forest flex-shrink-0">

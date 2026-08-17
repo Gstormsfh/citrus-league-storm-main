@@ -142,7 +142,7 @@ export function HockeyFooter({
         </div>
 
         <div className="border-t border-white/5 pt-6">
-          <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/30 flex items-center gap-2 flex-wrap">
+          <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 flex items-center gap-2 flex-wrap">
             <span>© 2026 Citrus Fantasy Sports</span>
             <span className="text-white/15">·</span>
             <Link to="/privacy" className="hover:text-white/70 transition-colors">Privacy</Link>

@@ -161,7 +161,7 @@ export default function PreviewBoards() {
         <section className="relative max-w-[1280px] mx-auto px-6 pb-16 grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Stormy AI chat */}
           <div className="bg-white rounded-3xl border border-pastel-sage/30 shadow-[0_24px_60px_-24px_rgba(27,48,34,0.18)] overflow-hidden">
-            <div className="flex items-center gap-3 px-6 py-4 border-b border-pastel-sage/30 bg-pastel-orange/8">
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-pastel-sage/30 bg-pastel-orange/[0.08]">
               <div className="w-9 h-9 rounded-full bg-pastel-orange flex items-center justify-center text-white">
                 <Sparkles className="w-4 h-4" strokeWidth={2.5} />
               </div>

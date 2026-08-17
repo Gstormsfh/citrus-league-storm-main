@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -70,7 +71,7 @@ const ResetPassword = () => {
         }, 2000);
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      const errorMessage = userMessage(err, 'An unexpected error occurred.');
       setError(errorMessage);
     } finally {
       setLoading(false);

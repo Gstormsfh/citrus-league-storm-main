@@ -120,17 +120,17 @@ export default function CapProjection() {
     <div className="space-y-6">
       {/* Instructions */}
       {!selectedTeam && (
-        <div className="text-center py-8 bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-dashed border-citrus-sage/40">
-          <CalendarRange className="w-10 h-10 text-citrus-sage/50 mx-auto mb-3" />
-          <h3 className="font-varsity text-lg text-citrus-forest mb-1">Cap Projection</h3>
-          <p className="text-sm text-citrus-charcoal/60 font-display max-w-md mx-auto">
+        <div className="text-center py-8 bg-pastel-surface-tile rounded-2xl border-2 border-dashed border-citrus-sage/40">
+          <CalendarRange className="w-10 h-10 text-citrus-sage/75 mx-auto mb-3" />
+          <h3 className="font-varsity text-lg text-pastel-cream mb-1">Cap Projection</h3>
+          <p className="text-sm text-white/65 font-display max-w-md mx-auto">
             See committed salary, projected cap space, and expiring contracts for the next 6 seasons.
           </p>
         </div>
       )}
 
       {/* Team Selector */}
-      <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
+      <div className="bg-pastel-surface-tile rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
         <button
           onClick={() => setShowTeamPicker(!showTeamPicker)}
           className="w-full px-4 py-3 bg-gradient-to-r from-citrus-sage/20 to-citrus-sage/10 flex items-center gap-3 hover:from-citrus-sage/25 transition-colors"
@@ -139,16 +139,16 @@ export default function CapProjection() {
             <img loading="lazy" decoding="async" src={teamInfo.logoUrl} alt={teamInfo.abbrev} className="w-8 h-8 object-contain" />
           ) : (
             <div className="w-8 h-8 rounded-full bg-citrus-sage/20 flex items-center justify-center">
-              <Shield className="w-4 h-4 text-citrus-sage/60" />
+              <Shield className="w-4 h-4 text-citrus-sage/80" />
             </div>
           )}
           <div className="flex-1 text-left">
-            <div className="text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">Team</div>
-            <div className="font-varsity text-sm text-citrus-forest">
+            <div className="text-[10px] text-white/55 uppercase font-display font-bold tracking-wider">Team</div>
+            <div className="font-varsity text-sm text-pastel-cream">
               {teamInfo ? teamInfo.fullName : 'Select a team'}
             </div>
           </div>
-          <ChevronDown className={cn("w-4 h-4 text-citrus-charcoal/40 transition-transform", showTeamPicker && "rotate-180")} />
+          <ChevronDown className={cn("w-4 h-4 text-white/50 transition-transform", showTeamPicker && "rotate-180")} />
         </button>
 
         {showTeamPicker && (
@@ -166,7 +166,7 @@ export default function CapProjection() {
                   )}
                 >
                   <img loading="lazy" decoding="async" src={t.logoUrl} alt={t.abbrev} className="w-6 h-6 object-contain" />
-                  <span className="text-[7px] font-varsity text-citrus-forest">{t.abbrev}</span>
+                  <span className="text-[7px] font-varsity text-pastel-cream">{t.abbrev}</span>
                 </button>
               ))}
             </div>
@@ -185,10 +185,10 @@ export default function CapProjection() {
       {teamData && !isLoading && (
         <div className="space-y-6 animate-in fade-in duration-300">
           {/* Chart */}
-          <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
+          <div className="bg-pastel-surface-tile rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
             <div className="px-4 md:px-6 py-3 bg-gradient-to-r from-citrus-sage/20 to-citrus-sage/10 border-b-2 border-citrus-sage/30">
-              <h4 className="font-varsity text-base text-citrus-forest">Committed Salary vs Cap Ceiling</h4>
-              <p className="text-[10px] text-citrus-charcoal/50 font-display mt-0.5">
+              <h4 className="font-varsity text-base text-pastel-cream">Committed Salary vs Cap Ceiling</h4>
+              <p className="text-[10px] text-white/55 font-display mt-0.5">
                 Cap ceiling projections based on estimated ~$4M/year increase
               </p>
             </div>
@@ -264,45 +264,45 @@ export default function CapProjection() {
 
           {/* Year-by-Year Breakdown */}
           <div className="space-y-3">
-            <h4 className="font-varsity text-base text-citrus-forest flex items-center gap-2">
+            <h4 className="font-varsity text-base text-pastel-cream flex items-center gap-2">
               <CalendarRange className="w-4 h-4 text-citrus-sage" />
               Season-by-Season Breakdown
             </h4>
 
             {projection.map(year => (
-              <div key={year.expiryYear} className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
+              <div key={year.expiryYear} className="bg-pastel-surface-tile rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
                 <button
                   onClick={() => setExpandedYear(expandedYear === year.expiryYear ? null : year.expiryYear)}
                   className="w-full px-4 py-3 flex items-center gap-3 hover:bg-citrus-sage/5 transition-colors"
                 >
                   <div className="flex-1 text-left">
-                    <div className="font-varsity text-sm text-citrus-forest">{year.season}</div>
-                    <div className="text-[10px] text-citrus-charcoal/50 font-display">
+                    <div className="font-varsity text-sm text-pastel-cream">{year.season}</div>
+                    <div className="text-[10px] text-white/55 font-display">
                       {year.expiringPlayers.length} expiring contract{year.expiringPlayers.length !== 1 ? 's' : ''}
                     </div>
                   </div>
 
                   <div className="hidden md:flex items-center gap-4">
                     <div className="text-right">
-                      <div className="text-[8px] text-citrus-charcoal/50 uppercase font-display font-bold">Committed</div>
-                      <div className="font-varsity text-sm text-citrus-forest">{formatCap(year.committed)}</div>
+                      <div className="text-[8px] text-white/55 uppercase font-display font-bold">Committed</div>
+                      <div className="font-varsity text-sm text-pastel-cream">{formatCap(year.committed)}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[8px] text-citrus-charcoal/50 uppercase font-display font-bold">Proj. Space</div>
+                      <div className="text-[8px] text-white/55 uppercase font-display font-bold">Proj. Space</div>
                       <div className={cn(
                         "font-varsity text-sm",
-                        year.projectedSpace < 0 ? "text-red-600" : year.projectedSpace < 5_000_000 ? "text-amber-600" : "text-green-600"
+                        year.projectedSpace < 0 ? "text-red-400" : year.projectedSpace < 5_000_000 ? "text-amber-300" : "text-emerald-400"
                       )}>
                         {formatCap(year.projectedSpace)}
                       </div>
                     </div>
                     {year.ufaCount > 0 && (
-                      <Badge className="bg-red-100 text-red-700 text-[8px] font-varsity border border-red-200">
+                      <Badge className="bg-red-500/20 text-red-300 text-[8px] font-varsity border border-red-400/40">
                         {year.ufaCount} UFA
                       </Badge>
                     )}
                     {year.rfaCount > 0 && (
-                      <Badge className="bg-amber-100 text-amber-700 text-[8px] font-varsity border border-amber-200">
+                      <Badge className="bg-amber-500/20 text-amber-200 text-[8px] font-varsity border border-amber-400/40">
                         {year.rfaCount} RFA
                       </Badge>
                     )}
@@ -311,25 +311,25 @@ export default function CapProjection() {
                   {/* Mobile summary */}
                   <div className="md:hidden flex items-center gap-1.5 flex-wrap justify-end">
                     {year.ufaCount > 0 && (
-                      <Badge className="bg-red-100 text-red-700 text-[7px] h-4 px-1 font-varsity border border-red-200">
+                      <Badge className="bg-red-500/20 text-red-300 text-[7px] h-4 px-1 font-varsity border border-red-400/40">
                         {year.ufaCount} UFA
                       </Badge>
                     )}
                     {year.rfaCount > 0 && (
-                      <Badge className="bg-amber-100 text-amber-700 text-[7px] h-4 px-1 font-varsity border border-amber-200">
+                      <Badge className="bg-amber-500/20 text-amber-200 text-[7px] h-4 px-1 font-varsity border border-amber-400/40">
                         {year.rfaCount} RFA
                       </Badge>
                     )}
                     <span className={cn(
                       "font-varsity text-sm",
-                      year.projectedSpace < 0 ? "text-red-600" : "text-green-600"
+                      year.projectedSpace < 0 ? "text-red-400" : "text-emerald-400"
                     )}>
                       {formatCap(year.projectedSpace)}
                     </span>
                   </div>
 
                   <ChevronDown className={cn(
-                    "w-4 h-4 text-citrus-charcoal/40 transition-transform",
+                    "w-4 h-4 text-white/50 transition-transform",
                     expandedYear === year.expiryYear && "rotate-180"
                   )} />
                 </button>
@@ -340,10 +340,10 @@ export default function CapProjection() {
                     {/* Header */}
                     <div className="px-4 py-2 bg-citrus-sage/10">
                       <div className="flex items-center justify-between">
-                        <span className="text-[9px] text-citrus-charcoal/60 uppercase font-display font-bold tracking-wider">
+                        <span className="text-[9px] text-white/65 uppercase font-display font-bold tracking-wider">
                           Expiring after {year.season}
                         </span>
-                        <span className="text-xs font-varsity text-citrus-forest">
+                        <span className="text-xs font-varsity text-pastel-cream">
                           {formatCap(year.expiringCap)} coming off books
                         </span>
                       </div>
@@ -357,24 +357,24 @@ export default function CapProjection() {
                           key={p.playerId || `${p.name}-${i}`}
                           className={cn(
                             "flex items-center gap-3 px-4 py-2 border-b border-citrus-sage/10",
-                            i % 2 === 0 ? "bg-white/40" : "bg-citrus-cream/30"
+                            i % 2 === 0 ? "bg-pastel-surface" : "bg-white/5"
                           )}
                         >
                           <div className="flex-1 min-w-0">
-                            <div className="font-display font-bold text-xs text-citrus-forest truncate">{p.name}</div>
+                            <div className="font-display font-bold text-xs text-pastel-cream truncate">{p.name}</div>
                             <div className="flex items-center gap-1">
-                              <Badge className="bg-citrus-sage/20 text-citrus-forest text-[7px] h-3.5 px-1 font-varsity border border-citrus-sage/40">
+                              <Badge className="bg-citrus-sage/20 text-pastel-cream text-[7px] h-3.5 px-1 font-varsity border border-citrus-sage/40">
                                 {p.position}
                               </Badge>
-                              {p.age > 0 && <span className="text-[9px] text-citrus-charcoal/50 font-display">Age {p.age + (year.expiryYear - 2026)}</span>}
+                              {p.age > 0 && <span className="text-[9px] text-white/55 font-display">Age {p.age + (year.expiryYear - 2026)}</span>}
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-varsity text-xs text-citrus-forest">{formatCap(p.capHit)}</div>
+                            <div className="font-varsity text-xs text-pastel-cream">{formatCap(p.capHit)}</div>
                           </div>
                           <Badge className={cn(
                             "text-[8px] h-5 px-1.5 font-varsity font-bold",
-                            p.expiryStatus === 'UFA' ? "bg-red-500/80 text-white" : "bg-amber-500/80 text-white"
+                            p.expiryStatus === 'UFA' ? "bg-red-500/90 text-white" : "bg-amber-400 text-pastel-surface"
                           )}>
                             {p.expiryStatus}
                           </Badge>
@@ -385,7 +385,7 @@ export default function CapProjection() {
 
                 {expandedYear === year.expiryYear && year.expiringPlayers.length === 0 && (
                   <div className="border-t-2 border-citrus-sage/20 px-4 py-6 text-center">
-                    <span className="text-xs text-citrus-charcoal/50 font-display">No contracts expiring after this season</span>
+                    <span className="text-xs text-white/55 font-display">No contracts expiring after this season</span>
                   </div>
                 )}
               </div>
@@ -394,7 +394,7 @@ export default function CapProjection() {
 
           {/* Disclaimer */}
           <div className="text-center">
-            <p className="text-[10px] text-citrus-charcoal/40 font-display">
+            <p className="text-[10px] text-white/50 font-display">
               Cap ceiling projections are estimates based on recent CBA trends (~$4M/year increase).
               <br />Actual cap numbers will be announced by the NHL. Future commitments do not include potential signings.
             </p>

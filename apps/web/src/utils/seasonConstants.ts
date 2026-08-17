@@ -15,4 +15,6 @@ export {
   getCurrentSeason,
   getSeasonGameCount,
   getHeadshotUrl,
+  getSeasonStartDate,
+  getUpcomingSeasonStart,
 } from '@citrus/shared';

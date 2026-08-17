@@ -415,7 +415,21 @@
   text-transform: uppercase;
   letter-spacing: -0.025em; /* tracking-tighter for block letters */
   font-weight: 900;
-  @apply text-citrus-forest;
+  /* NO colour here on purpose.
+   *
+   * This used to be `@apply text-citrus-forest`, which is #4A5F4D -- a text
+   * colour picked for LIGHT backgrounds. It is not a default: it OVERRIDES
+   * inheritance, so every .font-varsity element that didn't set its own colour
+   * rendered mid-green regardless of the surface under it. On the v2 dark tiles
+   * (#1A2A20) that measured 2.17:1 -- below the 4.5:1 floor.
+   *
+   * The `.dark h1, .dark h2, .dark .font-varsity` rule above was meant to cover
+   * that, but nothing puts `.dark` on <html> -- v2 is permanently dark by
+   * design, not a toggled theme -- so the light rule always won.
+   *
+   * Letting colour inherit is the correct behaviour: a varsity heading takes
+   * the colour of whatever surface component it sits in, and components that
+   * want a specific colour still set one explicitly. */
   }
   
   /* Accent Script - Surf Shop Labels */
@@ -438,9 +452,26 @@
   }
   
   /* Force warm colors - NO pure white or black */
-  p, span, div {
-  @apply text-citrus-forest;
-  }
+  /* REMOVED 2026-08-14 — `p, span, div { @apply text-citrus-forest; }`
+   *
+   * This set color: #4A5F4D on every p, span and div in the app, which does
+   * not "default" the text colour — it OVERRIDES INHERITANCE. Any element that
+   * set a colour on itself lost it the moment its label was wrapped in a bare
+   * <span>. The homepage hero button was the clearest case:
+   *
+   *   <a class="bg-pastel-orange text-[#581E00]"><span>Drop the Puck</span></a>
+   *        a  -> rgb(88,30,0)   #581E00 on orange = 4.60:1  (passes AA)
+   *     span  -> rgb(74,95,77)  #4A5F4D on orange = 2.43:1  (fails AA)
+   *
+   * The span carried no class at all; the rule above beat inheritance and
+   * repainted it. Same cause on /auth "Sign in", /pricing "Create your
+   * account", /nhl/playoffs "Build Your Bracket" and the CTA banner.
+   *
+   * It was also redundant: `body` already applies text-citrus-forest, so the
+   * default is unchanged by removing this — descendants that set no colour
+   * still inherit #4A5F4D from body. The only behaviour that changes is that
+   * an explicitly-coloured parent is now respected, which is what the markup
+   * asked for. */
   
   /* Selection with vintage sage green */
   ::selection {

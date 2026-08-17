@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Citrus &middot; Decks &amp; Comparisons</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #07090D;
+    --surface: #11161E;
+    --surface-2: #1A222C;
+    --border: #232C39;
+    --border-soft: #1A222C;
+    --text: #ECF2F8;
+    --muted: #8B949E;
+    --dim: #4A5462;
+    --orange: #FF6B00;
+    --pink: #FF7AB6;
+    --purple: #C49DFF;
+    --green: #00D26A;
+    --blue: #5BB6FF;
+    --teal: #3FB9B0;
+    --yellow: #FFB800;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 15% 10%, rgba(255,107,0,0.12) 0%, transparent 45%),
+      radial-gradient(ellipse at 85% 30%, rgba(255,122,182,0.08) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 90%, rgba(196,157,255,0.07) 0%, transparent 50%);
+    z-index: 0;
+    pointer-events: none;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size: 40px 40px;
+    z-index: 0;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse at center, black 40%, transparent 85%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 85%);
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 80px 32px;
+  }
+
+  /* HERO */
+  .hero {
+    text-align: center;
+    margin-bottom: 70px;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 18px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, rgba(255,107,0,0.15), rgba(255,122,182,0.12));
+    border: 1px solid rgba(255,107,0,0.3);
+    color: var(--orange);
+    margin-bottom: 24px;
+  }
+  .eyebrow .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--orange);
+    box-shadow: 0 0 12px var(--orange);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.85); }
+  }
+  .hero h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(40px, 6vw, 72px);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -1.8px;
+    margin-bottom: 18px;
+    background: linear-gradient(135deg, var(--orange), var(--pink), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero p {
+    font-size: clamp(15px, 1.4vw, 19px);
+    color: var(--muted);
+    max-width: 720px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+  .hero p strong { color: var(--text); font-weight: 600; }
+
+  /* SECTION LABEL */
+  .label-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .label-row .lbl {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .label-row .line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border-soft), transparent);
+  }
+
+  /* GRID */
+  .deck-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 22px;
+    margin-bottom: 60px;
+  }
+  @media (max-width: 800px) { .deck-grid { grid-template-columns: 1fr; } }
+
+  .deck {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 22px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+    position: relative;
+  }
+  .deck:hover {
+    transform: translateY(-6px);
+    border-color: var(--border);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+  }
+  .deck.featured {
+    border-color: rgba(255,107,0,0.4);
+    background: linear-gradient(160deg, rgba(255,107,0,0.05), var(--surface) 70%);
+    box-shadow: 0 0 0 1px rgba(255,107,0,0.12), 0 20px 48px rgba(255,107,0,0.10);
+  }
+  .deck.featured:hover {
+    box-shadow: 0 0 0 1px rgba(255,107,0,0.2), 0 30px 70px rgba(255,107,0,0.18);
+  }
+
+  .deck-preview {
+    height: 200px;
+    background: var(--surface-2);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .deck-preview .bg {
+    position: absolute;
+    inset: 0;
+    opacity: 0.7;
+  }
+  .deck-preview .label-tag {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 4px 10px;
+    border-radius: 100px;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--text);
+    z-index: 2;
+  }
+  .deck-preview .vbadge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    z-index: 2;
+  }
+  .deck-preview .vbadge.v1 { background: rgba(63,185,176,0.18); color: var(--teal); }
+  .deck-preview .vbadge.v2 { background: rgba(255,107,0,0.20); color: var(--orange); }
+  .deck-preview .vbadge.new { background: linear-gradient(135deg, var(--orange), var(--pink)); color: #07090D; }
+  .deck-preview .vbadge.archive { background: rgba(139,148,158,0.15); color: var(--muted); }
+
+  /* preview art for each deck — pure CSS hockey vibes */
+  .preview-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .preview-bars {
+    position: absolute;
+    inset: 50px 30px 30px 30px;
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+  }
+  .preview-bars .pb {
+    flex: 1;
+    border-radius: 3px 3px 0 0;
+  }
+  .preview-orb {
+    width: 100px; height: 100px; border-radius: 50%;
+    filter: blur(40px);
+    position: absolute;
+  }
+
+  .deck-body {
+    padding: 26px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .deck-eyebrow {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--orange);
+    margin-bottom: 8px;
+  }
+  .deck.archive .deck-eyebrow { color: var(--muted); }
+  .deck h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.4px;
+    margin-bottom: 8px;
+  }
+  .deck p {
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.6;
+    flex: 1;
+    margin-bottom: 18px;
+  }
+  .deck-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-soft);
+    font-size: 11px;
+    color: var(--dim);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+  }
+  .deck-meta .open {
+    margin-left: auto;
+    color: var(--orange);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .deck-meta .arrow {
+    transition: transform 0.2s;
+    display: inline-block;
+  }
+  .deck:hover .arrow { transform: translateX(4px); }
+  .deck.archive .deck-meta .open { color: var(--muted); }
+
+  /* TAGS */
+  .tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 9px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    color: var(--muted);
+    border: 1px solid var(--border-soft);
+  }
+  .tag.featured { background: rgba(255,107,0,0.12); color: var(--orange); border-color: rgba(255,107,0,0.25); }
+
+  /* INFO STRIP */
+  .info-strip {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 22px;
+    padding: 32px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    margin-bottom: 70px;
+  }
+  @media (max-width: 800px) { .info-strip { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px) { .info-strip { grid-template-columns: 1fr; } }
+  .info-strip .istat {
+    text-align: center;
+  }
+  .info-strip .istat .v {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .info-strip .istat .l {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-top: 8px;
+    font-weight: 600;
+  }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    padding: 36px 0 0;
+    border-top: 1px solid var(--border-soft);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .footer strong { color: var(--text); }
+  .footer .url {
+    color: var(--orange);
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .footer .url:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- =========== HERO =========== -->
+  <div class="hero">
+    <div class="eyebrow">
+      <span class="dot"></span>
+      Citrus Decks &middot; All Comparisons
+    </div>
+    <h1>The Citrus Showroom.</h1>
+    <p>
+      Every comparison, scorecard, and architecture brief Citrus has produced &mdash; one click each. <strong>Built for Web Summit 2026</strong>, useful any time you need to explain why Citrus is what it is.
+    </p>
+  </div>
+
+  <!-- =========== WEB SUMMIT 2026 =========== -->
+  <div class="label-row">
+    <div class="lbl" style="color:var(--orange);">Web Summit 2026 &middot; The Lead Doc</div>
+    <div class="line"></div>
+  </div>
+
+  <div class="deck-grid" style="grid-template-columns: 1fr; margin-bottom:18px;">
+
+    <!-- ===== ACCURACY SHOOTOUT (FEATURED) ===== -->
+    <a class="deck featured" href="citrus-data-accuracy.html" style="min-height:340px;">
+      <div class="deck-preview" style="height:240px; background:linear-gradient(135deg, #0A1410, #11221C);">
+        <div class="preview-orb" style="background:var(--orange); top:-40px; left:-40px;"></div>
+        <div class="preview-orb" style="background:#6BBF8A; bottom:-40px; right:10%;"></div>
+        <div class="preview-grid"></div>
+        <div class="label-tag">Auditable &middot; Source-Cited</div>
+        <div class="vbadge new">New &middot; Lead Doc</div>
+        <!-- Real auditable chart preview -->
+        <div style="position:relative; z-index:1; text-align:center; padding:0 30px;">
+          <div style="font-family:'Space Grotesk', sans-serif; font-size:42px; font-weight:800; line-height:1; letter-spacing:-1.5px; background:linear-gradient(135deg, var(--orange), #FF8A3D, #6BBF8A); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">
+            The Accuracy Shootout
+          </div>
+          <div style="font-size:13px; color:var(--muted); margin-top:14px; max-width:520px; margin-left:auto; margin-right:auto; line-height:1.5;">
+            Citrus <strong style="color:var(--orange);">0.817 AUC</strong> &middot; Evolving Hockey <strong style="color:#6BBF8A;">0.7822</strong> &middot; ESPN, Yahoo, Sleeper, FantasyPros, DK, FD: <strong style="color:#FF5C5C;">no disclosure</strong>
+          </div>
+        </div>
+      </div>
+      <div class="deck-body">
+        <div class="deck-eyebrow">Web Summit 2026 &middot; Featured</div>
+        <h3>The Accuracy Shootout &mdash; We Measured ESPN/Yahoo Ourselves</h3>
+        <p>They won&rsquo;t publish their accuracy. So we measured it for them. Two reproducible audit scripts run against 10,000 player-games and 1,000 matchup-weeks. We replicated Yahoo&rsquo;s and ESPN&rsquo;s publicly-described methodology in code, ran it against the same actuals, and published every number. <strong>Citrus wins every metric &mdash; biggest gap on weekly matchup win-probability Brier (22.4% better).</strong> 14 citations, all footnoted to primary URLs with last-accessed dates.</p>
+        <div class="tags">
+          <span class="tag featured">Featured</span>
+          <span class="tag">Live Audit Numbers</span>
+          <span class="tag">14 Citations</span>
+          <span class="tag">Reproducible Code</span>
+          <span class="tag">Disclosure Matrix</span>
+          <span class="tag">AUC + Brier + Calibration</span>
+        </div>
+        <div class="deck-meta">
+          <span>Verified &middot; 2026-05-14</span>
+          <span class="open">Open <span class="arrow">&rarr;</span></span>
+        </div>
+      </div>
+    </a>
+
+  </div>
+
+  <!-- =========== INFO STRIP =========== -->
+  <div class="info-strip">
+    <div class="istat"><div class="v" style="color:var(--orange);">+44%</div><div class="l">Higher R<sup>2</sup> vs Yahoo-style</div></div>
+    <div class="istat"><div class="v" style="color:#6BBF8A;">+15%</div><div class="l">Higher Spearman &rho;</div></div>
+    <div class="istat"><div class="v" style="color:#C49DFF;">22.4%</div><div class="l">Lower Win-Prob Brier</div></div>
+    <div class="istat"><div class="v" style="color:#5BB6FF;">11,000</div><div class="l">Player-Games Audited</div></div>
+  </div>
+
+  <!-- =========== EARLIER ATTEMPTS =========== -->
+  <div class="label-row">
+    <div class="lbl" style="color:var(--muted);">Earlier Attempts &middot; Web Summit Pitch Variations</div>
+    <div class="line"></div>
+  </div>
+
+  <div class="deck-grid">
+
+    <!-- ===== V1 ===== -->
+    <a class="deck" href="citrus-websummit-comparison.html">
+      <div class="deck-preview" style="background:linear-gradient(135deg, #0D1117, #1A222C);">
+        <div class="preview-grid"></div>
+        <div class="label-tag">Data-Dense &middot; Investor-Pitch</div>
+        <div class="vbadge v1">v1</div>
+        <div class="preview-bars">
+          <div class="pb" style="background:var(--orange); height:60%; opacity:0.85;"></div>
+          <div class="pb" style="background:var(--orange); height:75%;"></div>
+          <div class="pb" style="background:var(--orange); height:90%;"></div>
+          <div class="pb" style="background:var(--orange); height:80%;"></div>
+          <div class="pb" style="background:var(--orange); height:55%;"></div>
+          <div class="pb" style="background:var(--muted); height:18%; opacity:0.5;"></div>
+          <div class="pb" style="background:var(--muted); height:14%; opacity:0.5;"></div>
+          <div class="pb" style="background:var(--muted); height:12%; opacity:0.5;"></div>
+          <div class="pb" style="background:var(--muted); height:10%; opacity:0.5;"></div>
+        </div>
+        <div style="position:absolute; bottom:14px; left:30px; right:30px; display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace; font-size:9px; color:var(--muted); letter-spacing:1px;">
+          <span>CITRUS</span><span>YAHOO</span><span>ESPN</span>
+        </div>
+      </div>
+      <div class="deck-body">
+        <div class="deck-eyebrow" style="color:var(--muted);">Earlier Attempt &middot; v1</div>
+        <h3>Pepsi Challenge &mdash; Investor Walkthrough</h3>
+        <p>Nine-section walkthrough with side-by-side product columns, eight-category scorecard, moat diagram, market quadrant. Kept for reference. <em>Numbers were directional, not source-cited &mdash; use the Accuracy Shootout above for any external sharing.</em></p>
+        <div class="deck-meta">
+          <span>May 2026</span>
+          <span class="open" style="color:var(--muted);">Open <span class="arrow">&rarr;</span></span>
+        </div>
+      </div>
+    </a>
+
+    <!-- ===== V2 ===== -->
+    <a class="deck" href="citrus-websummit-comparison-v2.html">
+      <div class="deck-preview">
+        <div class="preview-orb" style="background:var(--orange); top:-30px; left:-30px;"></div>
+        <div class="preview-orb" style="background:var(--pink); bottom:-30px; right:-30px;"></div>
+        <div class="preview-grid"></div>
+        <div class="label-tag">Cinematic &middot; Product-First</div>
+        <div class="vbadge v2">v2</div>
+        <div style="position:relative; z-index:1; text-align:center;">
+          <div style="font-family:'Space Grotesk', sans-serif; font-size:36px; font-weight:700; line-height:1; letter-spacing:-1.5px; background:linear-gradient(135deg, var(--orange), var(--pink), var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">A quant desk<br>in your pocket.</div>
+        </div>
+      </div>
+      <div class="deck-body">
+        <div class="deck-eyebrow" style="color:var(--muted);">Earlier Attempt &middot; v2</div>
+        <h3>Cinematic Edition &mdash; Product-Surface Mockups</h3>
+        <p>Bigger type, fewer sections, mocked product surfaces, QR code. Kept for reference. <em>Off-brand for Citrus and lacked auditable depth &mdash; use the Accuracy Shootout above.</em></p>
+        <div class="deck-meta">
+          <span>May 2026</span>
+          <span class="open" style="color:var(--muted);">Open <span class="arrow">&rarr;</span></span>
+        </div>
+      </div>
+    </a>
+
+  </div>
+
+  <!-- =========== TECH ARCHIVE =========== -->
+  <div class="label-row">
+    <div class="lbl" style="color:var(--purple);">Technical Archive &middot; Existing Docs</div>
+    <div class="line"></div>
+  </div>
+
+  <div class="deck-grid" style="grid-template-columns: repeat(3, 1fr);">
+    <style>
+      @media (max-width: 1000px) { .deck-grid { grid-template-columns: repeat(2, 1fr) !important; } }
+      @media (max-width: 600px) { .deck-grid { grid-template-columns: 1fr !important; } }
+    </style>
+
+    <!-- xG competitive -->
+    <a class="deck archive" href="citrus-xg-competitive-analysis.html">
+      <div class="deck-preview" style="background:linear-gradient(135deg, #0D1117, #1A222C);">
+        <div class="preview-orb" style="background:var(--orange); top:-20px; left:30%;"></div>
+        <div class="preview-grid"></div>
+        <div class="label-tag">Competitive Analysis</div>
+        <div class="vbadge archive">Archive</div>
+        <div style="position:relative; z-index:1; text-align:center;">
+          <div style="font-family:'JetBrains Mono', monospace; font-size:54px; font-weight:900; background:linear-gradient(135deg, var(--orange), var(--green)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; letter-spacing:-2px;">xG vs.</div>
+        </div>
+      </div>
+      <div class="deck-body">
+        <div class="deck-eyebrow">Technical Deep Dive</div>
+        <h3>xG Model &amp; Monte Carlo Competitive Analysis</h3>
+        <p>Citrus xG v3 vs. MoneyPuck, NST, Evolving Hockey, NHL Edge. Six sections, full tables, math-grade comparison cards.</p>
+        <div class="deck-meta">
+          <span>March 2026</span>
+          <span class="open">Open <span class="arrow">&rarr;</span></span>
+        </div>
+      </div>
+    </a>
+
+    <!-- secret sauce -->
+    <a class="deck archive" href="citrus-secret-sauce.html">
+      <div class="deck-preview" style="background:linear-gradient(135deg, #0D1117, #1A222C);">
+        <div class="preview-orb" style="background:var(--purple); top:30%; left:-20px;"></div>
+        <div class="preview-orb" style="background:var(--pink); bottom:-20px; right:20%;"></div>
+        <div class="preview-grid"></div>
+        <div class="label-tag">Proprietary Tech</div>
+        <div class="vbadge archive">Archive</div>
+        <div style="position:relative; z-index:1; text-align:center;">
+          <div style="font-family:'Space Grotesk', sans-serif; font-size:30px; font-weight:700; line-height:1; letter-spacing:-1px; background:linear-gradient(135deg, var(--purple), var(--pink)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">The Secret<br>Sauce</div>
+        </div>
+      </div>
+      <div class="deck-body">
+        <div class="deck-eyebrow">Technical Deep Dive</div>
+        <h3>The Secret Sauce</h3>
+        <p>Eight &ldquo;sauces&rdquo; that make Citrus the most technically advanced fantasy hockey platform &mdash; xG v3, MC engine, uncertainty propagation, infrastructure.</p>
+        <div class="deck-meta">
+          <span>March 2026</span>
+          <span class="open">Open <span class="arrow">&rarr;</span></span>
+        </div>
+      </div>
+    </a>
+
+    <!-- architecture diagram -->
+    <a class="deck archive" href="citrus-architecture-diagram.html">
+      <div class="deck-preview" style="background:linear-gradient(135deg, #0D1117, #1A222C);">
+        <div class="preview-orb" style="background:var(--blue); top:-20px; right:30%;"></div>
+        <div class="preview-grid"></div>
+        <div class="label-tag">System Architecture</div>
+        <div class="vbadge archive">Archive</div>
+        <div style="position:relative; z-index:1; text-align:center;">
+          <div style="font-family:'JetBrains Mono', monospace; font-size:18px; font-weight:700; color:var(--blue); letter-spacing:1px;">Python &rarr; PG &rarr; Hono &rarr; React</div>
+          <div style="font-size:11px; color:var(--muted); margin-top:8px; letter-spacing:0.8px;">Full stack &middot; End-to-end</div>
+        </div>
+      </div>
+      <div class="deck-body">
+        <div class="deck-eyebrow">Technical Deep Dive</div>
+        <h3>Citrus Architecture Diagram</h3>
+        <p>End-to-end system architecture. How data flows from NHL ingestion through the xG model, MC engine, PostgreSQL, Hono API, and the React frontend.</p>
+        <div class="deck-meta">
+          <span>March 2026</span>
+          <span class="open">Open <span class="arrow">&rarr;</span></span>
+        </div>
+      </div>
+    </a>
+
+  </div>
+
+  <!-- =========== FOOTER =========== -->
+  <div class="footer">
+    <p>
+      <strong>Citrus Fantasy Sports</strong> &middot; The most technically advanced fantasy hockey platform ever built.
+    </p>
+    <p style="margin-top:8px;">
+      <a class="url" href="https://citrus-fantasy-sports.web.app">citrus-fantasy-sports.web.app</a>
+      &middot;
+      Web Summit 2026 &middot; Lisbon
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

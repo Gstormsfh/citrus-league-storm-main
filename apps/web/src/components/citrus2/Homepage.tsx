@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { MASCOT_LIST } from '@/constants/mascots';
+import { getUpcomingSeasonStart } from '@citrus/shared';
 import {
   DarkLayout,
   HockeyFooter,
@@ -93,15 +94,28 @@ function SceneVisual({ src, alt }: { src: string; alt: string }) {
   );
 }
 
+/** "2026-09-29" -> "Sept 29". Month abbreviations match the copy voice used
+ * elsewhere on the page (Sept, not Sep). */
+function formatStartLabel(iso: string): string {
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+  const [, m, d] = iso.split('-').map(Number);
+  return `${MONTHS[m - 1]} ${d}`;
+}
+
 function getHeroSlides(): HeroSlide[] {
-  return [
+  const upcoming = getUpcomingSeasonStart();
+
+  const slides: HeroSlide[] = [
     {
       id: 'brackets',
-      eyebrow: '🏒 Stanley Cup Playoffs · Live now',
+      // NOT "Live now". This slide is in permanent rotation, so any live-event
+      // claim here is false for ~10 months of the year. Playoff liveness is not
+      // derivable from the calendar — see getUpcomingSeasonStart's note.
+      eyebrow: '🏒 Stanley Cup Brackets · Every spring',
       headline: { lead: 'Lift the', accent: 'Cup' },
-      sub: 'Predict the entire Stanley Cup playoffs round-by-round — First Round, Second Round, Conference Finals, Cup Final. Live bracket updates every 60 seconds. Build yours before puck drop.',
-      primary: { label: 'Build Your Bracket', to: '/nhl/playoffs' },
-      secondary: { label: 'View live bracket →', to: '/nhl/playoffs' },
+      sub: 'Predict the whole Stanley Cup playoffs round-by-round — First Round, Second Round, Conference Finals, Cup Final. Brackets lock at puck drop and update live through the run.',
+      primary: { label: 'See the Bracket', to: '/nhl/playoffs' },
+      secondary: { label: 'How brackets work →', to: '/nhl/playoffs' },
       visual: <SceneVisual src="/mascots/scene-cup.webp" alt="Pineapple lifting the Stanley Cup" />,
     },
     {
@@ -133,14 +147,28 @@ function getHeroSlides(): HeroSlide[] {
     },
     {
       id: 'fantasy',
-      eyebrow: 'Fantasy Hockey 2026 · Drafts open · Season starts Oct 8',
-      headline: { lead: 'Fantasy Hockey', accent: '2026' },
+      // Start date derived from the shipped schedule (SEASON_STARTS), not typed
+      // by hand. The literal it replaced read "Oct 8"; the 2026-27 season's
+      // first game is 2026-09-29.
+      eyebrow: upcoming
+        ? `Fantasy Hockey ${upcoming.season} · Drafts open · Season starts ${formatStartLabel(upcoming.start)}`
+        : 'Fantasy Hockey · Drafts open · Season underway',
+      headline: { lead: 'Fantasy Hockey', accent: String(upcoming?.season ?? '') || 'Live' },
       sub: 'A 31-feature xG model. Live shift-level scoring. Snake, auction, or salary-cap drafts. Built by hockey heads, for hockey heads. Lock in founders pricing now.',
       primary: { label: 'Drop the Puck', to: '/create-league' },
       secondary: { label: 'Try a mock draft →', to: '/draft' },
       visual: <SceneVisual src="/mascots/scene-squad.webp" alt="The Citrus Squad on the bench" />,
     },
   ];
+
+  // Lead with fantasy while a season is still ahead of us — that is what a
+  // visitor in the run-up can actually act on. Outside that window the original
+  // order stands. Ordering is derived, never hand-set to a moment in time.
+  if (upcoming) {
+    const i = slides.findIndex((s) => s.id === 'fantasy');
+    if (i > 0) slides.unshift(slides.splice(i, 1)[0]);
+  }
+  return slides;
 }
 
 // =============================================================================
@@ -333,6 +361,7 @@ const FAQ: FaqEntry[] = [
 
 export function Homepage() {
   const slides = getHeroSlides();
+  const upcoming = getUpcomingSeasonStart();
 
   return (
     <DarkLayout>
@@ -480,7 +509,15 @@ export function Homepage() {
 
       {/* Final CTA */}
       <CtaBanner
-        eyebrow="7 Games Tonight · Puck drops 7pm ET"
+        // Was "7 Games Tonight · Puck drops 7pm ET" — a hardcoded live-slate
+        // claim with no data behind it, shown all summer. A real slate count
+        // needs nhl_games for today; until this reads that, it counts down to
+        // a date we ship rather than asserting games that may not exist.
+        eyebrow={
+          upcoming
+            ? `Opening night · ${formatStartLabel(upcoming.start)} · ${upcoming.daysUntil} day${upcoming.daysUntil === 1 ? '' : 's'} to go`
+            : 'Live shift scoring · Every game, every night'
+        }
         eyebrowPulse
         title={
           <>

@@ -114,11 +114,11 @@ export const WinProbabilityBar = ({
         {/* Compact simulation details */}
         {hasSimulation && (
           <div className="flex justify-between mt-1">
-            <span className="text-[8px] font-mono text-white/55/50">
+            <span className="text-[8px] font-mono text-white/55">
               {simulation.team1Projected.toFixed(1)} vs{" "}
               {simulation.team2Projected.toFixed(1)} proj
             </span>
-            <span className="text-[8px] font-mono text-white/55/50">
+            <span className="text-[8px] font-mono text-white/55">
               {simulation.nSims.toLocaleString()} sims
             </span>
           </div>
@@ -140,14 +140,23 @@ export const WinProbabilityBar = ({
           </span>
           {hasSimulation && (
             <span
-              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono border ${confidence.color} border-current/20 bg-current/5`}
+              // border-current/20 and bg-current/5 compiled to nothing: Tailwind
+              // cannot build an alpha channel from the `currentColor` keyword, so
+              // this badge had no border colour and no fill. color-mix keeps the
+              // original intent — both derived from whatever ${confidence.color}
+              // sets — and is a real declaration rather than a dead class.
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono border ${confidence.color}`}
+              style={{
+                borderColor: 'color-mix(in srgb, currentColor 20%, transparent)',
+                backgroundColor: 'color-mix(in srgb, currentColor 5%, transparent)',
+              }}
             >
               <BarChart3 className="w-2.5 h-2.5" />
               {confidence.label}
             </span>
           )}
           {isStale && (
-            <span className="text-[9px] font-mono text-white/55/40">
+            <span className="text-[9px] font-mono text-white/55">
               updating...
             </span>
           )}
@@ -190,26 +199,26 @@ export const WinProbabilityBar = ({
         <div className="mt-3 grid grid-cols-3 gap-2">
           {/* Projected Points */}
           <div className="bg-[#1A2A20] rounded-lg px-2.5 py-1.5 border border-pastel-sage/20">
-            <div className="text-[9px] font-varsity text-white/55/60 uppercase">
+            <div className="text-[9px] font-varsity text-white/55 uppercase">
               Projected
             </div>
             <div className="font-mono text-xs text-pastel-cream">
               <span className="font-bold">
                 {simulation.team1Projected.toFixed(1)}
               </span>
-              <span className="text-white/55/40 mx-1">vs</span>
+              <span className="text-white/55 mx-1">vs</span>
               <span className="font-bold">
                 {simulation.team2Projected.toFixed(1)}
               </span>
             </div>
-            <div className="text-[8px] font-mono text-white/55/40">
+            <div className="text-[8px] font-mono text-white/55">
               ±{simulation.team1Std.toFixed(1)} / ±{simulation.team2Std.toFixed(1)}
             </div>
           </div>
 
           {/* Margin */}
           <div className="bg-[#1A2A20] rounded-lg px-2.5 py-1.5 border border-pastel-sage/20">
-            <div className="text-[9px] font-varsity text-white/55/60 uppercase">
+            <div className="text-[9px] font-varsity text-white/55 uppercase">
               Margin
             </div>
             <div className="flex items-center gap-1">
@@ -223,25 +232,25 @@ export const WinProbabilityBar = ({
                 {simulation.marginMean.toFixed(1)}
               </span>
             </div>
-            <div className="text-[8px] font-mono text-white/55/40">
+            <div className="text-[8px] font-mono text-white/55">
               ±{simulation.marginStd.toFixed(1)} std
             </div>
           </div>
 
           {/* Tail Risk */}
           <div className="bg-[#1A2A20] rounded-lg px-2.5 py-1.5 border border-pastel-sage/20">
-            <div className="text-[9px] font-varsity text-white/55/60 uppercase">
+            <div className="text-[9px] font-varsity text-white/55 uppercase">
               Tail Risk
             </div>
             <div className="font-mono text-[10px] text-pastel-cream space-y-0.5">
               <div className="flex justify-between">
-                <span className="text-white/55/50">Win 20+</span>
+                <span className="text-white/55">Win 20+</span>
                 <span className="font-bold">
                   {(simulation.pBlowoutWin * 100).toFixed(1)}%
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-white/55/50">Lose 20+</span>
+                <span className="text-white/55">Lose 20+</span>
                 <span className="font-bold">
                   {(simulation.pBlowoutLoss * 100).toFixed(1)}%
                 </span>
@@ -254,11 +263,11 @@ export const WinProbabilityBar = ({
       {/* Simulation metadata */}
       {hasSimulation && (
         <div className="mt-2 flex justify-between items-center">
-          <span className="text-[8px] font-mono text-white/55/30">
+          <span className="text-[8px] font-mono text-white/55">
             95% CI: ({(simulation.ci95[0] * 100).toFixed(1)}%,{" "}
             {(simulation.ci95[1] * 100).toFixed(1)}%)
           </span>
-          <span className="text-[8px] font-mono text-white/55/30">
+          <span className="text-[8px] font-mono text-white/55">
             {simulation.nSims.toLocaleString()} Monte Carlo simulations
           </span>
         </div>

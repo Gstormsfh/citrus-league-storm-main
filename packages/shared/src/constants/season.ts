@@ -109,3 +109,47 @@ const SEASON_GAME_COUNTS: Record<number, number> = {
 export function getSeasonGameCount(season: number): number {
   return SEASON_GAME_COUNTS[season] ?? 82;
 }
+
+/** Regular-season start date (YYYY-MM-DD) for `season`, or null if we don't
+ * ship that season's schedule. Sourced from SEASON_STARTS above, which mirrors
+ * `SELECT season, min(game_date) FROM nhl_games WHERE game_type='regular'`. */
+export function getSeasonStartDate(season: number): string | null {
+  return SEASON_STARTS.find((s) => s.season === season)?.start ?? null;
+}
+
+/**
+ * The next regular season that has NOT started yet, with a day count — or null
+ * once we are on/after the most recent known start.
+ *
+ * ── WHY THIS EXISTS ──────────────────────────────────────────────────
+ * The marketing homepage previously hardcoded three live-event claims:
+ * a hero reading "Stanley Cup Playoffs · Live now", a CTA band reading
+ * "7 Games Tonight · Puck drops 7pm ET", and "Season starts Oct 8". None
+ * had any date logic. On 2026-08-14 the site was advertising a playoff run
+ * that ended in June, games that were not being played, and a start date
+ * two weeks later than the schedule (real first game: 2026-09-29).
+ *
+ * ── WHAT THIS DELIBERATELY DOES NOT DO ───────────────────────────────
+ * It does not report whether the playoffs are live. Playoff windows are set
+ * by the NHL per season and are not derivable from a regular-season start
+ * date. Guessing them reproduces the exact bug this replaced. Any surface
+ * that needs live playoff state must read `nhl_playoff_series`, not the
+ * calendar.
+ */
+export function getUpcomingSeasonStart(
+  d: Date = new Date(),
+): { season: number; start: string; daysUntil: number } | null {
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  // SEASON_STARTS is newest-first; take the oldest entry still in the future.
+  const future = SEASON_STARTS.filter((s) => s.start > iso).sort((a, b) => (a.start < b.start ? -1 : 1));
+  const next = future[0];
+  if (!next) return null;
+  // Whole days between two calendar dates, timezone-free: compare UTC midnights
+  // built from the date parts, so DST transitions cannot shift the count.
+  const toUtc = (ymd: string) => {
+    const [y, m, day] = ymd.split('-').map(Number);
+    return Date.UTC(y, m - 1, day);
+  };
+  const daysUntil = Math.round((toUtc(next.start) - toUtc(iso)) / 86_400_000);
+  return { season: next.season, start: next.start, daysUntil };
+}

@@ -97,3 +97,5 @@ pytest-cache-files-*
 __pycache__/
 **/__pycache__/
 *.pyc
+_to_delete/
+.claude/settings.local.json

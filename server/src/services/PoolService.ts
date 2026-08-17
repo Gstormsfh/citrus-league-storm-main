@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, SEASON_START_YEAR } from '@citrus/shared';
+import { COLUMNS, SEASON_START_YEAR, getSeasonStartDate } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { ScheduleService } from './ScheduleService';
 import { AppError } from '../lib/errors';
@@ -24,13 +24,36 @@ export class PoolService {
 
   // ── Week Helpers ────────────────────────────────────────────────────
 
+  /**
+   * Sunday on or before the season's first game — the start of pool week 1.
+   *
+   * Was "first Sunday ON OR AFTER October 1". That is only correct when the
+   * season opens in October. The 2026-27 season opens 2026-09-29, so the old
+   * rule placed week 1 at 2026-10-04 and stranded the first five days of the
+   * season — 34 games, including opening night — outside every pool week.
+   *
+   * The SQL side already had this right: get_current_pool_week is documented
+   * "Anchored on the Sunday on or before the season opener" and returns week 1
+   * for 2026-09-27..2026-10-03. This TS layer disagreed with the layer that
+   * actually scores, so the pick'em page would have listed the WRONG GAMES for
+   * week 1 on opening night while the scorer graded the right ones.
+   *
+   * No-op for 2025 (both rules give 2025-10-05).
+   */
+  private getFirstPoolSunday(): Date {
+    const start = getSeasonStartDate(SEASON_START_YEAR);
+    const anchor = start
+      ? new Date(`${start}T00:00:00Z`)
+      : new Date(Date.UTC(SEASON_START_YEAR, 9, 1));
+    const firstSunday = new Date(anchor);
+    firstSunday.setUTCDate(anchor.getUTCDate() - anchor.getUTCDay());
+    firstSunday.setUTCHours(0, 0, 0, 0);
+    return firstSunday;
+  }
+
   /** Get the current NHL week number. */
   getCurrentWeek(): number {
-    const oct1 = new Date(SEASON_START_YEAR, 9, 1);
-    const dayOfWeek = oct1.getDay();
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-    const firstSunday = new Date(oct1);
-    firstSunday.setDate(oct1.getDate() + daysUntilSunday);
+    const firstSunday = this.getFirstPoolSunday();
 
     const now = new Date();
     const diffMs = now.getTime() - firstSunday.getTime();
@@ -40,16 +63,12 @@ export class PoolService {
 
   /** Get week date range (Sunday–Saturday). */
   private getWeekDateRange(weekNumber: number): { start: string; end: string } {
-    const oct1 = new Date(SEASON_START_YEAR, 9, 1);
-    const dayOfWeek = oct1.getDay();
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-    const firstSunday = new Date(oct1);
-    firstSunday.setDate(oct1.getDate() + daysUntilSunday);
+    const firstSunday = this.getFirstPoolSunday();
 
     const start = new Date(firstSunday);
-    start.setDate(firstSunday.getDate() + (weekNumber - 1) * 7);
+    start.setUTCDate(firstSunday.getUTCDate() + (weekNumber - 1) * 7);
     const end = new Date(start);
-    end.setDate(start.getDate() + 6);
+    end.setUTCDate(start.getUTCDate() + 6);
 
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
     return { start: fmt(start), end: fmt(end) };

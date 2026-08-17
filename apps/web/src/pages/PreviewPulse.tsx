@@ -164,7 +164,7 @@ export default function PreviewPulse() {
           {LIVE_GAMES.map((g, i) => (
             <article
               key={`${g.away}-${g.home}`}
-              className={`${TONE_BG[g.tone]} rounded-[20px] p-5 ring-1 ring-pastel-forest/8 hover:-translate-y-0.5 transition-all`}
+              className={`${TONE_BG[g.tone]} rounded-[20px] p-5 ring-1 ring-pastel-forest/[0.08] hover:-translate-y-0.5 transition-all`}
             >
               <div className="flex items-center justify-between mb-4">
                 <span className="flex items-center gap-1.5">

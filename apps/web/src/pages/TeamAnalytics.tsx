@@ -522,7 +522,7 @@ const TeamAnalytics = () => {
                             </div>
 
                             {pos.suggestion && (
-                              <div className="bg-pastel-orange/8 ring-1 ring-pastel-orange/20 p-3 rounded-xl flex gap-3 items-start">
+                              <div className="bg-pastel-orange/[0.08] ring-1 ring-pastel-orange/20 p-3 rounded-xl flex gap-3 items-start">
                                 <Narwhal className="h-5 w-5 text-pastel-orange shrink-0 mt-0.5" />
                                 <div className="space-y-1">
                                   <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft">Stormy's Suggestion</div>

@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
@@ -140,7 +141,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
       setChatMessage('');
     } catch (error: unknown) {
       logger.error('Error sending chat message:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send message. Please try again.';
+      const errorMessage = userMessage(error, 'Failed to send message. Please try again.');
       toast({ title: "Message Didn't Send", description: errorMessage, variant: 'destructive' });
     } finally {
       setSendingMessage(false);

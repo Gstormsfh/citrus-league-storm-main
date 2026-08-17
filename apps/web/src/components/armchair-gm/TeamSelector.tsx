@@ -77,13 +77,13 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
       {/* Search + View Toggle */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-citrus-charcoal/40" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
           <input
             type="text"
             placeholder="Search teams..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border-2 border-citrus-sage/30 bg-white/60 backdrop-blur-sm text-sm font-display text-citrus-forest placeholder:text-citrus-charcoal/40 focus:outline-none focus:border-citrus-sage focus:ring-2 focus:ring-citrus-sage/20 transition-all"
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border-2 border-citrus-sage/30 bg-pastel-surface-tile text-sm font-display text-pastel-cream placeholder:text-white/50 focus:outline-none focus:border-citrus-sage focus:ring-2 focus:ring-citrus-sage/20 transition-all"
           />
         </div>
         <div className="flex rounded-xl border-2 border-citrus-sage/30 overflow-hidden">
@@ -94,8 +94,8 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
               className={cn(
                 "px-3 py-2 text-[10px] font-display font-bold uppercase tracking-wider transition-colors",
                 viewMode === mode
-                  ? "bg-citrus-sage text-citrus-forest"
-                  : "bg-white/60 text-citrus-charcoal/60 hover:bg-citrus-sage/10"
+                  ? "bg-citrus-sage text-pastel-surface"
+                  : "bg-pastel-surface-tile text-white/65 hover:bg-citrus-sage/10"
               )}
             >
               {mode === 'division' ? 'Division' : mode === 'grid' ? 'All' : 'Rankings'}
@@ -110,14 +110,14 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
           {teamsByDivision.map((div) => (
             <div
               key={div.name}
-              className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 overflow-hidden"
+              className="bg-pastel-surface-tile rounded-2xl border-2 border-citrus-sage/30 overflow-hidden"
             >
               <div className="px-4 py-2.5 bg-gradient-to-r from-citrus-sage/20 to-citrus-sage/10 border-b border-citrus-sage/30">
                 <div className="flex items-center gap-2">
-                  <span className="font-varsity text-sm text-citrus-forest tracking-tight">
+                  <span className="font-varsity text-sm text-pastel-cream tracking-tight">
                     {div.name}
                   </span>
-                  <span className="text-[9px] text-citrus-charcoal/50 font-display">
+                  <span className="text-[9px] text-white/55 font-display">
                     {div.conference}
                   </span>
                 </div>
@@ -154,17 +154,17 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
 
       {/* Rankings Table View */}
       {viewMode === 'rankings' && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
+        <div className="bg-pastel-surface-tile rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
           <div className="px-4 py-2.5 bg-gradient-to-r from-citrus-sage/20 to-citrus-sage/10 border-b-2 border-citrus-sage/30 flex items-center justify-between">
-            <span className="font-varsity text-sm text-citrus-forest">League Cap Rankings</span>
-            <span className="text-[9px] text-citrus-charcoal/50 font-display">
+            <span className="font-varsity text-sm text-pastel-cream">League Cap Rankings</span>
+            <span className="text-[9px] text-white/55 font-display">
               Click any team to view full roster
             </span>
           </div>
 
           {/* Table Header */}
           <div className="grid grid-cols-[1.5rem_2rem_1fr_4.5rem_4.5rem] sm:grid-cols-[2rem_2.5rem_1fr_6rem_6rem_4rem] md:grid-cols-[2rem_2.5rem_1fr_7rem_7rem_5rem] items-center gap-1 md:gap-2 px-2 sm:px-3 py-2 bg-citrus-sage/10 border-b border-citrus-sage/20">
-            <span className="text-[7px] sm:text-[8px] text-citrus-charcoal/40 uppercase font-display font-bold text-center">#</span>
+            <span className="text-[7px] sm:text-[8px] text-white/50 uppercase font-display font-bold text-center">#</span>
             <span></span>
             <SortHeader label="Team" sortKey="name" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Cap Hit" sortKey="capHit" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} align="right" />
@@ -187,14 +187,14 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
                   className={cn(
                     "w-full grid grid-cols-[1.5rem_2rem_1fr_4.5rem_4.5rem] sm:grid-cols-[2rem_2.5rem_1fr_6rem_6rem_4rem] md:grid-cols-[2rem_2.5rem_1fr_7rem_7rem_5rem] items-center gap-1 md:gap-2 px-2 sm:px-3 py-2 sm:py-2.5 text-left transition-all border-b border-citrus-sage/10",
                     selectedTeam === team.teamAbbrev ? "bg-citrus-sage/20" : "hover:bg-citrus-sage/5",
-                    i % 2 === 0 ? "bg-white/40" : "bg-citrus-cream/20"
+                    i % 2 === 0 ? "bg-pastel-surface" : "bg-white/[0.03]"
                   )}
                 >
-                  <span className="text-[9px] sm:text-[10px] text-citrus-charcoal/50 font-display font-semibold text-center">{i + 1}</span>
+                  <span className="text-[9px] sm:text-[10px] text-white/55 font-display font-semibold text-center">{i + 1}</span>
                   <img loading="lazy" decoding="async" src={info?.logoUrl || ''} alt={team.teamAbbrev} className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
                   <div className="min-w-0">
-                    <span className="font-display font-bold text-[10px] sm:text-xs text-citrus-forest truncate block">{team.teamName}</span>
-                    <div className="h-1 mt-0.5 sm:mt-1 bg-citrus-cream rounded-full overflow-hidden">
+                    <span className="font-display font-bold text-[10px] sm:text-xs text-pastel-cream truncate block">{team.teamName}</span>
+                    <div className="h-1 mt-0.5 sm:mt-1 bg-pastel-surface rounded-full overflow-hidden">
                       <div
                         className={cn(
                           "h-full rounded-full transition-all",
@@ -204,14 +204,14 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
                       />
                     </div>
                   </div>
-                  <span className="font-varsity text-[10px] sm:text-xs text-citrus-forest text-right">{formatCap(team.projectedCapHit)}</span>
+                  <span className="font-varsity text-[10px] sm:text-xs text-pastel-cream text-right">{formatCap(team.projectedCapHit)}</span>
                   <span className={cn(
                     "font-varsity text-[10px] sm:text-xs text-right",
-                    isOverCap ? "text-red-600" : isNearCap ? "text-amber-600" : "text-green-600"
+                    isOverCap ? "text-red-400" : isNearCap ? "text-amber-300" : "text-emerald-400"
                   )}>
                     {isOverCap ? '-' : ''}{formatCap(Math.abs(team.capSpace))}
                   </span>
-                  <span className="hidden sm:block font-varsity text-xs text-citrus-charcoal/70 text-center">{team.activeRosterSize}</span>
+                  <span className="hidden sm:block font-varsity text-xs text-white/70 text-center">{team.activeRosterSize}</span>
                 </button>
               );
             })}
@@ -239,7 +239,7 @@ function SortHeader({
       onClick={() => onToggle(key)}
       className={cn(
         "flex items-center gap-0.5 text-[7px] sm:text-[8px] uppercase font-display font-bold tracking-wider transition-colors",
-        isActive ? "text-citrus-forest" : "text-citrus-charcoal/40 hover:text-citrus-charcoal/60",
+        isActive ? "text-pastel-cream" : "text-white/50 hover:text-white/65",
         align === 'right' && "justify-end",
         align === 'center' && "justify-center",
         className,
@@ -283,9 +283,9 @@ function TeamCard({
             onError={() => setImageError(true)}
           />
         ) : (
-          <Shield className="w-8 h-8 text-citrus-sage/50" />
+          <Shield className="w-8 h-8 text-citrus-sage/75" />
         )}
-        <span className="text-[9px] font-varsity text-citrus-forest">{team.abbrev}</span>
+        <span className="text-[9px] font-varsity text-pastel-cream">{team.abbrev}</span>
       </button>
     );
   }
@@ -308,13 +308,13 @@ function TeamCard({
           onError={() => setImageError(true)}
         />
       ) : (
-        <Shield className="w-8 h-8 text-citrus-sage/50 flex-shrink-0" />
+        <Shield className="w-8 h-8 text-citrus-sage/75 flex-shrink-0" />
       )}
       <div className="min-w-0">
-        <div className="font-display font-bold text-xs text-citrus-forest truncate">
+        <div className="font-display font-bold text-xs text-pastel-cream truncate">
           {team.name}
         </div>
-        <div className="text-[9px] text-citrus-charcoal/50 font-display">{team.abbrev}</div>
+        <div className="text-[9px] text-white/55 font-display">{team.abbrev}</div>
       </div>
     </button>
   );

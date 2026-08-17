@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { supabase } from '@/integrations/supabase/client';
 import { accountApi } from '@/api/account';
 import { logger } from '@/utils/logger';
@@ -29,7 +30,7 @@ export class UserAccountService {
       return { success: true };
     } catch (error: unknown) {
       logger.error('[UserAccountService] Password change error:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to update password' };
+      return { success: false, error: userMessage(error, 'Failed to update password') };
     }
   }
 
@@ -47,7 +48,7 @@ export class UserAccountService {
       return { success: true, data: result };
     } catch (error: unknown) {
       logger.error('[UserAccountService] Data export error:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to export data' };
+      return { success: false, error: userMessage(error, 'Failed to export data') };
     }
   }
 
@@ -66,7 +67,7 @@ export class UserAccountService {
       return { success: true };
     } catch (error: unknown) {
       logger.error('[UserAccountService] Account deletion error:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to delete account' };
+      return { success: false, error: userMessage(error, 'Failed to delete account') };
     }
   }
 

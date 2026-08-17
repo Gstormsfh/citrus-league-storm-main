@@ -326,7 +326,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     )}
                     {/* Final badge + score */}
                     {isFinal && (
-                      <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none bg-white/10 text-white/60 border border-white/10/20">
+                      <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none bg-white/10 text-white/60 border border-white/20">
                         F
                       </span>
                     )}

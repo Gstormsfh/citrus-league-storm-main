@@ -597,8 +597,8 @@ const OtherTeam = () => {
         </Button>
 
         <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-6 sm:p-8 mb-8 relative overflow-hidden">
-          <div aria-hidden="true" className="absolute top-0 right-0 w-72 h-72 bg-pastel-orange/8 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
-          <div aria-hidden="true" className="absolute bottom-0 left-0 w-48 h-48 bg-pastel-sage/6 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
+          <div aria-hidden="true" className="absolute top-0 right-0 w-72 h-72 bg-pastel-orange/[0.08] rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+          <div aria-hidden="true" className="absolute bottom-0 left-0 w-48 h-48 bg-pastel-sage/[0.06] rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
 
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
             <div className="flex items-center gap-4">

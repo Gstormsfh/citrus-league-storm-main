@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -819,7 +820,7 @@ const Profile = () => {
     } catch (error: unknown) {
       toast({
         title: "Profile Hiccup",
-        description: error instanceof Error ? error.message : 'Failed to update display name.',
+        description: userMessage(error, 'Failed to update display name.'),
         variant: 'destructive',
       });
     } finally {
@@ -852,7 +853,7 @@ const Profile = () => {
       logger.error('Password change error:', error);
       setSettingsMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Failed to update password',
+        text: userMessage(error, 'Failed to update password'),
       });
     } finally {
       setChangePasswordLoading(false);
@@ -933,7 +934,7 @@ const Profile = () => {
       logger.error('Data export error:', error);
       setSettingsMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Failed to export data. Please try again.',
+        text: userMessage(error, 'Failed to export data. Please try again.'),
       });
     } finally {
       setExportLoading(false);
@@ -955,7 +956,7 @@ const Profile = () => {
       logger.error('Account deletion error:', error);
       setSettingsMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Failed to delete account. Please contact support.',
+        text: userMessage(error, 'Failed to delete account. Please contact support.'),
       });
       setDeleteAccountLoading(false);
     }

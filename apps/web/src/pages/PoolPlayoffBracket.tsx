@@ -118,11 +118,11 @@ export default function PoolPlayoffBracket() {
     const load = async () => {
       try {
         const [bracketRes, picksRes, h2hRes] = await Promise.all([
-          fetch('/api/nhl-playoffs/bracket?season=2025'),
+          fetch('/api/nhl-playoffs/bracket'),
           fetch(`/api/playoff-pools/${leagueId}/picks?type=bracket`, {
             headers: { Authorization: `Bearer ${(await import('@/integrations/supabase/client')).supabase.auth.getSession ? (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session?.access_token || '' : ''}` },
           }),
-          fetch('/api/nhl-playoffs/h2h?season=2025').catch(() => null),
+          fetch('/api/nhl-playoffs/h2h').catch(() => null),
         ]);
         const bracket = await bracketRes.json();
         const picksData = await picksRes.json();
@@ -389,7 +389,7 @@ export default function PoolPlayoffBracket() {
                     return (
                       <div key={s.series_id} className={cn('border-2 rounded-xl p-3 space-y-2 bg-white relative',
                           gameIsLive && 'border-red-400 bg-red-50/20 ring-1 ring-red-400/20',
-                          locked && s.series_status === 'final' && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/8',
+                          locked && s.series_status === 'final' && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/[0.08]',
                           !gameIsLive && !locked && 'border-fantasy-border',
                       )}>
                         {/* LIVE ribbon — only when a game is ACTUALLY in progress */}
@@ -442,11 +442,11 @@ export default function PoolPlayoffBracket() {
                             <span className="font-semibold" style={highInfo ? { color: highInfo.primaryColor } : undefined}>
                               {high?.team_abbrev} {h2hMap[s.bracket_slot].high_wins}
                             </span>
-                            <span className="text-white/70/40">—</span>
+                            <span className="text-white/70">—</span>
                             <span className="font-semibold" style={lowInfo ? { color: lowInfo.primaryColor } : undefined}>
                               {h2hMap[s.bracket_slot].low_wins} {low?.team_abbrev}
                             </span>
-                            <span className="text-white/70/40">({h2hMap[s.bracket_slot].games} games)</span>
+                            <span className="text-white/70">({h2hMap[s.bracket_slot].games} games)</span>
                           </div>
                         )}
                         {myPick?.picked_team_id && !locked && (
@@ -464,7 +464,7 @@ export default function PoolPlayoffBracket() {
                                 {g}
                               </button>
                             ))}
-                            <span className="text-[10px] text-white/70/50 ml-1">+1 if correct</span>
+                            <span className="text-[10px] text-white/70 ml-1">+1 if correct</span>
                           </div>
                         )}
                         {/* Pick summary: always visible when a pick exists */}
@@ -499,7 +499,7 @@ export default function PoolPlayoffBracket() {
 
         {series.length === 0 && (
           <Card className="p-8 text-center">
-            <AlertTriangle className="h-8 w-8 text-white/70/30 mx-auto mb-2" aria-hidden="true" />
+            <AlertTriangle className="h-8 w-8 text-white/70 mx-auto mb-2" aria-hidden="true" />
             <p className="text-white/55 text-sm">Bracket not yet set. Picks open once seeds are finalized.</p>
           </Card>
         )}

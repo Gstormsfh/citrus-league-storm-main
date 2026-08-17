@@ -145,19 +145,52 @@ export const HeadlinesBanner = () => {
           logger.error('Error calculating streak:', error);
         }
 
-        // 3. Check for waiver wire deadline (default to Saturday 11 PM EST)
-        // For now, we'll use a simple check - could be enhanced with league settings
-        const today = new Date();
-        const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
-        const hours = today.getHours();
-        
+        // 3. Waiver wire deadline — Saturday 11 PM Eastern.
+        //
+        // This previously read `new Date().getDay()` and `.getHours()`, which are
+        // the VIEWER'S local day and hour, and then labelled the result "EST".
+        // For anyone outside Eastern the countdown was wrong by their UTC offset:
+        // on 2026-08-15 a Pacific viewer was told "13 hours remaining" when the
+        // Eastern deadline was 10.2 hours away. Three hours of false runway on
+        // the one clock in fantasy hockey that actually costs you a player.
+        // It also reported whole hours only, so 10:30 read as "13 hours".
+        //
+        // Everything below is evaluated in America/New_York regardless of where
+        // the viewer is, and the label says "ET" because the offset is EDT for
+        // half the season.
+        const nowNy = (() => {
+          const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/New_York',
+            hour12: false,
+            weekday: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+          }).formatToParts(new Date());
+          const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+          const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          return {
+            day: WD.indexOf(get('weekday')),
+            // Intl can return "24" for midnight in hour12:false
+            hour: Number(get('hour')) % 24,
+            minute: Number(get('minute')),
+          };
+        })();
+
+        const dayOfWeek = nowNy.day; // 0 = Sunday, 6 = Saturday — in Eastern
+        const hours = nowNy.hour;
+
         if (dayOfWeek === 6 && hours < 23) {
-          // Saturday before 11 PM
-          const hoursUntil = 23 - hours;
+          // Saturday before 11 PM Eastern
+          const minutesUntil = (23 - hours) * 60 - nowNy.minute;
+          const h = Math.floor(minutesUntil / 60);
+          const m = minutesUntil % 60;
+          // Round up rather than down: telling someone they have less time than
+          // they do is a harmless nudge; the reverse loses them the claim.
+          const remaining = h > 0 ? `${h}h ${m}m` : `${m} minutes`;
           headlines.push({
             type: 'waiver',
-            message: `Waiver Wire runs tonight at 11 PM EST. ${hoursUntil} hour${hoursUntil !== 1 ? 's' : ''} remaining.`,
-            urgency: hoursUntil <= 3 ? 'high' : 'medium'
+            message: `Waiver Wire runs tonight at 11 PM ET. ${remaining} remaining.`,
+            urgency: minutesUntil <= 180 ? 'high' : 'medium',
           });
         } else if (dayOfWeek === 0 || (dayOfWeek === 6 && hours >= 23)) {
           // Sunday or Saturday after 11 PM

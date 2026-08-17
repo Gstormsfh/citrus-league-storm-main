@@ -194,7 +194,7 @@ export default function PreviewStadium() {
             return (
               <article
                 key={c.label}
-                className={`${c.bg} rounded-[24px] p-6 ring-1 ring-pastel-forest/8 hover:-translate-y-1 hover:shadow-[0_16px_32px_-12px_rgba(27,48,34,0.18)] transition-all duration-200 flex flex-col`}
+                className={`${c.bg} rounded-[24px] p-6 ring-1 ring-pastel-forest/[0.08] hover:-translate-y-1 hover:shadow-[0_16px_32px_-12px_rgba(27,48,34,0.18)] transition-all duration-200 flex flex-col`}
               >
                 <div className="flex items-center justify-between mb-5">
                   <div className="w-10 h-10 rounded-xl bg-white/70 flex items-center justify-center text-pastel-forest">

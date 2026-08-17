@@ -131,7 +131,7 @@ export default function PoolPlayoffHub() {
         const [leagueRes, teamsRes, bracketRes] = await Promise.all([
           fetch(`/api/leagues/${leagueId}`, { headers }).then(r => r.json()).catch(() => null),
           fetch(`/api/leagues/${leagueId}/teams`, { headers }).then(r => r.json()).catch(() => null),
-          fetch('/api/nhl-playoffs/bracket?season=2025').then(r => r.json()).catch(() => null),
+          fetch('/api/nhl-playoffs/bracket').then(r => r.json()).catch(() => null),
         ]);
         const leagueData = leagueRes?.data || leagueRes;
         setLeague(leagueData);
@@ -556,7 +556,7 @@ export default function PoolPlayoffHub() {
                               'relative rounded-xl border-2 overflow-hidden bg-white transition-all',
                               isLive && 'border-red-400 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]',
                               isFinal && 'border-pastel-sage/30',
-                              !isLive && !isFinal && 'border-pastel-sage/40/20'
+                              !isLive && !isFinal && 'border-pastel-sage/20'
                             )}>
                               {/* Team-colored header with score */}
                               <div className="relative">
@@ -618,7 +618,7 @@ export default function PoolPlayoffHub() {
 
                               {/* Your players in this game */}
                               <div className="p-3 space-y-1.5">
-                                <div className="flex items-center justify-between mb-1 pb-1 border-b border-pastel-sage/40/10">
+                                <div className="flex items-center justify-between mb-1 pb-1 border-b border-pastel-sage/10">
                                   <span className="text-[10px] uppercase font-display font-bold text-white/50 tracking-wider">
                                     Your Players ({g.myPlayers.length})
                                   </span>
@@ -655,7 +655,7 @@ export default function PoolPlayoffHub() {
                                           </span>
                                         </div>
                                       ) : (
-                                        <span className="text-[10px] text-white/70/40 italic flex-shrink-0">Not started</span>
+                                        <span className="text-[10px] text-white/70 italic flex-shrink-0">Not started</span>
                                       )}
                                     </div>
                                   );
@@ -741,11 +741,11 @@ export default function PoolPlayoffHub() {
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-1.5 text-sm font-display font-bold text-pastel-cream">
                                   <span className={cn(myPickAbbrev === g.away_team && 'underline decoration-pastel-orange decoration-2 underline-offset-4')}>{g.away_team}</span>
-                                  <span className="text-white/70/40">@</span>
+                                  <span className="text-white/70">@</span>
                                   <span className={cn(myPickAbbrev === g.home_team && 'underline decoration-pastel-orange decoration-2 underline-offset-4')}>{g.home_team}</span>
                                 </div>
                                 {g.series_game_number && (
-                                  <Badge variant="outline" className="text-[9px] border-pastel-sage/40/40">Game {g.series_game_number}</Badge>
+                                  <Badge variant="outline" className="text-[9px] border-pastel-sage/40">Game {g.series_game_number}</Badge>
                                 )}
                               </div>
                               <div className="flex items-center justify-between">
@@ -762,7 +762,7 @@ export default function PoolPlayoffHub() {
                                     'text-[9px] px-1.5 py-0',
                                     isLive && 'border-red-600 bg-red-600 text-white animate-pulse',
                                     isFinal && 'ring-1 ring-white/10 bg-white/5',
-                                    !isLive && !isFinal && 'border-pastel-sage/40/50',
+                                    !isLive && !isFinal && 'border-pastel-sage/50',
                                   )}
                                 >
                                   {gameStatusLabel(g)}
@@ -809,7 +809,7 @@ export default function PoolPlayoffHub() {
                             'flex items-center gap-2 p-2 rounded border',
                             isCorrect && 'border-green-400 bg-green-50/50',
                             isWrong && 'border-red-300 bg-red-50/30',
-                            !isFinal && pick && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/8',
+                            !isFinal && pick && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/[0.08]',
                             !pick && 'border-2 border-dashed border-white/15 bg-white/5'
                           )}>
                             <span className="text-[9px] font-mono text-white/50 w-8">{roundName}-{String.fromCharCode(64 + s.bracket_slot)}</span>
@@ -830,13 +830,13 @@ export default function PoolPlayoffHub() {
                                 </div>
                                 {isCorrect && <Check className="h-4 w-4 text-green-500 flex-shrink-0" aria-hidden="true" />}
                                 {isFinal && pick.points_earned != null && (
-                                  <span className={cn('text-xs font-bold flex-shrink-0', isCorrect ? 'text-green-600' : 'text-white/70/40')}>
+                                  <span className={cn('text-xs font-bold flex-shrink-0', isCorrect ? 'text-green-600' : 'text-white/70')}>
                                     +{pick.points_earned}
                                   </span>
                                 )}
                               </>
                             ) : (
-                              <span className="text-[11px] text-white/70/40 italic flex-1">No pick yet</span>
+                              <span className="text-[11px] text-white/70 italic flex-1">No pick yet</span>
                             )}
                           </div>
                         );
@@ -888,8 +888,8 @@ export default function PoolPlayoffHub() {
                                 <tr
                                   key={t.id}
                                   className={cn(
-                                    'border-b border-pastel-sage/40/10 last:border-b-0',
-                                    isMe && 'bg-pastel-sage/8 ring-1 ring-pastel-sage/20',
+                                    'border-b border-pastel-sage/10 last:border-b-0',
+                                    isMe && 'bg-pastel-sage/[0.08] ring-1 ring-pastel-sage/20',
                                     isRosterPool && 'cursor-pointer hover:bg-pastel-orange/10 transition-colors',
                                   )}
                                   onClick={isRosterPool ? () => navigate(`/pool/playoff-roster?league=${leagueId}&view=${t.owner_id}`) : undefined}
@@ -916,7 +916,7 @@ export default function PoolPlayoffHub() {
                                   </td>
                                   {isRosterPool && (
                                     <td className="px-3 py-2 text-right">
-                                      <Eye className="h-4 w-4 text-white/70/30 inline" />
+                                      <Eye className="h-4 w-4 text-white/70 inline" />
                                     </td>
                                   )}
                                 </tr>
@@ -941,7 +941,7 @@ export default function PoolPlayoffHub() {
                   <div className="text-[10px] uppercase font-display text-white/50">Join Code</div>
                   <button
                     onClick={copyJoinCode}
-                    className="w-full flex items-center justify-between p-2 rounded ring-1 ring-pastel-sage/30 bg-pastel-sage/8 hover:bg-pastel-sage/15 transition-colors"
+                    className="w-full flex items-center justify-between p-2 rounded ring-1 ring-pastel-sage/30 bg-pastel-sage/[0.08] hover:bg-pastel-sage/15 transition-colors"
                   >
                     <span className="text-lg font-mono font-bold text-pastel-cream tracking-wider">{league.join_code}</span>
                     {copied ? <Check className="h-4 w-4 text-green-600" aria-hidden="true" /> : <Copy className="h-4 w-4 text-white/50" aria-hidden="true" />}

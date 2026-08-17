@@ -9,11 +9,11 @@ interface PlayerAvatarProps {
 }
 
 const positionColors: Record<string, { bg: string; border: string; text: string }> = {
-  C: { bg: 'from-citrus-sage/40 to-[#7CB518]/30', border: 'border-citrus-sage', text: 'text-citrus-forest' },
-  LW: { bg: 'from-[#7CB518]/40 to-citrus-sage/30', border: 'border-[#7CB518]/70', text: 'text-citrus-forest' },
-  RW: { bg: 'from-citrus-orange/30 to-citrus-peach/40', border: 'border-citrus-orange/60', text: 'text-citrus-forest' },
-  D: { bg: 'from-blue-200/50 to-blue-300/30', border: 'border-blue-400/60', text: 'text-blue-900' },
-  G: { bg: 'from-purple-200/50 to-purple-300/30', border: 'border-purple-400/60', text: 'text-purple-900' },
+  C: { bg: 'from-citrus-sage/22 to-[#7CB518]/16', border: 'border-citrus-sage', text: 'text-pastel-cream' },
+  LW: { bg: 'from-[#7CB518]/22 to-citrus-sage/16', border: 'border-[#7CB518]/70', text: 'text-pastel-cream' },
+  RW: { bg: 'from-citrus-orange/16 to-citrus-peach/22', border: 'border-citrus-orange/60', text: 'text-pastel-cream' },
+  D: { bg: 'from-blue-200/28 to-blue-300/18', border: 'border-blue-400/60', text: 'text-blue-200' },
+  G: { bg: 'from-purple-200/28 to-purple-300/18', border: 'border-purple-400/60', text: 'text-purple-200' },
 };
 
 const sizeMap = {
@@ -70,7 +70,7 @@ export default function PlayerAvatar({ name, position, jerseyNumber, size = 'md'
 
       {/* Jersey number (only show on md and lg) */}
       {jerseyNumber !== undefined && jerseyNumber > 0 && (size === 'md' || size === 'lg') && (
-        <span className={cn(sizing.number, "text-citrus-charcoal/50 font-display font-bold leading-none relative z-10 -mt-px")}>
+        <span className={cn(sizing.number, "text-white/85 font-display font-bold leading-none relative z-10 -mt-px")}>
           #{jerseyNumber}
         </span>
       )}

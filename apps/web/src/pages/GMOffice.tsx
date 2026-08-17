@@ -281,7 +281,7 @@ const GMOffice = () => {
                         <div aria-hidden="true" className="absolute -top-12 -right-12 w-44 h-44 bg-pastel-orange/10 rounded-full blur-3xl pointer-events-none transition-opacity duration-300 group-hover:bg-pastel-orange/25" />
 
                         {/* Sage accent corner — adds subtle dimensional warmth */}
-                        <div aria-hidden="true" className="absolute -bottom-12 -left-12 w-40 h-40 bg-pastel-sage/8 rounded-full blur-3xl pointer-events-none" />
+                        <div aria-hidden="true" className="absolute -bottom-12 -left-12 w-40 h-40 bg-pastel-sage/[0.08] rounded-full blur-3xl pointer-events-none" />
 
                         {/* Top-right chip — micro-copy that frames the card's intent */}
                         {action.chip && (

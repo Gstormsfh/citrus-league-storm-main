@@ -262,7 +262,7 @@ export function PercentileBullet({
         {hasPercentile && (
           <div
             aria-hidden="true"
-            className="absolute top-0 bottom-0 w-px bg-white/12"
+            className="absolute top-0 bottom-0 w-px bg-white/[0.12]"
             style={{ left: '50%' }}
           />
         )}

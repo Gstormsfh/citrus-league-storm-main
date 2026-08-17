@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
@@ -183,7 +184,7 @@ export function DropPlayerForAddDialog({
       logger.error('Atomic swap failed', err);
       toast({
         title: 'Swap Failed',
-        description: err instanceof Error ? err.message : 'Unexpected error. Your roster is unchanged.',
+        description: userMessage(err, 'Unexpected error. Your roster is unchanged.'),
         variant: 'destructive',
       });
     } finally {

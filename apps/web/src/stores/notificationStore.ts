@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { create } from 'zustand';
 import { NotificationService, Notification } from '@/services/NotificationService';
 import { logger } from '@/utils/logger';
@@ -86,7 +87,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       logger.error('[NotificationStore] Error loading notifications:', error);
       set((state) => {
         const newErrors = new Map(state.errors);
-        newErrors.set(leagueId, error instanceof Error ? error.message : 'Failed to load notifications');
+        newErrors.set(leagueId, userMessage(error, 'Failed to load notifications'));
         const newLoading = new Map(state.loading);
         newLoading.set(leagueId, false);
         return { errors: newErrors, loading: newLoading };

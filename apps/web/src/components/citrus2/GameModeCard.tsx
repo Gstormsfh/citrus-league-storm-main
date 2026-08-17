@@ -34,7 +34,7 @@ export function GameModeCard({
 }) {
   const a = ACCENT_CLASSES[accent];
   const button = (
-    <button className="mt-auto w-full inline-flex items-center justify-center gap-1.5 bg-pastel-orange text-[#581E00] px-4 h-10 rounded-md text-[13px] font-bold hover:bg-pastel-orange-soft transition-all duration-200 active:scale-95 group/btn">
+    <button className="mt-auto w-full inline-flex items-center justify-center gap-1.5 bg-pastel-orange text-[#581E00] px-4 h-11 rounded-md text-[13px] font-bold hover:bg-pastel-orange-soft transition-all duration-200 active:scale-95 group/btn">
       {ctaLabel} <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" strokeWidth={2.5} />
     </button>
   );

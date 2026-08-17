@@ -7,7 +7,7 @@
 
 import { poolApi } from '@/api/pools';
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
-import { SEASON_START_YEAR } from '@/utils/seasonConstants';
+import { SEASON_START_YEAR, getSeasonStartDate } from '@/utils/seasonConstants';
 import { getTodayMSTDate } from '@/utils/timezoneUtils';
 import { logger } from '@/utils/logger';
 
@@ -79,12 +79,34 @@ export interface ConfidenceStanding {
 
 // ── Week helpers (kept local for synchronous getCurrentWeek) ─────────
 
+/**
+ * Sunday on or before the season's first game — the start of pool week 1.
+ *
+ * This replaced an anchor of "the first Sunday ON OR AFTER October 1". That rule
+ * is only correct when the season opens in October. The 2026-27 season opens
+ * 2026-09-29, so the old rule put pool week 1 at 2026-10-04 and left the first
+ * FIVE DAYS of the season — 34 real games, including opening night — outside
+ * every pool week. Nobody caught it because 2025 opened 2025-10-07, where both
+ * rules produce the identical answer (2025-10-05).
+ *
+ * Anchoring to the Sunday on or before the opener keeps opening night inside
+ * week 1 and is a no-op for any season that opens later in October.
+ */
+function getFirstPoolSunday(seasonStartYear: number): Date {
+  const start = getSeasonStartDate(seasonStartYear);
+  // Fall back to the old Oct-1 anchor only for seasons whose schedule we do not
+  // ship, so behaviour for historical seasons is unchanged.
+  const anchor = start
+    ? new Date(`${start}T00:00:00`)
+    : new Date(`${seasonStartYear}-10-01T00:00:00`);
+  const firstSunday = new Date(anchor);
+  firstSunday.setDate(anchor.getDate() - anchor.getDay()); // back up to Sunday
+  firstSunday.setHours(0, 0, 0, 0);
+  return firstSunday;
+}
+
 function getCurrentWeekNumber(seasonStartYear: number = SEASON_START_YEAR): number {
-  const oct1 = new Date(seasonStartYear, 9, 1);
-  const dayOfWeek = oct1.getDay();
-  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-  const firstSunday = new Date(oct1);
-  firstSunday.setDate(oct1.getDate() + daysUntilSunday);
+  const firstSunday = getFirstPoolSunday(seasonStartYear);
 
   const today = getTodayMSTDate();
   const diffMs = today.getTime() - firstSunday.getTime();
@@ -93,11 +115,7 @@ function getCurrentWeekNumber(seasonStartYear: number = SEASON_START_YEAR): numb
 }
 
 function getWeekDateRange(weekNumber: number, seasonStartYear: number = SEASON_START_YEAR): { start: Date; end: Date } {
-  const oct1 = new Date(seasonStartYear, 9, 1);
-  const dayOfWeek = oct1.getDay();
-  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-  const firstSunday = new Date(oct1);
-  firstSunday.setDate(oct1.getDate() + daysUntilSunday);
+  const firstSunday = getFirstPoolSunday(seasonStartYear);
 
   const start = new Date(firstSunday);
   start.setDate(firstSunday.getDate() + (weekNumber - 1) * 7);

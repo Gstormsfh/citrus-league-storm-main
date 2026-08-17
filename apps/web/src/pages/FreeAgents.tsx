@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import {
@@ -838,7 +839,7 @@ const FreeAgents = () => {
         }
       }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to add player. Please try again.";
+      const errorMessage = userMessage(error, "Failed to add player. Please try again.");
       const lower = errorMessage.toLowerCase();
       const isLimitError =
         lower.includes('full') || lower.includes('max') || lower.includes('limit') ||
