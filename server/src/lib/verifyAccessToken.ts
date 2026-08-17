@@ -107,6 +107,41 @@ function readAlgUnsafe(token: string): string | null {
 }
 
 /**
+ * Is this token's `exp` claim already in the past?
+ *
+ * DRAFT-NIGHT FIX (2026-08-18). Read WITHOUT verifying the signature, and
+ * used for exactly one decision: classifying a failure that already
+ * happened. An expired token is a credential problem by definition — it can
+ * never be a transient auth-provider outage — so this lets the middleware
+ * answer 401 ("sign in again") instead of 503 ("please retry") no matter
+ * what error shape GoTrue returns.
+ *
+ * Safety: this can only ever turn a 503 into a 401 on a token that is
+ * verifiably stale. It NEVER grants access — a forged token with a future
+ * `exp` returns false here and still fails every real check. Unreadable or
+ * exp-less tokens return false (unchanged 503 behavior).
+ *
+ * Garrett hit the old behavior live on draft night: after signing out of one
+ * account, rejoining showed "Cannot verify your session right now — please
+ * retry", which reads as "our servers are down" for what is really "your
+ * session ended". The client retries a 503 with backoff, so the dead end
+ * repeated instead of bouncing him to sign-in.
+ */
+export function isTokenExpiredUnsafe(token: string, nowMs: number = Date.now()): boolean {
+  const parts = token.split('.');
+  if (parts.length < 2) return false;
+  try {
+    const payload = JSON.parse(
+      Buffer.from(parts[1], 'base64url').toString('utf8'),
+    ) as { exp?: unknown };
+    if (typeof payload.exp !== 'number' || !Number.isFinite(payload.exp)) return false;
+    return payload.exp * 1000 <= nowMs;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Verify a Supabase access token locally. No network.
  *
  * Returns the user id on success. On ANY failure the caller must fall back to

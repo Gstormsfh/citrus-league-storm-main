@@ -2,7 +2,7 @@ import { Context, Next } from 'hono';
 import { createClient, isAuthApiError, type AuthError } from '@supabase/supabase-js';
 import type { Env } from '../app';
 import { logger } from '@citrus/shared';
-import { verifyAccessTokenLocally } from '../lib/verifyAccessToken';
+import { verifyAccessTokenLocally, isTokenExpiredUnsafe } from '../lib/verifyAccessToken';
 
 // NOTE: env vars are read inside each middleware function (not at module scope)
 // because ESM import hoisting causes module-level code to run before .env is loaded.
@@ -26,12 +26,27 @@ const CREDENTIAL_FAILURE_CODES = new Set([
   'token_expired',
   'invalid_token',
   'session_not_found',
+  // DRAFT-NIGHT FIX (2026-08-18) — codes GoTrue emits for a credential
+  // that will never become valid again. Each previously fell through to
+  // the transient-503 default, so the client retried forever.
+  'user_not_found',
+  'session_expired',
+  'jwt_expired',
+  'user_banned',
 ]);
 
 function isCredentialFailure(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   if (isAuthApiError(err)) {
-    if (err.status === 400 || err.status === 401) return true;
+    // DRAFT-NIGHT FIX (2026-08-18): 403 added. GoTrue answers 403 for a
+    // revoked session and for "user from sub claim does not exist" — both
+    // are unambiguously about the credential, not provider health. Under
+    // the old 400/401-only test they fell through to the 503 default and
+    // surfaced as "Cannot verify your session right now — please retry",
+    // which the client then RETRIED with backoff. Garrett hit exactly this
+    // after signing out mid-draft-night: a permanent condition presented
+    // as a transient one, with no path to sign-in.
+    if (err.status === 400 || err.status === 401 || err.status === 403) return true;
   }
   const code = (err as { code?: unknown }).code;
   if (typeof code === 'string' && CREDENTIAL_FAILURE_CODES.has(code)) return true;
@@ -121,6 +136,25 @@ export async function authMiddleware(c: Context<Env>, next: Next) {
     // Amendment 1 (2026-07-31 architect ruling): allowlist credential
     // failures; default everything else to 503 transient. Cost asymmetry
     // is stark — see block comment above CREDENTIAL_FAILURE_CODES.
+    //
+    // DRAFT-NIGHT FIX (2026-08-18) — deterministic backstop, checked FIRST.
+    // The allowlist above depends on GoTrue's error taxonomy, which we do
+    // not control and which shifts between versions. An expired `exp` is
+    // ground truth we can read ourselves: no outage can make a stale token
+    // valid, so it is always 401 and never "please retry". This closes the
+    // dead-end class regardless of what shape the provider's error takes.
+    if (isTokenExpiredUnsafe(token)) {
+      logger.error('[Auth] token expired (local exp check):', { path: c.req.path });
+      return c.json(
+        {
+          error: {
+            code: 'AUTHENTICATION_REQUIRED',
+            message: 'Your session expired — please sign in again',
+          },
+        },
+        401,
+      );
+    }
     if (authError && isCredentialFailure(authError)) {
       logger.error('[Auth] credential failure:', {
         errorMessage: authError.message,

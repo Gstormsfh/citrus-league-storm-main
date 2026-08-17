@@ -190,7 +190,20 @@ export const GOALIE_GSAX_COLUMNS = 'goalie_id, regressed_gsax';
 // ============================================================================
 // TEAM LINEUPS COLUMNS
 // ============================================================================
-export const TEAM_LINEUP_COLUMNS = 'id, team_id, league_id, starters, bench, ir, slot_assignments, updated_at, created_at';
+// SCHEMA-TRUTH FIX (2026-08-18, draft-night finding). This list asked for
+// `id` and `created_at`, and `team_lineups` has NEITHER — the table is keyed
+// by the composite PRIMARY KEY (league_id, team_id), so there is no surrogate
+// id by design. PostgREST rejects the whole select with 42703 ("column id
+// does not exist"), which means EVERY read through this constant returned a
+// 500: GET /api/rosters/league/:leagueId/team/:teamId/lineup (rosters.ts) and
+// LineupService.getLineup (server). Observed live during draft night — two
+// 500s, one per team, on the Matchup page.
+//
+// Because the select is static, this failed 100% of the time rather than
+// intermittently, so no caller can have been depending on the missing
+// fields. Matching the constant to the real schema is the whole fix — no
+// migration, no data change.
+export const TEAM_LINEUP_COLUMNS = 'team_id, league_id, starters, bench, ir, slot_assignments, updated_at';
 
 // ============================================================================
 // MATCHUP SIMULATIONS COLUMNS
