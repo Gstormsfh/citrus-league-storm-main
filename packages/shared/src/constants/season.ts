@@ -19,10 +19,52 @@
  *      CURRENT_SEASON.
  */
 
+/**
+ * Seasons that open BEFORE October, keyed by season year, as a local ISO date.
+ *
+ * The month rule below encodes "NHL seasons start in October". That is true of
+ * every season in this codebase's history and false for the next one: 2026-27
+ * opens 2026-09-29, and 8 regular-season games are played before October 1.
+ * Without this map, CURRENT_SEASON reads 2025 on opening night and again on
+ * Sept 30, flipping only on Oct 1 -- so for the first two days of the season
+ * every season-scoped query asks for the previous one. player_directory holds
+ * 805 players for 2026 and 1,076 for 2025; the default-lineup builder would
+ * have been handed the wrong universe on the busiest night of the year.
+ *
+ * Explicit map rather than a derived rule, for the same reason
+ * SEASON_GAME_COUNTS is one: the NHL sets this per season by agreement, and a
+ * wrong value does not throw -- it silently returns last season's data.
+ *
+ * The SQL side does not need this map. public.get_current_season() reads the
+ * loaded fixture list directly, which is strictly better; the browser cannot,
+ * so it gets the table.
+ */
+const SEASON_START_DATES: Record<number, string> = {
+  2026: '2026-09-29',
+};
+
+/** Local-calendar ISO date. Deliberately local, not UTC, to stay on the same
+ * basis as the getMonth()/getFullYear() rule below. */
+function _localISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function _deriveNhlSeasonYear(d: Date = new Date()): number {
   // Month is 0-indexed in JS; NHL season year starts in October (month
   // 10 = index 9).
-  return d.getMonth() >= 9 ? d.getFullYear() : d.getFullYear() - 1;
+  const byCalendar = d.getMonth() >= 9 ? d.getFullYear() : d.getFullYear() - 1;
+
+  // If the NEXT season has an explicit early start and we are on or past it,
+  // that season has begun regardless of the month.
+  const nextStart = SEASON_START_DATES[byCalendar + 1];
+  if (nextStart && _localISODate(d) >= nextStart) {
+    return byCalendar + 1;
+  }
+
+  return byCalendar;
 }
 
 /** Always-fresh NHL season year. Prefer this over CURRENT_SEASON in any
@@ -30,6 +72,19 @@ function _deriveNhlSeasonYear(d: Date = new Date()): number {
  * without a restart. */
 export function getCurrentSeason(): number {
   return _deriveNhlSeasonYear();
+}
+
+/**
+ * The NHL season year for an arbitrary date.
+ *
+ * Exported so the rule can be tested at a specific date. Until 2026-08-11
+ * there was no such entry point -- getCurrentSeason() takes no argument and
+ * always reads the clock -- which is the direct reason the "seasons start in
+ * October" assumption survived into a season that starts in September. A rule
+ * you cannot evaluate at a date you choose is a rule you cannot test.
+ */
+export function getSeasonYearForDate(d: Date): number {
+  return _deriveNhlSeasonYear(d);
 }
 
 /** The numeric season identifier used in DB queries. Evaluated at module

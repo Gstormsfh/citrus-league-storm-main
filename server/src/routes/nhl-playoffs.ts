@@ -10,7 +10,7 @@ import { Hono } from 'hono';
 import type { Env } from '../app';
 import { supabaseAdmin } from '../lib/supabase';
 import { ok, handleError } from '../lib/responses';
-import { CURRENT_SEASON } from '@citrus/shared';
+import { getCurrentSeason } from '@citrus/shared';
 
 const nhlPlayoffsRoutes = new Hono<Env>();
 
@@ -19,7 +19,7 @@ const nhlPlayoffsRoutes = new Hono<Env>();
 // GET /api/nhl-playoffs/bracket?season=2025 — full bracket state
 nhlPlayoffsRoutes.get('/bracket', async (c) => {
   const seasonParam = c.req.query('season');
-  const season = seasonParam ? parseInt(seasonParam, 10) : CURRENT_SEASON;
+  const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentSeason();
 
   try {
     const [seedsRes, seriesRes] = await Promise.all([
@@ -52,7 +52,7 @@ nhlPlayoffsRoutes.get('/bracket', async (c) => {
 nhlPlayoffsRoutes.get('/series/:slot', async (c) => {
   const slot = parseInt(c.req.param('slot'), 10);
   const seasonParam = c.req.query('season');
-  const season = seasonParam ? parseInt(seasonParam, 10) : CURRENT_SEASON;
+  const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentSeason();
 
   try {
     const seriesRes = await supabaseAdmin
@@ -81,7 +81,7 @@ nhlPlayoffsRoutes.get('/series/:slot', async (c) => {
 // Returns { [slot]: { high_wins, low_wins, games, high_abbrev, low_abbrev } }
 nhlPlayoffsRoutes.get('/h2h', async (c) => {
   const seasonParam = c.req.query('season');
-  const season = seasonParam ? parseInt(seasonParam, 10) : CURRENT_SEASON;
+  const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentSeason();
 
   try {
     // Get all playoff series with both teams known
@@ -153,7 +153,7 @@ nhlPlayoffsRoutes.get('/h2h', async (c) => {
 // actually live, instead of conflating "series has started" with "game live now".
 nhlPlayoffsRoutes.get('/live-games', async (c) => {
   const seasonParam = c.req.query('season');
-  const season = seasonParam ? parseInt(seasonParam, 10) : CURRENT_SEASON;
+  const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentSeason();
 
   try {
     const { data, error } = await supabaseAdmin

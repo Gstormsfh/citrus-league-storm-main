@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, CURRENT_SEASON, logger, getTodayMST } from '@citrus/shared';
+import { COLUMNS, getCurrentSeason, logger, getTodayMST } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 
 /**
@@ -319,29 +319,71 @@ export class MatchupService {
       logger.error('[buildDefaultLineup] roster_assignments query error:', assignErr);
       return false;
     }
-    if (!assignments || assignments.length === 0) {
-      logger.error('[buildDefaultLineup] No roster_assignments for team', teamId);
-      return false;
+
+    // Ownership lives in ONE of two tables depending on the league, and this
+    // builder only ever read one of them.
+    //
+    // Measured on prod 2026-08-11: 46 teams have draft_picks, only 12 have
+    // roster_assignments, and of the 24 drafted teams with no team_lineups row,
+    // the number holding roster_assignments is ZERO. So the roster_assignments
+    // read repairs none of the teams that actually need repairing — it returns
+    // false, the caller logs "nothing to snapshot", and the team goes into
+    // opening night with no daily roster and scores nothing.
+    //
+    // draft_picks is also what check_data_integrity CHECK 1 treats as the
+    // ownership source of truth when it reconciles against team_lineups.
+    let playerIds: Array<string | number> =
+      (assignments || []).map((a: { player_id: string | number }) => a.player_id);
+
+    if (playerIds.length === 0) {
+      const { data: picks, error: picksErr } = await admin
+        .from('draft_picks')
+        .select('player_id')
+        .eq('team_id', teamId)
+        .eq('league_id', leagueId)
+        .is('deleted_at', null);
+
+      if (picksErr) {
+        logger.error('[buildDefaultLineup] draft_picks query error:', picksErr);
+        return false;
+      }
+      playerIds = (picks || []).map((d: { player_id: string | number }) => d.player_id);
+      if (playerIds.length > 0) {
+        logger.info('[buildDefaultLineup] team', teamId,
+          'has no roster_assignments; built from', playerIds.length, 'draft_picks');
+      }
     }
 
-    const playerIds = assignments.map((a: { player_id: number }) => a.player_id);
+    if (playerIds.length === 0) {
+      logger.error('[buildDefaultLineup] No roster_assignments and no draft_picks for team', teamId);
+      return false;
+    }
     logger.info('[buildDefaultLineup] Found', playerIds.length, 'roster players for team', teamId);
 
     // Get position info from player_directory — MUST filter by current season
-    // to avoid duplicate rows (one per season per player)
-    // Uses CURRENT_SEASON from @citrus/shared/constants
+    // to avoid duplicate rows (one per season per player).
+    //
+    // getCurrentSeason() per call, NOT the CURRENT_SEASON constant: that
+    // constant is evaluated once at module load (see the LIFECYCLE CAVEAT in
+    // constants/season.ts), and this function runs on the two nights of the
+    // year when the value changes. A Cloud Run instance warm across the
+    // 2026-09-28 -> 09-29 boundary would otherwise ask for the 2025 universe
+    // of 1,076 players instead of the 2026 universe of 805 — silently, because
+    // a season filter that matches nothing looks identical to a player who
+    // simply is not in the directory.
+    const season = getCurrentSeason();
     const { data: players, error: pdErr } = await admin
       .from('player_directory')
       .select('player_id, position_code, is_goalie')
       .in('player_id', playerIds)
-      .eq('season', CURRENT_SEASON);
+      .eq('season', season);
 
     if (pdErr) {
       logger.error('[buildDefaultLineup] player_directory query error:', pdErr);
       return false;
     }
     if (!players || players.length === 0) {
-      logger.error('[buildDefaultLineup] No player_directory rows for season', CURRENT_SEASON, '— trying without season filter');
+      logger.error('[buildDefaultLineup] No player_directory rows for season', season, '— trying without season filter');
       // Fallback: get latest row per player without season filter
       const { data: fallbackPlayers } = await admin
         .from('player_directory')
@@ -1099,9 +1141,44 @@ export class MatchupService {
     let actual_team_matchups_written = 0;
 
     for (const p of pairs) {
-      const lineup = lineupByTeam.get(p.team_id);
+      let lineup = lineupByTeam.get(p.team_id);
+
+      // No base lineup: BUILD one, rather than skipping the team.
+      //
+      // The interactive path (backfillDailyRostersIfMissing) has always done
+      // this. The scheduled path did not — it recorded an error and continued,
+      // which drops actual_team_matchups_written below expected and makes
+      // /api/scheduled/roster-snapshot-today return 500. So one condition
+      // self-healed whenever somebody opened the Matchup page, and paged at
+      // 02:00 MT when nobody was awake to open anything. On opening night the
+      // difference is whether a team has a roster or silently scores zero.
       if (!lineup || (lineup.starters.length + lineup.bench.length + lineup.ir.length === 0)) {
-        errors.push({ ...p, error: 'no base team_lineups entry — nothing to snapshot' });
+        const built = await this.buildAndSaveDefaultLineup(admin, p.team_id, p.league_id);
+        if (built) {
+          const { data: fresh } = await admin
+            .from('team_lineups')
+            .select('starters, bench, ir, slot_assignments')
+            .eq('team_id', p.team_id)
+            .eq('league_id', p.league_id)
+            .maybeSingle();
+          if (fresh) {
+            lineup = {
+              starters: ((fresh.starters as unknown[]) || []).map(String),
+              bench: ((fresh.bench as unknown[]) || []).map(String),
+              ir: ((fresh.ir as unknown[]) || []).map(String),
+              slot_assignments: (fresh.slot_assignments as Record<string, string>) || {},
+            };
+            lineupByTeam.set(p.team_id, lineup);
+            logger.info('[snapshotTodayForAllLeagues] built default lineup for team', p.team_id);
+          }
+        }
+      }
+
+      // Still nothing to snapshot. A team with neither a lineup nor any roster
+      // assignment is a real finding, not a transient, so it must still break
+      // the coverage assertion loudly rather than pass quietly.
+      if (!lineup || (lineup.starters.length + lineup.bench.length + lineup.ir.length === 0)) {
+        errors.push({ ...p, error: 'no team_lineups entry, and no roster_assignments to build one from' });
         continue;
       }
       const addRows = (playerIds: string[], slotType: string) => {

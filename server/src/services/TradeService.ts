@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, CURRENT_SEASON } from '@citrus/shared';
+import { COLUMNS, getCurrentSeason } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
 /**
@@ -71,7 +71,7 @@ export class TradeService {
         ? this.supabase
             .from('player_directory')
             .select('player_id, full_name, position_code, team_abbrev')
-            .eq('season', CURRENT_SEASON)
+            .eq('season', getCurrentSeason())
             .in('player_id', Array.from(playerIds).map((id) => parseInt(id, 10)).filter((n) => !isNaN(n)))
         : Promise.resolve({ data: [] as Array<{ player_id: number; full_name: string; position_code: string; team_abbrev: string }> }),
     ]);

@@ -9,7 +9,7 @@ import { DEMO_LEAGUE_ID_FOR_GUESTS } from "./DemoLeagueService";
 import { logger } from "@/utils/logger";
 import { ScoringCalculator, type CategoryStats } from "@/utils/scoringUtils";
 import { getTodayMST, getTodayMSTDate, formatMoment } from "@/utils/timezoneUtils";
-import { CURRENT_SEASON } from "@/utils/seasonConstants";
+
 import type { LeagueType, ScoringFormat, DraftType as LeagueDraftType, LeagueSettings } from "@/types/leagueTypes";
 import { extractFormatSettings } from "@/types/leagueTypes";
 import { leagueApi } from "@/api/leagues";
@@ -32,7 +32,7 @@ export interface League {
   waiver_process_time?: string;
   waiver_period_hours?: number;
   waiver_game_lock?: boolean;
-  waiver_type?: 'rolling' | 'faab' | 'reverse_standings';
+  waiver_type?: 'rolling' | 'reverse_draft_order' | 'faab' | 'reverse_standings';
   allow_trades_during_games?: boolean;
   scoring_settings?: {
     skater?: {
@@ -321,7 +321,7 @@ export const LeagueService = {
       waiver_process_time?: string;
       waiver_period_hours?: number;
       waiver_game_lock?: boolean;
-      waiver_type?: 'rolling' | 'faab' | 'reverse_standings';
+      waiver_type?: 'rolling' | 'reverse_draft_order' | 'faab' | 'reverse_standings';
       allow_trades_during_games?: boolean;
     }
   ): Promise<{ league: League | null; team: Team | null; error: unknown }> {
@@ -1224,13 +1224,11 @@ async joinLeagueByCode(
   getLineup: LineupService.getLineup.bind(LineupService),
   loadDailyRoster: LineupService.loadDailyRoster.bind(LineupService),
 
-
   // ─── Standings methods (delegated to StandingsService) ─────────
   calculateTeamStandings: StandingsService.calculateTeamStandings.bind(StandingsService),
   calculateSeasonPointsStandings: StandingsService.calculateSeasonPointsStandings.bind(StandingsService),
   calculateCategoryStandings: StandingsService.calculateCategoryStandings.bind(StandingsService),
   calculateRotoStandingsFromDB: StandingsService.calculateRotoStandingsFromDB.bind(StandingsService),
-
 
   /**
    * Update all teams owned by a user with a new team name
@@ -1258,7 +1256,6 @@ async joinLeagueByCode(
 
   // initializeTeamLineup delegated to LineupService (see lineup methods above)
   initializeTeamLineup: LineupService.initializeTeamLineup.bind(LineupService),
-
 
   /**
    * Drop a player from the roster using process_roster_move (Transactional Engine)

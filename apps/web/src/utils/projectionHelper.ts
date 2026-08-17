@@ -1,7 +1,7 @@
 import { apiClient } from '@/api/client';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
-import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import { getCurrentSeason } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
 
 /**
@@ -35,7 +35,7 @@ export async function getWeeklyProjections(
     const startDate = dates[0];
     const endDate = dates[dates.length - 1];
     const { data } = await apiClient.get(
-      `/api/players/projections/batch?ids=${playerIds.join(',')}&startDate=${startDate}&endDate=${endDate}&season=${CURRENT_SEASON}`
+      `/api/players/projections/batch?ids=${playerIds.join(',')}&startDate=${startDate}&endDate=${endDate}&season=${getCurrentSeason()}`
     );
 
     // Sum projections per player across all days
@@ -103,7 +103,7 @@ export async function getLeagueAverageProjections(
     // Get player positions to group by position via API client
     const playerIdsArray = Array.from(allPlayerIds);
     const { data: players } = await apiClient.get(
-      `/api/players/directory?ids=${playerIdsArray.join(',')}&season=${CURRENT_SEASON}`
+      `/api/players/directory?ids=${playerIdsArray.join(',')}&season=${getCurrentSeason()}`
     );
 
     if (!players) {

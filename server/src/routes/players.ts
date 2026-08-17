@@ -6,7 +6,7 @@ import { PlayerService } from '../services/PlayerService';
 import { NhlPlayoffStateService } from '../services/NhlPlayoffStateService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
-import { logger, CURRENT_SEASON } from '@citrus/shared';
+import { logger, getCurrentSeason } from '@citrus/shared';
 
 const playerRoutes = new Hono<Env>();
 
@@ -51,7 +51,7 @@ playerRoutes.get('/', authMiddleware, async (c) => {
   }
 
   if (aliveTeamsOnly) {
-    const season = seasonParam ? parseInt(seasonParam, 10) : CURRENT_SEASON;
+    const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentSeason();
     const playoffSvc = new NhlPlayoffStateService(supabase);
     const aliveAbbrevs = await playoffSvc.getAliveTeamAbbreviations(season);
     // If the bracket isn't populated yet (pre-playoffs), aliveAbbrevs is
@@ -118,7 +118,7 @@ playerRoutes.get('/ros-projections', authMiddleware, async (c) => {
   const { data, error } = await supabase
     .from('player_ros_projections')
     .select('player_id, player_name, position, team_abbrev, is_goalie, total_projected_points, avg_points_per_game, games_remaining, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins_ros, projected_saves_ros, projected_shutouts_ros')
-    .eq('season', CURRENT_SEASON)
+    .eq('season', getCurrentSeason())
     .order('total_projected_points', { ascending: false })
     .limit(Math.min(limit, 500));
 
@@ -160,7 +160,7 @@ playerRoutes.get('/projections/batch', authMiddleware, async (c) => {
     }
     // Default to current season so missing param doesn't return all
     // historical projections (multiple rows per player × 82 games).
-    query = query.eq('season', season ? parseInt(season, 10) : CURRENT_SEASON);
+    query = query.eq('season', season ? parseInt(season, 10) : getCurrentSeason());
 
     const { data, error } = await query;
 

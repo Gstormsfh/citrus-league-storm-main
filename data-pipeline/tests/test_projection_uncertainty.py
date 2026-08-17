@@ -14,6 +14,9 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# the module under test lives in projections/, which is not a package on sys.path
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'projections'))
 import _bootstrap  # noqa: F401
 
 from projection_uncertainty import (

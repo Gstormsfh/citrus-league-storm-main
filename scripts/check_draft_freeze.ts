@@ -1,10 +1,10 @@
 // CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
-// CATEGORY: UTILITY
-// Purpose:     Check draft freeze state for a league (debugging tool)
-// Last active: 2026-04-14
-// Invoked:     manual run when investigating draft state
-// Reads:       leagues, draft_events
-// Writes:      stdout
+// CATEGORY: ACTIVE
+// Purpose:     Change-freeze gate. HARD-FAIL step in production-deploy.yml.
+// Last active: 2026-08-11
+// Invoked:     every push to master, before any deploy job runs
+// Reads:       public.draft_freeze_blockers() RPC
+// Writes:      stdout / GitHub annotations
 // ────────────────────────────────────────────────────────────
 /**
  * Change Freeze Guard — blocks deploys within 24 hours of any scheduled draft.
@@ -36,6 +36,10 @@
 
 const OVERRIDE_ENV = 'OVERRIDE_DRAFT_FREEZE';
 const FREEZE_HOURS = 24;
+// A draft counts as LIVE if it moved within this many hours. Evidence-based on
+// purpose: three leagues have sat draft_status='in_progress' since April 2026,
+// and blocking on that status alone would block every deploy forever.
+const LIVE_HOURS = 6;
 
 async function main(): Promise<number> {
   // Manual override — emergency bypass. Must be logged in commit message.
@@ -59,26 +63,30 @@ async function main(): Promise<number> {
     return 2;
   }
 
-  // Query leagues with a scheduled_draft_time in the next 24 hours.
-  // PostgREST filter: >= now() AND <= now() + 24h.
-  const nowIso = new Date().toISOString();
-  const windowEndIso = new Date(
-    Date.now() + FREEZE_HOURS * 60 * 60 * 1000,
-  ).toISOString();
-
-  const url =
-    `${supabaseUrl}/rest/v1/leagues` +
-    `?select=id,name,scheduled_draft_time` +
-    `&scheduled_draft_time=gte.${encodeURIComponent(nowIso)}` +
-    `&scheduled_draft_time=lte.${encodeURIComponent(windowEndIso)}`;
+  // Ask the database, via public.draft_freeze_blockers(). Two reasons that
+  // logic lives in SQL rather than here:
+  //
+  //   1. It needs a join between leagues and the most recent non-deleted pick,
+  //      which PostgREST cannot express in one call.
+  //   2. It is behaviourally testable there. This script cannot be exercised in
+  //      CI without a real database, so the part that decides gets proven by
+  //      fault injection in SQL instead.
+  //
+  // It blocks on a draft scheduled inside the window AND on a draft that is
+  // actually running now, which the previous version missed entirely --
+  // scheduled_draft_time is in the past once a draft has started.
+  const url = `${supabaseUrl}/rest/v1/rpc/draft_freeze_blockers`;
 
   let res: Response;
   try {
     res = await fetch(url, {
+      method: 'POST',
       headers: {
         apikey: serviceKey,
         Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ p_upcoming_hours: FREEZE_HOURS, p_live_hours: LIVE_HOURS }),
     });
   } catch (err) {
     console.error(
@@ -96,31 +104,34 @@ async function main(): Promise<number> {
   }
 
   const leagues = (await res.json()) as Array<{
-    id: string;
-    name: string | null;
-    scheduled_draft_time: string;
+    league_id: string;
+    league_name: string | null;
+    reason: string;
+    at_time: string | null;
   }>;
 
   if (leagues.length === 0) {
     console.log(
-      `check_draft_freeze: OK — no drafts scheduled in the next ${FREEZE_HOURS} hours.`,
+      `check_draft_freeze: OK — no draft running now, and none scheduled in the next ${FREEZE_HOURS} hours.`,
     );
     return 0;
   }
 
   // Found at least one — block the deploy.
   console.error(
-    `::error::Change freeze active: ${leagues.length} league(s) have a draft scheduled within ${FREEZE_HOURS} hours.`,
+    `::error::Change freeze active: ${leagues.length} league(s) are drafting now or within ${FREEZE_HOURS} hours.`,
   );
   console.error('');
   for (const league of leagues) {
-    const when = new Date(league.scheduled_draft_time).toISOString();
-    const label = league.name ? `${league.name} (${league.id})` : league.id;
-    console.error(`  - ${label} — draft at ${when}`);
+    const label = league.league_name
+      ? `${league.league_name} (${league.league_id})`
+      : league.league_id;
+    const when = league.at_time ? new Date(league.at_time).toISOString() : 'unknown time';
+    console.error(`  - ${label} — ${league.reason} (${when})`);
   }
   console.error('');
   console.error(
-    'Production deploys are blocked in the 24h window before any scheduled draft.',
+    'Production deploys are blocked during a live draft and in the 24h window before a scheduled one.',
   );
   console.error(
     'If this deploy is required to UNBLOCK a broken draft (not introduce new code),',

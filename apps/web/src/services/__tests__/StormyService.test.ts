@@ -50,7 +50,8 @@ vi.mock('@/utils/logger', () => ({
   },
 }));
 
-vi.mock('@/utils/seasonConstants', () => ({
+vi.mock('@/utils/seasonConstants', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/seasonConstants')>()),
   CURRENT_SEASON: 2025,
 }));
 
@@ -211,7 +212,15 @@ describe('StormyService', () => {
       vi.doMock('@/utils/logger', () => ({
         logger: { log: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
       }));
-      vi.doMock('@/utils/seasonConstants', () => ({ CURRENT_SEASON: 2025 }));
+      // 2026-08-12, ledger 364. Last hand-written seasonConstants mock in the web
+      // suite: last session's sweep converted the vi.mock forms to importOriginal
+      // and missed vi.doMock. Inert today -- StormyService imports no season
+      // constants, verified -- but a hand-written module mock omits every export
+      // it does not list, so it breaks the moment that stops being true.
+      vi.doMock('@/utils/seasonConstants', async (importOriginal) => ({
+        ...(await importOriginal<typeof import('@/utils/seasonConstants')>()),
+        CURRENT_SEASON: 2025,
+      }));
       vi.doMock('@/utils/weekCalculator', () => ({
         getFirstWeekStartDate: vi.fn(), getCurrentWeekNumber: vi.fn(),
         getWeekStartDate: vi.fn(), getWeekEndDate: vi.fn(),

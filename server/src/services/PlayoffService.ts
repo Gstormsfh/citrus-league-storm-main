@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { CURRENT_SEASON, COLUMNS } from '@citrus/shared';
+import { getCurrentSeason, COLUMNS } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 
 export class PlayoffService {
@@ -25,7 +25,7 @@ export class PlayoffService {
       .from('playoff_brackets')
       .select(COLUMNS.PLAYOFF_BRACKET)
       .eq('league_id', leagueId)
-      .eq('season', CURRENT_SEASON)
+      .eq('season', getCurrentSeason())
       .maybeSingle();
 
     if (bracketError) return { bracket: null, seeds: [], series: [], error: bracketError };

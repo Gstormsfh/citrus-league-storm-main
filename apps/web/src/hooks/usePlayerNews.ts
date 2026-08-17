@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PlayerService } from '@/services/PlayerService';
-import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import { getCurrentSeason } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
 
 export interface PlayerNewsItem {
@@ -108,7 +108,7 @@ export function usePlayerNews(
           event: 'UPDATE',
           schema: 'public',
           table: 'player_talent_metrics',
-          filter: `season=eq.${CURRENT_SEASON}`,
+          filter: `season=eq.${getCurrentSeason()}`,
         },
         (payload) => {
           if (debounceTimeoutRef.current) {
