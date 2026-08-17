@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Menu, X, Trophy, UserPlus, Newspaper, Calendar, LogOut, CircleUser, Settings, ChevronDown, Check } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -152,7 +153,12 @@ const MobileMenuButton = () => {
       </button>
 
       {/* Full-screen slide-in menu — dark Citrus 2.0 panel */}
-      {menuOpen && (
+      {/* PORTAL FIX (2026-08-17): page headers using this button carry
+          backdrop-blur, which makes them the containing block for fixed
+          descendants — the same trap that collapsed the Navbar menu to a
+          4px strip ("transparent menu"). Portal to <body> so
+          position:fixed always means the viewport. */}
+      {menuOpen && createPortal(
         <div className="fixed inset-0 top-0 z-[60] bg-[#0F1F15]/95 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
           <div className="flex flex-col h-[calc(100dvh-env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+0.75rem)] px-4 pb-3 bg-[#0F1F15] text-pastel-cream relative overflow-hidden">
             {/* Decorative orange + sage halos */}
@@ -308,7 +314,8 @@ const MobileMenuButton = () => {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

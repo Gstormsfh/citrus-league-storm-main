@@ -64,7 +64,12 @@ vi.mock('@/integrations/supabase/client', () => ({
       onAuthStateChange: () => ({
         data: { subscription: { unsubscribe: () => {} } },
       }),
-      getSession: () => Promise.resolve({ data: { session: null } }),
+      // DRAFT-NIGHT FIX (2026-08-17): auto-join now verifies a LIVE session
+      // before hitting the API (stale-user-after-signout guard). These
+      // tests mock a logged-in user, so the mocked session must exist too —
+      // session:null here would (correctly) bounce to /auth instead of
+      // joining, which is covered by the signed-out corridor tests.
+      getSession: () => Promise.resolve({ data: { session: { access_token: 'test-token' } } }),
     },
   },
 }));

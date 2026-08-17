@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Swords, Users, BarChart3, User, Search, Target, Newspaper, Trophy } from 'lucide-react';
+import { Swords, Users, BarChart3, User, Search, Target, Newspaper, Trophy, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -13,15 +13,22 @@ const MobileBottomNav = () => {
   const user = auth?.user ?? null;
   const activeLeagueId = league?.activeLeagueId ?? null;
 
-  // Prevent iOS rubber-band overscroll from shifting the fixed nav (mobile only)
+  // Prevent iOS rubber-band overscroll from shifting the fixed nav.
+  // SCROLL FIX (2026-08-17): gate on TOUCH devices, not window width —
+  // the old innerWidth<1024 check fired on narrow DESKTOP windows and
+  // planted overscroll-behavior:none on body/html, which (combined with
+  // body being a scroll container) stopped mouse-wheel scroll chaining
+  // dead. Rubber-banding only exists on touch devices; only they need
+  // the guard, and only on the root element.
   useEffect(() => {
-    const isMobile = window.innerWidth < 1024;
-    if (isMobile) {
-      document.body.style.overscrollBehavior = 'none';
+    // matchMedia is universal in real browsers but absent in jsdom (and
+    // some ancient webviews) — feature-detect so the nav can never crash.
+    const isTouch = typeof window.matchMedia === 'function'
+      && window.matchMedia('(pointer: coarse)').matches;
+    if (isTouch) {
       document.documentElement.style.overscrollBehavior = 'none';
     }
     return () => {
-      document.body.style.overscrollBehavior = '';
       document.documentElement.style.overscrollBehavior = '';
     };
   }, []);
@@ -98,15 +105,28 @@ const MobileBottomNav = () => {
     }
   };
 
+  // REGULAR-SEASON NAV (2026-08-17): the old default branch was the
+  // playoff-era nav (Playoffs / Create-a-playoff-pool) — a manager in a
+  // fantasy league had NO mobile route to their matchup, roster, or
+  // standings. Now: an active fantasy league gets the same five tabs as
+  // the desktop Navbar; everyone else gets a season-neutral default with
+  // zero playoff branding.
   const navItems = isPool
     ? getPoolNavItems()
-    : [
-        // Playoff-first mobile nav — season-long items accessible via direct URL.
-        { icon: Trophy, label: 'Playoffs', path: '/nhl/playoffs' },
-        { icon: Target, label: 'Create', path: '/create-league?type=playoff' },
-        { icon: Newspaper, label: 'News', path: '/news' },
-        { icon: User, label: user ? 'Profile' : 'Sign In', path: user ? '/profile' : '/auth' },
-      ];
+    : (user && activeLeagueId)
+      ? [
+          { icon: Trophy, label: 'League', path: `/league/${activeLeagueId}?league=${activeLeagueId}` },
+          { icon: Swords, label: 'Matchup', path: '/matchup' },
+          { icon: Users, label: 'Roster', path: '/roster' },
+          { icon: Search, label: 'Players', path: '/free-agents' },
+          { icon: BarChart3, label: 'Standings', path: '/standings' },
+        ]
+      : [
+          { icon: Home, label: 'Home', path: '/' },
+          { icon: Target, label: 'Create', path: '/create-league' },
+          { icon: Newspaper, label: 'News', path: '/news' },
+          { icon: User, label: user ? 'Profile' : 'Sign In', path: user ? '/profile' : '/auth' },
+        ];
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';

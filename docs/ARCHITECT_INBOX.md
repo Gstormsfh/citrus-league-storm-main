@@ -4340,3 +4340,100 @@ The device VM kills any process at ~45 s and vitest needs longer over the mounte
 
 **No production writes. `ada00015` untouched — `in_progress`, 0 picks, 1 event. Rigs ada00026/27 retired and named *"safe to delete"*.**
 
+## Entry 183 — **Shipped. Three deploys, verified in Garrett's hands.** And the last defect of the day was the one nobody had thought to look for: the draft board was sorted by NHL debut date, so it opened on a 54-year-old Jaromir Jagr.
+
+**Garrett's direction, escalating through the day:** *"You telling me that a human pick costs 3-5 seconds? Oof…. Thats not sleeper level at all."* → *"you have permission to execute… fix properly as if Yahoo/ESPN/Sleeper would"* → *"We finish this today. Properly. To perfection."*
+
+---
+
+### What went out
+
+| | fix | proven by |
+|---|---|---|
+| **web** | optimistic pick render — the player leaves the pool on click | Garrett clicking it |
+| **api** | E145 (dead broadcast) + local JWT verification | 1,074 server tests, deployed |
+| **db** | E142 — completed drafts produce rosters | 144/144 at THE TWELVE's shape |
+| **web** | player pool ranked by real stats, retired players undraftable | read live from his browser |
+
+---
+
+### The pool defect — three layers deep, and only the top one was obvious
+
+Garrett drafted **Patrick Marleau, Joe Thornton and Matt Cullen** in a live test. Not as a joke. He clicked the top of the list.
+
+1. **Retired players were draftable.** `player_directory` is an all-time index, not a roster — **923 of 2,035 rows have no NHL club.** Every one of them was in the pool.
+2. **They were sorted FIRST.** Ordering fell back to `player_id` ascending, and NHL ids increase over time. The first fifteen entries were all retired.
+3. **The reason the sort collapsed:** `usePreloadedPlayers` returned every player with goals, assists, shots and wins hard-coded to **0**. PlayerPool's default sort is `projRank`, computed from those stats through ScoringCalculator — so every player scored identically, the sort became a no-op, and `Array.prototype.sort`'s stability left the list in arrival order.
+
+**Nothing was broken in PlayerPool or ScoringCalculator.** They were correct, and starved. `player_season_stats` — 1,066 rows — had been sitting there unread the whole time.
+
+**The detail that would have re-broken it:** I took the `nhl_*` columns, not the unprefixed ones. Both exist. Hellebuyck reads `wins = 0` in the unprefixed set and `nhl_wins = 23` in the other — a goalie ranked on zero wins sorts below every backup in the league.
+
+**And the asymmetry that keeps it safe:** the filter is on the DRAFTABLE pool, never on the directory load. The directory map resolves names for already-drafted players; filtering there would turn a finished roster into `#8466139 / ? / -`.
+
+**The board now opens:** Celebrini, Robertson, Pastrnak, Bouchard, Suzuki, Boldy, Kaprizov — read out of his live browser, pool size **1,108**, down from ~2,029.
+
+---
+
+### The bit worth remembering — "it didn't work" was true and the fix was fine
+
+Garrett reported the pool still opened on old players **after** deploying. Everything checked out statically: right component, right season constant, permissive RLS, the new query present in the shipped bundle.
+
+**So I stopped reasoning and opened his browser.** The pool was already correct — 1,108 players, properly ranked.
+
+**What gave it away was his own draft:** he had taken **Jagr at pick 4 and Chara at pick 5.** Neither has an NHL club. With the fix live they are not in the pool *at all* — unpickable. The only way to draft them is to be running pre-deploy JavaScript.
+
+**Cause: the service worker.** The PWA precaches its own bundle (126 entries); his tab held the old one in memory and SPA navigation never re-fetched it. `Ctrl+Shift+R` and it was gone.
+
+**Draft-night consequence, and it is a real one:** the config is `registerType: "autoUpdate"` with `skipWaiting`, so it self-heals on any true page load. But **do not deploy once the twelve are in the room** — anyone with the tab already open keeps drafting on the build they arrived with.
+
+**The method lesson, again:** four separate static checks all said "this should work," and they were all correct. The answer only appeared by looking at the running thing. Same shape as E142 surviving three days of certification, and the same shape as the mutation test this morning that found my own anon-key test was passing for the wrong reason.
+
+---
+
+### Where the latency actually went
+
+| stage | before | after |
+|---|---|---|
+| auth — "who is this?" | a round trip to Montreal, **every request** | **0 — local HMAC** |
+| awaited broadcast to zero subscribers | **~4,000 ms** | **0** |
+| `submit_pick_v2` DB work | 3.5 ms | 3.5 ms — was never the problem |
+| what the manager sees | **~6 s of nothing** | **instant** |
+
+**The database was never the bottleneck.** The entire read path of `submit_pick_v2` measures **3.5 ms** on the 252-pick soak league, every hot-path index correct.
+
+---
+
+### Verified
+
+**2,898 tests green** — 1,824 web, 1,074 server. **Thirteen mutants killed** across three batteries (5 overlay, 4 token verification, 4 player pool). Zero new type errors. Production never written to.
+
+### Still open, honestly
+
+- 🔴 **`player_directory` is 6 days stale**, against Garrett's own *"stale > 24 h → POSTPONE"*. Other session's lane.
+- 🟠 **The season stats look like seed data.** Last updated 2026-04-23, and McDavid reads 138 points in 82 games — not a real McDavid season. The *relative* ranking is sane so the board is credible, but the absolute figures need the pipeline owner's eye before Aug 20.
+- **Cloud Run is in Iowa; both Supabase projects are in Montreal.** ~1,500 km on every remaining round trip. `northamerica-northeast1` is the same metro as the database. Deploy-only change, Garrett's call, applies to production.
+- **Engine deploy E117/E118** still pending — nothing from today depends on it.
+- **156 pre-existing TypeScript errors** and `vite build` does not typecheck.
+- **Production has not had the E142 migration.** Committed as `20260812150000_…sql`, deliberately not applied. **And `production-deploy.yml` fires on push to `master`** — so a push today would ship all of this to prod without that migration.
+
+---
+
+### Addendum — the timer report, honestly unresolved
+
+Garrett reported the pick clock frozen. Two rounds of investigation:
+
+**Round 1 — my fault.** He saw "180:00" stuck. `DraftTimerV2` clamps the display with `Math.min(remaining, pickTimeLimitSec)`, and `submit_pick_v2` always arms the deadline at **`limit + 1 second`** — permanently one tick above the cap. So the display pins at the ceiling briefly on *every* pick at *any* clock length. At 90s that is an invisible ~1s pause; on the 3-hour clock I had set on the rig, he sat watching a dead number. **Reproduced the correct behaviour at 90s: 01:18 → 01:15 → 01:12 → … ticking cleanly.**
+
+**Round 2 — not reproduced.** He then saw it frozen at 5:00 on picks 3 and 4 of a 300s draft. Checks run:
+
+- Fresh tab, 300s clock, Garrett's seat on the clock at **pick 2, immediately after a bot autopick**: `04:41 → 04:38 → 04:35 → 04:33 → 04:30 → 04:27 → 04:25 → 04:22`. **Correct.**
+- His machine's clock measured against server truth three ways: **1.8 s BEHIND**. Wrong direction to cause a pin at the ceiling — a lagging client clock shows *less* time, not more.
+- `updateOffset` call sites read correct; wire `timestamp` is ISO 8601 and parsed properly.
+
+**Leading hypothesis, unproven: background-tab throttling.** Chrome throttles `setInterval` to ~1/minute in a backgrounded tab. The timer repaints off a 500 ms interval, so a tab that loses focus right after a re-arm would keep painting the last value — which is **exactly the full clock**. Fits the symptom and fits why pick 1 was fine (he was actively browsing the pool then).
+
+**Left open deliberately.** The distinguishing observation belongs to Garrett: does the number start moving within a second or two while the tab is foregrounded, or does it sit at the cap while he stares at it? The first is cosmetic and self-correcting; the second is a draft-night blocker, because a frozen clock is how a manager gets autopicked believing they had time.
+
+**The discipline point:** three static analyses all said "this should work," and all three were right. Twice today the answer only appeared by opening the running app. It did not appear this time either — so the honest state is *unreproduced*, not *fixed*.
+

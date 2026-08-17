@@ -37,6 +37,8 @@ import { OnClockActionBar } from '@/components/draft/v2/OnClockActionBar';
 import { ManagerPresencePanel } from '@/components/draft/v2/ManagerPresencePanel';
 import { DraftBoard } from '@/components/draft/DraftBoard';
 import { PlayerPool } from '@/components/draft/PlayerPool';
+import { PlayerCardDialog } from '@/components/draft/PlayerCardDialog';
+import { ScoringCalculator } from '@citrus/shared';
 import { DraftHistory } from '@/components/draft/DraftHistory';
 import { TeamRosters } from '@/components/draft/TeamRosters';
 import { DraftQueue } from '@/components/draft/DraftQueue';
@@ -671,6 +673,18 @@ function MainTabs({
   const pendingActions = usePendingActions();
   const [tab, setTab] = useState<'players' | 'board' | 'history'>('players');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  // V2-PARITY (2026-08-17) — tap-for-player-card. Garrett's #1 feedback
+  // from Citrus Draft Night: rows only highlighted; no card ever opened.
+  const [cardPlayer, setCardPlayer] = useState<Player | null>(null);
+  // V2-PARITY (2026-08-17) — autodraft toggle ("autodraft button doesn't
+  // exist" — same feedback list). When ON and it's my turn, the client
+  // submits automatically after a short beat: top of my queue first,
+  // best season-FPTS available otherwise (the pool's own #1 ranking).
+  // Persisted per league so a reload mid-draft keeps the setting.
+  const [autodraftOn, setAutodraftOn] = useState<boolean>(() => {
+    try { return localStorage.getItem(`citrus:autodraft:${leagueId}`) === '1'; } catch { return false; }
+  });
+  const lastAutoPickForRef = useRef<number | null>(null);
 
   // Is it my turn? (computed early — feeds alarm + on-clock action bar.)
   const amIOnClock =
@@ -896,6 +910,53 @@ function MainTabs({
   const isDraftActive = derived?.draftStatus === 'in_progress';
   const isDraftComplete = derived?.draftStatus === 'completed';
 
+  // V2-PARITY (2026-08-17) — autodraft machinery.
+  const toggleAutodraft = useCallback(() => {
+    setAutodraftOn(v => {
+      const next = !v;
+      try { localStorage.setItem(`citrus:autodraft:${leagueId}`, next ? '1' : '0'); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }, [leagueId]);
+
+  useEffect(() => {
+    if (!autodraftOn || !amIOnClock || isSubmitPending) return;
+    const pickNo = derived?.currentPickNumber ?? null;
+    // One attempt per pick slot: if the submit fails (e.g. the engine
+    // refuses the player), we deliberately do NOT retry this slot — the
+    // engine's own expiry autopick remains the backstop, and the toast
+    // tells the manager what happened.
+    if (pickNo === null || lastAutoPickForRef.current === pickNo) return;
+    if (availablePlayers.length === 0) return;
+    const timer = setTimeout(() => {
+      const availSet = new Set(availablePlayers.map(p => p.id));
+      const queuedId = queue.find(id => availSet.has(id));
+      let target = queuedId ? availablePlayers.find(p => p.id === queuedId) : undefined;
+      if (!target) {
+        // Mirror PlayerPool's rankMap: season FPTS via the default
+        // ScoringCalculator (v2 passes no league scoringSettings to the
+        // pool either, so this matches the visible #1 exactly).
+        const scorer = new ScoringCalculator(undefined);
+        let best = -Infinity;
+        for (const p of availablePlayers) {
+          const isG = p.position === 'G';
+          const f = scorer.calculatePoints(
+            isG
+              ? { wins: p.wins || 0, saves: p.saves || 0, shutouts: p.shutouts || 0, goals_against: p.goals_against || 0 }
+              : { goals: p.goals || 0, assists: p.assists || 0, shots: p.shots || 0, blocks: p.blocks || 0, hits: p.hits || 0, pim: p.pim || 0, ppp: p.ppp || 0, shp: p.shp || 0 },
+            isG,
+          );
+          if (f > best) { best = f; target = p; }
+        }
+      }
+      if (target) {
+        lastAutoPickForRef.current = pickNo;
+        void handleDraftFromPool(target);
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [autodraftOn, amIOnClock, isSubmitPending, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool]);
+
   return (
     <div className="space-y-3">
       {/* T13 architect Entry 13 (2026-08-09) — completion-moment
@@ -967,6 +1028,24 @@ function MainTabs({
             {alarm.muted ? '🔇 Alarm muted — click to unmute' : '🔊 Alarm on — click to mute'}
           </button>
         )}
+        {/* V2-PARITY (2026-08-17) — autodraft toggle, always visible so a
+            manager can arm it BEFORE their turn (that's the whole point). */}
+        {!isDraftComplete && (
+          <button
+            type="button"
+            onClick={toggleAutodraft}
+            className={
+              autodraftOn
+                ? 'mt-1 ml-3 text-xs underline text-fantasy-primary font-semibold'
+                : 'mt-1 ml-3 text-xs underline text-muted-foreground hover:text-foreground'
+            }
+            data-testid="autodraft-toggle"
+            aria-pressed={autodraftOn}
+            title="When on, your picks submit automatically — top of your queue first, best available otherwise. One attempt per pick; the draft clock is still the backstop."
+          >
+            {autodraftOn ? '🤖 Autodraft ON — click to turn off' : '🤖 Autodraft off — click to turn on'}
+          </button>
+        )}
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
@@ -998,6 +1077,9 @@ function MainTabs({
                  that can put a player in the queue. */
               queue={queue}
               onAddToQueue={toggleQueued}
+              /* V2-PARITY (2026-08-17) — per-row info button opens the
+                 player card. */
+              onShowCard={setCardPlayer}
             />
           )}
         </TabsContent>
@@ -1056,6 +1138,16 @@ function MainTabs({
           <DraftHistory draftHistory={draftHistory} />
         </TabsContent>
       </Tabs>
+
+      {/* V2-PARITY (2026-08-17) — the player card. Draftable straight
+          from the card when it's your turn. */}
+      <PlayerCardDialog
+        player={cardPlayer}
+        onClose={() => setCardPlayer(null)}
+        onDraft={handleDraftFromPool}
+        canDraft={amIOnClock && isDraftActive && cardPlayer !== null && !draftedIds.includes(cardPlayer.id)}
+        isSubmitPending={isSubmitPending}
+      />
     </div>
   );
 }

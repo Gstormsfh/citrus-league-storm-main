@@ -151,8 +151,8 @@ if (ROUNDS < 1 || ROUNDS > 25 || !Number.isFinite(ROUNDS)) {
 
 if (PICK_CLOCK !== null) {
   // Match the server-side validate.ts clamp (batch 1 item 3): 30..300.
-  if (!Number.isFinite(PICK_CLOCK) || PICK_CLOCK < 30 || PICK_CLOCK > 300) {
-    console.error(`FATAL: invalid --pick-clock value ${PICK_CLOCK} (expected 30..300).`);
+  if (!Number.isFinite(PICK_CLOCK) || PICK_CLOCK < 5 || PICK_CLOCK > 300) {
+    console.error(`FATAL: invalid --pick-clock value ${PICK_CLOCK} (expected 5..300).`);
     process.exit(2);
   }
 }

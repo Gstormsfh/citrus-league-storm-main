@@ -324,16 +324,39 @@ export const MatchupService = {
       }
 
       // PLAYOFF RESERVATION (2026-08-16): when the commissioner didn't set
-      // regularSeasonWeeks, reserve the final 3 calendar weeks for the
+      // regularSeasonWeeks, reserve the final calendar weeks for the
       // playoff bracket instead of round-robin-filling every week. The DB
       // playoff generators key off MAX(matchups.week_number), so stopping
       // the regular season 3 weeks short makes bracket weeks line up
       // automatically (start = MAX + 1) with real NHL games in them.
       // Previously the round-robin consumed the whole calendar and default
       // playoffs could never begin before the NHL season ended.
+      // SETTINGS-DRIVEN RESERVATION (2026-08-17): reserve exactly the
+      // commissioner's configured playoff length instead of a blanket 3.
+      // playoffTeams 0 → no reservation (a no-playoff league gets every
+      // week); playoffWeeks absent/invalid → legacy 3. Clamped 1..4 so a
+      // bad setting can never consume the season. Fetched HERE (the choke
+      // point) so every caller — draft-completion hook, Matchup self-heal,
+      // commissioner button — honors the league's actual playoff shape.
+      // FAIL-OPEN: any fetch error falls back to the proven 3-week reserve.
+      let reserveWeeks = 3;
+      try {
+        const { league: leagueRow } = await LeagueService.getLeague(leagueId);
+        const ls = (leagueRow?.settings ?? {}) as Record<string, unknown>;
+        const pt = Number(ls.playoffTeams);
+        const pw = Number(ls.playoffWeeks);
+        if (Number.isFinite(pt) && pt <= 0) {
+          reserveWeeks = 0;
+        } else if (Number.isFinite(pw) && pw > 0) {
+          reserveWeeks = Math.max(1, Math.min(4, Math.round(pw)));
+        }
+      } catch { /* fail-open: legacy 3-week reservation */ }
+
       const effectiveRegularWeeks = (regularSeasonWeeks && regularSeasonWeeks > 0)
         ? regularSeasonWeeks
-        : (allAvailableWeeks.length > 8 ? allAvailableWeeks.length - 3 : allAvailableWeeks.length);
+        : (allAvailableWeeks.length > reserveWeeks + 5
+            ? allAvailableWeeks.length - reserveWeeks
+            : allAvailableWeeks.length);
       const availableWeeks = allAvailableWeeks.filter(w => w <= effectiveRegularWeeks);
       const formatLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 

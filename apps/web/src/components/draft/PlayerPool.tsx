@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Star, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Clock } from 'lucide-react';
+import { Search, Star, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Clock, Info } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Player } from '@/services/PlayerService';
@@ -18,6 +18,12 @@ interface PlayerPoolProps {
   isDraftActive: boolean;
   availablePlayers: Player[];
   onAddToQueue?: (playerId: string) => void;
+  /**
+   * V2-PARITY (2026-08-17): when provided, every row gets an info
+   * button that opens the player card (PlayerCardDialog in the v2
+   * room). Optional so existing v1 callers are untouched.
+   */
+  onShowCard?: (player: Player) => void;
   onToggleWatchlist?: (playerId: string) => void;
   queue?: string[];
   watchlist?: Set<string>;
@@ -63,6 +69,7 @@ export const PlayerPool = memo(({
   isDraftActive,
   availablePlayers,
   onAddToQueue,
+  onShowCard,
   onToggleWatchlist,
   queue = [],
   watchlist = new Set(),
@@ -353,6 +360,23 @@ export const PlayerPool = memo(({
         <td className="px-2 py-1.5 text-xs text-center font-semibold text-sky-300 bg-sky-500/10">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(2) : '-'}</td>
         <td className="px-2 py-1.5 text-pastel-cream">
           <div className="flex items-center gap-1 relative z-10" onClick={(e) => e.stopPropagation()}>
+            {onShowCard && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 p-0 relative z-20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onShowCard(player);
+                }}
+                title={`View ${player.full_name} card`}
+                aria-label={`View ${player.full_name} player card`}
+                data-testid="pool-row-card-button"
+              >
+                <Info className="h-4 w-4 text-pastel-cream/70 hover:text-sky-300" />
+              </Button>
+            )}
             {onAddToQueue && (
               <Button
                 variant="ghost"
@@ -400,7 +424,7 @@ export const PlayerPool = memo(({
   });
     Row.displayName = 'PlayerRow';
     return Row;
-  }, [selectedPlayer?.id, draftedSet, isDraftActive, isYourTurn, isSubmitPending, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, fptsMap, projectedFptsMap]);
+  }, [selectedPlayer?.id, draftedSet, isDraftActive, isYourTurn, isSubmitPending, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, onShowCard, fptsMap, projectedFptsMap]);
 
   return (
     <Card className="p-2 sm:p-4 border-white/10 bg-pastel-surface-tile">
@@ -635,6 +659,15 @@ export const PlayerPool = memo(({
                     <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-sky-300 bg-sky-500/10">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(1) : '-'}</td>
                     <td className="px-1.5 py-1 text-pastel-cream" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-0.5">
+                        {onShowCard && (
+                          <Button variant="ghost" size="sm" className="h-9 w-9 p-0"
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onShowCard(player); }}
+                            title={`View ${player.full_name} card`}
+                            aria-label={`View ${player.full_name} player card`}
+                            data-testid="pool-row-card-button">
+                            <Info className="h-4 w-4 text-pastel-cream/70" />
+                          </Button>
+                        )}
                         {onAddToQueue && (
                           <Button variant="ghost" size="sm" className="h-9 w-9 p-0"
                             onClick={(e) => { e.stopPropagation(); e.preventDefault(); onAddToQueue(player.id); }}

@@ -386,8 +386,11 @@
   }
 
   body {
-  overflow-x: hidden;
-  overflow-y: auto;
+  /* SCROLL FIX (2026-08-17): overflow-x CLIP, not hidden — clip cuts off
+     horizontal overflow without turning body into a scroll container
+     (hidden forces overflow-y into auto per spec, which created the
+     second scroller that broke wheel routing). No overflow-y here ever. */
+  overflow-x: clip;
   background: #0F1F15;
   @apply text-citrus-forest font-sans corduroy-texture;
   margin: 0;
@@ -448,12 +451,21 @@
   }
   
   html {
-  scroll-behavior: smooth;
+  /* SCROLL FIX (2026-08-17), part 2 — root scroller restored.
+     Previously BOTH html and body declared overflow-x:hidden +
+     overflow-y:auto, making EACH a scroll container. Chrome demotes the
+     root scroller in that double-scroller setup and wheel/trackpad
+     gesture routing breaks (page scrolls programmatically and via
+     keyboard, but the mouse wheel does nothing). html now keeps NO
+     overflow declarations: the viewport is the one true scroller, the
+     way every site that scrolls normally does it. Horizontal clipping
+     lives on body via overflow-x:clip, which clips WITHOUT creating a
+     scroll container (unlike hidden). scroll-behavior stays native —
+     smooth is opt-in per container via .scroll-smooth. */
+  scroll-behavior: auto;
   margin: 0;
   padding: 0;
   width: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
   }
   
   #root {

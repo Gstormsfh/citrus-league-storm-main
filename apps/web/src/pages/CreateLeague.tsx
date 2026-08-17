@@ -256,7 +256,22 @@ const CreateLeague = () => {
       // Pass the code EXPLICITLY so we don't race with setJoinCode().
       // Previously handleJoinLeague read joinCode from closure which
       // could be empty if state hadn't committed yet.
-      setTimeout(() => handleJoinLeague(code), 50);
+      // DRAFT-NIGHT FIX (2026-08-17): verify a LIVE session before firing.
+      // After sign-out, React can briefly hold a stale `user` while the
+      // token is already revoked — auto-join then hits the API with a dead
+      // token and surfaces "Cannot verify your session". If the session is
+      // gone, bounce to /auth with the code preserved instead.
+      setTimeout(async () => {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (!data.session) {
+            const target = `/create-league?tab=join&code=${encodeURIComponent(code)}`;
+            navigate(`/auth?redirect=${encodeURIComponent(target)}`);
+            return;
+          }
+        } catch { /* fall through — handleJoinLeague surfaces its own error */ }
+        handleJoinLeague(code);
+      }, 50);
     }
     // JOIN-FLOW (2026-08-16): the Sleeper-parity hand-off. A BRAND-NEW
     // user tapping an invite link previously reached this page, hit
@@ -348,6 +363,48 @@ const CreateLeague = () => {
     );
   };
 
+  // ── SETTINGS-DYNAMICS (2026-08-17) ────────────────────────────────
+  // Dependent settings must track the settings they depend on, the way
+  // Sleeper/ESPN do it. The DB trigger validate_league_settings hard-
+  // rejects playoffTeams > teamsCount (Garrett's 2-team test: teams=2
+  // with the form's default playoffTeams=6 → INSERT refused → the user
+  // saw only a generic "Failed to create league"). The form now keeps
+  // the pair valid BY CONSTRUCTION: options shrink to fit the league,
+  // selections auto-clamp when team count drops, and submit re-clamps
+  // as a final guard so no payload can ever violate the trigger.
+  //
+  // num(): parseInt where 0 is a LEGAL choice. `parseInt(x) || fb`
+  // silently turns a chosen 0 into the fallback — "No Playoffs" became
+  // 6 playoff teams and "No Deadline" became a week-20 deadline.
+  const num = (v: string, fallback: number): number => {
+    const n = parseInt(v, 10);
+    return Number.isNaN(n) ? fallback : n;
+  };
+  const PLAYOFF_SIZES = [8, 6, 4, 2];
+  // Largest preset playoff size that fits both the team count and the
+  // commissioner's chosen size. 0 = no playoffs.
+  const playoffCap = (cap: number, desired: number): number => {
+    for (const n of PLAYOFF_SIZES) { if (n <= cap && n <= desired) return n; }
+    return 0;
+  };
+  // Bracket length in rounds: 2 teams → 1, 4 → 2, 6/8 → 3.
+  const playoffRounds = (n: number): number => (n >= 2 ? Math.ceil(Math.log2(n)) : 0);
+  const teamCapNum = num(teamsCount, 12);
+  const playoffOptions = PLAYOFF_SIZES.filter((n) => n <= teamCapNum).reverse();
+
+  // Auto-clamp the playoff selection whenever the team count drops
+  // below it (and re-derive playoff length from the new bracket size).
+  useEffect(() => {
+    const cap = num(teamsCount, 12);
+    const current = num(playoffTeams, 6);
+    if (current > cap) {
+      const next = playoffCap(cap, current);
+      setPlayoffTeams(String(next));
+      if (next >= 2) setPlayoffWeeks(String(playoffRounds(next)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamsCount]);
+
   const handleCreateLeague = async () => {
     if (!user) {
       setError("Sign in first, then spin up your league.");
@@ -386,7 +443,7 @@ const CreateLeague = () => {
       // Build settings object — ONLY include fields relevant to this league type
       const settings: Record<string, unknown> = {
         leagueType,
-        teamsCount: parseInt(teamsCount),
+        teamsCount: parseInt(teamsCount) || 12,
       };
 
       if (isFantasy) {
@@ -394,19 +451,29 @@ const CreateLeague = () => {
         settings.scoringFormat = scoringFormat;
         settings.draftType = draftType;
         settings.stats = enabledStats;
-        settings.pickTimeLimit = parseInt(pickTimeLimit);
+        // DRAFT-NIGHT FIX (2026-08-17): every numeric form field gets a
+        // sane fallback. parseInt('') === NaN, NaN serializes to JSON
+        // null, and the API's validator rejects null with a 400 the user
+        // only ever saw as "Failed to create league". One empty field
+        // must never sink league creation.
+        settings.pickTimeLimit = parseInt(pickTimeLimit) || 90;
         settings.rosterSlots = rosterSlots;
         settings.positionType = positionType;
 
-        // Season settings
-        settings.playoffTeams = parseInt(playoffTeams);
-        settings.playoffWeeks = parseInt(playoffWeeks);
-        settings.tradeDeadlineWeek = parseInt(tradeDeadlineWeek);
+        // Season settings — clamped so the payload can never violate the
+        // DB's validate_league_settings trigger (playoffTeams ≤ teams),
+        // and 0 survives as a real choice (No Playoffs / No Deadline).
+        const effectivePlayoffTeams = playoffCap(count, num(playoffTeams, 6));
+        settings.playoffTeams = effectivePlayoffTeams;
+        settings.playoffWeeks = effectivePlayoffTeams >= 2
+          ? Math.min(Math.max(num(playoffWeeks, playoffRounds(effectivePlayoffTeams)), 1), 4)
+          : 0;
+        settings.tradeDeadlineWeek = num(tradeDeadlineWeek, 0);
 
         // Keeper / Dynasty
         settings.keeperEnabled = keeperEnabled;
         if (keeperEnabled) {
-          settings.keeperCount = parseInt(keeperCount);
+          settings.keeperCount = parseInt(keeperCount) || 0;
           settings.keeperPenalty = keeperPenalty;
           settings.dynastyMode = dynastyMode;
         }
@@ -417,19 +484,19 @@ const CreateLeague = () => {
         // Category / Roto settings (only for category-based formats)
         if (showCategories) {
           settings.categories = selectedCategories;
-          settings.minGoalieGames = parseInt(minGoalieGames);
+          settings.minGoalieGames = num(minGoalieGames, 2); // 0 = "No minimum" is legal
         }
 
         // Auction settings (only for auction drafts)
         if (draftType === 'auction') {
-          settings.auctionBudget = parseInt(auctionBudget);
-          settings.auctionMinBid = parseInt(auctionMinBid);
-          settings.auctionNominationTime = parseInt(auctionNominationTime);
+          settings.auctionBudget = parseInt(auctionBudget) || 200;
+          settings.auctionMinBid = parseInt(auctionMinBid) || 1;
+          settings.auctionNominationTime = parseInt(auctionNominationTime) || 30;
           // SETTINGS-ENFORCEMENT (2026-08-16) — the v2 engine reads
           // auctionNominationWindowSeconds (draft/index.ts), not
           // auctionNominationTime. Write both so the commissioner's
           // value actually reaches the auction clock.
-          settings.auctionNominationWindowSeconds = parseInt(auctionNominationTime);
+          settings.auctionNominationWindowSeconds = parseInt(auctionNominationTime) || 30;
         }
 
         // Waiver/transaction settings (persisted in settings AND dedicated columns)
@@ -441,6 +508,12 @@ const CreateLeague = () => {
         settings.faabBudget = waiverSettings.faab_budget;
         settings.weeklyAddLimit = parseInt(weeklyAddLimit) || 0;
         settings.seasonAddLimit = parseInt(seasonAddLimit) || 0;
+
+        // DB trigger: FAAB budget must be > 0 when FAAB waivers are on.
+        // Self-heal to the default rather than letting the insert bounce.
+        if (settings.waiver_type === 'faab' && !(Number(settings.faabBudget) > 0)) {
+          settings.faabBudget = 100;
+        }
       } else {
         // Pool-specific settings — only what this pool type needs
         settings.scoringFormat = 'total-points';
@@ -451,13 +524,13 @@ const CreateLeague = () => {
 
         if (leagueType === 'pickem') {
           settings.pickemFormat = pickemFormat;
-          settings.picksPerWeek = parseInt(picksPerWeek);
+          settings.picksPerWeek = parseInt(picksPerWeek) || 5;
         } else if (leagueType === 'survivor') {
-          settings.survivorLives = parseInt(survivorLives);
+          settings.survivorLives = parseInt(survivorLives) || 1;
           settings.allowRepeatTeams = allowRepeatTeams;
         } else if (leagueType === 'confidence-pool') {
-          settings.picksPerWeek = parseInt(picksPerWeek);
-          settings.confidenceMaxPoints = parseInt(confidenceMaxPoints);
+          settings.picksPerWeek = parseInt(picksPerWeek) || 5;
+          settings.confidenceMaxPoints = parseInt(confidenceMaxPoints) || 16;
         } else if (leagueType === 'playoff-bracket-pickem') {
           settings.playoffBracketPointsPerRound = { r1: 2, r2: 4, r3: 8, scf: 16 };
           settings.playoffGamesPickBonus = 1;
@@ -518,10 +591,16 @@ const CreateLeague = () => {
         leagueName.trim(),
         user.id,
         isFantasy ? rosterSize : 0,
-        isFantasy ? parseInt(draftRounds) : 0,
+        isFantasy ? (parseInt(draftRounds) || rosterSize || 21) : 0,
         settings,
         scoringSettings,
-        isFantasy ? waiverSettings : undefined
+        // Mirror the FAAB self-heal into the dedicated-column payload so
+        // settings JSONB and the waiver columns can't disagree.
+        isFantasy
+          ? (waiverSettings.waiver_type === 'faab' && !(Number(waiverSettings.faab_budget) > 0)
+              ? { ...waiverSettings, faab_budget: 100 }
+              : waiverSettings)
+          : undefined
       );
 
       if (createError) throw createError;
@@ -1520,15 +1599,29 @@ const CreateLeague = () => {
                         {showMatchupSettings && (
                           <div className="space-y-3">
                             <Label>Playoff Teams</Label>
-                            <Select value={playoffTeams} onValueChange={setPlayoffTeams}>
+                            <Select
+                              value={playoffTeams}
+                              onValueChange={(v) => {
+                                setPlayoffTeams(v);
+                                // Track bracket length to the bracket size;
+                                // the commissioner can still override below.
+                                const n = parseInt(v, 10);
+                                if (n >= 2) setPlayoffWeeks(String(playoffRounds(n)));
+                              }}
+                            >
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="0">No Playoffs</SelectItem>
-                                <SelectItem value="4">4 Teams</SelectItem>
-                                <SelectItem value="6">6 Teams</SelectItem>
-                                <SelectItem value="8">8 Teams</SelectItem>
+                                {playoffOptions.map((n) => (
+                                  <SelectItem key={n} value={String(n)}>
+                                    {n === 2 ? '2 Teams (Final only)' : `${n} Teams`}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
+                            <p className="text-xs text-white/55">
+                              Options adjust to your number of teams.
+                            </p>
                           </div>
                         )}
 
@@ -1539,11 +1632,15 @@ const CreateLeague = () => {
                             <Select value={playoffWeeks} onValueChange={setPlayoffWeeks}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="1">1 Week</SelectItem>
                                 <SelectItem value="2">2 Weeks</SelectItem>
                                 <SelectItem value="3">3 Weeks</SelectItem>
                                 <SelectItem value="4">4 Weeks</SelectItem>
                               </SelectContent>
                             </Select>
+                            <p className="text-xs text-white/55">
+                              {`${playoffRounds(num(playoffTeams, 6))} round${playoffRounds(num(playoffTeams, 6)) === 1 ? '' : 's'} needed for ${num(playoffTeams, 6)} teams.`}
+                            </p>
                           </div>
                         )}
 

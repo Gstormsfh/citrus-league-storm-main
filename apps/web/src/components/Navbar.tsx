@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import {
   Menu, X, Bell, Search, Users, LogOut, CircleUser,
@@ -409,11 +410,19 @@ const Navbar = () => {
       </div>
 
       {/* ===== MOBILE: Slide-in menu ===== */}
-      {mobileMenuOpen && (
+      {/* PORTAL FIX (2026-08-17): the header's backdrop-blur makes the
+          header the CONTAINING BLOCK for fixed descendants, so this
+          panel's position:fixed resolved against the ~60px navbar box —
+          collapsing it to a 4px strip whose solid background never
+          painted behind the menu items. The items then floated over the
+          page with no backdrop: Garrett's "transparent menu." Verified
+          live (computed height 4px, top:56px inside a 60px box).
+          Portaling to <body> restores true viewport positioning. */}
+      {mobileMenuOpen && createPortal(
         // SWEEP FIX (2026-08-16): bg-pastel-surface/98 — /98 is not a
         // generated opacity step, so the class silently produced NO
         // background and the menu rendered transparent over page content.
-        <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-pastel-surface backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
+        <div className="lg:hidden fixed inset-0 top-[56px] z-[70] bg-pastel-surface backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
           <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3">
             {/* League context + switcher */}
             {user && !leagueLoading && userLeagues.length === 0 && (
@@ -563,7 +572,8 @@ const Navbar = () => {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <style>

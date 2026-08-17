@@ -24,7 +24,7 @@
 // can't be produced by a component that never mounts.
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // Contexts are mocked rather than provided: this test is about routing, and
@@ -50,9 +50,12 @@ const renderAt = (path: string) =>
     </MemoryRouter>,
   );
 
-// A rendered nav always contains a Profile/Sign In tab, on every branch of
-// getPoolNavItems and on the fantasy default. Its absence == returned null.
-const navIsRendered = () => screen.queryByText(/Profile|Sign In/) !== null;
+// A rendered nav is the single <nav> landmark this component returns; its
+// absence == the component returned null. Structural, not label-based:
+// the old Profile-tab detector broke when the fantasy branch replaced the
+// Profile tab with league tabs (REGULAR-SEASON NAV 2026-08-17), and tab
+// labels are expected to keep evolving — the route-hide contract is not.
+const navIsRendered = () => document.querySelector('nav') !== null;
 
 afterEach(cleanup);
 

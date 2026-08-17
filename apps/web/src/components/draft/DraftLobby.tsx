@@ -72,6 +72,7 @@ interface DraftLobbyProps {
   onDeleteTeam?: (teamId: string) => Promise<void>; // Optional callback to delete a team
   leagueId?: string; // League ID for adding AI teams
   maxTeams?: number; // Maximum teams allowed in league (from settings.teamsCount)
+  leagueDraftType?: string; // League's draft type from creation (snake/linear/auction) — single source of truth for draft order
   joinCode?: string; // League join code for inviting managers
   leagueName?: string; // League name for email template
   scheduledDraftTime?: string | null; // Scheduled draft time (ISO string)
@@ -107,6 +108,7 @@ export const DraftLobby = ({
   onAddAITeams,
   leagueId,
   maxTeams = 12,
+  leagueDraftType,
   joinCode,
   leagueName,
   scheduledDraftTime,
@@ -121,12 +123,19 @@ export const DraftLobby = ({
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [scheduleDateInput, setScheduleDateInput] = useState('');
   const [scheduleTimeInput, setScheduleTimeInput] = useState('');
+  // SETTINGS-UNIFICATION (2026-08-17): every value here INHERITS from the
+  // league (set once at creation). 'snake' at creation === 'serpentine'
+  // here — same concept, and the lobby now speaks the creation vocabulary.
+  const orderFromLeague = leagueDraftType === 'linear' ? 'standard' as const : 'serpentine' as const;
   const [settings, setSettings] = useState<DraftSettings>({
     rounds: leagueDraftRounds, // Use league's draft_rounds setting
     pickTimeLimit: leaguePickTimeLimit || DEFAULT_PICK_TIME_LIMIT_SECONDS, // Use league's saved pickTimeLimit
-    draftOrder: 'serpentine',
+    draftOrder: orderFromLeague,
     scoringFormat: 'standard'
   });
+  // Commissioner-only override disclosure — settings show as a summary by
+  // default so nobody is asked the same question twice.
+  const [showAdjust, setShowAdjust] = useState(false);
   
   // Custom draft order state (team IDs in order) - for dropdown option
   const [customOrder, setCustomOrder] = useState<string[]>(teams && Array.isArray(teams) ? teams.map(t => t.id) : []);
@@ -139,14 +148,19 @@ export const DraftLobby = ({
       : (teams && Array.isArray(teams) ? teams.map(t => t.id) : [])
   );
 
-  // Sync settings from league data when props change
+  // Sync settings from league data when props change. draftOrder follows
+  // the league's draft type unless the commissioner explicitly chose a
+  // custom order in this lobby session.
   useEffect(() => {
     setSettings(prev => ({
       ...prev,
       rounds: leagueDraftRounds,
-      ...(leaguePickTimeLimit ? { pickTimeLimit: leaguePickTimeLimit } : {})
+      ...(leaguePickTimeLimit ? { pickTimeLimit: leaguePickTimeLimit } : {}),
+      ...(prev.draftOrder !== 'custom' && leagueDraftType
+        ? { draftOrder: leagueDraftType === 'linear' ? 'standard' as const : 'serpentine' as const }
+        : {})
     }));
-  }, [leagueDraftRounds, leaguePickTimeLimit]);
+  }, [leagueDraftRounds, leaguePickTimeLimit, leagueDraftType]);
 
   // Initialize custom order when teams change
   useEffect(() => {
@@ -262,10 +276,10 @@ export const DraftLobby = ({
   };
 
   const handleStartDraft = () => {
-    if (!teams || !Array.isArray(teams) || teams.length < 4) {
+    if (!teams || !Array.isArray(teams) || teams.length < 2) {
       toast({
         title: "Not enough teams",
-        description: "You need at least 4 teams to start the draft.",
+        description: "You need at least 2 teams to start the draft.",
         variant: "destructive"
       });
       return;
@@ -307,6 +321,44 @@ export const DraftLobby = ({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6 overflow-x-auto">
+              {/* SETTINGS-UNIFICATION (2026-08-17): the summary IS the
+                  settings view — every value inherited from league creation.
+                  The controls below live behind a commissioner-only
+                  "Adjust" disclosure so the lobby never re-asks a question
+                  the commissioner already answered. */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 overflow-x-auto">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">{teams.length}<span className="text-base text-muted-foreground">/{maxTeams}</span></div>
+                  <div className="text-sm text-muted-foreground">Teams</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">{settings.rounds}</div>
+                  <div className="text-sm text-muted-foreground">Rounds</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">{settings.pickTimeLimit}s</div>
+                  <div className="text-sm text-muted-foreground">Per Pick</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {settings.draftOrder === 'standard' ? 'Linear' : settings.draftOrder === 'custom' ? 'Custom' : 'Snake'}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Draft Order</div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                Inherited from your league settings — nothing to re-enter.
+              </p>
+
+              {isCommissioner && (
+                <div className="text-center">
+                  <Button variant="ghost" size="sm" onClick={() => setShowAdjust(v => !v)}>
+                    {showAdjust ? 'Hide adjustments' : 'Adjust for this draft'}
+                  </Button>
+                </div>
+              )}
+
+              {showAdjust && isCommissioner && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="rounds">Number of Rounds</Label>
@@ -319,13 +371,17 @@ export const DraftLobby = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="12">12 Rounds</SelectItem>
-                      <SelectItem value="16">16 Rounds</SelectItem>
-                      <SelectItem value="18">18 Rounds</SelectItem>
-                      <SelectItem value="20">20 Rounds</SelectItem>
-                      <SelectItem value="21">21 Rounds</SelectItem>
-                      <SelectItem value="24">24 Rounds</SelectItem>
-                      <SelectItem value="30">30 Rounds</SelectItem>
+                      {/* SETTINGS-DYNAMICS (2026-08-17): league creation
+                          derives rounds from roster size (e.g. 14), so the
+                          league's actual value must always be selectable —
+                          a fixed list made nonstandard counts render as an
+                          empty select. */}
+                      {Array.from(new Set([settings.rounds, 12, 14, 16, 18, 20, 21, 24, 30]))
+                        .filter(n => Number.isFinite(n) && n >= 1)
+                        .sort((a, b) => a - b)
+                        .map(n => (
+                          <SelectItem key={n} value={n.toString()}>{n} Rounds</SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -366,9 +422,18 @@ export const DraftLobby = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {[4, 6, 8, 10, 12, 14, 16, 18, 20].filter(n => n >= teams.length).map(n => (
-                        <SelectItem key={n} value={n.toString()}>{n} Teams</SelectItem>
-                      ))}
+                      {/* SETTINGS-DYNAMICS (2026-08-17): 2-team leagues are
+                          legal (league creation allows 2–50) — this list
+                          starting at 4 meant the lobby literally could not
+                          express the league the commissioner configured, and
+                          nudged 2-team leagues up to 4. Include the league's
+                          own size even if nonstandard. */}
+                      {Array.from(new Set([maxTeams, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]))
+                        .filter(n => Number.isFinite(n) && n >= 2 && n >= teams.length)
+                        .sort((a, b) => a - b)
+                        .map(n => (
+                          <SelectItem key={n} value={n.toString()}>{n} Teams</SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   {teams.length > 0 && <p className="text-xs text-muted-foreground">{teams.length} joined so far</p>}
@@ -385,8 +450,10 @@ export const DraftLobby = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="standard">Standard (1-8, 1-8, 1-8...)</SelectItem>
-                      <SelectItem value="serpentine">Serpentine (1-8, 8-1, 1-8...)</SelectItem>
+                      {/* Vocabulary matches league creation: Snake there
+                          === serpentine here. One concept, one name. */}
+                      <SelectItem value="serpentine">Snake (1-8, 8-1, 1-8...)</SelectItem>
+                      <SelectItem value="standard">Linear (1-8, 1-8, 1-8...)</SelectItem>
                       <SelectItem value="custom">Custom Order (Set Manually)</SelectItem>
                     </SelectContent>
                   </Select>
@@ -459,46 +526,11 @@ export const DraftLobby = ({
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="scoring">Scoring Format</Label>
-                  <Select 
-                    value={settings.scoringFormat} 
-                    onValueChange={(value: 'standard' | 'points' | 'categories') => setSettings({...settings, scoringFormat: value})}
-                    disabled={!isCommissioner}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="standard">Standard</SelectItem>
-                      <SelectItem value="points">Points Only</SelectItem>
-                      <SelectItem value="categories">Categories</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Scoring Format was configured at league creation
+                    (format, stat set, point values). The lobby no longer
+                    re-asks — SETTINGS-UNIFICATION (2026-08-17). */}
               </div>
-
-              <Separator />
-
-              {/* Draft Summary */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 overflow-x-auto">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">{teams.length}</div>
-                  <div className="text-sm text-muted-foreground">Teams</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">{settings.rounds}</div>
-                  <div className="text-sm text-muted-foreground">Rounds</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">{settings.pickTimeLimit}s</div>
-                  <div className="text-sm text-muted-foreground">Per Pick</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">{teams.length * settings.rounds}</div>
-                  <div className="text-sm text-muted-foreground">Total Picks</div>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -614,9 +646,18 @@ export const DraftLobby = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {[4, 6, 8, 10, 12, 14, 16, 18, 20].filter(n => n >= teams.length).map(n => (
-                        <SelectItem key={n} value={n.toString()}>{n} Teams</SelectItem>
-                      ))}
+                      {/* SETTINGS-DYNAMICS (2026-08-17): 2-team leagues are
+                          legal (league creation allows 2–50) — this list
+                          starting at 4 meant the lobby literally could not
+                          express the league the commissioner configured, and
+                          nudged 2-team leagues up to 4. Include the league's
+                          own size even if nonstandard. */}
+                      {Array.from(new Set([maxTeams, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]))
+                        .filter(n => Number.isFinite(n) && n >= 2 && n >= teams.length)
+                        .sort((a, b) => a - b)
+                        .map(n => (
+                          <SelectItem key={n} value={n.toString()}>{n} Teams</SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -953,7 +994,7 @@ Your Commissioner`);
                           });
                         }}
                         className="w-full"
-                        disabled={teams.length < 4 || isStartingDraft}
+                        disabled={teams.length < 2 || isStartingDraft}
                       >
                         <Hourglass className="h-4 w-4 mr-2" aria-hidden="true" />
                         Prepare Draft
@@ -962,7 +1003,7 @@ Your Commissioner`);
                     <Button
                       onClick={handleStartDraft}
                       className="w-full"
-                      disabled={teams.length < 4 || isStartingDraft}
+                      disabled={teams.length < 2 || isStartingDraft}
                       variant={onPrepareDraft ? "outline" : "default"}
                     >
                       <Play className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -974,7 +1015,7 @@ Your Commissioner`);
                       <Button
                         variant="outline"
                         className="w-full"
-                        disabled={teams.length < 4}
+                        disabled={teams.length < 2}
                         onClick={() => {
                           // Default to tomorrow at 8 PM
                           const tomorrow = new Date();
@@ -990,9 +1031,9 @@ Your Commissioner`);
                       </Button>
                     )}
 
-                    {teams.length < 4 && (
+                    {teams.length < 2 && (
                       <p className="text-xs text-muted-foreground text-center">
-                        Need at least 4 teams to start
+                        Need at least 2 teams to start
                       </p>
                     )}
                   </>

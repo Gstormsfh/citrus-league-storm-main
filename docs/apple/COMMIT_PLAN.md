@@ -34,6 +34,7 @@ git add `
   apps/web/src/components/citrus2/HockeyNav.tsx `
   apps/web/src/components/ui/toast.tsx `
   apps/web/vite.config.ts `
+  apps/web/src/index.css `
   apps/web/scripts/build-native.mjs `
   server/src/app.ts `
   supabase/migrations/20260817120000_draft_metrics_partitions_enable_rls.sql `
@@ -44,6 +45,7 @@ git add `
   server/src/lib/__tests__/leagueRules.test.ts `
   server/src/services/LineupService.ts `
   server/src/services/MatchupService.ts `
+  server/src/routes/leagues.ts `
   server/src/services/WaiverService.ts `
   server/src/services/TradeService.ts `
   server/src/routes/scheduled.ts `
@@ -52,6 +54,7 @@ git add `
   server/src/draft/index.ts `
   .github/workflows/daily-waiver-process.yml `
   apps/web/src/pages/CreateLeague.tsx `
+  apps/web/src/pages/__tests__/CreateLeague.autoJoin.integration.test.tsx `
   apps/web/src/pages/LeagueDashboard.tsx `
   apps/web/src/pages/Roster.tsx `
   apps/web/src/pages/Standings.tsx `
@@ -60,6 +63,15 @@ git add `
   apps/web/src/pages/NHLPlayoffBracket.tsx `
   apps/web/src/components/Navbar.tsx `
   apps/web/src/components/MobileMenuButton.tsx `
+  apps/web/src/components/MobileBottomNav.tsx `
+  apps/web/src/components/draft/DraftLobby.tsx `
+  apps/web/src/pages/DraftRoom.tsx `
+  apps/web/src/pages/DraftRoomV2.tsx `
+  apps/web/src/components/draft/PlayerPool.tsx `
+  apps/web/src/components/draft/PlayerCardDialog.tsx `
+  apps/web/src/components/draft/__tests__/PlayerPool.cardButton.test.tsx `
+  supabase/migrations/20260817200500_draft_completion_finalizes_league_state.sql `
+  apps/web/src/components/__tests__/MobileBottomNav.hideRoutes.test.tsx `
   apps/web/src/components/AdSpace.tsx `
   apps/web/src/components/matchup/PlayerCard.tsx `
   apps/web/src/components/citrus2/Homepage.tsx `
