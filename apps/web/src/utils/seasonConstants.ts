@@ -13,5 +13,6 @@ export {
   SEASON_LABEL,
   DEFAULT_TEST_DATE,
   getCurrentSeason,
+  getSeasonGameCount,
   getHeadshotUrl,
 } from '@citrus/shared';

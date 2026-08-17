@@ -395,4 +395,112 @@ leagueRoutes.get('/:leagueId/transactions', membershipMiddleware, async (c) => {
   return ok(c, transactions);
 });
 
+
+// ---------------------------------------------------------------------------
+// Scoring RULES — the data-driven replacement for the twelve categories that
+// used to be hardcoded in calculate_daily_matchup_scores.
+//
+// stat_catalog holds the vocabulary (35 stats). league_scoring_rules holds one
+// multiplier per league per stat, with league_id 00000000-... as the explicit
+// global default. Adding a category is a row, not a migration.
+//
+// The legacy leagues.scoring_settings JSONB is now redundant — every league that
+// had one was migrated verbatim. Do not write both.
+// ---------------------------------------------------------------------------
+
+// GET /api/leagues/:leagueId/scoring-rules — catalog + this league's effective weights
+leagueRoutes.get('/:leagueId/scoring-rules', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+
+  try {
+    const [catalogRes, rulesRes] = await Promise.all([
+      supabase
+        .from('stat_catalog')
+        .select('stat_key, display_name, applies_to, default_multiplier, is_core, sort_order')
+        .order('applies_to')
+        .order('sort_order'),
+      supabase.rpc('get_effective_scoring_rules', { p_league_id: leagueId }),
+    ]);
+
+    if (catalogRes.error) return handleError(c, catalogRes.error, 'Failed to fetch stat catalog');
+    if (rulesRes.error) return handleError(c, rulesRes.error, 'Failed to fetch scoring rules');
+
+    const effective = new Map<string, number>(
+      ((rulesRes.data ?? []) as Array<{ stat_key: string; multiplier: number }>)
+        .map((r) => [r.stat_key, Number(r.multiplier)]),
+    );
+
+    const stats = ((catalogRes.data ?? []) as Array<Record<string, unknown>>).map((s) => ({
+      ...s,
+      multiplier: effective.get(s.stat_key as string) ?? Number(s.default_multiplier),
+    }));
+
+    return ok(c, { stats });
+  } catch (err) {
+    return handleError(c, err, 'Failed to fetch scoring rules');
+  }
+});
+
+// PUT /api/leagues/:leagueId/scoring-rules — commissioner sets weights
+leagueRoutes.put('/:leagueId/scoring-rules', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const userId = c.get('userId');
+
+  const parsed = z
+    .object({
+      rules: z
+        .array(
+          z.object({
+            stat_key: z.string().min(1).max(64),
+            multiplier: z.number().finite().min(-100).max(100),
+          }),
+        )
+        .min(1)
+        .max(100),
+    })
+    .safeParse(await c.req.json().catch(() => null));
+
+  if (!parsed.success) {
+    return fail(c, AppError.badRequest('Body must be { rules: [{ stat_key, multiplier }] }'));
+  }
+
+  const supabase = createUserClient(c.get('userToken'));
+  const admin = getSupabaseAdmin();
+
+  try {
+    // Reject unknown stat keys rather than silently persisting a rule that can
+    // never score anything.
+    const { data: known, error: catErr } = await supabase.from('stat_catalog').select('stat_key');
+    if (catErr) return handleError(c, catErr, 'Failed to validate scoring rules');
+
+    const valid = new Set(((known ?? []) as Array<{ stat_key: string }>).map((k) => k.stat_key));
+    const unknown = parsed.data.rules.filter((r) => !valid.has(r.stat_key)).map((r) => r.stat_key);
+    if (unknown.length > 0) {
+      return fail(c, AppError.badRequest(`Unknown stat keys: ${unknown.join(', ')}`));
+    }
+
+    const { error: upsertErr } = await admin.from('league_scoring_rules').upsert(
+      parsed.data.rules.map((r) => ({
+        league_id: leagueId,
+        stat_key: r.stat_key,
+        multiplier: r.multiplier,
+        updated_at: new Date().toISOString(),
+      })),
+      { onConflict: 'league_id,stat_key' },
+    );
+    if (upsertErr) return handleError(c, upsertErr, 'Failed to update scoring rules');
+
+    // NOTE: not audit-logged. AuditService.log takes a closed SecurityEventType
+    // union and there is no member for a scoring-rule change. Adding one (and
+    // logging here) is a worthwhile follow-up — inventing a string that fails
+    // the type is not.
+    void userId;
+
+    return ok(c, { success: true, updated: parsed.data.rules.length });
+  } catch (err) {
+    return handleError(c, err, 'Failed to update scoring rules');
+  }
+});
+
 export { leagueRoutes };

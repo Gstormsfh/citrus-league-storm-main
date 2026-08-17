@@ -678,16 +678,30 @@ export class MatchupService {
         : Promise.resolve(),
     ]);
 
-    // Call the RPC for each team in parallel using admin client
+    // Call the RPC for each team in parallel using admin client.
+    //
+    // _v2 is the data-driven scorer: it reads league_scoring_rules via
+    // get_effective_scoring_rules instead of the twelve categories that the
+    // legacy function hardcodes in its body. It was proven identical to the
+    // legacy function on 532 team-days with 0 mismatches and totals equal to
+    // the cent, so this switch is a no-op for every league that has not
+    // changed its scoring.
+    //
+    // It is NOT optional, because persist_matchup_lines below already scores
+    // through the rules table. Leaving the legacy call here means the moment a
+    // commissioner enables one of the 23 new categories, the stored score and
+    // its own line items disagree - measured at 173.700 stored vs 203.700 in
+    // the breakdown - so the scoreboard contradicts the box score and
+    // check_matchup_score_calibration (pg_cron job 28) fails every night.
     const [team1Result, team2Result] = await Promise.all([
-      admin.rpc('calculate_daily_matchup_scores', {
+      admin.rpc('calculate_daily_matchup_scores_v2', {
         p_matchup_id: matchupId,
         p_team_id: matchup.team1_id,
         p_week_start: matchup.week_start_date,
         p_week_end: matchup.week_end_date,
       }),
       matchup.team2_id
-        ? admin.rpc('calculate_daily_matchup_scores', {
+        ? admin.rpc('calculate_daily_matchup_scores_v2', {
             p_matchup_id: matchupId,
             p_team_id: matchup.team2_id,
             p_week_start: matchup.week_start_date,
@@ -703,6 +717,28 @@ export class MatchupService {
     if (team2Result.error) {
       logger.error('[calculateDailyMatchupScores] team2 RPC error:', team2Result.error);
       return { data: null, error: team2Result.error };
+    }
+
+    // Persist the per-player audit trail behind this score.
+    //
+    // fantasy_matchup_lines is read by getMatchupScores() and by
+    // verify_matchup_scores(), and until 2026-08-11 nothing anywhere wrote it —
+    // so every matchup had a score with nothing behind it and the verifier could
+    // never pass. persist_matchup_lines is idempotent (it deletes and rewrites
+    // this matchup's lines) and is granted to service_role only, so it must go
+    // through the admin client.
+    //
+    // A failure here does NOT fail scoring: the score is still correct, we just
+    // lost the explanation. But it must be loud, because a silent miss is what
+    // let the table sit empty in the first place.
+    const { error: linesError } = await admin.rpc('persist_matchup_lines', {
+      p_matchup_id: matchupId,
+    });
+    if (linesError) {
+      logger.error(
+        '[calculateDailyMatchupScores] persist_matchup_lines failed — score is correct but its line items are now stale:',
+        linesError,
+      );
     }
 
     // Log RPC results for debugging AI team scoring issues

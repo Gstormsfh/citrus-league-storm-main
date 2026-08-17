@@ -1,7 +1,7 @@
 // src/services/CitrusPuckService.ts
 
 import { CitrusPuckPlayerData, AggregatedPlayerData, Situation } from "@/types/citruspuck";
-import { CURRENT_SEASON } from "@/utils/seasonConstants";
+import { CURRENT_SEASON, getCurrentSeason, getSeasonGameCount } from "@/utils/seasonConstants";
 import { logger } from '@/utils/logger';
 import { playerApi } from '@/api/players';
 
@@ -320,7 +320,9 @@ export const CitrusPuckService = {
     if (!dataCurrent || !dataCurrent.allSituation) return {} as CitrusPuckPlayerData;
     const allCurrent = dataCurrent.allSituation;
     const gamesPlayed = allCurrent.games_played || 0;
-    const gamesInSeason = 82;
+    // 2026-27 is an 84-game season. A literal here silently zeroes every
+    // rest-of-season projection once a player passes it — in the final week.
+    const gamesInSeason = getSeasonGameCount(getCurrentSeason());
     const gamesRemaining = Math.max(0, gamesInSeason - gamesPlayed);
 
     if (gamesPlayed === 0 && dataPrior && dataPrior.allSituation) {

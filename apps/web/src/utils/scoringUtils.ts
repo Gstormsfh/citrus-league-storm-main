@@ -50,7 +50,13 @@ export const DEFAULT_SCORING: ScoringSettings = {
     blocks: 0.5,
     hits: 0.2,
     penalty_minutes: 0.5,
-    plus_minus: 0.5
+    // 0, not 0.5. These constants must equal the database global default row in
+    // league_scoring_rules (league_id 000...0), which is what the scoring engine
+    // actually applies. plus_minus is one of the 23 categories that became
+    // scoreable on 2026-08-11 and every one of them ships at 0 until a
+    // commissioner turns it on. A non-zero default here meant the client valued
+    // a category the engine scored at zero.
+    plus_minus: 0
   },
   goalie: {
     wins: 4,

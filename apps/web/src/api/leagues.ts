@@ -76,6 +76,26 @@ export const leagueApi = {
     return apiClient.put(`/api/leagues/${leagueId}/scoring-settings`, settings);
   },
 
+  /**
+   * Read the scoring catalog with this league's effective multipliers.
+   *
+   * This is the data-driven replacement for the twelve categories that were
+   * hardcoded in calculate_daily_matchup_scores. Returns every stat in
+   * stat_catalog with the multiplier actually in force for this league.
+   */
+  getScoringRules(leagueId: string) {
+    return apiClient.get(`/api/leagues/${leagueId}/scoring-rules`);
+  },
+
+  /** Set scoring weights (commissioner only) */
+  updateScoringRules(
+    leagueId: string,
+    rules: Array<{ stat_key: string; multiplier: number }>,
+  ) {
+    c.invalidate(`leagues:${leagueId}`);
+    return apiClient.put(`/api/leagues/${leagueId}/scoring-rules`, { rules });
+  },
+
   /** Update draft settings (commissioner only) */
   updateDraftSettings(leagueId: string, settings: Record<string, unknown>) {
     c.invalidate(`leagues:${leagueId}`);

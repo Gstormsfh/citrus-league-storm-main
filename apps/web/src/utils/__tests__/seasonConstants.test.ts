@@ -6,6 +6,7 @@ import {
   SEASON_LABEL,
   DEFAULT_TEST_DATE,
   getHeadshotUrl,
+  getSeasonGameCount,
 } from '../seasonConstants';
 
 // =============================================================================
@@ -13,24 +14,38 @@ import {
 // =============================================================================
 
 describe('Season Constants', () => {
-  it('CURRENT_SEASON equals 2025', () => {
-    expect(CURRENT_SEASON).toBe(2025);
+  // These constants are DERIVED from today's date (NHL seasons run Oct-Jun, so
+  // months 1-9 belong to the previous calendar year). They used to be asserted
+  // against the literal 2025, which meant every one of these tests was set to
+  // fail on 2026-10-01 - two days after opening night. That is the exact
+  // literal-pinning the shared season module was created to eliminate, so the
+  // assertions now check the RULE and the FORMAT instead of a frozen year.
+
+  it('CURRENT_SEASON follows the Oct-Jun season-year rule for today', () => {
+    const now = new Date();
+    const expected = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+    expect(CURRENT_SEASON).toBe(expected);
   });
 
-  it('HEADSHOT_SEASON equals "20252026"', () => {
-    expect(HEADSHOT_SEASON).toBe('20252026');
+  it('HEADSHOT_SEASON is the eight-digit span starting at CURRENT_SEASON', () => {
+    expect(HEADSHOT_SEASON).toMatch(/^\d{8}$/);
+    expect(HEADSHOT_SEASON).toBe(`${CURRENT_SEASON}${CURRENT_SEASON + 1}`);
   });
 
-  it('SEASON_START_YEAR equals 2025', () => {
-    expect(SEASON_START_YEAR).toBe(2025);
+  it('SEASON_START_YEAR tracks CURRENT_SEASON', () => {
+    expect(SEASON_START_YEAR).toBe(CURRENT_SEASON);
   });
 
-  it('SEASON_LABEL equals "2025-26"', () => {
-    expect(SEASON_LABEL).toBe('2025-26');
+  it('SEASON_LABEL is YYYY-YY and tracks CURRENT_SEASON', () => {
+    expect(SEASON_LABEL).toMatch(/^\d{4}-\d{2}$/);
+    expect(SEASON_LABEL).toBe(
+      `${CURRENT_SEASON}-${String((CURRENT_SEASON + 1) % 100).padStart(2, '0')}`,
+    );
   });
 
-  it('DEFAULT_TEST_DATE equals "2025-12-08"', () => {
-    expect(DEFAULT_TEST_DATE).toBe('2025-12-08');
+  it('DEFAULT_TEST_DATE is a mid-season date inside the current season', () => {
+    expect(DEFAULT_TEST_DATE).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(DEFAULT_TEST_DATE).toBe(`${CURRENT_SEASON}-12-08`);
   });
 
   it('CURRENT_SEASON is a number', () => {
@@ -104,4 +119,21 @@ describe('getHeadshotUrl', () => {
     expect(url).not.toBeNull();
     expect(url!.endsWith('.png')).toBe(true);
   });
+
+  describe('getSeasonGameCount', () => {
+    it('returns 84 for the 2026-27 season', () => {
+      expect(getSeasonGameCount(2026)).toBe(84);
+    });
+
+    it('returns 82 for earlier seasons', () => {
+      expect(getSeasonGameCount(2025)).toBe(82);
+      expect(getSeasonGameCount(2024)).toBe(82);
+      expect(getSeasonGameCount(2019)).toBe(82);
+    });
+
+    it('defaults to 82 for unknown future seasons rather than throwing', () => {
+      expect(getSeasonGameCount(2099)).toBe(82);
+    });
+  });
+
 });
