@@ -185,6 +185,9 @@ vi.mock('@/utils/timezoneUtils', () => ({
 }));
 
 vi.mock('@/utils/weekCalculator', () => ({
+  // Identity in tests: the clamp's transformation is pinned by
+  // weekCalculator.test.ts; here the mock controls week output directly.
+  clampToSeasonStart: vi.fn((d: Date) => d),
   getFirstWeekStartDate: vi.fn().mockReturnValue(new Date('2025-01-05')),
   getWeekStartDate: vi.fn((weekNum: number, firstWeek: Date) => {
     const d = new Date(firstWeek);

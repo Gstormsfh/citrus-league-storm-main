@@ -454,6 +454,12 @@ const TeamAnalytics = () => {
                   <h2 className="font-calistoga text-2xl text-pastel-cream flex items-center gap-2">
                     <ScoreboardIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} />
                     Positional Deep Dive
+                    {/* SWEEP FIX (2026-08-16): this section's grades/trends are
+                        illustrative until the analytics API lands — say so
+                        instead of presenting fabricated A+ grades as real. */}
+                    <span className="ml-1 px-2.5 py-0.5 rounded-full bg-pastel-orange/15 ring-1 ring-pastel-orange/40 text-pastel-orange-soft text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold">
+                      Preview · live after opening night
+                    </span>
                   </h2>
 
                   <div className="space-y-4">

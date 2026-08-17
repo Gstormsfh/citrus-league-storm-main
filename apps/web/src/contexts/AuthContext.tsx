@@ -6,6 +6,11 @@ import { analyticsService } from '@/services/AnalyticsService';
 import { setSentryUser } from '@/integrations/sentry/config';
 import { logger } from '@/utils/logger';
 import { PROFILE_QUERY_KEY } from '@/hooks/useProfile';
+import {
+  isNativeShell,
+  beginNativeOAuth,
+  registerNativeAuthListener,
+} from '@/lib/nativeAuth';
 
 /** Returns true if JWT is expired or within 30s of expiry. */
 function isTokenExpired(token: string | undefined): boolean {
@@ -127,6 +132,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [queryClient]);
 
+  // APPLE-WRAP (2026-08-15) — completes the PKCE exchange when iOS
+  // re-enters the app via citrussports://auth-callback. In every
+  // browser registerNativeAuthListener returns a no-op immediately
+  // (isNativePlatform() is false), so the web app's behaviour is
+  // untouched. The returned unsubscriber is the effect cleanup, which
+  // keeps StrictMode double-mounts from stacking duplicate listeners.
+  useEffect(
+    () =>
+      registerNativeAuthListener(supabase, (msg) => {
+        logger.error('[Auth] native OAuth callback failed: ' + msg);
+      }),
+    [],
+  );
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -218,6 +237,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const opts = providerOptions[provider] || {};
+
+    /*
+     * APPLE-WRAP (2026-08-15) — inside the iOS shell the auth leg must
+     * run in the SYSTEM browser and redirect back via a custom scheme:
+     * Google refuses OAuth in embedded webviews outright, and the web
+     * redirect would strand the session in Safari instead of the app.
+     * Mechanics + the one Supabase-dashboard step: src/lib/nativeAuth.ts.
+     * In any browser isNativeShell() is false and this branch is dead
+     * code — the path below is byte-for-byte the pre-existing web flow.
+     */
+    if (isNativeShell()) {
+      return beginNativeOAuth(supabase, provider, opts);
+    }
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider,

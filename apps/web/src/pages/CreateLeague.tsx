@@ -49,7 +49,6 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@citrus/shared";
-import WaitlistSignup from "@/components/WaitlistSignup";
 import {
   type LeagueType,
   type ScoringFormat,
@@ -132,7 +131,7 @@ const SectionHeader = ({ title, subtitle, badge }: { title: string; subtitle: st
 const CreateLeague = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { data: profile } = useProfile();
   const { refreshLeagues, setActiveLeagueId } = useLeague();
   const { toast } = useToast();
@@ -247,6 +246,7 @@ const CreateLeague = () => {
   // Previously users clicked an invite link, landed on the join tab with
   // code pre-filled, and had to hit "Join" manually. Now it fires automatically.
   const autoJoinFiredRef = useRef(false);
+  const authBounceFiredRef = useRef(false);
   useEffect(() => {
     const code = searchParams.get('code');
     if (code && user && !autoJoinFiredRef.current && !loading) {
@@ -258,8 +258,21 @@ const CreateLeague = () => {
       // could be empty if state hadn't committed yet.
       setTimeout(() => handleJoinLeague(code), 50);
     }
+    // JOIN-FLOW (2026-08-16): the Sleeper-parity hand-off. A BRAND-NEW
+    // user tapping an invite link previously reached this page, hit
+    // "Join", and was bounced to /auth with the code thrown away — after
+    // signing up they landed on home, stranded. Now: unauthenticated +
+    // ?code= → straight to /auth carrying a validated same-origin
+    // redirect back here, so the existing auto-join effect fires the
+    // moment their session exists. authLoading guard prevents bouncing
+    // users whose session is still restoring on page load.
+    if (code && !user && !authLoading && !authBounceFiredRef.current) {
+      authBounceFiredRef.current = true;
+      const target = `/create-league?tab=join&code=${encodeURIComponent(code)}`;
+      navigate(`/auth?redirect=${encodeURIComponent(target)}`);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, searchParams]);
+  }, [user, authLoading, searchParams]);
 
   // Reset format settings and smart defaults when league type changes
   useEffect(() => {
@@ -337,8 +350,8 @@ const CreateLeague = () => {
 
   const handleCreateLeague = async () => {
     if (!user) {
-      setError("You must be logged in to create a league");
-      navigate("/auth");
+      setError("Sign in first, then spin up your league.");
+      navigate(`/auth?redirect=${encodeURIComponent('/create-league')}`);
       return;
     }
 
@@ -412,6 +425,11 @@ const CreateLeague = () => {
           settings.auctionBudget = parseInt(auctionBudget);
           settings.auctionMinBid = parseInt(auctionMinBid);
           settings.auctionNominationTime = parseInt(auctionNominationTime);
+          // SETTINGS-ENFORCEMENT (2026-08-16) — the v2 engine reads
+          // auctionNominationWindowSeconds (draft/index.ts), not
+          // auctionNominationTime. Write both so the commissioner's
+          // value actually reaches the auction clock.
+          settings.auctionNominationWindowSeconds = parseInt(auctionNominationTime);
         }
 
         // Waiver/transaction settings (persisted in settings AND dedicated columns)
@@ -555,17 +573,13 @@ const CreateLeague = () => {
   };
 
   const handleJoinLeague = async (codeOverride?: string) => {
-    if (!user) {
-      setError("Sign in first, then jump into the league.");
-      navigate("/auth");
-      return;
-    }
-
     // Defensive code resolution: explicit arg → local state → URL query →
     // browser location (triple fallback). Fixes the 'Join code is required'
     // error that fired when the Input was controlled but state hadn't
     // committed yet, or when the URL had ?code= but a re-render cleared
     // joinCode state. ALL three sources are checked before giving up.
+    // Resolved BEFORE the auth check so an unauthenticated bounce can
+    // carry the code through /auth and back (JOIN-FLOW 2026-08-16).
     let resolvedCode = (codeOverride ?? '').trim();
     if (!resolvedCode) resolvedCode = (joinCode ?? '').trim();
     if (!resolvedCode) resolvedCode = (searchParams.get('code') ?? '').trim();
@@ -573,6 +587,15 @@ const CreateLeague = () => {
       try {
         resolvedCode = (new URLSearchParams(window.location.search).get('code') ?? '').trim();
       } catch { /* fall through */ }
+    }
+
+    if (!user) {
+      setError("Sign in first, then jump into the league.");
+      const target = resolvedCode
+        ? `/create-league?tab=join&code=${encodeURIComponent(resolvedCode)}`
+        : '/create-league?tab=join';
+      navigate(`/auth?redirect=${encodeURIComponent(target)}`);
+      return;
     }
 
     if (!resolvedCode) {
@@ -736,20 +759,13 @@ const CreateLeague = () => {
           <Alert className="mb-6 bg-pastel-orange/15 ring-1 ring-pastel-orange/40 border-0 text-pastel-cream rounded-2xl shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]">
             <Sparkles className="h-4 w-4 text-pastel-orange" />
             <AlertDescription className="text-pastel-cream">
-              <span className="font-bold text-pastel-orange-soft">We&rsquo;re in testing phase.</span>{' '}
-              Your league will be filled with AI teams so you can experience the full platform. Try the complete draft experience and draft against AI opponents.
-              <span className="block mt-2 text-sm text-white/70">
-                Sign up for the waitlist to be notified when full service launches with real multiplayer leagues.
-              </span>
+              <span className="font-bold text-pastel-orange-soft">Play with friends or AI.</span>{' '}
+              Create your league and share the join code — friends claim their teams instantly. Short on managers? Fill any open slots with AI opponents at the press of a button and draft right away.
             </AlertDescription>
           </Alert>
           )}
 
           {/* Waitlist Signup */}
-          <div className="mb-6">
-            <WaitlistSignup source="create_league_page" variant="compact" />
-          </div>
-
           <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] overflow-hidden">
             <CardContent className="p-4 sm:p-8">
               <Tabs defaultValue={defaultTab} value={defaultTab} onValueChange={(v) => setDefaultTab(v as "create" | "join")} className="w-full">

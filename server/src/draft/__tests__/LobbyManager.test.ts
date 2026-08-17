@@ -2131,19 +2131,33 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
           resolve({ data: [], error: null });
         return chain;
       }
+      // AUTOPICK-TRUNCATION-2 (2026-08-13) — this read is paged now, so
+      // the chain must offer .range(). Without it the strategy called an
+      // undefined method, returned no_eligible_players, and autopick
+      // silently STOPPED FIRING — four tests in this file caught exactly
+      // that before it shipped. A single row means one page; returning it
+      // only on the first page keeps the loop terminating.
       if (table === 'player_ros_projections') {
         const chain: Record<string, unknown> = {};
+        let offset: number | null = null;
         chain.select = () => chain;
         chain.order = () => chain;
+        chain.range = (from: number) => {
+          offset = from;
+          return chain;
+        };
         chain.then = (resolve: (val: unknown) => void) =>
           resolve({
-            data: [
-              {
-                player_id: playerId,
-                total_projected_points: 99.9,
-                avg_points_per_game: 5.5,
-              },
-            ],
+            data:
+              offset !== null && offset > 0
+                ? []
+                : [
+                    {
+                      player_id: playerId,
+                      total_projected_points: 99.9,
+                      avg_points_per_game: 5.5,
+                    },
+                  ],
             error: null,
           });
         return chain;

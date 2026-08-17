@@ -94,6 +94,21 @@ interface SeasonStatsRow {
   nhl_shutouts: number | null;
   nhl_save_pct: number | null;
   nhl_gaa: number | null;
+  /**
+   * xG (2026-08-13) — expected goals for the season.
+   *
+   * Reported from the field as "xG isn't there (all 0.0) but I think
+   * that's an issue with the database". It is not a database issue.
+   * `player_season_stats.x_goals` on staging is 1,066 rows, ZERO of
+   * them null, 928 of them positive, max 36.47, mean 7.34 among
+   * scorers — a healthy season of real data sitting in the very row
+   * this query already fetches. The column was simply never added to
+   * the select list, and `directoryRowToPlayer` hard-codes
+   * `xGoals: 0`, so every player rendered 0.0 and nothing ever
+   * errored. `PlayerService` has read this same column all along
+   * (PlayerService.ts:150) — the two loaders disagreed.
+   */
+  x_goals: number | null;
 }
 
 const n = (v: number | null | undefined): number => (typeof v === 'number' ? v : 0);
@@ -111,6 +126,11 @@ function applySeasonStats(p: Player, s: SeasonStatsRow): void {
   p.ppp = n(s.nhl_ppp);
   p.shp = n(s.nhl_shp);
   p.plus_minus = n(s.nhl_plus_minus);
+  // xG (2026-08-13) — see SeasonStatsRow.x_goals. Skaters only in
+  // practice; goalie rows carry 0 here and their xG-flavoured stat is
+  // goals-saved-above-expected, which lives in raw_player_stats and is
+  // still hard-coded to 0 below. Flagged, not fixed in this pass.
+  p.xGoals = n(s.x_goals);
   if (p.wins !== null || p.saves !== null) {
     // Goalie — PlayerPool's fpts path reads these four.
     p.wins = n(s.nhl_wins);
@@ -315,7 +335,7 @@ export function usePreloadedPlayers(): UsePreloadedPlayersResult {
             const { data: statsData, error: statsErr } = await statsClient
               .from('player_season_stats')
               .select(
-                'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa',
+                'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa, x_goals',
               )
               .eq('season', CURRENT_SEASON)
               .order('player_id', { ascending: true })

@@ -202,16 +202,45 @@ export const projectionsStrategy: AutopickStrategy = async ({
   // This reads the SAME projections table (no new schema, no
   // dependency on the projections pipeline's internals) plus one
   // additional read of prior-season games played.
-  const { data: projections, error: projErr } = await supabase
-    .from('player_ros_projections')
-    .select('player_id, avg_points_per_game, total_projected_points');
-  if (projErr) {
-    structuredLogger.error(
-      'autopick.projections.read_failed',
-      { leagueId, message: projErr.message ?? null },
-      projErr,
-    );
-    return { ok: false, reason: 'no_eligible_players' };
+  // AUTOPICK-TRUNCATION-2 (2026-08-13) — this read is now paged too.
+  //
+  // The 2026-08-12 pass paged `player_season_stats` (immediately below)
+  // and left THIS query, one statement above it, unbounded. Same defect
+  // class, same file, missed by a single query.
+  //
+  // Latent rather than active on staging today: the table holds 926
+  // rows against PostgREST's 1,000-row `db-max-rows`. But this is the
+  // AUTOPICK BOARD. The obvious "let's freshen staging's projections
+  // before the draft" move copies prod's table, which is 1,361 rows —
+  // that would silently drop 361 players, and with no ORDER BY on the
+  // original query, *which* 361 was arbitrary and could differ between
+  // calls. A live draft is the worst possible place to discover that.
+  //
+  // Paging + a deterministic order makes the board complete and stable
+  // regardless of how the table grows.
+  const projections: Array<Record<string, unknown>> = [];
+  {
+    const PAGE = 1000;
+    let offset = 0;
+    for (;;) {
+      const { data, error: projErr } = await supabase
+        .from('player_ros_projections')
+        .select('player_id, avg_points_per_game, total_projected_points')
+        .order('player_id', { ascending: true })
+        .range(offset, offset + PAGE - 1);
+      if (projErr) {
+        structuredLogger.error(
+          'autopick.projections.read_failed',
+          { leagueId, message: projErr.message ?? null },
+          projErr,
+        );
+        return { ok: false, reason: 'no_eligible_players' };
+      }
+      const rows = data ?? [];
+      projections.push(...rows);
+      if (rows.length < PAGE) break;
+      offset += PAGE;
+    }
   }
 
   // AUTOPICK-TRUNCATION (2026-08-12) — this read is now paged.

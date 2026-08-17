@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, CURRENT_SEASON, logger, getTodayMST } from '@citrus/shared';
+import { resolveSlotConfig } from '../lib/leagueRules';
 import { getSupabaseAdmin } from '../lib/supabase';
 
 /**
@@ -381,14 +382,13 @@ export class MatchupService {
       .select('settings')
       .eq('id', leagueId)
       .single();
+    // SETTINGS-ENFORCEMENT (2026-08-16) — config-driven, was hardcoded.
     const posType = (leagueData?.settings as Record<string, unknown>)?.positionType === 'forward' ? 'forward' : 'individual';
-
-    const slotsNeeded: Record<string, number> = posType === 'forward'
-      ? { F: 6, D: 4, G: 2, UTIL: 1 }
-      : { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
-    const slotsFilled: Record<string, number> = posType === 'forward'
-      ? { F: 0, D: 0, G: 0, UTIL: 0 }
-      : { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0 };
+    const initCfg = resolveSlotConfig(leagueData?.settings as Record<string, unknown>);
+    const slotsNeeded: Record<string, number> = { ...initCfg.slots, UTIL: initCfg.utilCount };
+    const slotsFilled: Record<string, number> = Object.fromEntries(
+      Object.keys(slotsNeeded).map((k) => [k, 0]),
+    );
     const starters: number[] = [];
     const bench: number[] = [];
     const slotAssignments: Record<string, string> = {};

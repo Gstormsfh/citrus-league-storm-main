@@ -487,12 +487,25 @@ async function loadAuctionConfig(
     typeof settings?.auctionBudget === 'number' ? settings.auctionBudget : 200;
   const auctionMinBid =
     typeof settings?.auctionMinBid === 'number' ? settings.auctionMinBid : 1;
-  const draftRounds =
+  // SETTINGS-ENFORCEMENT (2026-08-16) — settings.draftRounds and
+  // settings.rosterSize are keys NOTHING writes; every v2 auction
+  // resolved rounds to 0 and was blocked by the rounds>0 start guard.
+  // Read the real columns (leagues.draft_rounds / roster_size), keeping
+  // the jsonb keys as highest-priority overrides for forward compat.
+  let draftRounds =
     typeof settings?.draftRounds === 'number'
       ? settings.draftRounds
       : typeof settings?.rosterSize === 'number'
         ? settings.rosterSize
         : 0;
+  if (draftRounds <= 0) {
+    const { data: leagueCols } = await supabaseAdmin
+      .from('leagues')
+      .select('draft_rounds, roster_size')
+      .eq('id', leagueId)
+      .single();
+    draftRounds = leagueCols?.draft_rounds ?? leagueCols?.roster_size ?? 0;
+  }
 
   const { data: round1, error: round1Err } = await supabaseAdmin
     .from('draft_order')

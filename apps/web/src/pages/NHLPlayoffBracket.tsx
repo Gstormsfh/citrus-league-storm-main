@@ -116,10 +116,21 @@ export default function NHLPlayoffBracket() {
   const seriesByRound: Record<number, Series[]> = { 1: [], 2: [], 3: [], 4: [] };
   series.forEach((s) => seriesByRound[s.round]?.push(s));
 
+  // SWEEP FIX (2026-08-16): off-season this rendered "Live · Updated
+  // 9273044s ago" — a raw seconds counter months after the Cup final.
+  // Humanize the age and drop the LIVE claim once data is >1h stale.
   const lastRefresh = meta?.oldest_refresh ? new Date(meta.oldest_refresh) : null;
-  const refreshAgo = lastRefresh
-    ? `${Math.max(1, Math.round((Date.now() - lastRefresh.getTime()) / 1000))}s`
-    : '60s';
+  const refreshAgeSec = lastRefresh
+    ? Math.max(1, Math.round((Date.now() - lastRefresh.getTime()) / 1000))
+    : 60;
+  const bracketIsLive = refreshAgeSec < 3600;
+  const refreshAgo = refreshAgeSec < 90
+    ? `${refreshAgeSec}s`
+    : refreshAgeSec < 5400
+      ? `${Math.round(refreshAgeSec / 60)}m`
+      : refreshAgeSec < 172800
+        ? `${Math.round(refreshAgeSec / 3600)}h`
+        : `${Math.round(refreshAgeSec / 86400)}d`;
 
   if (loading) {
     return (
@@ -162,8 +173,8 @@ export default function NHLPlayoffBracket() {
         {/* Hero text — refresh status under the banner */}
         <div className="text-center mb-10">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold flex items-center justify-center gap-2">
-            <LivePulse size="xs" />
-            Live · Updated {refreshAgo} ago
+            {bracketIsLive && <LivePulse size="xs" />}
+            {bracketIsLive ? `Live · Updated ${refreshAgo} ago` : `Final · 2025-26 season · Updated ${refreshAgo} ago`}
           </div>
           <div className="flex items-center justify-center gap-3 mb-3">
             <Trophy className="w-9 h-9 text-pastel-orange" strokeWidth={2} />

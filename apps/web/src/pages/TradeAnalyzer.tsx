@@ -179,8 +179,12 @@ const TradeAnalyzer = () => {
           allPlayers.forEach(p => playerMap.set(String(p.id), p));
 
           // Set my team roster
+          // SWEEP FIX (2026-08-16): roster_assignments.player_id arrives as a
+          // NUMBER over JSON while playerMap keys are String(p.id) — the raw
+          // .get(id) missed every lookup, so real-league trade rosters always
+          // rendered "No players found". Coerce to string on every lookup.
           const myPlayerIds = myTeamData ? (teamRosters.get(myTeamData.id) || []) : [];
-          const myRoster = myPlayerIds.map(id => playerMap.get(id)).filter((p): p is Player => !!p);
+          const myRoster = myPlayerIds.map(id => playerMap.get(String(id))).filter((p): p is Player => !!p);
           setMyTeamRoster(myRoster);
 
           // Build opponent teams
@@ -188,7 +192,7 @@ const TradeAnalyzer = () => {
             .filter(t => t.id !== myTeamData?.id)
             .map((t, idx) => {
               const playerIds = teamRosters.get(t.id) || [];
-              const roster = playerIds.map(id => playerMap.get(id)).filter((p): p is Player => !!p);
+              const roster = playerIds.map(id => playerMap.get(String(id))).filter((p): p is Player => !!p);
               return {
                 id: t.id as unknown as number,
                 name: t.team_name || `Team ${idx + 1}`,

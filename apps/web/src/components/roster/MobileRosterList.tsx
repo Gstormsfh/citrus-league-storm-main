@@ -18,14 +18,38 @@ const getPositionAbbr = (pos: string) => {
 
 import type { PositionType } from "@/utils/rosterUtils";
 
+/**
+ * CONTRAST (2026-08-13) — text colour now travels WITH the background.
+ *
+ * The base badge class hard-coded `text-white`, but three of these
+ * backgrounds are light. Measured on the live roster:
+ *
+ *   LW  bg-pastel-sage-soft #C8DCC4 + white .... 1.45:1  invisible
+ *   C   bg-pastel-sage      #84A57D + white .... 2.75:1  marginal
+ *   UTIL same as C ............................. 2.75:1  marginal
+ *   D   #1A2A20 + white ....................... ~14:1    fine
+ *
+ * `G` already carried its own text colour, which is the pattern worth
+ * generalising: a background and the text that survives on it are one
+ * decision, not two. Pairing them here makes an unreadable combination
+ * impossible to introduce by editing a single map entry.
+ *
+ * `pastel-forest` (#1B3022) is the design system's documented
+ * "deep forest text" for light surfaces — ~5:1 on sage, ~9:1 on
+ * sage-soft.
+ *
+ * RW (#FF6B1A + white, 2.85:1) is deliberately UNCHANGED: it is a brand
+ * accent, it is legible at this weight, and inverting it would be a
+ * visual redesign rather than a legibility fix. Flagged, not touched.
+ */
 const posColor: Record<string, string> = {
-  LW: 'bg-pastel-sage-soft',
-  C: 'bg-pastel-sage',
-  RW: 'bg-pastel-orange',
-  D: 'bg-[#1A2A20]',
+  LW: 'bg-pastel-sage-soft text-pastel-forest',
+  C: 'bg-pastel-sage text-pastel-forest',
+  RW: 'bg-pastel-orange text-white',
+  D: 'bg-[#1A2A20] text-white',
   G: 'bg-pastel-sage/15 text-pastel-cream',
-  UTIL: 'bg-pastel-sage',
-  F: 'bg-emerald-600',
+  UTIL: 'bg-pastel-sage text-pastel-forest',
+  F: 'bg-emerald-600 text-white',
 };
 
 const posRingColor: Record<string, string> = {
@@ -193,9 +217,11 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
       {/* Position badge — tap to swap */}
       <div
         className={cn(
-          "w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center text-white font-varsity text-[11px] font-black tracking-wide",
+          // No `text-white` here — posColor owns the text colour so it
+          // can never disagree with its own background (see the map).
+          "w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center font-varsity text-[11px] font-black tracking-wide",
           "ring-1 active:scale-95 transition-transform cursor-pointer",
-          posColor[slotPosition] || 'bg-white/40',
+          posColor[slotPosition] || 'bg-white/40 text-pastel-forest',
           posRingColor[slotPosition] || 'ring-white/20',
           isEligibleTarget && !isSwapSelected && "!ring-pastel-sage !ring-2 animate-pulse",
           isSwapSelected && "!ring-pastel-orange !ring-2",
@@ -403,8 +429,23 @@ const MobileRosterList = ({
 
   const benchIsTarget = tapSelectedPlayerId != null && tapEligibleSlots.has('bench-grid');
 
+  // CONTRAST (2026-08-13) — was `bg-card`, which resolves to the LIGHT
+  // theme token (--card: 85 40% 90% => #E7F0DB). Every text token in
+  // this component is a DARK-surface token: text-pastel-cream for
+  // names, and eleven separate text-white/xx values for the secondary
+  // line, separators and badges. Cream (#FFF8F0) on #E7F0DB measures
+  // **1.11:1** — WCAG AA wants 4.5:1 — so player names, "FORWARDS" and
+  // "DEFENSE" were effectively invisible. Field-reported 2026-08-13
+  // with a screenshot; 26 text nodes affected on one roster.
+  // The component was never wrong — its container was. `surface-tile`
+  // is the design system's own documented "card / tile surface" for v2
+  // (#1A2A20, tailwind.config.ts), the same family as the page shell
+  // this list already sits inside. On it, cream measures ~14:1 and
+  // text-white/55 ~4.9:1. Fixing one container beats overriding
+  // eleven text tokens, and it keeps the component honest: it renders
+  // light-on-dark, and now it is actually on dark.
   return (
-    <div className="bg-card rounded-xl border border-pastel-sage/25 shadow-sm overflow-hidden">
+    <div className="bg-pastel-surface-tile rounded-xl border border-white/10 shadow-sm overflow-hidden">
       {/* Starters: Forwards */}
       <SectionHeader
         label="Forwards"

@@ -197,13 +197,19 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         value: (savePct * 100).toFixed(1) + '%'
       });
       
+      // SWEEP FIX (2026-08-16): the ingest hasn't populated GSAx yet — every
+      // goalie carries 0, and a card full of "+0.0" reads as broken. Show
+      // the chip only when a real (non-zero) value exists; wins fill the
+      // slot meanwhile.
       const gsax = player.goalieStats?.goalsSavedAboveExpected;
-      if (gsax !== undefined && gsax !== null) {
+      if (gsax !== undefined && gsax !== null && gsax !== 0) {
         const gsaxSign = gsax >= 0 ? '+' : '';
-        stats.push({ 
-          label: 'GSAx', 
+        stats.push({
+          label: 'GSAx',
           value: `${gsaxSign}${gsax.toFixed(1)}`
         });
+      } else {
+        stats.push({ label: 'W', value: String(player.goalieStats?.wins ?? 0) });
       }
     } else {
       // Skater stats: PPP (Power Play Points), xG (Expected Goals) - SEASON TOTALS

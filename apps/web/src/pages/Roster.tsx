@@ -3009,7 +3009,13 @@ const Roster = () => {
                     </h1>
                   </div>
                   <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold">
-                    Manager · {userLeagueState === 'guest' ? 'Demo Team' : (profile?.username || 'You')}
+                    {/* SWEEP FIX (2026-08-16): prefer display_name; never show
+                        the generated user_<id> signup handle. */}
+                    Manager · {userLeagueState === 'guest'
+                      ? 'Demo Team'
+                      : (profile?.display_name
+                          || (profile?.username && !/^user_[0-9a-f]{6,}$/i.test(profile.username) ? profile.username : null)
+                          || 'You')}
                   </div>
                 </div>
               </div>

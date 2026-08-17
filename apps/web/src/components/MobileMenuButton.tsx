@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Menu, X, Trophy, UserPlus, Newspaper, Calendar, LogOut, CircleUser, Settings, ChevronDown, Check } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +38,17 @@ const MobileMenuButton = () => {
   const showPlayoffs = league?.showPlayoffs ?? false;
 
   const closeMenu = () => setMenuOpen(false);
+
+  // SWEEP FIX (2026-08-16): Escape closes the menu (a11y — keyboard users
+  // previously had no way out short of tapping the X).
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -111,14 +122,23 @@ const MobileMenuButton = () => {
     }
   };
 
+  // SWEEP FIX (2026-08-16): fantasy leagues had no nav links here — only
+  // the stale playoff-era trio. Mirror of the Navbar fix.
   const navTabs = isPool && activeLeagueId
     ? getPoolTabs()
-    : [
-        // Playoffs front and center. Season-long still accessible via direct URL.
-        { label: 'NHL Playoffs', path: '/nhl/playoffs', icon: Trophy },
-        { label: 'Create Pool', path: '/create-league?type=playoff', icon: Sparkles },
-        { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
-      ];
+    : activeLeagueId && !isPool
+      ? [
+          { label: 'League HQ', path: `/league/${activeLeagueId}`, icon: Trophy },
+          { label: 'Matchup', path: `/matchup/${activeLeagueId}`, icon: Swords },
+          { label: 'Roster', path: `/roster?league=${activeLeagueId}`, icon: Users },
+          { label: 'Free Agents', path: `/free-agents?league=${activeLeagueId}`, icon: UserPlus },
+          { label: 'Standings', path: `/standings?league=${activeLeagueId}`, icon: TrendingUp },
+        ]
+      : [
+          { label: 'Create League', path: '/create-league', icon: Sparkles },
+          { label: 'NHL Playoffs', path: '/nhl/playoffs', icon: Trophy },
+          { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
+        ];
 
   return (
     <>
@@ -195,6 +215,11 @@ const MobileMenuButton = () => {
                               navigate(`/league/${l.id}`);
                             } else if (location.pathname.startsWith('/draft-room') || location.pathname === '/draft') {
                               navigate('/gm-office');
+                            } else {
+                              // SWEEP FIX (2026-08-16): from home/any other
+                              // page, land in the league's HQ instead of a
+                              // silent context switch.
+                              navigate(`/league/${l.id}`);
                             }
                             setLeagueListOpen(false);
                             closeMenu();

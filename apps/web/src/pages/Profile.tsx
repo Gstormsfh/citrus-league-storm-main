@@ -646,7 +646,13 @@ const Profile = () => {
     if (profile?.first_name && profile?.last_name) {
       return `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase();
     }
-    if (profile?.username) {
+    // SWEEP FIX (2026-08-16): display_name outranks username, and the
+    // generated signup handle (user_<id>) must never drive initials —
+    // it rendered "US" for everyone without a real name set.
+    if (profile?.display_name) {
+      return profile.display_name.substring(0, 2).toUpperCase();
+    }
+    if (profile?.username && !/^user_[0-9a-f]{6,}$/i.test(profile.username)) {
       return profile.username.substring(0, 2).toUpperCase();
     }
     if (user?.email) {

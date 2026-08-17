@@ -1424,7 +1424,7 @@ const LeagueDashboard = () => {
                                   const subject = encodeURIComponent(`Join my fantasy league: ${league.name}`);
                                   const body = encodeURIComponent(`Hi!
 
-I'd like to invite you to join my fantasy hockey league on Citrus League Storm:
+I'd like to invite you to join my fantasy hockey league on Citrus:
 
 League: ${league.name}
 Join Code: ${league.join_code}

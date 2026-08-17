@@ -450,7 +450,7 @@ function StickyHeader({ onRetryNow, clockOffsetMs }: StickyHeaderProps) {
   const wsOpen = connectionState.kind === 'connected';
 
   return (
-    <div className="sticky top-0 z-30 bg-background border-b border-border pb-3 mb-4">
+    <div className="sticky top-0 z-30 bg-background border-b border-border pb-3 mb-4 pt-safe">
       <h1 className="text-xl font-bold mb-2">Draft Room</h1>
       <ConnectionBanner onRetryNow={onRetryNow} />
       {snapshot !== null && derived !== null && (
@@ -511,6 +511,33 @@ function DraftRoomBody({
   playersLoading,
   clockOffsetMs,
 }: DraftRoomBodyProps) {
+  /*
+   * QUEUE-REACH (2026-08-13) — this state was declared inside
+   * `SidebarPanel`. That made the queue invisible to `PlayerPool`,
+   * which lives in `MainTabs`, a SIBLING. `PlayerPool` already
+   * supports the queue completely — it takes `queue` and
+   * `onAddToQueue` and renders a per-row star (PlayerPool.tsx:356 for
+   * the mobile card, :631 for the desktop table) — but v2 never passed
+   * either prop, and the star only renders when `onAddToQueue` is
+   * defined. So the v2 room shipped a queue panel whose own empty
+   * state reads "Click the star icon on players to add them to your
+   * queue" next to a pool with no stars in it.
+   *
+   * That is not cosmetic. The server-side queue (`set_draft_queue`)
+   * and the autopick `queueStrategy` that reads it both landed
+   * 2026-08-12, and both are driven ENTIRELY by what a manager puts in
+   * this list. With no way to fill it, a manager who misses their
+   * clock falls through to projections-only autopick — the exact
+   * outcome the queue exists to prevent. The whole chain was wired
+   * except its first inch.
+   *
+   * Lifting to the common parent is the minimum that fixes it: one
+   * `DraftQueue` instance still owns hydration and persistence (two
+   * instances would race, and the empty-initial-state save would wipe
+   * the very queue it restored — see DraftQueue.persistence.test.tsx),
+   * while the pool becomes a read/write view of the same array.
+   */
+  const [queue, setQueue] = useState<string[]>([]);
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
   const resolvedMyTeamId = useMyTeamId();
@@ -579,14 +606,32 @@ function DraftRoomBody({
           playersLoading={playersLoading}
           myTeamId={myTeamId}
           clockOffsetMs={clockOffsetMs}
+          queue={queue}
+          onQueueChange={setQueue}
         />
       </div>
-      <div className="hidden lg:block space-y-4">
+      {/* QUEUE-REACH (2026-08-13) — was `hidden lg:block`.
+          Below 1024px that hid the ENTIRE sidebar: manager presence,
+          team rosters, and the draft queue. Measured on staging at a
+          766px viewport: the sidebar was display:none while the
+          player pool was capped to 467px with 2,582px of rows hidden
+          inside its own scrollbar — so there was nothing to scroll TO
+          and no way to scroll there. Reported as two separate issues
+          ("I can't scroll on the page, only the internal table of
+          players" and "doesn't have a proper watchlist/queue
+          button/list"); they are one layout bug.
+          Below lg the grid is already `grid-cols-1`, so this simply
+          stacks underneath the pool, which is what v1 has always
+          done. At lg and up nothing changes — it is still the right
+          hand column. */}
+      <div className="space-y-4">
         <SidebarPanel
           leagueId={leagueId}
           teams={teams}
           playersById={playersById}
           myTeamId={myTeamId}
+          queue={queue}
+          onQueueChange={setQueue}
         />
       </div>
     </div>
@@ -602,6 +647,9 @@ interface MainTabsProps {
   playersLoading: boolean;
   myTeamId: string | null;
   clockOffsetMs: number;
+  /** QUEUE-REACH (2026-08-13) — owned by DraftRoomBody, shared with the sidebar. */
+  queue: string[];
+  onQueueChange: (next: string[]) => void;
 }
 
 function MainTabs({
@@ -611,6 +659,8 @@ function MainTabs({
   playersLoading,
   myTeamId,
   clockOffsetMs,
+  queue,
+  onQueueChange,
 }: MainTabsProps) {
   const derived = useDerivedDraftState();
   const snapshot = useDraftSnapshot();
@@ -824,6 +874,25 @@ function MainTabs({
     [amIOnClock, myTeamId, derived, leagueId, pendingActions],
   );
 
+  /*
+   * QUEUE-REACH (2026-08-13) — star toggles membership, appending to
+   * the END so the list stays in the manager's chosen priority order.
+   * `queueStrategy` (server/src/draft/autopickStrategy.ts) walks it
+   * front-to-back and takes the first player still available, so
+   * position IS priority; inserting anywhere but the end would
+   * silently reorder someone's board.
+   */
+  const toggleQueued = useCallback(
+    (playerId: string) => {
+      onQueueChange(
+        queue.includes(playerId)
+          ? queue.filter((id) => id !== playerId)
+          : [...queue, playerId],
+      );
+    },
+    [queue, onQueueChange],
+  );
+
   const isDraftActive = derived?.draftStatus === 'in_progress';
   const isDraftComplete = derived?.draftStatus === 'completed';
 
@@ -922,6 +991,13 @@ function MainTabs({
               availablePlayers={availablePlayers}
               isYourTurn={amIOnClock}
               isSubmitPending={isSubmitPending}
+              /* QUEUE-REACH (2026-08-13) — the two props that make the
+                 per-row star appear. `onAddToQueue` is optional in
+                 PlayerPool and the star is gated on it being defined,
+                 so omitting it (as v2 did) removed the only control
+                 that can put a player in the queue. */
+              queue={queue}
+              onAddToQueue={toggleQueued}
             />
           )}
         </TabsContent>
@@ -991,6 +1067,9 @@ interface SidebarPanelProps {
   teams: FetchedTeam[];
   playersById: ReadonlyMap<string, Player>;
   myTeamId: string | null;
+  /** QUEUE-REACH (2026-08-13) — lifted to DraftRoomBody; see the note there. */
+  queue: string[];
+  onQueueChange: (next: string[]) => void;
 }
 
 function SidebarPanel({
@@ -998,10 +1077,11 @@ function SidebarPanel({
   teams,
   playersById,
   myTeamId,
+  queue,
+  onQueueChange,
 }: SidebarPanelProps) {
   const derived = useDerivedDraftState();
   const matrix = useDraftMatrix();
-  const [queue, setQueue] = useState<string[]>([]);
 
   // DR-3.1 F9 fix: same filter as MainTabs — TeamRosters' pick label
   // formula reads teams.length as round size.
@@ -1063,7 +1143,7 @@ function SidebarPanel({
           queue={queue}
           players={allPlayers}
           draftedPlayers={draftedIds}
-          onQueueChange={setQueue}
+          onQueueChange={onQueueChange}
           onDraftFromQueue={() => {
             // Queue-drive submit is post-DR-3. For now, users draft
             // via the pool's Draft button. Queue is display-only per
@@ -1084,7 +1164,7 @@ function SidebarPanel({
           className="text-xs text-muted-foreground mt-1"
           data-testid="queue-persistence-note"
         >
-          Saved on this device
+          Saved to your team — used for autopick if your clock expires
         </div>
       </div>
       {/* DR-3 (2026-07-29) — DraftControls HIDDEN per architect ruling:

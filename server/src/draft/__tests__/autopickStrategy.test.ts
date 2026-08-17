@@ -32,6 +32,8 @@ interface MockProjections {
    * back to DEFAULT_EXPECTED_GAMES (55) inside the strategy.
    */
   seasonGames?: Array<{ player_id: number; games_played: number }>;
+  /** AUTOPICK-TRUNCATION-2: simulate a failed player_ros_projections read. */
+  projectionsError?: { message?: string | null };
   /** E117: simulate a failed player_season_stats read. */
   seasonStatsError?: { message: string };
   /**
@@ -120,12 +122,40 @@ function makeMockSupabase(opts: MockProjections): SupabaseClient {
         });
       return chain;
     }
+    // AUTOPICK-TRUNCATION-2 (2026-08-13) — the projections read is paged
+    // now too. `range` is HONOURED here, not ignored: a mock that returns
+    // the full set regardless of range would happily pass a paging loop
+    // that pages wrongly, which is the entire failure mode being guarded.
+    // See player_directory above for the same reasoning.
     if (table === 'player_ros_projections') {
+      const all = opts.projections ?? [];
       const chain: Record<string, unknown> = {};
+      let rangeFrom: number | null = null;
+      let rangeTo = 0;
       chain.select = () => chain;
       chain.order = () => chain;
+      chain.range = (from: number, to: number) => {
+        rangeFrom = from;
+        rangeTo = to;
+        return chain;
+      };
+      // Faithful to PostgREST: a select with NO range is clamped
+      // server-side at `db-max-rows` (1,000). Returning `all` here
+      // instead would let an unpaged read pass — which is precisely the
+      // hole that let the original bug ship, and which a first cut of
+      // this mock reproduced exactly.
       chain.then = (resolve: (val: unknown) => void) =>
-        resolve({ data: opts.projections, error: null });
+        resolve(
+          opts.projectionsError
+            ? { data: null, error: opts.projectionsError }
+            : {
+                data:
+                  rangeFrom === null
+                    ? all.slice(0, 1000)
+                    : all.slice(rangeFrom, rangeTo + 1),
+                error: null,
+              },
+        );
       return chain;
     }
     // E117 draft-value ranking reads prior-season games played.
@@ -328,6 +358,52 @@ describe('projectionsStrategy (chunk 11g.4 step 6c)', () => {
     });
 
     expect(result).toEqual({ ok: true, playerId: 900003, source: 'draft_value' });
+  });
+
+  // AUTOPICK-TRUNCATION-2 (2026-08-13) — the regression guard.
+  //
+  // `player_ros_projections` is 926 rows on staging, i.e. UNDER
+  // PostgREST's 1,000-row cap, so an unpaged read looks perfectly
+  // healthy there. Prod's copy is 1,361. The obvious pre-draft move —
+  // freshen staging's projections from prod — is exactly what would
+  // have armed the bug, silently and on draft night.
+  //
+  // So this fixture is deliberately 1,200 rows: bigger than the cap,
+  // and the correct answer lives at index 1,150, past it. If the read
+  // ever reverts to unpaged, the mock returns the first 1,000 rows and
+  // the best player is simply not in the board.
+  // AUTOPICK-TRUNCATION-2 (2026-08-13) — the regression guard.
+  //
+  // `player_ros_projections` is 926 rows on staging, i.e. UNDER
+  // PostgREST's 1,000-row cap, so an unpaged read looks perfectly
+  // healthy there. Prod's copy is 1,361. The obvious pre-draft move —
+  // freshen staging's projections from prod — is exactly what would
+  // have armed this bug, silently, on draft night.
+  //
+  // The fixture is deliberately 1,200 rows with the correct answer at
+  // index 1,150, past the cap. Revert the read to unpaged and the mock
+  // hands back only the first 1,000 rows, so the best player is simply
+  // absent from the board and this fails.
+  it('AUTOPICK-TRUNCATION-2: reads past the 1,000-row cap', async () => {
+    const projections = Array.from({ length: 1200 }, (_, i) => ({
+      player_id: 90000 + i,
+      total_projected_points: 10,
+    }));
+    projections[1150] = { player_id: 91150, total_projected_points: 400 };
+
+    const supabase = makeMockSupabase({ drafted: [], projections });
+
+    const result = await projectionsStrategy({
+      leagueId: 'league-1',
+      teamId: 'team-1',
+      supabase,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      playerId: 91150,
+      source: 'draft_value',
+    });
   });
 
   it('E117: a player with no prior-season row is ranked, never zeroed', async () => {

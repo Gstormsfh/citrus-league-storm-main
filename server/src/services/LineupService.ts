@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, logger, getTodayMST, getTodayMSTDate, getTodayNhlScheduleDate } from '@citrus/shared';
+import { resolveSlotConfig, validateSlotAssignments } from '../lib/leagueRules';
 
 /**
  * LineupService — Server-side lineup management with DI Supabase client.
@@ -95,10 +96,33 @@ export class LineupService {
       }
     }
 
-    // 1b. Validate slot_assignments structure
+    // 1b. Validate slot_assignments against the LEAGUE'S configuration.
+    //
+    // SETTINGS-ENFORCEMENT (2026-08-16). The old check was a hardcoded
+    // regex (`slot-(C|LW|RW|D|G|F)-[1-8]|slot-UTIL`) that never read the
+    // league's roster_slots: any API client could start 8 centers in a
+    // 2-C league, and the app's own default UTIL:2 config emitted
+    // `slot-UTIL-2`, which the regex SILENTLY STRIPPED on every save.
+    // Now: malformed ids are still stripped (legacy tolerance), but
+    // exceeding the commissioner's per-position counts REJECTS the save
+    // with a plain-language error. Pure logic + tests: lib/leagueRules.ts.
+    const { data: slotLeague } = await this.supabase
+      .from('leagues')
+      .select('settings')
+      .eq('id', leagueId)
+      .single();
+    const slotConfig = resolveSlotConfig(slotLeague?.settings as Record<string, unknown>);
+    const verdict = validateSlotAssignments(lineup.slot_assignments, slotConfig);
+    if (!verdict.ok) {
+      return { success: false, error: verdict.error };
+    }
+    for (const pid of verdict.strip) {
+      logger.warn('[LineupService.saveLineup] Stripping invalid slot for player:', pid, lineup.slot_assignments[pid]);
+      delete lineup.slot_assignments[pid];
+    }
+
     const starterSet = new Set(lineup.starters);
     const irSet = new Set(lineup.ir);
-    const VALID_SLOT_PATTERN = /^slot-(C|LW|RW|D|G|F)-[1-8]$|^slot-UTIL$|^ir-slot-[1-3]$/;
     const seenSlots = new Set<string>();
     for (const playerId of Object.keys(lineup.slot_assignments)) {
       const slotId = lineup.slot_assignments[playerId];
@@ -106,12 +130,6 @@ export class LineupService {
       const isStarter = starterSet.has(playerId);
       const isIr = irSet.has(playerId);
       if (!isStarter && !(isIr && slotId.startsWith('ir-slot-'))) {
-        delete lineup.slot_assignments[playerId];
-        continue;
-      }
-      // Validate slot_id format
-      if (!VALID_SLOT_PATTERN.test(slotId)) {
-        logger.warn('[LineupService.saveLineup] Invalid slot_id:', slotId, 'for player:', playerId);
         delete lineup.slot_assignments[playerId];
         continue;
       }
@@ -531,13 +549,13 @@ export class LineupService {
     const ir: string[] = [];
     const slotAssignments: Record<string, string> = {};
 
-    // Use F/D/G slot structure when position type is forward
-    const slotsNeeded: Record<string, number> = positionType === 'forward'
-      ? { F: 6, D: 4, G: 2, UTIL: 1 }
-      : { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
-    const slotsFilled: Record<string, number> = positionType === 'forward'
-      ? { F: 0, D: 0, G: 0, UTIL: 0 }
-      : { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0 };
+    // SETTINGS-ENFORCEMENT (2026-08-16) — was hardcoded 2-2-2-4-2/6-4-2.
+    // Custom-slot leagues got wrong-shaped default lineups.
+    const initCfg = resolveSlotConfig(leagueData?.settings as Record<string, unknown>);
+    const slotsNeeded: Record<string, number> = { ...initCfg.slots, UTIL: initCfg.utilCount };
+    const slotsFilled: Record<string, number> = Object.fromEntries(
+      Object.keys(slotsNeeded).map((k) => [k, 0]),
+    );
     let irSlotIndex = 1;
 
     for (const pid of sortedIds) {

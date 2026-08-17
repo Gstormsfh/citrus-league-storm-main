@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, logger } from '@citrus/shared';
+import { resolveAddLimits, evaluateGameLock } from '../lib/leagueRules';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
@@ -26,9 +27,12 @@ export class WaiverService {
       .eq('id', leagueId)
       .single();
 
+    // SETTINGS-ENFORCEMENT (2026-08-16) — the reader looked only at
+    // snake_case keys; CreateLeague has always written camelCase
+    // (weeklyAddLimit/seasonAddLimit), so add limits were silently
+    // unenforced for every league created through the UI. Accept both.
     const settings = league?.settings || {};
-    const weeklyLimit = settings.weekly_add_limit;
-    const seasonLimit = settings.season_add_limit;
+    const { weeklyLimit, seasonLimit } = resolveAddLimits(settings);
 
     // Count ADD transactions
     let weeklyAdds = 0;
@@ -735,6 +739,46 @@ export class WaiverService {
       }
     }
 
+    // SETTINGS-ENFORCEMENT (2026-08-16) — waiver_game_lock was a stored
+    // toggle with no enforcement: a direct POST could grab a player
+    // mid-game regardless. Industry behaviour (Yahoo): players lock at
+    // game time. Fail-open on any data problem — a schedule hiccup must
+    // never block legitimate adds. Pure logic: lib/leagueRules.evaluateGameLock.
+    try {
+      const { data: lockLeague } = await this.supabase
+        .from('leagues')
+        .select('waiver_game_lock')
+        .eq('id', leagueId)
+        .single();
+      if (lockLeague?.waiver_game_lock) {
+        const admin0 = getSupabaseAdmin();
+        const { data: dirRow } = await admin0
+          .from('player_directory')
+          .select('team_abbrev')
+          .eq('player_id', playerId)
+          .order('season', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const abbrev = dirRow?.team_abbrev;
+        if (abbrev) {
+          const today = new Date().toISOString().slice(0, 10);
+          const { data: games } = await admin0
+            .from('nhl_games')
+            .select('status, game_date, game_time, home_team, away_team')
+            .eq('game_date', today)
+            .or(`home_team.eq.${abbrev},away_team.eq.${abbrev}`);
+          if (games && evaluateGameLock(games, abbrev, Date.now())) {
+            return {
+              success: false,
+              error: `${abbrev}'s game has started — this player is locked until tomorrow (game-time lock is on in this league).`,
+            };
+          }
+        }
+      }
+    } catch (lockErr) {
+      logger.warn('[addFreeAgent] game-lock check failed open:', lockErr);
+    }
+
     // Check if player is on waivers (recently dropped) — must use waiver claim instead
     try {
       const { data: onWaivers } = await this.supabase.rpc('is_player_on_waivers', {
@@ -772,7 +816,7 @@ export class WaiverService {
         .select('roster_size')
         .eq('id', leagueId)
         .single();
-      const maxRoster = leagueData?.roster_size || 22;
+      const maxRoster = leagueData?.roster_size || 21; // fallback aligned to DB default
       if (rosterCount !== null && rosterCount >= maxRoster) {
         return { success: false, error: `Roster is full (${rosterCount}/${maxRoster}). Drop a player first.` };
       }

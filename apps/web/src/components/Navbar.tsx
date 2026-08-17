@@ -55,6 +55,16 @@ const Navbar = () => {
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
+  // SWEEP FIX (2026-08-16): Escape closes the mobile menu.
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileMenuOpen]);
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
@@ -129,14 +139,26 @@ const Navbar = () => {
     }
   };
 
+  // SWEEP FIX (2026-08-16): fantasy leagues had NO nav tabs — the default
+  // trio was playoff-era ("Playoffs front and center. Season-long still
+  // accessible via direct URL"), which left league pages reachable only by
+  // typing URLs. A user with an active season-long league now gets the
+  // full league tab set; users with no league get Create League first.
   const navTabs = isPool && activeLeagueId
     ? getPoolTabs()
-    : [
-        // Playoffs front and center. Season-long still accessible via direct URL.
-        { label: 'NHL Playoffs', path: '/nhl/playoffs', icon: Trophy },
-        { label: 'Create Pool', path: '/create-league?type=playoff', icon: Sparkles },
-        { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
-      ];
+    : activeLeagueId && !isPool
+      ? [
+          { label: 'League HQ', path: `/league/${activeLeagueId}`, icon: Trophy },
+          { label: 'Matchup', path: `/matchup/${activeLeagueId}`, icon: Swords },
+          { label: 'Roster', path: `/roster?league=${activeLeagueId}`, icon: Users },
+          { label: 'Free Agents', path: `/free-agents?league=${activeLeagueId}`, icon: UserPlus },
+          { label: 'Standings', path: `/standings?league=${activeLeagueId}`, icon: TrendingUp },
+        ]
+      : [
+          { label: 'Create League', path: '/create-league', icon: Sparkles },
+          { label: 'NHL Playoffs', path: '/nhl/playoffs', icon: Trophy },
+          { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
+        ];
 
   return (
     <header className="fixed top-0 left-0 right-0 w-full z-50 lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-pastel-surface/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-white/10">
@@ -204,6 +226,12 @@ const Navbar = () => {
                           navigate(`/league/${l.id}`);
                         } else if (location.pathname.startsWith('/draft-room') || location.pathname === '/draft') {
                           navigate('/gm-office');
+                        } else {
+                          // SWEEP FIX (2026-08-16): selecting a league from
+                          // the home page (or any non-league page) previously
+                          // did nothing visible — set context AND land the
+                          // user in that league's HQ.
+                          navigate(`/league/${l.id}`);
                         }
                       }}
                       className={cn(
@@ -382,7 +410,10 @@ const Navbar = () => {
 
       {/* ===== MOBILE: Slide-in menu ===== */}
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-pastel-surface/98 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
+        // SWEEP FIX (2026-08-16): bg-pastel-surface/98 — /98 is not a
+        // generated opacity step, so the class silently produced NO
+        // background and the menu rendered transparent over page content.
+        <div className="lg:hidden fixed inset-0 top-[56px] z-50 bg-pastel-surface backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
           <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3">
             {/* League context + switcher */}
             {user && !leagueLoading && userLeagues.length === 0 && (
@@ -438,6 +469,10 @@ const Navbar = () => {
                             navigate(`/league/${l.id}`);
                           } else if (location.pathname.startsWith('/draft-room') || location.pathname === '/draft') {
                             navigate('/gm-office');
+                          } else {
+                            // SWEEP FIX (2026-08-16): land in League HQ from
+                            // home/any other page instead of a silent switch.
+                            navigate(`/league/${l.id}`);
                           }
                           closeMobileMenu();
                         }}

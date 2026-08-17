@@ -4,7 +4,7 @@ import { League, Team, LeagueService } from './LeagueService';
 import { PlayerService, Player } from './PlayerService';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from './DemoLeagueService';
 import { MatchupPlayer, StatBreakdown } from '@/components/matchup/types';
-import { getFirstWeekStartDate, getWeekStartDate, getWeekEndDate, getAvailableWeeks, getScheduleLength } from '@/utils/weekCalculator';
+import { clampToSeasonStart, getFirstWeekStartDate, getWeekStartDate, getWeekEndDate, getAvailableWeeks, getScheduleLength } from '@/utils/weekCalculator';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { ScheduleService, NHLGame, GameInfo } from './ScheduleService';
 import { withTimeout } from '@/utils/promiseUtils';
@@ -288,18 +288,58 @@ export const MatchupService = {
         return { error: new Error('Cannot generate matchups: Duplicate team IDs found') };
       }
 
+      // SCHEDULE-GEN (2026-08-16) — clamp the anchor to the season FIRST.
+      // Every caller (draft-completion hook, Matchup-page self-heal, the
+      // commissioner button) funnels through here, so this one line fixes
+      // "offseason draft → zero weeks → zero matchups" everywhere. See
+      // clampToSeasonStart in weekCalculator.ts for the full account.
+      const effectiveFirstWeekStart = clampToSeasonStart(firstWeekStart);
+
       // Build fantasy weeks from available weeks. If regularSeasonWeeks is
       // provided (commissioner-configured), truncate so playoff weeks are NOT
       // populated by the regular-season round-robin scheduler.
-      const allAvailableWeeks = getAvailableWeeks(firstWeekStart);
-      const availableWeeks = (regularSeasonWeeks && regularSeasonWeeks > 0)
-        ? allAvailableWeeks.filter(w => w <= regularSeasonWeeks)
-        : allAvailableWeeks;
+      let allAvailableWeeks = getAvailableWeeks(effectiveFirstWeekStart);
+
+      // SEASON-END TRIM (2026-08-16): the date-math season end is generous
+      // (late April) but the real NHL slate can stop earlier — 2026-27's
+      // final game is Apr 10, leaving the calculator's week 29 (Apr 12-18)
+      // with ZERO NHL games. A fantasy week nobody can score in is a defect,
+      // and worse, playoff generation keys off max(week). Probe the last
+      // weeks against the ingested schedule and drop trailing gameless
+      // weeks. FAIL-OPEN: any fetch error leaves the week list untouched
+      // (getGamesForDateRange reports errors distinctly from empty weeks).
+      try {
+        const MAX_TRIM = 4;
+        for (let i = 0; i < MAX_TRIM && allAvailableWeeks.length > 1; i++) {
+          const lastWeek = allAvailableWeeks[allAvailableWeeks.length - 1];
+          const { games, error: gamesErr } = await ScheduleService.getGamesForDateRange(
+            getWeekStartDate(lastWeek, effectiveFirstWeekStart),
+            getWeekEndDate(lastWeek, effectiveFirstWeekStart),
+          );
+          if (gamesErr || games.length > 0) break;
+          allAvailableWeeks = allAvailableWeeks.slice(0, -1);
+        }
+      } catch {
+        // fail-open: keep the untrimmed calendar-derived weeks
+      }
+
+      // PLAYOFF RESERVATION (2026-08-16): when the commissioner didn't set
+      // regularSeasonWeeks, reserve the final 3 calendar weeks for the
+      // playoff bracket instead of round-robin-filling every week. The DB
+      // playoff generators key off MAX(matchups.week_number), so stopping
+      // the regular season 3 weeks short makes bracket weeks line up
+      // automatically (start = MAX + 1) with real NHL games in them.
+      // Previously the round-robin consumed the whole calendar and default
+      // playoffs could never begin before the NHL season ended.
+      const effectiveRegularWeeks = (regularSeasonWeeks && regularSeasonWeeks > 0)
+        ? regularSeasonWeeks
+        : (allAvailableWeeks.length > 8 ? allAvailableWeeks.length - 3 : allAvailableWeeks.length);
+      const availableWeeks = allAvailableWeeks.filter(w => w <= effectiveRegularWeeks);
       const formatLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
       const fantasyWeeks = availableWeeks.map(weekNumber => {
-        const weekStart = getWeekStartDate(weekNumber, firstWeekStart);
-        const weekEnd = getWeekEndDate(weekNumber, firstWeekStart);
+        const weekStart = getWeekStartDate(weekNumber, effectiveFirstWeekStart);
+        const weekEnd = getWeekEndDate(weekNumber, effectiveFirstWeekStart);
         return {
           week_number: weekNumber,
           start_date: formatLocal(weekStart),
@@ -1067,6 +1107,10 @@ export const MatchupService = {
     weekEnd: Date,
     timezone: string = 'America/Denver',
     games: NHLGame[],
+    // SETTINGS-ENFORCEMENT (2026-08-16) — league scoring, threaded from
+    // getMatchupRosters (which already extracts it at :1492). Undefined
+    // → DEFAULT_SCORING, so default leagues are numerically identical.
+    leagueScoring?: import('@citrus/shared').ScoringSettings,
     matchupStats?: { 
       goals: number; 
       assists: number; 
@@ -1199,7 +1243,7 @@ export const MatchupService = {
             fantasyPoints = 0; // Reject season totals from RPC
           } else {
             // Goalie fantasy scoring using centralized ScoringCalculator
-            const goalieScorer = new ScoringCalculator();
+            const goalieScorer = new ScoringCalculator(leagueScoring);
             fantasyPoints = goalieScorer.calculatePoints({
               wins, saves, shutouts, goals_against
             }, true);
@@ -1222,7 +1266,7 @@ export const MatchupService = {
           } else {
             // CRITICAL: Use blocks from matchup week stats, NOT season stats
             blocks = matchupStats.blocks || 0; // Get from matchup week stats
-            const skaterScorer = new ScoringCalculator();
+            const skaterScorer = new ScoringCalculator(leagueScoring);
             fantasyPoints = skaterScorer.calculatePoints({
               goals: matchupStats.goals, assists: matchupStats.assists,
               sog: matchupStats.sog, blocks,
@@ -2001,6 +2045,7 @@ export const MatchupService = {
             weekEnd,
             timezone,
             playerGames,
+            scoringSettings,
             matchupStats,
             garMap.get(playerId),
             dailyProjection
@@ -2235,6 +2280,7 @@ export const MatchupService = {
             weekEnd,
             timezone,
             playerGames,
+            scoringSettings,
             matchupStats,
             garMap.get(playerId),
             dailyProjection
