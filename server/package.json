@@ -18,7 +18,7 @@
     "uWebSockets.js": "https://github.com/uNetworking/uWebSockets.js/archive/refs/tags/v20.51.0.tar.gz",
     "undici": "^7.22.0",
     "zod": "^3.23.8",
-    "pg": "^8.23.0"
+    "pg": "^8.19.0"
   },
   "devDependencies": {
     "@types/node": "^22.5.5",
