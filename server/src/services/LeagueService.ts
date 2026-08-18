@@ -57,6 +57,30 @@ export class LeagueService {
     const filtered = unique.filter((l: Record<string, unknown>) =>
       !DEMO_LEAGUE_IDS.has(l.id as string) &&
       !String((l as { name?: unknown }).name ?? '').startsWith('[DELETED'));
+
+    // SWEEP FIX (2026-08-18): deterministic order, newest first.
+    //
+    // Neither query above carries an ORDER BY, and the two result sets are
+    // concatenated, so the order Postgres happened to return decided which
+    // league the app treated as active — LeagueContext falls through to
+    // `filteredLeagues[0]` when there is no ?league= param, no in-session
+    // selection and no localStorage entry.
+    //
+    // Field report (prod, 2026-08-18): an account in 18 leagues opened on a
+    // playoff-roster-pool from April and got the playoff nav — Pool Home /
+    // My Roster / NHL Bracket — instead of their season-long league. The nav
+    // was right for the league it was given; the league was arbitrary.
+    //
+    // Newest-first is both deterministic and the better default: the league
+    // you just created or joined is the one you meant to open.
+    filtered.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+      const at = Date.parse(String(a.created_at ?? '')) || 0;
+      const bt = Date.parse(String(b.created_at ?? '')) || 0;
+      if (bt !== at) return bt - at;
+      // Stable tiebreak so equal timestamps cannot reintroduce arbitrary order.
+      return String(a.id).localeCompare(String(b.id));
+    });
+
     return { leagues: filtered, error: null };
   }
 

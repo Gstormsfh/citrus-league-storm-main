@@ -56,6 +56,7 @@ change, and guideline 5.3 applies.⟩
 | User ID | Yes | Yes | No |
 | Gameplay content (rosters, picks) | Yes | Yes | No |
 | Coarse location / precise location | No | — | — |
+| Usage data (product interaction) | Yes, **only with consent** | Yes | No |
 | Advertising data | No | — | — |
 
 **Ads correction (2026-08-15 sweep):** the WEBSITE loads Google AdSense
@@ -63,8 +64,21 @@ change, and guideline 5.3 applies.⟩
 (`scripts/build-native.mjs` asserts the strip), so the app itself ships ad-free
 and "Data Not Used to Track You" stands for the App Store labels. Do not
 answer the advertising questions based on the website.
-⟨Verify Firebase Analytics: services/AnalyticsService.ts uses firebase v12 —
-if enabled in the shell, declare Usage Data accordingly or gate it native-off.⟩
+**Firebase Analytics — resolved (2026-08-18).** It IS wired
+(`services/AnalyticsService.ts` → `integrations/firebase/config.ts`) but it is
+**consent-gated**: `getAnalyticsInstance()` returns null unless
+`localStorage['citrus_analytics_consent'] === 'granted'`, so the default state
+for a fresh install is off until the user accepts the banner. It also calls
+`setUserId(session.user.id)` from AuthContext, so when consent IS granted the
+analytics data is **linked to identity**. That is already reflected in the
+User ID row above; add the Usage Data row below. It is first-party product
+analytics, not cross-app tracking — `NSPrivacyTracking` stays `false` and the
+tracking domains array stays empty, which matches PrivacyInfo.xcprivacy.
+
+**Data region — resolved (2026-08-18):** both Supabase projects are
+`ca-central-1` (Canada). Use that in the privacy policy's storage-location
+clause; `CitrusFantasySports` is prod, `citrus-staging` is staging — they are
+separate databases, not one shared instance.
 
 ## Review notes (draft)
 > CitrusSports is a free season-long fantasy hockey app. No real money: no

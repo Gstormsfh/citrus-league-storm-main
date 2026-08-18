@@ -13,6 +13,7 @@ import { StormyChatBubble } from "./components/StormyChatBubble";
 import MobileBottomNav from "./components/MobileBottomNav";
 import { CookieConsent } from "./components/CookieConsent";
 import ScrollToTop from "./components/ScrollToTop";
+import PushDeepLink from "./components/PushDeepLink";
 import LoadingScreen from "./components/LoadingScreen";
 import '@/integrations/firebase/config'; // Initialize Firebase
 import "./App.css";
@@ -173,6 +174,7 @@ const App = () => {
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <a href="#main-content" className="skip-to-content">Skip to content</a>
               <ScrollToTop />
+              <PushDeepLink />
               <LeagueProvider>
                 <Suspense fallback={<PageLoader />}>
                   <main id="main-content">

@@ -1,7 +1,22 @@
 # Citrus draft — load test results
 
 **Date:** 2026-08-18 (Monday)
-**Target:** production Supabase project `jjgspcpvqaiitloglxbb` (the live DB serving staging + prod web)
+**Target:** **staging** Supabase project `jjgspcpvqaiitloglxbb` (`citrus-staging`).
+
+> **Correction (2026-08-18).** This line previously read "production Supabase
+> project `jjgspcpvqaiitloglxbb` (the live DB serving staging + prod web)". Both
+> halves were wrong. `jjgspcpvqaiitloglxbb` is **staging**; production is
+> `iezwazccqqrhrjupxzvf` (`CitrusFantasySports`). They are two separate
+> databases, not one shared instance — the parity work on 2026-08-18 exists
+> precisely because they had drifted apart.
+>
+> **The numbers below are also pessimistic.** When this run was taken, staging's
+> RLS policies still called `auth.uid()` / `auth.role()` bare — once per
+> candidate row. Production had already been through Supabase's
+> `auth_rls_initplan` pass, which wraps them as `( SELECT auth.uid() )` so the
+> planner evaluates once per query. Staging was brought onto the fast path on
+> 2026-08-18 (133 policies rewritten). Re-run before quoting these figures as
+> production latency.
 **Method:** real `submit_pick_v2` calls through the production code path — same RPC, same
 triggers, same indexes the live draft engine uses. Concurrency generated with `pg_cron`
 worker sessions released by a shared timestamp barrier so the drafts genuinely overlap
