@@ -22,14 +22,16 @@ removal — **web 1899/1899, server 1140/1140, typecheck baselines unchanged (15
 
 ## Dependency landmine defused
 
-`server/package.json` now declares **`pg ^8.23.0`**. The draft engine's realtime NOTIFY
+`server/package.json` now declares **`pg ^8.19.0`** (the lock-resolved line; bumping to
+8.23+ rides with the lockfile-regeneration backlog item). The draft engine's realtime NOTIFY
 listener (`server/src/draft/eventSubscription.ts`) imports `pg`, but it was declared
 nowhere — it installed only as a transitive dependency of `firebase-tools` (a
 devDependency). The production image survives today because the Dockerfile runs a full
 `npm ci`; the first person to remove firebase-tools or add `--omit=dev` would have
 silently killed live pick broadcasts. Declaring it makes the dependency load-bearing on
-purpose. (`npm ci` validation verified tolerant of this addition — the `server` workspace
-is not lock-tracked; see below.)
+purpose. (Learned in CI on this very PR: even though the `server` workspace has no lock
+entry, `npm ci` still validates declared ranges against the lock's resolved graph — it
+rejected a ^8.23.0 floor against the lock's 8.19.0. Hence the floor matches the lock.)
 
 ## Ranked backlog — next trims (not in this PR)
 
@@ -70,4 +72,3 @@ is not lock-tracked; see below.)
 - `apps/web/ios/App/App/public/cordova*.js` — Capacitor shell runtime files; invisible to
   the import graph by design.
 - `scripts/**` — manually-run operational tooling (2026-06-12 purge review stands).
-
