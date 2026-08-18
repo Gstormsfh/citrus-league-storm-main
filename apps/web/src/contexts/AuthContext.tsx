@@ -11,6 +11,7 @@ import {
   beginNativeOAuth,
   registerNativeAuthListener,
 } from '@/lib/nativeAuth';
+import { registerForPush, unregisterDeviceToken } from '@/lib/pushNotifications';
 
 /** Returns true if JWT is expired or within 30s of expiry. */
 function isTokenExpired(token: string | undefined): boolean {
@@ -125,6 +126,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           analyticsService.setUserId(session.user.id);
           setSentryUser({ id: session.user.id, email: session.user.email });
           queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
+          // PUSH (2026-08-18) — register this device for draft-turn alerts.
+          // No-op in every browser (isNativePlatform() is false) and safe to
+          // repeat: device_tokens upserts on the token, so a returning device
+          // refreshes its row instead of accumulating duplicates. Deliberately
+          // not awaited — the permission prompt must not delay sign-in.
+          void registerForPush(supabase, session.user.id, (msg) =>
+            logger.warn('[Auth] push registration: ' + msg),
+          );
           if (mounted) setLoading(false);
         } else if (event === 'INITIAL_SESSION') {
           clearTimeout(timeout);
@@ -251,6 +260,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     // SOC 2 CC7.2: Audit log logout (fire-and-forget, before clearing session)
     import('@/services/AuditService').then(({ AuditService }) => AuditService.logLogout()).catch(() => {});
+    // PUSH (2026-08-18) — drop this device's token BEFORE the session goes, or
+    // RLS no longer matches the rows and they are orphaned. Without this the
+    // next person to sign in on a shared phone keeps receiving draft alerts for
+    // the previous user's leagues. No-op in a browser.
+    const departingUserId = user?.id;
+    if (departingUserId) {
+      await unregisterDeviceToken(supabase, departingUserId, (msg) =>
+        logger.warn('[Auth] push cleanup: ' + msg),
+      );
+    }
     await supabase.auth.signOut();
     // Clear user ID from analytics
     analyticsService.setUserId(null);

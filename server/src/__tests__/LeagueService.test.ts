@@ -56,6 +56,68 @@ describe('LeagueService', () => {
       expect(result.error).toBeNull();
       expect(result.leagues).toHaveLength(0);
     });
+
+    /**
+     * SWEEP FIX (2026-08-18). Neither underlying query carries an ORDER BY and
+     * the two result sets are concatenated, so the order Postgres happened to
+     * return decided the user's active league — LeagueContext falls through to
+     * `leagues[0]` when there is no ?league= param, no in-session selection and
+     * no localStorage entry.
+     *
+     * Field report from production: an account in 18 leagues opened on a
+     * playoff-roster-pool created in April and got the playoff nav (Pool Home /
+     * My Roster / NHL Bracket) instead of its season-long league. The nav was
+     * correct for the league it was handed; the league was arbitrary.
+     */
+    it('returns newest-first so the default active league is not arbitrary', async () => {
+      const older = { id: 'l-old', name: 'April playoff pool', created_at: '2026-04-17T18:55:43.648Z' };
+      const newer = { id: 'l-new', name: 'Season-long league', created_at: '2026-08-16T23:21:13.374Z' };
+
+      let callCount = 0;
+      mockSupabase.from = vi.fn(() => {
+        callCount++;
+        // Commissioner query deliberately yields the OLDER league first —
+        // the pre-fix concatenation order.
+        if (callCount === 1) return createChain({ data: [older], error: null });
+        if (callCount === 2) return createChain({ data: [{ league_id: 'l-new' }], error: null });
+        return createChain({ data: [newer], error: null });
+      });
+
+      const result = await service.getUserLeagues('user-1');
+      expect(result.leagues.map((l: { id: string }) => l.id)).toEqual(['l-new', 'l-old']);
+    });
+
+    it('breaks created_at ties by id so equal timestamps stay deterministic', async () => {
+      const sameTime = '2026-08-16T23:21:13.374Z';
+      const b = { id: 'bbb', name: 'B', created_at: sameTime };
+      const a = { id: 'aaa', name: 'A', created_at: sameTime };
+
+      let callCount = 0;
+      mockSupabase.from = vi.fn(() => {
+        callCount++;
+        if (callCount === 1) return createChain({ data: [b, a], error: null });
+        return createChain({ data: [], error: null });
+      });
+
+      const result = await service.getUserLeagues('user-1');
+      expect(result.leagues.map((l: { id: string }) => l.id)).toEqual(['aaa', 'bbb']);
+    });
+
+    it('does not crash when created_at is missing', async () => {
+      const withDate = { id: 'l1', name: 'Has date', created_at: '2026-08-16T00:00:00.000Z' };
+      const noDate = { id: 'l2', name: 'No date' };
+
+      let callCount = 0;
+      mockSupabase.from = vi.fn(() => {
+        callCount++;
+        if (callCount === 1) return createChain({ data: [noDate, withDate], error: null });
+        return createChain({ data: [], error: null });
+      });
+
+      const result = await service.getUserLeagues('user-1');
+      // Missing timestamps sort to 0 and land last, but nothing throws.
+      expect(result.leagues.map((l: { id: string }) => l.id)).toEqual(['l1', 'l2']);
+    });
   });
 
   describe('createLeague', () => {

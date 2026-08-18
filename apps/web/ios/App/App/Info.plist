@@ -54,6 +54,13 @@
       </array>
     </dict>
 	</dict>
+	<!-- PUSH (2026-08-18) — required for APNs alert delivery while the app is
+	     backgrounded. The Push Notifications capability itself is toggled in
+	     Xcode (Signing & Capabilities), which writes App.entitlements. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

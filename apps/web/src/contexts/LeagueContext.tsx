@@ -353,20 +353,41 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
             }
             
             // Not a member. Instead of slamming them with "Access Denied",
-            // query supabase directly for the league's join_code and redirect
-            // to the join flow. RLS policy "Authenticated users can read
-            // leagues by join code" allows any logged-in user to see leagues,
-            // so this works even if they're not a member yet.
-            // (The /api/leagues/:id server endpoint requires membership,
-            // so we bypass it by going straight to the table.)
+            // resolve the league's join_code and redirect to the join flow.
+            // This used to read public.leagues directly, relying on an RLS policy
+            // ("Authenticated users can read leagues by join code") that existed
+            // only on staging — and which let ANY signed-in user read EVERY league
+            // row and every join code. Production never had it, so this path always
+            // fell through to "Access Denied" there. It now goes through
+            // get_league_invite_by_id(), a SECURITY DEFINER lookup that resolves
+            // exactly one league by an id the user already holds (it came from the
+            // link they were sent) and returns only the invite fields, so there is
+            // no way to enumerate leagues.
+            // (The /api/leagues/:id server endpoint requires membership, which is
+            // why we don't use it here.)
             logger.warn('[LeagueContext] User attempted to access league not in their list:', urlLeagueId);
             try {
               const { supabase } = await import('@/integrations/supabase/client');
-              const { data: leagueInfo } = await supabase
-                .from('leagues')
-                .select('id, name, join_code, settings')
-                .eq('id', urlLeagueId)
-                .maybeSingle();
+              // The generated Database type declares no Functions, so every
+              // .rpc() name types as `never`. Same locally-scoped cast the
+              // draft queue uses (see DraftQueue.tsx) until types are regenerated.
+              const inviteClient = supabase as unknown as {
+                rpc: (
+                  fn: 'get_league_invite_by_id',
+                  args: { p_league_id: string },
+                ) => Promise<{
+                  data: Array<{
+                    id: string;
+                    name: string | null;
+                    join_code: string | null;
+                    settings: Record<string, unknown> | null;
+                  }> | null;
+                  error: { message?: string } | null;
+                }>;
+              };
+              const { data: inviteRows } = await inviteClient
+                .rpc('get_league_invite_by_id', { p_league_id: urlLeagueId });
+              const leagueInfo = inviteRows?.[0];
               const joinCode = leagueInfo?.join_code;
               if (joinCode) {
                 navigate(`/create-league?tab=join&code=${joinCode}`, { replace: true });

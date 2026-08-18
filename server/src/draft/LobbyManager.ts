@@ -103,6 +103,7 @@ import {
   type SubmitPickResult,
 } from '../services/DraftServiceV2';
 import { createHash, randomUUID } from 'node:crypto';
+import { getPushService } from '../services/PushService';
 
 /**
  * Derive a deterministic UUID-formatted string from a seed via MD5
@@ -4507,12 +4508,86 @@ export class LobbyManager {
    *   auction). Recovery from a lost timer is not a fresh on-clock
    *   transition — the instant-autopick benefit applies to the
    *   NEXT normal pick, not to a re-arm of a stale deadline.
+   *
+   * PUSH (2026-08-18): `notifyOnClockDevice` is appended AFTER the
+   * helper→setPickDeadline call, never folded into it. That call is
+   * a single expression on purpose and engineEar3.test.ts pins both
+   * its exact shape and its length ("if a future refactor splits
+   * them ... this lock trips", matched within a 300-char window) —
+   * so the body stays minimal and the reasoning lives up here.
+   * It is handed `rpcDeadline` rather than the computed value: the
+   * two differ only for ownerless seats, which have no owner to
+   * notify and send nothing anyway.
    */
   private armPickDeadline(rpcDeadline: Date): void {
     this.setPickDeadline(
       this.computeArmDeadlineForOnClockTeam(rpcDeadline),
       'pick',
     );
+    this.notifyOnClockDevice(rpcDeadline);
+  }
+
+  /**
+   * PUSH (2026-08-18) — "you're on the clock" notification.
+   *
+   * Hangs off armPickDeadline because that is already the enforced single entry
+   * point for a snake/linear pick clock, so it cannot be bypassed by a future
+   * arm site the way `computeArmDeadlineForOnClockTeam` once was (E113: only 2
+   * of ~7 arm sites carried it).
+   *
+   * SAFETY POSTURE — this must never be able to affect a draft:
+   *   - Fire-and-forget. Not awaited, so it cannot add latency to a pick.
+   *   - PushService.notifyOnTheClock is total; it returns a result rather than
+   *     throwing. The extra try/catch and .catch() here are belt-and-braces
+   *     against a synchronous throw before the promise is created.
+   *   - Dormant unless APNs credentials are configured, so local dev, CI and any
+   *     deploy without secrets do nothing at all.
+   *
+   * DOUBLE-SEND — armPickDeadline also fires on init() after event-log replay,
+   * i.e. every engine restart re-arms the current pick. PushService claims the
+   * (league_id, pick_number) row in public.push_deliveries and only sends if it
+   * won, so a mid-draft deploy cannot re-notify a lobby.
+   *
+   * Ownerless seats resolve to zero device tokens inside the service, so AI
+   * teams cost one cheap lookup and send nothing.
+   */
+  private notifyOnClockDevice(deadline: Date): void {
+    try {
+      if (this.format !== 'snake' && this.format !== 'linear') {
+        return;
+      }
+      if (this.picksMade >= this.draftOrder.length) {
+        return;
+      }
+      const onClockTeamId = this.draftOrder[this.picksMade].teamId;
+      if (!onClockTeamId) {
+        return;
+      }
+      const push = getPushService(this.supabase);
+      if (!push.isConfigured()) {
+        return;
+      }
+      void push
+        .notifyOnTheClock({
+          leagueId: this.leagueId,
+          pickNumber: this.picksMade + 1,
+          teamId: onClockTeamId,
+          deadlineIso: deadline.toISOString(),
+        })
+        .catch((err: unknown) => {
+          structuredLogger.warn(
+            `[lobby] push notify failed lobbyId=${this.lobbyId} pick=${this.picksMade + 1}: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        });
+    } catch (err) {
+      structuredLogger.warn(
+        `[lobby] push notify threw lobbyId=${this.lobbyId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   private setPickDeadline(
