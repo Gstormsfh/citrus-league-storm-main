@@ -1,32 +1,50 @@
-// E80 V1-FENCE (2026-08-11) — source-shape lock for the P0 pre-TWELVE
-// fix. F28 IGNITION Run 1 (Entry 80) surfaced that v1's legacy
-// client-side draft machinery ran an ENTIRE draft in Garrett's
-// browser after his refresh landed on an old /draft-room?league= URL
-// for a v2-era league — engine deaf, v1 rendered lobby, v1's
-// autopick fired locally, v1 wrote 12 picks to v1 tables, v1 flipped
-// league status. T7 fenced the legacy START button; the fence tested
-// here catches the RUNNING machinery ever landing on a v2-era league
-// at all.
+// E80 V1-FENCE (2026-08-11) → RETIREMENT (2026-08-18) — source-shape lock.
+//
+// History, because the shape of this fence is a record of two field
+// incidents:
+//
+// E80 (2026-08-11): v1's legacy client-side draft machinery ran an
+// ENTIRE draft in Garrett's browser after a refresh landed on an old
+// /draft-room?league= URL for a v2-era league — engine deaf, v1
+// rendered lobby, v1's autopick fired locally, v1 wrote 12 picks to
+// v1 tables, v1 flipped league status. The fence was born: probe the
+// league's v2-era status, redirect v2-era leagues to /draft-v2,
+// mount v1 only when "v1-safe".
+//
+// RETIREMENT (2026-08-18): production field evidence (league
+// 0c84a9e5, "Chris Dacosta TESTTTTERRRR") proved the probe's
+// remaining branch was itself the defect. A FRESH league probes
+// v2Era=false — correctly, it has no events yet — so the fence
+// mounted v1 "safely" and the whole draft ran on the legacy
+// reserve/confirm path: 7 picks in v1 draft_picks, zero engine
+// events, and the sluggish per-pick latency v2 was built to
+// eliminate. "v1-safe" was really "v1-DEFAULT", and every new league
+// starts fresh. The v2 lobby fully handles not_started leagues (T7
+// Start linkage, proven by THE TWELVE), so the probe is gone: any
+// leagueId routes straight to /draft-v2. The v1 body remains only as
+// the !leagueId fall-through (the load-user-league URL-rewrite
+// dance), pending full deletion (trim backlog).
 //
 // Source-read pattern matches DraftRoom.copyLock.test.tsx: the file
-// is 5100+ lines with 30+ dependencies to mock; a full render test
+// is 5000+ lines with 30+ dependencies to mock; a full render test
 // would take longer to author than the fence itself. The fence's
 // shape is small + load-bearing + easy to regress silently, so a
 // structural lock is the right test surface.
 //
 // The load-bearing contracts asserted below:
-//   1. useV1Fence hook exists and probes `draft_events` filtered by
-//      league_id (not some other table, not unfiltered).
-//   2. Non-zero probe result → state.kind = 'v2-era' (the redirect
-//      branch); empty result → 'v1-safe' (v1 body mounts).
-//   3. Top-level DraftRoom wrapper renders a <Navigate to="/draft-v2/…"
-//      replace> when fence.kind === 'v2-era' — BEFORE DraftRoomInner
-//      can mount. `replace: true` is required so the back button
-//      doesn't reland on /draft-room.
-//   4. The legacy body was renamed to DraftRoomInner and only mounts
-//      from the 'v1-safe' branch (proves the wrapper pattern is in
-//      place — not a hook-early-return which would violate React's
-//      hook-order rule with hundreds of downstream hooks).
+//   1. useV1Fence exists and routes EVERY league with a leagueId to
+//      'v2-era' — unconditionally. No probe, no v2Era branch, no
+//      "fall through to v1" path for a league that has an id.
+//   2. Top-level DraftRoom wrapper renders <Navigate to="/draft-v2/…"
+//      replace> for 'v2-era' — BEFORE DraftRoomInner can mount.
+//      `replace: true` so back-button doesn't reland on /draft-room.
+//   3. 'v1-safe' is reachable ONLY from the !leagueId early return
+//      (stale bare-URL fall-through), and the legacy body mounts
+//      only from that branch via the wrapper pattern (not a
+//      hook-early-return, which would violate hook-order with
+//      hundreds of downstream hooks).
+//   4. Both branches log — E104 always-log doctrine survives the
+//      retirement. `[V1-FENCE]` stays the stable operator grep.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -37,139 +55,92 @@ const HERE = resolve(fileURLToPath(import.meta.url), '..');
 const DR_PATH = resolve(HERE, '..', 'DraftRoom.tsx');
 const source = readFileSync(DR_PATH, 'utf8');
 
-describe('DraftRoom.tsx — E80 V1-FENCE + E104 FENCE-2 (source-shape lock)', () => {
+// The E80/E104 history lives in comments and legitimately NAMES the old
+// probe (`/era`, v2Era, supabase.from('draft_events')) in prose. The
+// negative assertions below are about CODE, so they run against a
+// comment-stripped view; the history stays readable without tripping them.
+const code = source
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .split('\n')
+  .map((l) => {
+    const i = l.indexOf('//');
+    return i === -1 ? l : l.slice(0, i);
+  })
+  .join('\n');
+
+describe('DraftRoom.tsx — V1-FENCE retirement (source-shape lock)', () => {
   it('useV1Fence hook is declared at module scope', () => {
-    // Not just any variable named useV1Fence — a proper function
-    // declaration or `const useV1Fence = ` (must resemble a hook).
     expect(source).toMatch(/function useV1Fence\s*\(/);
   });
 
-  it('E104 FENCE-2: fence probes the API era endpoint (not client-side supabase RLS)', () => {
-    // E104 rewire: client-side supabase.from('draft_events') RLS
-    // probe was subject to a session-restore race on first mount —
-    // supabase-js hadn't attached the session, so RLS returned zero
-    // rows silently for authenticated members and the fence fell
-    // through to v1. Fix: probe the API server (`GET /api/draft/v2/
-    // league/:leagueId/era` → `{v2Era: boolean}`), which uses
-    // service-role EXISTS immune to client session timing.
-    expect(source).toMatch(/\/api\/draft\/v2\/league\/\$\{encodeURIComponent\(leagueId\)\}\/era/);
+  it('RETIREMENT: no era probe remains — the API era endpoint is not called', () => {
+    // The probe's remaining "v1-safe for fresh leagues" branch was the
+    // 2026-08-18 defect. If this path reappears, the v1 room becomes the
+    // default for every new league again.
+    expect(code).not.toMatch(/\/api\/draft\/v2\/league\/.*\/era/);
+    expect(code).not.toMatch(/v2Era/);
   });
 
-  it('E104 FENCE-2: fence probe reads v2Era boolean from response', () => {
-    // Load-bearing shape: response.data.v2Era. Any refactor that
-    // renames the field or expects a different shape breaks the
-    // fence silently — machine-lock it.
-    expect(source).toMatch(/v2Era/);
-    expect(source).toMatch(/payload\?\.v2Era/);
+  it('E104 heritage: fence does NOT probe supabase.from(draft_events) client-side', () => {
+    // The pre-E104 RLS probe had a session-restore race. It must not
+    // come back in any form.
+    const fenceRegion = code.slice(0, code.indexOf('const DraftRoomInner'));
+    expect(fenceRegion).not.toMatch(/from\(['"]draft_events['"]\)/);
   });
 
-  it('E104 FENCE-2: fence does NOT probe supabase.from(draft_events) directly (removed)', () => {
-    // Regression pin: the pre-E104 client-side RLS probe must
-    // stay removed. If a future refactor reintroduces
-    // `supabase.from('draft_events')` inside useV1Fence, the
-    // session-restore race returns.
-    // Extract useV1Fence body and assert absence.
-    const hookMatch = source.match(
-      /function useV1Fence[\s\S]*?^\}/m,
-    );
-    expect(hookMatch).not.toBeNull();
-    if (hookMatch) {
-      expect(hookMatch[0]).not.toMatch(/supabase\.from\(['"]draft_events['"]\)/);
-      expect(hookMatch[0]).not.toMatch(/untypedFrom\(['"]draft_events['"]\)/);
-    }
+  it('RETIREMENT: any leagueId routes to v2-era unconditionally', () => {
+    // The retirement log and the unconditional setState must both be
+    // present, in the effect, with no conditional between them and the
+    // leagueId guard.
+    expect(source).toMatch(/\[V1-FENCE\] v1 draft room retired \(2026-08-18\); routing to \/draft-v2/);
+    expect(source).toMatch(/setState\(\{ kind: 'v2-era', leagueId \}\)/);
   });
 
   it('fence state includes checking / v2-era / v1-safe discriminants', () => {
-    // The three-state union is the load-bearing shape: checking →
-    // suppresses v1 mount; v2-era → hard redirect; v1-safe → mount
-    // legacy body. A collapse to boolean would lose the ability to
-    // gate mounting during the probe window.
-    expect(source).toContain("kind: 'checking'");
-    expect(source).toContain("kind: 'v2-era'");
-    expect(source).toContain("kind: 'v1-safe'");
+    expect(source).toMatch(/kind: 'checking'/);
+    expect(source).toMatch(/kind: 'v2-era'/);
+    expect(source).toMatch(/kind: 'v1-safe'/);
   });
 
-  it('v2-era detection renders <Navigate to="/draft-v2/…" replace>', () => {
-    // The redirect target MUST be /draft-v2/:leagueId (not
-    // /draft-room, not /gm-office, not root) with replace: true so
-    // browser back doesn't reland on the fenced surface.
-    // Match tolerates ordering of the props + template-literal or
-    // string composition of the URL.
+  it("v2-era renders <Navigate to='/draft-v2/…' replace>", () => {
     expect(source).toMatch(
-      /<Navigate[\s\S]*to=\{`\/draft-v2\/\$\{encodeURIComponent\(fence\.leagueId\)\}`\}[\s\S]*replace/,
+      /Navigate\s*\n?\s*to=\{`\/draft-v2\/\$\{encodeURIComponent\(fence\.leagueId\)\}`\}\s*\n?\s*replace/,
     );
   });
 
+  it('DraftRoom wrapper mounts DraftRoomInner only from the v1-safe branch', () => {
+    // Wrapper pattern: the v2-era and checking branches return before
+    // the inner body, and the final return is the inner mount.
+    const wrapper = source.slice(
+      source.indexOf('const DraftRoom = () =>'),
+      source.indexOf('const DraftRoomInner'),
+    );
+    expect(wrapper).toContain("fence.kind === 'v2-era'");
+    expect(wrapper).toContain("fence.kind === 'checking'");
+    expect(wrapper).toContain('return <DraftRoomInner />');
+  });
+
+  it("'v1-safe' is set only from the !leagueId early return", () => {
+    // Count setState calls that produce v1-safe: exactly one, and it
+    // must sit inside the !leagueId guard. A second v1-safe site means
+    // someone reopened a with-league path into the legacy room.
+    const matches = source.match(/setState\(\{ kind: 'v1-safe' \}\)/g) ?? [];
+    expect(matches).toHaveLength(1);
+    const guardIdx = source.indexOf('if (!leagueId) {');
+    const setIdx = source.indexOf("setState({ kind: 'v1-safe' })");
+    expect(guardIdx).toBeGreaterThan(-1);
+    expect(setIdx).toBeGreaterThan(guardIdx);
+    // …and before the guard's closing early return ends the branch.
+    const returnIdx = source.indexOf('return;', guardIdx);
+    expect(setIdx).toBeLessThan(returnIdx);
+  });
+
+  it('E104 always-log doctrine: both fence branches log with the stable prefix', () => {
+    expect(source).toMatch(/\[V1-FENCE\] no leagueId on mount/);
+    expect(source).toMatch(/\[V1-FENCE\] v1 draft room retired/);
+  });
+
   it('checking state renders a placeholder (not v1 UI) to suppress arm', () => {
-    // A stable data-testid so future test authors can lock behavior
-    // + so operator debugging has a targetable selector during the
-    // probe window. Any suppression element is acceptable; the
-    // testid is the mnemonic anchor.
-    expect(source).toContain('data-testid="v1-fence-checking"');
-  });
-
-  it('DraftRoom wrapper mounts DraftRoomInner only from v1-safe branch', () => {
-    // The wrapper pattern is REQUIRED — a hook-early-return inside
-    // the same component would violate React's hook-order rule
-    // against hundreds of downstream v1 hooks. Match ensures the
-    // rename to DraftRoomInner is present and used from the wrapper.
-    expect(source).toMatch(/const DraftRoomInner = \(\) => \{/);
-    expect(source).toMatch(/return <DraftRoomInner \/>/);
-  });
-
-  it('fence effect handles missing leagueId (falls through to v1-safe)', () => {
-    // No leagueId in the URL → the legacy load-user-league path
-    // handles the redirect itself. The fence must not block that
-    // path or infinite-loop on null.
-    expect(source).toMatch(/if \(!leagueId\)[\s\S]*setState\(\{ kind: 'v1-safe' \}\)/);
-  });
-
-  it('fence effect defensively falls through to v1 on DB errors', () => {
-    // Probe failure is a v1 fall-through by architect ratification
-    // (Entry 80 fence-not-block doctrine): the fence's job is to
-    // CATCH v2-era leagues, not to block v1 leagues on a transient
-    // DB error. The T7 START-button fence catches the other rail.
-    // Match on the fall-through logger tag or the setState pattern.
-    expect(source).toMatch(/\[V1-FENCE\][\s\S]*setState\(\{ kind: 'v1-safe' \}\)/);
-  });
-
-  // ── E104 always-log doctrine ────────────────────────────────────
-  //
-  // Morning field verification (E104) spent hours proving a
-  // negative the fence could have printed. Post-E104: EVERY branch
-  // logs with the `[V1-FENCE]` prefix. Below assertions pin each
-  // branch's log surface so a future silent-fence regression fails
-  // here before it costs another verification cycle.
-
-  it('E104: !leagueId early return logs', () => {
-    // Pre-E104 this branch was silent; a stale mount looked
-    // indistinguishable from a real probe.
-    expect(source).toMatch(/\[V1-FENCE\][^]*no leagueId/i);
-  });
-
-  it('E104: probe-start log fires before the fetch', () => {
-    // Instrumentation: a probe-start line makes it possible to see
-    // "probe fired but no response" in the console vs "probe never
-    // fired at all" (the E103/E104 silent-fall-through defect).
-    expect(source).toMatch(/\[V1-FENCE\][^]*probing era endpoint/i);
-  });
-
-  it('E104: v2Era=true redirect log fires before setState', () => {
-    // The load-bearing branch: a v2-era detection must be visible
-    // in the console so a field observer can confirm the fence
-    // fired.
-    expect(source).toMatch(/\[V1-FENCE\][^]*v2Era=true/);
-  });
-
-  it('E104: v2Era=false v1-safe log fires', () => {
-    // The mundane branch — still logs so operators can distinguish
-    // "probe returned false" from "probe never returned".
-    expect(source).toMatch(/\[V1-FENCE\][^]*v2Era=false/);
-  });
-
-  it('E104: probe error log fires before defensive fall-through', () => {
-    // Any error path must log — the pre-E104 silent-catch was the
-    // exact defect class that made FENCE-2 necessary.
-    expect(source).toMatch(/\[V1-FENCE\][^]*era probe threw/i);
+    expect(source).toMatch(/data-testid="v1-fence-checking"/);
   });
 });

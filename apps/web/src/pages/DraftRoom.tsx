@@ -140,65 +140,30 @@ type V1FenceState =
 function useV1Fence(leagueId: string | null): V1FenceState {
   const [state, setState] = useState<V1FenceState>({ kind: 'checking' });
   useEffect(() => {
-    let cancelled = false;
     // Always-log per E104 doctrine: the !leagueId early return
     // used to be silent; now instrumented so a stale mount can be
-    // distinguished from a real probe.
+    // distinguished from a real redirect.
     if (!leagueId) {
       logger.log('[V1-FENCE] no leagueId on mount; falling through to v1 (legacy load-user-league path handles redirect)');
       setState({ kind: 'v1-safe' });
       return;
     }
-    logger.log('[V1-FENCE] probing era endpoint', { leagueId });
-    (async () => {
-      try {
-        // E104 FENCE-2 rewire: hit the API server (service-role
-        // EXISTS via authMiddleware) instead of client-side supabase
-        // RLS. The prior RLS probe was subject to a session-restore
-        // race on first mount — supabase-js hadn't attached the JWT
-        // yet, so `draft_events` (RLS: "commissioner or team owner")
-        // returned zero rows silently even for authenticated members.
-        const { apiClient } = await import('@/api/client');
-        const path = `/api/draft/v2/league/${encodeURIComponent(leagueId)}/era`;
-        const response = await apiClient.get<{ v2Era: boolean }>(path);
-        if (cancelled) return;
-        // apiClient responses may have {data} envelope or return the
-        // payload at top level (both patterns exist in the codebase —
-        // see defaultFetchDiscovery in draftClient/runner.ts).
-        const payload =
-          response.data ?? (response as unknown as { v2Era?: boolean });
-        if (response.error !== undefined || typeof payload?.v2Era !== 'boolean') {
-          logger.warn(
-            '[V1-FENCE] era probe returned unexpected shape; falling through to v1',
-            { leagueId, response },
-          );
-          setState({ kind: 'v1-safe' });
-          return;
-        }
-        if (payload.v2Era) {
-          logger.log('[V1-FENCE] v2Era=true; redirecting to /draft-v2', { leagueId });
-          setState({ kind: 'v2-era', leagueId });
-          return;
-        }
-        logger.log('[V1-FENCE] v2Era=false; mounting v1 body', { leagueId });
-        setState({ kind: 'v1-safe' });
-      } catch (err) {
-        if (cancelled) return;
-        // Query failure is defensive fall-through to v1: if we cannot
-        // verify the league's v2-era status, prefer not to silently
-        // redirect (the guard's job is to CATCH v2-era leagues, not
-        // to block v1 leagues on a transient error). The v1 path has
-        // other rails (T7 START fence). ALWAYS log per E104 doctrine.
-        logger.warn(
-          '[V1-FENCE] era probe threw; falling through to v1',
-          { leagueId, error: err instanceof Error ? err.message : String(err) },
-        );
-        setState({ kind: 'v1-safe' });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    // RETIREMENT (2026-08-18): the era probe is gone — every league with a
+    // leagueId routes straight to /draft-v2. Field evidence from production
+    // (league 0c84a9e5, "Chris Dacosta TESTTTTERRRR", 2026-08-18 18:06Z): a
+    // FRESH league probed v2Era=false — correctly, it had no events yet —
+    // so the fence mounted v1 "safely" and the ENTIRE draft ran on the
+    // legacy reserve/confirm path: 7 picks in v1 draft_picks, zero engine
+    // events, draft_state never left not_started, and the sluggish per-pick
+    // latency v2 was built to eliminate. For a fresh league "v1-safe" was
+    // really "v1-DEFAULT", and every new league starts fresh — so the shiny
+    // engine room was only reachable by leagues that had already used it.
+    // The v2 lobby fully handles not_started leagues (T7 Start linkage,
+    // proven by THE TWELVE), so no league state needs the v1 room anymore.
+    // The v1 body remains only as the !leagueId fall-through above, pending
+    // full deletion (trim backlog).
+    logger.log('[V1-FENCE] v1 draft room retired (2026-08-18); routing to /draft-v2', { leagueId });
+    setState({ kind: 'v2-era', leagueId });
     // E104: dep list includes leagueId so a null→value transition
     // (URL rewrite dance: /draft-room mounts with no ?league=, then
     // the load-user-league path rewrites to /draft-room?league=X)
