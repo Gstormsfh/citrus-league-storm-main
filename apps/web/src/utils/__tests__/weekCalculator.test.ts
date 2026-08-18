@@ -163,7 +163,7 @@ import { clampToSeasonStart, getAvailableWeeks as gaw } from '../weekCalculator'
 describe2('clampToSeasonStart — offseason drafts land on the season opener', () => {
   it2('THE regression: an August draft clamps to the Monday of Oct-1 week', () => {
     const clamped = clampToSeasonStart(new Date(2026, 7, 16)); // Aug 16 2026
-    expect2(clamped.getMonth()).toBe(8 + 1 === 9 ? 8 : 8); // September or October Monday
+    expect2(clamped.getMonth()).toBe(8); // Sep 28 - September is month index 8
     // Oct 1 2026 is a Thursday → Monday of that week is Sep 28.
     expect2(clamped.getFullYear()).toBe(2026);
     expect2([8, 9]).toContain(clamped.getMonth()); // Sep 28 = month 8
