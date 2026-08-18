@@ -172,7 +172,7 @@ export default function PoolPlayoffHub() {
     // Need SOMETHING playoff-specific to load
     if (lgType !== 'playoff-roster-pool' && lgType !== 'playoff-bracket-pickem' && lgType !== 'playoff-confidence-pool') return;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const sb = supabase as any;
     const isRosterPool = lgType === 'playoff-roster-pool';
 
@@ -331,7 +331,7 @@ export default function PoolPlayoffHub() {
     if (!leagueId) return;
     const fetchStandings = async () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const { data } = await (supabase as any)
           .from('playoff_pool_standings')
           .select('user_id, total_points, current_rank')

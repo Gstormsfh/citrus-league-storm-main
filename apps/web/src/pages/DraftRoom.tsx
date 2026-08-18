@@ -334,12 +334,14 @@ const DraftRoomInner = () => {
   const actualLoading = loading || authLoading || (!user && userLeagueState !== 'guest' && userLeagueState !== 'logged-in-no-league');
   const displayLoading = useMinimumLoadingTime(actualLoading, 400);
 
-  // T7 architect Entry 7 (2026-08-08): commissioner Start Draft button now
+  // T7 architect Entry 7 (2026-08-08): commissioner Start Draft button
   // wires through F27 start_draft_v2 via useStartDraftFull hook. isPending
-  // gates the DraftLobby buttons across both init + ignition steps
-  // (Condition 3). Legacy handleStartDraft renamed
-  // handleStartDraftLegacy_DEPRECATED below and slated for deletion once
-  // THE TWELVE ships and the v2 route is proven in prod (task #60).
+  // gates the DraftLobby buttons across both init + ignition steps.
+  // TRIM (2026-08-18, task #60 closed): the legacy flip-era handler
+  // (handleStartDraftLegacy_DEPRECATED, 234 lines) was deleted after the
+  // v2 route carried three live production drafts (252+48+28 picks).
+  // Server-side v1 remnants (routes/draft.ts POST start, api/draft.ts
+  // startDraft wrapper) are docketed in docs/TRIM_LEDGER_2026-08-18.md.
   const startDraftFull = useStartDraftFull();
 
   // ── Lookup Maps (O(1) instead of O(n) for .find()) ──────────────
@@ -1528,7 +1530,7 @@ const DraftRoomInner = () => {
     };
   // Supabase realtime subscription: league, draftPhase, teams, and resolveTeamOrder are accessed
   // via refs/functional-updaters to prevent re-subscribing on state changes (causes missed events).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [leagueId, user?.id]);
 
   const loadDraftState = async (retryCount: number = 0, skipStatusCheck: boolean = false): Promise<DraftState | null> => {
@@ -3214,256 +3216,6 @@ const DraftRoomInner = () => {
     }
   };
 
-  /**
-   * @deprecated LEGACY v1 flip-era start-draft handler. RENAMED
-   * (2026-08-08 T7 architect Entry 7 wire-up) and no longer wired to
-   * DraftLobby. Retained temporarily as a safety net during THE TWELVE
-   * (Aug 8-15) in case a rollback is required. Scheduled for deletion
-   * post-TWELVE per task #60 alongside:
-   *   - server/src/routes/draft.ts POST /league/:leagueId/start (v1)
-   *   - apps/web/src/api/draft.ts startDraft() client wrapper
-   *   - server/src/services/DraftService.ts start-draft flip logic (if any)
-   *
-   * The legacy flow used `leagueApi.updateSettings({draft_status:'in_progress'})`
-   * to flip status without going through start_draft_v2 — bypassing F27's
-   * preflight taxonomy, idempotency, event-log ignition, and audit trail.
-   * Anti-pattern per Phase 4.5 architecture (event-sourcing principle).
-   */
-  const handleStartDraftLegacy_DEPRECATED = async (settings: DraftSettings) => {
-    // ⚠️ DEMO STATE: Disable all draft actions
-    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
-      if (userLeagueState === 'guest') {
-        navigate('/auth');
-      } else {
-        navigate('/create-league');
-      }
-      return;
-    }
-
-    if (!leagueId) return;
-
-    // Non-commissioners can rejoin an in-progress draft (but not start a new one)
-    if (!isCommissioner) {
-      if (league?.draft_status === 'in_progress') {
-        logger.log('Non-commissioner rejoining in-progress draft');
-        // Transition to ACTIVE immediately — don't wait on network. The draft board
-        // falls back to `teams` when `orderedTeamsForBoard` is empty, and loadDraftState
-        // will populate state in the background.
-        setDraftPhase(DraftPhase.ACTIVE);
-
-        // Parallelize all fetches — previously these were sequential, causing 3+ round trips
-        // before the user saw anything. Don't gate the draft-order call on sessionId —
-        // the server query returns the latest round-1 order regardless.
-        try {
-          const [stateRes, orderRes, picksRes] = await Promise.all([
-            DraftService.getDraftState(leagueId, teams, league.draft_rounds || 21, user?.id),
-            DraftService.getDraftOrder(leagueId, user?.id || '', 1),
-            DraftService.getDraftPicks(leagueId, user?.id || ''),
-          ]);
-
-          if (stateRes.state) {
-            setDraftState(stateRes.state);
-          }
-
-          if (orderRes.order && orderRes.order.team_order && orderRes.order.team_order.length > 0) {
-            const orderedTeams = resolveTeamOrder(orderRes.order.team_order);
-            if (orderedTeams.length === teams.length) {
-              setOrderedTeamsForBoard(orderedTeams);
-            }
-          }
-
-          // Auto-start timer if picks already exist
-          const activeRejoinPicks = picksRes.picks.filter((p: DraftPick) => !p.deleted_at);
-          if (activeRejoinPicks.length > 0) {
-            setDraftHistory(activeRejoinPicks);
-            setDraftedPlayerIds(new Set(activeRejoinPicks.map(p => p.player_id)));
-            setDraftTimerStarted(true);
-            draftTimerStartedRef.current = true;
-          }
-        } catch (rejoinErr) {
-          logger.error('Non-commissioner rejoin: error loading draft data:', rejoinErr);
-          // loadDraftState will retry via polling fallback
-        }
-        return;
-      }
-      // Non-commissioners can't start a new draft
-      return;
-    }
-
-    // Commissioner rejoining an in-progress draft (not starting a new one)
-    if (league?.draft_status === 'in_progress') {
-      logger.log('Commissioner rejoining in-progress draft');
-      setDraftPhase(DraftPhase.ACTIVE);
-
-      // Parallelize all fetches — 3 sequential round-trips was causing a visible delay
-      // when rejoining on mobile.
-      try {
-        const [stateRes, orderRes, picksRes] = await Promise.all([
-          DraftService.getDraftState(leagueId, teams, league.draft_rounds || 21, user?.id),
-          DraftService.getDraftOrder(leagueId, user?.id || '', 1),
-          DraftService.getDraftPicks(leagueId, user?.id || ''),
-        ]);
-
-        if (stateRes.state) {
-          setDraftState(stateRes.state);
-        }
-
-        if (orderRes.order && orderRes.order.team_order && orderRes.order.team_order.length > 0) {
-          const orderedTeams = resolveTeamOrder(orderRes.order.team_order);
-          if (orderedTeams.length === teams.length) {
-            setOrderedTeamsForBoard(orderedTeams);
-          }
-        }
-
-        // Auto-start timer if picks already exist (otherwise commissioner sees "Start Draft Timer" button)
-        const activeRejoinPicks = picksRes.picks.filter((p: DraftPick) => !p.deleted_at);
-        if (activeRejoinPicks.length > 0) {
-          setDraftHistory(activeRejoinPicks);
-          setDraftedPlayerIds(new Set(activeRejoinPicks.map(p => p.player_id)));
-          setDraftTimerStarted(true);
-          draftTimerStartedRef.current = true;
-        }
-      } catch (rejoinErr) {
-        logger.error('Commissioner rejoin: error loading draft data:', rejoinErr);
-      }
-      return;
-    }
-
-    try {
-      logger.log('handleStartDraft: Starting draft', { leagueId, settings, teamsCount: teams.length });
-      
-      setDraftSettings(settings);
-      setTimeRemaining(settings.pickTimeLimit);
-
-      // Always (re)initialize draft order when starting a draft.
-      // This ensures the randomized/custom order from the lobby is actually used,
-      // rather than stale order rows from a previous draft attempt.
-      const draftRounds = settings.rounds || league?.draft_rounds || 21;
-      // Priority: effectiveOrder from DraftLobby (most reliable) > settings.customOrder > local state > none
-      const orderToUse = settings.effectiveOrder
-        || (settings.draftOrder === 'custom' && settings.customOrder ? settings.customOrder : undefined)
-        || customDraftOrder
-        || randomizedTeamOrder
-        || undefined;
-
-      logger.log('handleStartDraft: Initializing draft order', {
-        hasEffectiveOrder: !!settings.effectiveOrder,
-        hasCustomOrder: !!orderToUse,
-        orderLength: orderToUse?.length,
-        orderFirstTeam: orderToUse?.[0],
-        draftRounds
-      });
-
-      const startDraftType = (league?.settings as LeagueSettings)?.draftType || 'snake';
-      const { error: initError } = await DraftService.initializeDraftOrder(
-        leagueId,
-        user.id,
-        teams,
-        draftRounds,
-        true, // resetExisting=true to always delete old orders and create fresh ones
-        orderToUse,
-        startDraftType
-      );
-
-      if (initError) {
-        toast({ title: "Draft Hiccup", description: `Failed to initialize draft order: ${(initError as any).message || 'Unknown error'}. Please try preparing the draft first.`, variant: "destructive" });
-        return;
-      }
-
-      // Update league status to in_progress and save draft settings + rounds
-      try {
-        await leagueApi.updateSettings(leagueId, {
-          draft_status: 'in_progress',
-          draft_rounds: settings.rounds,
-          settings: {
-            ...(league?.settings || {}),
-            pickTimeLimit: settings.pickTimeLimit,
-            draftOrder: settings.draftOrder
-          }
-        } as Record<string, unknown>);
-      } catch (leagueStatusErr) {
-        const leagueStatusError = leagueStatusErr instanceof Error ? leagueStatusErr : new Error('Unknown error');
-        logger.error('Error updating league status:', leagueStatusError);
-        toast({ title: "Draft Hiccup", description: `Failed to start draft: ${leagueStatusError.message || 'Unknown error'}`, variant: "destructive" });
-        return;
-      }
-
-      // Update local league state with saved settings and rounds
-      if (league) {
-        setLeague({
-          ...league,
-          draft_status: 'in_progress',
-          draft_rounds: settings.rounds,
-          settings: {
-            ...(league.settings || {}),
-            pickTimeLimit: settings.pickTimeLimit,
-            draftOrder: settings.draftOrder
-          }
-        });
-      }
-
-      // Set draft phase to active
-      setDraftPhase(DraftPhase.ACTIVE);
-      
-      // Clear any old draft state and reset timer started flag
-      setDraftState(null);
-      setDraftHistory([]);
-      setDraftedPlayerIds(new Set());
-      setDraftTimerStarted(false); // Reset so commissioner must click "Start Draft Timer"
-
-      // Load draft state immediately and keep retrying until it works
-      // Uses ref-tracked timeouts so unmount can cancel pending retries
-      const loadStateAfterStart = async (retryCount: number = 0) => {
-        try {
-          // Verify draft order exists
-          const { order: verifyOrder, error: orderError } = await DraftService.getDraftOrder(leagueId, user.id, 1);
-
-          if (orderError || !verifyOrder) {
-            if (retryCount < 10) {
-              logger.log(`Draft order not found, retrying (${retryCount + 1}/10)...`);
-              startDraftRetryRef.current = setTimeout(() => loadStateAfterStart(retryCount + 1), 500);
-              return;
-            } else {
-              logger.error('Draft order not found after max retries');
-              return;
-            }
-          }
-
-          // Load draft state
-          const updatedLeagueRes = await leagueApi.getLeague(leagueId);
-          const updatedLeague = updatedLeagueRes.data as League | null;
-
-          if (updatedLeague?.draft_status === 'in_progress') {
-            const loadedState = await loadDraftState(0, true);
-            if (loadedState) {
-              logger.log('Draft state loaded successfully after start');
-            } else if (retryCount < 10) {
-              startDraftRetryRef.current = setTimeout(() => loadStateAfterStart(retryCount + 1), 500);
-            }
-          }
-        } catch (stateError: unknown) {
-          logger.error('Error loading draft state after start:', stateError);
-          if (retryCount < 10) {
-            startDraftRetryRef.current = setTimeout(() => loadStateAfterStart(retryCount + 1), 500);
-          }
-        }
-      };
-
-      // Start loading state immediately
-      startDraftRetryRef.current = setTimeout(() => loadStateAfterStart(0), 500);
-
-      // SOC 2 CC7.2: Audit log draft start
-      import('@/services/AuditService').then(({ AuditService }) => 
-        AuditService.logDraftEvent('DRAFT_START', leagueId, { teamsCount: teams.length, rounds: settings.rounds })
-      ).catch(() => {});
-
-      logger.log('handleStartDraft: Draft started successfully');
-    } catch (error: unknown) {
-      logger.error('handleStartDraft: Error starting draft', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast({ title: "Draft Hiccup", description: `Failed to start draft: ${errorMessage}`, variant: "destructive" });
-    }
-  };
 
   // Handle pausing the draft timer
   // Handle pausing the draft timer - clears timerStartedAt in DB
