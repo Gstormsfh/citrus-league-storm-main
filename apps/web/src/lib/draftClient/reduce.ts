@@ -21,7 +21,11 @@ import type {
   SideEffect,
 } from './types';
 import { classifyCloseCode } from './closeCodes';
-import { computeBackoffMs } from './backoff';
+import {
+  computeBackoffMs,
+  JITTER_FACTOR,
+  NOT_STARTED_POLL_MS,
+} from './backoff';
 
 /**
  * Random function used by `reduce` to compute backoff delays. Default
@@ -174,8 +178,66 @@ function handleTokenFetchFailed(
       sideEffects: [],
     };
   }
-  // Transient — back off and retry.
-  return scheduleReconnect(state.attempt, event.error, randomFn);
+  // ARCHITECT 2026-08-12 (LOBBY-WAIT / inbox E124) — branch A:
+  // `not_started` is NOT an error. Discovery is correctly refusing
+  // because the commissioner has not pressed START. Hold a flat,
+  // jittered 3s poll and flag the state so the UI can say so in
+  // words, instead of escalating a backoff curve against an event
+  // that will arrive on a human's schedule. See NOT_STARTED_POLL_MS
+  // for why this one case must not escalate.
+  if (
+    event.statusCode === 409 &&
+    event.draftStatus === 'not_started'
+  ) {
+    const jitter = (randomFn() * 2 - 1) * JITTER_FACTOR;
+    const delayMs = Math.max(
+      500,
+      Math.round(NOT_STARTED_POLL_MS * (1 + jitter)),
+    );
+    return {
+      state: {
+        kind: 'reconnecting',
+        // Reset the error-escalation counter, don't carry it. Reaching
+        // this branch required a COMPLETED round trip whose body we
+        // parsed — 409 DRAFT_NOT_CONNECTABLE with status not_started.
+        // That is positive proof the API is healthy and only the draft
+        // hasn't begun, which is the same thing a successful connect
+        // proves and which `currentAttempt` already resets on. Without
+        // the reset, a client that had climbed to a 30s backoff during
+        // an earlier outage would carry that penalty into its first
+        // real error AFTER recovery, for no reason.
+        attempt: 0,
+        nextAttemptAt: Date.now() + delayMs,
+        lastError: null,
+        waitingForStart: true,
+      },
+      sideEffects: [{ kind: 'schedule_backoff_timer', delayMs }],
+    };
+  }
+  // Branch B — a real transient failure (5xx, network, unclassified).
+  // ARCHITECT 2026-08-12 (LOBBY-WAIT / inbox E124): this line used to
+  // read `scheduleReconnect(state.attempt, ...)`. `attempt` is
+  // PRESERVED (not incremented) by `handleBackoffTimerFired` on the
+  // way back into `fetching_token`, so passing it through unchanged
+  // here pinned the counter forever and the exponential curve in
+  // `backoff.ts` never started: measured live on staging at a flat
+  // ~1s (computeBackoffMs(0), jitter 832-1138ms observed) for as long
+  // as the client was left open. Every discovery-path failure —
+  // including a genuine API outage — therefore retried at ~1Hz per
+  // client with no escalation, which is precisely the thundering herd
+  // the module's own header says it exists to prevent. `ws_closed`
+  // has always incremented correctly (`currentAttempt(state) + 1`);
+  // only this path was missing it. The `Math.min(..., 10)` cap
+  // mirrors the existing idiom at the network_changed site.
+  //
+  // A successful connect resets the counter for free: `currentAttempt`
+  // returns 0 for any state outside fetching_token/connecting/
+  // reconnecting, so one blip never leaves a client permanently slow.
+  return scheduleReconnect(
+    Math.min(state.attempt + 1, 10),
+    event.error,
+    randomFn,
+  );
 }
 
 /**

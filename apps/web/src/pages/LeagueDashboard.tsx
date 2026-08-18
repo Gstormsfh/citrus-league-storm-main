@@ -62,7 +62,7 @@ const LeagueDashboard = () => {
     waiver_process_time: '02:00:00',
     waiver_period_hours: 48,
     waiver_game_lock: true,
-    waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
+    waiver_type: 'rolling' as 'rolling' | 'reverse_draft_order' | 'faab' | 'reverse_standings',
     allow_trades_during_games: true,
     weeklyAddLimit: 0,
     seasonAddLimit: 0,
@@ -772,19 +772,20 @@ const LeagueDashboard = () => {
                           </Label>
                           <Select 
                             value={waiverSettings.waiver_type}
-                            onValueChange={(value: 'rolling' | 'faab' | 'reverse_standings') => setWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
+                            onValueChange={(value: 'rolling' | 'reverse_draft_order' | 'faab' | 'reverse_standings') => setWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
                           >
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="rolling">Rolling Priority</SelectItem>
+                              <SelectItem value="rolling">Rolling Priority (Join Order)</SelectItem>
+                              <SelectItem value="reverse_draft_order">Rolling Priority (Reverse Draft Order)</SelectItem>
                               <SelectItem value="reverse_standings">Reverse Standings</SelectItem>
                               <SelectItem value="faab">FAAB (Bidding)</SelectItem>
                             </SelectContent>
                           </Select>
                           <p className="text-xs text-white/55">
-                            Rolling: Priority moves after claim. Reverse: Worst team gets priority.
+                            Join Order: seeded by when teams joined. Reverse Draft Order: the last round-one pick holds waiver 1. Both roll — the claimant drops to the back. Reverse Standings: recomputed weekly, worst record first.
                           </p>
                         </div>
 
@@ -1272,7 +1273,7 @@ const LeagueDashboard = () => {
                                   const subject = encodeURIComponent(`Join my fantasy league: ${league.name}`);
                                   const body = encodeURIComponent(`Hi!
 
-I'd like to invite you to join my fantasy hockey league on Citrus League Storm:
+I'd like to invite you to join my fantasy hockey league on Citrus:
 
 League: ${league.name}
 Join Code: ${league.join_code}

@@ -7,6 +7,7 @@ import {
   DEFAULT_TEST_DATE,
   getHeadshotUrl,
   getSeasonGameCount,
+  getSeasonYearForDate,
 } from '../seasonConstants';
 
 // =============================================================================
@@ -133,6 +134,48 @@ describe('getHeadshotUrl', () => {
 
     it('defaults to 82 for unknown future seasons rather than throwing', () => {
       expect(getSeasonGameCount(2099)).toBe(82);
+    });
+  });
+
+
+  describe('getSeasonYearForDate — the season boundary', () => {
+    // Local Date construction on purpose: the rule reads getMonth()/getFullYear(),
+    // which are local, so a UTC-constructed date would test a different question.
+    const on = (iso: string) => {
+      const [y, m, d] = iso.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    };
+
+    it('THE 2026-27 REGRESSION: the season opens 2026-09-29, not October 1', () => {
+      // 8 regular-season games are played before Oct 1. Under the bare month
+      // rule these two days resolved to 2025, so every season-scoped query
+      // asked for the previous season on the two biggest nights of the year.
+      expect(getSeasonYearForDate(on('2026-09-28'))).toBe(2025);
+      expect(getSeasonYearForDate(on('2026-09-29'))).toBe(2026);
+      expect(getSeasonYearForDate(on('2026-09-30'))).toBe(2026);
+      expect(getSeasonYearForDate(on('2026-10-01'))).toBe(2026);
+    });
+
+    it('leaves normal October-start seasons alone', () => {
+      expect(getSeasonYearForDate(on('2024-11-15'))).toBe(2024);
+      expect(getSeasonYearForDate(on('2025-12-01'))).toBe(2025);
+      expect(getSeasonYearForDate(on('2026-04-16'))).toBe(2025);
+      expect(getSeasonYearForDate(on('2027-01-15'))).toBe(2026);
+    });
+
+    it('a September date in a season with no early-start entry stays on the month rule', () => {
+      expect(getSeasonYearForDate(on('2027-09-29'))).toBe(2026);
+      expect(getSeasonYearForDate(on('2025-09-29'))).toBe(2024);
+    });
+
+    it('CONTROL: the function actually reads its argument', () => {
+      // If it ignored the date every assertion above would pass vacuously.
+      const seen = new Set([
+        getSeasonYearForDate(on('2024-11-15')),
+        getSeasonYearForDate(on('2026-09-29')),
+        getSeasonYearForDate(on('2027-01-15')),
+      ]);
+      expect(seen.size).toBeGreaterThan(1);
     });
   });
 

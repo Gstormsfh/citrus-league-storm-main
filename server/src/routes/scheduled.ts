@@ -105,4 +105,255 @@ scheduledRoutes.post('/roster-snapshot-today', async (c) => {
   }
 });
 
+
+/**
+ * POST /api/scheduled/waiver-process
+ *
+ * SETTINGS-ENFORCEMENT (2026-08-16) — the missing ignition. The waiver
+ * processors (process_all_pending_waivers, process_faab_waivers_for_league)
+ * existed with NO scheduled caller: claims sat pending forever unless a
+ * commissioner manually hit process-all. Industry standard is automatic
+ * processing at the league's configured time (~3 AM at ESPN).
+ *
+ * Called hourly by .github/workflows/daily-waiver-process.yml. Honors
+ * each league's `waiver_process_time` to the hour via the existing
+ * `should_process_waivers_now` DB function where present, falling back
+ * to processing any league with pending claims (better processed at the
+ * wrong hour than never).
+ */
+scheduledRoutes.post('/waiver-process', async (c) => {
+  const admin = getSupabaseAdmin();
+  try {
+    const { data: pending } = await admin
+      .from('waiver_claims')
+      .select('league_id')
+      .eq('status', 'pending');
+    const leagueIds = [...new Set((pending ?? []).map((r) => r.league_id as string))];
+    if (leagueIds.length === 0) return ok(c, { processed: 0, leagues: [] });
+
+    const results: Array<Record<string, unknown>> = [];
+    let ranGlobalRolling = false;
+
+    for (const leagueId of leagueIds) {
+      const { data: league } = await admin
+        .from('leagues')
+        .select('waiver_type, waiver_process_time')
+        .eq('id', leagueId)
+        .single();
+
+      // Honor the commissioner's processing hour when the gate fn exists.
+      try {
+        const { data: due, error: dueErr } = await admin.rpc('should_process_waivers_now', {
+          p_league_id: leagueId,
+        });
+        if (!dueErr && due === false) {
+          results.push({ leagueId, skipped: 'not_due_yet' });
+          continue;
+        }
+      } catch {
+        /* gate unavailable → process anyway */
+      }
+
+      if (league?.waiver_type === 'faab') {
+        const { data, error } = await admin.rpc('process_faab_waivers_for_league', {
+          p_league_id: leagueId,
+        });
+        results.push({ leagueId, type: 'faab', error: error?.message ?? null, claims: data ?? null });
+      } else if (!ranGlobalRolling) {
+        // rolling / reverse_standings share the global processor; it is
+        // idempotent for leagues with nothing pending. Run it once.
+        const { data, error } = await admin.rpc('process_all_pending_waivers');
+        ranGlobalRolling = true;
+        results.push({ type: 'rolling_global', error: error?.message ?? null, leagues: data ?? null });
+      }
+    }
+    // NOTIFICATIONS (2026-08-16) — waiver RESULTS were silent: claims
+    // resolved and nobody was told. Notify each human owner whose claim
+    // just resolved (window covers this run; a run that dies between
+    // processing and notifying drops that batch's notifications — v1
+    // accepted trade-off, claims themselves are never lost).
+    try {
+      const windowIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      const { data: resolved } = await admin
+        .from('waiver_claims')
+        .select('id, league_id, team_id, player_id, status, failure_reason, processed_at')
+        .in('status', ['successful', 'failed'])
+        .gte('processed_at', windowIso)
+        .limit(500);
+
+      if (resolved && resolved.length > 0) {
+        const teamIds = [...new Set(resolved.map((r) => r.team_id as string))];
+        const playerIds = [...new Set(resolved.map((r) => r.player_id as number))];
+        const [{ data: owners }, { data: players }] = await Promise.all([
+          admin.from('teams').select('id, owner_id').in('id', teamIds),
+          admin.from('player_directory').select('player_id, full_name').in('player_id', playerIds),
+        ]);
+        const ownerByTeam = new Map((owners ?? []).map((t) => [t.id as string, t.owner_id as string | null]));
+        const nameById = new Map((players ?? []).map((p) => [Number(p.player_id), p.full_name as string]));
+
+        const rows = resolved.flatMap((cl) => {
+          const ownerId = ownerByTeam.get(cl.team_id as string);
+          if (!ownerId) return []; // AI team — no one to notify
+          const player = nameById.get(Number(cl.player_id)) ?? 'your target player';
+          const won = cl.status === 'successful';
+          return [{
+            league_id: cl.league_id,
+            user_id: ownerId,
+            type: 'waiver_result',
+            title: won ? 'Waiver Claim Successful' : 'Waiver Claim Missed',
+            message: won
+              ? `${player} is now on your roster.`
+              : `Your claim for ${player} did not go through${cl.failure_reason ? ` — ${cl.failure_reason}` : '.'}`,
+            metadata: { claim_id: cl.id, player_id: cl.player_id, status: cl.status },
+          }];
+        });
+        if (rows.length > 0) {
+          await admin.from('notifications').insert(rows);
+        }
+      }
+    } catch (notifyErr) {
+      logger.error('[scheduled.waiver-process] result notifications failed:', notifyErr);
+    }
+
+    return ok(c, { processed: leagueIds.length, results });
+  } catch (e) {
+    logger.error('[scheduled.waiver-process] failed:', e);
+    return fail(c, AppError.internal(e instanceof Error ? e.message : String(e)));
+  }
+});
+
+/**
+ * POST /api/scheduled/trade-review-sweep
+ *
+ * SETTINGS-ENFORCEMENT (2026-08-16) — trades under league review whose
+ * review window expired previously hung forever: submit_trade_vote
+ * blocks late votes, but nothing ever resolved the trade. Industry
+ * behaviour: a trade that survives its review period un-vetoed EXECUTES.
+ */
+scheduledRoutes.post('/trade-review-sweep', async (c) => {
+  const admin = getSupabaseAdmin();
+  try {
+    const nowIso = new Date().toISOString();
+    const { data: expired } = await admin
+      .from('trade_offers')
+      .select('id, league_id, from_team_id, to_team_id')
+      .eq('status', 'under_review')
+      .lt('review_ends_at', nowIso)
+      .limit(50);
+
+    const results: Array<Record<string, unknown>> = [];
+    for (const trade of expired ?? []) {
+      const { data: rpcData, error } = await admin.rpc('execute_trade', {
+        p_trade_offer_id: trade.id,
+      });
+      const inner = rpcData as { success?: boolean; error?: string } | null;
+      if (error || inner?.success === false) {
+        results.push({ tradeId: trade.id, error: error?.message ?? inner?.error ?? 'execute failed' });
+        continue;
+      }
+      await admin
+        .from('trade_offers')
+        .update({ status: 'accepted', processed_at: nowIso })
+        .eq('id', trade.id);
+      results.push({ tradeId: trade.id, executed: true });
+    }
+    return ok(c, { swept: (expired ?? []).length, results });
+  } catch (e) {
+    logger.error('[scheduled.trade-review-sweep] failed:', e);
+    return fail(c, AppError.internal(e instanceof Error ? e.message : String(e)));
+  }
+});
+
+/**
+ * POST /api/scheduled/matchup-sweep
+ *
+ * AUTONOMY (2026-08-16) — season progression without page visits.
+ * update_all_matchup_scores / auto_complete_matchups /
+ * auto_generate_playoff_bracket previously ran only when someone opened
+ * the right page: a league nobody visited never scored, never completed
+ * weeks, never generated its playoff bracket. Yahoo/ESPN/Sleeper advance
+ * the season server-side on a schedule; this endpoint is that schedule.
+ *
+ * Called hourly by .github/workflows/daily-waiver-process.yml (all three
+ * RPCs are idempotent — re-running is a no-op). Order matters: scores
+ * first (write final numbers), then completion (lock statuses), then
+ * playoff generation (self-guarded in SQL: skips unless draft completed,
+ * regular season fully complete, auto-playoffs enabled, and no bracket
+ * exists for the season).
+ */
+scheduledRoutes.post('/matchup-sweep', async (c) => {
+  const admin = getSupabaseAdmin();
+  try {
+    // Population: every league whose draft is done. Pre-season or
+    // matchup-less leagues no-op inside the RPCs. Deliberately NOT
+    // derived from a matchups select — that read caps at db-max-rows
+    // (1000) and would silently drop leagues as the table grows.
+    const { data: leagues, error: lErr } = await admin
+      .from('leagues')
+      .select('id')
+      .eq('draft_status', 'completed');
+    if (lErr) return fail(c, AppError.internal(lErr.message));
+
+    const scored: Array<Record<string, unknown>> = [];
+    for (const lg of leagues ?? []) {
+      // Post-draft waiver priority (inverse draft order) — idempotent
+      // no-op for every league that already has rows. Industry behaviour
+      // Yahoo/ESPN set at draft completion; the sweep is our guarantee.
+      try {
+        await admin.rpc('initialize_waiver_priority', { p_league_id: lg.id });
+      } catch { /* non-critical; next sweep retries */ }
+
+      const { data, error } = await admin.rpc('update_all_matchup_scores', {
+        p_league_id: lg.id,
+      });
+      const updated = Array.isArray(data)
+        ? data.filter((r: { updated?: boolean }) => r.updated).length
+        : 0;
+      if (error || updated > 0) {
+        scored.push({ leagueId: lg.id, updated, error: error?.message ?? null });
+      }
+    }
+
+    const { data: completedRows, error: cErr } = await admin.rpc('auto_complete_matchups');
+    const completedCount = Array.isArray(completedRows)
+      ? ((completedRows[0] as { updated_count?: number } | undefined)?.updated_count ?? 0)
+      : 0;
+
+    const playoffs: Array<Record<string, unknown>> = [];
+    for (const lg of leagues ?? []) {
+      const { data, error } = await admin.rpc('auto_generate_playoff_bracket', {
+        p_league_id: lg.id,
+      });
+      const outcome = data as { skipped?: string } | null;
+      // Only report leagues where something happened or went wrong —
+      // the common self-skip cases would drown the log otherwise.
+      if (error || !outcome?.skipped) {
+        playoffs.push({ leagueId: lg.id, result: data ?? null, error: error?.message ?? null });
+      }
+    }
+
+    // Round advancement: time-guarded in SQL (only rounds whose matchup
+    // weeks are fully completed advance), commissioner-gated function is
+    // invoked under a transaction-local claim by the definer wrapper.
+    const { data: advanced, error: advErr } = await admin.rpc('auto_advance_playoff_rounds');
+
+    logger.info(
+      '[scheduled.matchup-sweep] leagues=', (leagues ?? []).length,
+      'completed=', completedCount,
+    );
+    return ok(c, {
+      leagues: (leagues ?? []).length,
+      scored,
+      completedMatchups: completedCount,
+      completeError: cErr?.message ?? null,
+      playoffs,
+      roundsAdvanced: advanced ?? [],
+      advanceError: advErr?.message ?? null,
+    });
+  } catch (e) {
+    logger.error('[scheduled.matchup-sweep] failed:', e);
+    return fail(c, AppError.internal(e instanceof Error ? e.message : String(e)));
+  }
+});
+
 export { scheduledRoutes };

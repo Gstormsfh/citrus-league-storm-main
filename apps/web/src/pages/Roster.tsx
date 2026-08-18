@@ -46,7 +46,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { getTodayMST, getTodayMSTDate, formatWaiverProcessTime, formatMoment, computeNextWaiverProcessMoment } from '@/utils/timezoneUtils';
-import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import { getCurrentSeason } from '@/utils/seasonConstants';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';
@@ -1981,10 +1981,10 @@ const Roster = () => {
     const loadAnalytics = async () => {
         try {
             // Load previous season and current season data
-            const prevSeason = CURRENT_SEASON - 1;
+            const prevSeason = getCurrentSeason() - 1;
             const [dataPrev, dataCurr] = await Promise.all([
                 CitrusPuckService.getAllAnalytics(prevSeason),
-                CitrusPuckService.getAllAnalytics(CURRENT_SEASON)
+                CitrusPuckService.getAllAnalytics(getCurrentSeason())
             ]);
 
             const enrichPlayer = (p: HockeyPlayer) => {
@@ -2067,7 +2067,7 @@ const Roster = () => {
                 // Fetch all future projections for these players (all 8 stat categories to match matchup system)
                 const projResponse = await playerApi.getBatchProjections(
                   allPlayerIds.map(String),
-                  { startDate: todayStr, season: CURRENT_SEASON }
+                  { startDate: todayStr, season: getCurrentSeason() }
                 );
                 const projectionsData = projResponse.data as any[] | null;
 
@@ -3009,7 +3009,13 @@ const Roster = () => {
                     </h1>
                   </div>
                   <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold">
-                    Manager · {userLeagueState === 'guest' ? 'Demo Team' : (profile?.username || 'You')}
+                    {/* SWEEP FIX (2026-08-16): prefer display_name; never show
+                        the generated user_<id> signup handle. */}
+                    Manager · {userLeagueState === 'guest'
+                      ? 'Demo Team'
+                      : (profile?.display_name
+                          || (profile?.username && !/^user_[0-9a-f]{6,}$/i.test(profile.username) ? profile.username : null)
+                          || 'You')}
                   </div>
                 </div>
               </div>

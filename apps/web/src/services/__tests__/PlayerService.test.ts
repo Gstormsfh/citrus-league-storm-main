@@ -35,7 +35,12 @@ vi.mock('@/utils/logger', () => ({
   },
 }));
 
-vi.mock('@/utils/seasonConstants', () => ({
+vi.mock('@/utils/seasonConstants', async (importOriginal) => ({
+  // Spread the real module: a hand-written object here omits whatever the
+  // service starts calling next. getCurrentSeason() was added to several
+  // services on 2026-08-11 and every partial mock broke with `undefined is
+  // not a function`, surfacing as assertion noise rather than a clear error.
+  ...(await importOriginal<typeof import('@/utils/seasonConstants')>()),
   CURRENT_SEASON: 2025,
   HEADSHOT_SEASON: '20252026',
   getHeadshotUrl: (teamAbbrev: string | null, playerId: number | string | null) => {

@@ -48,7 +48,23 @@ const rangeMock = vi.fn(() => Promise.resolve(terminalResult));
 const orderMock = vi.fn(() => ({ range: rangeMock }));
 const eqMock = vi.fn(() => ({ order: orderMock }));
 const selectMock = vi.fn(() => ({ eq: eqMock }));
-const fromMock = vi.fn((_table: string) => ({ select: selectMock }));
+
+// PLAYER-POOL (2026-08-12): the hook now makes a SECOND paged pass over
+// `player_season_stats` to merge real production onto the directory rows.
+// The mock is therefore table-aware — a single shared `rangeMock` would
+// conflate the two loops and turn every directory-pagination assertion
+// below into a count of both.
+const statsResult = { data: [] as unknown[], error: null as unknown };
+const statsRangeMock = vi.fn(() => Promise.resolve(statsResult));
+const statsOrderMock = vi.fn(() => ({ range: statsRangeMock }));
+const statsEqMock = vi.fn(() => ({ order: statsOrderMock }));
+const statsSelectMock = vi.fn(() => ({ eq: statsEqMock }));
+
+const fromMock = vi.fn((table: string) =>
+  table === 'player_season_stats'
+    ? { select: statsSelectMock }
+    : { select: selectMock },
+);
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -84,6 +100,14 @@ beforeEach(() => {
   // used to test pagination) don't leak into later tests.
   rangeMock.mockReset();
   rangeMock.mockImplementation(() => Promise.resolve(terminalResult));
+
+  statsResult.data = [];
+  statsResult.error = null;
+  statsSelectMock.mockClear();
+  statsEqMock.mockClear();
+  statsOrderMock.mockClear();
+  statsRangeMock.mockReset();
+  statsRangeMock.mockImplementation(() => Promise.resolve(statsResult));
 });
 
 afterEach(() => {
@@ -290,5 +314,122 @@ describe('usePreloadedPlayers (Entry 87 Fix B — direct player_directory)', () 
       expect(result.current.playersById.size).toBe(0);
       expect(rangeMock).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+// ── PLAYER-POOL (2026-08-12) — the season-stats merge ─────────────────
+//
+// Before this, every player came back with goals/assists/shots/wins = 0.
+// PlayerPool ranks on those via ScoringCalculator, so the sort was a no-op
+// and the list fell back to arrival order = player_id ascending = OLDEST
+// FIRST. The board opened on a 54-year-old Jaromir Jagr.
+describe('usePreloadedPlayers — season-stats merge', () => {
+  function mkStats(player_id: number, over: Record<string, unknown> = {}) {
+    return {
+      player_id,
+      games_played: 82,
+      nhl_goals: 48,
+      nhl_assists: 90,
+      nhl_points: 138,
+      nhl_shots_on_goal: 306,
+      nhl_hits: 40,
+      nhl_blocks: 29,
+      nhl_pim: 20,
+      nhl_ppp: 54,
+      nhl_shp: 2,
+      nhl_plus_minus: 21,
+      nhl_wins: null,
+      nhl_losses: null,
+      nhl_ot_losses: null,
+      nhl_saves: null,
+      nhl_goals_against: null,
+      nhl_shutouts: null,
+      nhl_save_pct: null,
+      nhl_gaa: null,
+      ...over,
+    };
+  }
+
+  it('merges real production onto the matching directory row', async () => {
+    terminalResult.data = [mkRow(8478402, 'Connor McDavid')];
+    statsResult.data = [mkStats(8478402)];
+
+    const { result } = renderHook(() => usePreloadedPlayers());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    const p = result.current.playersById.get('8478402');
+    expect(p?.points).toBe(138);
+    expect(p?.goals).toBe(48);
+    expect(p?.assists).toBe(90);
+    expect(p?.shots).toBe(306);
+    expect(p?.games_played).toBe(82);
+  });
+
+  it('queries player_season_stats as a separate table', async () => {
+    terminalResult.data = [mkRow(8478402, 'Connor McDavid')];
+    statsResult.data = [mkStats(8478402)];
+
+    const { result } = renderHook(() => usePreloadedPlayers());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(fromMock).toHaveBeenCalledWith('player_directory');
+    expect(fromMock).toHaveBeenCalledWith('player_season_stats');
+  });
+
+  it('leaves a player with no stats row at zero — they sort to the bottom', async () => {
+    // This is exactly what happens to Jagr and Thornton now: present in the
+    // directory so their names still resolve, but unranked.
+    terminalResult.data = [mkRow(8466138, 'Joe Thornton')];
+    statsResult.data = [];
+
+    const { result } = renderHook(() => usePreloadedPlayers());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    const p = result.current.playersById.get('8466138');
+    expect(p?.full_name).toBe('Joe Thornton');
+    expect(p?.points).toBe(0);
+  });
+
+  it('pages the stats table too (1,066 rows > the 1000-row cap)', async () => {
+    terminalResult.data = [mkRow(1, 'A')];
+    const full = Array.from({ length: 1000 }, (_, i) => mkStats(i + 1));
+    statsRangeMock
+      .mockResolvedValueOnce({ data: full, error: null })
+      .mockResolvedValueOnce({ data: [mkStats(1001)], error: null });
+
+    const { result } = renderHook(() => usePreloadedPlayers());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(statsRangeMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('SURVIVES a stats failure with the directory intact', async () => {
+    // The safety property. The directory map resolves NAMES for drafted
+    // players — losing it turns a finished roster into `#8466138 / ? / -`.
+    // A stats outage may cost ranking; it must never cost the names.
+    terminalResult.data = [mkRow(8478402, 'Connor McDavid')];
+    statsRangeMock.mockResolvedValue({ data: null, error: { message: 'boom' } });
+
+    const { result } = renderHook(() => usePreloadedPlayers());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.playersById.size).toBe(1);
+    expect(result.current.playersById.get('8478402')?.full_name).toBe('Connor McDavid');
+    expect(result.current.error).toBeNull();
+  });
+
+  it('merges goalie production onto a goalie row', async () => {
+    const goalieRow = { ...mkRow(8476945, 'Connor Hellebuyck'), is_goalie: true, position_code: 'G' };
+    terminalResult.data = [goalieRow];
+    statsResult.data = [
+      mkStats(8476945, { nhl_wins: 23, nhl_saves: 1369, nhl_shutouts: 0, nhl_goals_against: 120 }),
+    ];
+
+    const { result } = renderHook(() => usePreloadedPlayers());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    const p = result.current.playersById.get('8476945');
+    expect(p?.wins).toBe(23);
+    expect(p?.saves).toBe(1369);
   });
 });

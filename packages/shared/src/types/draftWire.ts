@@ -620,6 +620,24 @@ export interface DraftSnapshot {
    * Root cause + fix pre-ratified in inbox Entry 103.
    */
   picks?: ReadonlyArray<TerminalSnapshotPick>;
+  /**
+   * TIMER-1 / E121 (2026-08-12) — the SERVER's wall-clock at the
+   * moment this snapshot was delivered, in epoch ms. Stamped by the
+   * client's snapshot fetcher from the HTTP `Date` response header
+   * (never by the server body), so it needs no engine change and is
+   * present on the very first paint of a draft that has zero events.
+   *
+   * WHY IT EXISTS: the clock-offset estimator used to seed only from
+   * `recentEvents[last].timestamp`, and the engine's ring buffer
+   * carries pick events ONLY — a freshly-ignited draft has an EMPTY
+   * buffer, so the first pick rendered `deadline − localNow` with no
+   * skew correction at all (a 5s-slow device showed 0:35 on a 30s
+   * clock). This field gives the estimator a server timestamp that
+   * always exists. Optional: absent when the header is unavailable
+   * (non-HTTP transports, test doubles), in which case the estimator
+   * falls back to its previous event-seeded behaviour.
+   */
+  serverReceivedAtMs?: number;
 }
 
 // ── Wire envelope ──────────────────────────────────────────────────

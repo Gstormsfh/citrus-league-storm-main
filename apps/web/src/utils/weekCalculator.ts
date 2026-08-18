@@ -141,6 +141,38 @@ export function getCurrentWeekNumber(firstWeekStart: Date): number {
  * @param firstWeekStart - The Sunday date of the first week of the season
  * @returns Array of week numbers (1-based) from week 1 to the last week of regular season
  */
+/**
+ * SCHEDULE-GEN (2026-08-16) — clamp a draft-time anchor to the season.
+ *
+ * THE BUG THIS FIXES: `getAvailableWeeks` assumed week 1 starts when the
+ * league drafts. Its season-end heuristic (`month >= 9 → ends next
+ * April`) breaks for any draft held May–September: an August 2026 draft
+ * computed "regular season ends April 15, 2026" — a date in the PAST —
+ * so the week loop produced ZERO weeks, the generator inserted zero
+ * matchups, reported success, and every offseason-drafted league showed
+ * "No matchup found for week 1". Measured live on staging 2026-08-16:
+ * matchups table had 0 rows across ALL leagues, including a completed
+ * 252-pick draft. Preseason drafting is the industry's entire draft
+ * season — Yahoo drafts happen in September.
+ *
+ * Rule: a first-week anchor landing in May(4)–September(8) belongs to
+ * the UPCOMING season, so it clamps forward to the Monday of the week
+ * containing October 1. In-season anchors (Oct–Apr) pass through
+ * unchanged, preserving existing behaviour for mid-season leagues.
+ */
+export function clampToSeasonStart(firstWeekStart: Date): Date {
+  const m = firstWeekStart.getMonth(); // 0-11
+  if (m < 4 || m > 8) return firstWeekStart; // Oct–Apr: in-season, unchanged
+  const oct1 = new Date(firstWeekStart.getFullYear(), 9, 1);
+  // Monday of the week containing Oct 1 (getDay: Sun=0 … Sat=6)
+  const day = oct1.getDay();
+  const daysBackToMonday = (day + 6) % 7;
+  const monday = new Date(oct1);
+  monday.setDate(oct1.getDate() - daysBackToMonday);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
 export function getAvailableWeeks(firstWeekStart: Date): number[] {
   const weeks: number[] = [];
   
@@ -154,7 +186,12 @@ export function getAvailableWeeks(firstWeekStart: Date): number[] {
   // If season starts Oct-Dec, regular season ends April of next year
   // If season starts Jan-Apr, regular season ends April of same year
   let regularSeasonEndYear = firstWeekYear;
-  if (firstWeekMonth >= 9) { // October (9) through December (11)
+  // SCHEDULE-GEN (2026-08-16) — was `>= 9` (October+). September is NHL
+  // preseason of the UPCOMING season: a Sep anchor (including the
+  // Monday-of-Oct-1-week that clampToSeasonStart produces, e.g. Sep 28)
+  // must end the following April, or the season-end lands in the past
+  // and the schedule collapses to the 1-week bug.
+  if (firstWeekMonth >= 8) { // September (8) through December (11)
     regularSeasonEndYear = firstWeekYear + 1; // Season ends next year
   }
   

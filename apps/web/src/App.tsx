@@ -227,6 +227,11 @@ const App = () => {
                 <Route path="/pool/playoff-confidence" element={<ProtectedRoute><ErrorBoundary><PoolPlayoffConfidence /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/pool/playoff-hub" element={<ProtectedRoute><ErrorBoundary><PoolPlayoffHub /></ErrorBoundary></ProtectedRoute>} />
                 {/* Hidden preview routes for redesign work — not linked from anywhere in production nav */}
+                {/* SWEEP (2026-08-15) — 15 unfinished preview mockups were shipping
+                    publicly (168KB of chunks, reachable by URL in the App Store
+                    build). DEV-only now: import.meta.env.DEV is statically false in
+                    production, so Rollup drops both the routes and their chunks. */}
+                {import.meta.env.DEV && (<>
                 <Route path="/preview-redesign" element={<PreviewRedesign />} />
                 <Route path="/preview-mockups" element={<PreviewMockups />} />
                 <Route path="/previews" element={<PreviewIndex />} />
@@ -242,6 +247,7 @@ const App = () => {
                 <Route path="/preview-clone" element={<PreviewClone />} />
                 <Route path="/preview-dashboard-primitives" element={<PreviewDashboardPrimitives />} />
                 <Route path="/preview-player-profile" element={<PreviewPlayerProfile />} />
+                </>)}
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

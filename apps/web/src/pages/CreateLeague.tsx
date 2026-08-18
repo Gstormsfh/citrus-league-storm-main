@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { visibleLeagueTypes } from '@/utils/leagueTypeHelpers';
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   HockeyFooter,
@@ -48,7 +49,6 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@citrus/shared";
-import WaitlistSignup from "@/components/WaitlistSignup";
 import {
   type LeagueType,
   type ScoringFormat,
@@ -131,7 +131,7 @@ const SectionHeader = ({ title, subtitle, badge }: { title: string; subtitle: st
 const CreateLeague = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { data: profile } = useProfile();
   const { refreshLeagues, setActiveLeagueId } = useLeague();
   const { toast } = useToast();
@@ -141,7 +141,13 @@ const CreateLeague = () => {
 
   // ---- Core Settings ----
   const [leagueName, setLeagueName] = useState("");
-  const [leagueType, setLeagueType] = useState<LeagueType>("playoff-bracket-pickem");
+  // SEASON-AGNOSTIC (2026-08-13) — default to season-long fantasy.
+  //
+  // This was hard-coded to 'playoff-bracket-pickem' because the site was
+  // launched during the playoffs. `?type=playoff` still selects it, and
+  // every playoff CTA in the nav already passes that param, so the
+  // playoff funnel is unchanged.
+  const [leagueType, setLeagueType] = useState<LeagueType>("fantasy");
   const [scoringFormat, setScoringFormat] = useState<ScoringFormat>("h2h-points");
   const [draftType, setDraftType] = useState<DraftType>("snake");
   const [teamsCount, setTeamsCount] = useState("12");
@@ -194,7 +200,7 @@ const CreateLeague = () => {
     waiver_process_time: '02:00:00',
     waiver_period_hours: 48,
     waiver_game_lock: true,
-    waiver_type: 'rolling' as 'rolling' | 'faab' | 'reverse_standings',
+    waiver_type: 'rolling' as 'rolling' | 'reverse_draft_order' | 'faab' | 'reverse_standings',
     allow_trades_during_games: true,
     faab_budget: 100,
   });
@@ -240,6 +246,7 @@ const CreateLeague = () => {
   // Previously users clicked an invite link, landed on the join tab with
   // code pre-filled, and had to hit "Join" manually. Now it fires automatically.
   const autoJoinFiredRef = useRef(false);
+  const authBounceFiredRef = useRef(false);
   useEffect(() => {
     const code = searchParams.get('code');
     if (code && user && !autoJoinFiredRef.current && !loading) {
@@ -249,10 +256,38 @@ const CreateLeague = () => {
       // Pass the code EXPLICITLY so we don't race with setJoinCode().
       // Previously handleJoinLeague read joinCode from closure which
       // could be empty if state hadn't committed yet.
-      setTimeout(() => handleJoinLeague(code), 50);
+      // DRAFT-NIGHT FIX (2026-08-17): verify a LIVE session before firing.
+      // After sign-out, React can briefly hold a stale `user` while the
+      // token is already revoked — auto-join then hits the API with a dead
+      // token and surfaces "Cannot verify your session". If the session is
+      // gone, bounce to /auth with the code preserved instead.
+      setTimeout(async () => {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (!data.session) {
+            const target = `/create-league?tab=join&code=${encodeURIComponent(code)}`;
+            navigate(`/auth?redirect=${encodeURIComponent(target)}`);
+            return;
+          }
+        } catch { /* fall through — handleJoinLeague surfaces its own error */ }
+        handleJoinLeague(code);
+      }, 50);
+    }
+    // JOIN-FLOW (2026-08-16): the Sleeper-parity hand-off. A BRAND-NEW
+    // user tapping an invite link previously reached this page, hit
+    // "Join", and was bounced to /auth with the code thrown away — after
+    // signing up they landed on home, stranded. Now: unauthenticated +
+    // ?code= → straight to /auth carrying a validated same-origin
+    // redirect back here, so the existing auto-join effect fires the
+    // moment their session exists. authLoading guard prevents bouncing
+    // users whose session is still restoring on page load.
+    if (code && !user && !authLoading && !authBounceFiredRef.current) {
+      authBounceFiredRef.current = true;
+      const target = `/create-league?tab=join&code=${encodeURIComponent(code)}`;
+      navigate(`/auth?redirect=${encodeURIComponent(target)}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, searchParams]);
+  }, [user, authLoading, searchParams]);
 
   // Reset format settings and smart defaults when league type changes
   useEffect(() => {
@@ -328,10 +363,52 @@ const CreateLeague = () => {
     );
   };
 
+  // ── SETTINGS-DYNAMICS (2026-08-17) ────────────────────────────────
+  // Dependent settings must track the settings they depend on, the way
+  // Sleeper/ESPN do it. The DB trigger validate_league_settings hard-
+  // rejects playoffTeams > teamsCount (Garrett's 2-team test: teams=2
+  // with the form's default playoffTeams=6 → INSERT refused → the user
+  // saw only a generic "Failed to create league"). The form now keeps
+  // the pair valid BY CONSTRUCTION: options shrink to fit the league,
+  // selections auto-clamp when team count drops, and submit re-clamps
+  // as a final guard so no payload can ever violate the trigger.
+  //
+  // num(): parseInt where 0 is a LEGAL choice. `parseInt(x) || fb`
+  // silently turns a chosen 0 into the fallback — "No Playoffs" became
+  // 6 playoff teams and "No Deadline" became a week-20 deadline.
+  const num = (v: string, fallback: number): number => {
+    const n = parseInt(v, 10);
+    return Number.isNaN(n) ? fallback : n;
+  };
+  const PLAYOFF_SIZES = [8, 6, 4, 2];
+  // Largest preset playoff size that fits both the team count and the
+  // commissioner's chosen size. 0 = no playoffs.
+  const playoffCap = (cap: number, desired: number): number => {
+    for (const n of PLAYOFF_SIZES) { if (n <= cap && n <= desired) return n; }
+    return 0;
+  };
+  // Bracket length in rounds: 2 teams → 1, 4 → 2, 6/8 → 3.
+  const playoffRounds = (n: number): number => (n >= 2 ? Math.ceil(Math.log2(n)) : 0);
+  const teamCapNum = num(teamsCount, 12);
+  const playoffOptions = PLAYOFF_SIZES.filter((n) => n <= teamCapNum).reverse();
+
+  // Auto-clamp the playoff selection whenever the team count drops
+  // below it (and re-derive playoff length from the new bracket size).
+  useEffect(() => {
+    const cap = num(teamsCount, 12);
+    const current = num(playoffTeams, 6);
+    if (current > cap) {
+      const next = playoffCap(cap, current);
+      setPlayoffTeams(String(next));
+      if (next >= 2) setPlayoffWeeks(String(playoffRounds(next)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamsCount]);
+
   const handleCreateLeague = async () => {
     if (!user) {
-      setError("You must be logged in to create a league");
-      navigate("/auth");
+      setError("Sign in first, then spin up your league.");
+      navigate(`/auth?redirect=${encodeURIComponent('/create-league')}`);
       return;
     }
 
@@ -366,7 +443,7 @@ const CreateLeague = () => {
       // Build settings object — ONLY include fields relevant to this league type
       const settings: Record<string, unknown> = {
         leagueType,
-        teamsCount: parseInt(teamsCount),
+        teamsCount: parseInt(teamsCount) || 12,
       };
 
       if (isFantasy) {
@@ -374,19 +451,29 @@ const CreateLeague = () => {
         settings.scoringFormat = scoringFormat;
         settings.draftType = draftType;
         settings.stats = enabledStats;
-        settings.pickTimeLimit = parseInt(pickTimeLimit);
+        // DRAFT-NIGHT FIX (2026-08-17): every numeric form field gets a
+        // sane fallback. parseInt('') === NaN, NaN serializes to JSON
+        // null, and the API's validator rejects null with a 400 the user
+        // only ever saw as "Failed to create league". One empty field
+        // must never sink league creation.
+        settings.pickTimeLimit = parseInt(pickTimeLimit) || 90;
         settings.rosterSlots = rosterSlots;
         settings.positionType = positionType;
 
-        // Season settings
-        settings.playoffTeams = parseInt(playoffTeams);
-        settings.playoffWeeks = parseInt(playoffWeeks);
-        settings.tradeDeadlineWeek = parseInt(tradeDeadlineWeek);
+        // Season settings — clamped so the payload can never violate the
+        // DB's validate_league_settings trigger (playoffTeams ≤ teams),
+        // and 0 survives as a real choice (No Playoffs / No Deadline).
+        const effectivePlayoffTeams = playoffCap(count, num(playoffTeams, 6));
+        settings.playoffTeams = effectivePlayoffTeams;
+        settings.playoffWeeks = effectivePlayoffTeams >= 2
+          ? Math.min(Math.max(num(playoffWeeks, playoffRounds(effectivePlayoffTeams)), 1), 4)
+          : 0;
+        settings.tradeDeadlineWeek = num(tradeDeadlineWeek, 0);
 
         // Keeper / Dynasty
         settings.keeperEnabled = keeperEnabled;
         if (keeperEnabled) {
-          settings.keeperCount = parseInt(keeperCount);
+          settings.keeperCount = parseInt(keeperCount) || 0;
           settings.keeperPenalty = keeperPenalty;
           settings.dynastyMode = dynastyMode;
         }
@@ -397,14 +484,19 @@ const CreateLeague = () => {
         // Category / Roto settings (only for category-based formats)
         if (showCategories) {
           settings.categories = selectedCategories;
-          settings.minGoalieGames = parseInt(minGoalieGames);
+          settings.minGoalieGames = num(minGoalieGames, 2); // 0 = "No minimum" is legal
         }
 
         // Auction settings (only for auction drafts)
         if (draftType === 'auction') {
-          settings.auctionBudget = parseInt(auctionBudget);
-          settings.auctionMinBid = parseInt(auctionMinBid);
-          settings.auctionNominationTime = parseInt(auctionNominationTime);
+          settings.auctionBudget = parseInt(auctionBudget) || 200;
+          settings.auctionMinBid = parseInt(auctionMinBid) || 1;
+          settings.auctionNominationTime = parseInt(auctionNominationTime) || 30;
+          // SETTINGS-ENFORCEMENT (2026-08-16) — the v2 engine reads
+          // auctionNominationWindowSeconds (draft/index.ts), not
+          // auctionNominationTime. Write both so the commissioner's
+          // value actually reaches the auction clock.
+          settings.auctionNominationWindowSeconds = parseInt(auctionNominationTime) || 30;
         }
 
         // Waiver/transaction settings (persisted in settings AND dedicated columns)
@@ -416,6 +508,12 @@ const CreateLeague = () => {
         settings.faabBudget = waiverSettings.faab_budget;
         settings.weeklyAddLimit = parseInt(weeklyAddLimit) || 0;
         settings.seasonAddLimit = parseInt(seasonAddLimit) || 0;
+
+        // DB trigger: FAAB budget must be > 0 when FAAB waivers are on.
+        // Self-heal to the default rather than letting the insert bounce.
+        if (settings.waiver_type === 'faab' && !(Number(settings.faabBudget) > 0)) {
+          settings.faabBudget = 100;
+        }
       } else {
         // Pool-specific settings — only what this pool type needs
         settings.scoringFormat = 'total-points';
@@ -426,13 +524,13 @@ const CreateLeague = () => {
 
         if (leagueType === 'pickem') {
           settings.pickemFormat = pickemFormat;
-          settings.picksPerWeek = parseInt(picksPerWeek);
+          settings.picksPerWeek = parseInt(picksPerWeek) || 5;
         } else if (leagueType === 'survivor') {
-          settings.survivorLives = parseInt(survivorLives);
+          settings.survivorLives = parseInt(survivorLives) || 1;
           settings.allowRepeatTeams = allowRepeatTeams;
         } else if (leagueType === 'confidence-pool') {
-          settings.picksPerWeek = parseInt(picksPerWeek);
-          settings.confidenceMaxPoints = parseInt(confidenceMaxPoints);
+          settings.picksPerWeek = parseInt(picksPerWeek) || 5;
+          settings.confidenceMaxPoints = parseInt(confidenceMaxPoints) || 16;
         } else if (leagueType === 'playoff-bracket-pickem') {
           settings.playoffBracketPointsPerRound = { r1: 2, r2: 4, r3: 8, scf: 16 };
           settings.playoffGamesPickBonus = 1;
@@ -493,10 +591,16 @@ const CreateLeague = () => {
         leagueName.trim(),
         user.id,
         isFantasy ? rosterSize : 0,
-        isFantasy ? parseInt(draftRounds) : 0,
+        isFantasy ? (parseInt(draftRounds) || rosterSize || 21) : 0,
         settings,
         scoringSettings,
-        isFantasy ? waiverSettings : undefined
+        // Mirror the FAAB self-heal into the dedicated-column payload so
+        // settings JSONB and the waiver columns can't disagree.
+        isFantasy
+          ? (waiverSettings.waiver_type === 'faab' && !(Number(waiverSettings.faab_budget) > 0)
+              ? { ...waiverSettings, faab_budget: 100 }
+              : waiverSettings)
+          : undefined
       );
 
       if (createError) throw createError;
@@ -548,17 +652,13 @@ const CreateLeague = () => {
   };
 
   const handleJoinLeague = async (codeOverride?: string) => {
-    if (!user) {
-      setError("Sign in first, then jump into the league.");
-      navigate("/auth");
-      return;
-    }
-
     // Defensive code resolution: explicit arg → local state → URL query →
     // browser location (triple fallback). Fixes the 'Join code is required'
     // error that fired when the Input was controlled but state hadn't
     // committed yet, or when the URL had ?code= but a re-render cleared
     // joinCode state. ALL three sources are checked before giving up.
+    // Resolved BEFORE the auth check so an unauthenticated bounce can
+    // carry the code through /auth and back (JOIN-FLOW 2026-08-16).
     let resolvedCode = (codeOverride ?? '').trim();
     if (!resolvedCode) resolvedCode = (joinCode ?? '').trim();
     if (!resolvedCode) resolvedCode = (searchParams.get('code') ?? '').trim();
@@ -566,6 +666,15 @@ const CreateLeague = () => {
       try {
         resolvedCode = (new URLSearchParams(window.location.search).get('code') ?? '').trim();
       } catch { /* fall through */ }
+    }
+
+    if (!user) {
+      setError("Sign in first, then jump into the league.");
+      const target = resolvedCode
+        ? `/create-league?tab=join&code=${encodeURIComponent(resolvedCode)}`
+        : '/create-league?tab=join';
+      navigate(`/auth?redirect=${encodeURIComponent(target)}`);
+      return;
     }
 
     if (!resolvedCode) {
@@ -721,25 +830,21 @@ const CreateLeague = () => {
             </p>
           </div>
 
-          {/* Testing Phase Banner — only for season-long fantasy */}
-          {searchParams.get('type') === 'all' && (
+          {/* Testing Phase Banner — season-long fantasy only.
+              SEASON-AGNOSTIC (2026-08-13): was gated on `?type=all`, which
+              meant it never rendered on the default page once season-long
+              became the default. Now it hides only on the playoff funnel. */}
+          {searchParams.get('type') !== 'playoff' && (
           <Alert className="mb-6 bg-pastel-orange/15 ring-1 ring-pastel-orange/40 border-0 text-pastel-cream rounded-2xl shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]">
             <Sparkles className="h-4 w-4 text-pastel-orange" />
             <AlertDescription className="text-pastel-cream">
-              <span className="font-bold text-pastel-orange-soft">We&rsquo;re in testing phase.</span>{' '}
-              Your league will be filled with AI teams so you can experience the full platform. Try the complete draft experience and draft against AI opponents.
-              <span className="block mt-2 text-sm text-white/70">
-                Sign up for the waitlist to be notified when full service launches with real multiplayer leagues.
-              </span>
+              <span className="font-bold text-pastel-orange-soft">Play with friends or AI.</span>{' '}
+              Create your league and share the join code — friends claim their teams instantly. Short on managers? Fill any open slots with AI opponents at the press of a button and draft right away.
             </AlertDescription>
           </Alert>
           )}
 
           {/* Waitlist Signup */}
-          <div className="mb-6">
-            <WaitlistSignup source="create_league_page" variant="compact" />
-          </div>
-
           <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] overflow-hidden">
             <CardContent className="p-4 sm:p-8">
               <Tabs defaultValue={defaultTab} value={defaultTab} onValueChange={(v) => setDefaultTab(v as "create" | "join")} className="w-full">
@@ -776,18 +881,14 @@ const CreateLeague = () => {
                   {/* ======================================================== */}
                   <div>
                     <SectionHeader
-                      title={searchParams.get('type') === 'all' ? "Choose Your League Type" : "Choose Your Playoff Pool Format"}
-                      subtitle={searchParams.get('type') === 'all' ? "Select the format that fits your group" : "Pick how your playoff pool will work"}
+                      title={searchParams.get('type') === 'playoff' ? "Choose Your Playoff Pool Format" : "Choose Your League Type"}
+                      subtitle={searchParams.get('type') === 'playoff' ? "Pick how your playoff pool will work" : "Select the format that fits your group"}
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {(Object.keys(LEAGUE_TYPE_LABELS) as LeagueType[])
-                        .filter(type => {
-                          const isPlayoffType = type === 'playoff-bracket-pickem' || type === 'playoff-confidence-pool' || type === 'playoff-roster-pool';
-                          // ?type=all shows everything (backdoor for testing season-long)
-                          if (searchParams.get('type') === 'all') return true;
-                          // Default: only show playoff types (we're in playoff season)
-                          return isPlayoffType;
-                        })
+                      {/* SEASON-AGNOSTIC (2026-08-13) — the rule lives in
+                          `visibleLeagueTypes` (utils/leagueTypeHelpers) so it
+                          is pinned by a test rather than buried in JSX. */}
+                      {visibleLeagueTypes(searchParams.get('type'))
                         .map((type) => (
                         <button
                           key={type}
@@ -1498,15 +1599,29 @@ const CreateLeague = () => {
                         {showMatchupSettings && (
                           <div className="space-y-3">
                             <Label>Playoff Teams</Label>
-                            <Select value={playoffTeams} onValueChange={setPlayoffTeams}>
+                            <Select
+                              value={playoffTeams}
+                              onValueChange={(v) => {
+                                setPlayoffTeams(v);
+                                // Track bracket length to the bracket size;
+                                // the commissioner can still override below.
+                                const n = parseInt(v, 10);
+                                if (n >= 2) setPlayoffWeeks(String(playoffRounds(n)));
+                              }}
+                            >
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="0">No Playoffs</SelectItem>
-                                <SelectItem value="4">4 Teams</SelectItem>
-                                <SelectItem value="6">6 Teams</SelectItem>
-                                <SelectItem value="8">8 Teams</SelectItem>
+                                {playoffOptions.map((n) => (
+                                  <SelectItem key={n} value={String(n)}>
+                                    {n === 2 ? '2 Teams (Final only)' : `${n} Teams`}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
+                            <p className="text-xs text-white/55">
+                              Options adjust to your number of teams.
+                            </p>
                           </div>
                         )}
 
@@ -1517,11 +1632,15 @@ const CreateLeague = () => {
                             <Select value={playoffWeeks} onValueChange={setPlayoffWeeks}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="1">1 Week</SelectItem>
                                 <SelectItem value="2">2 Weeks</SelectItem>
                                 <SelectItem value="3">3 Weeks</SelectItem>
                                 <SelectItem value="4">4 Weeks</SelectItem>
                               </SelectContent>
                             </Select>
+                            <p className="text-xs text-white/55">
+                              {`${playoffRounds(num(playoffTeams, 6))} round${playoffRounds(num(playoffTeams, 6)) === 1 ? '' : 's'} needed for ${num(playoffTeams, 6)} teams.`}
+                            </p>
                           </div>
                         )}
 
@@ -1687,11 +1806,12 @@ const CreateLeague = () => {
                           <Label>Waiver Type</Label>
                           <Select
                             value={waiverSettings.waiver_type}
-                            onValueChange={(value: 'rolling' | 'faab' | 'reverse_standings') => setWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
+                            onValueChange={(value: 'rolling' | 'reverse_draft_order' | 'faab' | 'reverse_standings') => setWaiverSettings(prev => ({ ...prev, waiver_type: value }))}
                           >
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="rolling">Rolling Priority</SelectItem>
+                              <SelectItem value="rolling">Rolling Priority (Join Order)</SelectItem>
+                              <SelectItem value="reverse_draft_order">Rolling Priority (Reverse Draft Order)</SelectItem>
                               <SelectItem value="reverse_standings">Reverse Standings</SelectItem>
                               <SelectItem value="faab">FAAB (Bidding)</SelectItem>
                             </SelectContent>

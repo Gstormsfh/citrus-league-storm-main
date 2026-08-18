@@ -87,3 +87,11 @@ apps/web/.env.prod
 
 # Supabase CLI cache — version marker + local state, regenerated on every CLI run
 supabase/.temp/
+_to_delete/
+.claude/
+.arch-tmp/
+.bin-transfer/
+.claude-commitmsg.txt
+scripts/proof/results/
+*.local.mjs
+*.local.json

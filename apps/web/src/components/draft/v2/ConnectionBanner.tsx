@@ -115,22 +115,41 @@ function ReconnectingBanner({ state, onRetryNow }: ReconnectingBannerProps) {
   // both paths so existing regression tests (and muscle-memory reading
   // of the banner) keep working; the distinction lives in the title +
   // the data-stale-triggered attribute (queryable in tests + e2e).
-  const title = state.staleTriggered
-    ? 'Connection appears stale'
-    : 'Connection lost';
+  //
+  // ARCHITECT 2026-08-12 (LOBBY-WAIT / inbox E124) — third variant.
+  // `waitingForStart` means discovery answered 409 with status
+  // `not_started`: the commissioner has not pressed START yet.
+  // NOTHING IS WRONG, so this variant drops the destructive styling,
+  // the alarming title, the raw server message, and the countdown.
+  // Eleven of the twelve managers will see this banner on draft night
+  // — every one of them who opens the room before the commissioner
+  // does — and "Connection lost" in red is the wrong first impression
+  // of a product that is working exactly as designed.
+  const title = state.waitingForStart
+    ? 'Waiting for the draft to start'
+    : state.staleTriggered
+      ? 'Connection appears stale'
+      : 'Connection lost';
 
   return (
     <Alert
-      variant="destructive"
-      role="alert"
+      variant={state.waitingForStart ? 'default' : 'destructive'}
+      role={state.waitingForStart ? 'status' : 'alert'}
       data-banner-kind="reconnecting"
       data-stale-triggered={state.staleTriggered ? 'true' : undefined}
+      data-waiting-for-start={state.waitingForStart ? 'true' : undefined}
     >
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription className="flex items-center justify-between gap-4">
         <span>
-          Reconnecting in {Math.max(0, secondsRemaining)}s
-          {state.lastError ? ` — ${state.lastError}` : ''}
+          {state.waitingForStart ? (
+            <>You&apos;re in the room. It will open the moment your commissioner starts the draft.</>
+          ) : (
+            <>
+              Reconnecting in {Math.max(0, secondsRemaining)}s
+              {state.lastError ? ` — ${state.lastError}` : ''}
+            </>
+          )}
         </span>
         {onRetryNow && (
           <Button

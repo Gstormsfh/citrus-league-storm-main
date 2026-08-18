@@ -371,4 +371,30 @@ waiverRoutes.delete('/:claimId', async (c) => {
   return ok(c, { success: true });
 });
 
+
+/**
+ * POST /api/waivers/league/:leagueId/recalculate-priority
+ *
+ * SETTINGS-ENFORCEMENT (2026-08-16) — the client
+ * (WaiverService.recalculateReverseStandingsPriority) has POSTed to this
+ * path all along; the route never existed, so `reverse_standings`
+ * leagues silently behaved as rolling. The RPC
+ * `recalculate_reverse_standings_priority` already exists in the DB —
+ * this is purely the missing wire.
+ */
+waiverRoutes.post('/league/:leagueId/recalculate-priority', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.rpc('recalculate_reverse_standings_priority', {
+    p_league_id: leagueId,
+  });
+  if (error) {
+    logger.error('[waivers.recalculate-priority] rpc failed:', error);
+    return fail(c, AppError.internal(error.message));
+  }
+  const audit = new AuditService(createUserClient(c.get('userToken')));
+  audit.log('ADMIN_ACTION', leagueId, { action: 'waiver_priority_recalc', by: 'commissioner' });
+  return ok(c, { success: true, result: data ?? null });
+});
+
 export { waiverRoutes };

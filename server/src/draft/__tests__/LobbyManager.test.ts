@@ -2131,15 +2131,78 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
           resolve({ data: [], error: null });
         return chain;
       }
+      // AUTOPICK-TRUNCATION-2 (2026-08-13) — this read is paged now, so
+      // the chain must offer .range(). Without it the strategy called an
+      // undefined method, returned no_eligible_players, and autopick
+      // silently STOPPED FIRING — four tests in this file caught exactly
+      // that before it shipped. A single row means one page; returning it
+      // only on the first page keeps the loop terminating.
       if (table === 'player_ros_projections') {
         const chain: Record<string, unknown> = {};
+        let offset: number | null = null;
         chain.select = () => chain;
         chain.order = () => chain;
+        chain.range = (from: number) => {
+          offset = from;
+          return chain;
+        };
         chain.then = (resolve: (val: unknown) => void) =>
           resolve({
-            data: [{ player_id: playerId, total_projected_points: 99.9 }],
+            data:
+              offset !== null && offset > 0
+                ? []
+                : [
+                    {
+                      player_id: playerId,
+                      total_projected_points: 99.9,
+                      avg_points_per_game: 5.5,
+                    },
+                  ],
             error: null,
           });
+        return chain;
+      }
+      // E117: the draft-value ranking reads prior-season games played
+      // to weight per-game rate by durability. An empty result is a
+      // valid answer here (the strategy falls back to a default games
+      // estimate), so the mock returns [] rather than throwing.
+      // AUTOPICK-TRUNCATION (2026-08-12) — this read is paged now
+      // (.order().range()), because unbounded it silently truncated at
+      // PostgREST's 1,000-row default. An empty first page ends the loop.
+      if (table === 'player_season_stats') {
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = () => chain;
+        chain.order = () => chain;
+        chain.range = () => chain;
+        chain.then = (resolve: (val: unknown) => void) =>
+          resolve({ data: [], error: null });
+        return chain;
+      }
+      // E118 roster-shape guard: reads league rosterSlots config and
+      // player positions. Empty/default answers exercise the
+      // "no caps configured, nothing owned" path, which is what these
+      // timer tests care about (they assert the autopick FIRES).
+      if (table === 'leagues') {
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = () => chain;
+        chain.maybeSingle = () =>
+          Promise.resolve({ data: { settings: {} }, error: null });
+        return chain;
+      }
+      // AUTOPICK-TRUNCATION (2026-08-12) — two shapes hit this table:
+      // the team's own picks (.in) and the board-wide position map,
+      // which is now paged (.order().range()). Serve both; an empty
+      // first page ends the paging loop.
+      if (table === 'player_directory') {
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.in = () => chain;
+        chain.order = () => chain;
+        chain.range = () => chain;
+        chain.then = (resolve: (val: unknown) => void) =>
+          resolve({ data: [], error: null });
         return chain;
       }
       throw new Error(`unexpected table: ${table}`);

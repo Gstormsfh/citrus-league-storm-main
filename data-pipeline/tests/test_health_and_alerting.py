@@ -200,12 +200,18 @@ class TestAlertManager:
         call_args = mock_send.call_args
         assert "stale" in call_args[0][0].lower()
 
-    @patch("monitoring.alerting.requests")
-    def test_slack_integration(self, mock_requests):
+    # _send_slack does `import requests` INSIDE the function body, so the module
+    # has no `requests` attribute and the old target
+    # @patch("monitoring.alerting.requests") raised
+    #   AttributeError: module 'monitoring.alerting' does not have the attribute 'requests'
+    # This test had therefore never passed. Nobody noticed because ci.yml ran no
+    # Python at all until 2026-08-11. Patch where the call actually resolves.
+    @patch("requests.post")
+    def test_slack_integration(self, mock_post):
         """Sends properly formatted Slack webhook payload."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_requests.post.return_value = mock_response
+        mock_post.return_value = mock_response
 
         manager = AlertManager()
         manager.slack_webhook = "https://hooks.slack.com/test"
@@ -215,7 +221,7 @@ class TestAlertManager:
             "details": {"key": "value"},
         })
         assert result is True
-        mock_requests.post.assert_called_once()
+        mock_post.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -18,9 +18,11 @@
 Draft config for the dry-run:
 - Format: **snake**
 - League size: **12** (matches THE TWELVE)
-- Rounds: **12** (matches THE TWELVE) — full-scale dry run
+- Rounds: **must equal whatever THE TWELVE is actually created with.** `THE_TWELVE_DRAFT_NIGHT.md` §T-3d says to create it with **12** — *"one round per team, smallest possible real draft for the FIRST live-human exercise."* The product default if you don't specify is **21**. **Whichever you choose, the dry run must use the same one.**
 - Pick clock: **30s** (matches THE TWELVE)
 - **Do NOT abbreviate — dry-run must be full-scale to catch scale-dependent bugs.**
+
+> ⚠️ **E170 claimed the original "Rounds: 12 (matches THE TWELVE)" was wrong. E171 retracts that — it was right.** §T-3d of the draft-night runbook does specify 12 rounds for THE TWELVE, deliberately. I assumed 21 because that is the product default and what my own soak rigs used, and I asserted a mismatch that did not exist. **What survives from E170 is the useful half: read `draft_rounds` off the league after creating it (§T3v now selects it) and derive the expected counts, rather than trusting any hard-coded number — including one I wrote.**
 
 ---
 
@@ -86,14 +88,19 @@ psql "$env:SUPABASE_DB_URL?client_encoding=UTF8" -c "SELECT now(), version();"
 - [ ] `draft_status = 'completed'`
 - [ ] `draft_state = 'completed'` (if N-2 migration is applied; else 'active' — cosmetic but log it)
 - [ ] `pick_deadline = NULL`
-- [ ] `draft_event_counter` count matches expected: 1 draft_started + 144 picks + 1 draft_completed = 146
+- [ ] `draft_event_counter` matches **1 + (league_size × draft_rounds) + 1**, read off the league. For **12 × 12** that is **146**; for 12 × 21 it is 254. *(E170 asserted 254; E171 corrected that to the formula — see the note above.)*
 - [ ] Every human's browser shows the "Draft complete" banner (per F28)
 - [ ] Engine logs: zero `F20 'clock fired but draftStatus=completed'` warnings
 - [ ] Engine logs: zero `autopick_failed` errors
 - [ ] Engine logs: zero `draft_started_apply.skipped_stale_status` warnings (F27b-2 has cleared this)
 - [ ] Engine logs: zero `bootstrap unknown event_type` warnings (F27b-1 has cleared this)
 - [ ] Harness `ordering-violations: 0` (from N-1 fix in task #53) — if any harness runs were part of the dry-run
+- [ ] 🚨 **ROSTERS EXIST.** `SELECT count(*) FROM roster_assignments WHERE league_id = '<DRY_RUN_LEAGUE_ID>';` must equal `league_size × draft_rounds` (144 for 12×12, 252 for 12×21). **Added E170.** Until the E142 fix is applied this will be **ZERO**, and every other box on this list will still be green — see the note below.
+- [ ] 🚨 **A manager's roster page renders their team.** Open `/roster` as one of the human participants. It must show players, not *"Empty Roster — your roster will be populated after the draft is completed."*
+- [ ] **`draft_extend` and `draft_pause`/`draft_resume` were exercised** on this dry-run league (runbook §E12 / §E13). They are the only two levers available on the night, they have no button, and this is the right moment to run them for the first time.
 - [ ] Full replay of the draft events from disk reproduces the same picks in the same order (structural determinism check via bootstrapFullEventReplay — run `pg_dump --data-only -t public.draft_events` filtered by league_id, then load into a scratch DB and count/verify)
+
+> 🚨 **WHY THE ROSTER CHECKS WERE ADDED (E170).** As written before 2026-08-12, **every box on this list could be green on a draft that produced no teams at all.** That is inbox **E142**: a completed v2 draft records all 252 picks perfectly and never materialises `roster_assignments`, so the league home page says *"Rosters are set"* while every roster is empty. The acceptance criteria checked the event log, the engine logs and the completion flags — all of which are correct in that failure — and nothing downstream of the draft. **The last gate before THE TWELVE was blind to the single biggest defect on the board.**
 
 ### 7. Post-dry-run
 

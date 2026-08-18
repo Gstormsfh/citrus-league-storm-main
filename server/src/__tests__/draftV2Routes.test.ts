@@ -188,6 +188,50 @@ describe('POST /api/draft/v2/league/:leagueId/pick', () => {
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
+  // ARCHITECT 2026-08-12 (PICK-LATENCY / inbox E145) — the response must NOT
+  // wait for the Realtime broadcast.
+  //
+  // FIELD EVIDENCE. Two human picks on staging: click -> durable ledger row
+  // took 1,837ms and 2,123ms, while the POST returned at 5,710ms and 5,966ms.
+  // Both sit just above BROADCAST_TIMEOUT_MS (5_000) — the timeout firing,
+  // not slow work. The channel `draft_events_v2:<leagueId>` has ZERO
+  // subscribers (grep finds only the publisher and its own test; the v2
+  // client reads the ENGINE's uWS socket), so the Realtime tenant shuts down
+  // between uses and every publish cold-starts and times out. Every human
+  // pick paid ~4 seconds for a message nobody receives — 252 times on draft
+  // night.
+  //
+  // This test makes `subscribe` never call back, which is precisely the live
+  // behaviour. Before the fix the route awaited it and the request took the
+  // full timeout; now it must return immediately. The assertion is on
+  // elapsed time because that IS the contract — a correct-but-slow response
+  // is the bug.
+  it('returns without waiting for the broadcast when the channel never subscribes', async () => {
+    mockUserClientRpc = vi.fn().mockResolvedValue({
+      data: { event_id: 4712, seq: 2, pick_deadline: '2026-04-25T20:00:30Z', was_duplicate: false },
+      error: null,
+    });
+    // Never invokes the callback — mirrors a cold Realtime tenant.
+    mockAdminChannelImpl = () => ({
+      subscribe: (_cb: any) => ({}),
+      send:      vi.fn().mockResolvedValue(undefined),
+    });
+
+    const app = await getApp();
+    const startedAt = Date.now();
+    const res = await app.request(PICK_PATH, {
+      method: 'POST',
+      headers: authedHeaders({ 'X-Idempotency-Key': VALID_KEY }),
+      body: JSON.stringify({ team_id: TEAM_ID, player_id: 8478402, round: 1, pick_number: 1 }),
+    });
+    const elapsed = Date.now() - startedAt;
+
+    expect(res.status).toBe(200);
+    // Generous bound: the real timeout is 5s, so anything under a second
+    // proves we did not wait on it, without being flaky on a slow machine.
+    expect(elapsed).toBeLessThan(1000);
+  });
+
   it('returns 200 + service result on success, with Cache-Control: no-store', async () => {
     mockUserClientRpc = vi.fn().mockResolvedValue({
       data: { event_id: 4711, seq: 1, pick_deadline: '2026-04-25T20:00:30Z', was_duplicate: false },

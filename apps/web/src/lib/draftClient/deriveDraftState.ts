@@ -54,6 +54,18 @@ export interface RosterEntry {
   roundNumber: number;
   isAutopick?: boolean;
   isOverride?: boolean;
+  /**
+   * PICK-LATENCY (2026-08-12) — true ONLY on synthetic entries injected
+   * by `overlayPendingPicks` for a pick the user has submitted but the
+   * server has not yet confirmed.
+   *
+   * The fold NEVER sets this: `deriveDraftState` produces exclusively
+   * server-confirmed entries, so anything carrying `isPending` came from
+   * the optimistic overlay and will be replaced by a real entry (or
+   * removed by rollback) within a few hundred milliseconds. Consumers
+   * that must not count unconfirmed picks should filter on it.
+   */
+  isPending?: boolean;
 }
 
 /**

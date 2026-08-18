@@ -93,6 +93,33 @@ describe('submitPick — happy path', () => {
 });
 
 describe('submitPick — header pass-through (Q1 architect verification)', () => {
+  // ⚠️ DO NOT "FIX" THIS BY GENERATING TWO SEPARATE UUIDs.
+  //
+  // Sending one id as both headers looks redundant. It is load-bearing, and
+  // this is the only place the coupling is enforced (PICK-LATENCY, 2026-08-12):
+  //
+  //   1. The client records a pending action keyed by `attemptId` and, as of
+  //      the optimistic-render change, DRAWS THE PICK IMMEDIATELY under that
+  //      key (see lib/draftClient/overlayPending.ts).
+  //   2. The API forwards the headers to submit_pick_v2, which stores them in
+  //      draft_events.idempotency_key and draft_events.correlation_id.
+  //   3. The engine broadcasts the confirmation with
+  //      `correlationId: event.idempotency_key ?? ''`
+  //      — note: the IDEMPOTENCY KEY, not the correlation_id column
+  //      (server/src/draft/LobbyManager.ts).
+  //   4. The store clears the optimistic entry via
+  //      reconcileOnBroadcast(pendingActions, event.correlationId), which is a
+  //      plain Map key lookup.
+  //
+  // So the drawn pick is only ever cleared because step 1's key and step 3's
+  // broadcast are THE SAME UUID. Give them separate ids and nothing errors:
+  // the pick commits, the board updates from the fold — and the optimistic
+  // entry never matches, hangs for the full 8s dangle timer, then rolls back
+  // with "We couldn't confirm your pick" on a pick that actually succeeded.
+  // Silent, and worst on the busiest turn of the night.
+  //
+  // Verified on staging 2026-08-12: 5 of 5 real human picks have
+  // idempotency_key = correlation_id.
   it('sends both X-Idempotency-Key AND X-Correlation-Id set to attemptId', async () => {
     apiClientPostMock.mockResolvedValueOnce({
       data: { event_id: '1', seq: 1, pick_deadline: null, was_duplicate: false },

@@ -499,10 +499,20 @@ export class DraftClientRunner {
         });
         return;
       }
+      // ARCHITECT 2026-08-12 (LOBBY-WAIT / inbox E124) — carry the
+      // discovery route's reported `draft_status` on the failure
+      // event. The route already returns it (`body.error.status`) and
+      // the terminal branch above already reads it; the non-terminal
+      // branch was throwing it away, which is why `not_started` — the
+      // single most common 409 a manager will ever see, because it is
+      // what every one of the other eleven gets for opening the room
+      // before the commissioner presses START — was indistinguishable
+      // from a server outage and rendered as "Connection lost".
       this.dispatch({
         type: 'token_fetch_failed',
         error: errorObj.message ?? String(err),
         statusCode,
+        ...(typeof draftStatus === 'string' ? { draftStatus } : {}),
       });
     }
   }
@@ -879,6 +889,28 @@ export async function defaultFetchDiscovery(draftId: string): Promise<DraftServe
 }
 
 /**
+ * Read the `Date` response header as epoch ms (TIMER-1 / E121).
+ *
+ * `apiClient` returns a parsed envelope rather than the raw
+ * `Response`, so this reads the header off whichever shape is
+ * available and returns null when it cannot — callers treat null as
+ * "no server clock available" and keep the previous behaviour.
+ */
+function getResponseDateMs(response: unknown): number | null {
+  const headers = (response as { headers?: unknown })?.headers;
+  let raw: string | null = null;
+  if (headers && typeof (headers as Headers).get === 'function') {
+    raw = (headers as Headers).get('date');
+  } else if (headers && typeof headers === 'object') {
+    const rec = headers as Record<string, string | undefined>;
+    raw = rec.date ?? rec.Date ?? null;
+  }
+  if (typeof raw !== 'string' || raw.length === 0) return null;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
  * Default snapshot fetcher (chunk 11g.7 sub-step 7b). Calls
  * `GET /api/drafts/:draftId/snapshot` via the apiClient pattern.
  * On success, returns the parsed `DraftSnapshot`. On failure,
@@ -892,6 +924,10 @@ export async function defaultFetchDiscovery(draftId: string): Promise<DraftServe
  */
 export async function defaultFetchSnapshot(draftId: string): Promise<DraftSnapshot> {
   const { apiClient } = await import('@/api/client');
+  // TIMER-1 / E121 — capture the client's wall-clock immediately
+  // around the request so the server `Date` header can be turned
+  // into a usable offset seed (see the stamping block below).
+  const requestStartedAtMs = Date.now();
   const response = await apiClient.get<DraftSnapshot>(
     `/api/drafts/${encodeURIComponent(draftId)}/snapshot`,
   );
@@ -909,6 +945,31 @@ export async function defaultFetchSnapshot(draftId: string): Promise<DraftSnapsh
       statusCode?: number;
     };
     throw err;
+  }
+  // TIMER-1 / E121 — stamp the SERVER's clock onto the snapshot.
+  //
+  // The offset estimator previously seeded only from
+  // `recentEvents[last].timestamp`, but the engine's ring buffer
+  // holds pick events ONLY: a freshly-ignited draft has an EMPTY
+  // buffer, so the first pick's countdown rendered
+  // `deadline − localNow` with zero skew correction (a 5s-slow
+  // device showed 0:35 on a 30s clock — the exact defect reported
+  // from the field). The HTTP `Date` header is always present and
+  // is the API server's clock, so it seeds the estimator on the
+  // very first paint.
+  //
+  // Accuracy: the header has 1-second granularity, and we correct
+  // for half the round-trip so the estimate is centred rather than
+  // biased by network latency. That is far inside the tolerance we
+  // need (multi-second device skew), and infinitely better than the
+  // zero-correction it replaces.
+  const serverDateHeader = getResponseDateMs(response);
+  if (serverDateHeader !== null) {
+    const halfRoundTripMs = Math.max(0, (Date.now() - requestStartedAtMs) / 2);
+    return {
+      ...payload,
+      serverReceivedAtMs: serverDateHeader + halfRoundTripMs,
+    };
   }
   return payload;
 }

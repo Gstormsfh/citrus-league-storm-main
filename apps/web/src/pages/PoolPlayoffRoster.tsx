@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { API_BASE_URL } from '@/api/client';
 import { cn } from '@/lib/utils';
 import { ScoringCalculator, type ScoringSettings } from '@/utils/scoringUtils';
 import { supabase } from '@/integrations/supabase/client';
@@ -255,9 +256,9 @@ export default function PoolPlayoffRosterEntry() {
         const session = (await supabase.auth.getSession()).data.session;
         const headers: Record<string, string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
         const [leagueRes, playersRes, picksRes] = await Promise.all([
-          fetch(`/api/leagues/${leagueId}`, { headers }).then(r => r.json()),
-          fetch('/api/players?limit=1000', { headers }).then(r => r.json()),
-          fetch(`/api/playoff-pools/${leagueId}/picks?type=roster`, { headers }).then(r => r.json()).catch(() => null),
+          fetch(`${API_BASE_URL}/api/leagues/${leagueId}`, { headers }).then(r => r.json()),
+          fetch(`${API_BASE_URL}/api/players?limit=1000`, { headers }).then(r => r.json()),
+          fetch(`${API_BASE_URL}/api/playoff-pools/${leagueId}/picks?type=roster`, { headers }).then(r => r.json()).catch(() => null),
         ]);
         const leagueData = leagueRes.data || leagueRes;
         setLeague(leagueData);
@@ -480,7 +481,7 @@ export default function PoolPlayoffRosterEntry() {
     setSaving(true);
     try {
       const session = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session;
-      const res = await fetch('/api/playoff-pools/roster', {
+      const res = await fetch(`${API_BASE_URL}/api/playoff-pools/roster`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({
@@ -519,7 +520,7 @@ export default function PoolPlayoffRosterEntry() {
       setSaving(true);
       try {
         const session = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session;
-        const res = await fetch('/api/playoff-pools/roster', {
+        const res = await fetch(`${API_BASE_URL}/api/playoff-pools/roster`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
           body: JSON.stringify({
@@ -604,7 +605,7 @@ export default function PoolPlayoffRosterEntry() {
       )}
 
       {/* Sticky header with roster progress */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-xl border-b border-fantasy-border shadow-sm">
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-xl border-b border-fantasy-border shadow-sm pt-safe">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>

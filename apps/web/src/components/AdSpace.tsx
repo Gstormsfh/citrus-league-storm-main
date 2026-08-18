@@ -29,7 +29,7 @@ interface AdSpaceProps {
   adSlot?: string;
 }
 
-export const AdSpace = ({ size = '300x250', className, label = 'Featured Sponsor', adSlot }: AdSpaceProps) => {
+export const AdSpace = ({ size = '300x250', className, label = 'The Citrus Squad', adSlot }: AdSpaceProps) => {
   const adRef = useRef<HTMLModElement>(null);
   const [adFailed, setAdFailed] = useState(false);
   const pushedRef = useRef(false);
@@ -167,17 +167,18 @@ function AdSpacePlaceholder({
           )}>
             <CitrusSlice className={cn("text-[#E8EED9]", config.iconInner)} />
           </div>
+          {/* SWEEP FIX (2026-08-16): this fallback renders in the native
+              app (ads stripped) and whenever AdSense fails — "Your Brand
+              Here / Premium Placement / 300x250" read as an unfinished ad
+              slot to users and App Store reviewers. House-brand card now. */}
           <div className={cn(
             isHorizontal && "ml-4 text-left flex-1"
           )}>
             <div className="font-varsity text-base text-citrus-forest uppercase tracking-wide mb-2">
-              Your Brand Here
+              Citrus Fantasy
             </div>
             <div className="font-display text-xs text-citrus-charcoal/70 mb-1">
-              Premium Placement
-            </div>
-            <div className="font-mono text-[10px] text-citrus-sage">
-              {size}
+              Built by hockey heads, for hockey heads
             </div>
           </div>
         </div>
@@ -185,7 +186,7 @@ function AdSpacePlaceholder({
         {/* CTA */}
         {!isHorizontal && (
           <div className="font-display text-[10px] text-citrus-orange uppercase tracking-wide">
-            Reach thousands of fantasy hockey fans
+            Live xG scoring · Snake &amp; auction drafts · Stormy AI
           </div>
         )}
       </div>

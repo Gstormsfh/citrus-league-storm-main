@@ -17,7 +17,7 @@ import { DraftService } from '@/services/DraftService';
 import { PlayerService } from '@/services/PlayerService';
 import { DemoLeagueService, DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { MatchupService } from '@/services/MatchupService';
-import { CURRENT_SEASON } from '@/utils/seasonConstants';
+import { getCurrentSeason } from '@/utils/seasonConstants';
 import { RefreshCw } from 'lucide-react';
 import {
   type ScoringFormat,
@@ -56,9 +56,9 @@ interface StandingsTeam {
 
 const Standings = () => {
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId, activeLeague, isChangingLeague } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeague, isChangingLeague, loading: leaguesLoading } = useLeague();
   const { toast } = useToast();
-  const [season, setSeason] = useState(String(CURRENT_SEASON));
+  const [season, setSeason] = useState(String(getCurrentSeason()));
   const [loading, setLoading] = useState(true);
   const [leagues, setLeagues] = useState<League[]>([]);
   const [teams, setTeams] = useState<StandingsTeam[]>([]);
@@ -93,6 +93,13 @@ const Standings = () => {
       try {
         // State 1: Guest - show REAL demo league data from database
         // State 2: Logged in, no league - show REAL demo league data (will show CTAs in UI)
+        // SWEEP FIX (2026-08-16): while the user's leagues are still being
+        // fetched, userLeagueState briefly reads 'logged-in-no-league' for
+        // every logged-in user — which fired a doomed demo-league fetch and
+        // logged an ApiError on every Standings visit. Wait for resolution.
+        if (userLeagueState !== 'guest' && leaguesLoading) {
+          return; // league list still resolving — the effect re-runs when done
+        }
         if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
           // Load demo league data via service
           const { data: demoLeagueData, error: leagueError } = await DemoLeagueService.getDemoLeague();
@@ -385,7 +392,7 @@ const Standings = () => {
       setLoading(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loadStandings is inline; listed deps are the actual triggers for data refresh
-  }, [user?.id, toast, userLeagueState, activeLeagueId]);
+  }, [user?.id, toast, userLeagueState, activeLeagueId, leaguesLoading]);
 
   // Animation observer setup
   // CRITICAL: Force animate class immediately for standings content to ensure visibility
@@ -557,7 +564,7 @@ const Standings = () => {
                     <SelectValue placeholder="Select Season" />
                   </SelectTrigger>
                   <SelectContent className="z-[9999]">
-                    {Array.from({ length: 3 }, (_, i) => CURRENT_SEASON - 2 + i).map(year => (
+                    {Array.from({ length: 3 }, (_, i) => getCurrentSeason() - 2 + i).map(year => (
                       <SelectItem key={year} value={String(year)}>{year} Season</SelectItem>
                     ))}
                   </SelectContent>

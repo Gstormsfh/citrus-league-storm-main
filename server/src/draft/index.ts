@@ -487,12 +487,25 @@ async function loadAuctionConfig(
     typeof settings?.auctionBudget === 'number' ? settings.auctionBudget : 200;
   const auctionMinBid =
     typeof settings?.auctionMinBid === 'number' ? settings.auctionMinBid : 1;
-  const draftRounds =
+  // SETTINGS-ENFORCEMENT (2026-08-16) — settings.draftRounds and
+  // settings.rosterSize are keys NOTHING writes; every v2 auction
+  // resolved rounds to 0 and was blocked by the rounds>0 start guard.
+  // Read the real columns (leagues.draft_rounds / roster_size), keeping
+  // the jsonb keys as highest-priority overrides for forward compat.
+  let draftRounds =
     typeof settings?.draftRounds === 'number'
       ? settings.draftRounds
       : typeof settings?.rosterSize === 'number'
         ? settings.rosterSize
         : 0;
+  if (draftRounds <= 0) {
+    const { data: leagueCols } = await supabaseAdmin
+      .from('leagues')
+      .select('draft_rounds, roster_size')
+      .eq('id', leagueId)
+      .single();
+    draftRounds = leagueCols?.draft_rounds ?? leagueCols?.roster_size ?? 0;
+  }
 
   const { data: round1, error: round1Err } = await supabaseAdmin
     .from('draft_order')
@@ -652,6 +665,26 @@ lobbyRegistry.startIdleEvictionTimer();
 // env, or opts; 0 disables. Tests disable via vitest setup.
 lobbyRegistry.startClockLivenessScanner();
 
+// ENGINE-EAR v3 Slice 1 item 2 (E106, 2026-08-11): BOOT-SCAN
+// resumes in_progress + paused leagues on engine startup.
+//
+// Fires in the background (does NOT block the Hono/uWS listener
+// startup — the engine serves on port before boot-scan finishes so
+// clients can connect and force lazy-create in the meantime, which
+// is idempotent with getOrCreate's placeholder pattern).
+//
+// Entry 83 measured 4.7 dead minutes post-restart on fad02304;
+// this scan eliminates that dead window for in_progress drafts.
+// Skipped when EVENT_SUBSCRIPTION_DISABLED=1 (tests).
+if (process.env.EVENT_SUBSCRIPTION_DISABLED !== '1') {
+  void lobbyRegistry.performBootScan(supabaseAdmin).catch((err) => {
+    // Non-fatal — engine keeps serving. performBootScan itself
+    // logs per-league failures + a summary; this catch handles
+    // any final throw the method itself didn't swallow.
+    structuredLogger.error('registry.boot_scan_uncaught', {}, err);
+  });
+}
+
 // Phase 4.5 chunk 11g.10 sub-step 10b — mount engine-ops admin routes
 // at /api/admin/engine/* on the engine's Hono server.
 //
@@ -725,18 +758,92 @@ if (subscriptionDisabled) {
   subscriptionHandle = startEventSubscription({
     connectionString: dbUrl,
     dispatch: async (notification, notificationReceivedAtMs) => {
-      // Lobby-load forbidden on NOTIFY (resource-exhaustion protection).
-      // Unknown leagueId is silently ignored to prevent the attack
-      // vector of every external event firing a lobby load. Lobbies
-      // load lazily on WS connect; bootstrap catches up via
-      // snapshot+delta from chunk 11g.7 sub-step 7c.
-      const lobby = lobbyRegistry.get(notification.leagueId);
+      // ENGINE-EAR v3 Slice 1 item 1 (E106, 2026-08-11):
+      // NOTIFY-CREATES-LOBBY (client-independent ignition).
+      //
+      // Pre-Slice-1 defect: this dispatch called only `registry.get`
+      // and silently dropped every NOTIFY for a league with no
+      // in-memory lobby. Combined with LAZY lobby creation (only on
+      // WS client connect), this meant: commissioner ignites a
+      // draft → draft_started NOTIFY arrives → no lobby → dropped →
+      // no timer armed → no autopicks → dead draft until someone
+      // clicks join. Entry 82 (CSP-starved clients), Entry 83
+      // (post-restart 4.7-min dead window), Entry 88 (lazy-arm
+      // structural confirmation) all measured this class of stall.
+      //
+      // Fix: for `in_progress` / `paused` leagues, `getOrCreate` the
+      // lobby on NOTIFY. Ignition + subsequent events drive the
+      // engine without any client ever connecting — the twelve's
+      // "commissioner presses start, everyone's phone is slow"
+      // scenario now WORKS.
+      //
+      // Gating: check `leagues.draft_status` before creating. Only
+      // in_progress / paused warrant a lobby; not_started /
+      // completed / cancelled skip (no live timer needed). This is
+      // the resource-exhaustion protection the pre-Slice-1 comment
+      // guarded against — restricted, not blanket-forbidden.
+      //
+      // Idempotency: `getOrCreate` is safe under concurrent NOTIFY
+      // storms (its Promise-placeholder pattern ensures at-most-one
+      // construction per lobbyId). A subsequent client connect
+      // finds the already-created lobby.
+      let lobby = lobbyRegistry.get(notification.leagueId);
       if (!lobby) {
-        structuredLogger.debug(
-          'event_subscription.event_skipped_unknown_lobby',
-          { leagueId: notification.leagueId, seq: notification.seq },
-        );
-        return;
+        // Peek at draft_status before spinning up. Reads a single
+        // column via the admin client (bypasses RLS). Cast the
+        // .from() *result* through `any` — extracting `.from` off
+        // the client loses `this`, and supabase-js reads `this.rest`
+        // (E109 lesson; same fix applied at LobbyRegistry.ts).
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: leagueRow, error: leagueErr } = await (supabaseAdmin.from('leagues') as any)
+            .select('draft_status')
+            .eq('id', notification.leagueId)
+            .maybeSingle();
+          if (leagueErr) {
+            structuredLogger.warn('event_subscription.notify_status_probe_failed', {
+              leagueId: notification.leagueId,
+              seq: notification.seq,
+              error: leagueErr.message,
+            });
+            return;
+          }
+          const status = (leagueRow as { draft_status?: string } | null)?.draft_status;
+          // E111 lesson: `draft_status` enum has NO 'paused' value
+          // — `paused` lives on the OTHER column `leagues.draft_state`.
+          // Prior `status !== 'paused'` guard was a dead branch that
+          // encoded the wrong data model. Slice-1's contract only
+          // requires in_progress rehydration; paused-draft NOTIFY
+          // handling is a Slice-2+ decision (would require reading
+          // draft_state alongside).
+          if (status !== 'in_progress') {
+            structuredLogger.debug(
+              'event_subscription.notify_skipped_non_live_league',
+              {
+                leagueId: notification.leagueId,
+                seq: notification.seq,
+                draftStatus: status ?? '<unknown>',
+              },
+            );
+            return;
+          }
+          structuredLogger.info('event_subscription.notify_creates_lobby', {
+            leagueId: notification.leagueId,
+            seq: notification.seq,
+            draftStatus: status,
+          });
+          lobby = await lobbyRegistry.getOrCreate(
+            notification.leagueId,
+            notification.leagueId,
+          );
+        } catch (err) {
+          structuredLogger.error(
+            'event_subscription.notify_lobby_create_failed',
+            { leagueId: notification.leagueId, seq: notification.seq },
+            err,
+          );
+          return;
+        }
       }
       // Chunk 11g.10 sub-step 10c-1b: thread the NOTIFY receipt
       // timestamp into the LobbyManager so `external_event.applied`

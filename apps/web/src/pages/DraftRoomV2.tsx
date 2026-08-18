@@ -37,6 +37,8 @@ import { OnClockActionBar } from '@/components/draft/v2/OnClockActionBar';
 import { ManagerPresencePanel } from '@/components/draft/v2/ManagerPresencePanel';
 import { DraftBoard } from '@/components/draft/DraftBoard';
 import { PlayerPool } from '@/components/draft/PlayerPool';
+import { PlayerCardDialog } from '@/components/draft/PlayerCardDialog';
+import { ScoringCalculator } from '@citrus/shared';
 import { DraftHistory } from '@/components/draft/DraftHistory';
 import { TeamRosters } from '@/components/draft/TeamRosters';
 import { DraftQueue } from '@/components/draft/DraftQueue';
@@ -73,6 +75,7 @@ import {
   participatingTeamIdsFromMatrix,
   type FetchedTeam,
 } from '@/lib/draftClient/v1Adapters';
+import { overlayPendingPicks } from '@/lib/draftClient/overlayPending';
 import type { Player } from '@/services/PlayerService';
 
 export default function DraftRoomV2() {
@@ -169,13 +172,41 @@ export default function DraftRoomV2() {
           // deadline rendered as 35s until the first pick event
           // seeded the EMA. Seeding here eliminates that first-paint
           // window entirely.
-          if (snapshot.recentEvents.length > 0) {
-            const last =
-              snapshot.recentEvents[snapshot.recentEvents.length - 1];
-            const serverMs = new Date(last.timestamp).getTime();
-            if (Number.isFinite(serverMs)) {
-              updateOffset(Date.now(), serverMs);
-            }
+          // TIMER-1 / E121 — seed from the snapshot RESPONSE's server
+          // clock first. E104's event-based seed (below) cannot fire
+          // on a freshly-ignited draft: the engine's ring buffer holds
+          // pick events only, so `recentEvents` is EMPTY until the
+          // first pick lands — leaving the opening pick of every
+          // draft uncorrected (0:35 on a 30s clock for a slow device).
+          // `serverReceivedAtMs` is stamped by the snapshot fetcher
+          // from the HTTP Date header and is always present.
+          //
+          // TIMER-2 (2026-08-12) — the event-timestamp fallback is GONE.
+          //
+          // It used to seed the estimator from
+          // `recentEvents[last].timestamp` whenever the Date header was
+          // unavailable — which is ALWAYS, because getResponseDateMs reads
+          // `response.headers` and the snapshot fetcher receives apiClient's
+          // parsed envelope, which has none. So this fallback ran on every
+          // single load.
+          //
+          // An event timestamp says WHEN A PICK HAPPENED, not what the
+          // server's clock reads now. Seeding from it means "offset = age of
+          // the last pick". Open a league 80s after the previous pick and the
+          // estimator concludes your clock runs 80s fast; the deadline is
+          // pushed 80s into the future; DraftTimerV2's
+          // `Math.min(remaining, pickTimeLimitSec)` then pins the display at
+          // the configured limit and THE CLOCK APPEARS FROZEN.
+          //
+          // Field-confirmed 2026-08-12: server had 520s remaining on a 600s
+          // clock, the browser showed a motionless 10:00. 520 + 80 = 600.
+          //
+          // With no seed the offset stays 0 and the countdown renders
+          // `deadline - localNow` — accurate to the device's real skew
+          // (measured at 1.8s on Garrett's machine, invisible on any clock).
+          // That is strictly better than a confidently wrong correction.
+          if (typeof snapshot.serverReceivedAtMs === 'number') {
+            updateOffset(Date.now(), snapshot.serverReceivedAtMs);
           }
           void fetchDraftOrderMatrix(
             leagueId,
@@ -191,11 +222,11 @@ export default function DraftRoomV2() {
           store.applyEvent(event);
         },
         onEvents: (events) => {
-          if (events.length > 0) {
-            const last = events[events.length - 1];
-            const serverMs = new Date(last.timestamp).getTime();
-            if (Number.isFinite(serverMs)) updateOffset(Date.now(), serverMs);
-          }
+          // TIMER-2 (2026-08-12) — deliberately does NOT seed the clock
+          // offset. This is the RESYNC path: the batch is history, and its
+          // last entry can be minutes old. Same defect as the snapshot
+          // fallback above — see the comment there. `onEvent` still seeds,
+          // and correctly, because a live frame genuinely just happened.
           store.applyEvents(events);
         },
         onPresence: (payload) => {
@@ -421,7 +452,7 @@ function StickyHeader({ onRetryNow, clockOffsetMs }: StickyHeaderProps) {
   const wsOpen = connectionState.kind === 'connected';
 
   return (
-    <div className="sticky top-0 z-30 bg-background border-b border-border pb-3 mb-4">
+    <div className="sticky top-0 z-30 bg-background border-b border-border pb-3 mb-4 pt-safe">
       <h1 className="text-xl font-bold mb-2">Draft Room</h1>
       <ConnectionBanner onRetryNow={onRetryNow} />
       {snapshot !== null && derived !== null && (
@@ -482,6 +513,33 @@ function DraftRoomBody({
   playersLoading,
   clockOffsetMs,
 }: DraftRoomBodyProps) {
+  /*
+   * QUEUE-REACH (2026-08-13) — this state was declared inside
+   * `SidebarPanel`. That made the queue invisible to `PlayerPool`,
+   * which lives in `MainTabs`, a SIBLING. `PlayerPool` already
+   * supports the queue completely — it takes `queue` and
+   * `onAddToQueue` and renders a per-row star (PlayerPool.tsx:356 for
+   * the mobile card, :631 for the desktop table) — but v2 never passed
+   * either prop, and the star only renders when `onAddToQueue` is
+   * defined. So the v2 room shipped a queue panel whose own empty
+   * state reads "Click the star icon on players to add them to your
+   * queue" next to a pool with no stars in it.
+   *
+   * That is not cosmetic. The server-side queue (`set_draft_queue`)
+   * and the autopick `queueStrategy` that reads it both landed
+   * 2026-08-12, and both are driven ENTIRELY by what a manager puts in
+   * this list. With no way to fill it, a manager who misses their
+   * clock falls through to projections-only autopick — the exact
+   * outcome the queue exists to prevent. The whole chain was wired
+   * except its first inch.
+   *
+   * Lifting to the common parent is the minimum that fixes it: one
+   * `DraftQueue` instance still owns hydration and persistence (two
+   * instances would race, and the empty-initial-state save would wipe
+   * the very queue it restored — see DraftQueue.persistence.test.tsx),
+   * while the pool becomes a read/write view of the same array.
+   */
+  const [queue, setQueue] = useState<string[]>([]);
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
   const resolvedMyTeamId = useMyTeamId();
@@ -516,6 +574,23 @@ function DraftRoomBody({
         </div>
       );
     }
+    // ARCHITECT 2026-08-12 (LOBBY-WAIT / inbox E124) — the same
+    // reasoning as the ConnectionBanner variant. "Waiting for draft
+    // state…" is engine vocabulary; a manager waiting on his
+    // commissioner should be told that in his own language, and the
+    // room should read as ready rather than broken.
+    if (
+      connectionState.kind === 'reconnecting' &&
+      connectionState.waitingForStart
+    ) {
+      return (
+        <div className="text-muted-foreground" data-testid="draft-waiting-for-start">
+          The draft hasn&apos;t started yet. This page will open on its own
+          as soon as your commissioner starts it — you don&apos;t need to
+          refresh.
+        </div>
+      );
+    }
     return (
       <div className="text-muted-foreground" data-testid="draft-loading">
         Waiting for draft state…
@@ -533,14 +608,32 @@ function DraftRoomBody({
           playersLoading={playersLoading}
           myTeamId={myTeamId}
           clockOffsetMs={clockOffsetMs}
+          queue={queue}
+          onQueueChange={setQueue}
         />
       </div>
-      <div className="hidden lg:block space-y-4">
+      {/* QUEUE-REACH (2026-08-13) — was `hidden lg:block`.
+          Below 1024px that hid the ENTIRE sidebar: manager presence,
+          team rosters, and the draft queue. Measured on staging at a
+          766px viewport: the sidebar was display:none while the
+          player pool was capped to 467px with 2,582px of rows hidden
+          inside its own scrollbar — so there was nothing to scroll TO
+          and no way to scroll there. Reported as two separate issues
+          ("I can't scroll on the page, only the internal table of
+          players" and "doesn't have a proper watchlist/queue
+          button/list"); they are one layout bug.
+          Below lg the grid is already `grid-cols-1`, so this simply
+          stacks underneath the pool, which is what v1 has always
+          done. At lg and up nothing changes — it is still the right
+          hand column. */}
+      <div className="space-y-4">
         <SidebarPanel
           leagueId={leagueId}
           teams={teams}
           playersById={playersById}
           myTeamId={myTeamId}
+          queue={queue}
+          onQueueChange={setQueue}
         />
       </div>
     </div>
@@ -556,6 +649,9 @@ interface MainTabsProps {
   playersLoading: boolean;
   myTeamId: string | null;
   clockOffsetMs: number;
+  /** QUEUE-REACH (2026-08-13) — owned by DraftRoomBody, shared with the sidebar. */
+  queue: string[];
+  onQueueChange: (next: string[]) => void;
 }
 
 function MainTabs({
@@ -565,6 +661,8 @@ function MainTabs({
   playersLoading,
   myTeamId,
   clockOffsetMs,
+  queue,
+  onQueueChange,
 }: MainTabsProps) {
   const derived = useDerivedDraftState();
   const snapshot = useDraftSnapshot();
@@ -575,6 +673,18 @@ function MainTabs({
   const pendingActions = usePendingActions();
   const [tab, setTab] = useState<'players' | 'board' | 'history'>('players');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  // V2-PARITY (2026-08-17) — tap-for-player-card. Garrett's #1 feedback
+  // from Citrus Draft Night: rows only highlighted; no card ever opened.
+  const [cardPlayer, setCardPlayer] = useState<Player | null>(null);
+  // V2-PARITY (2026-08-17) — autodraft toggle ("autodraft button doesn't
+  // exist" — same feedback list). When ON and it's my turn, the client
+  // submits automatically after a short beat: top of my queue first,
+  // best season-FPTS available otherwise (the pool's own #1 ranking).
+  // Persisted per league so a reload mid-draft keeps the setting.
+  const [autodraftOn, setAutodraftOn] = useState<boolean>(() => {
+    try { return localStorage.getItem(`citrus:autodraft:${leagueId}`) === '1'; } catch { return false; }
+  });
+  const lastAutoPickForRef = useRef<number | null>(null);
 
   // Is it my turn? (computed early — feeds alarm + on-clock action bar.)
   const amIOnClock =
@@ -616,21 +726,39 @@ function MainTabs({
     () => participatingTeamIdsFromMatrix(matrix ?? null),
     [matrix],
   );
+  // PICK-LATENCY (2026-08-12) — optimistic render.
+  //
+  // `renderDerived` is `derived` plus any pick the user has submitted
+  // but the server has not yet confirmed. It feeds ONLY the four view
+  // adapters below, so the pool, board, rosters and history all update
+  // the instant the manager clicks Draft.
+  //
+  // Everything else on this page — amIOnClock, the countdown, the
+  // on-clock action bar, isDraftActive, the submit guards — deliberately
+  // keeps reading raw `derived`. The pick draws immediately; whose turn
+  // it is stays server-authoritative. See overlayPending.ts for why.
+  const renderDerived = useMemo(
+    () => overlayPendingPicks(derived, pendingActions),
+    [derived, pendingActions],
+  );
   const v1Teams = useMemo(
-    () => (derived ? toV1Teams(teams, derived, playersById, participatingTeamIds) : []),
-    [teams, derived, playersById, participatingTeamIds],
+    () =>
+      renderDerived
+        ? toV1Teams(teams, renderDerived, playersById, participatingTeamIds)
+        : [],
+    [teams, renderDerived, playersById, participatingTeamIds],
   );
   const draftHistory = useMemo(
-    () => (derived ? toDraftHistory(teams, derived, playersById) : []),
-    [teams, derived, playersById],
+    () => (renderDerived ? toDraftHistory(teams, renderDerived, playersById) : []),
+    [teams, renderDerived, playersById],
   );
   const draftedIds = useMemo(
-    () => (derived ? toDraftedPlayerIds(derived) : []),
-    [derived],
+    () => (renderDerived ? toDraftedPlayerIds(renderDerived) : []),
+    [renderDerived],
   );
   const availablePlayers = useMemo(
-    () => (derived ? toAvailablePlayers(playersById, derived) : []),
-    [playersById, derived],
+    () => (renderDerived ? toAvailablePlayers(playersById, renderDerived) : []),
+    [playersById, renderDerived],
   );
 
   // amIOnClock is computed once at the top of MainTabs (feeds alarm +
@@ -674,11 +802,17 @@ function MainTabs({
       // Capture the currentPickNumber we're submitting for; feeds the
       // F11 layer 2 disambiguate check on the pick_out_of_order path.
       const submittingForPickNumber = derived.currentPickNumber;
+      // PICK-LATENCY (2026-08-12): capture the pick slot at CLICK time.
+      // overlayPendingPicks places the optimistic entry at exactly these
+      // coordinates; reading them at render time instead would misplace
+      // the pick on any frame where the server has already advanced.
       useDraftClientStore.getState().recordPending({
         correlationId: attemptId,
         teamId: myTeamId,
         playerId: playerIdNum,
         submittedAt,
+        pickNumber: submittingForPickNumber,
+        roundNumber: derived.currentRoundNumber,
       });
       // Dangle-safety timer (DR-2 architect amendment) — see
       // submitPick.ts and the removed SubmitPickControl.
@@ -754,8 +888,74 @@ function MainTabs({
     [amIOnClock, myTeamId, derived, leagueId, pendingActions],
   );
 
+  /*
+   * QUEUE-REACH (2026-08-13) — star toggles membership, appending to
+   * the END so the list stays in the manager's chosen priority order.
+   * `queueStrategy` (server/src/draft/autopickStrategy.ts) walks it
+   * front-to-back and takes the first player still available, so
+   * position IS priority; inserting anywhere but the end would
+   * silently reorder someone's board.
+   */
+  const toggleQueued = useCallback(
+    (playerId: string) => {
+      onQueueChange(
+        queue.includes(playerId)
+          ? queue.filter((id) => id !== playerId)
+          : [...queue, playerId],
+      );
+    },
+    [queue, onQueueChange],
+  );
+
   const isDraftActive = derived?.draftStatus === 'in_progress';
   const isDraftComplete = derived?.draftStatus === 'completed';
+
+  // V2-PARITY (2026-08-17) — autodraft machinery.
+  const toggleAutodraft = useCallback(() => {
+    setAutodraftOn(v => {
+      const next = !v;
+      try { localStorage.setItem(`citrus:autodraft:${leagueId}`, next ? '1' : '0'); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }, [leagueId]);
+
+  useEffect(() => {
+    if (!autodraftOn || !amIOnClock || isSubmitPending) return;
+    const pickNo = derived?.currentPickNumber ?? null;
+    // One attempt per pick slot: if the submit fails (e.g. the engine
+    // refuses the player), we deliberately do NOT retry this slot — the
+    // engine's own expiry autopick remains the backstop, and the toast
+    // tells the manager what happened.
+    if (pickNo === null || lastAutoPickForRef.current === pickNo) return;
+    if (availablePlayers.length === 0) return;
+    const timer = setTimeout(() => {
+      const availSet = new Set(availablePlayers.map(p => p.id));
+      const queuedId = queue.find(id => availSet.has(id));
+      let target = queuedId ? availablePlayers.find(p => p.id === queuedId) : undefined;
+      if (!target) {
+        // Mirror PlayerPool's rankMap: season FPTS via the default
+        // ScoringCalculator (v2 passes no league scoringSettings to the
+        // pool either, so this matches the visible #1 exactly).
+        const scorer = new ScoringCalculator(undefined);
+        let best = -Infinity;
+        for (const p of availablePlayers) {
+          const isG = p.position === 'G';
+          const f = scorer.calculatePoints(
+            isG
+              ? { wins: p.wins || 0, saves: p.saves || 0, shutouts: p.shutouts || 0, goals_against: p.goals_against || 0 }
+              : { goals: p.goals || 0, assists: p.assists || 0, shots: p.shots || 0, blocks: p.blocks || 0, hits: p.hits || 0, pim: p.pim || 0, ppp: p.ppp || 0, shp: p.shp || 0 },
+            isG,
+          );
+          if (f > best) { best = f; target = p; }
+        }
+      }
+      if (target) {
+        lastAutoPickForRef.current = pickNo;
+        void handleDraftFromPool(target);
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [autodraftOn, amIOnClock, isSubmitPending, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool]);
 
   return (
     <div className="space-y-3">
@@ -771,6 +971,31 @@ function MainTabs({
           totalPicks={derived?.totalPicks ?? 0}
           topPickTeamName={null}
           topPickPlayerName={null}
+          /*
+           * ARCHITECT 2026-08-12 (ROSTER-CTA / inbox E133). The banner's
+           * `rosterHref` defaults to a bare "/roster", and `Roster.tsx` has no
+           * :leagueId route param — it resolves the league from LeagueContext's
+           * `activeLeagueId` (Roster.tsx:218, :502). DraftRoomV2 reads its
+           * leagueId from the PATH and never calls setActiveLeagueId, so the
+           * context still points wherever it pointed before the user entered
+           * the room. Observed live: finishing a draft in league ada00018 and
+           * clicking "View your roster" landed on /roster?league=ada00015 —
+           * a different league entirely.
+           *
+           * Scoping the href with ?league=<id> routes through LeagueContext's
+           * existing "update active league when the URL param changes (with
+           * membership validation)" effect, which is the designed mechanism
+           * for exactly this. `CompletionMomentBanner` already declares the
+           * prop and its test already covers "parent may pass league-scoped
+           * variant" — the parent simply never did.
+           *
+           * The broader issue (the draft room not owning the active league at
+           * all, which also leaves the mobile nav and every league-scoped route
+           * pointing elsewhere for the duration of the draft) is a
+           * LeagueContext change and is written up as a proposal, not shipped
+           * here.
+           */
+          rosterHref={leagueId ? `/roster?league=${leagueId}` : undefined}
         />
       )}
 
@@ -803,6 +1028,24 @@ function MainTabs({
             {alarm.muted ? '🔇 Alarm muted — click to unmute' : '🔊 Alarm on — click to mute'}
           </button>
         )}
+        {/* V2-PARITY (2026-08-17) — autodraft toggle, always visible so a
+            manager can arm it BEFORE their turn (that's the whole point). */}
+        {!isDraftComplete && (
+          <button
+            type="button"
+            onClick={toggleAutodraft}
+            className={
+              autodraftOn
+                ? 'mt-1 ml-3 text-xs underline text-fantasy-primary font-semibold'
+                : 'mt-1 ml-3 text-xs underline text-muted-foreground hover:text-foreground'
+            }
+            data-testid="autodraft-toggle"
+            aria-pressed={autodraftOn}
+            title="When on, your picks submit automatically — top of your queue first, best available otherwise. One attempt per pick; the draft clock is still the backstop."
+          >
+            {autodraftOn ? '🤖 Autodraft ON — click to turn off' : '🤖 Autodraft off — click to turn on'}
+          </button>
+        )}
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
@@ -827,6 +1070,16 @@ function MainTabs({
               availablePlayers={availablePlayers}
               isYourTurn={amIOnClock}
               isSubmitPending={isSubmitPending}
+              /* QUEUE-REACH (2026-08-13) — the two props that make the
+                 per-row star appear. `onAddToQueue` is optional in
+                 PlayerPool and the star is gated on it being defined,
+                 so omitting it (as v2 did) removed the only control
+                 that can put a player in the queue. */
+              queue={queue}
+              onAddToQueue={toggleQueued}
+              /* V2-PARITY (2026-08-17) — per-row info button opens the
+                 player card. */
+              onShowCard={setCardPlayer}
             />
           )}
         </TabsContent>
@@ -847,6 +1100,36 @@ function MainTabs({
             draftHistory={draftHistory}
             currentPick={derived?.currentPickNumber ?? 0}
             currentRound={derived?.currentRoundNumber ?? 0}
+            /*
+             * ARCHITECT 2026-08-12 (BOARD-ROUNDS / inbox E129). This prop was
+             * dropped in the v1 -> v2 port. `DraftBoard`'s signature defaults
+             * `totalRounds = 16` (DraftBoard.tsx:57) and computes
+             * `totalPicks = teams.length * totalRounds`, so without it the v2
+             * board showed EVERY league as a 16-round draft. Observed live on
+             * a 12x21 league that had finished: the board header read
+             * "252 of 192 picks made" — a denominator smaller than the
+             * numerator. In a live 21-round draft it would read
+             * "192 of 192 picks made" around pick 192 and stay there for the
+             * remaining 60 picks, which reads as "the draft is over" three
+             * quarters of the way through. v1 has always passed this
+             * (DraftRoom.tsx:4574, `league?.draft_rounds || ... || 21`).
+             *
+             * Deriving it from `derived.totalPicks` rather than from a league
+             * settings field is deliberate: `totalPicks` comes straight from
+             * `DraftSnapshot.stateSnapshot.totalPicks`, i.e. the ENGINE's own
+             * authoritative count, and it is the same value the header two
+             * hundred lines up already renders. Computing the board's
+             * denominator from it makes the two numbers agree by construction
+             * instead of by coincidence. `Math.round` (not ceil/floor) because
+             * totalPicks is always teams x rounds exactly; rounding only
+             * guards float noise. Falls back to the old 16 only when there are
+             * no teams to divide by, which is the pre-snapshot render.
+             */
+            totalRounds={
+              v1Teams.length > 0 && derived && derived.totalPicks > 0
+                ? Math.round(derived.totalPicks / v1Teams.length)
+                : undefined
+            }
             draftType="snake"
           />
         </TabsContent>
@@ -855,6 +1138,16 @@ function MainTabs({
           <DraftHistory draftHistory={draftHistory} />
         </TabsContent>
       </Tabs>
+
+      {/* V2-PARITY (2026-08-17) — the player card. Draftable straight
+          from the card when it's your turn. */}
+      <PlayerCardDialog
+        player={cardPlayer}
+        onClose={() => setCardPlayer(null)}
+        onDraft={handleDraftFromPool}
+        canDraft={amIOnClock && isDraftActive && cardPlayer !== null && !draftedIds.includes(cardPlayer.id)}
+        isSubmitPending={isSubmitPending}
+      />
     </div>
   );
 }
@@ -866,6 +1159,9 @@ interface SidebarPanelProps {
   teams: FetchedTeam[];
   playersById: ReadonlyMap<string, Player>;
   myTeamId: string | null;
+  /** QUEUE-REACH (2026-08-13) — lifted to DraftRoomBody; see the note there. */
+  queue: string[];
+  onQueueChange: (next: string[]) => void;
 }
 
 function SidebarPanel({
@@ -873,10 +1169,11 @@ function SidebarPanel({
   teams,
   playersById,
   myTeamId,
+  queue,
+  onQueueChange,
 }: SidebarPanelProps) {
   const derived = useDerivedDraftState();
   const matrix = useDraftMatrix();
-  const [queue, setQueue] = useState<string[]>([]);
 
   // DR-3.1 F9 fix: same filter as MainTabs — TeamRosters' pick label
   // formula reads teams.length as round size.
@@ -938,7 +1235,7 @@ function SidebarPanel({
           queue={queue}
           players={allPlayers}
           draftedPlayers={draftedIds}
-          onQueueChange={setQueue}
+          onQueueChange={onQueueChange}
           onDraftFromQueue={() => {
             // Queue-drive submit is post-DR-3. For now, users draft
             // via the pool's Draft button. Queue is display-only per
@@ -948,6 +1245,10 @@ function SidebarPanel({
           isDraftActive={derived?.draftStatus === 'in_progress'}
           isYourTurn={amIOnClock}
           leagueId={leagueId}
+          // QUEUE (2026-08-12) — enables server persistence. Null for a
+          // spectator or an unresolved identity, in which case DraftQueue
+          // stays on its previous localStorage-only path.
+          teamId={myTeamId}
           currentPick={derived?.currentPickNumber ?? undefined}
           totalPicks={derived?.totalPicks ?? undefined}
         />
@@ -955,7 +1256,7 @@ function SidebarPanel({
           className="text-xs text-muted-foreground mt-1"
           data-testid="queue-persistence-note"
         >
-          Saved on this device
+          Saved to your team — used for autopick if your clock expires
         </div>
       </div>
       {/* DR-3 (2026-07-29) — DraftControls HIDDEN per architect ruling:

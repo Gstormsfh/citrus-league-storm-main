@@ -14,6 +14,52 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # ── Data pipeline (Python) ───────────────────────────────────────────
+  # Added 2026-08-11. Before this, ci.yml ran ZERO Python: nine test files
+  # under data-pipeline/tests had never gated anything, and three of them
+  # could not even be imported.
+  #
+  # The one that mattered was test_nhl_season_year_parity.py, whose own
+  # docstring says "the comment 'keep these in sync' is not a control; the
+  # test is" — and which had been silently uncollectable because it put
+  # data-pipeline on sys.path without importing _bootstrap to register the
+  # data_pipeline package. Meanwhile the Python and TypeScript season rules
+  # drifted from the schedule in exactly the way it was written to catch.
+  #
+  # test_slack_integration used to be deselected here: it patched
+  # monitoring.alerting.requests, but _send_slack does `import requests` inside
+  # the function body, so that attribute never existed and the test had never
+  # passed. Repointed at requests.post, verified by fault injection (stubbing
+  # _send_slack to return True without posting makes it fail), and the deselect
+  # removed. The whole suite runs.
+  python-tests:
+    name: Data Pipeline Tests (Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r data-pipeline/requirements.txt
+          pip install pytest==8.3.4
+
+      - name: pytest
+        working-directory: data-pipeline
+        env:
+          # The season-parity tests call the real SQL functions over PostgREST
+          # rather than re-implementing them. Without these they self-skip.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          pytest tests/ -q --no-header
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

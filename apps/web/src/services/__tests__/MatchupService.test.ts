@@ -168,7 +168,12 @@ vi.mock('../DemoLeagueService', () => ({
   DEMO_LEAGUE_ID_FOR_GUESTS: 'demo-league-id',
 }));
 
-vi.mock('@/utils/seasonConstants', () => ({
+vi.mock('@/utils/seasonConstants', async (importOriginal) => ({
+  // Spread the real module: a hand-written object here omits whatever the
+  // service starts calling next. getCurrentSeason() was added to several
+  // services on 2026-08-11 and every partial mock broke with `undefined is
+  // not a function`, surfacing as assertion noise rather than a clear error.
+  ...(await importOriginal<typeof import('@/utils/seasonConstants')>()),
   CURRENT_SEASON: 2025,
   DEFAULT_TEST_DATE: '2025-01-15',
 }));
@@ -185,6 +190,9 @@ vi.mock('@/utils/timezoneUtils', () => ({
 }));
 
 vi.mock('@/utils/weekCalculator', () => ({
+  // Identity in tests: the clamp's transformation is pinned by
+  // weekCalculator.test.ts; here the mock controls week output directly.
+  clampToSeasonStart: vi.fn((d: Date) => d),
   getFirstWeekStartDate: vi.fn().mockReturnValue(new Date('2025-01-05')),
   getWeekStartDate: vi.fn((weekNum: number, firstWeek: Date) => {
     const d = new Date(firstWeek);

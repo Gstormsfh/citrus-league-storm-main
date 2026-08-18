@@ -12,14 +12,31 @@ import { describe, it, expect } from 'vitest';
 // this test. The component's imports/JSX aren't needed; we assert on
 // the values that the component keys into.
 
+// CONTRAST (2026-08-13) — every entry now carries its TEXT colour too.
+//
+// The badge base class used to hard-code `text-white`, which is only
+// correct for the dark backgrounds. Measured on the live roster:
+//
+//   LW  #C8DCC4 + white ..... 1.11-1.45:1   invisible
+//   C   #84A57D + white ..... 2.75:1        marginal
+//   UTIL same as C .......... 2.75:1        marginal
+//
+// `G` already paired its own text colour, and that entry is the only
+// one that kept passing when the others broke — the pattern was
+// already here, it just wasn't applied consistently. Pairing them makes
+// a background/foreground mismatch impossible to introduce by editing
+// one map entry.
+//
+// RW stays white-on-orange (2.85:1): a brand accent, legible at this
+// weight, and inverting it is a redesign rather than a legibility fix.
 const EXPECTED_POS_COLOR: Record<string, string> = {
-  LW: 'bg-pastel-sage-soft',
-  C: 'bg-pastel-sage',
-  RW: 'bg-pastel-orange',
-  D: 'bg-[#1A2A20]',
+  LW: 'bg-pastel-sage-soft text-pastel-forest',
+  C: 'bg-pastel-sage text-pastel-forest',
+  RW: 'bg-pastel-orange text-white',
+  D: 'bg-[#1A2A20] text-white',
   G: 'bg-pastel-sage/15 text-pastel-cream',
-  UTIL: 'bg-pastel-sage',
-  F: 'bg-emerald-600',
+  UTIL: 'bg-pastel-sage text-pastel-forest',
+  F: 'bg-emerald-600 text-white',
 };
 
 const EXPECTED_POS_RING_COLOR: Record<string, string> = {
@@ -42,8 +59,28 @@ import { fileURLToPath } from 'node:url';
 const HERE = resolve(fileURLToPath(import.meta.url), '..');
 const COMPONENT_PATH = resolve(HERE, '..', 'MobileRosterList.tsx');
 
+/**
+ * Parse a `const <name>: Record<string, string> = { ... }` block out of
+ * the component source into a real map, so invariants can be asserted
+ * against what the component ACTUALLY ships rather than against this
+ * file's own copy of it.
+ */
+function parseClassMap(source: string, name: string): Record<string, string> {
+  const block = source.match(
+    new RegExp(`const ${name}: Record<string, string> = \\{([^}]+)\\}`, 's'),
+  );
+  if (!block) return {};
+  const out: Record<string, string> = {};
+  for (const line of block[1].split('\n')) {
+    const m = line.match(/^\s*([A-Za-z0-9_]+)\s*:\s*'([^']*)'\s*,?\s*$/);
+    if (m) out[m[1]] = m[2];
+  }
+  return out;
+}
+
 describe('MobileRosterList — position-ring map lock (Entry 40 A-lite)', () => {
   const source = readFileSync(COMPONENT_PATH, 'utf8');
+  const SOURCE_POS_COLOR = parseClassMap(source, 'posColor');
 
   it.each(Object.entries(EXPECTED_POS_COLOR))(
     'posColor[%s] === %s',
@@ -67,6 +104,48 @@ describe('MobileRosterList — position-ring map lock (Entry 40 A-lite)', () => 
       expect(line).toContain(`'${expectedClass}'`);
     },
   );
+
+  // CONTRAST (2026-08-13) — the invariant that actually prevents the bug.
+  //
+  // The original lock pinned each background but said nothing about the
+  // text on it, so `text-white` could sit on a #C8DCC4 chip and every
+  // assertion still passed. This one fails if ANY position ships a
+  // background without deciding the foreground that survives on it.
+  //
+  // It reads the SOURCE map, not EXPECTED_POS_COLOR. Iterating the
+  // expectation would be tautological: adding `P: 'bg-sky-200'` to the
+  // component and nothing else left all 17 tests green when this was
+  // written the easy way (measured, not assumed). Every other assertion
+  // here is keyed BY position, so an unknown position is invisible to
+  // all of them — this is the only test that can see one arrive.
+  it('every position in the component pairs a background with a text colour', () => {
+    expect(Object.keys(SOURCE_POS_COLOR).length).toBeGreaterThan(0);
+    for (const [position, cls] of Object.entries(SOURCE_POS_COLOR)) {
+      expect(cls, `${position} must set a bg-* class`).toMatch(/\bbg-/);
+      expect(cls, `${position} must set its own text-* class`).toMatch(/\btext-/);
+    }
+  });
+
+  // Guards the assumption the test above relies on: that the component's
+  // key set is the one this file claims to cover. A position added to
+  // the component without being added here would otherwise sail past
+  // every `it.each` (they iterate the expectation, so they simply never
+  // ask about it).
+  it('the component ships exactly the positions this lock covers', () => {
+    expect(Object.keys(SOURCE_POS_COLOR).sort()).toEqual(
+      Object.keys(EXPECTED_POS_COLOR).sort(),
+    );
+  });
+
+  // The base badge class must NOT reintroduce a blanket text colour —
+  // that is exactly how the light chips ended up with white text.
+  it('the badge base class does not hard-code a text colour', () => {
+    const badgeBase = source.match(
+      /"w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center[^"]*"/,
+    );
+    expect(badgeBase).toBeTruthy();
+    expect(badgeBase![0]).not.toMatch(/\btext-white\b/);
+  });
 
   it('both maps cover the same position set (LW/C/RW/D/G/UTIL/F)', () => {
     const posColorKeys = Object.keys(EXPECTED_POS_COLOR).sort();

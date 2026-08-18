@@ -445,6 +445,134 @@ export class LobbyRegistry {
   }
 
   /**
+   * ENGINE-EAR v3 Slice 1 item 2 (E106, 2026-08-11) — BOOT-SCAN
+   * RESUMES IN_PROGRESS LEAGUES.
+   *
+   * Pre-Slice-1 defect: engine boot did NOT resume in_progress
+   * drafts. Entry 83 measured 4.7 dead minutes post-restart on
+   * fad02304 (in_progress league, seq-1 on ledger, got nothing
+   * until a client connected). Root cause: lobbies were LAZY,
+   * created only on first WS client connect or first NOTIFY. A
+   * post-restart in-progress league with no clients and no
+   * pending event stalled indefinitely.
+   *
+   * Fix: enumerate `leagues WHERE draft_status IN
+   * ('in_progress', 'paused')` at engine startup and `getOrCreate`
+   * a lobby for each. Each lobby's `init()` reads
+   * `leagues.pick_deadline` + replays the event log + arms the
+   * timer — so post-restart in-progress drafts resume within the
+   * boot-scan window (≪ 5s in practice) instead of waiting for
+   * a client.
+   *
+   * Called once from `index.ts` after registry construction, in
+   * the background (does not block the Hono/uWS listener startup —
+   * the engine is serving on port before boot-scan finishes so
+   * clients can still connect and force lazy-create in the
+   * meantime, which is idempotent with getOrCreate's placeholder
+   * pattern).
+   *
+   * Non-fatal: per-league construction failures log and continue;
+   * one broken league can't take down the whole engine's boot.
+   * The summary log at completion lets operators see how many
+   * lobbies resumed cleanly.
+   */
+  async performBootScan(
+    supabaseAdmin: SupabaseClient,
+  ): Promise<{ scanned: number; resumed: number; failed: number }> {
+    const startTime = Date.now();
+    let scanned = 0;
+    let resumed = 0;
+    let failed = 0;
+
+    try {
+      // Cast the fluent-chain through `any` for THIS query only —
+      // Supabase's generated Database types push the .from → .select
+      // → .in inference chain deep enough to trip the instantiation
+      // cap on the `leagues` type (wide settings JSONB). The scan
+      // only needs id column.
+      //
+      // E109 lesson: cast the *result* of `.from()`, NOT the method
+      // itself. `const untypedFrom = supabaseAdmin.from` extracts
+      // the method as a free function → `this` is undefined at call
+      // time → real supabase-js reads `this.rest` → TypeError. The
+      // Proxy at server/src/lib/supabase.ts:40 makes accidental
+      // rebinding impossible.
+      // E111 lesson: `draft_status` enum in the DB is
+      //   ('not_started', 'queued', 'in_progress', 'completed')
+      // per supabase/migrations/20250101000001 + 20260206000000
+      // — `paused` is NOT a member of this enum. Pause lives on the
+      // OTHER column `leagues.draft_state='paused'` (see
+      // DraftServiceV2.ts:551 + LobbyManager.ts:5523). A Postgres
+      // `.in()` list containing a non-member literal is rejected
+      // whole (22P02) — the scan then returns zero and resumes
+      // nothing. Slice-1 contract only requires `in_progress`
+      // rehydration; paused-drafts resume-via-boot-scan is a Slice-2+
+      // decision.
+      //
+      // NOTE: the shared type `DRAFT_STATUSES` at
+      // packages/shared/src/types/league.ts erroneously includes
+      // 'paused'; that is a client-facing type-drift docket for
+      // another cycle and is why the enum-domain mismatch survived
+      // 1031 offline tests.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabaseAdmin.from('leagues') as any)
+        .select('id')
+        .eq('draft_status', 'in_progress');
+      if (error) {
+        structuredLogger.error(
+          'registry.boot_scan_query_failed',
+          {},
+          error,
+        );
+        return { scanned: 0, resumed: 0, failed: 0 };
+      }
+      const rows = (data ?? []) as Array<{ id: string }>;
+      scanned = rows.length;
+      structuredLogger.info('registry.boot_scan_started', {
+        activeLeagues: scanned,
+      });
+
+      // Sequential await — parallel would race on the same Supabase
+      // admin connection pool + each getOrCreate is fast (~50ms per
+      // lobby per Entry 88 measurements) so sequential is fine for
+      // the twelve-scale target. If launch scales past 100
+      // concurrent in-progress leagues per engine, batch this.
+      for (const row of rows) {
+        try {
+          // leagueId === lobbyId per Citrus's data model (see
+          // server/src/routes/drafts.ts header comment).
+          await this.getOrCreate(row.id, row.id);
+          resumed += 1;
+          structuredLogger.debug('registry.boot_scan_lobby_resumed', {
+            leagueId: row.id,
+          });
+        } catch (err) {
+          failed += 1;
+          structuredLogger.warn('registry.boot_scan_lobby_failed', {
+            leagueId: row.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      structuredLogger.info('registry.boot_scan_complete', {
+        scanned,
+        resumed,
+        failed,
+        durationMs: Date.now() - startTime,
+      });
+    } catch (err) {
+      structuredLogger.error(
+        'registry.boot_scan_threw',
+        { scanned, resumed, failed, durationMs: Date.now() - startTime },
+        err,
+      );
+    }
+
+    return { scanned, resumed, failed };
+  }
+
+  /**
    * Drop a lobby from the registry. Used by chunk 11g.7's
    * snapshot-then-evict flow when a draft completes. Has no effect
    * if no entry exists.

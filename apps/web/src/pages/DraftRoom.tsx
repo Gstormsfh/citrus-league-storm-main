@@ -4054,6 +4054,7 @@ const DraftRoomInner = () => {
                 onDeleteTeam={handleDeleteTeam}
                 leagueId={leagueId}
                 maxTeams={league?.settings?.teamsCount || 12}
+                leagueDraftType={typeof league?.settings?.draftType === 'string' ? league.settings.draftType : 'snake'}
                 joinCode={league?.join_code}
                 leagueName={league?.name}
                 scheduledDraftTime={league?.scheduled_draft_time}

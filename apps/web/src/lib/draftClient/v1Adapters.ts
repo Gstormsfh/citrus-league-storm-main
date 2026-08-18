@@ -246,7 +246,24 @@ export function toDraftedPlayerIds(derived: DerivedDraftState): string[] {
 
 /**
  * Filter the full player index down to the pool's `availablePlayers`
- * array — everything not yet drafted.
+ * array — everything not yet drafted, and actually draftable.
+ *
+ * PLAYER-POOL (2026-08-12) — the `team` guard.
+ * `player_directory` is an all-time index, not a roster: 923 of its 2,035
+ * rows on staging have no NHL club, including Jaromir Jagr, Zdeno Chara and
+ * Joe Thornton. Every one of them was draftable. A manager took Marleau,
+ * Thornton and Cullen in a live test simply by clicking the top of the list.
+ *
+ * `team` is `team_abbrev ?? ''` (see usePreloadedPlayers), so an empty
+ * string means "not on an NHL roster". Rookies and prospects who ARE on a
+ * roster keep their club and stay draftable, which is why this filters on
+ * club rather than on having stats.
+ *
+ * NOTE the deliberate asymmetry: this filters the DRAFTABLE pool only. The
+ * full `playersById` map is untouched, so a player already drafted — or one
+ * who retires mid-season — still resolves to a real name on the board, the
+ * roster and the history. Filtering at the directory load instead would turn
+ * those into `#8466139 / ? / -`.
  */
 export function toAvailablePlayers(
   playersById: ReadonlyMap<string, Player>,
@@ -255,7 +272,9 @@ export function toAvailablePlayers(
   const drafted = new Set(toDraftedPlayerIds(derived));
   const out: Player[] = [];
   playersById.forEach((p) => {
-    if (!drafted.has(p.id)) out.push(p);
+    if (drafted.has(p.id)) return;
+    if (typeof p.team !== 'string' || p.team.trim() === '') return;
+    out.push(p);
   });
   return out;
 }

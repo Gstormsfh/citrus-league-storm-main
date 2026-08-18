@@ -1,0 +1,39 @@
+# SETTINGS-ENFORCEMENT (2026-08-16) — the waiver processors and the
+# trade-review sweep had NO scheduled caller: FAAB bids sat pending
+# forever, expired trade reviews hung forever. This is the ignition.
+#
+# Hourly (like daily-roster-lock) so each league's waiver_process_time
+# is honored to the hour via should_process_waivers_now server-side.
+# NOTE: schedule triggers run only from the DEFAULT branch — this
+# activates when merged to master, which also deploys the API revision
+# carrying the two endpoints. Until both are true it is inert.
+name: League Automation (Waivers, Trades, Matchups)
+
+on:
+  schedule:
+    - cron: "10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Process due waivers
+        run: |
+          curl -sS -X POST "${{ secrets.API_BASE_URL }}/api/scheduled/waiver-process" \
+            -H "X-Scheduled-Secret: ${{ secrets.SCHEDULED_TRIGGER_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail-with-body
+      - name: Sweep expired trade reviews
+        run: |
+          curl -sS -X POST "${{ secrets.API_BASE_URL }}/api/scheduled/trade-review-sweep" \
+            -H "X-Scheduled-Secret: ${{ secrets.SCHEDULED_TRIGGER_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail-with-body
+      - name: Matchup sweep (scores, completion, playoff generation)
+        run: |
+          curl -sS -X POST "${{ secrets.API_BASE_URL }}/api/scheduled/matchup-sweep" \
+            -H "X-Scheduled-Secret: ${{ secrets.SCHEDULED_TRIGGER_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail-with-body

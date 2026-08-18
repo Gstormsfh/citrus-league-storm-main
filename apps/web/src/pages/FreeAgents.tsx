@@ -124,6 +124,12 @@ const FreeAgents = () => {
   const [swapAddPlayer, setSwapAddPlayer] = useState<Player | null>(null);
   const [swapTeamId, setSwapTeamId] = useState<string | null>(null);
 
+  // SETTINGS-ENFORCEMENT (2026-08-16) — league scoring for FPTS
+  // display. Undefined → DEFAULT_SCORING inside ScoringCalculator, so
+  // default leagues render identical numbers (pinned by scoringUtils
+  // equivalence test).
+  const [leagueScoring, setLeagueScoring] = useState<import('@citrus/shared').ScoringSettings | undefined>(undefined);
+
   // Waiver process time from league settings (for toast messages)
   const [waiverProcessTime, setWaiverProcessTime] = useState<string | null>(null);
 
@@ -264,6 +270,15 @@ const FreeAgents = () => {
         WaiverService.getLeagueWaiverSettings(currentLeagueId, user.id)
           .then(settings => { if (settings) setWaiverProcessTime(settings.waiver_process_time); })
           .catch(() => { /* non-critical */ });
+        // League scoring for FPTS columns — one fetch, display-only.
+        supabase
+          .from('leagues')
+          .select('scoring_settings')
+          .eq('id', currentLeagueId)
+          .single()
+          .then(({ data }) => {
+            if (data?.scoring_settings) setLeagueScoring(data.scoring_settings as unknown as import('@citrus/shared').ScoringSettings);
+          });
       }
 
       // Get all players from our pipeline tables (player_directory + player_season_stats)
@@ -296,7 +311,23 @@ const FreeAgents = () => {
             .select('player_id, dropped_at')
             .eq('league_id', currentLeagueId)
             .is('cleared_at', null);
-          const waiverWindowMs = 48 * 60 * 60 * 1000;
+          // SETTINGS-ENFORCEMENT (2026-08-16) — was hardcoded 48h;
+          // read the league's configured period. 48 remains only as the
+          // absent-config fallback.
+          const { data: periodRow } = await (supabase as unknown as {
+            from: (t: string) => {
+              select: (c: string) => {
+                eq: (k: string, v: string) => {
+                  single: () => Promise<{ data: { waiver_period_hours: number | null } | null }>
+                }
+              }
+            }
+          })
+            .from('leagues')
+            .select('waiver_period_hours')
+            .eq('id', currentLeagueId)
+            .single();
+          const waiverWindowMs = (periodRow?.waiver_period_hours ?? 48) * 60 * 60 * 1000;
           const now = Date.now();
           const waiverMap = new Map<string, string>();
           for (const r of (waiverRows || [])) {
@@ -478,26 +509,29 @@ const FreeAgents = () => {
         }
       });
 
-      // Fetch projections for each day and aggregate ALL 8 STATS
-      for (const date of weekDays) {
-        try {
-          const dailyProjections = await MatchupService.getDailyProjectionsForMatchup(playerIds, date);
-
-          // Sum up ALL STATS for each player (full transparency)
-          // CRITICAL: Use playerId directly (numeric) as Map key to ensure proper accumulation
-          dailyProjections.forEach((projection, playerId) => {
-            // Use playerId directly as key (it's already a number from the Map)
-            const currentTotal = weeklyProjectionMap.get(playerId) || 0;
-            const dailyPoints = Number(projection.total_projected_points || 0);
-            const newTotal = currentTotal + dailyPoints;
-            weeklyProjectionMap.set(playerId, newTotal);
-
-            // Count games: if projection system returned data for this player on this day, they have a game
-            gameCountMap.set(playerId, (gameCountMap.get(playerId) || 0) + 1);
-          });
-        } catch (error) {
-          // Error fetching projections for this date - continue with other dates
-        }
+      // PERF SWEEP (2026-08-16): fetch all days CONCURRENTLY. The old
+      // sequential for-await made this 7 round-trips back to back —
+      // measured live as the dominant stall on this page's load.
+      const perDay = await Promise.all(
+        weekDays.map(async (date) => {
+          try {
+            return await MatchupService.getDailyProjectionsForMatchup(playerIds, date);
+          } catch {
+            return null; // continue with other dates
+          }
+        }),
+      );
+      for (const dailyProjections of perDay) {
+        if (!dailyProjections) continue;
+        // Sum up ALL STATS for each player (full transparency)
+        // CRITICAL: Use playerId directly (numeric) as Map key to ensure proper accumulation
+        dailyProjections.forEach((projection, playerId) => {
+          const currentTotal = weeklyProjectionMap.get(playerId) || 0;
+          const dailyPoints = Number(projection.total_projected_points || 0);
+          weeklyProjectionMap.set(playerId, currentTotal + dailyPoints);
+          // Count games: if projection system returned data for this player on this day, they have a game
+          gameCountMap.set(playerId, (gameCountMap.get(playerId) || 0) + 1);
+        });
       }
 
       setWeeklyProjections(weeklyProjectionMap);
@@ -1193,7 +1227,7 @@ const FreeAgents = () => {
       const seasonPPG = p.games_played > 0 ? (p.points || 0) / p.games_played : 0;
       const isGoalie = p.position === 'G';
       // Use centralized ScoringCalculator for fantasy PPG
-      const scorer = new ScoringCalculator();
+      const scorer = new ScoringCalculator(leagueScoring);
       const estimatedFantasyPPG = isGoalie
         ? ((p.wins || 0) > 0 && p.games_played > 0 ? scorer.calculatePointsPerGame({
             wins: p.wins || 0, saves: p.saves || 0, shutouts: p.shutouts || 0, goals_against: p.goals_against || 0
@@ -1934,7 +1968,7 @@ const FreeAgents = () => {
                           // Fallback uses actual fantasy PPG * games (not broken points/20)
                           const gw = player.gamesThisWeek || 0;
                           const isG = player.position === 'G';
-                          const faScorer = new ScoringCalculator();
+                          const faScorer = new ScoringCalculator(leagueScoring);
                           const estPPG = isG
                             ? ((player.wins || 0) > 0 && player.games_played > 0 ? faScorer.calculatePointsPerGame({
                                 wins: player.wins || 0, saves: player.saves || 0, shutouts: player.shutouts || 0, goals_against: player.goals_against || 0

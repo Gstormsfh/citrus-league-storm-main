@@ -6,6 +6,11 @@ import { analyticsService } from '@/services/AnalyticsService';
 import { setSentryUser } from '@/integrations/sentry/config';
 import { logger } from '@/utils/logger';
 import { PROFILE_QUERY_KEY } from '@/hooks/useProfile';
+import {
+  isNativeShell,
+  beginNativeOAuth,
+  registerNativeAuthListener,
+} from '@/lib/nativeAuth';
 
 /** Returns true if JWT is expired or within 30s of expiry. */
 function isTokenExpired(token: string | undefined): boolean {
@@ -16,6 +21,53 @@ function isTokenExpired(token: string | undefined): boolean {
   } catch {
     return true;
   }
+}
+
+/**
+ * Reads the auth-session identity from a JWT so AUTH_LOGIN can be emitted
+ * exactly once per session. Falls back to sub:iat if the provider ever stops
+ * issuing session_id — an occasional duplicate is far cheaper than a hole.
+ */
+function sessionKeyOf(token: string | undefined): string | null {
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (typeof payload.session_id === 'string') return payload.session_id;
+    if (payload.sub && payload.iat) return `${payload.sub}:${payload.iat}`;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const LOGIN_AUDIT_KEY = 'citrus.audit.lastLoginSessionId';
+
+/**
+ * SOC 2 CC7.2 — emit AUTH_LOGIN once per auth session.
+ *
+ * This used to live in signIn(), which only covers the password form. Server
+ * side signup calls setSession() directly ("no client-side signIn call") and
+ * OAuth returns through a redirect, so both minted a real session with no audit
+ * row. Measured against the identity provider's own log, capture was 13.9%
+ * (38 AUTH_LOGIN rows against 274 real logins, Apr-Aug 2026), and three logins
+ * after 2026-06-23 produced nothing at all.
+ *
+ * Emitting from onAuthStateChange catches every path that mints a session.
+ * Dedupe on the session key so INITIAL_SESSION restores, tab focus and a second
+ * tab do not re-log a session that was already recorded.
+ */
+function recordLoginOnce(session: Session | null): void {
+  const key = sessionKeyOf(session?.access_token);
+  if (!key) return;
+  try {
+    if (window.localStorage.getItem(LOGIN_AUDIT_KEY) === key) return;
+    window.localStorage.setItem(LOGIN_AUDIT_KEY, key);
+  } catch {
+    // storage blocked (private mode) — fall through and log anyway
+  }
+  import('@/services/AuditService')
+    .then(({ AuditService }) => AuditService.logLogin())
+    .catch((err) => logger.warn('[Auth] AUTH_LOGIN audit emit failed', err));
 }
 
 interface AuthContextType {
@@ -67,6 +119,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return;
           }
           setUser(session.user);
+          recordLoginOnce(session);
           initialSessionHandled = true;
           clearTimeout(timeout);
           analyticsService.setUserId(session.user.id);
@@ -127,15 +180,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [queryClient]);
 
+  // APPLE-WRAP (2026-08-15) — completes the PKCE exchange when iOS
+  // re-enters the app via citrussports://auth-callback. In every
+  // browser registerNativeAuthListener returns a no-op immediately
+  // (isNativePlatform() is false), so the web app's behaviour is
+  // untouched. The returned unsubscriber is the effect cleanup, which
+  // keeps StrictMode double-mounts from stacking duplicate listeners.
+  useEffect(
+    () =>
+      registerNativeAuthListener(supabase, (msg) => {
+        logger.error('[Auth] native OAuth callback failed: ' + msg);
+      }),
+    [],
+  );
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    // SOC 2 CC7.2: Audit log auth events (fire-and-forget)
-    if (!error) {
-      import('@/services/AuditService').then(({ AuditService }) => AuditService.logLogin()).catch(() => {});
-    } else {
+    // SOC 2 CC7.2. AUTH_LOGIN is emitted by recordLoginOnce() from
+    // onAuthStateChange, which sees every path that mints a session, not just
+    // this form. AUTH_FAILED has to stay here: no session is created on a
+    // failed attempt, so no auth state change fires.
+    if (error) {
       import('@/services/AuditService').then(({ AuditService }) =>
         AuditService.log('AUTH_FAILED', null, { email, error: error.message }, 'WARN')
       ).catch(() => {});
@@ -218,6 +286,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const opts = providerOptions[provider] || {};
+
+    /*
+     * APPLE-WRAP (2026-08-15) — inside the iOS shell the auth leg must
+     * run in the SYSTEM browser and redirect back via a custom scheme:
+     * Google refuses OAuth in embedded webviews outright, and the web
+     * redirect would strand the session in Safari instead of the app.
+     * Mechanics + the one Supabase-dashboard step: src/lib/nativeAuth.ts.
+     * In any browser isNativeShell() is false and this branch is dead
+     * code — the path below is byte-for-byte the pre-existing web flow.
+     */
+    if (isNativeShell()) {
+      return beginNativeOAuth(supabase, provider, opts);
+    }
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider,

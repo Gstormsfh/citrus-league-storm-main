@@ -57,7 +57,12 @@ accountRoutes.post('/consent', validateBody(schemas.recordConsent), async (c) =>
   const body = getValidatedBody<z.infer<typeof schemas.recordConsent>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new AccountService(supabase);
-  await service.recordConsent(body.policyType, body.version);
+  const consent = await service.recordConsent(body.policyType, body.version);
+  if (!consent.success) {
+    // Consent is GDPR evidence, not telemetry. Do not tell the client it
+    // persisted when it did not — that is exactly what happened for 72 signups.
+    return fail(c, AppError.internal('Failed to record consent'));
+  }
   return ok(c, { success: true });
 });
 
@@ -66,8 +71,10 @@ accountRoutes.post('/audit-log', validateBody(schemas.auditLog), async (c) => {
   const body = getValidatedBody<z.infer<typeof schemas.auditLog>>(c);
   const supabase = createUserClient(c.get('userToken'));
   const service = new AccountService(supabase);
-  await service.logSecurityEvent(body.eventType, body.leagueId || null, body.details || {}, body.severity || 'INFO');
-  return ok(c, { success: true });
+  const audit = await service.logSecurityEvent(body.eventType, body.leagueId || null, body.details || {}, body.severity || 'INFO');
+  // Deliberately 200 either way — audit logging must never break a user-facing
+  // path — but the body now tells the truth about whether the row landed.
+  return ok(c, { success: true, recorded: audit.success });
 });
 
 // GET /api/account/stats — Get aggregated user performance stats

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Menu, X, Trophy, UserPlus, Newspaper, Calendar, LogOut, CircleUser, Settings, ChevronDown, Check } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +39,17 @@ const MobileMenuButton = () => {
   const showPlayoffs = league?.showPlayoffs ?? false;
 
   const closeMenu = () => setMenuOpen(false);
+
+  // SWEEP FIX (2026-08-16): Escape closes the menu (a11y — keyboard users
+  // previously had no way out short of tapping the X).
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -111,14 +123,23 @@ const MobileMenuButton = () => {
     }
   };
 
+  // SWEEP FIX (2026-08-16): fantasy leagues had no nav links here — only
+  // the stale playoff-era trio. Mirror of the Navbar fix.
   const navTabs = isPool && activeLeagueId
     ? getPoolTabs()
-    : [
-        // Playoffs front and center. Season-long still accessible via direct URL.
-        { label: 'NHL Playoffs', path: '/nhl/playoffs', icon: Trophy },
-        { label: 'Create Pool', path: '/create-league?type=playoff', icon: Sparkles },
-        { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
-      ];
+    : activeLeagueId && !isPool
+      ? [
+          { label: 'League HQ', path: `/league/${activeLeagueId}`, icon: Trophy },
+          { label: 'Matchup', path: `/matchup/${activeLeagueId}`, icon: Swords },
+          { label: 'Roster', path: `/roster?league=${activeLeagueId}`, icon: Users },
+          { label: 'Free Agents', path: `/free-agents?league=${activeLeagueId}`, icon: UserPlus },
+          { label: 'Standings', path: `/standings?league=${activeLeagueId}`, icon: TrendingUp },
+        ]
+      : [
+          { label: 'Create League', path: '/create-league', icon: Sparkles },
+          { label: 'NHL Playoffs', path: '/nhl/playoffs', icon: Trophy },
+          { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
+        ];
 
   return (
     <>
@@ -132,7 +153,12 @@ const MobileMenuButton = () => {
       </button>
 
       {/* Full-screen slide-in menu — dark Citrus 2.0 panel */}
-      {menuOpen && (
+      {/* PORTAL FIX (2026-08-17): page headers using this button carry
+          backdrop-blur, which makes them the containing block for fixed
+          descendants — the same trap that collapsed the Navbar menu to a
+          4px strip ("transparent menu"). Portal to <body> so
+          position:fixed always means the viewport. */}
+      {menuOpen && createPortal(
         <div className="fixed inset-0 top-0 z-[60] bg-[#0F1F15]/95 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
           <div className="flex flex-col h-[calc(100dvh-env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+0.75rem)] px-4 pb-3 bg-[#0F1F15] text-pastel-cream relative overflow-hidden">
             {/* Decorative orange + sage halos */}
@@ -195,6 +221,11 @@ const MobileMenuButton = () => {
                               navigate(`/league/${l.id}`);
                             } else if (location.pathname.startsWith('/draft-room') || location.pathname === '/draft') {
                               navigate('/gm-office');
+                            } else {
+                              // SWEEP FIX (2026-08-16): from home/any other
+                              // page, land in the league's HQ instead of a
+                              // silent context switch.
+                              navigate(`/league/${l.id}`);
                             }
                             setLeagueListOpen(false);
                             closeMenu();
@@ -283,7 +314,8 @@ const MobileMenuButton = () => {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

@@ -173,3 +173,89 @@ describe('defaultFetchSnapshot — contract (F3 fix, 2026-07-28)', () => {
     );
   });
 });
+
+// ── TIMER-1 / E121: server-clock stamping ─────────────────────────
+//
+// Field defect these pin: the clock-offset estimator seeded ONLY from
+// `recentEvents[last].timestamp`, and the engine's ring buffer holds
+// pick events only — so a freshly-ignited draft (empty buffer) got no
+// skew correction at all and the FIRST pick rendered a wrong
+// countdown (0:35 on a 30s clock for a device 5s slow). The fetcher
+// now stamps the server's `Date` header onto the snapshot so the
+// estimator always has a server clock, even at zero events.
+
+describe('defaultFetchSnapshot — server-clock stamp (TIMER-1 / E121)', () => {
+  beforeEach(() => {
+    apiClientGetMock.mockReset();
+  });
+
+  it('stamps serverReceivedAtMs from the Date response header', async () => {
+    const serverDate = new Date('2026-08-12T04:00:00.000Z');
+    apiClientGetMock.mockResolvedValueOnce({
+      ...VALID_SNAPSHOT,
+      headers: new Headers({ date: serverDate.toUTCString() }),
+    });
+
+    const result = await defaultFetchSnapshot('draft-1');
+
+    expect(typeof result.serverReceivedAtMs).toBe('number');
+    // Header granularity is 1s; half-round-trip correction is small
+    // in a test. Allow a generous window and assert we are anchored
+    // to the SERVER clock, not the local one.
+    expect(
+      Math.abs((result.serverReceivedAtMs as number) - serverDate.getTime()),
+    ).toBeLessThan(5000);
+  });
+
+  it('accepts a plain-object headers bag (non-Headers transports)', async () => {
+    const serverDate = new Date('2026-08-12T05:30:00.000Z');
+    apiClientGetMock.mockResolvedValueOnce({
+      ...VALID_SNAPSHOT,
+      headers: { date: serverDate.toUTCString() },
+    });
+
+    const result = await defaultFetchSnapshot('draft-1');
+
+    expect(typeof result.serverReceivedAtMs).toBe('number');
+    expect(
+      Math.abs((result.serverReceivedAtMs as number) - serverDate.getTime()),
+    ).toBeLessThan(5000);
+  });
+
+  it('omits serverReceivedAtMs when no Date header is available', async () => {
+    apiClientGetMock.mockResolvedValueOnce({ ...VALID_SNAPSHOT });
+
+    const result = await defaultFetchSnapshot('draft-1');
+
+    // Absent, not zero — the room falls back to event-based seeding,
+    // which is the pre-E121 behaviour rather than a wrong offset.
+    expect(result.serverReceivedAtMs).toBeUndefined();
+    expect(result.format).toBe('snake');
+  });
+
+  it('ignores an unparseable Date header rather than poisoning the clock', async () => {
+    apiClientGetMock.mockResolvedValueOnce({
+      ...VALID_SNAPSHOT,
+      headers: new Headers({ date: 'not-a-date' }),
+    });
+
+    const result = await defaultFetchSnapshot('draft-1');
+
+    expect(result.serverReceivedAtMs).toBeUndefined();
+  });
+
+  it('still returns the snapshot payload intact when stamping', async () => {
+    apiClientGetMock.mockResolvedValueOnce({
+      ...VALID_SNAPSHOT,
+      headers: new Headers({ date: new Date().toUTCString() }),
+    });
+
+    const result = await defaultFetchSnapshot('draft-1');
+
+    expect(result.lobbyId).toBe(VALID_SNAPSHOT.lobbyId);
+    expect(result.stateSnapshot.totalPicks).toBe(
+      VALID_SNAPSHOT.stateSnapshot.totalPicks,
+    );
+  });
+});
+

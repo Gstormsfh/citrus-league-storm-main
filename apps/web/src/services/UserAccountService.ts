@@ -67,8 +67,11 @@ export class UserAccountService {
   static async recordConsent(policyType: string, version: string): Promise<void> {
     try {
       await accountApi.recordConsent(policyType, version);
-    } catch {
-      // Fire-and-forget — consent recording should never block auth
+    } catch (error) {
+      // Still non-blocking — a failed consent write must not strand a signup —
+      // but no longer silent. This call reached a non-existent RPC and reported
+      // success for 72 signups; the swallow is what made that invisible.
+      logger.error('[UserAccountService] GDPR consent NOT recorded', policyType, version, error);
     }
   }
 }

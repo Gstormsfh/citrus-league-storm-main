@@ -47,7 +47,12 @@ vi.mock('@/utils/timezoneUtils', () => ({
   getTodayMSTDate: vi.fn().mockReturnValue(new Date('2026-03-08T00:00:00')),
 }));
 
-vi.mock('@/utils/seasonConstants', () => ({
+vi.mock('@/utils/seasonConstants', async (importOriginal) => ({
+  // Spread the real module: a hand-written object here omits whatever the
+  // service starts calling next. getCurrentSeason() was added to several
+  // services on 2026-08-11 and every partial mock broke with `undefined is
+  // not a function`, surfacing as assertion noise rather than a clear error.
+  ...(await importOriginal<typeof import('@/utils/seasonConstants')>()),
   CURRENT_SEASON: '20252026',
 }));
 

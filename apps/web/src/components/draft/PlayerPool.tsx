@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Star, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Clock } from 'lucide-react';
+import { Search, Star, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Clock, Info } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Player } from '@/services/PlayerService';
@@ -18,6 +18,12 @@ interface PlayerPoolProps {
   isDraftActive: boolean;
   availablePlayers: Player[];
   onAddToQueue?: (playerId: string) => void;
+  /**
+   * V2-PARITY (2026-08-17): when provided, every row gets an info
+   * button that opens the player card (PlayerCardDialog in the v2
+   * room). Optional so existing v1 callers are untouched.
+   */
+  onShowCard?: (player: Player) => void;
   onToggleWatchlist?: (playerId: string) => void;
   queue?: string[];
   watchlist?: Set<string>;
@@ -63,6 +69,7 @@ export const PlayerPool = memo(({
   isDraftActive,
   availablePlayers,
   onAddToQueue,
+  onShowCard,
   onToggleWatchlist,
   queue = [],
   watchlist = new Set(),
@@ -296,18 +303,18 @@ export const PlayerPool = memo(({
     return (
       <tr
         className={cn(
-          'border-b border-fantasy-border/50 hover:bg-fantasy-light/30 active:bg-fantasy-light/50 transition-colors cursor-pointer',
+          'border-b border-white/5 hover:bg-white/5 active:bg-pastel-surface-high/60 transition-colors cursor-pointer',
           isSelected && 'bg-fantasy-primary/10 ring-2 ring-fantasy-primary/30',
           isDrafted && 'opacity-50'
         )}
         onClick={() => !isDrafted && onPlayerSelect(player)}
       >
-        <td className="px-1.5 py-2 text-center w-[44px] bg-[#E8EED9]/95">
+        <td className="px-1.5 py-2 text-center w-[44px] bg-pastel-surface-tile text-pastel-cream">
           <span className="text-xs font-mono text-citrus-forest font-bold">
             {displayRank}
           </span>
         </td>
-        <td className="px-2 py-2 sticky left-[44px] bg-[#E8EED9]/95 z-10">
+        <td className="px-2 py-2 sticky left-[44px] bg-pastel-surface-tile z-10 text-pastel-cream">
           <div className="flex items-center gap-1">
             {isInQueue && (
               <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary" />
@@ -315,44 +322,61 @@ export const PlayerPool = memo(({
             <span className="font-medium text-sm truncate max-w-[140px]">{player.full_name}</span>
           </div>
         </td>
-        <td className="px-2 py-1.5">
+        <td className="px-2 py-1.5 text-pastel-cream">
           <Badge variant="outline" className="text-[10px] px-1">
             {player.eligible_positions && player.eligible_positions.length > 1 ? player.eligible_positions.join('/') : normalizePosition(player.position)}
           </Badge>
         </td>
-        <td className="px-2 py-1.5 text-xs text-muted-foreground">{player.team}</td>
-        <td className="px-2 py-1.5 text-xs text-center font-medium">{player.games_played}</td>
+        <td className="px-2 py-1.5 text-xs text-pastel-cream/70">{player.team}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-medium text-pastel-cream">{player.games_played}</td>
         {player.position === 'G' ? (
           <>
-            <td className="px-2 py-1.5 text-xs text-center font-semibold">{player.wins || 0}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.losses || 0}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'}%</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.saves || 0}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.shutouts || 0}</td>
+            <td className="px-2 py-1.5 text-xs text-center font-semibold text-pastel-cream">{player.wins || 0}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.losses || 0}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'}%</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.saves || 0}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.shutouts || 0}</td>
           </>
         ) : (
           <>
-            <td className="px-2 py-1.5 text-xs text-center font-semibold">{player.points}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.goals}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.assists}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.plus_minus > 0 ? '+' : ''}{player.plus_minus}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.ppp || 0}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.shp || 0}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.shots}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.hits}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.blocks}</td>
-            <td className="px-2 py-1.5 text-xs text-center">{player.pim || 0}</td>
-            <td className="px-2 py-1.5 text-xs text-center text-muted-foreground">{player.icetime_seconds && player.games_played ? (() => { const totalSec = Math.round(player.icetime_seconds / player.games_played); const m = Math.floor(totalSec / 60); const s = totalSec % 60; return `${m}:${s < 10 ? '0' : ''}${s}`; })() : '-'}</td>
-            <td className="px-2 py-1.5 text-xs text-center text-muted-foreground">{player.xGoals.toFixed(2)}</td>
+            <td className="px-2 py-1.5 text-xs text-center font-semibold text-pastel-cream">{player.points}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.goals}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.assists}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.plus_minus > 0 ? '+' : ''}{player.plus_minus}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.ppp || 0}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.shp || 0}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.shots}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.hits}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.blocks}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.pim || 0}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream/70">{player.icetime_seconds && player.games_played ? (() => { const totalSec = Math.round(player.icetime_seconds / player.games_played); const m = Math.floor(totalSec / 60); const s = totalSec % 60; return `${m}:${s < 10 ? '0' : ''}${s}`; })() : '-'}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream/70">{player.xGoals.toFixed(2)}</td>
           </>
         )}
-        <td className="px-2 py-1.5 text-xs text-center font-bold text-green-700 bg-green-50/30">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
-        <td className="px-2 py-1.5 text-xs text-center font-semibold text-green-600 bg-green-50/30">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(2) : '-'}</td>
-        <td className="px-2 py-1.5 text-xs text-center font-bold text-blue-700 bg-blue-50/30" title={`${projectedFptsMap.get(player.id)?.gamesRemaining || 0} games remaining`}>{(projectedFptsMap.get(player.id)?.total || 0) > 0 ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
-        <td className="px-2 py-1.5 text-xs text-center font-semibold text-blue-600 bg-blue-50/30">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(2) : '-'}</td>
-        <td className="px-2 py-1.5">
+        <td className="px-2 py-1.5 text-xs text-center font-bold text-emerald-300 bg-emerald-500/10">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-semibold text-emerald-300 bg-emerald-500/10">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(2) : '-'}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-bold text-sky-300 bg-sky-500/10" title={`${projectedFptsMap.get(player.id)?.gamesRemaining || 0} games remaining`}>{(projectedFptsMap.get(player.id)?.total || 0) > 0 ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-semibold text-sky-300 bg-sky-500/10">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(2) : '-'}</td>
+        <td className="px-2 py-1.5 text-pastel-cream">
           <div className="flex items-center gap-1 relative z-10" onClick={(e) => e.stopPropagation()}>
+            {onShowCard && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 p-0 relative z-20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onShowCard(player);
+                }}
+                title={`View ${player.full_name} card`}
+                aria-label={`View ${player.full_name} player card`}
+                data-testid="pool-row-card-button"
+              >
+                <Info className="h-4 w-4 text-pastel-cream/70 hover:text-sky-300" />
+              </Button>
+            )}
             {onAddToQueue && (
               <Button
                 variant="ghost"
@@ -364,10 +388,17 @@ export const PlayerPool = memo(({
                   onAddToQueue(player.id);
                 }}
                 title={isInQueue ? "Remove from queue" : "Add to queue"}
+                aria-label={
+                  isInQueue
+                    ? `Remove ${player.full_name} from your queue`
+                    : `Add ${player.full_name} to your queue`
+                }
+                aria-pressed={isInQueue}
+                data-testid="pool-queue-star"
               >
                 <Star className={cn(
                   "h-4 w-4",
-                  isInQueue ? "fill-fantasy-tertiary text-fantasy-tertiary" : "text-muted-foreground hover:text-fantasy-tertiary"
+                  isInQueue ? "fill-fantasy-tertiary text-fantasy-tertiary" : "text-pastel-cream/70 hover:text-fantasy-tertiary"
                 )} />
               </Button>
             )}
@@ -393,23 +424,23 @@ export const PlayerPool = memo(({
   });
     Row.displayName = 'PlayerRow';
     return Row;
-  }, [selectedPlayer?.id, draftedSet, isDraftActive, isYourTurn, isSubmitPending, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, fptsMap, projectedFptsMap]);
+  }, [selectedPlayer?.id, draftedSet, isDraftActive, isYourTurn, isSubmitPending, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, onShowCard, fptsMap, projectedFptsMap]);
 
   return (
-    <Card className="p-2 sm:p-4 border-fantasy-border bg-fantasy-surface">
+    <Card className="p-2 sm:p-4 border-white/10 bg-pastel-surface-tile">
       <div className="flex items-center justify-between mb-3 px-1">
-        <h2 className="text-base sm:text-xl font-semibold flex items-center gap-2 text-fantasy-dark">
+        <h2 className="text-base sm:text-xl font-semibold flex items-center gap-2 text-pastel-cream">
           <Star className="h-4 w-4 sm:h-5 sm:w-5 text-fantasy-primary" />
           Players
         </h2>
         <div className="flex items-center gap-3">
           {dataFreshnessLabel && (
-            <span className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="hidden sm:flex items-center gap-1 text-[11px] text-pastel-cream/70">
               <Clock className="h-3 w-3" />
               {dataFreshnessLabel}
             </span>
           )}
-          <div className="text-xs sm:text-sm text-muted-foreground">
+          <div className="text-xs sm:text-sm text-pastel-cream/70">
             {filteredAndSortedPlayers.length}
           </div>
         </div>
@@ -418,17 +449,17 @@ export const PlayerPool = memo(({
       {/* Filters - compact on mobile */}
       <div className="flex flex-wrap gap-2 mb-3 px-1">
         <div className="relative flex-1 min-w-[140px]">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-pastel-cream/70" />
           <Input
             placeholder="Search..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8 h-9 text-sm bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border"
+            className="pl-8 h-9 text-sm bg-pastel-surface-tile backdrop-blur-sm border-white/10"
           />
         </div>
 
         <Select value={selectedPosition} onValueChange={setSelectedPosition}>
-          <SelectTrigger className="w-[80px] sm:w-[120px] h-9 bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border text-xs sm:text-sm">
+          <SelectTrigger className="w-[80px] sm:w-[120px] h-9 bg-pastel-surface-tile backdrop-blur-sm border-white/10 text-xs sm:text-sm">
             <SelectValue placeholder="Pos" />
           </SelectTrigger>
           <SelectContent>
@@ -443,12 +474,12 @@ export const PlayerPool = memo(({
         </Select>
 
         <div className="hidden sm:block space-y-1">
-          <Label className="text-xs text-muted-foreground">Sort By</Label>
+          <Label className="text-xs text-pastel-cream/70">Sort By</Label>
           <Select value={sortBy} onValueChange={(value) => {
             setSortBy(value);
             setSortDirection('desc');
           }}>
-            <SelectTrigger className="bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border">
+            <SelectTrigger className="bg-pastel-surface-tile backdrop-blur-sm border-white/10">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
@@ -487,7 +518,7 @@ export const PlayerPool = memo(({
 
         {/* Mobile sort select - ALL stats available */}
         <Select value={sortBy} onValueChange={(value) => { setSortBy(value); setSortDirection('desc'); }}>
-          <SelectTrigger className="sm:hidden w-[80px] h-9 bg-[#E8EED9]/50 backdrop-blur-sm border-fantasy-border text-xs">
+          <SelectTrigger className="sm:hidden w-[80px] h-9 bg-pastel-surface-tile backdrop-blur-sm border-white/10 text-xs">
             <SelectValue placeholder="Sort" />
           </SelectTrigger>
           <SelectContent>
@@ -535,42 +566,42 @@ export const PlayerPool = memo(({
       </div>
 
       {/* Mobile: Table view with unified horizontal scroll — scrolls all players as one */}
-      <div className="md:hidden border border-fantasy-border rounded-lg bg-[#E8EED9]/50 backdrop-blur-sm min-w-0">
+      <div className="md:hidden border border-white/10 rounded-lg bg-pastel-surface-tile text-pastel-cream backdrop-blur-sm min-w-0">
         <div className="overflow-x-auto scrollbar-styled" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full min-w-[900px] text-sm border-collapse">
-            <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
+            <thead className="bg-pastel-surface-high/60 border-b border-white/10">
               <tr>
-                <th className="px-1 py-1.5 text-center font-semibold text-fantasy-dark sticky left-0 bg-fantasy-light/95 z-10 w-[32px] text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projRank')}>#</th>
-                <th className="px-2 py-1.5 text-left font-semibold text-fantasy-dark sticky left-[32px] bg-fantasy-light/95 z-10 min-w-[100px] text-xs">Player</th>
+                <th className="px-1 py-1.5 text-center font-semibold text-pastel-cream sticky left-0 bg-pastel-surface-high z-10 w-[32px] text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projRank')}>#</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-pastel-cream sticky left-[32px] bg-pastel-surface-high z-10 min-w-[100px] text-xs">Player</th>
                 {selectedPosition === 'G' ? (
                   <>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('wins')}>W</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('losses')}>L</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('gaa')}>GAA</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('savePct')}>SV%</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('saves')}>SV</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('shutouts')}>SO</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('wins')}>W</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('losses')}>L</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('gaa')}>GAA</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('savePct')}>SV%</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('saves')}>SV</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('shutouts')}>SO</th>
                   </>
                 ) : (
                   <>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('points')}>PTS</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('goals')}>G</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('assists')}>A</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('plusMinus')}>+/-</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('ppp')}>PPP</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('shp')}>SHP</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('shots')}>SOG</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('hits')}>HIT</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('blocks')}>BLK</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('pim')}>PIM</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px] cursor-pointer" onClick={() => handleHeaderClick('xGoals')}>xG</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('points')}>PTS</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('goals')}>G</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('assists')}>A</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('plusMinus')}>+/-</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('ppp')}>PPP</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('shp')}>SHP</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('shots')}>SOG</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('hits')}>HIT</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('blocks')}>BLK</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('pim')}>PIM</th>
+                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('xGoals')}>xG</th>
                   </>
                 )}
-                <th className="px-1.5 py-1.5 text-center font-bold text-green-700 bg-green-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('fpts')}>FPTS</th>
-                <th className="px-1.5 py-1.5 text-center font-bold text-green-700 bg-green-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('fptsPerGp')}>F/GP</th>
-                <th className="px-1.5 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projFpts')} title="Rest-of-season projected fantasy points">ROS</th>
-                <th className="px-1.5 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projFptsPerGp')} title="Projected fantasy points per game (rest of season)">P/GP</th>
-                <th className="px-1.5 py-1.5 text-center font-semibold text-fantasy-dark text-[11px]"></th>
+                <th className="px-1.5 py-1.5 text-center font-bold text-emerald-300 bg-emerald-500/10 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('fpts')}>FPTS</th>
+                <th className="px-1.5 py-1.5 text-center font-bold text-emerald-300 bg-emerald-500/10 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('fptsPerGp')}>F/GP</th>
+                <th className="px-1.5 py-1.5 text-center font-bold text-sky-300 bg-sky-500/10 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projFpts')} title="Rest-of-season projected fantasy points">ROS</th>
+                <th className="px-1.5 py-1.5 text-center font-bold text-sky-300 bg-sky-500/10 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projFptsPerGp')} title="Projected fantasy points per game (rest of season)">P/GP</th>
+                <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px]"></th>
               </tr>
             </thead>
             <tbody>
@@ -582,16 +613,16 @@ export const PlayerPool = memo(({
                   <tr
                     key={player.id}
                     className={cn(
-                      'border-b border-fantasy-border/50 transition-colors cursor-pointer active:bg-fantasy-light/50',
+                      'border-b border-white/5 transition-colors cursor-pointer active:bg-pastel-surface-high/60',
                       isSelected && 'bg-fantasy-primary/10',
                       isDrafted && 'opacity-40'
                     )}
                     onClick={() => !isDrafted && onPlayerSelect(player)}
                   >
-                    <td className="px-1 py-1.5 text-center w-[32px] sticky left-0 bg-[#E8EED9]/95 z-10">
+                    <td className="px-1 py-1.5 text-center w-[32px] sticky left-0 bg-pastel-surface-tile z-10 text-pastel-cream">
                       <span className="text-[10px] font-mono text-citrus-forest font-bold">{index + 1}</span>
                     </td>
-                    <td className="px-1.5 py-1.5 sticky left-[32px] bg-[#E8EED9]/95 z-10">
+                    <td className="px-1.5 py-1.5 sticky left-[32px] bg-pastel-surface-tile z-10 text-pastel-cream">
                       <div className="flex items-center gap-1">
                         {isInQueue && <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />}
                         <span className="font-medium text-xs truncate max-w-[100px]">{player.full_name}</span>
@@ -600,38 +631,55 @@ export const PlayerPool = memo(({
                     </td>
                     {player.position === 'G' ? (
                       <>
-                        <td className="px-1.5 py-1 text-[11px] text-center font-semibold">{player.wins || 0}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.losses || 0}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'}%</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.saves || 0}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.shutouts || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-pastel-cream">{player.wins || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.losses || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'}%</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.saves || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.shutouts || 0}</td>
                       </>
                     ) : (
                       <>
-                        <td className="px-1.5 py-1 text-[11px] text-center font-semibold">{player.points}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.goals}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.assists}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.plus_minus > 0 ? '+' : ''}{player.plus_minus}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.ppp || 0}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.shp || 0}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.shots}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.hits}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.blocks}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center">{player.pim || 0}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-muted-foreground">{player.xGoals.toFixed(1)}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-pastel-cream">{player.points}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.goals}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.assists}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.plus_minus > 0 ? '+' : ''}{player.plus_minus}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.ppp || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.shp || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.shots}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.hits}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.blocks}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.pim || 0}</td>
+                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream/70">{player.xGoals.toFixed(1)}</td>
                       </>
                     )}
-                    <td className="px-1.5 py-1 text-[11px] text-center font-bold text-green-700 bg-green-50/30">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
-                    <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-green-600 bg-green-50/30">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(1) : '-'}</td>
-                    <td className="px-1.5 py-1 text-[11px] text-center font-bold text-blue-700 bg-blue-50/30">{(projectedFptsMap.get(player.id)?.total || 0) > 0 ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
-                    <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-blue-600 bg-blue-50/30">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(1) : '-'}</td>
-                    <td className="px-1.5 py-1" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-1.5 py-1 text-[11px] text-center font-bold text-emerald-300 bg-emerald-500/10">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
+                    <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-emerald-300 bg-emerald-500/10">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(1) : '-'}</td>
+                    <td className="px-1.5 py-1 text-[11px] text-center font-bold text-sky-300 bg-sky-500/10">{(projectedFptsMap.get(player.id)?.total || 0) > 0 ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
+                    <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-sky-300 bg-sky-500/10">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(1) : '-'}</td>
+                    <td className="px-1.5 py-1 text-pastel-cream" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-0.5">
+                        {onShowCard && (
+                          <Button variant="ghost" size="sm" className="h-9 w-9 p-0"
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onShowCard(player); }}
+                            title={`View ${player.full_name} card`}
+                            aria-label={`View ${player.full_name} player card`}
+                            data-testid="pool-row-card-button">
+                            <Info className="h-4 w-4 text-pastel-cream/70" />
+                          </Button>
+                        )}
                         {onAddToQueue && (
                           <Button variant="ghost" size="sm" className="h-9 w-9 p-0"
-                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onAddToQueue(player.id); }}>
-                            <Star className={cn("h-4 w-4", isInQueue ? "fill-fantasy-tertiary text-fantasy-tertiary" : "text-muted-foreground")} />
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onAddToQueue(player.id); }}
+                            title={isInQueue ? 'Remove from queue' : 'Add to queue'}
+                            aria-label={
+                              isInQueue
+                                ? `Remove ${player.full_name} from your queue`
+                                : `Add ${player.full_name} to your queue`
+                            }
+                            aria-pressed={isInQueue}
+                            data-testid="pool-queue-star">
+                            <Star className={cn("h-4 w-4", isInQueue ? "fill-fantasy-tertiary text-fantasy-tertiary" : "text-pastel-cream/70")} />
                           </Button>
                         )}
                         {(isSelected || isYourTurn) && isDraftActive && !isDrafted && (
@@ -659,20 +707,32 @@ export const PlayerPool = memo(({
           </button>
         )}
         {filteredAndSortedPlayers.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground text-sm">
+          <div className="text-center py-8 text-pastel-cream/70 text-sm">
             No players found.
           </div>
         )}
       </div>
 
       {/* Desktop: Full table view — horizontally scrollable to show all stats */}
-      <div className="hidden md:block border border-fantasy-border rounded-lg bg-[#E8EED9]/50 backdrop-blur-sm min-w-0">
-        <div className="overflow-auto scrollbar-styled max-h-[calc(100dvh-18rem)]" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <div className="hidden md:block border border-white/10 rounded-lg bg-pastel-surface-tile text-pastel-cream backdrop-blur-sm min-w-0">
+        {/* SCROLL-TRAP (2026-08-13) — the cap is now `lg:` only.
+            It used to apply from `md` (768px) up. In the 768-1023px
+            band the layout is a SINGLE column, so everything below the
+            pool — manager presence, team rosters, the draft queue —
+            sat underneath a 467px box holding 2,582px of rows
+            (measured on staging at 766x755). Every wheel tick landed
+            inside the box, and with 75 rows rendered you never reach
+            its bottom edge, so scroll never chains out to the page.
+            The page was not stuck; it was unreachable.
+            At lg and up the cap is correct and stays: the sidebar is a
+            real second column there, so pinning the pool to the
+            viewport keeps the board and the queue in view instead of
+            pushing them off-screen. */}
+        <div className="overflow-auto scrollbar-styled lg:max-h-[calc(100dvh-18rem)]" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full min-w-[1400px] text-sm border-collapse">
-            <thead className="bg-fantasy-light sticky top-0 z-20 border-b border-fantasy-border">
+            <thead className="bg-pastel-surface-high sticky top-0 z-20 border-b border-white/10">
               <tr>
-                <th
-                  className="px-1.5 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs w-[44px]"
+                <th className="px-1.5 py-2 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs w-[44px]"
                   onClick={() => handleHeaderClick('projRank')}
                 >
                   <div className="flex items-center justify-center gap-0.5">
@@ -683,15 +743,14 @@ export const PlayerPool = memo(({
                     {sortBy !== 'projRank' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th className="px-2 py-2 text-left font-semibold text-fantasy-dark sticky left-[44px] bg-fantasy-light/95 z-10 min-w-[160px]">Player</th>
-                <th className="px-2 py-2 text-left font-semibold text-fantasy-dark">Pos</th>
-                <th className="px-2 py-2 text-left font-semibold text-fantasy-dark">Team</th>
-                <th className="px-2 py-2 text-center font-semibold text-fantasy-dark">GP</th>
+                <th className="px-2 py-2 text-left font-semibold text-pastel-cream sticky left-[44px] bg-pastel-surface-high z-10 min-w-[160px]">Player</th>
+                <th className="px-2 py-2 text-left font-semibold text-pastel-cream">Pos</th>
+                <th className="px-2 py-2 text-left font-semibold text-pastel-cream">Team</th>
+                <th className="px-2 py-2 text-center font-semibold text-pastel-cream">GP</th>
                 {/* Conditionally show goalie or skater stats based on filter */}
                 {selectedPosition === 'G' ? (
                   <>
-                    <th
-                      className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                    <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                       onClick={() => handleHeaderClick('wins')}
                     >
                       <div className="flex items-center justify-center gap-1">
@@ -702,8 +761,7 @@ export const PlayerPool = memo(({
                         {sortBy !== 'wins' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                       </div>
                     </th>
-                    <th
-                      className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                    <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                       onClick={() => handleHeaderClick('losses')}
                     >
                       <div className="flex items-center justify-center gap-1">
@@ -714,8 +772,7 @@ export const PlayerPool = memo(({
                         {sortBy !== 'losses' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                       </div>
                     </th>
-                    <th
-                      className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                    <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                       onClick={() => handleHeaderClick('gaa')}
                     >
                       <div className="flex items-center justify-center gap-1">
@@ -726,8 +783,7 @@ export const PlayerPool = memo(({
                         {sortBy !== 'gaa' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                       </div>
                     </th>
-                    <th
-                      className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                    <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                       onClick={() => handleHeaderClick('savePct')}
                     >
                       <div className="flex items-center justify-center gap-1">
@@ -738,8 +794,7 @@ export const PlayerPool = memo(({
                         {sortBy !== 'savePct' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                       </div>
                     </th>
-                    <th
-                      className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                    <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                       onClick={() => handleHeaderClick('saves')}
                     >
                       <div className="flex items-center justify-center gap-1">
@@ -750,8 +805,7 @@ export const PlayerPool = memo(({
                         {sortBy !== 'saves' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                       </div>
                     </th>
-                    <th
-                      className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                    <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                       onClick={() => handleHeaderClick('shutouts')}
                     >
                       <div className="flex items-center justify-center gap-1">
@@ -765,8 +819,7 @@ export const PlayerPool = memo(({
                   </>
                 ) : (
                   <>
-                    <th
-                      className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                    <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                       onClick={() => handleHeaderClick('points')}
                     >
                       <div className="flex items-center justify-center gap-1">
@@ -777,8 +830,7 @@ export const PlayerPool = memo(({
                         {sortBy !== 'points' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                       </div>
                     </th>
-                <th
-                  className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('goals')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -789,8 +841,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'goals' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('assists')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -801,8 +852,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'assists' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('plusMinus')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -813,8 +863,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'plusMinus' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('ppp')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -825,8 +874,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'ppp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
+                <th className="px-3 py-2 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none"
                   onClick={() => handleHeaderClick('shp')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -837,8 +885,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'shp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-3 py-2 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none"
+                <th className="px-3 py-2 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none"
                   onClick={() => handleHeaderClick('shots')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -849,8 +896,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'shots' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('hits')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -861,8 +907,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'hits' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('blocks')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -873,8 +918,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'blocks' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('pim')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -885,8 +929,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'pim' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('toi')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -897,8 +940,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'toi' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-2 py-1.5 text-center font-semibold text-fantasy-dark cursor-pointer hover:bg-fantasy-light/70 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('xGoals')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -911,8 +953,7 @@ export const PlayerPool = memo(({
                 </th>
                   </>
                 )}
-                <th
-                  className="px-2 py-1.5 text-center font-bold text-green-700 bg-green-50/50 cursor-pointer hover:bg-green-100/50 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-bold text-emerald-300 bg-emerald-500/10 cursor-pointer hover:bg-emerald-500/20 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('fpts')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -923,8 +964,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'fpts' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-2 py-1.5 text-center font-bold text-green-700 bg-green-50/50 cursor-pointer hover:bg-green-100/50 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-bold text-emerald-300 bg-emerald-500/10 cursor-pointer hover:bg-emerald-500/20 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('fptsPerGp')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -935,8 +975,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'fptsPerGp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-2 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 cursor-pointer hover:bg-blue-100/50 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-bold text-sky-300 bg-sky-500/10 cursor-pointer hover:bg-sky-500/20 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('projFpts')}
                 >
                   <div className="flex items-center justify-center gap-1" title="Rest-of-season projected fantasy points (from last pipeline run)">
@@ -947,8 +986,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'projFpts' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th
-                  className="px-2 py-1.5 text-center font-bold text-blue-700 bg-blue-50/50 cursor-pointer hover:bg-blue-100/50 transition-colors select-none text-xs"
+                <th className="px-2 py-1.5 text-center font-bold text-sky-300 bg-sky-500/10 cursor-pointer hover:bg-sky-500/20 transition-colors select-none text-xs"
                   onClick={() => handleHeaderClick('projFptsPerGp')}
                 >
                   <div className="flex items-center justify-center gap-1" title="Projected fantasy points per game (rest of season, from last pipeline run)">
@@ -959,7 +997,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'projFptsPerGp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th className="px-2 py-1.5 text-center font-semibold text-fantasy-dark text-xs">Actions</th>
+                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream text-xs">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -972,13 +1010,13 @@ export const PlayerPool = memo(({
         {hasMore && (
           <button
             onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
-            className="w-full py-2 text-xs font-display font-bold text-citrus-forest bg-citrus-sage/10 hover:bg-citrus-sage/20 border-t border-fantasy-border transition-colors"
+            className="w-full py-2 text-xs font-display font-bold text-citrus-forest bg-citrus-sage/10 hover:bg-citrus-sage/20 border-t border-white/10 transition-colors"
           >
             Show more ({filteredAndSortedPlayers.length - visibleCount} remaining)
           </button>
         )}
         {filteredAndSortedPlayers.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
+          <div className="text-center py-12 text-pastel-cream/70">
             No players found. Try adjusting your filters.
           </div>
         )}

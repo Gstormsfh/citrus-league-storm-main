@@ -15,7 +15,27 @@ import { supabase } from '@/integrations/supabase/client';
 // In development, use empty string (same-origin) so requests go through
 // the Vite proxy which forwards /api/* to the API server. In production,
 // VITE_API_URL should be set to the deployed API server URL.
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+/*
+ * SWEEP (2026-08-15) — relative '/api/*' works on the web because
+ * Firebase Hosting rewrites it to Cloud Run. Inside the iOS shell the
+ * origin is capacitor://localhost: there IS no rewrite, so every
+ * relative request fails — silently, as generic network errors.
+ * Fail LOUDLY at first use instead: the fix is setting VITE_API_URL to
+ * the absolute API origin in the native build (docs/apple/IOS_BUILD.md),
+ * and scripts/build-native.mjs asserts it at build time. This runtime
+ * check is the belt to that suspender, and it costs the web path one
+ * boolean that is always false there.
+ */
+import { Capacitor } from '@capacitor/core';
+if (Capacitor.isNativePlatform() && !API_BASE_URL) {
+  throw new Error(
+    '[api/client] Native build has no VITE_API_URL — every API call would ' +
+    'silently fail against capacitor://localhost. Set VITE_API_URL and ' +
+    'rebuild via npm run ios:sync (see docs/apple/IOS_BUILD.md).',
+  );
+}
 
 interface ApiResponse<T = unknown> {
   data?: T;

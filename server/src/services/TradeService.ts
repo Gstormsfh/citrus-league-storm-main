@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, CURRENT_SEASON } from '@citrus/shared';
+import { isPastTradeDeadline } from '../lib/leagueRules';
+import { COLUMNS, getCurrentSeason } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
 /**
@@ -71,7 +72,7 @@ export class TradeService {
         ? this.supabase
             .from('player_directory')
             .select('player_id, full_name, position_code, team_abbrev')
-            .eq('season', CURRENT_SEASON)
+            .eq('season', getCurrentSeason())
             .in('player_id', Array.from(playerIds).map((id) => parseInt(id, 10)).filter((n) => !isNaN(n)))
         : Promise.resolve({ data: [] as Array<{ player_id: number; full_name: string; position_code: string; team_abbrev: string }> }),
     ]);
@@ -176,10 +177,29 @@ export class TradeService {
       return { success: false, error: 'Trades are not allowed in Best Ball leagues' };
     }
 
-    // Check trade deadline
-    if (league?.settings?.trade_deadline) {
-      const deadline = new Date(league.settings.trade_deadline);
-      if (new Date() > deadline) {
+    // SETTINGS-ENFORCEMENT (2026-08-16) — the old check read
+    // settings.trade_deadline, a key NOTHING writes; CreateLeague writes
+    // tradeDeadlineWeek (a matchup week). Enforce both forms; the week
+    // form compares against the league's current matchup week, failing
+    // OPEN if the schedule can't be resolved. Pure logic + tests:
+    // lib/leagueRules.isPastTradeDeadline.
+    {
+      let currentWeek: number | null = null;
+      try {
+        const nowIso = new Date().toISOString();
+        const { data: wk } = await this.supabase
+          .from('matchups')
+          .select('week_number')
+          .eq('league_id', leagueId)
+          .lte('week_start_date', nowIso)
+          .order('week_number', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        currentWeek = typeof wk?.week_number === 'number' ? wk.week_number : null;
+      } catch {
+        currentWeek = null;
+      }
+      if (isPastTradeDeadline(league?.settings ?? {}, new Date(), currentWeek)) {
         return { success: false, error: 'Trade deadline has passed' };
       }
     }
@@ -203,6 +223,26 @@ export class TradeService {
       })
       .select(COLUMNS.TRADE)
       .single();
+
+    // NOTIFICATIONS (2026-08-16) — the top gap from the audit: the
+    // recipient was never told a trade offer arrived. Targeted insert to
+    // the to-team's owner (AI teams have no owner → skip). Non-blocking:
+    // a notification failure must never fail the trade itself.
+    if (!error && toTeam.owner_id) {
+      try {
+        await this.supabase.from('notifications').insert({
+          league_id: leagueId,
+          user_id: toTeam.owner_id,
+          type: 'trade_offer',
+          title: 'New Trade Offer',
+          message: 'You received a trade offer. Review it in the Trade Center.',
+          metadata: {
+            trade_offer_id: (data as unknown as Record<string, unknown>)?.id ?? null,
+            from_team_id: fromTeamId,
+          },
+        });
+      } catch { /* non-critical */ }
+    }
 
     return { success: !error, error: error?.message, tradeId: (data as unknown as Record<string, unknown>)?.id as string | undefined };
   }

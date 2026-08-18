@@ -78,7 +78,18 @@ leagueRoutes.post('/', validateBody(schemas.createLeague), async (c) => {
   );
 
   if (error || !league) {
-    return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to create league'));
+    // ERROR PASSTHROUGH (2026-08-17): Postgres trigger refusals arrive as
+    // error OBJECTS ({ message }), and the old string-only check collapsed
+    // them into a generic "Failed to create league" — the 2-team draft-
+    // night test hid "Playoff teams (6) cannot exceed total teams (2)"
+    // behind exactly that. Surface the DB's user-facing message.
+    const detail =
+      typeof error === 'string'
+        ? error
+        : (error && typeof error === 'object' && typeof (error as { message?: unknown }).message === 'string'
+            ? (error as { message: string }).message
+            : 'Failed to create league');
+    return fail(c, AppError.badRequest(detail));
   }
 
   const audit = new AuditService(supabase);

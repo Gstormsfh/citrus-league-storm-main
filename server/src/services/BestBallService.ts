@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { CURRENT_SEASON } from '@citrus/shared';
+import { getCurrentSeason } from '@citrus/shared';
 
 export class BestBallService {
   private supabase: SupabaseClient;
@@ -37,7 +37,7 @@ export class BestBallService {
 
   /** Get weekly best ball data for a team (lineup, roster, player positions, weekly stats) */
   async getWeeklyBestBallData(leagueId: string, teamId: string, weekNumber: number) {
-    const season = CURRENT_SEASON;
+    const season = getCurrentSeason();
 
     // Get team lineup
     const { data: lineup } = await this.supabase

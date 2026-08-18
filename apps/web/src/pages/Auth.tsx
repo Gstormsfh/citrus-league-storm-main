@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { interceptExternal } from '@/lib/openExternal';
 import { supabase } from '@/integrations/supabase/client';
 import { UserAccountService } from '@/services/UserAccountService';
 import { Input } from '@/components/ui/input';
@@ -379,9 +380,9 @@ const Auth = () => {
                     <Checkbox id="tos-accept" checked={tosAccepted} onCheckedChange={(checked) => setTosAccepted(checked as boolean)} className="mt-0.5 border-white/30 data-[state=checked]:bg-pastel-orange data-[state=checked]:border-pastel-orange data-[state=checked]:text-white" />
                     <Label htmlFor="tos-accept" className="text-[12px] font-normal cursor-pointer leading-snug text-white/65">
                       I agree to the{' '}
-                      <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="text-pastel-orange-soft hover:text-pastel-orange font-bold underline-offset-4 hover:underline">Terms</a>{' '}
+                      <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" onClick={(e) => { if (interceptExternal('/terms-of-service.html')) e.preventDefault(); }} className="text-pastel-orange-soft hover:text-pastel-orange font-bold underline-offset-4 hover:underline">Terms</a>{' '}
                       and{' '}
-                      <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="text-pastel-orange-soft hover:text-pastel-orange font-bold underline-offset-4 hover:underline">Privacy Policy</a>
+                      <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" onClick={(e) => { if (interceptExternal('/privacy-policy.html')) e.preventDefault(); }} className="text-pastel-orange-soft hover:text-pastel-orange font-bold underline-offset-4 hover:underline">Privacy Policy</a>
                     </Label>
                   </div>
 

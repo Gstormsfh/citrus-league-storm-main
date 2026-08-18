@@ -204,6 +204,15 @@ DraftTimerV2.displayName = 'DraftTimerV2';
  * `clientReceiveMs` and `new Date(frame.timestamp).getTime()` for
  * `serverMs`. Read `offsetMs` inside the timer prop.
  */
+/**
+ * TIMER-2 (2026-08-12) — largest device clock skew we will believe.
+ *
+ * Real consumer machines sit within a few seconds of true time. A reading
+ * beyond this is not skew, it is a bad input, and acting on it can freeze
+ * the draft clock. See the guard in `updateOffset`.
+ */
+const MAX_PLAUSIBLE_CLOCK_SKEW_MS = 30_000;
+
 export function useClockOffsetEstimator(): {
   offsetMs: number;
   updateOffset: (clientReceiveMs: number, serverMs: number) => void;
@@ -214,6 +223,26 @@ export function useClockOffsetEstimator(): {
     () => (clientReceiveMs: number, serverMs: number) => {
       const frameOffset = clientReceiveMs - serverMs;
       if (!Number.isFinite(frameOffset)) return;
+      // TIMER-2 (2026-08-12) — plausibility guard.
+      //
+      // This estimator corrects for DEVICE CLOCK SKEW, which is seconds,
+      // not minutes: an unsynced consumer machine drifts a few seconds a
+      // week, and anything past ~30s means we were handed a timestamp that
+      // is not "the server's clock right now".
+      //
+      // That is exactly what used to happen. Callers seeded it from an
+      // EVENT timestamp, so the "offset" became the age of the last pick.
+      // A +80s reading pushed the deadline 80s into the future, the
+      // display clamp pinned at `pickTimeLimitSec`, and the draft clock
+      // froze — field-confirmed on a 600s clock showing a motionless
+      // 10:00 while the server had 520s left.
+      //
+      // The bad callers are fixed (see DraftRoomV2). This guard is the
+      // backstop so no future caller can freeze a live draft clock by
+      // feeding it the wrong kind of timestamp. Discarding a suspect
+      // reading costs at most a few seconds of skew correction; accepting
+      // one costs the manager their turn.
+      if (Math.abs(frameOffset) > MAX_PLAUSIBLE_CLOCK_SKEW_MS) return;
       setOffsetMs((prev) => {
         if (!seededRef.current) {
           seededRef.current = true;

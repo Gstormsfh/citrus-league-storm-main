@@ -93,16 +93,21 @@ function SceneVisual({ src, alt }: { src: string; alt: string }) {
   );
 }
 
+// SWEEP FIX (2026-08-16): the carousel led with "Stanley Cup Playoffs ·
+// Live now" — in August, months after the Cup was lifted. The season-long
+// fantasy slide (the actual live product, drafts open) now leads; the
+// brackets slide is seasonal-honest and moved to the back. Opening-night
+// date corrected to the ingested 2026-27 schedule (Sep 29, not Oct 8).
 function getHeroSlides(): HeroSlide[] {
   return [
     {
-      id: 'brackets',
-      eyebrow: '🏒 Stanley Cup Playoffs · Live now',
-      headline: { lead: 'Lift the', accent: 'Cup' },
-      sub: 'Predict the entire Stanley Cup playoffs round-by-round — First Round, Second Round, Conference Finals, Cup Final. Live bracket updates every 60 seconds. Build yours before puck drop.',
-      primary: { label: 'Build Your Bracket', to: '/nhl/playoffs' },
-      secondary: { label: 'View live bracket →', to: '/nhl/playoffs' },
-      visual: <SceneVisual src="/mascots/scene-cup.webp" alt="Pineapple lifting the Stanley Cup" />,
+      id: 'fantasy',
+      eyebrow: 'Fantasy Hockey 2026 · Drafts open · Puck drops Sep 29',
+      headline: { lead: 'Fantasy Hockey', accent: '2026' },
+      sub: 'A 31-feature xG model. Live shift-level scoring. Snake, auction, or salary-cap drafts. Built by hockey heads, for hockey heads. Lock in founders pricing now.',
+      primary: { label: 'Drop the Puck', to: '/create-league' },
+      secondary: { label: 'Try a mock draft →', to: '/draft' },
+      visual: <SceneVisual src="/mascots/scene-squad.webp" alt="The Citrus Squad on the bench" />,
     },
     {
       id: 'pickem',
@@ -125,20 +130,22 @@ function getHeroSlides(): HeroSlide[] {
     {
       id: 'stormy',
       eyebrow: 'Stormy · Assistant GM · Free during launch',
-      headline: { lead: 'An assistant GM who', accent: 'knows hockey' },
+      // SWEEP FIX (2026-08-16): "An assistant GM who" overflowed the
+      // viewport edge at tablet widths — shorter lead line wraps cleanly.
+      headline: { lead: 'An assistant GM', accent: 'who knows hockey' },
       sub: 'Stormy is plugged into your roster, scoring, and matchup. She cites xGF%, TOI, PP1 share, save% — never generic boilerplate. The AI assistant GM you wish your team had.',
       primary: { label: 'Talk to Stormy', to: '/gm-office/stormy' },
       secondary: { label: 'See an example →', to: '#stormy' },
       visual: <SceneVisual src="/mascots/scene-stormy-ai.webp" alt="Stormy with coach playbook and lineup board" />,
     },
     {
-      id: 'fantasy',
-      eyebrow: 'Fantasy Hockey 2026 · Drafts open · Season starts Oct 8',
-      headline: { lead: 'Fantasy Hockey', accent: '2026' },
-      sub: 'A 31-feature xG model. Live shift-level scoring. Snake, auction, or salary-cap drafts. Built by hockey heads, for hockey heads. Lock in founders pricing now.',
-      primary: { label: 'Drop the Puck', to: '/create-league' },
-      secondary: { label: 'Try a mock draft →', to: '/draft' },
-      visual: <SceneVisual src="/mascots/scene-squad.webp" alt="The Citrus Squad on the bench" />,
+      id: 'brackets',
+      eyebrow: '🏒 Stanley Cup Playoff Brackets · Returns in April',
+      headline: { lead: 'Lift the', accent: 'Cup' },
+      sub: 'Predict the entire Stanley Cup playoffs round-by-round — First Round, Second Round, Conference Finals, Cup Final. Live bracket updates every 60 seconds when the field is set.',
+      primary: { label: 'See How Brackets Work', to: '/nhl/playoffs' },
+      secondary: { label: 'Last season’s bracket →', to: '/nhl/playoffs' },
+      visual: <SceneVisual src="/mascots/scene-cup.webp" alt="Pineapple lifting the Stanley Cup" />,
     },
   ];
 }

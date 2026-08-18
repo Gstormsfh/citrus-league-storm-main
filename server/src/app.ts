@@ -97,6 +97,11 @@ app.use('/api/stormy/*', strictRateLimit);
 // include non-mutating endpoints later; we explicitly protect the
 // mutating ones here so the decision is traceable.
 app.use('/api/auth/signup', authRateLimit);
+// SWEEP (2026-08-15) — /check-method looks any email up via the
+// service-role admin API and answers {exists, providers}: at the
+// standard 600 req/min it is an account-enumeration oracle. Same
+// 5 req/min brute-force ceiling as signup.
+app.use('/api/auth/check-method', authRateLimit);
 
 // ── Health check — no auth required ──────────────────────────────────
 app.get('/api/health', async (c) => {

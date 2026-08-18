@@ -49,8 +49,14 @@ export class LeagueService {
 
     const allLeagues = [...(commissionerLeagues || []), ...memberLeagues];
     const unique = Array.from(new Map(allLeagues.map((l: Record<string, unknown>) => [l.id, l])).values());
-    // Exclude demo leagues — they should only be visible to guests via public API
-    const filtered = unique.filter((l: Record<string, unknown>) => !DEMO_LEAGUE_IDS.has(l.id as string));
+    // Exclude demo leagues — they should only be visible to guests via public API.
+    // SWEEP FIX (2026-08-16): also exclude soft-deleted leagues. Deletion
+    // renames the league to a "[DELETED-<timestamp>]" prefix (no dedicated
+    // column exists); without this filter the league switcher listed every
+    // deleted test league — 130+ junk entries labeled "SEASON ACTIVE".
+    const filtered = unique.filter((l: Record<string, unknown>) =>
+      !DEMO_LEAGUE_IDS.has(l.id as string) &&
+      !String((l as { name?: unknown }).name ?? '').startsWith('[DELETED'));
     return { leagues: filtered, error: null };
   }
 
@@ -231,7 +237,7 @@ export class LeagueService {
       waiver_process_time?: string;
       waiver_period_hours?: number;
       waiver_game_lock?: boolean;
-      waiver_type?: 'rolling' | 'faab' | 'reverse_standings';
+      waiver_type?: 'rolling' | 'reverse_draft_order' | 'faab' | 'reverse_standings';
       allow_trades_during_games?: boolean;
     },
   ) {
@@ -463,22 +469,31 @@ export class LeagueService {
     if (error || !teams.length) return { teams: [], error };
 
     const ownerIds = [...new Set(teams.map((t: { owner_id: string }) => t.owner_id).filter(Boolean))];
-    let profiles: { id: string; username: string | null; first_name: string | null; last_name: string | null }[] = [];
+    type OwnerProfile = { id: string; username: string | null; display_name: string | null; first_name: string | null; last_name: string | null };
+    let profiles: OwnerProfile[] = [];
     if (ownerIds.length > 0) {
       const { data } = await this.supabase
         .from('profiles')
-        .select('id, username, first_name, last_name')
+        .select('id, username, display_name, first_name, last_name')
         .in('id', ownerIds);
-      profiles = data || [];
+      profiles = (data || []) as OwnerProfile[];
     }
 
-    const profileMap = new Map(profiles.map((p: { id: string; username: string | null; first_name: string | null; last_name: string | null }) => [p.id, p]));
+    // SWEEP FIX (2026-08-16): signup mints username 'user_<id-prefix>' with
+    // display_name NULL, so owner labels rendered raw handles like
+    // "user_c4489220" across roster/standings. Prefer display_name, then
+    // real names, and never surface the generated handle — fall back to
+    // "Manager" instead.
+    const isGeneratedHandle = (u: string | null): boolean =>
+      !!u && /^user_[0-9a-f]{6,}$/i.test(u);
+    const profileMap = new Map(profiles.map((p: OwnerProfile) => [p.id, p]));
     const teamsWithOwners = teams.map((t: { owner_id: string; [key: string]: unknown }) => {
       const profile = profileMap.get(t.owner_id);
       const ownerName = profile
-        ? (profile.first_name && profile.last_name
-            ? `${profile.first_name} ${profile.last_name}`
-            : profile.username || 'Unknown')
+        ? (profile.display_name
+            || (profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : null)
+            || (isGeneratedHandle(profile.username) ? 'Manager' : profile.username)
+            || 'Manager')
         : 'Unknown';
       return { ...t, owner_name: ownerName };
     });

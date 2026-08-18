@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { CURRENT_SEASON } from '@citrus/shared';
+import { getCurrentSeason } from '@citrus/shared';
 
 /**
  * Service for the *NHL* playoff bracket state — distinct from PlayoffService,
@@ -34,7 +34,7 @@ export class NhlPlayoffStateService {
    * If the bracket isn't populated yet (pre-playoffs), returns an empty
    * array. Callers should treat that as "no filter active".
    */
-  async getAliveTeamAbbreviations(season: number = CURRENT_SEASON): Promise<string[]> {
+  async getAliveTeamAbbreviations(season: number = getCurrentSeason()): Promise<string[]> {
     const cached = NhlPlayoffStateService.cache.get(season);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.abbrevs;

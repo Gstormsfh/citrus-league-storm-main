@@ -138,6 +138,23 @@ export type DraftClientState =
        * Optional/absent (undefined) for reconnects from any other cause.
        */
       staleTriggered?: boolean;
+      /**
+       * ARCHITECT 2026-08-12 (LOBBY-WAIT / inbox E124) — set to `true`
+       * when this "reconnect" is not a failure at all: discovery
+       * answered 409 `DRAFT_NOT_CONNECTABLE` with status
+       * `not_started`, i.e. the commissioner has not started the draft
+       * yet. Consumed by `ConnectionBanner` and `DraftRoomV2` to
+       * render waiting copy instead of the red "Connection lost"
+       * alert, and by `reduce` to hold a flat 3s poll rather than the
+       * escalating error curve.
+       *
+       * Exactly parallel to `staleTriggered` above — same optional
+       * shape, same "annotate the reconnecting state so the UI can
+       * explain itself" mechanism.
+       *
+       * Optional/absent (undefined) for reconnects from any other cause.
+       */
+      waitingForStart?: boolean;
     }
   | {
       /**
@@ -217,7 +234,23 @@ export type DraftClientEvent =
   | { type: 'connect_requested' }
   | { type: 'disconnect_requested' }
   | { type: 'token_fetched'; token: string; wsUrl: string }
-  | { type: 'token_fetch_failed'; error: string; statusCode?: number }
+  | {
+      type: 'token_fetch_failed';
+      error: string;
+      statusCode?: number;
+      /**
+       * ARCHITECT 2026-08-12 (LOBBY-WAIT / inbox E124). The
+       * `draft_status` the discovery route reported alongside a 409
+       * `DRAFT_NOT_CONNECTABLE`, when it gave one. Populated by the
+       * runner from `body.error.status`.
+       *
+       * Only `'not_started'` is acted on today — it selects the calm
+       * waiting-for-the-commissioner path instead of the escalating
+       * error backoff. Terminal statuses never reach this event; they
+       * are routed to `discovery_refused_terminal` upstream.
+       */
+      draftStatus?: string;
+    }
   | {
       /**
        * Entry 87 Fix A (COMPLETED-ROOM-1) — the discovery endpoint

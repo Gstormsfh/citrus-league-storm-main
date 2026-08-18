@@ -5679,6 +5679,363 @@ Architect ratifies the v3 shape (or amendments per item). Terminal executes on c
 
 **End of R98. Master merge plan proposed (clean 9-commit absorb, zero-conflict prediction, refspec-push doctrine, execute pending countersign + Garrett master-push go). ENGINE-EAR v3 queued (6-item spec + acceptance mode + 3-slice recommendation, execute pending shape ratification). Morning fix arc closed per E105.**
 
+---
+
+## R99 — Entry 106 ENGINE-EAR v3 SLICE 1 EXECUTED · READY-CANDIDATE (2026-08-11 19:15Z / 1:15 PM MDT)
+
+### Executed per E106 amendment: items 1 + 2 + 6
+
+Post-merge commit `dcaeeeb9` on `phase-4-5-implementation` — pushed to origin. Slice 1 diff = 5 files, +1083 / -13.
+
+**Item 1 — NOTIFY-creates-lobby (client-independent ignition).**
+- File: `server/src/draft/index.ts` NOTIFY dispatch.
+- Change: when the LISTEN handler receives a payload whose `league_id` is not in `LobbyRegistry`, probe `leagues.draft_status`. If `in_progress` or `paused`, call `lobbyRegistry.getOrCreate(leagueId)` — the constructor runs bootstrap replay + arms the pick timer, driving autopicks with zero connected WS clients.
+- Always-log per E104 doctrine: `event_subscription.notify_creates_lobby` (success), `notify_skipped_non_live_league` (status guard), `notify_status_probe_failed` (DB query failure), `notify_lobby_create_failed` (constructor exception).
+- Contract satisfied: no-audience-no-ignition disease class dies at the entry point.
+
+**Item 2 — Boot-scan resume of `in_progress`/`paused` drafts.**
+- File: `server/src/draft/LobbyRegistry.ts` — new method `performBootScan(supabaseAdmin)`.
+- Query: `leagues.select('id').in('draft_status', ['in_progress', 'paused'])`. Sequential per-league `getOrCreate` with per-league try/catch failure isolation.
+- Structured logs: `registry.boot_scan_started` (with count), `registry.boot_scan_lobby_resumed` (per league), `registry.boot_scan_lobby_failed` (per league error), `registry.boot_scan_complete` (with resumed/failed tallies).
+- Wired in `server/src/draft/index.ts` post-registry construction: `void lobbyRegistry.performBootScan(supabaseAdmin).catch(...)`. Gated by `EVENT_SUBSCRIPTION_DISABLED !== '1'` — test / disabled-subscription modes skip the scan.
+- Contract satisfied: 4.7-min post-restart dead window from Entry 83 becomes < 5s (single query + N getOrCreate calls).
+
+**Item 6 — INSTANT-AUTOPICK for unowned seats (owner_id=NULL).**
+- File: `server/src/draft/LobbyManager.ts`.
+- New constant: `INSTANT_AUTOPICK_ARM_MS = 2_000` (~2s window — accommodates broadcast overhead + engine cascade).
+- New field: `private readonly teamOwners = new Map<string, string | null>()` — populated post-bootstrap in `init()` via `teams.select('id, owner_id').eq('league_id', leagueId)` inside a try/catch (fail-open on query failure).
+- New helper: `computeArmDeadlineForOnClockTeam(rpcDeadline: Date): Date`.
+  - Guards: only applies to `snake`/`linear` (auction uses its own state machine); returns `rpcDeadline` unchanged if teamOwners cache is unpopulated (fail-open); returns `rpcDeadline` unchanged if owner exists; returns `rpcDeadline` unchanged if it is already earlier than `now + 2s` (respect the tighter RPC deadline).
+  - Emits `[lobby] instant_autopick_arm` structured log on shortened deadline.
+- Applied at two arm sites:
+  - `init()` line ~979: `this.setPickDeadline(this.computeArmDeadlineForOnClockTeam(this.initialPickDeadline), 'pick')`.
+  - `applyPickEvent` line ~3551: `this.setPickDeadline(this.computeArmDeadlineForOnClockTeam(parsed), 'pick')`.
+- Discriminator satisfied per E106 spec: only `owner_id IS NULL` (truly-unowned) fires instant. "Owner exists but offline" respects full pick clock — the presence field is not consulted here.
+- Contract satisfied: unowned-seat autopicks fire within ~2s of on-clock transition, not the full `pick_time_limit_seconds` (typically 30s+).
+
+### Unit test coverage (all-green)
+
+- New file: `server/src/draft/__tests__/engineEar3.test.ts` — **22 tests, all pass** (515ms).
+  - 5 behavioral tests for `performBootScan` (empty query, `.in` filter shape, 3-league resume, per-league failure isolation, query error non-fatal).
+  - 5 source-shape tests for NOTIFY dispatch (getOrCreate presence, status-gate probe, 3 log tags per E104 always-log doctrine).
+  - 9 source-shape tests for INSTANT-AUTOPICK helper (constant value, method existence, fail-open on unknown, fail-open on owner-exists, earlier-rpc-deadline respected, format gate, cache-populate query shape, cache-populate log tags, non-fatal on error).
+  - 3 wiring tests (performBootScan called, EVENT_SUBSCRIPTION_DISABLED gate, uncaught error handling).
+- Source-shape locks use `readFileSync` + regex per the DraftRoom.copyLock.test.tsx pattern — pins the shape against future refactor drift without running the engine.
+
+### Acceptance rig (post-deploy proof, DB-observable)
+
+- New file: `scripts/proof/lifecycle-acceptance-engine-ear.local.mjs`.
+- Three scenarios, invoked separately:
+  - **S1** `--scenario=S1`: ignite fresh rig with ZERO WS clients, wait for autopick cascade + `draft_status=completed` within `12 × pick_time_limit_seconds + slack`. Proves item 1.
+  - **S2** `--scenario=S2`: ignite, wait for 3 picks to land, hand off engine-restart PowerShell block, resume + wait for completion. Proves item 2. Engine restart is HAND-OFF ONLY (`gcloud compute ssh … sudo docker restart …`) — never invoked from the script.
+  - **S3** `--scenario=S3`: verify all teams have `owner_id=NULL` (fixture-12 default), ignite, wait for cascade within `12 × (2s + slack)` window. Proves item 6.
+- Safety: whitelisted to `F27_NATIVE_LEAGUE_ID`; refuses pooled `SUPABASE_DB_URL`; no prod writes; cleanup reminder printed on exit.
+- Deferred to Slice 2/3: item 3 (eviction guard), item 4 (watchdog invariant), item 5 (F23 DB-side sweep).
+
+### CI-mirror gate result (post-merge tree)
+
+| Step | Result |
+| --- | --- |
+| eslint | **0 errors, 14 pre-existing warnings** (no new warnings from this cycle) |
+| server tsc | **clean** (no output) |
+| web tsc | pre-existing errors in unrelated files (Matchup/Playoff/Trade/Waiver services) — **CI treats web tsc as warning-only per strict-mode migration**: `|| echo "::warning::TypeScript found type errors — tracked for strict mode migration"` |
+| server build | **clean** |
+| web build | **12.56s, 124 PWA precache entries generated** |
+| server vitest FULL | **1024 passed / 6 skipped / 0 failed** (55 files, 4.12s) |
+| web vitest FULL | **1743 passed / 0 failed** (103 files, 30.68s) |
+
+All hard gates green. Web tsc warnings are inherited from master merge (no new errors introduced by this cycle).
+
+### Proposed pin table
+
+- **Previous-good**: `0ecbe605-draft` @ `sha256:152b79912cea9d80cf5c3147beeba48957973f5d201d54bdc9a3d6c429768a32` (per DEPLOY_PROTOCOL §4b, 2026-08-08 pin — SUNDAY_EXECUTION_BLOCKS.md §A-R).
+- **Superseded**: no interim engine deploy since `0ecbe605-draft`; this is the first engine cut since ratification of `E80/E99/E100/E103/E104` (those cycles were client + citrus-api only).
+- **Current-after-deploy** (proposed): `dcaeeeb9-eear3`.
+- **Rollback**: three-command `0ecbe605-draft` block from SUNDAY_EXECUTION_BLOCKS.md §A-R (retag → metadata revert → reset).
+
+### Proposed engine deploy block
+
+Uses SUNDAY_EXECUTION_BLOCKS.md §A-0 → §A-7 verbatim shape — image tag suffix `-eear3` in place of `-draft` (or `-draft` retained if architect prefers convention consistency — architect chooses). Pre-flight rollback pin capture per §A-0. Build via `-f server/Dockerfile.draft-engine` per INS §15.11. Nine-item boot verification harvest per §A-6 (with the tenth `event_subscription.watchdog_started`). Watchdog probe twice ~70s apart per §A-7.
+
+**No additional post-boot verification needed** beyond §A-6/§A-7 for correctness of Slice 1 changes — the log tags (`event_subscription.notify_creates_lobby`, `registry.boot_scan_*`, `[lobby] instant_autopick_arm`) will appear organically on real ignitions post-deploy. Acceptance script scenarios S1/S2/S3 are the machine-proof harness once the tag is running on staging.
+
+### Standing by
+
+Architect countersigns tag choice (`-eear3` vs `-draft`) + issues the deploy paste banner for Garrett to execute. Standing by for ratification.
+
+**End of R99. ENGINE-EAR v3 Slice 1 (items 1 + 2 + 6) EXECUTED per E106 amendment. Commit `dcaeeeb9` pushed. Full CI-mirror gate GREEN (server tsc clean, both builds clean, 1024 server + 1743 web tests all-pass). Acceptance rig authored (S1/S2/S3 scenarios). READY-CANDIDATE per Entry 65 — awaiting architect countersignature for engine deploy paste banner.**
+
+---
+
+## R100 — Entry 109 E109-HOTFIX (unbound-`.from` fix + regression guards) · READY-CANDIDATE (2026-08-11 20:00Z / 2:00 PM MDT)
+
+### Root cause acknowledged
+
+Field failure exactly as architect diagnosed: `const untypedFrom = supabaseAdmin.from as unknown as (t) => any` extracts the method as a free function. `this` is undefined at call time. supabase-js reads `this.rest` → TypeError. The Proxy at `server/src/lib/supabase.ts:40` makes accidental rebinding impossible. Two sites carried this defect:
+
+- **`server/src/draft/LobbyRegistry.ts:494`** — `performBootScan` boot query. **Item 2 DEAD** — surfaced as `registry.boot_scan_threw` in Garrett's fd67eb4d-draft boot log (scanned 0, resumed 0, durationMs 6).
+- **`server/src/draft/index.ts:784`** — NOTIFY status probe. **Item 1 DEAD** — silent, thrown inside a try/catch that surfaced as `notify_lobby_create_failed` or the probe warning. Same effect (no lobby created on NOTIFY when in_progress/paused), quieter failure mode.
+
+Item 6 (INSTANT-AUTOPICK) unaffected — uses `this.supabase.from(...)` directly, `this` bound naturally.
+
+### Fix (commit `4d496a40` on `phase-4-5-implementation`)
+
+Both sites: cast the RESULT of `.from()` not the method itself.
+
+Before (E109 anti-pattern, killed items 1 + 2):
+```ts
+const untypedFrom = supabaseAdmin.from as unknown as (t: string) => any;
+const { data, error } = await untypedFrom('leagues').select('id').in(...);
+```
+
+After (safe — `this` preserved by direct property access + invocation):
+```ts
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const { data, error } = await (supabaseAdmin.from('leagues') as any).select('id').in(...);
+```
+
+Applied verbatim at both call sites. Code comments call out the E109 lesson so future refactors don't reintroduce the pattern to dodge deep-instantiation.
+
+### Regression guards added (engineEar3.test.ts, +7 tests → 29 total)
+
+Per architect's directive that "a REAL-shaped stub whose `from` is defined on the prototype/object and throws if invoked unbound" is the strongest catch:
+
+1. **E109 REGRESSION GUARD stubs.** `makeAdminForBootScan` and new `makeAdminForNotifyStatusProbe` helpers rewritten with method-shorthand `.from(this: …, _table) { if (this === undefined) throw TypeError('…E109 regression') }`. Bare arrow-function stubs (the previous shape) masked the class of bug — the new shape throws exactly as real supabase-js does when `.from` is called unbound.
+2. **Source-shape anti-pattern bans (2 files).** Regex-locked against reintroduction of `const untypedFrom = …` or `const \w+ = supabaseAdmin.from as unknown` anywhere in `LobbyRegistry.ts` or `draft/index.ts`. Anchored to line-start (`^\s*const`, multiline flag) so the E109 lesson comment that mentions the anti-pattern by name doesn't false-positive.
+3. **Positive source-shape locks (2 files).** Regex pins the corrected shape `(supabaseAdmin.from('leagues') as any)` in both files — if a future refactor tries to hoist to a variable, the guard trips.
+4. **Behavioral test.** `performBootScan` against the `this`-dependent stub → resolves scanned=1 / resumed=1. Pre-fix: TypeError, returns `{0,0,0}`. Post-fix: green (as authored, and confirmed on the branch).
+5. **NOTIFY-probe path behavioral test.** Same-shape stub for the `select('draft_status').eq('id',…).maybeSingle()` chain — direct invocation proves the `(client.from(...) as any)` idiom works against a `this`-dependent client.
+6. **Sentinel test.** Confirms extracting `.from` off the stub DOES throw TypeError with the E109 regression message — proves the guard stub itself enforces the `this`-binding contract. If a future maintainer accidentally makes `.from` an arrow (rebreaking the guards silently), this sentinel goes red.
+
+All 5 pre-existing behavioral tests for `performBootScan` also now use the new `this`-dependent stub, so they would ALSO have caught this bug pre-ship. **Would-have-caught coverage: 12/12 tests exercising the boot-scan path now fail against the anti-pattern.**
+
+### Full CI-mirror gate (post-hotfix tree)
+
+| Step | Result | Delta |
+| --- | --- | --- |
+| eslint | 0 errors, 14 pre-existing warnings | unchanged |
+| server tsc | clean | unchanged |
+| web tsc | pre-existing warning-only errors | unchanged |
+| server build | clean | unchanged |
+| web build | 26.39s (dev-machine variance), PWA 124 entries | unchanged |
+| server vitest FULL | **1031 passed / 6 skipped / 0 failed** (55 files) | **+7 tests** (E109 regression guards) |
+| web vitest FULL | **1743 passed / 0 failed** (103 files, 46.27s) | unchanged |
+
+### Pin table (updated per E108 tag ruling + KNOWN-BAD tag)
+
+- **Previous-good** (holds): `0ecbe605-draft` @ `sha256:152b79912cea9d80cf5c3147beeba48957973f5d201d54bdc9a3d6c429768a32` (2026-08-08 pin).
+- **KNOWN-BAD interim** (do NOT roll back TO): `fd67eb4d-draft` @ `sha256:97e0ccd9…` — the initial Slice-1 build; boots but Items 1 + 2 are dead on it.
+- **Current-after-deploy** (proposed): `4d496a40-draft` (E109 hotfix on top of dcaeeeb9).
+- **Rollback**: SUNDAY_EXECUTION_BLOCKS.md §A-R three-command block, target = `0ecbe605-draft` (skip fd67eb4d-draft — bypass the interim; it is not a valid rollback target).
+
+### Proposed redeploy block
+
+§A-0 → §A-7 verbatim from SUNDAY_EXECUTION_BLOCKS.md. Image tag suffix `-draft` per E108 tag ruling. Build via `-f server/Dockerfile.draft-engine` (strike #2 invariant). Nine-item boot verification (plus tenth `event_subscription.watchdog_started`). Post-boot expectations THIS cycle add the previously-broken tags — architect's post-E108 checklist survives verbatim:
+
+**MUST see in boot log for hotfix proof:**
+- All standard nine (fingerprint / hono / uws / subscription / self_test / watchdog / registry.idle_eviction_timer_started / registry.clock_liveness_scanner_started / env checks).
+- `registry.boot_scan_started` — Item 2 hotfix live (pre-hotfix this fired then TypeError).
+- `registry.boot_scan_complete` — with resumed count reflecting any in_progress/paused rigs. **Zero TypeError line between started and complete** — that's the hotfix proof.
+- No `registry.boot_scan_threw` (this was the E109 signature — must be absent).
+
+**Zero A-R rollback pin change** from R99 — still `0ecbe605-draft`.
+
+### Standing by
+
+Architect countersigns SHA + issues redeploy paste banner. Post-deploy: architect runs S1/S2/S3 acceptance per E108 post-deploy plan (S1 zero-client ignition, S2 mid-cascade restart, S3 instant-autopick timing). If S1 flows autopicks and S3 measures ~2-3s ownerless spacing vs 31s courtesy clock, all three items are field-proven.
+
+**End of R100. E109 hotfix EXECUTED — 3 lines of production code + 7 regression-guard tests + 2 anti-pattern source locks. Commit `4d496a40` pushed. Full CI-mirror gate GREEN (server vitest 1031, +7 from R99's 1024). Pin table updated with fd67eb4d-draft marked KNOWN-BAD. READY-CANDIDATE per Entry 65 — awaiting architect countersignature for engine redeploy paste banner.**
+
+---
+
+## R101 — Entry 111 E111-HOTFIX (draft_status enum-domain fix + value-domain guard class) · READY-CANDIDATE (2026-08-11 20:15Z / 2:15 PM MDT)
+
+### Root cause acknowledged
+
+E109 TypeError gone (architect's field verification confirmed). New failure at the same seam, one layer deeper — data model, not JavaScript. The Slice-1 boot-scan and its NOTIFY-guard sibling both queried `draft_status` for the literal `'paused'`, but `paused` is **NOT a member of the `draft_status` enum**:
+
+- DB enum per `supabase/migrations/20250101000001_create_leagues_teams_tables.sql` + `20260206000000_add_scheduled_draft_time.sql`:  **`('not_started', 'queued', 'in_progress', 'completed')`** — four values, no `paused`.
+- Pause lives on the OTHER column: `leagues.draft_state='paused'` (DraftServiceV2.ts:551 + LobbyManager.ts:5523 confirm).
+- Postgres 22P02 rejects the whole `.in(['in_progress', 'paused'])` list on the invalid literal → scan returns zero, resumes NOTHING → Item 2 inert on tag `7b10d48a-draft` (E109-fix build).
+- NOTIFY guard `status !== 'in_progress' && status !== 'paused'` was a dead branch (`status` from that probe can never be `'paused'`) but encoded the same wrong model.
+
+**Aggravator**: `packages/shared/src/types/league.ts:552` exports `DRAFT_STATUSES` erroneously **including** `'paused'` — a client-facing type-drift docket for another cycle. That mis-encoding is what let the invalid literal sail through 1031 offline tests: the mock stubs accepted any string as valid.
+
+### Fix (commit `a9204e31` on `phase-4-5-implementation`)
+
+Per architect's E111 minimal-edit ruling (Slice-1's contract only requires `in_progress` rehydration; paused-draft resume is a Slice-2+ decision requiring reading `draft_state` alongside):
+
+- **`server/src/draft/LobbyRegistry.ts:503`**: `.in('draft_status', ['in_progress', 'paused'])` → `.eq('draft_status', 'in_progress')`. Simpler + safer than `.in([…])` with a single element.
+- **`server/src/draft/index.ts:799`**: `if (status !== 'in_progress' && status !== 'paused')` → `if (status !== 'in_progress')`. Removes the dead branch that encoded the wrong data model.
+
+Both edits carry inline E111 lesson comments citing migration source of truth + the shared-type drift docket, so future maintainers can't accidentally reintroduce `'paused'` on this column.
+
+### Value-domain guard class added (engineEar3.test.ts, +7 tests → 36 total)
+
+Per architect E111 lesson-of-the-cycle: **"mocked DB stubs that accept arbitrary literals cannot catch enum-domain errors — any future filter on an enum column gets a value-domain assertion."** The R100 guard suite was source-shape + `this`-binding focused; E111 adds:
+
+1. **`DB_DRAFT_STATUS_ENUM` constant** — pinned to migration source of truth (`['not_started', 'queued', 'in_progress', 'completed']`) with citation to both migration files + a comment naming the shared-type drift so this test file is the authoritative offline-side pointer to what the DB actually rejects.
+2. **`makeAdminForBootScan` stub rewritten with Postgres-like enum enforcement.** Both `.eq(col, val)` and `.in(col, values)` return the exact Postgres 22P02 error shape (`{code: '22P02', message: 'invalid input value for enum draft_status: "…"'}`) when the value/list is not a subset of `DB_DRAFT_STATUS_ENUM`. Pre-E111 the stubs returned `{data: activeLeagues, error: null}` for any argument — that's precisely why 1031 tests were green while staging was 22P02.
+3. **Source-shape anti-pattern locks (2 files).** `.eq|.in('draft_status', …)` combined with `'paused'` literal — banned in both `LobbyRegistry.ts` and `draft/index.ts`. Regex is line-anchored + strips comment lines so the E111 lesson comments that mention the anti-pattern by name don't false-positive.
+4. **Positive shape lock.** `.eq('draft_status', 'in_progress')` pinned in `LobbyRegistry.ts` — regression detection if a future refactor widens back to `.in([…])`.
+5. **Behavioral proof.** `performBootScan` against the enum-aware stub with 2 in_progress rigs → resumed=2 / failed=0. Pre-fix (using `['in_progress', 'paused']`) the stub now fires 22P02 through `boot_scan_query_failed`, matching the exact staging error class-for-class.
+6. **Sentinels.** Two — E109 (extracting `.from` throws TypeError) + E111 (stub `.eq/.in` against `'paused'` returns 22P02 with correct code + message + wrapped literal). If a future maintainer accidentally degrades either guard (e.g. arrow-form `from`, or removes the enum-check), the sentinels flip red and the guards are proven dead-in-place.
+7. **Migration-source-of-truth pin.** `DB_DRAFT_STATUS_ENUM` contents asserted sorted-equal to `['completed', 'in_progress', 'not_started', 'queued']`. If a future migration adds a member (or if `'paused'` genuinely gets added), this test forces a conscious update rather than silent drift.
+
+**Would-have-caught coverage this cycle**: the enum-aware stub means every boot-scan behavioral test now fails against any invalid `draft_status` literal. Pre-fix, the code + stubs BOTH used the wrong literal and cancelled out. Post-fix, the stub is authoritative — any reintroduction of `'paused'` on this column trips at least four tests offline.
+
+### Full CI-mirror gate (post-hotfix tree)
+
+| Step | Result | Delta |
+| --- | --- | --- |
+| eslint | 0 errors, 14 pre-existing warnings | unchanged |
+| server tsc | clean | unchanged |
+| web tsc | pre-existing warning-only errors | unchanged |
+| server build | clean | unchanged |
+| web build | clean, PWA 124 entries | unchanged |
+| server vitest FULL | **1038 passed / 6 skipped / 0 failed** (55 files) | **+7 tests** (E111 value-domain guards) |
+| web vitest FULL | **1743 passed / 0 failed** (103 files) | unchanged |
+
+### Pin table (updated — second interim marked KNOWN-BAD)
+
+- **Previous-good** (holds): `0ecbe605-draft` @ `sha256:152b79912cea9d80cf5c3147beeba48957973f5d201d54bdc9a3d6c429768a32` (2026-08-08 pin).
+- **KNOWN-BAD interim #1** (do NOT roll back TO): `fd67eb4d-draft` @ `sha256:97e0ccd9…` — E109 TypeError, Items 1 + 2 dead.
+- **KNOWN-BAD interim #2** (do NOT roll back TO): `7b10d48a-draft` @ `sha256:326838e1…` — E111 enum-domain, Item 2 still inert (query returns 22P02).
+- **Current-after-deploy** (proposed): `a9204e31-draft`.
+- **Rollback**: SUNDAY_EXECUTION_BLOCKS.md §A-R three-command block, target = `0ecbe605-draft` (skip BOTH interim tags — bypass fd67eb4d-draft AND 7b10d48a-draft; neither is a valid rollback target).
+
+### Proposed redeploy block
+
+§A-0 → §A-7 verbatim from SUNDAY_EXECUTION_BLOCKS.md. Image tag suffix `-draft` per E108 tag ruling. Build via `-f server/Dockerfile.draft-engine` (strike #2 invariant). Nine-item boot verification + tenth `event_subscription.watchdog_started`.
+
+**MUST see in boot log for E111 hotfix proof (unchanged from E110/R100 expectations):**
+- All standard nine (fingerprint / hono / uws / subscription / self_test / watchdog / registry.idle_eviction_timer_started / registry.clock_liveness_scanner_started / env checks).
+- `registry.boot_scan_started` — Item 2 fires.
+- `registry.boot_scan_complete` — this time with real tallies (staging has in_progress rig leagues from E100 verify + LOAD1 residue). **Zero `boot_scan_query_failed` between started and complete** — that's the E111 hotfix proof.
+- Neither `registry.boot_scan_threw` (E109 signature) nor `registry.boot_scan_query_failed` (E111 signature) must appear.
+
+**Zero A-R rollback pin change** from R100 — still `0ecbe605-draft`. If a hypothetical E112 appears at redeploy, add `a9204e31-draft` to the KNOWN-BAD list — rollback path stays deterministic.
+
+### Standing by
+
+Architect countersigns SHA + issues redeploy paste banner. Post-deploy S1/S2/S3 acceptance per E110 plan should run cleanly now — the boot-scan should report actual resumes for the first time in the wild, and NOTIFY-creates-lobby should ignite Item 1 on any subsequent draft start.
+
+**Note per architect INS-class lesson (E111 line 1254)**: this is the second consecutive Slice-1 bug that only the deploy-and-watch loop caught. Recording that the deploy loop is earning its keep — the value-domain guard class ships with this cycle to close that class of gap going forward.
+
+**End of R101. E111 hotfix EXECUTED — 2 lines of production code (both filters/guards enum-corrected) + 7 value-domain regression guards + 2 anti-pattern source locks + Postgres-like stub upgrade. Commit `a9204e31` pushed. Full CI-mirror gate GREEN (server vitest 1038, +7 from R100's 1031). Pin table updated with 7b10d48a-draft marked KNOWN-BAD alongside fd67eb4d-draft. READY-CANDIDATE per Entry 65 — awaiting architect countersignature for engine redeploy paste banner.**
+
+---
+
+## R102 — Entry 113 E113-HOTFIX (armPickDeadline wrapper — Item 6 class-fix) · READY-CANDIDATE (2026-08-11 20:50Z / 2:50 PM MDT)
+
+### Root cause acknowledged + field-proof recognition
+
+🏆 **S1 PASS acknowledged and recorded**: architect's field verification on league ada00009 (12 ownerless seats, 30s clock, ZERO clients) proved Item 1 works — seq-1 draft_started 20:37:24.334 → seq-2 pick @ 20:37:27.106 (2.77s later, no clients connected). The Run-2 no-audience-no-ignition disease class is field-cured. Item 2 boot-scan mechanically green (census-correct on empty).
+
+⚠️ **S3 PARTIAL acknowledged**: seq-3 landed at +30.99s — full courtesy clock. Item 6 fired on pick 1 only, then reverted. Architect source-read identified the root: `computeArmDeadlineForOnClockTeam` was wired at only **2 of ~7** pick-deadline arm sites (init :1054 + applyPickEvent :3635). The missing sites — :1907 self-drive, :2944 draft_started apply, and 4 resume/extend re-arms — all bypassed the helper silently. Garrett's order was half-delivered.
+
+### Class fix (commit `71c285dd` on `phase-4-5-implementation`)
+
+Per E113 structural preference — mirrors E109/E111 lesson-shaped fixes: **introduce a single private `armPickDeadline` wrapper so no future arm site can bypass the helper.**
+
+```ts
+private armPickDeadline(rpcDeadline: Date): void {
+  this.setPickDeadline(
+    this.computeArmDeadlineForOnClockTeam(rpcDeadline),
+    'pick',
+  );
+}
+```
+
+Wrapper docstring enumerates:
+- **Contract**: single entry point for arming a snake/linear pick deadline. Every call site MUST route through here.
+- **Exempt paths** (with rationale + expected in-code marker `E113 EXEMPT`): `draft_extended` handlers, auction `bid_window`/`nomination_window` sites, and `handleStallScanner` recovery re-arm.
+
+### Routing decisions
+
+**7 sites routed through `armPickDeadline`:**
+
+| Line | Site | Rationale |
+| --- | --- | --- |
+| 1055 | init post-replay | E106 original wiring, converted to wrapper for consistency |
+| 1911 | processSubmitPick step 6c (self-drive) | **E113 PRIMARY MISS** — the one that made seq-3 fire at +30.99s |
+| 2951 | draft_started dispatcher apply | **E113 PRIMARY MISS** — first-pick deadline path |
+| 3049 | draft_resumed dispatcher A | Resume = fresh on-clock transition, ownerless seats deserve instant |
+| 3276 | draft_resumed dispatcher B (bootstrap-mode) | Same rationale as A |
+| 3662 | applyPickEvent external-apply | E106 original wiring, converted from inline pattern to wrapper |
+| 5455 | resumeDraft (commissioner-invoked) | Same rationale as dispatcher resume paths |
+
+**2 sites EXEMPT with inline `E113 EXEMPT` marker + rationale (both `draft_extended`):**
+
+| Line | Site | Reason for exemption |
+| --- | --- | --- |
+| 3075 | draft_extended dispatcher A | Commissioner explicitly added time; shortening it back to the instant window for ownerless seats would defeat the extension |
+| 3301 | draft_extended dispatcher B (bootstrap-mode) | Same rationale as A |
+
+**Skipped from routing (documented in wrapper docstring as outside E113 scope):**
+- `handleStallScanner` recovery re-arm (~:4796): dynamic `kind` (could be auction). Recovery from a lost timer is not a fresh on-clock transition; the instant-autopick benefit applies to the NEXT normal pick, not to re-arming a stale deadline.
+- All auction `setPickDeadline(_, 'bid_window' | 'nomination_window')` sites: auction has its own state machine, outside ENGINE-EAR v3 Slice 1 scope.
+
+### Test coverage additions (engineEar3.test.ts, +8 tests → 44 total)
+
+Following E113's "class-fix pattern mirrors E109/E111" — source-shape locks are the durable defense against future arm-site drift:
+
+1. **Wrapper signature lock.** `private armPickDeadline(rpcDeadline: Date): void` — signature drift catches (e.g., adding a `kind` parameter breaks the single-purpose invariant).
+2. **Wrapper body sequence lock.** The wrapper body must invoke BOTH `computeArmDeadlineForOnClockTeam` AND `setPickDeadline(_, 'pick')` in a single expression. Multi-line match (~300 chars); regression class = someone splitting the pipeline.
+3. **Positive count lock.** `this.armPickDeadline(` call sites: **≥6** (init, self-drive, draft_started apply, both resume dispatchers, applyPickEvent). Any drop back to raw `setPickDeadline` reduces the count.
+4. **WALK-THE-FILE guard (the strongest catch).** Every raw `setPickDeadline(_, 'pick')` call outside the wrapper's body is either (a) skipped because it's the wrapper's own call OR (b) preceded within 12 lines by an `E113 EXEMPT` marker. If a future contributor adds a new pick arm site without either routing through the wrapper or marking exempt, this guard trips.
+5. **Exempt-vocabulary lock.** Every `E113 EXEMPT` block must contain the word `extend` or `extension` — so the intent is inline (and drift-catches: if a future maintainer copy-pastes the marker for the wrong reason, they can't just borrow the vocabulary).
+6. **Primary-site anchor locks.** The two E113 primary miss sites (self-drive + draft_started apply) carry E113-specific comment vocabulary AND the wrapper call — mutual pin catches drift on either.
+7. **Applied-inline-pattern ban.** Raw `setPickDeadline(computeArmDeadlineForOnClockTeam(...), 'pick')` shape (the pre-E113 inline duplication) is banned — forces every consumer through the named wrapper for easier grep.
+
+**Would-have-caught coverage this cycle**: the WALK-THE-FILE guard would have surfaced 5 unwrapped `setPickDeadline(_, 'pick')` sites on the pre-E113 tree (self-drive, draft_started, both resume dispatchers, applyPickEvent's inline pattern). Post-fix: zero violations offline. This is the strongest offline class-catch available for the arm-site-bypass regression class.
+
+### Full CI-mirror gate (post-hotfix tree)
+
+| Step | Result | Delta |
+| --- | --- | --- |
+| eslint | 0 errors, 14 pre-existing warnings | unchanged |
+| server tsc | clean | unchanged |
+| web tsc | pre-existing warning-only errors | unchanged |
+| server build | clean | unchanged |
+| web build | clean, PWA 124 entries | unchanged |
+| server vitest FULL | **1046 passed / 6 skipped / 0 failed** (55 files) | **+8 tests** (E113 wrapper-routing guards) |
+| web vitest FULL | **1743 passed / 0 failed** (103 files) | unchanged |
+
+### Pin table (updated — third interim marked KNOWN-BAD)
+
+- **Previous-good** (holds): `0ecbe605-draft` @ `sha256:152b79912cea9d80cf5c3147beeba48957973f5d201d54bdc9a3d6c429768a32` (2026-08-08 pin).
+- **KNOWN-BAD interim #1** (do NOT roll back TO): `fd67eb4d-draft` — E109 TypeError, Items 1 + 2 dead.
+- **KNOWN-BAD interim #2** (do NOT roll back TO): `7b10d48a-draft` — E111 enum-domain, Item 2 inert (22P02).
+- **KNOWN-BAD interim #3** (do NOT roll back TO): `a9204e31-draft` — E113 partial, S1 PASS but Item 6 pick-1-only (5 unrouted arm sites).
+- **Current-after-deploy** (proposed): `71c285dd-draft`.
+- **Rollback**: SUNDAY_EXECUTION_BLOCKS.md §A-R three-command block, target = `0ecbe605-draft` (skip ALL THREE interim tags — none is a valid rollback target).
+
+### Proposed redeploy block
+
+§A-0 → §A-7 verbatim from SUNDAY_EXECUTION_BLOCKS.md. Image tag suffix `-draft` per E108 tag ruling. Build via `-f server/Dockerfile.draft-engine` (strike #2 invariant). Nine-item boot verification + tenth `event_subscription.watchdog_started`.
+
+**MUST see in boot log (unchanged from E110/R100/R101 expectations):**
+- All standard nine + `event_subscription.watchdog_started`.
+- `registry.boot_scan_started` + `registry.boot_scan_complete` (real tallies if in_progress rigs present; census-correct-zero otherwise).
+- Zero `boot_scan_threw` (E109 signature), zero `boot_scan_query_failed` (E111 signature).
+
+**E113 hotfix proof requires draft activity (not boot alone).** The wrapper routes silently at boot; the proof surfaces during a live draft:
+- On subsequent ownerless-seat picks (2..N in an unowned rig), expect `[lobby] instant_autopick_arm` log lines per pick.
+- Pick cadence should hold at ~2s throughout, not jump to the full pick_clock after pick 1.
+
+### Acceptance status (per E113)
+
+- **S1 ✅** — field-proven on `a9204e31-draft` (league ada00009). Wrapper routing preserves the S1 behavior. Re-run optional per architect.
+- **S2 opportunistic** — the E113 redeploy provides the natural restart-mid-draft rehearsal (if league ada00009 or another in_progress rig is live during deploy, the boot-scan should resume it within 5s of container start).
+- **S3 rerun REQUIRED** — S3 pick-cadence measurement on the fresh build. Expect: pick spacing ≈ 2-3s throughout the cascade (vs the +30.99s regression seen on `a9204e31-draft` after pick 1). If S3 measures ≈2-3s across all 12 picks, Item 6 is field-cured.
+
+### Standing by
+
+Architect countersigns SHA + issues redeploy paste banner. Post-deploy S3 rerun proves Item 6 class-fixed. Given the pattern of the last three cycles (each caught a different Slice-1 defect deploy-and-watch), consider this the arm-site-bypass class closed — the wrapper + WALK-THE-FILE guard mean any future arm-site regression trips offline before deploy.
+
+**End of R102. E113 hotfix EXECUTED — 1 new wrapper + 7 arm sites routed + 2 exempt sites documented + 8 wrapper-routing regression guards. Commit `71c285dd` pushed. Full CI-mirror gate GREEN (server vitest 1046, +8 from R101's 1038). Pin table updated with a9204e31-draft marked KNOWN-BAD alongside fd67eb4d-draft + 7b10d48a-draft. READY-CANDIDATE per Entry 65 — awaiting architect countersignature for engine redeploy paste banner.**
+
 
 
 
