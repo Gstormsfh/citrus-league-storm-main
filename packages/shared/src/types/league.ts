@@ -558,4 +558,15 @@ export type DraftStatus = (typeof DRAFT_STATUSES)[number];
  * with 409. `paused` is connectable so users can stay in the draft
  * room and see chat / commissioner actions while picks are halted.
  */
-export const CONNECTABLE_DRAFT_STATUSES: readonly DraftStatus[] = ['queued', 'in_progress', 'paused'];
+// 'queued' REMOVED 2026-08-18: it is a v1-lobby concept ("ready to
+// start", set by the retired v1 room via updateDraftSettings). The v2
+// ignition path (start_draft_v2) goes not_started → in_progress and
+// never produces 'queued'. Treating queued as connectable made
+// discovery 200 for a league with no engine lobby and no events, so
+// the client sat in a reconnect loop with no Start button (prod
+// league 3327bc2e). Discovery now 409s queued exactly like
+// not_started, and the client reducer maps both to waitingForStart —
+// which renders the v2 commissioner lobby. The engine's boot-scan
+// only rehydrates 'in_progress' (LobbyRegistry), so nothing else
+// consumed queued-as-connectable.
+export const CONNECTABLE_DRAFT_STATUSES: readonly DraftStatus[] = ['in_progress', 'paused'];

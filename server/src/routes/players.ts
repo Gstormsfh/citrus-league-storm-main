@@ -3,6 +3,7 @@ import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { createUserClient } from '../lib/supabase';
 import { PlayerService } from '../services/PlayerService';
+import { PlayerDashboardService } from '../services/PlayerDashboardService';
 import { NhlPlayoffStateService } from '../services/NhlPlayoffStateService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
@@ -208,6 +209,43 @@ playerRoutes.get('/directory', authMiddleware, async (c) => {
     return ok(c, data || []);
   } catch (err) {
     return handleError(c, err, 'Failed to fetch player directory');
+  }
+});
+
+// GET /api/players/dashboard-index — league-wide Players section browse
+// index: every directory player for the current season with season
+// actuals + GAR/60 split + xG talent + rolled-forward projections
+// merged into one row each. Powers /players. Registered BEFORE
+// /:playerId (Hono matches in registration order — 'dashboard-index'
+// would otherwise be captured as a playerId).
+//
+// Query params:
+//   team     — filter by NHL team abbrev (e.g. TOR)
+//   position — filter by position_code (C/LW/RW/D/G)
+//   search   — case-insensitive substring match on name
+playerRoutes.get('/dashboard-index', authMiddleware, async (c) => {
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new PlayerDashboardService(supabase);
+
+  try {
+    const { players, error } = await service.getDashboardIndex();
+    if (error) {
+      return handleError(c, error, 'Failed to fetch player dashboard index');
+    }
+
+    const team = c.req.query('team');
+    const position = c.req.query('position');
+    const search = c.req.query('search')?.toLowerCase();
+
+    let filtered = players;
+    if (team) filtered = filtered.filter((p) => p.team === team);
+    if (position) filtered = filtered.filter((p) => p.position === position);
+    if (search) filtered = filtered.filter((p) => p.name.toLowerCase().includes(search));
+
+    return ok(c, filtered);
+  } catch (err) {
+    logger.error('[players/dashboard-index] Unexpected error:', err);
+    return handleError(c, err, 'Failed to fetch player dashboard index');
   }
 });
 

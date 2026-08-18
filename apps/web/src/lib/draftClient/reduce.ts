@@ -187,8 +187,13 @@ function handleTokenFetchFailed(
   // for why this one case must not escalate.
   if (
     event.statusCode === 409 &&
-    event.draftStatus === 'not_started'
+    (event.draftStatus === 'not_started' || event.draftStatus === 'queued')
   ) {
+    // 'queued' joined this branch 2026-08-18: it is the v1 lobby's
+    // "ready to start" marker and is pre-ignition exactly like
+    // not_started (discovery now 409s it — see shared
+    // CONNECTABLE_DRAFT_STATUSES). Same flat poll, same
+    // waitingForStart flag, so the v2 commissioner lobby renders.
     const jitter = (randomFn() * 2 - 1) * JITTER_FACTOR;
     const delayMs = Math.max(
       500,

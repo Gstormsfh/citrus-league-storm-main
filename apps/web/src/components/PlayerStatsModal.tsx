@@ -108,6 +108,10 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   const { toast } = useToast();
   const [isDropping, setIsDropping] = useState(false);
   const [imgErr, setImgErr] = useState(false);
+  // Headshot-first avatar (2026-08-18): try the player's real NHL
+  // headshot, fall back to team logo, then jersey number. Mirrors
+  // HockeyPlayerCard's chain so every card surface agrees.
+  const [headshotErr, setHeadshotErr] = useState(false);
 
   // Game log state (all 82 games: actuals for played + projections for future)
   const [gameLog, setGameLog] = useState<GameLogEntry[]>([]);
@@ -356,7 +360,16 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
           <div className="relative flex items-start gap-4">
             {/* Team logo / player avatar */}
             <div className="w-16 h-16 flex-shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm border-2 border-white/20 flex items-center justify-center overflow-hidden shadow-lg">
-              {!imgErr ? (
+              {player.image && !headshotErr ? (
+                <img
+                  loading="lazy"
+                  decoding="async"
+                  src={player.image}
+                  alt={player.name}
+                  className="w-full h-full object-cover"
+                  onError={() => setHeadshotErr(true)}
+                />
+              ) : !imgErr ? (
                 <img loading="lazy" decoding="async" src={teamLogoUrl} alt={teamAbbr} className="w-12 h-12 object-contain" onError={() => setImgErr(true)} />
               ) : (
                 <span className="text-2xl font-varsity font-black text-white/80">{player.number}</span>

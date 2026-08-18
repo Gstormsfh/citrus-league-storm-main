@@ -153,10 +153,12 @@ const Navbar = () => {
           { label: 'Matchup', path: `/matchup/${activeLeagueId}`, icon: Swords },
           { label: 'Roster', path: `/roster?league=${activeLeagueId}`, icon: Users },
           { label: 'Free Agents', path: `/free-agents?league=${activeLeagueId}`, icon: UserPlus },
+          { label: 'Players', path: '/players', icon: BarChart3 },
           { label: 'Standings', path: `/standings?league=${activeLeagueId}`, icon: TrendingUp },
         ]
       : [
           { label: 'Create League', path: '/create-league', icon: Sparkles },
+          { label: 'Players', path: '/players', icon: BarChart3 },
           { label: 'NHL Playoffs', path: '/nhl/playoffs', icon: Trophy },
           { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
         ];

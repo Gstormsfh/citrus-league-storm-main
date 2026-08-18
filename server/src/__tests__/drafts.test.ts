@@ -117,17 +117,21 @@ describe('Discovery endpoint — leagues lookup + status gating', () => {
     return app.request(`/api/drafts/${draftId}/server`, { headers: TEST_AUTH_HEADER });
   }
 
-  it('200: league exists, member, draft_status="queued" → returns {host, port, token}', async () => {
+  it('409: draft_status="queued" is PRE-IGNITION (2026-08-18) → DRAFT_NOT_CONNECTABLE with status queued', async () => {
+    // 'queued' is the retired v1 lobby's "ready to start" marker; the
+    // v2 ignition path never produces it. Treating it as connectable
+    // gave the client a 200 for a league with no engine lobby and no
+    // events — a reconnect loop with no Start button (prod league
+    // 3327bc2e). It now 409s like not_started; the client reducer
+    // maps both to waitingForStart, which renders the v2 lobby.
     mockLeague = { id: VALID_DRAFT_ID, draft_status: 'queued' };
     mockLeagueError = null;
     mockIsMember = true;
     const res = await call();
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(409);
     const body = await res.json();
-    expect(body.host).toBe('localhost');
-    expect(body.port).toBe(3002);
-    expect(typeof body.token).toBe('string');
-    expect(body.token.split('.').length).toBe(3);
+    expect(body.error.code).toBe('DRAFT_NOT_CONNECTABLE');
+    expect(body.error.status).toBe('queued');
   });
 
   it('200: league exists, member, draft_status="in_progress" → returns {host, port, token}', async () => {

@@ -69,6 +69,7 @@ const Guides = lazyWithErrorHandling(() => import("./pages/Guides"));
 const Matchup = lazyWithErrorHandling(() => import("./pages/Matchup"));
 const PlayoffBracket = lazyWithErrorHandling(() => import("./pages/PlayoffBracket"));
 const FreeAgents = lazyWithErrorHandling(() => import("./pages/FreeAgents"));
+const Players = lazyWithErrorHandling(() => import("./pages/Players"));
 const GMOffice = lazyWithErrorHandling(() => import("./pages/GMOffice"));
 const StormyAssistant = lazyWithErrorHandling(() => import("./pages/StormyAssistant"));
 const News = lazyWithErrorHandling(() => import("./pages/News"));
@@ -195,6 +196,7 @@ const App = () => {
                     <Route path="/matchup" element={<ErrorBoundary><Matchup /></ErrorBoundary>} /> {/* Fallback for /matchup without params */}
                     <Route path="/league/:leagueId/playoffs" element={<ProtectedRoute><ErrorBoundary><PlayoffBracket /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/free-agents" element={<ErrorBoundary><FreeAgents /></ErrorBoundary>} />
+                <Route path="/players" element={<ProtectedRoute><ErrorBoundary><Players /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office" element={<ProtectedRoute><ErrorBoundary><GMOffice /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office/stormy" element={<ProtectedRoute><ErrorBoundary><StormyAssistant /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/news" element={<News />} />

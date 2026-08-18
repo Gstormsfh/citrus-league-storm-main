@@ -69,6 +69,26 @@ describe('A — not_started is a waiting state, not a failure', () => {
     expect(state.waitingForStart).toBe(true);
   });
 
+  it("2026-08-18: 'queued' (v1 lobby's ready-to-start marker) waits identically", () => {
+    // Discovery 409s queued since CONNECTABLE_DRAFT_STATUSES dropped
+    // it; a queued league is pre-ignition and must get the Start
+    // lobby, not a reconnect loop (prod league 3327bc2e incident).
+    const { state } = reduce(
+      fetchingToken(),
+      {
+        type: 'token_fetch_failed',
+        error: 'Draft is not active. Current status: queued',
+        statusCode: 409,
+        draftStatus: 'queued',
+      },
+      noJitter,
+    );
+    expect(state.kind).toBe('reconnecting');
+    if (state.kind !== 'reconnecting') throw new Error('unreachable');
+    expect(state.waitingForStart).toBe(true);
+    expect(state.attempt).toBe(0);
+  });
+
   it('carries no lastError — there is nothing wrong to report', () => {
     // The pre-fix banner rendered the raw server string at the user.
     const { state } = notStarted();

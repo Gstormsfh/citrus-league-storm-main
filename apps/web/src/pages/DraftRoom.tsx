@@ -358,10 +358,14 @@ const DraftRoomInner = () => {
       const targetLeague = activeLeagueId
         ? leagues.find(l => l.id === activeLeagueId) || leagues[0]
         : leagues[0];
-      // Update URL using searchParams to avoid race condition
-      const newSearchParams = new URLSearchParams(searchParams);
-      newSearchParams.set('league', targetLeague.id);
-      navigate(`/draft-room?${newSearchParams.toString()}`, { replace: true });
+      // RETIREMENT (2026-08-18) follow-up: go STRAIGHT to the v2 room.
+      // The old rewrite to /draft-room?league=X re-entered this page,
+      // which (a) double-redirected through the fence and (b) let
+      // DraftRoomInner's league-scoped effects fire against a real
+      // league for one commit cycle before the fence's v2-era Navigate
+      // unmounted it — a window where legacy v1 machinery touched live
+      // leagues. Direct navigation closes that window entirely.
+      navigate(`/draft-v2/${encodeURIComponent(targetLeague.id)}`, { replace: true });
     } catch (error: unknown) {
       setError("Couldn't load your leagues — give it a moment and try again.");
       setLoading(false);

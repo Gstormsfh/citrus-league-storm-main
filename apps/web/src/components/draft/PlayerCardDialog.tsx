@@ -102,7 +102,21 @@ export const PlayerCardDialog = ({
         data-testid="player-card-dialog"
       >
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-pastel-cream">
+          <DialogTitle className="flex items-center gap-2.5 text-pastel-cream">
+            {player.headshot_url && (
+              <img
+                loading="lazy"
+                decoding="async"
+                src={player.headshot_url}
+                alt=""
+                aria-hidden="true"
+                className="h-10 w-10 flex-shrink-0 rounded-lg bg-white/10 object-cover ring-1 ring-white/15"
+                onError={(e) => {
+                  // Headshot 404s (offseason mug gaps) collapse to text-only.
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            )}
             <span className="text-lg font-bold">{player.full_name}</span>
             <Badge variant="outline" className="text-[10px] px-1.5">{positions}</Badge>
             <span className="text-sm font-normal text-white/55">{player.team}</span>

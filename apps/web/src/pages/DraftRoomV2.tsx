@@ -77,6 +77,8 @@ import {
 } from '@/lib/draftClient/v1Adapters';
 import { overlayPendingPicks } from '@/lib/draftClient/overlayPending';
 import type { Player } from '@/services/PlayerService';
+import { Button } from '@/components/ui/button';
+import type { Team } from '@/services/LeagueService';
 
 export default function DraftRoomV2() {
   const params = useParams<{ leagueId: string; draftId?: string }>();
@@ -339,6 +341,7 @@ export default function DraftRoomV2() {
         clockOffsetMs={clockOffsetMs}
       />
       <IdentityFailureBanner />
+      <DraftLobbyV2 leagueId={leagueId} teams={teams} />
       <DraftRoomBody
         leagueId={leagueId}
         teams={teams}
@@ -442,6 +445,241 @@ function describeStatus(
   if (derivedStatus === 'paused') return 'paused';
   if (derivedStatus === 'cancelled') return 'cancelled';
   return derivedStatus;
+}
+
+// ── COMMISH-START (2026-08-18) — pre-draft lobby, inside the v2 room ──
+//
+// Why this exists: retiring the v1 room (which used to host the start
+// lobby) left the v2 room with no way to START a draft — a not-started
+// league opened to "waiting for the commissioner" with no button, ever.
+// This restores the start flow where it belongs and makes it a real
+// lobby: participants land in the room and JOIN, the commissioner sees
+// who is in, and officially kicks the draft off. No instant/auto start.
+//
+// Purely additive by construction: it renders null the instant the
+// draft is live (draftStatus !== 'not_started' OR any pick made), so
+// the proven in-draft path is untouched. It reuses the SAME ignition
+// the v1 lobby used — useStartDraftFull → (init draft_order) +
+// start_draft_v2 — so starting is byte-identical to the proven
+// THE-TWELVE path; only the button's location moved into v2. On
+// success the live WS receives the draft_started event, `derived`
+// flips to in_progress, and this panel unmounts on the next render —
+// no navigation, we are already in /draft-v2.
+interface DraftLobbyV2Props {
+  leagueId: string;
+  teams: FetchedTeam[];
+}
+
+function DraftLobbyV2({ leagueId, teams }: DraftLobbyV2Props) {
+  const connectionState = useDraftConnectionState();
+  const myTeamId = useMyTeamId();
+  const [isStarting, setIsStarting] = useState(false);
+  const [league, setLeague] = useState<
+    { commissioner_id: string; draft_rounds: number; league_size: number | null; settings: Record<string, unknown> | null } | null
+  >(null);
+  // League-fetch failure is USER-VISIBLE. The original silent-null
+  // catch produced the exact incident this lobby exists to prevent:
+  // a commissioner staring at a waiting screen with no button and no
+  // explanation. leagueFetchNonce re-arms the effect for Retry.
+  const [leagueError, setLeagueError] = useState<string | null>(null);
+  const [leagueFetchNonce, setLeagueFetchNonce] = useState(0);
+
+  // Additive-only invariant, keyed on the SAME signal ConnectionBanner
+  // uses for its "Waiting for the draft to start" copy: the engine's
+  // discovery answers 409 with status `not_started` (commissioner hasn't
+  // pressed Start), which puts the client in `reconnecting` with
+  // `waitingForStart`. That is the ONLY genuinely pre-ignition state.
+  // Every live-draft state — INCLUDING the "started, awaiting pick 1"
+  // window where derived.draftStatus still reads 'not_started' — has a
+  // live `connected` connection, so this is false there.
+  const waitingForStart =
+    connectionState.kind === 'reconnecting' && connectionState.waitingForStart === true;
+
+  // Fetch the league record ONLY while we are actually the pre-draft
+  // lobby. Gating on waitingForStart keeps the in-draft render path free
+  // of any extra network work — during a live draft this effect is a
+  // no-op, so it can never perturb the draft's own fetch/timing.
+  useEffect(() => {
+    if (!waitingForStart) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { apiClient } = await import('@/api/client');
+        const path = `/api/leagues/${encodeURIComponent(leagueId)}`;
+        const response = await apiClient.get<{
+          commissioner_id: string;
+          draft_rounds: number;
+          league_size: number | null;
+          settings: Record<string, unknown> | null;
+        }>(path);
+        if (cancelled) return;
+        const payload =
+          response.data ??
+          (response as unknown as {
+            commissioner_id: string;
+            draft_rounds: number;
+            league_size: number | null;
+            settings: Record<string, unknown> | null;
+          });
+        if (payload && typeof payload.commissioner_id === 'string') {
+          setLeague(payload);
+          setLeagueError(null);
+        } else {
+          setLeagueError('League details came back in an unexpected shape.');
+        }
+      } catch {
+        if (!cancelled) {
+          // Loud, recoverable failure — never a silent no-button state.
+          setLeagueError("Couldn't load league details — the Start button needs them.");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId, waitingForStart, leagueFetchNonce]);
+
+  if (!waitingForStart) return null;
+
+  // Our user id = the owner of our team. The teams list carries owner_id
+  // and the store already resolved our teamId (the DR-2 my-team fetch), so
+  // commissioner status needs no AuthProvider and no supabase import — the
+  // v2 room stays testable in isolation.
+  const myUserId = teams.find((t) => t.id === myTeamId)?.owner_id ?? null;
+  const isCommissioner = !!myUserId && !!league && myUserId === league.commissioner_id;
+  const joinedHumans = teams.filter((t) => t.owner_id);
+
+  // start_draft_v2 hard-requires round-1 team_order length ===
+  // league_size (draft_not_configured otherwise). Enabling Start with
+  // fewer teams hands the commissioner a button that can only fail
+  // with a raw RPC error — so the gate lives HERE, with words.
+  const leagueSize = league?.league_size ?? null;
+  const roomFull = leagueSize == null ? teams.length >= 2 : teams.length >= leagueSize;
+  const startBlockedReason = !roomFull
+    ? leagueSize != null
+      ? `Waiting for teams — ${teams.length} of ${leagueSize} created. The draft needs all ${leagueSize} before it can start.`
+      : 'Need at least 2 teams to start.'
+    : null;
+
+  // Reuses the EXACT ignition the v1 lobby used, via the same plain
+  // building blocks useStartDraftFull calls under the hood —
+  // DraftService.initializeDraftOrder (builds draft_order from whoever
+  // has joined) then draftV2Api.startDraftV2 (the F27 start_draft_v2 RPC).
+  // Called directly (not through the hook) so the lobby stays free of
+  // provider-coupled hooks; ignition semantics are identical.
+  const handleStart = async () => {
+    if (!myUserId || !league || isStarting) return;
+    setIsStarting(true);
+    try {
+      const [{ DraftService }, { draftV2Api }] = await Promise.all([
+        import('@/services/DraftService'),
+        import('@/api/draftV2'),
+      ]);
+      const draftType =
+        ((league.settings as { draftType?: string } | null)?.draftType) || 'snake';
+      const mappedTeams: Team[] = teams.map((t) => ({
+        id: t.id,
+        league_id: leagueId,
+        owner_id: t.owner_id ?? null,
+        team_name: t.team_name,
+        created_at: '',
+        updated_at: '',
+      }));
+      // initializeDraftOrder ignores its userId arg server-side and
+      // start_draft_v2 authorizes via the JWT; myUserId is passed for
+      // signature compatibility only.
+      const { error: initError } = await DraftService.initializeDraftOrder(
+        leagueId,
+        myUserId,
+        mappedTeams,
+        league.draft_rounds || 14,
+        true,
+        undefined,
+        draftType,
+      );
+      if (initError) {
+        toast.error('Failed to initialize draft', {
+          description: (initError as { message?: string })?.message ?? 'Please try again.',
+        });
+        return;
+      }
+      const idempotencyKey =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${leagueId}-${Date.now()}`;
+      await draftV2Api.startDraftV2(leagueId, idempotencyKey);
+      // Live WS receives draft_started; this panel unmounts on the next
+      // derivation — no navigate, we are already in /draft-v2.
+      toast.success('Draft started — good luck!');
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string } }; message?: string };
+      toast.error('Cannot start draft', {
+        description: e?.response?.data?.error ?? e?.message ?? 'Please try again.',
+      });
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  return (
+    <Card className="p-5 mb-4 border-2 border-pastel-sage/40" data-testid="draft-lobby-v2">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-lg font-bold">Draft Lobby</h2>
+          <p className="text-sm text-muted-foreground">
+            {joinedHumans.length} of {teams.length} team{teams.length === 1 ? '' : 's'} joined
+            {isCommissioner
+              ? ' · start when everyone is in'
+              : ' · waiting for the commissioner to start'}
+          </p>
+        </div>
+        {isCommissioner && (
+          <Button
+            onClick={handleStart}
+            disabled={isStarting || !roomFull}
+            data-testid="draft-lobby-v2-start"
+            size="lg"
+          >
+            {isStarting ? "Starting…" : "Start Draft"}
+          </Button>
+        )}
+      </div>
+      {leagueError && (
+        <div
+          className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2"
+          data-testid="draft-lobby-v2-error"
+        >
+          <p className="text-sm text-destructive">{leagueError}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setLeagueFetchNonce((n) => n + 1)}
+            data-testid="draft-lobby-v2-retry"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+      <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {teams.map((t) => (
+          <div
+            key={t.id}
+            className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${t.owner_id ? 'bg-green-500' : 'bg-muted-foreground/40'}`}
+            />
+            <span className="truncate font-medium">{t.team_name}</span>
+          </div>
+        ))}
+      </div>
+      {isCommissioner && startBlockedReason && (
+        <p className="mt-3 text-xs text-muted-foreground" data-testid="draft-lobby-v2-blocked">
+          {startBlockedReason}
+        </p>
+      )}
+    </Card>
+  );
 }
 
 function StickyHeader({ onRetryNow, clockOffsetMs }: StickyHeaderProps) {
