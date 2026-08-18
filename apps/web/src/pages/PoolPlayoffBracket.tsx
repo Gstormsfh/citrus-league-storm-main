@@ -99,7 +99,7 @@ export default function PoolPlayoffBracket() {
     const fetchLive = async () => {
       try {
         const today = new Date().toISOString().slice(0, 10);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const { data } = await (supabase as any)
           .from('nhl_games')
           .select('game_id, home_team, away_team, home_score, away_score, status, period, period_time, series_game_number')

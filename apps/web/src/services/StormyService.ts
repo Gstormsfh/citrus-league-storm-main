@@ -418,7 +418,7 @@ class StormyServiceImpl {
         // These exist in the DB but were never flowing to Stormy. Querying
         // them in parallel with the main player fetch keeps the latency cost
         // close to zero. Best-effort — failures here don't block context.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const sb = supabase as unknown as any;
         const talentPromise = (async () => {
           try {
@@ -704,7 +704,7 @@ class StormyServiceImpl {
     const ctx: Partial<StormyContext> = {};
     // Supabase generated types don't cover the playoff tables yet — use a
     // type-relaxed client for these queries so we don't fight TypeScript.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const sb = supabase as unknown as any;
 
     type SeriesRow = {
