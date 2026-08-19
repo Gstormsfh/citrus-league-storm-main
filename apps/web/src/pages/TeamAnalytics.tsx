@@ -432,7 +432,7 @@ const TeamAnalytics = () => {
                   <Card className="px-5 py-3 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]">
                     <div className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold">Team Rating</div>
                     <div className="font-calistoga text-3xl text-pastel-cream mt-1 leading-none tabular-nums">
-                      92.4 <span className="text-sm font-normal text-white/40 align-middle">/ 100</span>
+                      92.4 <span className="text-sm font-normal text-white/55 align-middle">/ 100</span>
                     </div>
                   </Card>
                 </div>

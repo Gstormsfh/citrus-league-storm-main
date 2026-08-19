@@ -5073,7 +5073,7 @@ const Matchup = () => {
             <span className="text-[10px] font-jbmono font-bold text-white/55 uppercase tracking-wider">
               {currentMatchup ? `Wk ${selectedWeek}` : 'VS'}
             </span>
-            <span className="text-xs text-white/40 font-bold">—</span>
+            <span className="text-xs text-white/55 font-bold">—</span>
           </div>
           {/* Opponent score + menu */}
           <div className="flex items-center gap-1 min-w-0 flex-1 justify-end">

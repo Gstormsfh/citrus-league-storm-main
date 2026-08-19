@@ -184,7 +184,7 @@ const ArmchairGM = () => {
                       <RosterLineupView data={teamCapData} />
 
                       <div className="text-center py-4">
-                        <p className="text-xs text-white/40">
+                        <p className="text-xs text-white/55">
                           Contract data is based on publicly available information and may not reflect the most recent transactions.
                           <br />
                           Salary cap for 2025-26: {formatCap(SALARY_CAP_2025_26)} · Roster data from NHL.com

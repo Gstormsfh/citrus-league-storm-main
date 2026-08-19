@@ -143,7 +143,7 @@ function Ring({ value, size, category, label, isLowSample, isLoading, showValue 
           style={{ width: size, height: size }}
         />
         {label && (
-          <div className="font-jbmono uppercase tracking-[0.22em] text-[9px] font-bold text-white/30 h-3 w-8 bg-white/10 rounded animate-pulse" />
+          <div className="font-jbmono uppercase tracking-[0.22em] text-[9px] font-bold text-white/55 h-3 w-8 bg-white/10 rounded animate-pulse" />
         )}
       </div>
     );
@@ -277,7 +277,7 @@ export function PercentileRingCluster({
       {caption && (
         <div
           id={`${clusterId}-caption`}
-          className="font-jbmono uppercase tracking-[0.22em] text-[9px] sm:text-[10px] font-bold text-white/45 text-center"
+          className="font-jbmono uppercase tracking-[0.22em] text-[9px] sm:text-[10px] font-bold text-white/55 text-center"
         >
           {caption}
         </div>

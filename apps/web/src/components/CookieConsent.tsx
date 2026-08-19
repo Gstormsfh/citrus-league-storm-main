@@ -27,7 +27,11 @@ export function CookieConsent() {
         <p className="flex-1 text-gray-700">
           We use analytics cookies to improve your experience. You can opt out anytime.
         </p>
-        <div className="flex gap-2 shrink-0">
+        {/* 2026-08-19: this banner is one of the few LIGHT surfaces left
+            (bg-white/95). The shared outline/ghost button variants now
+            carry cream text for the dark app, so they need an explicit
+            dark label here or they vanish into the white banner. */}
+        <div className="flex gap-2 shrink-0 [&_button]:text-[#0F1F15]">
           <Button size="sm" variant="outline" onClick={decline}>
             Decline
           </Button>

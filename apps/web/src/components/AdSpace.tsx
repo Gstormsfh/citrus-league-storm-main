@@ -3,6 +3,14 @@ import { Card } from '@/components/ui/card';
 import { CitrusSlice, CitrusSparkle, CitrusLeaf, CitrusWedge } from '@/components/icons/CitrusIcons';
 import { cn } from '@/lib/utils';
 
+/* 2026-08-19 visual audit — muted-text correction.
+   text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
+   original CREAM theme. At 20-70% opacity on the dark #1A2A20 tiles it
+   composites to near-invisible (team codes on this page measured
+   1.47:1). Remapped to cream at the alpha that preserves the intended
+   hierarchy while clearing 4.5:1 on a dark tile. */
+
+
 // AdSense publisher ID (public - embedded in page HTML)
 const ADSENSE_PUB_ID = 'ca-pub-9217677881289656';
 const ADSENSE_DISABLED = import.meta.env.VITE_ADSENSE_ENABLED === 'false';
@@ -174,10 +182,10 @@ function AdSpacePlaceholder({
           <div className={cn(
             isHorizontal && "ml-4 text-left flex-1"
           )}>
-            <div className="font-varsity text-base text-citrus-forest uppercase tracking-wide mb-2">
+            <div className="font-varsity text-base text-pastel-cream uppercase tracking-wide mb-2">
               Citrus Fantasy
             </div>
-            <div className="font-display text-xs text-citrus-charcoal/70 mb-1">
+            <div className="font-display text-xs text-pastel-cream/75 mb-1">
               Built by hockey heads, for hockey heads
             </div>
           </div>

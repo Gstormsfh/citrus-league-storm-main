@@ -37,7 +37,7 @@ export function StormyHeroTile({ exchange }: { exchange: StormyExchange }) {
                 </span>
               </span>
             </div>
-            <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 font-bold">
+            <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 font-bold">
               Assistant GM · 31-Feature xG
             </div>
           </div>
@@ -48,7 +48,7 @@ export function StormyHeroTile({ exchange }: { exchange: StormyExchange }) {
           {/* User question */}
           <div className="flex justify-end">
             <div className="bg-white/5 rounded-2xl rounded-tr-sm px-4 py-3 max-w-[85%]">
-              <div className="font-jbmono text-[10px] tracking-wider uppercase text-white/45 font-bold mb-1">
+              <div className="font-jbmono text-[10px] tracking-wider uppercase text-white/55 font-bold mb-1">
                 YOU
               </div>
               <div className="text-[13px] text-pastel-cream leading-snug">{exchange.question}</div>
@@ -67,7 +67,7 @@ export function StormyHeroTile({ exchange }: { exchange: StormyExchange }) {
 
           {/* "Stormy is online" footer */}
           <div className="flex items-center justify-between pt-2 border-t border-white/5">
-            <span className="font-jbmono text-[10px] text-white/35 tracking-wider">
+            <span className="font-jbmono text-[10px] text-white/55 tracking-wider">
               Powered by your league data
             </span>
             <span className="font-jbmono text-[10px] text-pastel-orange-soft tracking-wider font-bold">

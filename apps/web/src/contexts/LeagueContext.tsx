@@ -300,12 +300,14 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   // league, which could silently flip the user off their chosen league.
   useEffect(() => {
     leagueLoadSucceeded.current = false;
-    loadUserLeagues().then(() => {
-      // If we got leagues, mark as succeeded
-      leagueLoadSucceeded.current = true;
-    }).catch(() => {
-      leagueLoadSucceeded.current = false;
-    });
+    // 2026-08-18 launch audit: this used to force
+    // `leagueLoadSucceeded.current = true` in .then(). loadUserLeagues
+    // catches every error internally and therefore ALWAYS resolves — so
+    // that line marked failed loads as successful and made the
+    // TOKEN_REFRESHED retry below permanently dead code. The function
+    // already sets the ref correctly on both paths (true on success,
+    // false on either failure branch); trust it rather than overwriting.
+    void loadUserLeagues();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadUserLeagues is not memoized; user?.id is the only meaningful trigger
   }, [user?.id]);
 
@@ -316,9 +318,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'TOKEN_REFRESHED' && user && !leagueLoadSucceeded.current) {
         logger.info('[LeagueContext] Token refreshed, retrying league load');
-        loadUserLeagues().then(() => {
-          leagueLoadSucceeded.current = true;
-        }).catch(() => {});
+        // Same fix as above — loadUserLeagues owns the ref on both paths.
+        void loadUserLeagues();
       }
     });
     return () => subscription.unsubscribe();

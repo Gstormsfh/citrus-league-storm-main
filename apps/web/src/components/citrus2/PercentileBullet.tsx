@@ -178,7 +178,7 @@ export function PercentileBullet({
             {label}
           </span>
           {context && (
-            <span className={cn('font-jbmono uppercase tracking-wider text-white/45 truncate', captionSize)}>
+            <span className={cn('font-jbmono uppercase tracking-wider text-white/55 truncate', captionSize)}>
               {context}
             </span>
           )}
@@ -207,7 +207,7 @@ export function PercentileBullet({
                   pct >= 75 ? 'text-pastel-orange-soft' :
                   pct >= 50 ? 'text-pastel-sage-soft' :
                   pct >= 25 ? 'text-white/55' :
-                              'text-white/45',
+                              'text-white/55',
                 )}
               >
                 {Math.round(pct)}{ordinalSuffix(Math.round(pct))}
@@ -216,7 +216,7 @@ export function PercentileBullet({
             {!hasPercentile && (
               <span
                 className={cn(
-                  'font-jbmono uppercase tracking-wider text-white/35',
+                  'font-jbmono uppercase tracking-wider text-white/55',
                   captionSize,
                 )}
               >

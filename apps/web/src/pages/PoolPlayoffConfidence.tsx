@@ -20,6 +20,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+// 2026-08-18 launch audit: every '/api/*' fetch on this page was
+// RELATIVE. That works on the web (Firebase Hosting rewrites /api/* to
+// Cloud Run) but the iOS Capacitor shell serves from capacitor://localhost
+// where no rewrite exists, so all of them failed as generic network
+// errors. The 2026-08-15 sweep that introduced API_BASE_URL missed this
+// file. Prefixed with API_BASE_URL, matching PoolPlayoffRoster.tsx.
+import { API_BASE_URL } from '@/api/client';
 
 interface Seed {
   team_id: number;
@@ -102,11 +109,11 @@ export default function PoolPlayoffConfidence() {
     const load = async () => {
       try {
         const [bracketRes, picksRes, h2hRes] = await Promise.all([
-          fetch('/api/nhl-playoffs/bracket?season=2025').then(r => r.json()),
-          fetch(`/api/playoff-pools/${leagueId}/picks?type=confidence`, {
+          fetch(`${API_BASE_URL}/api/nhl-playoffs/bracket?season=2025`).then(r => r.json()),
+          fetch(`${API_BASE_URL}/api/playoff-pools/${leagueId}/picks?type=confidence`, {
             headers: { Authorization: `Bearer ${(await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session?.access_token || ''}` },
           }).then(r => r.json()),
-          fetch('/api/nhl-playoffs/h2h?season=2025').then(r => r.json()).catch(() => null),
+          fetch(`${API_BASE_URL}/api/nhl-playoffs/h2h?season=2025`).then(r => r.json()).catch(() => null),
         ]);
         setSeeds(bracketRes.data?.seeds || bracketRes.seeds || []);
         setSeries(bracketRes.data?.series || bracketRes.series || []);
@@ -166,7 +173,7 @@ export default function PoolPlayoffConfidence() {
     setSaving(true);
     try {
       const session = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session;
-      const res = await fetch('/api/playoff-pools/confidence/picks', {
+      const res = await fetch(`${API_BASE_URL}/api/playoff-pools/confidence/picks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({ leagueId, picks: validPicks }),
@@ -222,7 +229,7 @@ export default function PoolPlayoffConfidence() {
         {/* Available confidence bank */}
         {availableValues.length > 0 && (
           <Card className="mb-4 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl p-3 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.2)]">
-            <div className="text-[10px] font-display font-bold uppercase text-white/70/50 mb-2">Available Confidence Points</div>
+            <div className="text-[10px] font-display font-bold uppercase text-white/50 mb-2">Available Confidence Points</div>
             <div className="flex flex-wrap gap-1.5">
               {availableValues.map(v => (
                 <div key={v} className="w-8 h-8 rounded-full bg-pastel-orange/15 ring-1 ring-pastel-orange/40 flex items-center justify-center text-xs font-bold text-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)]">
@@ -356,11 +363,11 @@ export default function PoolPlayoffConfidence() {
                               <span className="font-semibold" style={highInfo ? { color: highInfo.primaryColor } : undefined}>
                                 {high.team_abbrev} {h2hMap[s.bracket_slot].high_wins}
                               </span>
-                              <span className="text-white/70/40">—</span>
+                              <span className="text-white/55">—</span>
                               <span className="font-semibold" style={lowInfo ? { color: lowInfo.primaryColor } : undefined}>
                                 {h2hMap[s.bracket_slot].low_wins} {low.team_abbrev}
                               </span>
-                              <span className="text-white/70/40">({h2hMap[s.bracket_slot].games} games)</span>
+                              <span className="text-white/55">({h2hMap[s.bracket_slot].games} games)</span>
                             </div>
                           );
                         })()}
@@ -368,7 +375,7 @@ export default function PoolPlayoffConfidence() {
                         {/* Confidence selector */}
                         {pick?.picked_team_id && !locked && (
                           <div>
-                            <div className="text-[10px] font-display text-white/70/50 mb-1">Confidence:</div>
+                            <div className="text-[10px] font-display text-white/50 mb-1">Confidence:</div>
                             <div className="flex flex-wrap gap-1">
                               {Array.from({ length: totalSeries }, (_, i) => i + 1).map(v => {
                                 const isUsedElsewhere = usedValues.has(v) && pick.confidence_value !== v;
@@ -383,7 +390,7 @@ export default function PoolPlayoffConfidence() {
                                       isSelected
                                         ? 'bg-pastel-orange text-[#581E00] ring-2 ring-pastel-orange/60 scale-110 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]'
                                         : isUsedElsewhere
-                                          ? 'bg-white/5 ring-1 ring-white/10 text-white/30 cursor-not-allowed'
+                                          ? 'bg-white/5 ring-1 ring-white/10 text-white/55 cursor-not-allowed'
                                           : 'bg-white/5 ring-1 ring-white/10 text-white/55 hover:ring-pastel-orange/40 hover:text-pastel-cream'
                                     )}
                                   >
@@ -410,14 +417,14 @@ export default function PoolPlayoffConfidence() {
 
         {series.length === 0 && (
           <Card className="p-8 text-center">
-            <AlertTriangle className="h-8 w-8 text-white/70/30 mx-auto mb-2" aria-hidden="true" />
+            <AlertTriangle className="h-8 w-8 text-white/55 mx-auto mb-2" aria-hidden="true" />
             <p className="text-white/55 text-sm">Bracket not yet set. Picks open once playoff seeds are finalized.</p>
           </Card>
         )}
 
         {/* How it works */}
         <Card className="mt-6 bg-[#1A2A20] border-0 ring-1 ring-pastel-sage/30 rounded-2xl px-4 py-3 shadow-[0_8px_24px_-12px_rgba(166,211,160,0.15)]">
-          <div className="text-[10px] font-display font-bold uppercase text-white/70/50 mb-1">How Confidence Pools Work</div>
+          <div className="text-[10px] font-display font-bold uppercase text-white/50 mb-1">How Confidence Pools Work</div>
           <ul className="text-[11px] text-white/70 space-y-0.5 list-disc pl-3">
             <li>Pick the winner of each playoff series</li>
             <li>Assign a confidence value (1-{totalSeries}) to each pick — each value used exactly once</li>

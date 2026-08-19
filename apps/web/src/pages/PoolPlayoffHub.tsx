@@ -27,6 +27,13 @@ import { NHL_TEAMS } from '@/types/captracker';
 import { ScoringCalculator, type ScoringSettings } from '@/utils/scoringUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+// 2026-08-18 launch audit: every '/api/*' fetch on this page was
+// RELATIVE. That works on the web (Firebase Hosting rewrites /api/* to
+// Cloud Run) but the iOS Capacitor shell serves from capacitor://localhost
+// where no rewrite exists, so all of them failed as generic network
+// errors. The 2026-08-15 sweep that introduced API_BASE_URL missed this
+// file. Prefixed with API_BASE_URL, matching PoolPlayoffRoster.tsx.
+import { API_BASE_URL } from '@/api/client';
 
 interface Team {
   id: string;
@@ -129,9 +136,9 @@ export default function PoolPlayoffHub() {
         const session = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session;
         const headers: Record<string, string> = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
         const [leagueRes, teamsRes, bracketRes] = await Promise.all([
-          fetch(`/api/leagues/${leagueId}`, { headers }).then(r => r.json()).catch(() => null),
-          fetch(`/api/leagues/${leagueId}/teams`, { headers }).then(r => r.json()).catch(() => null),
-          fetch('/api/nhl-playoffs/bracket?season=2025').then(r => r.json()).catch(() => null),
+          fetch(`${API_BASE_URL}/api/leagues/${leagueId}`, { headers }).then(r => r.json()).catch(() => null),
+          fetch(`${API_BASE_URL}/api/leagues/${leagueId}/teams`, { headers }).then(r => r.json()).catch(() => null),
+          fetch(`${API_BASE_URL}/api/nhl-playoffs/bracket?season=2025`).then(r => r.json()).catch(() => null),
         ]);
         const leagueData = leagueRes?.data || leagueRes;
         setLeague(leagueData);
@@ -144,7 +151,7 @@ export default function PoolPlayoffHub() {
                       : lgType === 'playoff-confidence-pool' ? 'confidence'
                       : lgType === 'playoff-roster-pool' ? 'roster' : null;
         if (pickType && session?.access_token) {
-          const picksRes = await fetch(`/api/playoff-pools/${leagueId}/picks?type=${pickType}`, { headers }).then(r => r.json()).catch(() => null);
+          const picksRes = await fetch(`${API_BASE_URL}/api/playoff-pools/${leagueId}/picks?type=${pickType}`, { headers }).then(r => r.json()).catch(() => null);
           const rawPicks = picksRes?.data?.picks || picksRes?.picks || [];
           const myPicks = Array.isArray(rawPicks) ? rawPicks.filter((p: { user_id: string }) => p.user_id === session.user?.id) : [];
           setUserPicks(myPicks);
@@ -188,7 +195,7 @@ export default function PoolPlayoffHub() {
             const headers: Record<string, string> = session?.access_token
               ? { Authorization: `Bearer ${session.access_token}` }
               : {};
-            const picksRes = await fetch(`/api/playoff-pools/${leagueId}/picks?type=roster`, { headers })
+            const picksRes = await fetch(`${API_BASE_URL}/api/playoff-pools/${leagueId}/picks?type=roster`, { headers })
               .then(r => r.json())
               .catch(() => null);
             const rawPicks = picksRes?.data?.picks || picksRes?.picks || [];
@@ -223,7 +230,7 @@ export default function PoolPlayoffHub() {
           ? { Authorization: `Bearer ${session.access_token}` }
           : {};
         const [playersRes, statsRes] = await Promise.all([
-          fetch('/api/players?limit=1000', { headers: restHeaders })
+          fetch(`${API_BASE_URL}/api/players?limit=1000`, { headers: restHeaders })
             .then(r => r.json())
             .catch((): { data?: unknown } => ({ data: [] })),
           sb.from('player_playoff_stats').select('*').in('player_id', playerIds),
@@ -556,7 +563,7 @@ export default function PoolPlayoffHub() {
                               'relative rounded-xl border-2 overflow-hidden bg-white transition-all',
                               isLive && 'border-red-400 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]',
                               isFinal && 'border-pastel-sage/30',
-                              !isLive && !isFinal && 'border-pastel-sage/40/20'
+                              !isLive && !isFinal && 'border-pastel-sage/20'
                             )}>
                               {/* Team-colored header with score */}
                               <div className="relative">
@@ -618,7 +625,7 @@ export default function PoolPlayoffHub() {
 
                               {/* Your players in this game */}
                               <div className="p-3 space-y-1.5">
-                                <div className="flex items-center justify-between mb-1 pb-1 border-b border-pastel-sage/40/10">
+                                <div className="flex items-center justify-between mb-1 pb-1 border-b border-pastel-sage/10">
                                   <span className="text-[10px] uppercase font-display font-bold text-white/50 tracking-wider">
                                     Your Players ({g.myPlayers.length})
                                   </span>
@@ -655,7 +662,7 @@ export default function PoolPlayoffHub() {
                                           </span>
                                         </div>
                                       ) : (
-                                        <span className="text-[10px] text-white/70/40 italic flex-shrink-0">Not started</span>
+                                        <span className="text-[10px] text-white/55 italic flex-shrink-0">Not started</span>
                                       )}
                                     </div>
                                   );
@@ -741,11 +748,11 @@ export default function PoolPlayoffHub() {
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-1.5 text-sm font-display font-bold text-pastel-cream">
                                   <span className={cn(myPickAbbrev === g.away_team && 'underline decoration-pastel-orange decoration-2 underline-offset-4')}>{g.away_team}</span>
-                                  <span className="text-white/70/40">@</span>
+                                  <span className="text-white/55">@</span>
                                   <span className={cn(myPickAbbrev === g.home_team && 'underline decoration-pastel-orange decoration-2 underline-offset-4')}>{g.home_team}</span>
                                 </div>
                                 {g.series_game_number && (
-                                  <Badge variant="outline" className="text-[9px] border-pastel-sage/40/40">Game {g.series_game_number}</Badge>
+                                  <Badge variant="outline" className="text-[9px] border-pastel-sage/40">Game {g.series_game_number}</Badge>
                                 )}
                               </div>
                               <div className="flex items-center justify-between">
@@ -762,7 +769,7 @@ export default function PoolPlayoffHub() {
                                     'text-[9px] px-1.5 py-0',
                                     isLive && 'border-red-600 bg-red-600 text-white animate-pulse',
                                     isFinal && 'ring-1 ring-white/10 bg-white/5',
-                                    !isLive && !isFinal && 'border-pastel-sage/40/50',
+                                    !isLive && !isFinal && 'border-pastel-sage/50',
                                   )}
                                 >
                                   {gameStatusLabel(g)}
@@ -830,13 +837,13 @@ export default function PoolPlayoffHub() {
                                 </div>
                                 {isCorrect && <Check className="h-4 w-4 text-green-500 flex-shrink-0" aria-hidden="true" />}
                                 {isFinal && pick.points_earned != null && (
-                                  <span className={cn('text-xs font-bold flex-shrink-0', isCorrect ? 'text-green-600' : 'text-white/70/40')}>
+                                  <span className={cn('text-xs font-bold flex-shrink-0', isCorrect ? 'text-green-600' : 'text-white/55')}>
                                     +{pick.points_earned}
                                   </span>
                                 )}
                               </>
                             ) : (
-                              <span className="text-[11px] text-white/70/40 italic flex-1">No pick yet</span>
+                              <span className="text-[11px] text-white/55 italic flex-1">No pick yet</span>
                             )}
                           </div>
                         );
@@ -888,7 +895,7 @@ export default function PoolPlayoffHub() {
                                 <tr
                                   key={t.id}
                                   className={cn(
-                                    'border-b border-pastel-sage/40/10 last:border-b-0',
+                                    'border-b border-pastel-sage/10 last:border-b-0',
                                     isMe && 'bg-pastel-sage/8 ring-1 ring-pastel-sage/20',
                                     isRosterPool && 'cursor-pointer hover:bg-pastel-orange/10 transition-colors',
                                   )}
@@ -916,7 +923,7 @@ export default function PoolPlayoffHub() {
                                   </td>
                                   {isRosterPool && (
                                     <td className="px-3 py-2 text-right">
-                                      <Eye className="h-4 w-4 text-white/70/30 inline" />
+                                      <Eye className="h-4 w-4 text-white/55 inline" />
                                     </td>
                                   )}
                                 </tr>

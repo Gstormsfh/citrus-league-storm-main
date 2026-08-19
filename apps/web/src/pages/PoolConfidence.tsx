@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
@@ -79,7 +80,19 @@ const PoolConfidence = () => {
   const [existingPicks, setExistingPicks] = useState<ConfidencePick[]>([]);
   const [standings, setStandings] = useState<ConfidenceStanding[]>([]);
   const [records, setRecords] = useState<Record<string, { w: number; l: number; otl: number; streak?: string }>>({});
-  const [activeTab, setActiveTab] = useState('picks');
+  // 2026-08-18 launch audit: getPoolRoute() has always appended a
+  // `?tab=` param (Navbar, MobileBottomNav, GMOffice all pass one), but
+  // none of the pool pages ever read it — the tab was pure local state.
+  // Every "Standings" / "Pick History" link therefore landed on the
+  // default Picks tab. Worst case: Standings.tsx redirects pool users to
+  // getPoolRoute(..., 'standings'), so pool standings were unreachable
+  // from /standings entirely. Read and validate the param.
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = searchParams.get('tab');
+    const allowed = ['picks', 'standings', 'league'];
+    return requested && allowed.includes(requested) ? requested : 'picks';
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -198,7 +211,7 @@ const PoolConfidence = () => {
                   <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </Button>
                 <div className="px-3 text-center border-x border-white/10">
-                  <div className="text-[9px] font-jbmono text-white/45 uppercase tracking-widest leading-none">Week</div>
+                  <div className="text-[9px] font-jbmono text-white/55 uppercase tracking-widest leading-none">Week</div>
                   <div className="text-base font-bold text-pastel-cream leading-none tabular-nums">{currentWeek}</div>
                 </div>
                 <Button variant="ghost" size="icon" aria-label="Next week" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
@@ -246,7 +259,7 @@ const PoolConfidence = () => {
                         <Calendar className="w-3.5 h-3.5 text-pastel-orange-soft" aria-hidden="true" />
                         <span className="text-xs font-jbmono font-bold text-pastel-orange-soft uppercase tracking-[0.22em]">{formatDateHeader(dateKey)}</span>
                         <div className="flex-1 h-px bg-white/10" />
-                        <span className="text-[10px] font-jbmono text-white/35 tabular-nums">{dateGames.length} games</span>
+                        <span className="text-[10px] font-jbmono text-white/55 tabular-nums">{dateGames.length} games</span>
                       </div>
 
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -270,7 +283,7 @@ const PoolConfidence = () => {
                             }`}>
                               {/* Status bar with confidence */}
                               <div className={`flex items-center justify-between px-3 py-1.5 text-[10px] font-jbmono font-bold uppercase tracking-wider ${
-                                isFinal ? 'bg-black/40 text-white/55' : isLive ? 'bg-pastel-orange/20 text-pastel-orange-soft' : locked ? 'bg-white/5 text-white/45' : 'bg-black/20 text-white/55'
+                                isFinal ? 'bg-black/40 text-white/55' : isLive ? 'bg-pastel-orange/20 text-pastel-orange-soft' : locked ? 'bg-white/5 text-white/55' : 'bg-black/20 text-white/55'
                               }`}>
                                 <span>
                                   {isFinal ? 'Final' : isLive ? (
@@ -314,7 +327,7 @@ const PoolConfidence = () => {
                                   <TeamMonogram abbrev={game.away_team} size={34} />
                                   <span className="font-bold text-xs uppercase" style={{ color: awayInfo.primaryColor }}>{awayInfo.name}</span>
                                   {records[game.away_team] && (
-                                    <span className={`text-[10px] font-jbmono tabular-nums ${records[game.away_team].w > records[game.away_team].l ? 'text-pastel-sage-soft' : 'text-white/45'}`}>
+                                    <span className={`text-[10px] font-jbmono tabular-nums ${records[game.away_team].w > records[game.away_team].l ? 'text-pastel-sage-soft' : 'text-white/55'}`}>
                                       {records[game.away_team].w}-{records[game.away_team].l}-{records[game.away_team].otl}
                                     </span>
                                   )}
@@ -327,7 +340,7 @@ const PoolConfidence = () => {
                                   {pick && pick.picked_team !== game.away_team && !isFinal && <div className="absolute inset-0 bg-black/40 pointer-events-none" />}
                                 </button>
 
-                                <div className="flex items-center justify-center w-8 bg-black/20 text-[10px] text-white/30 font-bold shrink-0">@</div>
+                                <div className="flex items-center justify-center w-8 bg-black/20 text-[10px] text-white/55 font-bold shrink-0">@</div>
 
                                 <button
                                   className={`flex-1 flex flex-col items-center gap-1.5 py-3.5 px-2 transition-all relative ${locked ? 'cursor-default' : 'cursor-pointer'} ${isFinal && !homeWon ? 'opacity-40' : ''}`}
@@ -337,7 +350,7 @@ const PoolConfidence = () => {
                                   <TeamMonogram abbrev={game.home_team} size={34} />
                                   <span className="font-bold text-xs uppercase" style={{ color: homeInfo.primaryColor }}>{homeInfo.name}</span>
                                   {records[game.home_team] && (
-                                    <span className={`text-[10px] font-jbmono tabular-nums ${records[game.home_team].w > records[game.home_team].l ? 'text-pastel-sage-soft' : 'text-white/45'}`}>
+                                    <span className={`text-[10px] font-jbmono tabular-nums ${records[game.home_team].w > records[game.home_team].l ? 'text-pastel-sage-soft' : 'text-white/55'}`}>
                                       {records[game.home_team].w}-{records[game.home_team].l}-{records[game.home_team].otl}
                                     </span>
                                   )}
@@ -405,7 +418,7 @@ const PoolConfidence = () => {
                                 i === 0 ? 'bg-pastel-orange text-[#581E00]' :
                                 i === 1 ? 'bg-white/20 text-pastel-cream' :
                                 i === 2 ? 'bg-pastel-orange/40 text-white' :
-                                'text-white/45'
+                                'text-white/55'
                               }`}>{i + 1}</span>
                             </TableCell>
                             <TableCell className="font-bold text-pastel-cream">

@@ -121,7 +121,7 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
   return (
     <div className={cn("space-y-6", className)}>
       <div className="flex items-center justify-between mb-1">
-        <h2 className="text-lg font-varsity font-black flex items-center gap-2 text-citrus-forest uppercase tracking-tight">
+        <h2 className="text-lg font-varsity font-black flex items-center gap-2 text-pastel-cream uppercase tracking-tight">
           <CitrusSparkle className="w-5 h-5 text-citrus-orange" />
           Starting Lineup
         </h2>

@@ -11,6 +11,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { StormyChatBubble } from "./components/StormyChatBubble";
 import MobileBottomNav from "./components/MobileBottomNav";
+import { LeagueLoadErrorBanner } from "./components/LeagueLoadErrorBanner";
 import { CookieConsent } from "./components/CookieConsent";
 import ScrollToTop from "./components/ScrollToTop";
 import PushDeepLink from "./components/PushDeepLink";
@@ -177,6 +178,11 @@ const App = () => {
               <ScrollToTop />
               <PushDeepLink />
               <LeagueProvider>
+                {/* Consumes LeagueContext.error, which nothing rendered
+                    until the 2026-08-18 audit — a failed league load
+                    silently became "you have no leagues, create one".
+                    Mounted here so every page inherits it. */}
+                <LeagueLoadErrorBanner />
                 <Suspense fallback={<PageLoader />}>
                   <main id="main-content">
                   <Routes>

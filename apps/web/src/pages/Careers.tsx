@@ -41,7 +41,7 @@ export default function Careers() {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-sans font-bold text-[16px] text-pastel-cream mb-1">{job.title}</h3>
-                <div className="flex items-center gap-2 font-jbmono text-[10px] tracking-wider uppercase text-white/45">
+                <div className="flex items-center gap-2 font-jbmono text-[10px] tracking-wider uppercase text-white/55">
                   <span>{job.department}</span>
                   <span className="text-white/20">·</span>
                   <span>{job.location}</span>

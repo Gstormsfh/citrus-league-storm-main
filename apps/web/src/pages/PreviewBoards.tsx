@@ -128,7 +128,7 @@ export default function PreviewBoards() {
               <div className="font-jbmono text-[11px] tracking-wider uppercase text-pastel-cream font-bold">
                 47,000+ MANAGERS
               </div>
-              <div className="font-jbmono text-[10px] text-white/45">
+              <div className="font-jbmono text-[10px] text-white/55">
                 drafting on Citrus this season
               </div>
             </div>

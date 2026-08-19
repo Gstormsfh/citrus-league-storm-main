@@ -5,6 +5,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { CitrusSlice } from '@/components/icons/CitrusIcons';
 
+/* 2026-08-19 visual audit — muted-text correction.
+   text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
+   original CREAM theme. At 20-70% opacity on the dark #1A2A20 tiles it
+   composites to near-invisible (team codes on this page measured
+   1.47:1). Remapped to cream at the alpha that preserves the intended
+   hierarchy while clearing 4.5:1 on a dark tile. */
+
+
 interface NavItem {
   path: string;
   label: string;
@@ -116,7 +124,7 @@ const MobileBottomNav = () => {
                   <Icon 
                     className={cn(
                       "w-5 h-5 transition-colors duration-200",
-                      active ? "text-[#E8EED9]" : "text-citrus-charcoal/70"
+                      active ? "text-[#E8EED9]" : "text-pastel-cream/75"
                     )} 
                   />
                   
@@ -129,7 +137,7 @@ const MobileBottomNav = () => {
                 {/* Label */}
                 <span className={cn(
                   "text-[10px] font-display font-semibold tracking-tight transition-colors duration-200",
-                  active ? "text-citrus-forest" : "text-citrus-charcoal/60"
+                  active ? "text-pastel-cream" : "text-pastel-cream/70"
                 )}>
                   {item.label}
                 </span>

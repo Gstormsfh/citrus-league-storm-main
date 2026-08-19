@@ -6,6 +6,24 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { TrendingUp, TrendingDown, Users, FileText, AlertTriangle, Shield, X } from 'lucide-react';
 import { useIsMobile } from '@/components/mobile/AppShell';
 
+/* 2026-08-19 visual audit — muted-text correction.
+   text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
+   original CREAM theme. At 20-70% opacity on the dark #1A2A20 tiles it
+   composites to near-invisible (team codes on this page measured
+   1.47:1). Remapped to cream at the alpha that preserves the intended
+   hierarchy while clearing 4.5:1 on a dark tile. */
+
+
+/* 2026-08-19 visual audit — surface correction.
+   These panels used bg-white/55..80 ("frosted glass") on the #0F1F15
+   dark page. Composited, that lands around rgb(159,165,161) — a MID-GREY
+   dead zone where nothing reads: cream text measured 2.37:1 and the dark
+   labels 1.58:1 against it. There is no text colour that fixes a
+   mid-grey surface; the surface itself is the bug. Swapped to the dark
+   tile family the rest of the app uses (ui/card.tsx is
+   bg-pastel-surface-tile + ring-white/10), so cream text lands at 13:1. */
+
+
 interface CapSummaryBarProps {
   data: TeamCapData;
 }
@@ -18,7 +36,7 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
   const [capPopoverOpen, setCapPopoverOpen] = useState(false);
 
   return (
-    <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
+    <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
       {/* Team Header */}
       <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-sage/20 border-b-2 border-citrus-sage/30">
         <div className="flex items-center gap-3 sm:gap-4">
@@ -28,18 +46,18 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
             className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 object-contain drop-shadow-md"
           />
           <div className="flex-1 min-w-0">
-            <h2 className="font-varsity text-lg sm:text-xl md:text-2xl text-citrus-forest tracking-tight truncate">
+            <h2 className="font-varsity text-lg sm:text-xl md:text-2xl text-pastel-cream tracking-tight truncate">
               {data.teamName}
             </h2>
-            <p className="text-[10px] sm:text-xs text-citrus-charcoal/60 font-display">
+            <p className="text-[10px] sm:text-xs text-pastel-cream/70 font-display">
               {data.conference} &middot; {data.division}
             </p>
           </div>
           <div className="hidden md:block text-right">
-            <div className="text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">
+            <div className="text-[10px] text-pastel-cream/65 uppercase font-display font-bold tracking-wider">
               2025-26 Cap
             </div>
-            <div className="font-varsity text-lg text-citrus-charcoal">
+            <div className="font-varsity text-lg text-pastel-cream/85">
               {formatCap(SALARY_CAP_2025_26)}
             </div>
           </div>
@@ -51,15 +69,15 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
         {/* Numbers Row */}
         <div className="flex items-end justify-between mb-2">
           <div>
-            <div className="text-[9px] sm:text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">
+            <div className="text-[9px] sm:text-[10px] text-pastel-cream/65 uppercase font-display font-bold tracking-wider">
               Projected Cap Hit
             </div>
-            <div className="font-varsity text-base sm:text-lg md:text-xl text-citrus-forest">
+            <div className="font-varsity text-base sm:text-lg md:text-xl text-pastel-cream">
               {formatCapFull(data.projectedCapHit)}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[9px] sm:text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">
+            <div className="text-[9px] sm:text-[10px] text-pastel-cream/65 uppercase font-display font-bold tracking-wider">
               Cap Space
             </div>
             <div className={cn(
@@ -100,7 +118,7 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className={cn(
                   "font-varsity text-[10px] md:text-xs font-bold tracking-wider drop-shadow-sm",
-                  capUsedPercent > 50 ? "text-white" : "text-citrus-forest"
+                  capUsedPercent > 50 ? "text-white" : "text-pastel-cream"
                 )}>
                   {capUsedPercent.toFixed(1)}% USED
                 </span>
@@ -185,7 +203,7 @@ function QuickStat({
       "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border-2 transition-colors",
       warning
         ? "bg-red-50/50 border-red-200 text-red-700"
-        : "bg-citrus-sage/10 border-citrus-sage/30 text-citrus-forest"
+        : "bg-citrus-sage/10 border-citrus-sage/30 text-pastel-cream"
     )}>
       <div className={cn(
         "p-1 sm:p-1.5 rounded-lg flex-shrink-0",

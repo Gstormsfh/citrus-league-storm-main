@@ -24,7 +24,7 @@ export function StormyChatTile({
         {/* User question */}
         <div className="flex justify-end">
           <div className="bg-white/5 rounded-2xl rounded-tr-sm px-4 py-3 max-w-[85%]">
-            <div className="font-jbmono text-[10px] tracking-wider uppercase text-white/45 font-bold mb-1">
+            <div className="font-jbmono text-[10px] tracking-wider uppercase text-white/55 font-bold mb-1">
               YOU
             </div>
             <div className="text-[13px] text-pastel-cream leading-snug">{exchange.question}</div>

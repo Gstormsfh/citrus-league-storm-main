@@ -14,7 +14,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: cn(
-          "bg-citrus-sage text-citrus-forest border-citrus-sage-light rounded-[2rem]",
+          "bg-citrus-sage text-pastel-forest border-citrus-sage-light rounded-[2rem]",
           "shadow-[inset_0_2px_4px_rgba(0,0,0,0.05),0_3px_0_rgba(164,196,160,0.3)]",
           "hover:translate-y-[1px] hover:shadow-[inset_0_2px_4px_rgba(0,0,0,0.05),0_2px_0_rgba(164,196,160,0.3)] hover:bg-citrus-green-light"
         ),
@@ -23,24 +23,32 @@ const buttonVariants = cva(
           "shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)]",
           "hover:translate-y-[2px] hover:shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_2px_0_rgba(27,48,34,0.2)]"
         ),
+        // 2026-08-19 visual audit: text-citrus-forest (#4A5F4D) with
+        // bg-transparent puts dark green straight onto the #0F1F15 page.
+        // Outline buttons measured ~2.2:1 and read as disabled. The
+        // filled variants below (sage / peach fills) keep forest text —
+        // those fills ARE light, so dark text is correct there.
         outline: cn(
-          "bg-transparent text-citrus-forest border-citrus-sage rounded-[2rem]",
-          "hover:bg-citrus-sage/30 hover:translate-y-[1px] transition-all"
+          "bg-transparent text-pastel-cream border-citrus-sage rounded-[2rem]",
+          "hover:bg-citrus-sage/30 hover:text-pastel-cream hover:translate-y-[1px] transition-all"
         ),
         secondary: cn(
-          "bg-citrus-peach text-citrus-forest border-citrus-forest rounded-[2rem]",
+          "bg-citrus-peach text-pastel-forest border-citrus-forest rounded-[2rem]",
           "shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_4px_0_rgba(27,48,34,0.2)]",
           "hover:translate-y-[2px] hover:shadow-[inset_0_2px_4px_rgba(0,0,0,0.1),0_2px_0_rgba(27,48,34,0.2)]"
         ),
-        ghost: "border-0 hover:bg-citrus-sage/20 hover:text-citrus-forest rounded-xl text-citrus-forest font-display normal-case tracking-normal",
+        // Ghost has no fill at all — same dark-on-dark problem as outline.
+        ghost: "border-0 hover:bg-citrus-sage/20 rounded-xl text-pastel-cream font-display normal-case tracking-normal",
         link: "border-0 text-citrus-sage underline-offset-4 hover:underline font-display normal-case tracking-normal",
         varsity: cn(
-          "bg-citrus-sage text-citrus-forest border-citrus-sage-light rounded-[2rem] font-bold",
+          "bg-citrus-sage text-pastel-forest border-citrus-sage-light rounded-[2rem] font-bold",
           "shadow-[inset_0_2px_4px_rgba(0,0,0,0.05),0_3px_0_rgba(164,196,160,0.3)]",
           "hover:translate-y-[1px] hover:shadow-[inset_0_2px_4px_rgba(0,0,0,0.05),0_2px_0_rgba(164,196,160,0.3)] hover:bg-citrus-green-light"
         ),
+        // sage at 20% over a dark page composites to a DARK tint, so the
+        // label needs to be light — this is not a light fill.
         patch: cn(
-          "bg-citrus-sage/20 text-citrus-forest border-citrus-sage rounded-[2rem]",
+          "bg-citrus-sage/20 text-pastel-cream border-citrus-sage rounded-[2rem]",
           "shadow-sm",
           "hover:translate-y-0.5 hover:shadow transition-all"
         ),

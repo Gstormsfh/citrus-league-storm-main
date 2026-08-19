@@ -106,7 +106,7 @@ export function RotatingHero({
       </div>
 
       {/* Slide label */}
-      <div className="text-center mt-3 font-jbmono text-[10px] tracking-[0.32em] uppercase text-white/35">
+      <div className="text-center mt-3 font-jbmono text-[10px] tracking-[0.32em] uppercase text-white/55">
         {String(active + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')} · {slide.id}
       </div>
     </section>

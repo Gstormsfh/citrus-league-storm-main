@@ -79,12 +79,12 @@ const News = () => {
             </p>
           </div>
           <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/55" />
             <Input
               placeholder="Search news..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 rounded-md bg-pastel-surface-tile border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+              className="pl-9 rounded-md bg-pastel-surface-tile border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
             />
           </div>
         </div>
@@ -174,7 +174,7 @@ const News = () => {
                       {categoryIcons[featured.category]}
                       {featured.category.charAt(0).toUpperCase() + featured.category.slice(1)}
                     </Badge>
-                    <span className="text-xs text-white/45 flex items-center gap-1 font-jbmono">
+                    <span className="text-xs text-white/55 flex items-center gap-1 font-jbmono">
                       <Clock className="h-3 w-3" />
                       {formatDistanceToNow(new Date(featured.publishedAt), { addSuffix: true })}
                     </span>
@@ -226,7 +226,7 @@ const News = () => {
                         {categoryIcons[article.category]}
                         {article.category.charAt(0).toUpperCase() + article.category.slice(1)}
                       </Badge>
-                      <span className="text-[10px] text-white/45 flex items-center gap-1 font-jbmono">
+                      <span className="text-[10px] text-white/55 flex items-center gap-1 font-jbmono">
                         <Clock className="h-2.5 w-2.5" />
                         {formatDistanceToNow(new Date(article.publishedAt), { addSuffix: true })}
                       </span>

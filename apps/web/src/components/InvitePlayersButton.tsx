@@ -97,7 +97,7 @@ export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButto
   return (
     <div className="bg-white rounded-xl border border-citrus-sage/20 shadow-lg p-4 w-72">
       <div className="flex items-center justify-between mb-3">
-        <span className="font-display font-bold text-sm text-citrus-forest">Invite Players</span>
+        <span className="font-display font-bold text-sm text-pastel-cream">Invite Players</span>
         <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600">
           <X className="w-4 h-4" />
         </button>

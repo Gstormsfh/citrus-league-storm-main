@@ -30,26 +30,26 @@ export function LiveGameTile({ game }: { game: LiveGameData }) {
             </span>
           </span>
         ) : (
-          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 font-bold">
+          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 font-bold">
             {game.status ?? 'FINAL'}
           </span>
         )}
         {game.time && (
-          <span className="font-jbmono text-[10px] text-white/40 tabular-nums">{game.time}</span>
+          <span className="font-jbmono text-[10px] text-white/55 tabular-nums">{game.time}</span>
         )}
       </div>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <TeamChip abbrev={game.away} size="md" />
-          <div className="font-jbmono text-[9px] text-white/45 tracking-wider uppercase">Away</div>
+          <div className="font-jbmono text-[9px] text-white/55 tracking-wider uppercase">Away</div>
         </div>
         <div className="font-sans font-black text-[2.25rem] text-pastel-cream tabular-nums leading-none">
           {game.awayScore}
-          <span className="text-white/30 mx-1">·</span>
+          <span className="text-white/55 mx-1">·</span>
           {game.homeScore}
         </div>
         <div className="flex items-center gap-2">
-          <div className="font-jbmono text-[9px] text-white/45 tracking-wider uppercase">Home</div>
+          <div className="font-jbmono text-[9px] text-white/55 tracking-wider uppercase">Home</div>
           <TeamChip abbrev={game.home} size="md" />
         </div>
       </div>

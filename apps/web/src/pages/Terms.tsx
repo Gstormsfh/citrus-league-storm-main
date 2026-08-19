@@ -46,7 +46,7 @@ export default function Terms() {
         <h1 className="font-sans font-black text-[2.5rem] md:text-[3.25rem] leading-tight tracking-[-0.03em] text-pastel-cream mb-3">
           Terms of Service
         </h1>
-        <p className="font-jbmono text-[11px] tracking-wider uppercase text-white/45 mb-12">
+        <p className="font-jbmono text-[11px] tracking-wider uppercase text-white/55 mb-12">
           Last updated: November 26, 2025
         </p>
 

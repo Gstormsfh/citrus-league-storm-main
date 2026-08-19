@@ -198,7 +198,7 @@ function buildBandPath(points: NormalizedPoint[]): string {
 function SparklineEmpty({ text }: { text: string }) {
   return (
     <div className="absolute inset-0 grid place-items-center pointer-events-none">
-      <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] font-bold text-white/35">
+      <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] font-bold text-white/55">
         {text}
       </div>
     </div>
@@ -308,7 +308,7 @@ export function SparklineMicroChart({
       {/* Eyebrow row — caption only. Endpoint value moved into the chart area
           near the dot per iter #2 fix #5. */}
       {eyebrow && (
-        <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] sm:text-[11px] font-bold text-white/45 truncate mb-2">
+        <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] sm:text-[11px] font-bold text-white/55 truncate mb-2">
           {eyebrow}
         </div>
       )}
@@ -586,7 +586,7 @@ export function SparklineMicroChart({
                     {data[hoveredIdx].gameDate ?? `Game ${hoveredIdx + 1}`}
                   </span>
                   {data[hoveredIdx].opponent && (
-                    <span className="font-jbmono uppercase tracking-[0.18em] text-[9px] font-bold text-white/45">
+                    <span className="font-jbmono uppercase tracking-[0.18em] text-[9px] font-bold text-white/55">
                       vs {data[hoveredIdx].opponent}
                     </span>
                   )}
@@ -625,7 +625,7 @@ export function SparklineMicroChart({
                   {data[annotationIdx].gameDate && (
                     <>
                       <span>{data[annotationIdx].gameDate}</span>
-                      <span className="text-white/35">·</span>
+                      <span className="text-white/55">·</span>
                     </>
                   )}
                   <span>

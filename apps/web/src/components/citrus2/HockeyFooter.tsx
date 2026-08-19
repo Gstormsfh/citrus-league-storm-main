@@ -58,6 +58,23 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
  *   the app.
  * - Hover states on every link tint to pastel-orange-soft.
  */
+/**
+ * Real social URLs, keyed by the short label rendered in the button.
+ *
+ * 2026-08-18 launch audit: the social row previously rendered
+ * `<a href="#">` for all four handles — real-looking, aria-labelled
+ * buttons on the public homepage that did nothing but scroll to top.
+ * Add an entry here when an account actually exists and its button
+ * appears automatically; while this map is empty the row is not
+ * rendered at all, which is strictly better than dead links.
+ */
+const SOCIAL_LINKS: Record<string, string> = {
+  // X: 'https://x.com/…',
+  // IG: 'https://instagram.com/…',
+  // YT: 'https://youtube.com/@…',
+  // RD: 'https://reddit.com/r/…',
+};
+
 export function HockeyFooter({
   columns = DEFAULT_COLUMNS,
   socials = ['X', 'IG', 'YT', 'RD'],
@@ -77,7 +94,7 @@ export function HockeyFooter({
               </span>
               <span className="block w-1.5 h-1.5 bg-pastel-orange rounded-full animate-pulse" />
             </Link>
-            <p className="text-white/45 text-[13px] leading-relaxed mb-5 max-w-xs">
+            <p className="text-white/55 text-[13px] leading-relaxed mb-5 max-w-xs">
               A 31-feature xG model, live shift-level scoring, and an AI assistant GM who knows
               your roster. Built by hockey heads, for hockey heads.
             </p>
@@ -90,7 +107,7 @@ export function HockeyFooter({
           </div>
           {columns.map((col) => (
             <div key={col.title}>
-              <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 mb-3 font-bold">
+              <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 mb-3 font-bold">
                 {col.title}
               </div>
               <ul className="space-y-2.5">
@@ -112,7 +129,7 @@ export function HockeyFooter({
         {/* Squad lineup — Sleeper-style brand layering */}
         <div className="border-t border-white/5 pt-6 mb-6 flex items-center justify-between gap-6 flex-wrap">
           <div className="flex items-center gap-3">
-            <span className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-white/45 font-bold">
+            <span className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-white/55 font-bold">
               The Squad
             </span>
             <Link to="/about" className="flex items-center -space-x-2 group">
@@ -127,22 +144,36 @@ export function HockeyFooter({
               ))}
             </Link>
           </div>
-          <div className="flex items-center gap-3 text-white/45">
-            {socials.map((s) => (
-              <a
-                key={s}
-                href="#"
-                aria-label={`Citrus on ${s}`}
-                className="w-8 h-8 rounded-md bg-white/5 ring-1 ring-white/10 flex items-center justify-center font-jbmono text-[10px] font-bold hover:text-pastel-orange-soft hover:ring-pastel-orange/40 hover:bg-pastel-orange/10 transition-all duration-200"
-              >
-                {s}
-              </a>
-            ))}
-          </div>
+          {/* 2026-08-18 launch audit: these were four <a href="#"> stubs
+              rendered as real, aria-labelled social buttons on the public
+              homepage and eight other pages. Clicking one jumped the user
+              to the top of the page and did nothing — worse than not
+              being there, because it reads as a broken site. Rendered
+              only for socials that have a REAL url; the row disappears
+              entirely while SOCIAL_LINKS is empty. Fill in the handles
+              here when the accounts exist. */}
+          {Object.keys(SOCIAL_LINKS).length > 0 && (
+            <div className="flex items-center gap-3 text-white/55">
+              {socials
+                .filter((s) => SOCIAL_LINKS[s])
+                .map((s) => (
+                  <a
+                    key={s}
+                    href={SOCIAL_LINKS[s]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Citrus on ${s}`}
+                    className="w-8 h-8 rounded-md bg-white/5 ring-1 ring-white/10 flex items-center justify-center font-jbmono text-[10px] font-bold hover:text-pastel-orange-soft hover:ring-pastel-orange/40 hover:bg-pastel-orange/10 transition-all duration-200"
+                  >
+                    {s}
+                  </a>
+                ))}
+            </div>
+          )}
         </div>
 
         <div className="border-t border-white/5 pt-6">
-          <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/30 flex items-center gap-2 flex-wrap">
+          <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 flex items-center gap-2 flex-wrap">
             <span>© 2026 Citrus Fantasy Sports</span>
             <span className="text-white/15">·</span>
             <Link to="/privacy" className="hover:text-white/70 transition-colors">Privacy</Link>

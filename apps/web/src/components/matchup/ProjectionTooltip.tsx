@@ -14,6 +14,20 @@ import { MatchupPlayer } from "./types";
 import { useState, useEffect, ReactNode } from "react";
 import { X } from "lucide-react";
 
+/* 2026-08-19 visual audit — muted-text correction.
+   text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
+   original CREAM theme. At 20-70% opacity on the dark #1A2A20 tiles it
+   composites to near-invisible (team codes on this page measured
+   1.47:1). Remapped to cream at the alpha that preserves the intended
+   hierarchy while clearing 4.5:1 on a dark tile. */
+
+
+/* 2026-08-19 visual audit: light "glass" surface on a dark page — see
+   the surface-correction note in the armchair-gm components. bg-white/50
+   composites to mid-grey on #0F1F15, where neither light nor dark text
+   reaches 4.5:1. Uses the dark tile family instead. */
+
+
 // Hook to detect mobile
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
@@ -74,9 +88,9 @@ export const ProjectionTooltip = ({ projection, children }: ProjectionTooltipPro
       {/* Stats grid */}
       <div className="p-3 grid grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto">
         {stats.map((stat) => (
-          <div key={stat.label} className="p-2 bg-white/50 rounded-lg border border-citrus-sage/30">
+          <div key={stat.label} className="p-2 bg-white/5 rounded-lg border border-citrus-sage/30">
             <div className="text-[10px] text-citrus-sage uppercase font-bold mb-0.5">{stat.label}</div>
-            <div className="font-bold text-lg text-citrus-forest">{stat.value}</div>
+            <div className="font-bold text-lg text-pastel-cream">{stat.value}</div>
           </div>
         ))}
       </div>
@@ -85,21 +99,21 @@ export const ProjectionTooltip = ({ projection, children }: ProjectionTooltipPro
       {projection.likely_low != null && projection.likely_high != null && (
         <div className="px-4 py-2 bg-white/30 border-t border-citrus-sage/20">
           <div className="flex justify-between items-center mb-1">
-            <span className="text-[10px] font-display font-semibold text-citrus-charcoal/50 uppercase">Likely Range</span>
-            <span className="text-xs font-varsity font-black text-citrus-forest">
+            <span className="text-[10px] font-display font-semibold text-pastel-cream/65 uppercase">Likely Range</span>
+            <span className="text-xs font-varsity font-black text-pastel-cream">
               {projection.likely_low.toFixed(1)} – {projection.likely_high.toFixed(1)} pts
             </span>
           </div>
           {projection.dynamic_confidence != null && (
             <div className="flex items-center gap-2">
-              <span className="text-[9px] font-display text-citrus-charcoal/40">Confidence</span>
+              <span className="text-[9px] font-display text-pastel-cream/60">Confidence</span>
               <div className="flex-1 h-1.5 bg-citrus-sage/10 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-citrus-sage to-citrus-orange rounded-full"
                   style={{ width: `${Math.min(projection.dynamic_confidence * 100, 100)}%` }}
                 />
               </div>
-              <span className="text-[9px] font-varsity font-black text-citrus-forest">
+              <span className="text-[9px] font-varsity font-black text-pastel-cream">
                 {Math.round(projection.dynamic_confidence * 100)}%
               </span>
               {projection.confidence_label && (
@@ -119,7 +133,7 @@ export const ProjectionTooltip = ({ projection, children }: ProjectionTooltipPro
       {/* Footer */}
       <div className="bg-gradient-to-r from-citrus-peach via-citrus-orange/50 to-citrus-peach px-4 py-3 rounded-b-xl border-t-2 border-citrus-forest">
         <div className="flex justify-between items-center">
-          <span className="font-bold text-xs text-citrus-forest uppercase">Projected Total</span>
+          <span className="font-bold text-xs text-pastel-cream uppercase">Projected Total</span>
           <span className="font-black text-2xl text-citrus-orange">{projection.total_projected_points.toFixed(1)}</span>
         </div>
       </div>
@@ -128,7 +142,7 @@ export const ProjectionTooltip = ({ projection, children }: ProjectionTooltipPro
 
   // Default trigger: the projected points value as a tappable/hoverable badge
   const defaultTrigger = (
-    <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-citrus-forest transition-all">
+    <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-pastel-cream transition-all">
       {projection.total_projected_points.toFixed(1)} pts
     </span>
   );

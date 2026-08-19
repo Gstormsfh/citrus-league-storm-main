@@ -486,7 +486,7 @@ const Standings = () => {
           <h1 className="text-lg font-bold text-pastel-cream">Standings</h1>
           <div className="flex items-center gap-1">
             {(activeLeague?.name || leagueTeams.length > 0) && (
-              <span className="text-xs font-jbmono text-white/45 truncate max-w-[120px]">
+              <span className="text-xs font-jbmono text-white/55 truncate max-w-[120px]">
                 {activeLeague?.name}{leagueTeams.length > 0 ? ` \u2022 ${leagueTeams.length} teams` : ''}
               </span>
             )}
@@ -669,7 +669,7 @@ const Standings = () => {
                       >
                         <td className="px-3 sm:px-6 py-3 sm:py-4 font-medium">
                           <div className="flex items-center gap-2">
-                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold tabular-nums ${(hasMatchups && index < leagueFormat.playoffTeams) ? 'bg-pastel-orange text-[#581E00]' : 'text-white/45 bg-white/5'}`}>
+                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold tabular-nums ${(hasMatchups && index < leagueFormat.playoffTeams) ? 'bg-pastel-orange text-[#581E00]' : 'text-white/55 bg-white/5'}`}>
                               {index + 1}
                             </span>
                             {hasMatchups && index < leagueFormat.playoffTeams && (() => {
@@ -705,7 +705,7 @@ const Standings = () => {
                                 {team.name}
                                 {isUserTeam && <span className="ml-2 text-[9px] bg-pastel-orange/20 text-pastel-orange-soft ring-1 ring-pastel-orange/40 px-1.5 py-0.5 rounded-md font-jbmono uppercase tracking-wider font-bold">YOU</span>}
                               </div>
-                              <div className="text-xs text-white/45" style={{ visibility: 'visible', opacity: 1 }}>{team.owner}</div>
+                              <div className="text-xs text-white/55" style={{ visibility: 'visible', opacity: 1 }}>{team.owner}</div>
                             </div>
                           </div>
                         </td>

@@ -145,7 +145,14 @@ export function registerPushTapListener(
             const data = (action.notification?.data ?? {}) as Record<string, unknown>;
             const leagueId = typeof data.leagueId === 'string' ? data.leagueId : null;
             if (data.type === 'draft_on_the_clock' && leagueId) {
-              onNavigate(`/draft/${leagueId}`);
+              // 2026-08-18 launch audit: this was `/draft/${leagueId}`,
+              // which matches NO route — `/draft` is registered as an
+              // exact path, so `/draft/<uuid>` fell through to the
+              // catch-all 404. Tapping "you're on the clock" on the
+              // native build sent the user to a Not Found page while
+              // their pick clock ran down. `/draft-v2/:leagueId` is the
+              // real route (App.tsx), and matches useStartDraftV2.
+              onNavigate(`/draft-v2/${leagueId}`);
             }
           } catch (e) {
             onError(e instanceof Error ? e.message : 'push tap handling failed');

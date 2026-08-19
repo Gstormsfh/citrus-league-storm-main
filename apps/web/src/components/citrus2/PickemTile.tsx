@@ -29,7 +29,7 @@ export function PickemTile({
     <div className="bg-pastel-surface-tile border border-white/10 rounded-2xl p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
       <div className="flex items-center justify-between mb-5 pb-4 border-b border-white/10">
         <div>
-          <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 font-bold">
+          <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 font-bold">
             Pickem
           </div>
           <div className="font-sans font-bold text-[15px] text-pastel-cream mt-0.5">Tonight's Slate</div>
@@ -46,13 +46,13 @@ export function PickemTile({
           >
             <PickButton team={g.away} record={g.awayRec} state={pickState(g, 'away')} />
             <div className="flex items-center justify-center px-2 bg-white/[0.02]">
-              <span className="font-jbmono text-[10px] text-white/30">@</span>
+              <span className="font-jbmono text-[10px] text-white/55">@</span>
             </div>
             <PickButton team={g.home} record={g.homeRec} state={pickState(g, 'home')} />
           </div>
         ))}
       </div>
-      <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between font-jbmono text-[10px] text-white/45 tracking-wide">
+      <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between font-jbmono text-[10px] text-white/55 tracking-wide">
         <span>Locks at puck drop · {lockTime}</span>
         <span className="text-pastel-sage">{totalGames - picksMade} more →</span>
       </div>
@@ -81,7 +81,7 @@ function PickButton({ team, record, state }: { team: string; record: string; sta
       <TeamChip abbrev={team} />
       <div className="min-w-0">
         <div className="font-sans font-bold text-[12px] text-pastel-cream truncate">{team}</div>
-        <div className="font-jbmono text-[9px] text-white/45 tabular-nums">{record}</div>
+        <div className="font-jbmono text-[9px] text-white/55 tabular-nums">{record}</div>
       </div>
     </button>
   );

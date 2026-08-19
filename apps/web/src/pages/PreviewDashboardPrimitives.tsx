@@ -225,7 +225,7 @@ function VariantCard({
       className={`flex flex-col items-start gap-3 p-4 rounded-xl bg-pastel-surface-tile ring-1 ring-white/10 ${className}`}
     >
       <div className="flex items-center min-h-[80px] w-full">{children}</div>
-      <div className="font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45 font-bold">
+      <div className="font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/55 font-bold">
         {caption}
       </div>
     </div>
@@ -1023,7 +1023,7 @@ export default function PreviewDashboardPrimitives() {
               <PlayerMonogram size="md" {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
               <div>
                 <div className="font-sans font-bold text-pastel-cream text-[15px]">Connor McDavid</div>
-                <div className="font-jbmono text-[10px] uppercase tracking-wider text-white/45">C · EDM · 5v5</div>
+                <div className="font-jbmono text-[10px] uppercase tracking-wider text-white/55">C · EDM · 5v5</div>
               </div>
             </div>
             <div className="space-y-3">
@@ -1070,7 +1070,7 @@ export default function PreviewDashboardPrimitives() {
 
         <SubSection title="Hidden state — fresh data renders nothing">
           <VariantCard caption="2d old data → no badge rendered (verify by inspecting the empty card below)">
-            <div className="text-white/45 font-jbmono text-[10px] uppercase tracking-wider">
+            <div className="text-white/55 font-jbmono text-[10px] uppercase tracking-wider">
               <StaleDataBadge asOf={daysAgo(2)} />
               <span>(nothing should render before this caption)</span>
             </div>
@@ -1081,7 +1081,7 @@ export default function PreviewDashboardPrimitives() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <VariantCard caption="Default 14d threshold · 7d data is fresh">
               <StaleDataBadge asOf={daysAgo(7)} />
-              <span className="text-white/45 font-jbmono text-[10px] uppercase tracking-wider ml-2">
+              <span className="text-white/55 font-jbmono text-[10px] uppercase tracking-wider ml-2">
                 (no badge)
               </span>
             </VariantCard>
@@ -1108,7 +1108,7 @@ export default function PreviewDashboardPrimitives() {
                 <div className="font-sans font-black text-pastel-cream text-[18px] leading-tight">
                   Igor Shesterkin
                 </div>
-                <div className="font-jbmono text-[10px] uppercase tracking-wider text-white/45 mt-0.5">
+                <div className="font-jbmono text-[10px] uppercase tracking-wider text-white/55 mt-0.5">
                   G · NYR · 5v5
                 </div>
               </div>
@@ -1121,7 +1121,7 @@ export default function PreviewDashboardPrimitives() {
             <PercentileBullet size="sm" label="Total G-GAR" percentile={88} rawValue={11.8} sampleSize={11} category="defense" />
           </div>
           <div className="mt-4 pt-4 border-t border-white/10">
-            <div className="font-jbmono text-[9px] uppercase tracking-[0.22em] text-white/45 font-bold mb-1">
+            <div className="font-jbmono text-[9px] uppercase tracking-[0.22em] text-white/55 font-bold mb-1">
               Stormy verdict
             </div>
             <p className="text-[13px] text-pastel-orange-soft italic font-sans">
@@ -1132,7 +1132,7 @@ export default function PreviewDashboardPrimitives() {
         </div>
 
         <div className="mt-12 pt-6 border-t border-white/10">
-          <div className="font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45 font-bold mb-2">
+          <div className="font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/55 font-bold mb-2">
             Day 1 status
           </div>
           <p className="text-[13px] text-white/65">

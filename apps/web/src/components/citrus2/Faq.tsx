@@ -19,7 +19,7 @@ function FaqItem({ q, a }: FaqEntry) {
           {q}
         </span>
         <ChevronDown
-          className={`w-5 h-5 text-white/45 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`}
+          className={`w-5 h-5 text-white/55 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`}
           strokeWidth={2}
         />
       </button>

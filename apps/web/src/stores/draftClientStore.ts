@@ -167,8 +167,17 @@ interface DraftClientStoreState {
    * when myTeamId does not appear in the draft-order matrix AND a
    * re-resolve attempt did not fix it. Pass null to clear.
    */
+  // 2026-08-18 launch audit: this signature accepted only
+  // 'my_team_not_in_matrix', while the `identityFailure` STATE above
+  // declares both reasons — and useMyTeamIdCrossCheck.ts:147 has been
+  // passing 'my_team_unverifiable' since F14(b). That call has never
+  // typechecked; it only survives because Vite/esbuild strip types
+  // without checking them. Widened to match the state it writes.
   setIdentityFailure: (
-    failure: { reason: 'my_team_not_in_matrix' } | null,
+    failure:
+      | { reason: 'my_team_not_in_matrix' }
+      | { reason: 'my_team_unverifiable' }
+      | null,
   ) => void;
   setSnapshot: (snapshot: DraftSnapshot) => void;
   applyEvent: (event: BufferedDraftEvent) => void;
@@ -380,6 +389,15 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
 
   setMatrix: (matrix) =>
     set((prev) => {
+      // 2026-08-18 launch audit: fetchDraftOrderMatrix returns null on
+      // ANY failure, and both call sites piped that straight in here.
+      // A failed refetch could therefore CLOBBER a perfectly good matrix
+      // and leave the room with nobody on the clock mid-draft. A null
+      // means "this fetch failed", never "the draft order is now empty",
+      // so it must not destroy known-good state.
+      if (matrix === null && prev.matrix !== null) {
+        return prev;
+      }
       // DR-1b (2026-07-28) — install the fetched matrix and re-derive
       // from the current snapshot + all previously-folded events.
       // Idempotent for a given (snapshot, matrix, events) triple.

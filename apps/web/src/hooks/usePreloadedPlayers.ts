@@ -28,7 +28,7 @@
 //   - `error`: last error from the fetch attempt, or null. Non-fatal:
 //     the room continues to render with `#<id>` fallbacks.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CURRENT_SEASON } from '@citrus/shared';
 import { logger } from '@/utils/logger';
 import type { Player } from '@/services/PlayerService';
@@ -37,6 +37,11 @@ export interface UsePreloadedPlayersResult {
   playersById: ReadonlyMap<string, Player>;
   isLoading: boolean;
   error: Error | null;
+  /**
+   * Re-run the directory fetch. Added 2026-08-18: without it a single
+   * transient failure was permanent for the life of the mount.
+   */
+  reload: () => void;
 }
 
 /**
@@ -214,6 +219,12 @@ export function usePreloadedPlayers(): UsePreloadedPlayersResult {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const cancelledRef = useRef(false);
+  // 2026-08-18 launch audit: the effect had an empty dep array and no
+  // retry path, so a single directory-fetch failure was permanent for
+  // the life of the mount — the draft room showed an empty pool with
+  // "Try adjusting your filters" and the user simply could not draft.
+  const [reloadNonce, setReloadNonce] = useState(0);
+  const reload = useCallback(() => setReloadNonce((n) => n + 1), []);
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -376,10 +387,10 @@ export function usePreloadedPlayers(): UsePreloadedPlayersResult {
     return () => {
       cancelledRef.current = true;
     };
-  }, []);
+  }, [reloadNonce]);
 
   return useMemo(
-    () => ({ playersById, isLoading, error }),
-    [playersById, isLoading, error],
+    () => ({ playersById, isLoading, error, reload }),
+    [playersById, isLoading, error, reload],
   );
 }

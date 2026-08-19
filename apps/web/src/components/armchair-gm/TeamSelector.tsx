@@ -5,6 +5,24 @@ import { NHL_TEAMS, type NHLTeamInfo, formatCap, SALARY_CAP_2025_26 } from '@/ty
 import { getAllTeamsCapSummary } from '@/services/NHLCapService';
 import { Search, Shield, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 
+/* 2026-08-19 visual audit — muted-text correction.
+   text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
+   original CREAM theme. At 20-70% opacity on the dark #1A2A20 tiles it
+   composites to near-invisible (team codes on this page measured
+   1.47:1). Remapped to cream at the alpha that preserves the intended
+   hierarchy while clearing 4.5:1 on a dark tile. */
+
+
+/* 2026-08-19 visual audit — surface correction.
+   These panels used bg-white/55..80 ("frosted glass") on the #0F1F15
+   dark page. Composited, that lands around rgb(159,165,161) — a MID-GREY
+   dead zone where nothing reads: cream text measured 2.37:1 and the dark
+   labels 1.58:1 against it. There is no text colour that fixes a
+   mid-grey surface; the surface itself is the bug. Swapped to the dark
+   tile family the rest of the app uses (ui/card.tsx is
+   bg-pastel-surface-tile + ring-white/10), so cream text lands at 13:1. */
+
+
 interface TeamSelectorProps {
   selectedTeam: string | null;
   onSelectTeam: (abbrev: string) => void;
@@ -77,13 +95,13 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
       {/* Search + View Toggle */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-citrus-charcoal/40" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-pastel-cream/60" />
           <input
             type="text"
             placeholder="Search teams..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border-2 border-citrus-sage/30 bg-white/60 backdrop-blur-sm text-sm font-display text-citrus-forest placeholder:text-citrus-charcoal/40 focus:outline-none focus:border-citrus-sage focus:ring-2 focus:ring-citrus-sage/20 transition-all"
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border-2 border-citrus-sage/30 bg-pastel-surface-tile backdrop-blur-sm text-sm font-display text-pastel-cream placeholder:text-pastel-cream/60 focus:outline-none focus:border-citrus-sage focus:ring-2 focus:ring-citrus-sage/20 transition-all"
           />
         </div>
         <div className="flex rounded-xl border-2 border-citrus-sage/30 overflow-hidden">
@@ -94,8 +112,8 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
               className={cn(
                 "px-3 py-2 text-[10px] font-display font-bold uppercase tracking-wider transition-colors",
                 viewMode === mode
-                  ? "bg-citrus-sage text-citrus-forest"
-                  : "bg-white/60 text-citrus-charcoal/60 hover:bg-citrus-sage/10"
+                  ? "bg-citrus-sage text-pastel-forest"
+                  : "bg-pastel-surface-tile text-pastel-cream/70 hover:bg-citrus-sage/10"
               )}
             >
               {mode === 'division' ? 'Division' : mode === 'grid' ? 'All' : 'Rankings'}
@@ -110,14 +128,14 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
           {teamsByDivision.map((div) => (
             <div
               key={div.name}
-              className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 overflow-hidden"
+              className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 overflow-hidden"
             >
               <div className="px-4 py-2.5 bg-gradient-to-r from-citrus-sage/20 to-citrus-sage/10 border-b border-citrus-sage/30">
                 <div className="flex items-center gap-2">
-                  <span className="font-varsity text-sm text-citrus-forest tracking-tight">
+                  <span className="font-varsity text-sm text-pastel-cream tracking-tight">
                     {div.name}
                   </span>
-                  <span className="text-[9px] text-citrus-charcoal/50 font-display">
+                  <span className="text-[9px] text-pastel-cream/65 font-display">
                     {div.conference}
                   </span>
                 </div>
@@ -154,17 +172,17 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
 
       {/* Rankings Table View */}
       {viewMode === 'rankings' && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
+        <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
           <div className="px-4 py-2.5 bg-gradient-to-r from-citrus-sage/20 to-citrus-sage/10 border-b-2 border-citrus-sage/30 flex items-center justify-between">
-            <span className="font-varsity text-sm text-citrus-forest">League Cap Rankings</span>
-            <span className="text-[9px] text-citrus-charcoal/50 font-display">
+            <span className="font-varsity text-sm text-pastel-cream">League Cap Rankings</span>
+            <span className="text-[9px] text-pastel-cream/65 font-display">
               Click any team to view full roster
             </span>
           </div>
 
           {/* Table Header */}
           <div className="grid grid-cols-[1.5rem_2rem_1fr_4.5rem_4.5rem] sm:grid-cols-[2rem_2.5rem_1fr_6rem_6rem_4rem] md:grid-cols-[2rem_2.5rem_1fr_7rem_7rem_5rem] items-center gap-1 md:gap-2 px-2 sm:px-3 py-2 bg-citrus-sage/10 border-b border-citrus-sage/20">
-            <span className="text-[7px] sm:text-[8px] text-citrus-charcoal/40 uppercase font-display font-bold text-center">#</span>
+            <span className="text-[7px] sm:text-[8px] text-pastel-cream/60 uppercase font-display font-bold text-center">#</span>
             <span></span>
             <SortHeader label="Team" sortKey="name" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Cap Hit" sortKey="capHit" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} align="right" />
@@ -187,13 +205,13 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
                   className={cn(
                     "w-full grid grid-cols-[1.5rem_2rem_1fr_4.5rem_4.5rem] sm:grid-cols-[2rem_2.5rem_1fr_6rem_6rem_4rem] md:grid-cols-[2rem_2.5rem_1fr_7rem_7rem_5rem] items-center gap-1 md:gap-2 px-2 sm:px-3 py-2 sm:py-2.5 text-left transition-all border-b border-citrus-sage/10",
                     selectedTeam === team.teamAbbrev ? "bg-citrus-sage/20" : "hover:bg-citrus-sage/5",
-                    i % 2 === 0 ? "bg-white/40" : "bg-citrus-cream/20"
+                    i % 2 === 0 ? "bg-white/5" : "bg-citrus-cream/20"
                   )}
                 >
-                  <span className="text-[9px] sm:text-[10px] text-citrus-charcoal/50 font-display font-semibold text-center">{i + 1}</span>
+                  <span className="text-[9px] sm:text-[10px] text-pastel-cream/65 font-display font-semibold text-center">{i + 1}</span>
                   <img loading="lazy" decoding="async" src={info?.logoUrl || ''} alt={team.teamAbbrev} className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
                   <div className="min-w-0">
-                    <span className="font-display font-bold text-[10px] sm:text-xs text-citrus-forest truncate block">{team.teamName}</span>
+                    <span className="font-display font-bold text-[10px] sm:text-xs text-pastel-cream truncate block">{team.teamName}</span>
                     <div className="h-1 mt-0.5 sm:mt-1 bg-citrus-cream rounded-full overflow-hidden">
                       <div
                         className={cn(
@@ -204,14 +222,14 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
                       />
                     </div>
                   </div>
-                  <span className="font-varsity text-[10px] sm:text-xs text-citrus-forest text-right">{formatCap(team.projectedCapHit)}</span>
+                  <span className="font-varsity text-[10px] sm:text-xs text-pastel-cream text-right">{formatCap(team.projectedCapHit)}</span>
                   <span className={cn(
                     "font-varsity text-[10px] sm:text-xs text-right",
                     isOverCap ? "text-red-600" : isNearCap ? "text-amber-600" : "text-green-600"
                   )}>
                     {isOverCap ? '-' : ''}{formatCap(Math.abs(team.capSpace))}
                   </span>
-                  <span className="hidden sm:block font-varsity text-xs text-citrus-charcoal/70 text-center">{team.activeRosterSize}</span>
+                  <span className="hidden sm:block font-varsity text-xs text-pastel-cream/75 text-center">{team.activeRosterSize}</span>
                 </button>
               );
             })}
@@ -239,7 +257,7 @@ function SortHeader({
       onClick={() => onToggle(key)}
       className={cn(
         "flex items-center gap-0.5 text-[7px] sm:text-[8px] uppercase font-display font-bold tracking-wider transition-colors",
-        isActive ? "text-citrus-forest" : "text-citrus-charcoal/40 hover:text-citrus-charcoal/60",
+        isActive ? "text-pastel-cream" : "text-pastel-cream/60 hover:text-pastel-cream/70",
         align === 'right' && "justify-end",
         align === 'center' && "justify-center",
         className,
@@ -285,7 +303,7 @@ function TeamCard({
         ) : (
           <Shield className="w-8 h-8 text-citrus-sage/50" />
         )}
-        <span className="text-[9px] font-varsity text-citrus-forest">{team.abbrev}</span>
+        <span className="text-[9px] font-varsity text-pastel-cream">{team.abbrev}</span>
       </button>
     );
   }
@@ -311,10 +329,10 @@ function TeamCard({
         <Shield className="w-8 h-8 text-citrus-sage/50 flex-shrink-0" />
       )}
       <div className="min-w-0">
-        <div className="font-display font-bold text-xs text-citrus-forest truncate">
+        <div className="font-display font-bold text-xs text-pastel-cream truncate">
           {team.name}
         </div>
-        <div className="text-[9px] text-citrus-charcoal/50 font-display">{team.abbrev}</div>
+        <div className="text-[9px] text-pastel-cream/65 font-display">{team.abbrev}</div>
       </div>
     </button>
   );

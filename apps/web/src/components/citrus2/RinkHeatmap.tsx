@@ -321,7 +321,7 @@ function RinkModeControl({
               'disabled:cursor-default',
               isActive
                 ? 'text-pastel-cream bg-pastel-cream/[0.08]'
-                : 'text-white/45 hover:text-white/65',
+                : 'text-white/55 hover:text-white/65',
             )}
           >
             {/* Single ambient glow — ONLY on the active option, ONLY one per page */}
@@ -347,7 +347,7 @@ function RinkModeControl({
 function RinkSkeleton() {
   return (
     <div className="absolute inset-0 grid place-items-center">
-      <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] text-white/35 animate-pulse">
+      <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] text-white/55 animate-pulse">
         Loading rink…
       </div>
     </div>
@@ -358,10 +358,10 @@ function RinkEmpty() {
   return (
     <div className="absolute inset-0 grid place-items-center pointer-events-none">
       <div className="text-center">
-        <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] text-white/45 font-bold mb-1">
+        <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] text-white/55 font-bold mb-1">
           No shots in this view
         </div>
-        <div className="font-sans text-[12px] text-white/30 max-w-[240px]">
+        <div className="font-sans text-[12px] text-white/55 max-w-[240px]">
           Switch view modes or check back when more games have been played.
         </div>
       </div>
@@ -495,7 +495,7 @@ export function RinkHeatmap({
           )}
         >
           {verdictEyebrow && (
-            <div className="font-jbmono uppercase tracking-[0.22em] text-[9px] font-bold text-white/45 mb-1">
+            <div className="font-jbmono uppercase tracking-[0.22em] text-[9px] font-bold text-white/55 mb-1">
               {verdictEyebrow}
             </div>
           )}
@@ -515,7 +515,7 @@ export function RinkHeatmap({
       {/* Optional caption along bottom-left (low-sample now uses overlay treatment above) */}
       {caption && !isLowSample && (
         <div className="absolute left-6 sm:left-10 bottom-2 right-44 pointer-events-none">
-          <span className="font-jbmono uppercase tracking-[0.18em] text-[9px] font-bold text-white/45 truncate">
+          <span className="font-jbmono uppercase tracking-[0.18em] text-[9px] font-bold text-white/55 truncate">
             {caption}
           </span>
         </div>

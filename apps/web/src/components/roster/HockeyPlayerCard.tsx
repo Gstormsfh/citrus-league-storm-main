@@ -553,7 +553,7 @@ const HockeyPlayerCardContent = ({
                 </div>
               </>
             ) : (
-               <span className="text-[8px] font-display text-white/40 italic">No Game</span>
+               <span className="text-[8px] font-display text-white/55 italic">No Game</span>
             )}
           </div>
           
@@ -561,7 +561,7 @@ const HockeyPlayerCardContent = ({
              <span className="text-[7px] text-white/55 uppercase font-varsity font-bold tracking-wider">PROJ</span>
              <span className={cn(
                "text-[10px] font-varsity font-black tracking-tight",
-               hasGameOnSelectedDate ? "text-pastel-orange" : "text-white/40"
+               hasGameOnSelectedDate ? "text-pastel-orange" : "text-white/55"
              )}>
                  {hasGameOnSelectedDate ? projectedPoints.toFixed(1) : '-'}
              </span>

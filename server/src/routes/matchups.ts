@@ -205,6 +205,27 @@ matchupRoutes.post('/league/:leagueId/generate', commissionerMiddleware, validat
   return ok(c, { success: true });
 });
 
+// GET /api/matchups/job-status — Get matchup score job status
+//
+// MUST stay above `GET /:matchupId`. It was registered at the bottom of
+// this file until the 2026-08-18 launch audit, which meant the param
+// route swallowed it: a request for /api/matchups/job-status bound
+// matchupId="job-status", missed in the DB, and returned a 404 from the
+// wrong handler — getJobStatus was unreachable. Same ordering discipline
+// as routes/players.ts, where every literal precedes /:playerId.
+//
+// NOTE for future edits: the other literal paths in this file
+// (/update-scores, /auto-complete, /roto-standings, …) are safe ONLY
+// because they are POST and /:matchupId is GET. Any new single-segment
+// GET added below this line will be silently shadowed.
+matchupRoutes.get('/job-status', async (c) => {
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  const status = await service.getJobStatus();
+  return ok(c, status);
+});
+
 // ── Matchup-by-ID routes ─────────────────────────────────────────────
 // RLS on the matchups table ensures users can only access matchups from
 // leagues they belong to. Auth middleware validates the JWT.
@@ -549,13 +570,6 @@ matchupRoutes.post('/lock-completed-days', async (c) => {
   return ok(c, { lockedCount });
 });
 
-// GET /api/matchups/job-status — Get matchup score job status
-matchupRoutes.get('/job-status', async (c) => {
-  const supabase = createUserClient(c.get('userToken'));
-  const service = new MatchupService(supabase);
-
-  const status = await service.getJobStatus();
-  return ok(c, status);
-});
+// (GET /job-status moved above /:matchupId — see the note there.)
 
 export { matchupRoutes };

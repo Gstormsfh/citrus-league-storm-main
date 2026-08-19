@@ -274,7 +274,7 @@ const ChampionBanner: React.FC<{
         <div className="flex items-center justify-center gap-6 text-sm text-white/55">
           {runnerUpName && (
             <div className="flex items-center gap-1.5">
-              <Medal className="w-4 h-4 text-white/40" />
+              <Medal className="w-4 h-4 text-white/55" />
               <span>2nd: {runnerUpName}</span>
             </div>
           )}

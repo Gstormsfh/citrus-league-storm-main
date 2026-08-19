@@ -26,7 +26,7 @@ export function HeroCardStack() {
             <Trophy className="w-5 h-5" strokeWidth={2} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 font-bold">
+            <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 font-bold">
               Your League
             </div>
             <div className="font-sans font-bold text-[14px] text-pastel-cream truncate">
@@ -41,11 +41,11 @@ export function HeroCardStack() {
             { rank: 3, team: 'Hat Trick', rec: '12-6' },
           ].map((t) => (
             <div key={t.team} className="flex items-center gap-2.5 text-[13px]">
-              <span className={`font-sans font-black w-4 ${t.rank === 1 ? 'text-pastel-orange' : 'text-white/45'}`}>
+              <span className={`font-sans font-black w-4 ${t.rank === 1 ? 'text-pastel-orange' : 'text-white/55'}`}>
                 {t.rank}
               </span>
               <span className="flex-1 text-pastel-cream font-medium truncate">{t.team}</span>
-              <span className="font-jbmono text-[11px] text-white/45 tabular-nums">{t.rec}</span>
+              <span className="font-jbmono text-[11px] text-white/55 tabular-nums">{t.rec}</span>
             </div>
           ))}
         </div>
@@ -59,7 +59,7 @@ export function HeroCardStack() {
         <div className="flex items-center gap-3 mb-4">
           <MascotAvatar id="stormy" size="md" ring={false} className="ring-1 ring-pastel-orange/40 rounded-xl !rounded-xl" />
           <div className="flex-1 min-w-0">
-            <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 font-bold">
+            <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 font-bold">
               Stormy AI
             </div>
             <div className="font-sans font-bold text-[14px] text-pastel-cream truncate">
@@ -68,7 +68,7 @@ export function HeroCardStack() {
           </div>
         </div>
         <div className="bg-white/5 rounded-xl p-3 mb-3">
-          <div className="font-jbmono text-[10px] text-white/45 mb-1.5">YOU</div>
+          <div className="font-jbmono text-[10px] text-white/55 mb-1.5">YOU</div>
           <div className="text-[12px] text-pastel-cream leading-snug">
             Start Pettersson or Aho at C tonight?
           </div>
@@ -90,18 +90,18 @@ export function HeroCardStack() {
               Live · 3rd Period
             </span>
           </span>
-          <span className="font-jbmono text-[10px] text-white/40 tabular-nums">12:43</span>
+          <span className="font-jbmono text-[10px] text-white/55 tabular-nums">12:43</span>
         </div>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <TeamChip abbrev="EDM" size="md" />
-            <div className="font-jbmono text-[9px] text-white/45 tracking-wider uppercase hidden sm:block">Away</div>
+            <div className="font-jbmono text-[9px] text-white/55 tracking-wider uppercase hidden sm:block">Away</div>
           </div>
           <div className="font-sans font-black text-[1.75rem] sm:text-[2.25rem] text-pastel-cream tabular-nums leading-none">
-            4<span className="text-white/30 mx-1">·</span>3
+            4<span className="text-white/55 mx-1">·</span>3
           </div>
           <div className="flex items-center gap-2">
-            <div className="font-jbmono text-[9px] text-white/45 tracking-wider uppercase hidden sm:block">Home</div>
+            <div className="font-jbmono text-[9px] text-white/55 tracking-wider uppercase hidden sm:block">Home</div>
             <TeamChip abbrev="COL" size="md" />
           </div>
         </div>
@@ -109,7 +109,7 @@ export function HeroCardStack() {
           <div className="h-full bg-pastel-orange rounded-full" style={{ width: '78%' }} />
         </div>
         <div className="flex items-center justify-between">
-          <span className="font-jbmono text-[10px] text-white/45">McDavid +6.4 tonight</span>
+          <span className="font-jbmono text-[10px] text-white/55">McDavid +6.4 tonight</span>
           <span className="font-jbmono text-[10px] text-pastel-orange-soft font-bold">→</span>
         </div>
       </div>

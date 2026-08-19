@@ -81,6 +81,12 @@ const TradeAnalyzer = () => {
   // Trade offer state
   const [myTeamId, setMyTeamId] = useState<string | null>(null);
   const [tradeOffers, setTradeOffers] = useState<TradeOfferWithPlayers[]>([]);
+  // 2026-08-18 launch audit: loadTradeOffers' rejection was discarded
+  // with `.catch(() => {})`, so a failed fetch left tradeOffers empty and
+  // the panel rendered "No Trade Offers — trade offers you send or
+  // receive will appear here." A user with a real pending offer was told
+  // they had none, and had no way to know otherwise.
+  const [tradeOffersError, setTradeOffersError] = useState(false);
   const [activeTab, setActiveTab] = useState('propose');
   const [tradeMessage, setTradeMessage] = useState('');
 
@@ -152,7 +158,13 @@ const TradeAnalyzer = () => {
 
           if (myTeamData && isMounted) {
             setMyTeamId(myTeamData.id);
-            loadTradeOffers(myTeamData.id).catch(() => {});
+            loadTradeOffers(myTeamData.id)
+              .then(() => {
+                if (isMounted) setTradeOffersError(false);
+              })
+              .catch(() => {
+                if (isMounted) setTradeOffersError(true);
+              });
           }
           if (!isMounted) return;
 
@@ -665,10 +677,10 @@ const TradeAnalyzer = () => {
                 My Team
               </CardTitle>
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white/40" />
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white/55" />
                 <Input
                   placeholder="Search players…"
-                  className="pl-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                  className="pl-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                   value={searchMyTeam}
                   onChange={(e) => setSearchMyTeam(e.target.value)}
                 />
@@ -711,7 +723,7 @@ const TradeAnalyzer = () => {
                            {isSelected ? (
                              <CheckCircle2 className="h-5 w-5 text-red-300" />
                            ) : (
-                             <UserPlus className="h-5 w-5 text-white/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+                             <UserPlus className="h-5 w-5 text-white/55 opacity-0 group-hover:opacity-100 transition-opacity" />
                            )}
                         </div>
                       </div>
@@ -866,7 +878,7 @@ const TradeAnalyzer = () => {
 
                   <Input
                     placeholder="Add a message to your trade offer (optional)"
-                    className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                    className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                     value={tradeMessage}
                     onChange={(e) => setTradeMessage(e.target.value)}
                   />
@@ -896,10 +908,10 @@ const TradeAnalyzer = () => {
                 )}
               </CardTitle>
                <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white/40" />
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white/55" />
                 <Input
                   placeholder="Search their players…"
-                  className="pl-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 disabled:opacity-50"
+                  className="pl-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 disabled:opacity-50"
                   value={searchTheirTeam}
                   onChange={(e) => setSearchTheirTeam(e.target.value)}
                   disabled={!selectedPartnerTeam}
@@ -944,7 +956,7 @@ const TradeAnalyzer = () => {
                                {isSelected ? (
                                  <CheckCircle2 className="h-4 w-4 text-pastel-sage-soft" />
                                ) : (
-                                 <UserPlus className="h-4 w-4 text-white/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                 <UserPlus className="h-4 w-4 text-white/55 opacity-0 group-hover:opacity-100 transition-opacity" />
                                )}
                             </div>
                           </div>
@@ -1012,7 +1024,33 @@ const TradeAnalyzer = () => {
                 onVoted={() => (myTeamId ? loadTradeOffers(myTeamId) : Promise.resolve())}
               />
 
-              {tradeOffers.length === 0 ? (
+              {tradeOffers.length === 0 && tradeOffersError ? (
+                <Card
+                  className="p-8 text-center bg-[#1A2A20] border-0 ring-1 ring-destructive/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]"
+                  data-testid="trade-offers-error"
+                >
+                  <History className="h-12 w-12 mx-auto mb-4 text-destructive/40" />
+                  <h3 className="font-calistoga text-xl text-destructive mb-1">
+                    Couldn&apos;t load your trade offers
+                  </h3>
+                  <p className="text-sm text-white/55 mb-4">
+                    This is a connection problem — you may still have offers waiting.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="trade-offers-retry"
+                    onClick={() => {
+                      if (!myTeamId) return;
+                      loadTradeOffers(myTeamId)
+                        .then(() => setTradeOffersError(false))
+                        .catch(() => setTradeOffersError(true));
+                    }}
+                  >
+                    Retry
+                  </Button>
+                </Card>
+              ) : tradeOffers.length === 0 ? (
                 <Card className="p-8 text-center bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                   <History className="h-12 w-12 mx-auto mb-4 text-pastel-orange/30" />
                   <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">✦ Empty</div>

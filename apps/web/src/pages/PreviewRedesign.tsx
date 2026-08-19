@@ -77,17 +77,17 @@ function GameTickerCard({ game }: { game: TickerGame }) {
       <span className="font-jbmono text-[11px] text-white/90 leading-none tabular-nums">
         <span className="text-white/60">{game.away}</span>
         {game.awayScore !== undefined && <span className="ml-1.5 font-semibold">{game.awayScore}</span>}
-        <span className="mx-1.5 text-white/30">@</span>
+        <span className="mx-1.5 text-white/55">@</span>
         <span className="text-white/60">{game.home}</span>
         {game.homeScore !== undefined && <span className="ml-1.5 font-semibold">{game.homeScore}</span>}
       </span>
       {isLive && (
-        <span className="font-jbmono text-[10px] text-white/40 leading-none tabular-nums">
+        <span className="font-jbmono text-[10px] text-white/55 leading-none tabular-nums">
           {game.period} · {game.time}
         </span>
       )}
       {!isLive && !isFinal && (
-        <span className="font-jbmono text-[10px] text-white/40 leading-none">{game.time}</span>
+        <span className="font-jbmono text-[10px] text-white/55 leading-none">{game.time}</span>
       )}
     </div>
   );

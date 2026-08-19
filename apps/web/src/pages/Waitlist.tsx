@@ -81,7 +81,7 @@ const Waitlist = () => {
                   View Demo League
                 </Link>
               </div>
-              <p className="text-[11px] font-jbmono text-white/45 mt-4">
+              <p className="text-[11px] font-jbmono text-white/55 mt-4">
                 Create a test league filled with AI teams to experience the full platform today.
               </p>
             </div>

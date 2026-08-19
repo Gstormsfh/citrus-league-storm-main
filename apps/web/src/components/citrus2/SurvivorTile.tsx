@@ -30,7 +30,7 @@ export function SurvivorTile({
     <div className="bg-pastel-surface-tile border border-white/10 rounded-2xl p-6 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
       <div className="flex items-center justify-between mb-5 pb-4 border-b border-white/10">
         <div>
-          <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 font-bold">
+          <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 font-bold">
             Survivor · {round}
           </div>
           <div className="font-sans font-bold text-[15px] text-pastel-cream mt-0.5">Your Picks</div>
@@ -70,7 +70,7 @@ export function SurvivorTile({
                   p.status === 'win'
                     ? 'text-pastel-sage-soft'
                     : p.status === 'loss'
-                    ? 'text-white/45'
+                    ? 'text-white/55'
                     : 'text-pastel-orange-soft'
                 }`}
               >
@@ -82,7 +82,7 @@ export function SurvivorTile({
       </div>
       {/* Used teams reminder — real team colors, dimmed */}
       <div className="bg-white/[0.03] rounded-md p-2.5 mb-3">
-        <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/40 font-bold mb-2">
+        <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/55 font-bold mb-2">
           Used (can't pick again)
         </div>
         <div className="flex gap-1.5 flex-wrap">
@@ -103,7 +103,7 @@ export function SurvivorTile({
           })}
         </div>
       </div>
-      <div className="pt-3 border-t border-white/10 flex items-center justify-between font-jbmono text-[10px] text-white/45 tracking-wide">
+      <div className="pt-3 border-t border-white/10 flex items-center justify-between font-jbmono text-[10px] text-white/55 tracking-wide">
         <span>1 loss = eliminated</span>
         <span className="text-pastel-sage">{alive} of {totalEntered.toLocaleString()} alive →</span>
       </div>

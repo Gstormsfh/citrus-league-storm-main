@@ -4,6 +4,13 @@ import { cn } from '@/lib/utils';
 import { Player } from '@/services/PlayerService';
 import { DraftPick } from '@/services/DraftService';
 
+/* 2026-08-19 visual audit: this panel was still on the ORIGINAL light
+   theme (fantasy-surface #FFFFFF, fantasy-dark #1E293B, fantasy-light
+   #FFF1DB) while the draft room around it renders on #0F1F15. It read as
+   a white box pasted into a dark app. Migrated to the pastel dark
+   surface tokens the rest of the room already uses. */
+
+
 interface RosterDepthChartProps {
   draftedPlayers: Player[];
   draftPicks: DraftPick[];
@@ -152,9 +159,9 @@ export const RosterDepthChart = ({
   }, [draftPicks]);
 
   return (
-    <Card className="border-fantasy-border bg-fantasy-surface">
+    <Card className="border-white/10">
       <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
-        <CardTitle className="text-base sm:text-lg font-semibold text-fantasy-dark">
+        <CardTitle className="text-base sm:text-lg font-semibold text-pastel-cream">
           Roster
         </CardTitle>
         <div className="text-xs text-muted-foreground">
@@ -164,15 +171,15 @@ export const RosterDepthChart = ({
       <CardContent className="pt-0 space-y-3 sm:space-y-4 px-2 sm:px-6">
         {/* Starting Lineup Section */}
         <div>
-          <h3 className="text-xs sm:text-sm font-semibold text-fantasy-dark mb-1.5 px-1">Starters</h3>
-          <div className="border border-fantasy-border rounded-lg overflow-hidden">
+          <h3 className="text-xs sm:text-sm font-semibold text-pastel-cream mb-1.5 px-1">Starters</h3>
+          <div className="border border-white/10 rounded-lg overflow-hidden">
             <table className="w-full text-xs sm:text-sm">
-              <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
+              <thead className="bg-white/5 border-b border-white/10">
                 <tr>
-                  <th className="px-2 sm:px-3 py-1.5 text-left font-semibold text-fantasy-dark">Pos</th>
-                  <th className="px-2 sm:px-3 py-1.5 text-left font-semibold text-fantasy-dark">Player</th>
-                  <th className="px-2 sm:px-3 py-1.5 text-right font-semibold text-fantasy-dark">PTS</th>
-                  <th className="px-2 sm:px-3 py-1.5 text-right font-semibold text-fantasy-dark hidden sm:table-cell">Rd</th>
+                  <th className="px-2 sm:px-3 py-1.5 text-left font-semibold text-pastel-cream">Pos</th>
+                  <th className="px-2 sm:px-3 py-1.5 text-left font-semibold text-pastel-cream">Player</th>
+                  <th className="px-2 sm:px-3 py-1.5 text-right font-semibold text-pastel-cream">PTS</th>
+                  <th className="px-2 sm:px-3 py-1.5 text-right font-semibold text-pastel-cream hidden sm:table-cell">Rd</th>
                 </tr>
               </thead>
               <tbody>
@@ -220,15 +227,15 @@ export const RosterDepthChart = ({
         {/* Bench Section */}
         {bench.length > 0 && (
           <div>
-            <h3 className="text-xs sm:text-sm font-semibold text-fantasy-dark mb-1.5 px-1">Bench ({bench.length})</h3>
-            <div className="border border-fantasy-border rounded-lg overflow-hidden">
+            <h3 className="text-xs sm:text-sm font-semibold text-pastel-cream mb-1.5 px-1">Bench ({bench.length})</h3>
+            <div className="border border-white/10 rounded-lg overflow-hidden">
               <table className="w-full text-xs sm:text-sm">
-                <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
+                <thead className="bg-white/5 border-b border-white/10">
                   <tr>
-                    <th className="px-2 sm:px-3 py-1.5 text-left font-semibold text-fantasy-dark">Pos</th>
-                    <th className="px-2 sm:px-3 py-1.5 text-left font-semibold text-fantasy-dark">Player</th>
-                    <th className="px-2 sm:px-3 py-1.5 text-right font-semibold text-fantasy-dark">PTS</th>
-                    <th className="px-2 sm:px-3 py-1.5 text-right font-semibold text-fantasy-dark hidden sm:table-cell">Rd</th>
+                    <th className="px-2 sm:px-3 py-1.5 text-left font-semibold text-pastel-cream">Pos</th>
+                    <th className="px-2 sm:px-3 py-1.5 text-left font-semibold text-pastel-cream">Player</th>
+                    <th className="px-2 sm:px-3 py-1.5 text-right font-semibold text-pastel-cream">PTS</th>
+                    <th className="px-2 sm:px-3 py-1.5 text-right font-semibold text-pastel-cream hidden sm:table-cell">Rd</th>
                   </tr>
                 </thead>
                 <tbody>

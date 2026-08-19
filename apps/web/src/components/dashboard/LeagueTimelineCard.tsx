@@ -201,7 +201,7 @@ export function LeagueTimelineCard({
       <CitrusCardTitle size="sm">The league, lately</CitrusCardTitle>
 
       {isLoading ? (
-        <div className="mt-4 text-sm text-white/45">Loading…</div>
+        <div className="mt-4 text-sm text-white/55">Loading…</div>
       ) : items.length === 0 ? (
         <div className="mt-4 flex flex-col items-center text-center gap-3 py-4">
           {/* Empty-state art slot. Uses mascot-stormy.webp until the
@@ -235,7 +235,7 @@ export function LeagueTimelineCard({
                 <div className="text-sm text-pastel-cream font-medium leading-snug">
                   {item.headline}
                 </div>
-                <div className="text-xs text-white/45 mt-0.5">
+                <div className="text-xs text-white/55 mt-0.5">
                   <span>{item.sub}</span>
                   <span className="mx-1.5">·</span>
                   <span>{formatRelativeWhen(item.when)}</span>

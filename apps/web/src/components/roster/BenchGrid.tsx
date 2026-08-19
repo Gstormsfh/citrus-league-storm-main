@@ -6,6 +6,14 @@ import { cn } from "@/lib/utils";
 import HockeyPlayerCard, { HockeyPlayer } from "./HockeyPlayerCard";
 import { CitrusLeaf } from "@/components/icons/CitrusIcons";
 
+/* 2026-08-19 visual audit — muted-text correction.
+   text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
+   original CREAM theme. At 20-70% opacity on the dark #1A2A20 tiles it
+   composites to near-invisible (team codes on this page measured
+   1.47:1). Remapped to cream at the alpha that preserves the intended
+   hierarchy while clearing 4.5:1 on a dark tile. */
+
+
 interface BenchGridProps {
   players: HockeyPlayer[];
   onPlayerClick?: (player: HockeyPlayer) => void;
@@ -55,7 +63,7 @@ const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Se
   return (
     <div className={cn("space-y-4", className)}>
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-varsity font-black flex items-center gap-2 text-citrus-forest uppercase tracking-tight">
+        <h2 className="text-xl font-varsity font-black flex items-center gap-2 text-pastel-cream uppercase tracking-tight">
           <CitrusLeaf className="w-5 h-5 text-citrus-sage" />
           Bench
           <Badge variant="outline" className="ml-2 font-display">
@@ -112,15 +120,15 @@ const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Se
             <div className="text-center relative z-10">
               <CitrusLeaf className={cn(
                 "w-12 h-12 mx-auto mb-3 transition-colors",
-                isOver ? "text-citrus-sage" : "text-citrus-charcoal/40"
+                isOver ? "text-citrus-sage" : "text-pastel-cream/60"
               )} />
               <p className={cn(
                 "text-sm font-varsity font-bold mb-1 uppercase tracking-wide",
-                isOver ? "text-citrus-forest" : "text-citrus-charcoal/60"
+                isOver ? "text-pastel-cream" : "text-pastel-cream/70"
               )}>
                 {isOver ? "Drop players here" : "No bench players"}
               </p>
-              <p className="text-xs font-display text-citrus-charcoal/50">
+              <p className="text-xs font-display text-pastel-cream/65">
                 Drag players from starters or add from free agents
               </p>
             </div>

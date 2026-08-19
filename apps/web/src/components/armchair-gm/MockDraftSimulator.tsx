@@ -8,6 +8,16 @@ import { Trophy, Play, RotateCcw, ChevronDown, ChevronUp, Users } from 'lucide-r
 import { PlayerService } from '@/services/PlayerService';
 import type { Player } from '@/services/PlayerService';
 
+/* 2026-08-19 visual audit — surface correction.
+   These panels used bg-white/55..80 ("frosted glass") on the #0F1F15
+   dark page. Composited, that lands around rgb(159,165,161) — a MID-GREY
+   dead zone where nothing reads: cream text measured 2.37:1 and the dark
+   labels 1.58:1 against it. There is no text colour that fixes a
+   mid-grey surface; the surface itself is the bug. Swapped to the dark
+   tile family the rest of the app uses (ui/card.tsx is
+   bg-pastel-surface-tile + ring-white/10), so cream text lands at 13:1. */
+
+
 interface MockDraftPick {
   round: number;
   pick: number;
@@ -212,13 +222,13 @@ const MockDraftSimulator = () => {
     return (
       <div className="space-y-6">
         {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
-        <Card className="p-6 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest">
+        <Card className="p-6 bg-pastel-surface-tile ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-pastel-cream">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl bg-citrus-sage/20">
               <Trophy className="w-6 h-6 text-citrus-sage" />
             </div>
             <div>
-              <h2 className="font-varsity text-xl text-citrus-forest">Mock Draft Simulator</h2>
+              <h2 className="font-varsity text-xl text-pastel-cream">Mock Draft Simulator</h2>
               <p className="text-xs text-muted-foreground">Practice your draft strategy with real player data</p>
             </div>
           </div>
@@ -286,12 +296,12 @@ const MockDraftSimulator = () => {
     <div className="space-y-4">
       {/* Draft Header */}
       {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
-      <Card className="p-4 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest">
+      <Card className="p-4 bg-pastel-surface-tile ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-pastel-cream">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <div className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-citrus-sage" />
-              <h2 className="font-varsity text-lg text-citrus-forest">Mock Draft</h2>
+              <h2 className="font-varsity text-lg text-pastel-cream">Mock Draft</h2>
               <Badge variant="outline" className="text-[10px]">
                 {draftType === 'snake' ? 'Snake' : 'Linear'} • {numTeams} teams • {numRounds} rounds
               </Badge>
@@ -321,7 +331,7 @@ const MockDraftSimulator = () => {
         {/* Available Players */}
         <div className="lg:col-span-2">
           {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
-          <Card className="p-3 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest">
+          <Card className="p-3 bg-pastel-surface-tile ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-pastel-cream">
             <h3 className="font-bold text-sm mb-2 flex items-center gap-2">
               <Users className="w-4 h-4" />
               Available Players
@@ -390,7 +400,7 @@ const MockDraftSimulator = () => {
         {/* My Picks Sidebar */}
         <div>
           {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
-          <Card className="p-3 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest mb-4">
+          <Card className="p-3 bg-pastel-surface-tile ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-pastel-cream mb-4">
             <h3 className="font-bold text-sm mb-2">Your Roster ({myPicks.length})</h3>
             <div className="space-y-1">
               {myPicks.map(pick => {
@@ -411,7 +421,7 @@ const MockDraftSimulator = () => {
 
           {/* Draft Board Toggle */}
           {/* PINNED: v1 surface preserved until ArmchairGM page migrates to v2 */}
-          <Card className="p-3 bg-white/80 ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-citrus-forest">
+          <Card className="p-3 bg-pastel-surface-tile ring-1 ring-citrus-sage/30 border-0 shadow-varsity text-pastel-cream">
             <button
               onClick={() => setShowBoard(!showBoard)}
               className="flex items-center justify-between w-full text-sm font-bold"

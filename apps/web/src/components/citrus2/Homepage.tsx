@@ -360,7 +360,7 @@ export function Homepage() {
 
       {/* Trust strip — what's real about Citrus, no fake numbers */}
       <section className="relative max-w-[1280px] mx-auto px-6 pb-16">
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 border-t border-white/5 pt-6">
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 border-t border-white/5 pt-6">
           <span className="text-pastel-sage-soft">31 model features</span>
           <span className="text-white/20">·</span>
           <span className="text-pastel-sage-soft">Sun–Sat weeks</span>
@@ -384,7 +384,7 @@ export function Homepage() {
               Every way to play hockey.
             </h2>
           </div>
-          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/40">
+          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55">
             Scroll for more →
           </span>
         </div>

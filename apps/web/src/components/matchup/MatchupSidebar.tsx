@@ -9,6 +9,14 @@ import { MatchupPlayer } from './types';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { AdSpace } from '@/components/AdSpace';
 
+/* 2026-08-19 visual audit — muted-text correction.
+   text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
+   original CREAM theme. At 20-70% opacity on the dark #1A2A20 tiles it
+   composites to near-invisible (team codes on this page measured
+   1.47:1). Remapped to cream at the alpha that preserves the intended
+   hierarchy while clearing 4.5:1 on a dark tile. */
+
+
 interface MatchupSidebarProps {
   myStarters: MatchupPlayer[];
   opponentStarters: MatchupPlayer[];
@@ -83,7 +91,7 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
         <CitrusSlice className="absolute bottom-2 left-2 w-12 h-12 text-citrus-orange opacity-10 pointer-events-none" />
         
         <CardHeader className="pb-3 relative z-10 bg-gradient-to-r from-citrus-sage/20 via-citrus-sage/10 to-citrus-cream border-b-3 border-citrus-sage/30">
-          <CardTitle className="text-sm font-varsity font-black text-citrus-forest uppercase tracking-tight flex items-center gap-2">
+          <CardTitle className="text-sm font-varsity font-black text-pastel-cream uppercase tracking-tight flex items-center gap-2">
             <Flame className="w-4 h-4 text-citrus-orange" aria-hidden="true" />
             Top Performers
             <CitrusSparkle className="w-3 h-3 text-citrus-orange ml-auto" />
@@ -91,7 +99,7 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
         </CardHeader>
         <CardContent className="p-3 space-y-2 relative z-10">
           {topPerformers.length === 0 ? (
-            <div className="text-center py-4 text-xs font-display text-citrus-charcoal">
+            <div className="text-center py-4 text-xs font-display text-pastel-cream/85">
               No scores yet this week
             </div>
           ) : (
@@ -121,10 +129,10 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
                     
                     {/* Player info */}
                     <div className="flex-1 text-left min-w-0">
-                      <div className="font-varsity text-xs font-bold text-citrus-forest truncate">
+                      <div className="font-varsity text-xs font-bold text-pastel-cream truncate">
                         {player.name}
                       </div>
-                      <div className="font-display text-[10px] text-citrus-charcoal/70 truncate">
+                      <div className="font-display text-[10px] text-pastel-cream/75 truncate">
                         {player.teamName}
                       </div>
                     </div>

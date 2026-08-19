@@ -319,7 +319,7 @@ const GMOffice = () => {
                           {/* Subtle "tap to open" footer that only appears on hover */}
                           {!isLocked && (
                             <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
-                              <span className="font-jbmono text-[9px] uppercase tracking-[0.32em] text-white/40 group-hover:text-pastel-orange-soft transition-colors">
+                              <span className="font-jbmono text-[9px] uppercase tracking-[0.32em] text-white/55 group-hover:text-pastel-orange-soft transition-colors">
                                 Tap to open
                               </span>
                               <span className="text-pastel-orange/60 group-hover:text-pastel-orange group-hover:translate-x-0.5 transition-all" aria-hidden="true">

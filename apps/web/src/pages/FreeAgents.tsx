@@ -1300,7 +1300,7 @@ const FreeAgents = () => {
           <div className="flex gap-2 w-full md:w-auto">
             <Input
               placeholder="Search players…"
-              className="max-w-xs bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+              className="max-w-xs bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -2015,7 +2015,11 @@ const FreeAgents = () => {
                                    {isTopPick && (
                                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
                                        index === 0 ? 'bg-yellow-500 text-white' :
-                                       index === 1 ? 'bg-white/45 text-[#0F1F15]' :
+                                       // 2026-08-19: bg-white/45 over the dark
+                                       // page composites to mid-grey, leaving
+                                       // this "#2" rank chip at ~3.6:1. Solid
+                                       // silver reads cleanly instead.
+                                       index === 1 ? 'bg-slate-300 text-[#0F1F15]' :
                                        'bg-amber-700 text-white'
                                      }`}>
                                        {index + 1}

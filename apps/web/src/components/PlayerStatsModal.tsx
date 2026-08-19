@@ -18,6 +18,14 @@ import { MatchupService } from '@/services/MatchupService';
 import { matchupApi } from '@/api/matchups';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 
+/* 2026-08-19 visual audit — muted-text correction.
+   text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
+   original CREAM theme. At 20-70% opacity on the dark #1A2A20 tiles it
+   composites to near-invisible (team codes on this page measured
+   1.47:1). Remapped to cream at the alpha that preserves the intended
+   hierarchy while clearing 4.5:1 on a dark tile. */
+
+
 // ─── Types for game log entries ──────────────────────────────────────
 interface GameLogEntry {
   date: string; // YYYY-MM-DD
@@ -75,7 +83,7 @@ const posColors: Record<string, { bg: string; text: string; border: string }> = 
   LW: { bg: 'bg-citrus-green-dark', text: 'text-white', border: 'border-citrus-green-dark' },
   RW: { bg: 'bg-citrus-orange', text: 'text-white', border: 'border-citrus-orange' },
   D:  { bg: 'bg-citrus-forest', text: 'text-white', border: 'border-citrus-forest' },
-  G:  { bg: 'bg-citrus-peach', text: 'text-citrus-forest', border: 'border-citrus-peach' },
+  G:  { bg: 'bg-citrus-peach', text: 'text-pastel-forest', border: 'border-citrus-peach' },
 };
 
 const getPositionAbbr = (pos: string) => {
@@ -91,14 +99,14 @@ const getPositionAbbr = (pos: string) => {
 // ─── Stat cell helper ────────────────────────────────────────────────
 const StatCell = ({ label, value, highlight, sub }: { label: string; value: string | number; highlight?: boolean; sub?: string }) => (
   <div className="flex flex-col items-center p-3 bg-[#E8EED9]/40 rounded-xl border border-citrus-sage/20">
-    <span className="text-[10px] font-display font-semibold text-citrus-charcoal/50 uppercase tracking-wider mb-1">{label}</span>
+    <span className="text-[10px] font-display font-semibold text-pastel-cream/65 uppercase tracking-wider mb-1">{label}</span>
     <span className={cn(
       "text-xl font-varsity font-black leading-none",
-      highlight ? "text-citrus-orange" : "text-citrus-forest"
+      highlight ? "text-citrus-orange" : "text-pastel-cream"
     )}>
       {value}
     </span>
-    {sub && <span className="text-[9px] text-citrus-charcoal/40 font-display mt-0.5">{sub}</span>}
+    {sub && <span className="text-[9px] text-pastel-cream/60 font-display mt-0.5">{sub}</span>}
   </div>
 );
 
@@ -386,7 +394,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   {posAbbr}
                 </Badge>
                 <span className="text-white/70 text-sm font-display font-medium">{player.team}</span>
-                <span className="text-white/40 text-sm">#{player.number}</span>
+                <span className="text-white/55 text-sm">#{player.number}</span>
               </div>
               {/* Status badge */}
               {statusInfo && (
@@ -414,8 +422,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 </>
               ) : (
                 <>
-                  <Snowflake className="w-4 h-4 text-white/40" />
-                  <span className="text-white/40 text-sm font-display italic">No upcoming games</span>
+                  <Snowflake className="w-4 h-4 text-white/55" />
+                  <span className="text-white/55 text-sm font-display italic">No upcoming games</span>
                 </>
               )}
             </div>
@@ -425,7 +433,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
               </span>
               <span className={cn(
                 "text-xl font-varsity font-black",
-                hasGame ? "text-citrus-orange" : "text-white/30"
+                hasGame ? "text-citrus-orange" : "text-white/55"
               )}>
                 {hasGame ? heroProjectedPts.toFixed(1) : '—'}
               </span>
@@ -490,26 +498,26 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 <div className="flex items-center gap-4 py-2.5 px-3 bg-citrus-cream/30 rounded-xl border border-citrus-sage/15 text-sm">
                   {player.age && (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-citrus-charcoal/40 text-xs font-display">Age</span>
-                      <span className="font-display font-bold text-citrus-forest">{player.age}</span>
+                      <span className="text-pastel-cream/60 text-xs font-display">Age</span>
+                      <span className="font-display font-bold text-pastel-cream">{player.age}</span>
                     </div>
                   )}
                   {player.height && (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-citrus-charcoal/40 text-xs font-display">Ht</span>
-                      <span className="font-display font-bold text-citrus-forest">{player.height}</span>
+                      <span className="text-pastel-cream/60 text-xs font-display">Ht</span>
+                      <span className="font-display font-bold text-pastel-cream">{player.height}</span>
                     </div>
                   )}
                   {player.weight && (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-citrus-charcoal/40 text-xs font-display">Wt</span>
-                      <span className="font-display font-bold text-citrus-forest">{player.weight}</span>
+                      <span className="text-pastel-cream/60 text-xs font-display">Wt</span>
+                      <span className="font-display font-bold text-pastel-cream">{player.weight}</span>
                     </div>
                   )}
                   {player.experience && (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-citrus-charcoal/40 text-xs font-display">Exp</span>
-                      <span className="font-display font-bold text-citrus-forest">{player.experience}</span>
+                      <span className="text-pastel-cream/60 text-xs font-display">Exp</span>
+                      <span className="font-display font-bold text-pastel-cream">{player.experience}</span>
                     </div>
                   )}
                 </div>
@@ -559,8 +567,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                         { label: 'TOI/G', value: stats.toi ?? '—' },
                       ].map((item, i) => (
                         <div key={i} className="bg-card p-2.5 flex flex-col items-center text-center">
-                          <span className="text-[9px] font-display font-semibold text-citrus-charcoal/40 uppercase tracking-wider">{item.label}</span>
-                          <span className="text-base font-varsity font-black text-citrus-forest mt-0.5">{item.value}</span>
+                          <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase tracking-wider">{item.label}</span>
+                          <span className="text-base font-varsity font-black text-pastel-cream mt-0.5">{item.value}</span>
                         </div>
                       ))}
                     </div>
@@ -568,7 +576,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
                   {/* Advanced metrics */}
                   <div className="space-y-2">
-                    <h4 className="text-xs font-display font-bold text-citrus-charcoal/50 uppercase tracking-wider flex items-center gap-1.5">
+                    <h4 className="text-xs font-display font-bold text-pastel-cream/65 uppercase tracking-wider flex items-center gap-1.5">
                       <CitrusSparkle className="w-3.5 h-3.5 text-citrus-orange" />
                       Advanced
                     </h4>
@@ -593,7 +601,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
               {gameLogLoading ? (
                 <div className="text-center py-10">
                   <Loader2 className="w-8 h-8 text-citrus-sage/40 mx-auto mb-3 animate-spin" />
-                  <p className="text-sm font-display text-citrus-charcoal/40">Loading game log…</p>
+                  <p className="text-sm font-display text-pastel-cream/60">Loading game log…</p>
                 </div>
               ) : gameLog.length > 0 ? (
                 <>
@@ -601,19 +609,19 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-citrus-sage/10 to-citrus-peach/10 rounded-xl border border-citrus-sage/20">
                     <CalendarDays className="w-5 h-5 text-citrus-orange flex-shrink-0" />
                     <div>
-                      <span className="text-sm font-display font-bold text-citrus-forest">
+                      <span className="text-sm font-display font-bold text-pastel-cream">
                         {gameLog.length} Game{gameLog.length !== 1 ? 's' : ''}
                       </span>
-                      <span className="text-xs text-citrus-charcoal/50 ml-2">
+                      <span className="text-xs text-pastel-cream/65 ml-2">
                         {pastGames.length} played · {futureGames.length} remaining
                       </span>
                     </div>
                     <div className="ml-auto text-right">
                       {totalActual > 0 && (
-                        <div className="text-lg font-varsity font-black text-citrus-forest leading-tight">{totalActual.toFixed(1)}<span className="text-[9px] text-citrus-charcoal/40 font-display uppercase ml-1">actual</span></div>
+                        <div className="text-lg font-varsity font-black text-pastel-cream leading-tight">{totalActual.toFixed(1)}<span className="text-[9px] text-pastel-cream/60 font-display uppercase ml-1">actual</span></div>
                       )}
                       {futureGames.length > 0 && (
-                        <div className="text-sm font-varsity font-black text-citrus-orange leading-tight">{totalProjected.toFixed(1)}<span className="text-[9px] text-citrus-charcoal/40 font-display uppercase ml-1">proj</span></div>
+                        <div className="text-sm font-varsity font-black text-citrus-orange leading-tight">{totalProjected.toFixed(1)}<span className="text-[9px] text-pastel-cream/60 font-display uppercase ml-1">proj</span></div>
                       )}
                     </div>
                   </div>
@@ -648,11 +656,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                           <div className="flex flex-col items-center min-w-[40px]">
                             <span className={cn(
                               "text-[10px] font-varsity font-black uppercase tracking-wider",
-                              gp.isToday ? "text-citrus-orange" : "text-citrus-charcoal/50"
+                              gp.isToday ? "text-citrus-orange" : "text-pastel-cream/65"
                             )}>
                               {gp.dayLabel}
                             </span>
-                            <span className="text-xs font-display font-bold text-citrus-forest">{gp.dateLabel}</span>
+                            <span className="text-xs font-display font-bold text-pastel-cream">{gp.dateLabel}</span>
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
@@ -661,8 +669,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                               ) : (
                                 <Flame className={cn("w-3.5 h-3.5", gp.isToday ? "text-citrus-orange" : "text-citrus-sage/50")} />
                               )}
-                              <span className="text-sm font-display font-bold text-citrus-forest">{gp.opponent}</span>
-                              {!hasActuals && gp.gameTime && <span className="text-[10px] text-citrus-charcoal/40 font-display">{gp.gameTime}</span>}
+                              <span className="text-sm font-display font-bold text-pastel-cream">{gp.opponent}</span>
+                              {!hasActuals && gp.gameTime && <span className="text-[10px] text-pastel-cream/60 font-display">{gp.gameTime}</span>}
                             </div>
                             {gp.isToday && (
                               <Badge className="mt-0.5 bg-citrus-orange/90 text-white border-0 text-[10px] font-varsity font-black tracking-wider h-4 px-1.5">
@@ -673,11 +681,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                           <div className="text-right">
                             <div className={cn(
                               "text-xl font-varsity font-black",
-                              hasActuals ? "text-citrus-forest" : (displayPoints > 0 ? "text-citrus-orange" : "text-citrus-charcoal/30")
+                              hasActuals ? "text-pastel-cream" : (displayPoints > 0 ? "text-citrus-orange" : "text-pastel-cream/60")
                             )}>
                               {hasActuals ? displayPoints.toFixed(1) : (displayPoints > 0 ? displayPoints.toFixed(1) : (gp.isPast ? 'DNP' : '—'))}
                             </div>
-                            <div className="text-[10px] text-citrus-charcoal/40 font-display uppercase">
+                            <div className="text-[10px] text-pastel-cream/60 font-display uppercase">
                               {hasActuals ? 'pts' : (gp.isPast ? '' : 'proj')}
                             </div>
                           </div>
@@ -698,8 +706,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   { label: 'SV%', value: as.save_pct != null ? `${(Number(as.save_pct) * 100).toFixed(1)}` : '—' },
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-citrus-sage/10 rounded border border-citrus-sage/15">
-                                    <span className="text-[9px] font-display font-semibold text-citrus-charcoal/40 uppercase">{s.label}</span>
-                                    <span className="text-[10px] font-varsity font-black text-citrus-forest">{s.value}</span>
+                                    <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
+                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value}</span>
                                   </div>
                                 ))}
                               </div>
@@ -716,8 +724,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   { label: 'PIM', value: Number(as.pim || 0) },
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-citrus-sage/10 rounded border border-citrus-sage/15">
-                                    <span className="text-[9px] font-display font-semibold text-citrus-charcoal/40 uppercase">{s.label}</span>
-                                    <span className="text-[10px] font-varsity font-black text-citrus-forest">{s.value}</span>
+                                    <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
+                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value}</span>
                                   </div>
                                 ))}
                               </div>
@@ -737,8 +745,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   { label: 'SV%', value: gp.projection.projected_save_pct ? `${(Number(gp.projection.projected_save_pct) * 100).toFixed(1)}` : '—' },
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-[#E8EED9]/40 rounded border border-citrus-sage/10">
-                                    <span className="text-[9px] font-display font-semibold text-citrus-charcoal/40 uppercase">{s.label}</span>
-                                    <span className="text-[10px] font-varsity font-black text-citrus-forest">{s.value ?? '—'}</span>
+                                    <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
+                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '—'}</span>
                                   </div>
                                 ))}
                               </div>
@@ -755,8 +763,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   { label: 'PIM', value: (gp.projection.projected_pim as number | undefined)?.toFixed(1) },
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-[#E8EED9]/40 rounded border border-citrus-sage/10">
-                                    <span className="text-[9px] font-display font-semibold text-citrus-charcoal/40 uppercase">{s.label}</span>
-                                    <span className="text-[10px] font-varsity font-black text-citrus-forest">{s.value ?? '—'}</span>
+                                    <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
+                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '—'}</span>
                                   </div>
                                 ))}
                               </div>
@@ -764,22 +772,22 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                             {/* Likely Range + Confidence for future games */}
                             {gp.projection?.likely_low != null && gp.projection?.likely_high != null && (
                               <div className="flex items-center justify-between mt-1.5 px-1">
-                                <span className="text-[10px] font-display text-citrus-charcoal/40">Likely Range</span>
-                                <span className="text-[9px] font-varsity font-black text-citrus-forest">
+                                <span className="text-[10px] font-display text-pastel-cream/60">Likely Range</span>
+                                <span className="text-[9px] font-varsity font-black text-pastel-cream">
                                   {Number(gp.projection.likely_low).toFixed(1)} – {Number(gp.projection.likely_high).toFixed(1)} pts
                                 </span>
                               </div>
                             )}
                             {gp.computedConfidence > 0 && (
                               <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[10px] font-display text-citrus-charcoal/40">Confidence</span>
+                                <span className="text-[10px] font-display text-pastel-cream/60">Confidence</span>
                                 <div className="flex-1 h-1.5 bg-citrus-sage/10 rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-gradient-to-r from-citrus-sage to-citrus-orange rounded-full"
                                     style={{ width: `${Math.min(gp.computedConfidence * 100, 100)}%` }}
                                   />
                                 </div>
-                                <span className="text-[9px] font-varsity font-black text-citrus-forest">
+                                <span className="text-[9px] font-varsity font-black text-pastel-cream">
                                   {Math.round(gp.computedConfidence * 100)}%
                                 </span>
                               </div>
@@ -793,9 +801,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 </>
               ) : (
                 <div className="text-center py-10">
-                  <Snowflake className="w-10 h-10 text-citrus-charcoal/20 mx-auto mb-3" />
-                  <p className="text-sm font-display text-citrus-charcoal/40">No games scheduled</p>
-                  <p className="text-xs font-display text-citrus-charcoal/30 mt-1">Game log appears when games are on the schedule</p>
+                  <Snowflake className="w-10 h-10 text-pastel-cream/60 mx-auto mb-3" />
+                  <p className="text-sm font-display text-pastel-cream/60">No games scheduled</p>
+                  <p className="text-xs font-display text-pastel-cream/60 mt-1">Game log appears when games are on the schedule</p>
                 </div>
               )}
             </TabsContent>

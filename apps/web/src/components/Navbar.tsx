@@ -204,7 +204,7 @@ const Navbar = () => {
                     <span className="text-[13px] font-bold text-pastel-cream max-w-[200px] truncate">
                       {activeLeague?.name || 'Select League'}
                     </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-white/45" />
+                    <ChevronDown className="h-3.5 w-3.5 text-white/55" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-64 bg-pastel-surface-tile border-white/10 text-pastel-cream">
@@ -245,7 +245,7 @@ const Navbar = () => {
                       <Trophy className="h-4 w-4 mr-2 text-pastel-orange" />
                       <div className="flex-1 min-w-0">
                         <div className="font-bold truncate">{l.name}</div>
-                        <div className="text-[10px] font-jbmono uppercase tracking-wider text-white/45">
+                        <div className="text-[10px] font-jbmono uppercase tracking-wider text-white/55">
                           {isPoolLeague(lType) ? getPoolLabel(lType) + ' Pool' : (l.draft_status === 'completed' ? 'Season Active' : 'Draft Pending')}
                         </div>
                       </div>
@@ -286,7 +286,7 @@ const Navbar = () => {
                         {userInitial}
                       </div>
                       <span className="text-[13px] font-bold text-pastel-cream hidden xl:inline">{displayName}</span>
-                      <ChevronDown className="h-3.5 w-3.5 text-white/45 hidden xl:block" />
+                      <ChevronDown className="h-3.5 w-3.5 text-white/55 hidden xl:block" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48 bg-pastel-surface-tile border-white/10 text-pastel-cream">
@@ -345,7 +345,7 @@ const Navbar = () => {
                   "flex items-center gap-2 px-4 h-11 text-[13px] font-bold transition-all border-b-2 whitespace-nowrap",
                   isTabActive('/news')
                     ? "border-pastel-orange text-pastel-cream"
-                    : "border-transparent text-white/45 hover:text-pastel-cream"
+                    : "border-transparent text-white/55 hover:text-pastel-cream"
                 )}
               >
                 <Newspaper className="h-4 w-4" />
@@ -357,7 +357,7 @@ const Navbar = () => {
                   "flex items-center gap-2 px-4 h-11 text-[13px] font-bold transition-all border-b-2 whitespace-nowrap",
                   isTabActive('/contact')
                     ? "border-pastel-orange text-pastel-cream"
-                    : "border-transparent text-white/45 hover:text-pastel-cream"
+                    : "border-transparent text-white/55 hover:text-pastel-cream"
                 )}
               >
                 Contact
@@ -455,7 +455,7 @@ const Navbar = () => {
                       <span className="text-[13px] font-bold text-pastel-cream truncate flex-1 text-left">
                         {activeLeague?.name || 'Select League'}
                       </span>
-                      <ChevronDown className="h-3.5 w-3.5 text-white/45 flex-shrink-0" />
+                      <ChevronDown className="h-3.5 w-3.5 text-white/55 flex-shrink-0" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-w-[320px] bg-pastel-surface-tile border-white/10 text-pastel-cream">
@@ -495,7 +495,7 @@ const Navbar = () => {
                         <Trophy className="h-4 w-4 mr-2 text-pastel-orange" />
                         <div className="flex-1 min-w-0">
                           <div className="font-bold truncate">{l.name}</div>
-                          <div className="text-[10px] font-jbmono uppercase tracking-wider text-white/45">
+                          <div className="text-[10px] font-jbmono uppercase tracking-wider text-white/55">
                             {isPoolLeague(lType) ? getPoolLabel(lType) + ' Pool' : (l.draft_status === 'completed' ? 'Season Active' : 'Draft Pending')}
                           </div>
                         </div>
@@ -556,7 +556,7 @@ const Navbar = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-bold text-pastel-cream truncate">{displayName}</p>
-                    <p className="text-[11px] text-white/45 truncate">{user.email}</p>
+                    <p className="text-[11px] text-white/55 truncate">{user.email}</p>
                   </div>
                   <div className="flex gap-2">
                     <Link to="/profile" onClick={closeMobileMenu} className="p-2 rounded-md bg-white/5 hover:bg-white/10 transition-colors">

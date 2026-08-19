@@ -210,7 +210,7 @@ const Auth = () => {
     } finally { setResetLoading(false); }
   };
 
-  const darkInputClass = 'bg-pastel-surface border-white/10 text-pastel-cream placeholder:text-white/35 focus-visible:ring-pastel-orange/40 focus-visible:border-pastel-orange/50 h-11';
+  const darkInputClass = 'bg-pastel-surface border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 focus-visible:border-pastel-orange/50 h-11';
 
   return (
     <DarkLayout>
@@ -259,7 +259,7 @@ const Auth = () => {
 
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-white/10" /></div>
-                  <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45">or with email</span></div>
+                  <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/55">or with email</span></div>
                 </div>
 
                 <form onSubmit={handleSignIn} className="space-y-3">
@@ -273,7 +273,7 @@ const Auth = () => {
                   <div className="space-y-1.5">
                     <Label htmlFor="signin-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Email</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} aria-hidden="true" />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/55" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="signin-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
                     </div>
                   </div>
@@ -321,7 +321,7 @@ const Auth = () => {
                       </Dialog>
                     </div>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} aria-hidden="true" />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/55" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="signin-password" type="password" placeholder="••••••••" value={password} onChange={(e) => { setPassword(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
                     </div>
                   </div>
@@ -340,7 +340,7 @@ const Auth = () => {
 
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-white/10" /></div>
-                  <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/45">or with email</span></div>
+                  <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/55">or with email</span></div>
                 </div>
 
                 <form onSubmit={handleSignUp} className="space-y-3">
@@ -354,7 +354,7 @@ const Auth = () => {
                   <div className="space-y-1.5">
                     <Label htmlFor="signup-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Email</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} aria-hidden="true" />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/55" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="signup-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
                     </div>
                   </div>
@@ -362,7 +362,7 @@ const Auth = () => {
                   <div className="space-y-1.5">
                     <Label htmlFor="signup-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Password</Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} aria-hidden="true" />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/55" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="signup-password" type="password" placeholder="••••••••" value={password} onChange={(e) => { setPassword(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required minLength={8} />
                     </div>
                     {password && <PasswordStrength password={password} />}
@@ -371,7 +371,7 @@ const Auth = () => {
                   <div className="space-y-1.5">
                     <Label htmlFor="confirm-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Confirm Password</Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" strokeWidth={2.5} aria-hidden="true" />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/55" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="confirm-password" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
                     </div>
                   </div>
@@ -394,7 +394,7 @@ const Auth = () => {
             </Tabs>
           </CitrusCard>
 
-          <p className="text-center text-[10px] font-jbmono uppercase tracking-[0.32em] text-white/35 mt-6">
+          <p className="text-center text-[10px] font-jbmono uppercase tracking-[0.32em] text-white/55 mt-6">
             Free during launch · Founders pricing locked in
           </p>
         </div>

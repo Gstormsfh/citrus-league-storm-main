@@ -163,8 +163,13 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
         navigate(`/roster?league=${leagueId}`);
         break;
       case 'TRADE':
-        // Navigate to trades page (if exists)
-        navigate(`/roster?league=${leagueId}&tab=trades`);
+        // 2026-08-18 launch audit: this was `&tab=trades`. Roster.tsx
+        // never read a `tab` param at all, and even if it had, its tab
+        // values are roster | stats | trends | transactions — there is
+        // no 'trades'. Tapping a TRADE notification silently dumped the
+        // user on the default roster view. /trade-analyzer is the real
+        // destination for trade activity.
+        navigate(`/trade-analyzer?league=${leagueId}`);
         break;
       case 'WAIVER':
         // Navigate to waiver wire

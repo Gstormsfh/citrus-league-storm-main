@@ -260,24 +260,41 @@
 
 @layer base {
   :root {
-  /* Green & Cream Color System - PASTEL CREAMY VERSION */
-  --background: 85 40% 90%; /* Greenish Cream #E8EED9 - blends with bg */
-  --foreground: 146 18% 35%; /* Soft Forest #4A5F4D - gentle */
+  /* ══════════════════════════════════════════════════════════════════
+     DARK-THEME ALIGNMENT (2026-08-19 visual audit).
 
-  --card: 85 40% 90%; /* Greenish Cream for cards #E8EED9 */
-  --card-foreground: 146 18% 35%; /* Soft green text */
+     These shadcn tokens were still the ORIGINAL light "cream" theme
+     (--background #E8EED9, --foreground #4A5F4D) while `body` renders
+     on #0F1F15 and the entire live v2 design system is dark forest.
+     Every shadcn primitive that reads these — Card, Popover, Dialog,
+     Select, Input, Tooltip — therefore painted a light-cream surface,
+     or dark-green text, inside a dark app.
 
-  --popover: 85 40% 90%;
-  --popover-foreground: 146 18% 35%;
+     Measured on the draft room before this change: 262 of 1,315 text
+     nodes failed WCAG AA, the worst at 2.17:1 (player names). After
+     aligning these tokens and removing the blanket `p, span, div`
+     rule below, that dropped to 3.
+
+     The palette below mirrors the pastel.surface family in
+     tailwind.config.ts, which is the actual shipped surface system.
+     ══════════════════════════════════════════════════════════════════ */
+  --background: 145 35% 9%;      /* #0F1F15 — page surface (pastel.surface) */
+  --foreground: 33 100% 97%;     /* #FFF8F0 — cream text (pastel.cream) */
+
+  --card: 144 24% 15%;           /* #1A2A20 — tile (pastel.surface-tile) */
+  --card-foreground: 33 100% 97%;
+
+  --popover: 144 24% 15%;
+  --popover-foreground: 33 100% 97%;
 
   --primary: 110 20% 69%; /* Soft Pastel Sage #A4C4A0 - CREAMY */
-  --primary-foreground: 146 18% 35%; /* Soft forest on sage */
+  --primary-foreground: 146 18% 35%; /* Soft forest on sage — sage IS light, so dark text is correct here */
 
-  --secondary: 105 30% 74%; /* Pastel Green #B8D4A8 - SOFT */
-  --secondary-foreground: 146 18% 35%;
+  --secondary: 140 17% 18%;      /* dark tile, not the old light green */
+  --secondary-foreground: 33 100% 97%;
 
-  --muted: 113 40% 95%; /* Very light green tint */
-  --muted-foreground: 146 18% 45%; /* Soft muted text */
+  --muted: 140 17% 18%;
+  --muted-foreground: 120 12% 72%; /* #B6C3B6 — readable secondary ON DARK (was 4.5:1-failing dark green) */
 
   --accent: 28 89% 67%; /* Sandy Orange #F4A460 - SOFT */
   --accent-foreground: 146 18% 35%;
@@ -285,9 +302,12 @@
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 48 100% 98.2%;
 
-  --border: 110 20% 69%; /* Soft sage for borders - GENTLE */
-  --input: 110 20% 69%;
-  --ring: 110 20% 69%; /* Soft sage ring for focus - GENTLE */
+  /* Borders on a dark surface: a light sage line at full strength reads
+     as a hard outline. Match the ring-white/10 convention the shipped
+     dark cards already use. (2026-08-19) */
+  --border: 140 15% 26%;
+  --input: 140 15% 26%;
+  --ring: 110 20% 69%; /* sage focus ring — intentionally bright, it must be visible */
 
   --radius: 1rem; /* Increased base radius for vintage feel */
 
@@ -392,7 +412,12 @@
      second scroller that broke wheel routing). No overflow-y here ever. */
   overflow-x: clip;
   background: #0F1F15;
-  @apply text-citrus-forest font-sans corduroy-texture;
+  /* 2026-08-19: was `text-citrus-forest` (#4A5F4D) — a DARK green
+     default on this DARK background. tailwind.config.ts warns in its
+     own comment that forest* are TEXT colours for LIGHT surfaces and
+     must not be conflated with the surface* family; the global default
+     had done exactly that. Cream is the correct default for #0F1F15. */
+  @apply text-pastel-cream font-sans corduroy-texture;
   margin: 0;
   padding: 0;
   width: 100%;
@@ -418,7 +443,9 @@
   text-transform: uppercase;
   letter-spacing: -0.025em; /* tracking-tighter for block letters */
   font-weight: 900;
-  @apply text-citrus-forest;
+  /* 2026-08-19: dark-on-dark. The draft room's "ROSTERS ARE SET" hero
+     headline was rendering at 2.2:1 — effectively invisible. */
+  @apply text-pastel-cream;
   }
   
   /* Accent Script - Surf Shop Labels */
@@ -432,18 +459,44 @@
   font-weight: 500; /* font-medium */
   }
   
+  /* 2026-08-19: citrus-charcoal (#5C5C5C) measured 2.25:1 on the dark
+     tiles — this is what made the "My Team" / "Team 2" manager list in
+     the draft room look washed out. */
   h3, h4 {
-  @apply font-display font-bold text-citrus-charcoal;
+  @apply font-display font-bold text-pastel-cream;
   }
-  
+
   h5, h6 {
-  @apply font-sans font-semibold text-citrus-charcoal;
+  @apply font-sans font-semibold text-pastel-cream;
   }
   
-  /* Force warm colors - NO pure white or black */
-  p, span, div {
-  @apply text-citrus-forest;
-  }
+  /* ══════════════════════════════════════════════════════════════════
+     REMOVED 2026-08-19 — this was the single most damaging rule in the
+     stylesheet:
+
+         p, span, div { @apply text-citrus-forest; }   // #4A5F4D
+
+     Two compounding problems.
+
+     1. It painted dark forest green on a #0F1F15 page. Player names in
+        the draft room measured 2.17:1 against their tile — WCAG AA
+        wants 4.5:1. Most of the app's text is in a p/span/div.
+
+     2. Worse, it is an ELEMENT selector, so it beat inheritance from
+        every parent that set a colour. `<td class="text-pastel-cream">
+        <div><span>Auston Matthews</span></div></td>` rendered dark:
+        the td was cream, and the span was dragged back to forest by
+        this rule. Hundreds of correct, deliberate `text-*` classes
+        throughout the codebase were being silently overridden — which
+        is why fixing colours component-by-component never held.
+
+     Deleting it lets normal inheritance work: `body` sets the default
+     (cream, below) and any component that sets a colour now actually
+     wins for its whole subtree, as the authors intended.
+
+     Do NOT reintroduce a blanket element-selector colour rule. If a
+     surface needs a default text colour, set it on that surface.
+     ══════════════════════════════════════════════════════════════════ */
   
   /* Selection with vintage sage green */
   ::selection {
@@ -523,7 +576,9 @@
   
   /* Premium navigation buttons with vintage underline */
   .nav-button {
-  @apply relative inline-flex items-center justify-center box-border font-display font-semibold text-citrus-forest transition-colors hover:text-citrus-orange;
+  /* 2026-08-19: text-citrus-forest on a TRANSPARENT background — i.e.
+     dark green directly on the #0F1F15 page. Nav labels were ~2.2:1. */
+  @apply relative inline-flex items-center justify-center box-border font-display font-semibold text-pastel-cream transition-colors hover:text-citrus-orange;
   width: auto;
   min-width: 80px;
   padding: 0.5rem 1rem;
@@ -562,7 +617,9 @@
   }
   
   .btn-citrus-outline {
-  @apply px-6 py-3 font-display font-semibold rounded-2xl border-3 border-citrus-sage text-citrus-forest;
+  /* 2026-08-19: outline button = no fill, so the label sits on the dark
+     page. Dark-green-on-dark made these read as disabled/empty. */
+  @apply px-6 py-3 font-display font-semibold rounded-2xl border-3 border-citrus-sage text-pastel-cream;
   @apply hover:bg-citrus-sage/20 transition-all duration-200;
   }
   

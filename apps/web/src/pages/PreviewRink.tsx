@@ -210,7 +210,7 @@ export default function PreviewRink() {
               The slate.
             </h2>
           </div>
-          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/40">
+          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55">
             Updated 4s ago
           </span>
         </div>
@@ -234,13 +234,13 @@ export default function PreviewRink() {
                       </span>
                     </>
                   ) : (
-                    <span className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/40 font-bold">
+                    <span className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/55 font-bold">
                       Final
                     </span>
                   )}
                 </span>
                 {g.status === 'LIVE' && (
-                  <span className="font-jbmono text-[10px] tracking-wider text-white/40 tabular-nums">
+                  <span className="font-jbmono text-[10px] tracking-wider text-white/55 tabular-nums">
                     {g.period} · {g.time}
                   </span>
                 )}
@@ -248,14 +248,14 @@ export default function PreviewRink() {
               <div className="flex items-baseline justify-between">
                 <div>
                   <div className="font-sans font-black text-[1.5rem] text-pastel-cream leading-none">{g.away}</div>
-                  <div className="font-jbmono text-[9px] text-white/40 mt-1 tracking-wider uppercase">Away</div>
+                  <div className="font-jbmono text-[9px] text-white/55 mt-1 tracking-wider uppercase">Away</div>
                 </div>
                 <div className="font-sans font-black text-[2rem] text-pastel-cream tabular-nums leading-none">
-                  {g.awayScore}<span className="text-white/30 mx-0.5">·</span>{g.homeScore}
+                  {g.awayScore}<span className="text-white/55 mx-0.5">·</span>{g.homeScore}
                 </div>
                 <div className="text-right">
                   <div className="font-sans font-black text-[1.5rem] text-pastel-cream leading-none">{g.home}</div>
-                  <div className="font-jbmono text-[9px] text-white/40 mt-1 tracking-wider uppercase">Home</div>
+                  <div className="font-jbmono text-[9px] text-white/55 mt-1 tracking-wider uppercase">Home</div>
                 </div>
               </div>
               {g.status === 'LIVE' && (
@@ -331,7 +331,7 @@ export default function PreviewRink() {
       {/* Footer */}
       <footer className="relative bg-black/40 py-8 text-center border-t border-white/5">
         <div className="font-calistoga text-[18px] text-pastel-cream mb-1">Citrus</div>
-        <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/30">
+        <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55">
           © 2026 · Built for hockey
         </div>
       </footer>

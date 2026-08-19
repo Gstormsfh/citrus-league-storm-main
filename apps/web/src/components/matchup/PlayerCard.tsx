@@ -332,7 +332,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     )}
                     {/* Final badge + score */}
                     {isFinal && (
-                      <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none bg-white/10 text-white/60 border border-white/10/20">
+                      <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none bg-white/10 text-white/60 border border-white/20">
                         F
                       </span>
                     )}
@@ -703,7 +703,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             <span className="text-white/60 font-bold text-xs">
               0.0
             </span>
-            <span className="text-[8px] text-white/40 font-medium">Daily</span>
+            <span className="text-[8px] text-white/55 font-medium">Daily</span>
           </div>
         ) : hasProjection && projectedPoints > 0 ? (
           // Has upcoming game with projection - tappable to see breakdown

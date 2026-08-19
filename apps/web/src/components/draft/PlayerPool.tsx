@@ -17,6 +17,15 @@ interface PlayerPoolProps {
   draftedPlayers: string[];
   isDraftActive: boolean;
   availablePlayers: Player[];
+  /**
+   * 2026-08-18 launch audit: when the player DIRECTORY itself failed to
+   * load, this pool rendered "No players found. Try adjusting your
+   * filters." — telling a user to fix filters when in fact nothing had
+   * loaded and they could not draft at all. Pass the load error so the
+   * empty state can tell the truth.
+   */
+  loadError?: Error | null;
+  onRetryLoad?: () => void;
   onAddToQueue?: (playerId: string) => void;
   /**
    * V2-PARITY (2026-08-17): when provided, every row gets an info
@@ -68,6 +77,8 @@ export const PlayerPool = memo(({
   draftedPlayers,
   isDraftActive,
   availablePlayers,
+  loadError,
+  onRetryLoad,
   onAddToQueue,
   onShowCard,
   onToggleWatchlist,
@@ -310,7 +321,7 @@ export const PlayerPool = memo(({
         onClick={() => !isDrafted && onPlayerSelect(player)}
       >
         <td className="px-1.5 py-2 text-center w-[44px] bg-pastel-surface-tile text-pastel-cream">
-          <span className="text-xs font-mono text-citrus-forest font-bold">
+          <span className="text-xs font-mono text-pastel-cream font-bold">
             {displayRank}
           </span>
         </td>
@@ -620,7 +631,7 @@ export const PlayerPool = memo(({
                     onClick={() => !isDrafted && onPlayerSelect(player)}
                   >
                     <td className="px-1 py-1.5 text-center w-[32px] sticky left-0 bg-pastel-surface-tile z-10 text-pastel-cream">
-                      <span className="text-[10px] font-mono text-citrus-forest font-bold">{index + 1}</span>
+                      <span className="text-[10px] font-mono text-pastel-cream font-bold">{index + 1}</span>
                     </td>
                     <td className="px-1.5 py-1.5 sticky left-[32px] bg-pastel-surface-tile z-10 text-pastel-cream">
                       <div className="flex items-center gap-1">
@@ -701,7 +712,7 @@ export const PlayerPool = memo(({
         {hasMore && (
           <button
             onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
-            className="w-full py-2.5 text-xs font-display font-bold text-citrus-forest bg-citrus-sage/10 hover:bg-citrus-sage/20 transition-colors"
+            className="w-full py-2.5 text-xs font-display font-bold text-pastel-cream bg-citrus-sage/10 hover:bg-citrus-sage/20 transition-colors"
           >
             Show more ({filteredAndSortedPlayers.length - visibleCount} remaining)
           </button>
@@ -1010,15 +1021,34 @@ export const PlayerPool = memo(({
         {hasMore && (
           <button
             onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
-            className="w-full py-2 text-xs font-display font-bold text-citrus-forest bg-citrus-sage/10 hover:bg-citrus-sage/20 border-t border-white/10 transition-colors"
+            className="w-full py-2 text-xs font-display font-bold text-pastel-cream bg-citrus-sage/10 hover:bg-citrus-sage/20 border-t border-white/10 transition-colors"
           >
             Show more ({filteredAndSortedPlayers.length - visibleCount} remaining)
           </button>
         )}
         {filteredAndSortedPlayers.length === 0 && (
-          <div className="text-center py-12 text-pastel-cream/70">
-            No players found. Try adjusting your filters.
-          </div>
+          loadError ? (
+            <div className="text-center py-12" data-testid="player-pool-load-error">
+              <p className="font-semibold text-destructive">Couldn&apos;t load the player list.</p>
+              <p className="text-xs mt-1 text-pastel-cream/70">
+                This is a connection problem, not a filter — no players were loaded at all.
+              </p>
+              {onRetryLoad && (
+                <button
+                  type="button"
+                  onClick={onRetryLoad}
+                  data-testid="player-pool-load-retry"
+                  className="mt-3 rounded-md border border-destructive/50 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-pastel-cream/70">
+              No players found. Try adjusting your filters.
+            </div>
+          )
         )}
       </div>
     </Card>

@@ -101,7 +101,7 @@ export const PoolLeagueHub = ({ leagueId, league }: PoolLeagueHubProps) => {
             <div className="flex-1">
               <span className="text-xs font-display text-slate-500 uppercase tracking-wider">Join Code</span>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="font-mono text-lg font-bold text-citrus-forest tracking-widest">
+                <span className="font-mono text-lg font-bold text-pastel-cream tracking-widest">
                   {league.join_code || 'N/A'}
                 </span>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyCode}>
@@ -118,20 +118,20 @@ export const PoolLeagueHub = ({ leagueId, league }: PoolLeagueHubProps) => {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
             <div className="p-3 bg-slate-50 rounded-lg text-center">
               <div className="text-xs font-display text-slate-400 uppercase">Type</div>
-              <div className="font-display font-bold text-sm text-citrus-forest">{getPoolLabel(leagueType)}</div>
+              <div className="font-display font-bold text-sm text-pastel-cream">{getPoolLabel(leagueType)}</div>
             </div>
             <div className="p-3 bg-slate-50 rounded-lg text-center">
               <div className="text-xs font-display text-slate-400 uppercase">Members</div>
-              <div className="font-display font-bold text-sm text-citrus-forest">{members.length}{teamsCount ? ` / ${teamsCount}` : ''}</div>
+              <div className="font-display font-bold text-sm text-pastel-cream">{members.length}{teamsCount ? ` / ${teamsCount}` : ''}</div>
             </div>
             <div className="p-3 bg-slate-50 rounded-lg text-center">
               <div className="text-xs font-display text-slate-400 uppercase">Status</div>
-              <div className="font-display font-bold text-sm text-citrus-forest capitalize">{poolStatus}</div>
+              <div className="font-display font-bold text-sm text-pastel-cream capitalize">{poolStatus}</div>
             </div>
             {leagueType === 'pickem' && league.settings?.picksPerWeek && (
               <div className="p-3 bg-slate-50 rounded-lg text-center">
                 <div className="text-xs font-display text-slate-400 uppercase">Picks/Week</div>
-                <div className="font-display font-bold text-sm text-citrus-forest">
+                <div className="font-display font-bold text-sm text-pastel-cream">
                   {(league.settings.picksPerWeek as number) === 0 ? 'All' : league.settings.picksPerWeek as number}
                 </div>
               </div>
@@ -139,13 +139,13 @@ export const PoolLeagueHub = ({ leagueId, league }: PoolLeagueHubProps) => {
             {leagueType === 'survivor' && league.settings?.survivorLives && (
               <div className="p-3 bg-slate-50 rounded-lg text-center">
                 <div className="text-xs font-display text-slate-400 uppercase">Lives</div>
-                <div className="font-display font-bold text-sm text-citrus-forest">{league.settings.survivorLives as number}</div>
+                <div className="font-display font-bold text-sm text-pastel-cream">{league.settings.survivorLives as number}</div>
               </div>
             )}
             {leagueType === 'confidence-pool' && league.settings?.confidenceMaxPoints && (
               <div className="p-3 bg-slate-50 rounded-lg text-center">
                 <div className="text-xs font-display text-slate-400 uppercase">Max Points</div>
-                <div className="font-display font-bold text-sm text-citrus-forest">{league.settings.confidenceMaxPoints as number}</div>
+                <div className="font-display font-bold text-sm text-pastel-cream">{league.settings.confidenceMaxPoints as number}</div>
               </div>
             )}
           </div>

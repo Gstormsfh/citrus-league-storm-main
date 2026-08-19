@@ -4,6 +4,12 @@ import { StatBreakdown } from "./types";
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
+/* 2026-08-19 visual audit: light "glass" surface on a dark page — see
+   the surface-correction note in the armchair-gm components. bg-white/50
+   composites to mid-grey on #0F1F15, where neither light nor dark text
+   reaches 4.5:1. Uses the dark tile family instead. */
+
+
 // Hook to detect mobile
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
@@ -66,7 +72,7 @@ export const PointsTooltip = ({
       {/* Stats grid */}
       <div className="p-3 grid grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto">
         {breakdownArray.map((stat) => (
-          <div key={stat.label} className="p-2 bg-white/50 rounded-lg border border-citrus-orange/30">
+          <div key={stat.label} className="p-2 bg-white/5 rounded-lg border border-citrus-orange/30">
             <div className="flex items-baseline justify-between gap-1 mb-0.5">
               <span className="text-[10px] text-citrus-orange uppercase font-bold truncate">{stat.label}</span>
               <span className="text-xs text-gray-600 bg-gray-100 px-1 rounded">×{stat.count}</span>
@@ -92,7 +98,7 @@ export const PointsTooltip = ({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button 
-            className="text-sm text-citrus-orange hover:text-citrus-forest cursor-pointer font-bold font-varsity transition-all touch-manipulation"
+            className="text-sm text-citrus-orange hover:text-pastel-cream cursor-pointer font-bold font-varsity transition-all touch-manipulation"
             onClick={(e) => {
               e.stopPropagation();
               // Don't prevent default - let Popover handle the click
@@ -119,7 +125,7 @@ export const PointsTooltip = ({
     <Tooltip open={open} onOpenChange={setOpen}>
       <TooltipTrigger asChild>
         <button 
-          className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] hover:text-citrus-forest cursor-pointer transition-all"
+          className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] hover:text-pastel-cream cursor-pointer transition-all"
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();

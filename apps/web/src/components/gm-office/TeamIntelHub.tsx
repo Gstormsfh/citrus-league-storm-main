@@ -461,9 +461,16 @@ export const TeamIntelHub = () => {
     }
   };
 
-  // Handle click-to-trade for weak positions
-  const handleClickToTrade = (position: string) => {
-    navigate(`/trade-analyzer?position=${position}`);
+  // Handle click-to-trade for weak positions.
+  //
+  // 2026-08-18 launch audit: this used to append `?position=${position}`.
+  // TradeAnalyzer reads only `?partner=` — it has no position filter at
+  // all — so the param was silently discarded on every click. Rather
+  // than ship a URL that promises filtering the destination cannot do,
+  // carry the league (which IS consumed, via LeagueContext) and drop the
+  // dead param. Re-add it here the day TradeAnalyzer grows the filter.
+  const handleClickToTrade = (_position: string) => {
+    navigate(`/trade-analyzer?league=${activeLeagueId}`);
   };
 
   // Load Next Man Up suggestions when news items change
@@ -764,7 +771,18 @@ export const TeamIntelHub = () => {
                         size="sm"
                         variant="outline"
                         className="h-6 px-2 text-xs"
-                        onClick={() => navigate(`/waiver-wire?player=${player.id}`)}
+                        // 2026-08-18 launch audit: this passed
+                        // `?player=<id>`, which WaiverWire never read —
+                        // the Add button opened a bare waiver page with
+                        // nothing preselected and the user had to find
+                        // the player again by hand. WaiverWire now reads
+                        // `?search=`, which its existing search box
+                        // consumes directly.
+                        onClick={() =>
+                          navigate(
+                            `/waiver-wire?league=${activeLeagueId}&search=${encodeURIComponent(player.full_name)}`,
+                          )
+                        }
                       >
                         Add
                       </Button>

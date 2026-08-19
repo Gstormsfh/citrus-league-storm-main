@@ -1007,7 +1007,7 @@ const Profile = () => {
                         <Input
                           value={displayNameInput}
                           onChange={(e) => setDisplayNameInput(e.target.value)}
-                          className="text-xl font-bold h-10 w-64 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                          className="text-xl font-bold h-10 w-64 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                           placeholder="Your display name"
                           autoFocus
                           onKeyDown={(e) => {
@@ -1089,7 +1089,7 @@ const Profile = () => {
                                 id="firstName"
                                 value={formData.firstName}
                                 onChange={(e) => handleInputChange('firstName', e.target.value)}
-                                className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 mt-1.5"
+                                className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 mt-1.5"
                               />
                             ) : (
                               <p className="text-sm text-white/70 mt-1.5">{formData.firstName}</p>
@@ -1102,7 +1102,7 @@ const Profile = () => {
                                 id="lastName"
                                 value={formData.lastName}
                                 onChange={(e) => handleInputChange('lastName', e.target.value)}
-                                className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 mt-1.5"
+                                className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 mt-1.5"
                               />
                             ) : (
                               <p className="text-sm text-white/70 mt-1.5">{formData.lastName}</p>
@@ -1117,7 +1117,7 @@ const Profile = () => {
                               <Input
                                 value={formData.email}
                                 onChange={(e) => handleInputChange('email', e.target.value)}
-                                className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                                className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                               />
                             ) : (
                               <span className="text-white/70">{formData.email}</span>
@@ -1129,7 +1129,7 @@ const Profile = () => {
                               <Input
                                 value={formData.phone}
                                 onChange={(e) => handleInputChange('phone', e.target.value)}
-                                className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                                className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                               />
                             ) : (
                               <span className="text-white/70">{formData.phone}</span>
@@ -1141,7 +1141,7 @@ const Profile = () => {
                               <Input
                                 value={formData.location}
                                 onChange={(e) => handleInputChange('location', e.target.value)}
-                                className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                                className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                               />
                             ) : (
                               <span className="text-white/70">{formData.location}</span>
@@ -1158,7 +1158,7 @@ const Profile = () => {
                               id="bio"
                               value={formData.bio}
                               onChange={(e) => handleInputChange('bio', e.target.value)}
-                              className="w-full min-h-[80px] mt-1.5 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                              className="w-full min-h-[80px] mt-1.5 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                             />
                           ) : (
                             <p className="text-sm text-white/70 mt-1.5">{formData.bio}</p>
@@ -1432,7 +1432,7 @@ const Profile = () => {
                                 value={displayNameInput}
                                 onChange={(e) => setDisplayNameInput(e.target.value)}
                                 placeholder="Choose a display name"
-                                className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                                className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                               />
                               <Button
                                 onClick={handleSaveDisplayName}
@@ -1506,7 +1506,7 @@ const Profile = () => {
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
                             disabled={changePasswordLoading}
-                            className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 disabled:opacity-50"
+                            className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 disabled:opacity-50"
                           />
                         </div>
                         <div className="space-y-2">
@@ -1518,7 +1518,7 @@ const Profile = () => {
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             disabled={changePasswordLoading}
-                            className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 disabled:opacity-50"
+                            className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 disabled:opacity-50"
                           />
                         </div>
                         <Button
@@ -1552,7 +1552,7 @@ const Profile = () => {
                           id="team-name"
                           value={formData.teamName}
                           onChange={(e) => handleInputChange('teamName', e.target.value)}
-                          className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                          className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                         />
                       </div>
                       <div className="space-y-2">
@@ -1562,7 +1562,7 @@ const Profile = () => {
                           value={formData.teamAbbr}
                           maxLength={4}
                           onChange={(e) => handleInputChange('teamAbbr', e.target.value)}
-                          className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                          className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                         />
                       </div>
                       <div className="space-y-2">
@@ -1571,7 +1571,7 @@ const Profile = () => {
                           id="team-desc"
                           value={formData.teamDescription}
                           onChange={(e) => handleInputChange('teamDescription', e.target.value)}
-                          className="min-h-[80px] bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                          className="min-h-[80px] bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                         />
                       </div>
                       <Button onClick={handleSaveTeamName} className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Save Team Details</Button>
@@ -1865,7 +1865,7 @@ const Profile = () => {
                                             ...prev,
                                             skater: { ...prev.skater, [stat.key]: parseFloat(e.target.value) || 0 }
                                           }))}
-                                          className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 tabular-nums"
+                                          className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 tabular-nums"
                                         />
                                       </div>
                                     ))}
@@ -1891,7 +1891,7 @@ const Profile = () => {
                                             ...prev,
                                             goalie: { ...prev.goalie, [stat.key]: parseFloat(e.target.value) || 0 }
                                           }))}
-                                          className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 tabular-nums"
+                                          className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 tabular-nums"
                                         />
                                       </div>
                                     ))}
@@ -1913,7 +1913,7 @@ const Profile = () => {
                                       draft_rounds: parseInt(e.target.value) || 21
                                     }))}
                                     disabled={selectedLeagueData?.draft_status === 'completed'}
-                                    className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 tabular-nums disabled:opacity-50"
+                                    className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 tabular-nums disabled:opacity-50"
                                   />
                                   {selectedLeagueData?.draft_status === 'completed' && (
                                     <p className="text-xs text-white/55">Draft is completed — rounds cannot be changed</p>
@@ -1929,7 +1929,7 @@ const Profile = () => {
                                       pickTimeLimit: parseInt(e.target.value) || 90
                                     }))}
                                     disabled={selectedLeagueData?.draft_status === 'completed'}
-                                    className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 tabular-nums disabled:opacity-50"
+                                    className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 tabular-nums disabled:opacity-50"
                                   />
                                   {selectedLeagueData?.draft_status === 'completed' && (
                                     <p className="text-xs text-white/55">Draft is completed — time limit cannot be changed</p>
@@ -2174,7 +2174,7 @@ const Profile = () => {
                                   value={deleteConfirmation}
                                   onChange={(e) => setDeleteConfirmation(e.target.value)}
                                   placeholder="DELETE"
-                                  className="mt-2 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-red-400/50"
+                                  className="mt-2 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-red-400/50"
                                 />
                               </div>
                             </AlertDialogDescription>

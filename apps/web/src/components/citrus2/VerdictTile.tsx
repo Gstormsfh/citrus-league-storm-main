@@ -232,7 +232,7 @@ export function VerdictTile({
           {signature && (
             <div
               className={cn(
-                'font-jbmono uppercase tracking-[0.22em] font-bold text-white/45',
+                'font-jbmono uppercase tracking-[0.22em] font-bold text-white/55',
                 SIZE_SIGNATURE[size],
               )}
             >

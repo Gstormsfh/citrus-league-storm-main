@@ -150,6 +150,58 @@ export interface DashboardIndexEntry {
 let indexCache: { season: number; data: DashboardIndexEntry[]; timestamp: number } | null = null;
 const CACHE_TTL_MS = 2 * 60 * 1000;
 
+/**
+ * PostgREST silently clamps an unbounded `.select()` to the project's
+ * `max-rows` setting and returns a 200 with a truncated body — no error,
+ * no warning. This project has been bitten by exactly that on exactly
+ * these tables: see the field note in
+ * apps/web/src/hooks/usePreloadedPlayers.ts, where an unpaged
+ * player_directory read came back ~1000 rows in physical-row order and
+ * MacKinnon and McDavid were simply absent from the window.
+ *
+ * player_directory is ~1.9k rows in prod and ~2.0k in staging, so an
+ * unpaged read here would have shipped a Players page showing roughly
+ * half the league with missing stars looking like they don't exist.
+ * Page explicitly instead.
+ *
+ * `.order('player_id')` is REQUIRED, not cosmetic: Postgres gives no
+ * stable row order across separate LIMIT/OFFSET queries, so paging
+ * without an explicit sort can duplicate and skip rows between windows.
+ */
+const PAGE_SIZE = 1000;
+/** Guard against a pathological loop if a table ever returns full pages forever. */
+const MAX_PAGES = 25;
+
+async function selectAllPaged<T>(
+  supabase: SupabaseClient,
+  table: string,
+  columns: string,
+  season: number,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const out: T[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const from = page * PAGE_SIZE;
+    const { data, error } = await supabase
+      .from(table)
+      .select(columns)
+      .eq('season', season)
+      .order('player_id', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) return { data: [], error };
+
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    // A short page means we reached the end. An exactly-full page is
+    // ambiguous, so we go round again and accept one wasted empty read.
+    if (rows.length < PAGE_SIZE) return { data: out, error: null };
+  }
+  return {
+    data: out,
+    error: { message: `${table}: exceeded ${MAX_PAGES} pages (${MAX_PAGES * PAGE_SIZE} rows) while paging` },
+  };
+}
+
 /** Test hook — clears the module-level cache between tests. */
 export function clearDashboardIndexCache(): void {
   indexCache = null;
@@ -172,16 +224,20 @@ export class PlayerDashboardService {
     }
 
     // Parallel fan-out — these tables have no FKs between them, so
-    // this is 5 independent index-only scans, not an N+1.
+    // this is 5 independent index-only scans, not an N+1. Each one is
+    // PAGED (see selectAllPaged) because an unbounded select would be
+    // silently truncated by PostgREST's max-rows clamp.
     const [dirRes, statsRes, garRes, talentRes, rosRes] = await Promise.all([
-      this.supabase
-        .from('player_directory')
-        .select('player_id, full_name, position_code, team_abbrev, jersey_number, headshot_url, eligible_positions')
-        .eq('season', season),
-      this.supabase.from('player_season_stats').select(INDEX_STATS_COLS).eq('season', season),
-      this.supabase.from('player_gar_components').select(GAR_COLS).eq('season', season),
-      this.supabase.from('player_talent_metrics').select(TALENT_COLS).eq('season', season),
-      this.supabase.from('player_ros_projections').select(ROS_COLS).eq('season', season),
+      selectAllPaged<DirectoryRow>(
+        this.supabase,
+        'player_directory',
+        'player_id, full_name, position_code, team_abbrev, jersey_number, headshot_url, eligible_positions',
+        season,
+      ),
+      selectAllPaged<StatsRow>(this.supabase, 'player_season_stats', INDEX_STATS_COLS, season),
+      selectAllPaged<GarRow>(this.supabase, 'player_gar_components', GAR_COLS, season),
+      selectAllPaged<TalentRow>(this.supabase, 'player_talent_metrics', TALENT_COLS, season),
+      selectAllPaged<RosRow>(this.supabase, 'player_ros_projections', ROS_COLS, season),
     ]);
 
     const firstError = dirRes.error || statsRes.error || garRes.error || talentRes.error || rosRes.error;

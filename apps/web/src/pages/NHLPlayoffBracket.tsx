@@ -21,6 +21,13 @@ import {
   MascotPeek,
   StormyLoading,
 } from '@/components/citrus2';
+// 2026-08-18 launch audit: every '/api/*' fetch on this page was
+// RELATIVE. That works on the web (Firebase Hosting rewrites /api/* to
+// Cloud Run) but the iOS Capacitor shell serves from capacitor://localhost
+// where no rewrite exists, so all of them failed as generic network
+// errors. The 2026-08-15 sweep that introduced API_BASE_URL missed this
+// file. Prefixed with API_BASE_URL, matching PoolPlayoffRoster.tsx.
+import { API_BASE_URL } from '@/api/client';
 
 interface Seed {
   team_id: number;
@@ -77,9 +84,9 @@ export default function NHLPlayoffBracket() {
     const load = async () => {
       try {
         const [bracketRes, metaRes, h2hRes] = await Promise.all([
-          fetch(`/api/nhl-playoffs/bracket?season=${season}`),
-          fetch('/api/nhl-playoffs/meta'),
-          fetch(`/api/nhl-playoffs/h2h?season=${season}`).catch(() => null),
+          fetch(`${API_BASE_URL}/api/nhl-playoffs/bracket?season=${season}`),
+          fetch(`${API_BASE_URL}/api/nhl-playoffs/meta`),
+          fetch(`${API_BASE_URL}/api/nhl-playoffs/h2h?season=${season}`).catch(() => null),
         ]);
         const bracket = await bracketRes.json();
         const metaData = await metaRes.json();
@@ -102,7 +109,7 @@ export default function NHLPlayoffBracket() {
   useEffect(() => {
     const fetchLive = async () => {
       try {
-        const res = await fetch(`/api/nhl-playoffs/live-games?season=${season}`);
+        const res = await fetch(`${API_BASE_URL}/api/nhl-playoffs/live-games?season=${season}`);
         const json = await res.json();
         setLiveGames(json.data?.games || json.games || []);
       } catch { /* non-critical */ }
@@ -182,7 +189,7 @@ export default function NHLPlayoffBracket() {
               Stanley Cup Playoffs
             </h1>
           </div>
-          <p className="font-jbmono text-[11px] tracking-[0.22em] uppercase text-white/45">
+          <p className="font-jbmono text-[11px] tracking-[0.22em] uppercase text-white/55">
             {season}–{(season + 1).toString().slice(2)} · Best of 7 · 4 Rounds
           </p>
         </div>
@@ -260,7 +267,7 @@ export default function NHLPlayoffBracket() {
                         {/* Header */}
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-1.5">
-                            <span className="font-jbmono text-[9px] uppercase text-white/45 tracking-wider font-bold">
+                            <span className="font-jbmono text-[9px] uppercase text-white/55 tracking-wider font-bold">
                               Series {String.fromCharCode(64 + s.bracket_slot)}
                             </span>
                             {s.conference && (
@@ -298,12 +305,12 @@ export default function NHLPlayoffBracket() {
 
                         {/* Season H2H */}
                         {h2h && h2h.games > 0 && high && low && (
-                          <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-center gap-2 font-jbmono text-[10px] text-white/45">
+                          <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-center gap-2 font-jbmono text-[10px] text-white/55">
                             <span className="uppercase tracking-wider font-bold">Season H2H</span>
                             <span className="font-bold text-pastel-cream">
                               {high.team_abbrev} {h2h.high_wins}
                             </span>
-                            <span className="text-white/30">—</span>
+                            <span className="text-white/55">—</span>
                             <span className="font-bold text-pastel-cream">
                               {h2h.low_wins} {low.team_abbrev}
                             </span>
@@ -312,7 +319,7 @@ export default function NHLPlayoffBracket() {
 
                         {/* Game count */}
                         {s.games_played > 0 && (
-                          <div className="font-jbmono text-[10px] text-white/45 mt-2 text-center flex items-center justify-center gap-1">
+                          <div className="font-jbmono text-[10px] text-white/55 mt-2 text-center flex items-center justify-center gap-1">
                             <Clock className="w-3 h-3" aria-hidden="true" />
                             {s.games_played} of 7 games played
                           </div>
@@ -329,7 +336,7 @@ export default function NHLPlayoffBracket() {
         {series.length === 0 && (
           <div className="text-center py-16">
             <Trophy className="w-12 h-12 text-white/20 mx-auto mb-3" aria-hidden="true" />
-            <p className="font-jbmono text-[12px] uppercase tracking-wider text-white/45">
+            <p className="font-jbmono text-[12px] uppercase tracking-wider text-white/55">
               Bracket not yet finalized. Check back when seeds are set.
             </p>
           </div>
@@ -369,7 +376,7 @@ function BracketTeamRow({
   if (!team) {
     return (
       <div className="flex items-center gap-2 py-2 px-2 rounded">
-        <span className="text-white/30 italic text-xs font-jbmono">TBD</span>
+        <span className="text-white/55 italic text-xs font-jbmono">TBD</span>
       </div>
     );
   }
@@ -389,13 +396,13 @@ function BracketTeamRow({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
-          <span className="font-jbmono text-[10px] text-white/45 tabular-nums">#{team.seed}</span>
+          <span className="font-jbmono text-[10px] text-white/55 tabular-nums">#{team.seed}</span>
           <span className="text-xs font-sans font-bold truncate text-pastel-cream">
             {info?.name || team.team_abbrev}
           </span>
         </div>
         {team.wins != null && (
-          <div className="font-jbmono text-[9px] text-white/45 truncate tabular-nums">
+          <div className="font-jbmono text-[9px] text-white/55 truncate tabular-nums">
             {team.wins}-{team.losses}-{team.ot_losses} · {team.points}pts
           </div>
         )}

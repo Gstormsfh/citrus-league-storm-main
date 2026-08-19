@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
@@ -116,22 +117,22 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         </div>
         {/* Name + record */}
         <div className="flex-1 text-right min-w-0">
-          <div className={`font-bold text-xs truncate ${awayWon ? 'text-pastel-cream' : isFinal ? 'text-white/35' : 'text-pastel-cream'}`}>
+          <div className={`font-bold text-xs truncate ${awayWon ? 'text-pastel-cream' : isFinal ? 'text-white/55' : 'text-pastel-cream'}`}>
             {away.name}
           </div>
-          <div className="text-[10px] font-jbmono text-white/45 truncate">
+          <div className="text-[10px] font-jbmono text-white/55 truncate">
             {ar ? `${ar.w}-${ar.l}-${ar.otl}` : ''}
             {awayStreak && awayStreak !== '-' ? ` ${awayStreak}` : ''}
           </div>
         </div>
         {/* Odds */}
         {!isFinal && !isLive && ar && hr && (
-          <div className={`font-bold text-base leading-none shrink-0 tabular-nums ${awayPct >= 50 ? 'text-pastel-sage-soft' : 'text-white/35'}`}>
+          <div className={`font-bold text-base leading-none shrink-0 tabular-nums ${awayPct >= 50 ? 'text-pastel-sage-soft' : 'text-white/55'}`}>
             {awayPct}%
           </div>
         )}
         {isFinal && (
-          <span className={`font-bold text-lg shrink-0 tabular-nums ${awayWon ? 'text-pastel-cream' : 'text-white/30'}`}>{game.away_score}</span>
+          <span className={`font-bold text-lg shrink-0 tabular-nums ${awayWon ? 'text-pastel-cream' : 'text-white/55'}`}>{game.away_score}</span>
         )}
         {isLive && <span className="font-bold text-lg shrink-0 text-pastel-orange tabular-nums">{game.away_score}</span>}
         {pickedAway && !isFinal && !isLive && (
@@ -148,20 +149,20 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         {/* Row 1: Time or Score */}
         <div className="text-center">
           {isFinal ? (
-            <span className="text-[10px] font-jbmono font-bold text-white/45 uppercase tracking-wider">Final</span>
+            <span className="text-[10px] font-jbmono font-bold text-white/55 uppercase tracking-wider">Final</span>
           ) : isLive ? (
             <span className="flex items-center gap-1 text-[10px] font-jbmono font-bold text-pastel-orange uppercase tracking-wider">
               <LivePulse size="xs" /> Live
             </span>
           ) : locked ? (
-            <span className="flex items-center gap-0.5 text-[10px] font-jbmono text-white/45"><Lock className="w-2.5 h-2.5" aria-hidden="true" /> Locked</span>
+            <span className="flex items-center gap-0.5 text-[10px] font-jbmono text-white/55"><Lock className="w-2.5 h-2.5" aria-hidden="true" /> Locked</span>
           ) : (
             <span className="text-xs font-jbmono font-bold text-pastel-cream tabular-nums">{fmtTime(game)}</span>
           )}
         </div>
 
         {/* Row 2: H2H */}
-        <div className="text-[9px] font-jbmono text-white/45 mt-0.5">
+        <div className="text-[9px] font-jbmono text-white/55 mt-0.5">
           {h2hGames > 0 ? (
             <span>
               H2H:{' '}
@@ -176,14 +177,14 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
 
         {/* Row 3: Venue */}
         {game.venue && (
-          <div className="text-[8px] font-jbmono text-white/30 mt-0.5 truncate max-w-full">
+          <div className="text-[8px] font-jbmono text-white/55 mt-0.5 truncate max-w-full">
             {game.venue}
           </div>
         )}
 
         {/* Row 4: Home ice */}
         {!isFinal && (
-          <div className="text-[9px] font-jbmono text-white/45 mt-0.5">
+          <div className="text-[9px] font-jbmono text-white/55 mt-0.5">
             @ {home.fullName}
           </div>
         )}
@@ -208,21 +209,21 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
           {game.home_team}
         </div>
         <div className="flex-1 text-left min-w-0">
-          <div className={`font-bold text-xs truncate ${homeWon ? 'text-pastel-cream' : isFinal ? 'text-white/35' : 'text-pastel-cream'}`}>
+          <div className={`font-bold text-xs truncate ${homeWon ? 'text-pastel-cream' : isFinal ? 'text-white/55' : 'text-pastel-cream'}`}>
             {home.name}
           </div>
-          <div className="text-[10px] font-jbmono text-white/45 truncate">
+          <div className="text-[10px] font-jbmono text-white/55 truncate">
             {hr ? `${hr.w}-${hr.l}-${hr.otl}` : ''}
             {homeStreak && homeStreak !== '-' ? ` ${homeStreak}` : ''}
           </div>
         </div>
         {!isFinal && !isLive && ar && hr && (
-          <div className={`font-bold text-base leading-none shrink-0 tabular-nums ${homePct >= 50 ? 'text-pastel-sage-soft' : 'text-white/35'}`}>
+          <div className={`font-bold text-base leading-none shrink-0 tabular-nums ${homePct >= 50 ? 'text-pastel-sage-soft' : 'text-white/55'}`}>
             {homePct}%
           </div>
         )}
         {isFinal && (
-          <span className={`font-bold text-lg shrink-0 tabular-nums ${homeWon ? 'text-pastel-cream' : 'text-white/30'}`}>{game.home_score}</span>
+          <span className={`font-bold text-lg shrink-0 tabular-nums ${homeWon ? 'text-pastel-cream' : 'text-white/55'}`}>{game.home_score}</span>
         )}
         {isLive && <span className="font-bold text-lg shrink-0 text-pastel-orange tabular-nums">{game.home_score}</span>}
         {pickedHome && !isFinal && !isLive && (
@@ -252,7 +253,19 @@ const PoolPickem = () => {
   const [standings, setStandings] = useState<PickemStanding[]>([]);
   const [records, setRecords] = useState<Record<string, { w: number; l: number; otl: number; streak?: string }>>({});
   const [h2hData, setH2hData] = useState<Map<string, { awayWins: number; homeWins: number; games: number }>>(new Map());
-  const [activeTab, setActiveTab] = useState('picks');
+  // 2026-08-18 launch audit: getPoolRoute() has always appended a
+  // `?tab=` param (Navbar, MobileBottomNav, GMOffice all pass one), but
+  // none of the pool pages ever read it — the tab was pure local state.
+  // Every "Standings" / "Pick History" link therefore landed on the
+  // default Picks tab. Worst case: Standings.tsx redirects pool users to
+  // getPoolRoute(..., 'standings'), so pool standings were unreachable
+  // from /standings entirely. Read and validate the param.
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = searchParams.get('tab');
+    const allowed = ['picks', 'standings', 'league'];
+    return requested && allowed.includes(requested) ? requested : 'picks';
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -365,7 +378,7 @@ const PoolPickem = () => {
                   <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </Button>
                 <div className="px-2 sm:px-3 text-center border-x border-white/10">
-                  <div className="text-[8px] sm:text-[9px] font-jbmono text-white/45 uppercase tracking-widest leading-none">Week</div>
+                  <div className="text-[8px] sm:text-[9px] font-jbmono text-white/55 uppercase tracking-widest leading-none">Week</div>
                   <div className="text-base sm:text-lg font-bold text-pastel-cream leading-none tabular-nums">{currentWeek}</div>
                 </div>
                 <Button variant="ghost" size="icon" aria-label="Next week" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
@@ -422,7 +435,7 @@ const PoolPickem = () => {
                           {fmtDate(dateKey)}
                         </span>
                         <div className="flex-1 h-px bg-white/10" />
-                        <span className="text-[10px] font-jbmono text-white/35 tabular-nums">{dateGames.length} games</span>
+                        <span className="text-[10px] font-jbmono text-white/55 tabular-nums">{dateGames.length} games</span>
                       </div>
 
                       {/* Game rows — 2 columns on xl to reduce empty space */}
@@ -502,7 +515,7 @@ const PoolPickem = () => {
                                 i === 0 ? 'bg-pastel-orange text-[#581E00]' :
                                 i === 1 ? 'bg-white/20 text-pastel-cream' :
                                 i === 2 ? 'bg-pastel-orange/40 text-white' :
-                                'text-white/45'
+                                'text-white/55'
                               }`}>{i + 1}</span>
                             </TableCell>
                             <TableCell className="font-bold text-pastel-cream">

@@ -118,9 +118,19 @@ export function OnClockActionBar({
       : rawRemainingSec;
 
   const urgent = secondsRemaining !== null && secondsRemaining <= 10;
+  // 2026-08-19 visual audit — the most important surface in a live draft
+  // was unreadable in its normal state.
+  //
+  //   bg-fantasy-primary is #F9E076, a BRIGHT LEMON. Pairing it with
+  //   text-white put white on near-yellow at ~1.3:1, so "You're on the
+  //   clock", the player name, round and pick all but disappeared. The
+  //   urgent (red-600) state was fine at 4.8:1, which is likely why this
+  //   survived — it only looks broken when you are NOT about to time out.
+  //
+  // Lemon is a light surface, so it takes dark text: #0F1F15 gives 13.7:1.
   const barClass = urgent
     ? 'bg-red-600 text-white border-red-700'
-    : 'bg-fantasy-primary text-white border-fantasy-primary';
+    : 'bg-fantasy-primary text-[#0F1F15] border-fantasy-primary';
 
   const canDraft = selectedPlayer !== null;
 
@@ -171,7 +181,12 @@ export function OnClockActionBar({
       </div>
       <Button
         size="lg"
-        className="bg-white text-fantasy-primary hover:bg-white/90 font-bold px-6"
+        // Was `bg-white text-fantasy-primary` — lemon-yellow label on a
+        // white button, ~1.2:1. The single most-clicked control in the
+        // product was effectively a blank white pill. Deep forest on
+        // white reads at 16.9:1 and works on both the lemon and the red
+        // urgent bar. (2026-08-19)
+        className="bg-white text-[#0F1F15] hover:bg-white/90 font-bold px-6"
         disabled={!canDraft || isSubmitPending}
         onClick={() => canDraft && !isSubmitPending && onDraft(selectedPlayer)}
         data-testid="on-clock-draft-button"

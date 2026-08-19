@@ -182,4 +182,60 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     expect(players).toHaveLength(0);
     expect(error?.message).toContain('permission denied');
   });
+
+  // REGRESSION (2026-08-18 launch audit): the first cut of this service
+  // issued one unbounded .select() per table. PostgREST silently clamps
+  // those to the project max-rows (~1000 here) and returns 200 with a
+  // truncated body — no error. player_directory is ~1.9k rows in prod,
+  // so the Players page would have shipped showing roughly half the
+  // league, with missing stars looking like they simply don't exist.
+  // This is the same trap already documented in usePreloadedPlayers.ts.
+  it('pages past the PostgREST row clamp instead of silently truncating', async () => {
+    const PAGE = 1000;
+    // 1500 directory rows across two pages; page 2 is short => stop.
+    const mkDir = (i: number) => ({
+      player_id: 900000 + i,
+      full_name: `Player ${i}`,
+      position_code: 'C',
+      team_abbrev: 'TOR',
+      jersey_number: null,
+      headshot_url: null,
+      eligible_positions: ['C'],
+    });
+    const dirPages = [
+      Array.from({ length: PAGE }, (_, i) => mkDir(i)),
+      Array.from({ length: 500 }, (_, i) => mkDir(PAGE + i)),
+    ];
+
+    let dirCall = 0;
+    const rangeCalls: Array<[number, number]> = [];
+    const pagedDirChain: Record<string, any> = {};
+    for (const m of ['select', 'eq', 'order']) pagedDirChain[m] = vi.fn(() => pagedDirChain);
+    pagedDirChain.range = vi.fn((from: number, to: number) => {
+      rangeCalls.push([from, to]);
+      return pagedDirChain;
+    });
+    pagedDirChain.then = (resolve: any, reject: any) =>
+      Promise.resolve({ data: dirPages[dirCall++] ?? [], error: null }).then(resolve, reject);
+
+    mockSupabase.from = vi.fn((table: string) => {
+      if (table === 'player_directory') return pagedDirChain;
+      if (table === 'player_season_stats') return createChain({ data: STATS, error: null });
+      if (table === 'player_gar_components') return createChain({ data: GAR, error: null });
+      if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
+      if (table === 'player_ros_projections') return createChain({ data: ROS, error: null });
+      return createChain({ data: [], error: null });
+    });
+
+    const { players, error } = await service.getDashboardIndex();
+    expect(error).toBeNull();
+    // 1500, not 1000 — the whole point.
+    expect(players).toHaveLength(1500);
+    expect(rangeCalls).toEqual([
+      [0, 999],
+      [1000, 1999],
+    ]);
+    // Ordering is explicit, or the two windows could overlap/skip rows.
+    expect(pagedDirChain.order).toHaveBeenCalledWith('player_id', { ascending: true });
+  });
 });

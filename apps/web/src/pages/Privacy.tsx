@@ -13,7 +13,7 @@ const Privacy = () => {
         <h1 className="font-sans font-black text-[2.5rem] md:text-[3.25rem] leading-tight tracking-[-0.03em] text-pastel-cream mb-3">
           Privacy Policy
         </h1>
-        <p className="font-jbmono text-[11px] tracking-wider uppercase text-white/45 mb-12">Last Updated: February 18, 2026</p>
+        <p className="font-jbmono text-[11px] tracking-wider uppercase text-white/55 mb-12">Last Updated: February 18, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-white/75 prose-headings:text-pastel-cream prose-strong:text-pastel-cream prose-a:text-pastel-orange-soft hover:prose-a:text-pastel-orange">
             <p>

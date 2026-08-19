@@ -415,7 +415,7 @@ export function WrappedChapter({
         <ChapterSkeleton variant={variant} />
       ) : emptyText ? (
         <div className="flex items-center justify-center min-h-[220px]">
-          <div className="font-jbmono uppercase tracking-[0.22em] text-[11px] font-bold text-white/35">
+          <div className="font-jbmono uppercase tracking-[0.22em] text-[11px] font-bold text-white/55">
             {emptyText}
           </div>
         </div>
@@ -446,7 +446,7 @@ export function WrappedChapter({
                   {callout.value}
                 </div>
                 {callout.support && (
-                  <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] sm:text-[11px] font-bold text-white/45 mt-4">
+                  <div className="font-jbmono uppercase tracking-[0.22em] text-[10px] sm:text-[11px] font-bold text-white/55 mt-4">
                     {callout.support}
                   </div>
                 )}
@@ -455,7 +455,7 @@ export function WrappedChapter({
           </div>
 
           {subtitle && (
-            <div className="mt-8 text-center font-jbmono uppercase tracking-[0.22em] text-[10px] sm:text-[11px] font-bold text-white/45">
+            <div className="mt-8 text-center font-jbmono uppercase tracking-[0.22em] text-[10px] sm:text-[11px] font-bold text-white/55">
               {subtitle}
             </div>
           )}

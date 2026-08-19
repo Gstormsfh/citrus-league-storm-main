@@ -316,7 +316,7 @@ const StormyAssistant = () => {
                                 )}
                                 {msg.sender === 'user' ? (
                                   <div className="bg-white/5 ring-1 ring-white/10 rounded-2xl rounded-tr-sm px-4 py-3 max-w-[85%] whitespace-pre-wrap text-sm text-pastel-cream leading-relaxed">
-                                    <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/45 font-bold mb-1">YOU</div>
+                                    <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/55 font-bold mb-1">YOU</div>
                                     {msg.text}
                                   </div>
                                 ) : (
@@ -360,7 +360,7 @@ const StormyAssistant = () => {
                               placeholder="Ask Stormy about trades, waivers, or start/sit decisions…"
                               value={inputValue}
                               onChange={(e) => setInputValue(e.target.value)}
-                              className="flex-1 h-12 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                              className="flex-1 h-12 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                               autoFocus
                               disabled={isLoading}
                             />
@@ -425,7 +425,7 @@ const StormyAssistant = () => {
                         <CardContent className="space-y-6 relative z-10">
                           <div className="text-center py-4">
                             <div className="font-calistoga text-6xl text-pastel-orange tabular-nums leading-none">
-                              {messagesUsed}<span className="text-2xl text-white/40 ml-1">/{WEEKLY_LIMIT}</span>
+                              {messagesUsed}<span className="text-2xl text-white/55 ml-1">/{WEEKLY_LIMIT}</span>
                             </div>
                             <p className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-white/55 font-bold mt-2">Questions Used This Week</p>
                           </div>

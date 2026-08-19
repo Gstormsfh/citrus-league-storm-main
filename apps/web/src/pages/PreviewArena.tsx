@@ -196,7 +196,7 @@ export default function PreviewArena() {
                 <div className="font-jbmono text-[11px] tracking-wider uppercase text-pastel-cream font-bold">
                   47,000+ MANAGERS
                 </div>
-                <div className="font-jbmono text-[10px] text-white/45">
+                <div className="font-jbmono text-[10px] text-white/55">
                   drafting on Citrus this season
                 </div>
               </div>
@@ -218,7 +218,7 @@ export default function PreviewArena() {
                       Live · 3rd Period
                     </span>
                   </span>
-                  <span className="font-jbmono text-[10px] text-white/40 tabular-nums">12:43</span>
+                  <span className="font-jbmono text-[10px] text-white/55 tabular-nums">12:43</span>
                 </div>
                 <div className="flex items-baseline justify-between">
                   {LIVE_GAMES.slice(0, 1).map((g) => (
@@ -228,7 +228,7 @@ export default function PreviewArena() {
                         <div className="font-jbmono text-[10px] text-white/50 mt-1 tracking-wider uppercase">Away</div>
                       </div>
                       <div className="font-sans font-black text-[2.5rem] text-pastel-cream tabular-nums leading-none">
-                        {g.awayScore}<span className="text-white/30 mx-1">·</span>{g.homeScore}
+                        {g.awayScore}<span className="text-white/55 mx-1">·</span>{g.homeScore}
                       </div>
                       <div className="text-right">
                         <div className="font-sans font-black text-[1.75rem] text-pastel-cream leading-none">{g.home}</div>
@@ -246,7 +246,7 @@ export default function PreviewArena() {
               <div className="bg-[#1A2A20] border border-white/10 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
                   <div>
-                    <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 font-bold">
+                    <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 font-bold">
                       Sunday Beer League
                     </div>
                     <div className="font-sans font-bold text-[15px] text-pastel-cream mt-0.5">Week 12 Standings</div>
@@ -263,10 +263,10 @@ export default function PreviewArena() {
                     { rank: 4, team: 'Sage Slappers', record: '11-7', pts: 1089 },
                   ].map((t) => (
                     <div key={t.team} className="flex items-center gap-4 px-5 py-3 hover:bg-white/5 transition-colors">
-                      <span className={`font-sans font-black text-[14px] w-5 ${t.rank <= 3 ? 'text-pastel-orange' : 'text-white/45'}`}>{t.rank}</span>
+                      <span className={`font-sans font-black text-[14px] w-5 ${t.rank <= 3 ? 'text-pastel-orange' : 'text-white/55'}`}>{t.rank}</span>
                       <div className="flex-1 min-w-0">
                         <div className="font-sans font-semibold text-[14px] text-pastel-cream truncate">{t.team}</div>
-                        <div className="font-jbmono text-[10px] text-white/45 mt-0.5">{t.record}</div>
+                        <div className="font-jbmono text-[10px] text-white/55 mt-0.5">{t.record}</div>
                       </div>
                       <span className="font-jbmono text-[14px] font-bold text-pastel-cream tabular-nums">
                         {t.pts.toLocaleString()}
@@ -275,7 +275,7 @@ export default function PreviewArena() {
                   ))}
                 </div>
                 <div className="px-5 py-3 border-t border-white/10 bg-white/[0.02]">
-                  <div className="flex items-center justify-between font-jbmono text-[10px] text-white/40 tracking-wide">
+                  <div className="flex items-center justify-between font-jbmono text-[10px] text-white/55 tracking-wide">
                     <span>League chat · 14 new messages</span>
                     <span className="text-pastel-sage">Open league →</span>
                   </div>
@@ -297,7 +297,7 @@ export default function PreviewArena() {
               Every way to play hockey.
             </h2>
           </div>
-          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/40">
+          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55">
             Scroll for more →
           </span>
         </div>
@@ -318,7 +318,7 @@ export default function PreviewArena() {
                     {g.badge}
                   </span>
                 </div>
-                <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 mb-2">
+                <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 mb-2">
                   {g.label}
                 </div>
                 <h3 className="font-sans font-bold text-[1.25rem] leading-snug text-pastel-cream mb-3">
@@ -328,7 +328,7 @@ export default function PreviewArena() {
                   {g.body}
                 </p>
                 <div className="flex items-center justify-between">
-                  <span className="font-jbmono text-[10px] tracking-wider uppercase text-white/40">
+                  <span className="font-jbmono text-[10px] tracking-wider uppercase text-white/55">
                     {g.seasonal}
                   </span>
                   <button className="inline-flex items-center gap-1.5 bg-pastel-orange text-[#581E00] px-4 h-9 rounded-md text-[12px] font-bold hover:bg-pastel-orange-soft transition-colors">
@@ -380,7 +380,7 @@ export default function PreviewArena() {
         <div className="max-w-[1280px] mx-auto px-6 py-12 grid grid-cols-2 md:grid-cols-4 gap-8 text-[13px]">
           <div>
             <div className="font-calistoga text-[20px] text-pastel-cream mb-3">Citrus</div>
-            <p className="text-white/40 text-[12px] leading-relaxed">
+            <p className="text-white/55 text-[12px] leading-relaxed">
               Fantasy hockey, freshly squeezed. Made in California.
             </p>
           </div>
@@ -390,7 +390,7 @@ export default function PreviewArena() {
             { title: 'Citrus', links: ['About', 'Careers', 'Privacy', 'Terms'] },
           ].map((col) => (
             <div key={col.title}>
-              <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 mb-3 font-bold">
+              <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 mb-3 font-bold">
                 {col.title}
               </div>
               <ul className="space-y-2">
@@ -405,7 +405,7 @@ export default function PreviewArena() {
             </div>
           ))}
         </div>
-        <div className="border-t border-white/5 py-5 text-center font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/30">
+        <div className="border-t border-white/5 py-5 text-center font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55">
           © 2026 Citrus Fantasy Sports
         </div>
       </footer>

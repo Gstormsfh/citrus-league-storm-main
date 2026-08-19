@@ -111,12 +111,12 @@ const Blog = () => {
 
         <div className="mb-8 max-w-3xl mx-auto">
           <div className="relative">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-white/55 absolute left-3 top-1/2 -translate-y-1/2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
             </svg>
             <Input
               placeholder="Search articles..."
-              className="pl-10 bg-pastel-surface-tile border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+              className="pl-10 bg-pastel-surface-tile border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -155,13 +155,13 @@ const Blog = () => {
                   <span className="px-2 py-0.5 bg-pastel-orange/15 ring-1 ring-pastel-orange/30 text-pastel-orange-soft text-[10px] tracking-wider uppercase font-jbmono font-bold rounded">
                     {post.category}
                   </span>
-                  <span className="text-[10px] text-white/45 font-jbmono">{post.date}</span>
+                  <span className="text-[10px] text-white/55 font-jbmono">{post.date}</span>
                 </div>
                 <h3 className="font-sans font-bold text-[18px] text-pastel-cream mb-2 leading-snug">{post.title}</h3>
                 <p className="text-white/60 text-[14px] mb-4 leading-relaxed">{post.excerpt}</p>
               </CardContent>
               <CardFooter className="px-5 pb-5 pt-0 flex justify-between items-center">
-                <div className="text-[11px] text-white/45 font-jbmono">By {post.author}</div>
+                <div className="text-[11px] text-white/55 font-jbmono">By {post.author}</div>
                 <Button variant="link" className="p-0 text-pastel-orange-soft hover:text-pastel-orange font-bold text-[13px]">
                   Read More →
                 </Button>

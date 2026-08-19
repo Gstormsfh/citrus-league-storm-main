@@ -124,7 +124,7 @@ export default function PreviewIndex() {
       {/* Prior variants */}
       <section className="relative max-w-[1200px] mx-auto px-6 pb-16">
         <details className="bg-white/[0.03] backdrop-blur-md ring-1 ring-white/10 rounded-2xl p-5">
-          <summary className="cursor-pointer font-jbmono text-[10px] tracking-[0.32em] uppercase text-white/45 hover:text-pastel-cream font-bold">
+          <summary className="cursor-pointer font-jbmono text-[10px] tracking-[0.32em] uppercase text-white/55 hover:text-pastel-cream font-bold">
             Prior directions (kept for reference) →
           </summary>
           <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -142,7 +142,7 @@ export default function PreviewIndex() {
       </section>
 
       <footer className="relative max-w-[1200px] mx-auto px-6 pb-12 text-center">
-        <p className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/30">
+        <p className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55">
           All three are wired to <code className="font-jbmono not-italic">/preview-*</code> routes · Hidden from production · Reference: sleeper.com (dark)
         </p>
       </footer>

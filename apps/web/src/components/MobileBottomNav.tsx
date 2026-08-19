@@ -118,7 +118,12 @@ const MobileBottomNav = () => {
           { icon: Trophy, label: 'League', path: `/league/${activeLeagueId}?league=${activeLeagueId}` },
           { icon: Swords, label: 'Matchup', path: '/matchup' },
           { icon: Users, label: 'Roster', path: '/roster' },
-          { icon: Search, label: 'Players', path: '/free-agents' },
+          // 2026-08-18 launch audit: this tab was labelled "Players" but
+          // pointed at /free-agents, while a real /players section now
+          // exists with the full advanced-metrics dashboard. Desktop has
+          // both; mobile had only the mislabelled one, so the two navs
+          // disagreed about what "Players" means. Say what it is.
+          { icon: Search, label: 'Free Agents', path: '/free-agents' },
           { icon: BarChart3, label: 'Standings', path: '/standings' },
         ]
       : [
@@ -205,7 +210,7 @@ const MobileBottomNav = () => {
               </div>
               <span className={cn(
                 "text-[10px] font-bold leading-tight transition-colors duration-200 tracking-tight",
-                active ? "text-pastel-cream" : "text-white/45"
+                active ? "text-pastel-cream" : "text-white/55"
               )}>
                 {item.label}
               </span>

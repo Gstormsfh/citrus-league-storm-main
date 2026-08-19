@@ -94,7 +94,7 @@ export default function Pricing() {
               <h2 className="font-sans font-black text-[2.5rem] text-pastel-cream leading-none mb-1 relative z-10">
                 Free
               </h2>
-              <div className="font-jbmono text-[11px] text-white/45 mb-6 relative z-10">
+              <div className="font-jbmono text-[11px] text-white/55 mb-6 relative z-10">
                 Forever for founding managers
               </div>
               <p className="text-[14px] text-white/65 leading-relaxed mb-6 relative z-10">
@@ -137,7 +137,7 @@ export default function Pricing() {
               <h2 className="font-sans font-black text-[2.5rem] text-pastel-cream/85 leading-none mb-1 relative z-10">
                 TBD
               </h2>
-              <div className="font-jbmono text-[11px] text-white/45 mb-6 relative z-10">
+              <div className="font-jbmono text-[11px] text-white/55 mb-6 relative z-10">
                 Founders pricing locked in
               </div>
               <p className="text-[14px] text-white/65 leading-relaxed mb-6 relative z-10">

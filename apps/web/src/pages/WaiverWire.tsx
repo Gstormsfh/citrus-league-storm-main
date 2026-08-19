@@ -19,7 +19,7 @@ import { rosterApi } from '@/api/rosters';
 import { waiverApi } from '@/api/waivers';
 import { useToast } from '@/hooks/use-toast';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   HockeyFooter,
   ShiftIcon,
@@ -51,8 +51,17 @@ const WaiverWire = () => {
   const [waiverSettings, setWaiverSettings] = useState<any>(null);
   const [teamCount, setTeamCount] = useState<number>(0);
   
-  // Available players search
-  const [searchTerm, setSearchTerm] = useState('');
+  // Available players search.
+  //
+  // 2026-08-18 launch audit: callers deep-linked here expecting a player
+  // to be preselected (GM Office's "Add" button on a streamer suggestion
+  // sent `?player=<id>`), but this page read no search params at all, so
+  // every such link opened a blank waiver page and the user had to find
+  // the player again by hand. Seeded from `?search=` now.
+  const [waiverSearchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(
+    () => waiverSearchParams.get('search') ?? '',
+  );
   const [positionFilter, setPositionFilter] = useState<string>('all');
   const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -451,7 +460,7 @@ const WaiverWire = () => {
                           </span>
                           <span className="font-calistoga text-2xl text-pastel-orange tabular-nums leading-none shrink-0">
                             ${faabBudget}
-                            <span className="text-sm text-white/40 ml-1">/ $100</span>
+                            <span className="text-sm text-white/55 ml-1">/ $100</span>
                           </span>
                         </div>
                         <div className="h-2 rounded-full bg-white/10 overflow-hidden">
@@ -594,10 +603,10 @@ const WaiverWire = () => {
                 </div>
                 <div className="flex flex-col md:flex-row gap-3 mb-6">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/55" />
                     <Input
                       placeholder="Search by player name…"
-                      className="pl-10 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40 h-12"
+                      className="pl-10 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 h-12"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && searchPlayers()}
@@ -725,7 +734,7 @@ const WaiverWire = () => {
                             const val = Math.max(0, parseFloat(e.target.value) || 0);
                             setFaabBidAmount(Math.min(val, faabBudget ?? 100));
                           }}
-                          className="w-28 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/40 focus-visible:ring-pastel-orange/40"
+                          className="w-28 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                           placeholder="$0"
                         />
                         <span className="text-xs text-white/55 tabular-nums">of ${faabBudget ?? 0} remaining</span>

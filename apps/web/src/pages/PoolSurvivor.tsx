@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
@@ -47,7 +48,19 @@ const PoolSurvivor = () => {
   const [standings, setStandings] = useState<SurvivorStanding[]>([]);
   const [lockedTeams, setLockedTeams] = useState<Set<string>>(new Set());
   const [records, setRecords] = useState<Record<string, { w: number; l: number; otl: number }>>({});
-  const [activeTab, setActiveTab] = useState('pick');
+  // 2026-08-18 launch audit: getPoolRoute() has always appended a
+  // `?tab=` param (Navbar, MobileBottomNav, GMOffice all pass one), but
+  // none of the pool pages ever read it — the tab was pure local state.
+  // Every "Standings" / "Pick History" link therefore landed on the
+  // default Picks tab. Worst case: Standings.tsx redirects pool users to
+  // getPoolRoute(..., 'standings'), so pool standings were unreachable
+  // from /standings entirely. Read and validate the param.
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = searchParams.get('tab');
+    const allowed = ['pick', 'standings', 'history', 'league'];
+    return requested && allowed.includes(requested) ? requested : 'pick';
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -144,7 +157,7 @@ const PoolSurvivor = () => {
                   <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </Button>
                 <div className="px-3 text-center border-x border-white/10">
-                  <div className="text-[9px] font-jbmono text-white/45 uppercase tracking-widest leading-none">Week</div>
+                  <div className="text-[9px] font-jbmono text-white/55 uppercase tracking-widest leading-none">Week</div>
                   <div className="text-base font-bold text-pastel-cream leading-none tabular-nums">{currentWeek}</div>
                 </div>
                 <Button variant="ghost" size="icon" aria-label="Next week" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
@@ -215,7 +228,7 @@ const PoolSurvivor = () => {
                           {/* Monogram */}
                           <div
                             className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs tracking-wide shadow-sm ${
-                              isSelected ? 'bg-white/20 text-white' : isUsed ? 'bg-white/10 text-white/30' : 'text-white'
+                              isSelected ? 'bg-white/20 text-white' : isUsed ? 'bg-white/10 text-white/55' : 'text-white'
                             }`}
                             style={!isSelected && !isUsed ? { background: info.primaryColor } : {}}
                           >
@@ -223,13 +236,13 @@ const PoolSurvivor = () => {
                           </div>
                           {/* Team name + record */}
                           <span className={`text-[10px] font-bold leading-tight ${
-                            isSelected ? 'text-white/95' : isUsed ? 'text-white/30 line-through' : 'text-pastel-cream'
+                            isSelected ? 'text-white/95' : isUsed ? 'text-white/55 line-through' : 'text-pastel-cream'
                           }`}>
                             {info.name}
                           </span>
                           {records[team] && !isUsed && (
                             <span className={`text-[8px] font-jbmono leading-none tabular-nums ${
-                              isSelected ? 'text-white/65' : 'text-white/45'
+                              isSelected ? 'text-white/65' : 'text-white/55'
                             }`}>
                               {records[team].w}-{records[team].l}-{records[team].otl}
                             </span>
@@ -244,7 +257,7 @@ const PoolSurvivor = () => {
                   {/* Used teams chips */}
                   {usedTeams.length > 0 && (
                     <div className="mb-4 flex flex-wrap items-center gap-1.5">
-                      <span className="font-jbmono text-[10px] uppercase tracking-wider text-white/45 mr-1">Previously used:</span>
+                      <span className="font-jbmono text-[10px] uppercase tracking-wider text-white/55 mr-1">Previously used:</span>
                       {usedTeams.map(t => {
                         const info = getInfo(t);
                         return (
@@ -335,7 +348,7 @@ const PoolSurvivor = () => {
                                   style={{ background: getInfo(s.current_pick).primaryColor }}>
                                   {s.current_pick}
                                 </span>
-                              ) : <span className="text-white/30">-</span>}
+                              ) : <span className="text-white/55">-</span>}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -361,7 +374,11 @@ const PoolSurvivor = () => {
                     <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Head to the Picks tab and lock in this week's team — every choice you make lands here.</p>
                     <button
                       type="button"
-                      onClick={() => setActiveTab('picks')}
+                      // 'picks' matches none of this page's tab values
+                      // ('pick' | 'standings' | 'history' | 'league'), so
+                      // this CTA used to blank the content pane and
+                      // de-highlight every tab. (2026-08-18 audit)
+                      onClick={() => setActiveTab('pick')}
                       className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pastel-orange text-[#581E00] text-sm font-bold hover:bg-pastel-orange-soft transition-colors"
                     >
                       Make your pick →
@@ -383,7 +400,7 @@ const PoolSurvivor = () => {
                         <span className="font-bold text-sm text-pastel-cream flex-1">{info.fullName}</span>
                         {pick.is_correct === true && <CheckCircle2 className="w-5 h-5 text-pastel-sage shrink-0" aria-hidden="true" />}
                         {pick.is_correct === false && <XCircle className="w-5 h-5 text-red-400 shrink-0" aria-hidden="true" />}
-                        {pick.is_correct === null && <span className="font-jbmono text-[10px] uppercase tracking-wider text-white/45 shrink-0">Pending</span>}
+                        {pick.is_correct === null && <span className="font-jbmono text-[10px] uppercase tracking-wider text-white/55 shrink-0">Pending</span>}
                       </div>
                     );
                   })}

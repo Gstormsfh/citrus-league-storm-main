@@ -43,7 +43,48 @@ const code = SRC.replace(/\/\*[\s\S]*?\*\//g, '')
 describe('DraftRoomV2 — commissioner Start lobby (source-shape lock)', () => {
   it('defines DraftLobbyV2 and renders it in the room shell', () => {
     expect(code).toMatch(/function DraftLobbyV2\(/);
-    expect(code).toMatch(/<DraftLobbyV2\s+leagueId=\{leagueId\}\s+teams=\{teams\}\s*\/>/);
+    // Assert the props are PASSED, not the exact formatting of the JSX.
+    // The original regex pinned `<DraftLobbyV2 leagueId={leagueId}
+    // teams={teams} />` on one line and broke the moment a prop was
+    // added — a source-shape lock should protect the wiring, not the
+    // whitespace. (2026-08-18)
+    const usage = code.slice(code.indexOf('<DraftLobbyV2'));
+    const tag = usage.slice(0, usage.indexOf('/>') + 2);
+    expect(tag).toMatch(/leagueId=\{leagueId\}/);
+    expect(tag).toMatch(/teams=\{teams\}/);
+    expect(tag).toMatch(/teamsError=\{teamsError\}/);
+    expect(tag).toMatch(/onRetryTeams=\{retryTeamsFetch\}/);
+  });
+
+  // 2026-08-18 launch audit. The league fetch was hardened after the
+  // original silent-no-button incident, but the TEAMS fetch sitting
+  // right beside it kept its bare `catch {}` — and the lobby derives
+  // commissioner status FROM that list (myUserId = teams.find(...)).
+  // So a failed teams fetch reproduced the exact same incident: no
+  // Start button, under the words "0 of 0 teams joined · waiting for
+  // the commissioner to start", shown to the commissioner.
+  it('surfaces a teams-fetch failure loudly instead of a silent no-button state', () => {
+    expect(code).toMatch(/const \[teamsError, setTeamsError\] = useState<string \| null>\(null\)/);
+    expect(code).toMatch(/const \[teamsFetchNonce, setTeamsFetchNonce\] = useState\(0\)/);
+    // The retry re-arms the fetch effect.
+    expect(code).toMatch(/\}, \[leagueId, teamsFetchNonce\]\)/);
+    // No bare catch left on that effect.
+    expect(code).not.toMatch(/const response = await apiClient\.get<FetchedTeam\[\]>[\s\S]{0,600}?\}\s*catch\s*\{\s*\}/);
+    // Error surface + retry affordance exist in the lobby's render.
+    const lobby = code.slice(code.indexOf('function DraftLobbyV2('));
+    expect(lobby).toMatch(/data-testid="draft-lobby-v2-teams-error"/);
+    expect(lobby).toMatch(/data-testid="draft-lobby-v2-teams-retry"/);
+    // And the misleading "0 of 0 teams joined" copy is suppressed.
+    expect(lobby).toMatch(/teamsError \?/);
+  });
+
+  // A transient my-team fetch failure used to leave myTeamId null, which
+  // the cross-check treats as a legitimate spectator — so the owner sat
+  // out the whole draft silently and lost every pick to autopick.
+  it('retries the my-team fetch and fails loud rather than silently spectating', () => {
+    expect(code).toMatch(/setIdentityFailure\(\{ reason: 'my_team_unverifiable' \}\)/);
+    // Bounded retry before declaring failure.
+    expect(code).toMatch(/for \(let attempt = 0; attempt < 3; attempt\+\+\)/);
   });
 
   it('gates on connection waitingForStart, NOT on derived draftStatus', () => {

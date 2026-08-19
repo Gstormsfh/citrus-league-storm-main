@@ -249,6 +249,72 @@ playerRoutes.get('/dashboard-index', authMiddleware, async (c) => {
   }
 });
 
+// POST /api/players/transaction — record an add/drop for platform-wide
+// trending analytics.
+//
+// 2026-08-18 launch audit: the frontend has called this endpoint on every
+// free-agent add since the feature shipped (FreeAgents.tsx → PlayerService
+// .recordPlayerTransaction → api/players.ts), but the route never existed
+// — this router had ZERO POST handlers. Every call 404'd, and
+// PlayerService's try/catch swallowed it, so nothing ever surfaced.
+// Confirmed against prod: public.player_transactions has 0 rows, lifetime.
+// GET /trending reads get_trending_players() over that table, so the
+// Trending feature has been rendering an empty set forever.
+//
+// Registered BEFORE /:playerId for consistency with the other literals,
+// though as a POST it could not actually collide with that GET.
+//
+// SECURITY: user_id is taken from the verified JWT, never from the body.
+// The table's INSERT policy is `auth.uid() = user_id`, so a client-supplied
+// user_id would be rejected by RLS anyway — but not sending it at all is
+// the correct posture, and it keeps the failure mode honest.
+playerRoutes.post('/transaction', authMiddleware, async (c) => {
+  const userId = c.get('userId');
+  const supabase = createUserClient(c.get('userToken'));
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, AppError.badRequest('Invalid JSON body'));
+  }
+
+  const playerId = Number(body.playerId);
+  const leagueId = typeof body.leagueId === 'string' ? body.leagueId : null;
+  const teamId = typeof body.teamId === 'string' ? body.teamId : null;
+  const transactionType = body.transactionType;
+
+  if (!Number.isFinite(playerId) || playerId <= 0) {
+    return fail(c, AppError.badRequest('playerId must be a positive number'));
+  }
+  if (!leagueId || !teamId) {
+    return fail(c, AppError.badRequest('leagueId and teamId are required'));
+  }
+  if (transactionType !== 'add' && transactionType !== 'drop') {
+    return fail(c, AppError.badRequest("transactionType must be 'add' or 'drop'"));
+  }
+
+  const asText = (v: unknown): string | null => (typeof v === 'string' && v.length > 0 ? v : null);
+
+  const { error } = await supabase.from('player_transactions').insert({
+    player_id: playerId,
+    league_id: leagueId,
+    team_id: teamId,
+    user_id: userId,
+    transaction_type: transactionType,
+    source: asText(body.source),
+    player_name: asText(body.playerName),
+    player_team: asText(body.playerTeam),
+    player_position: asText(body.playerPosition),
+  });
+
+  if (error) {
+    return handleError(c, error, 'Failed to record player transaction');
+  }
+
+  return ok(c, { recorded: true });
+});
+
 // GET /api/players/:playerId — Get a single player
 playerRoutes.get('/:playerId', authMiddleware, async (c) => {
   const playerId = c.req.param('playerId');

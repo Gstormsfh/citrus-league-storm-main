@@ -316,7 +316,7 @@ function ShotBreakdownTile() {
               sampleSize={188}
               category={row.category}
             />
-            <div className="mt-1 font-jbmono text-[9px] uppercase tracking-[0.22em] text-white/35 font-bold tabular-nums">
+            <div className="mt-1 font-jbmono text-[9px] uppercase tracking-[0.22em] text-white/55 font-bold tabular-nums">
               {row.xgPerShot.toFixed(2)} xG/shot
             </div>
           </div>
@@ -430,7 +430,7 @@ export default function PreviewPlayerProfile() {
               <div className="font-jbmono text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-white/55 font-bold">
                 Standard Percentiles · vs all centers
               </div>
-              <div className="font-jbmono text-[9px] uppercase tracking-[0.22em] text-white/35 font-bold tabular-nums">
+              <div className="font-jbmono text-[9px] uppercase tracking-[0.22em] text-white/55 font-bold tabular-nums">
                 71 GP · 906 cohort
               </div>
             </div>
@@ -454,7 +454,7 @@ export default function PreviewPlayerProfile() {
           {/* Subtle freshness chip below the bento — chrome-zone inline citation */}
           <div className="mt-5 sm:mt-6 flex items-center justify-end gap-2">
             <StaleDataBadge asOf={TODAY_ISO} label="xG model" />
-            <span className="font-jbmono text-[9px] uppercase tracking-[0.22em] text-white/35 font-bold">
+            <span className="font-jbmono text-[9px] uppercase tracking-[0.22em] text-white/55 font-bold">
               · 906 centers benchmarked
             </span>
           </div>

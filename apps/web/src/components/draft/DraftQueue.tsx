@@ -27,6 +27,13 @@ import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
 import { supabase } from '@/integrations/supabase/client';
 
+/* 2026-08-19 visual audit: this panel was still on the ORIGINAL light
+   theme (fantasy-surface #FFFFFF, fantasy-dark #1E293B, fantasy-light
+   #FFF1DB) while the draft room around it renders on #0F1F15. It read as
+   a white box pasted into a dark app. Migrated to the pastel dark
+   surface tokens the rest of the room already uses. */
+
+
 /** A row of `draft_queues`. `position` is 1-based queue order. */
 interface QueueRow {
   player_id: number;
@@ -136,14 +143,14 @@ function SortableQueueItem({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const posColor = positionColors[player.position as keyof typeof positionColors] || 'bg-citrus-sage/20 text-citrus-forest border-citrus-sage/40';
+  const posColor = positionColors[player.position as keyof typeof positionColors] || 'bg-citrus-sage/20 text-pastel-cream border-citrus-sage/40';
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        'flex items-center gap-3 p-2 rounded-lg border bg-[#E8EED9]/50 backdrop-blur-sm transition-all',
+        'flex items-center gap-3 p-2 rounded-lg border bg-pastel-surface-tile backdrop-blur-sm transition-all',
         isDrafted && 'opacity-50 bg-muted/50',
         isDragging && 'shadow-lg scale-105 z-50',
         index === 0 && isYourTurn && !isDrafted && 'ring-2 ring-fantasy-primary bg-fantasy-primary/5'
@@ -427,11 +434,11 @@ export const DraftQueue = ({
   }, [isDraftActive, isYourTurn, availableQueuePlayers.length]);
 
   return (
-    <Card className="border-fantasy-border bg-fantasy-surface">
+    <Card className="border-white/10">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-lg font-semibold text-fantasy-dark">
+            <CardTitle className="text-lg font-semibold text-pastel-cream">
               Draft Queue
             </CardTitle>
             {isYourTurn && availableQueuePlayers.length > 0 && (
@@ -462,7 +469,7 @@ export const DraftQueue = ({
               <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
               <p className="text-sm font-medium">Your queue is empty</p>
               <p className="text-xs">Click the star icon on players to add them to your queue</p>
-              <div className="mt-2 p-2 bg-fantasy-light/30 rounded text-xs flex items-center gap-2">
+              <div className="mt-2 p-2 bg-white/5 rounded text-xs flex items-center gap-2">
                 <Info className="h-3 w-3" />
                 <span>Drag to reorder • Top player auto-drafts when it's your turn</span>
               </div>
@@ -498,7 +505,7 @@ export const DraftQueue = ({
         )}
 
         {draftedInQueue.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-fantasy-border">
+          <div className="mt-4 pt-4 border-t border-white/10">
             <div className="text-xs text-muted-foreground mb-2 flex items-center justify-between">
               <span>
                 {draftedInQueue.length} player{draftedInQueue.length !== 1 ? 's' : ''} already drafted

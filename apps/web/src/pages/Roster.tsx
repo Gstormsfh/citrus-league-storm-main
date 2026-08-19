@@ -53,6 +53,16 @@ import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { resolveFantasyPosition, type PositionType, getRosterSlots, DEFAULT_ROSTER_SLOTS, DEFAULT_FDG_ROSTER_SLOTS, getSlotPositions } from '@/utils/rosterUtils';
 
+/* 2026-08-19 visual audit — surface correction.
+   These panels used bg-white/55..80 ("frosted glass") on the #0F1F15
+   dark page. Composited, that lands around rgb(159,165,161) — a MID-GREY
+   dead zone where nothing reads: cream text measured 2.37:1 and the dark
+   labels 1.58:1 against it. There is no text colour that fixes a
+   mid-grey surface; the surface itself is the bug. Swapped to the dark
+   tile family the rest of the app uses (ui/card.tsx is
+   bg-pastel-surface-tile + ring-white/10), so cream text lands at 13:1. */
+
+
 // Helper function to transform position to fantasy slot
 // When posType is 'forward', C/LW/RW → 'F'
 const getFantasyPosition = (position: string, posType: PositionType = 'individual'): string => {
@@ -2963,7 +2973,7 @@ const Roster = () => {
               {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Roster')}
             </h1>
             {activeLeague?.name && (
-              <div className="text-xs font-jbmono text-white/40 truncate -mt-0.5">
+              <div className="text-xs font-jbmono text-white/55 truncate -mt-0.5">
                 {activeLeague.name}
               </div>
             )}
@@ -3575,7 +3585,7 @@ const Roster = () => {
                                     {(clearsAtFormatted || nextProcessFormatted) && (
                                       <div className="mt-3 grid gap-2 sm:grid-cols-2 text-xs">
                                         {clearsAtFormatted && (
-                                          <div className="flex items-start gap-2 rounded-md bg-white/70 border border-amber-500/40 p-2">
+                                          <div className="flex items-start gap-2 rounded-md bg-pastel-surface-tile border border-amber-500/40 p-2">
                                             <Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />
                                             <div>
                                               <div className="uppercase tracking-wide text-[10px] text-amber-700 font-bold">
@@ -3586,7 +3596,7 @@ const Roster = () => {
                                           </div>
                                         )}
                                         {nextProcessFormatted && (
-                                          <div className="flex items-start gap-2 rounded-md bg-white/70 border border-green-600/40 p-2">
+                                          <div className="flex items-start gap-2 rounded-md bg-pastel-surface-tile border border-green-600/40 p-2">
                                             <Zap className="w-4 h-4 text-green-700 mt-0.5 shrink-0" aria-hidden="true" />
                                             <div>
                                               <div className="uppercase tracking-wide text-[10px] text-green-700 font-bold">

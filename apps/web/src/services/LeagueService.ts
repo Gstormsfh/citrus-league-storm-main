@@ -284,19 +284,69 @@ const getNormalizedPos = (p: Player) => {
 const LEAGUE_CACHE_TTL = 30_000; // 30 seconds
 const leagueRequestCache = new Map<string, { promise: Promise<any>; timestamp: number }>();
 
+/**
+ * 2026-08-18 launch audit — do not cache failures.
+ *
+ * This cache holds the PROMISE, and several callers here (notably
+ * getUserLeagues) catch internally and RESOLVE with `{ ..., error }`
+ * rather than rejecting. A failed fetch therefore looked like a
+ * perfectly good cached value and was replayed for the full 30s TTL.
+ *
+ * The user-visible effect: pressing Retry — including the new
+ * LeagueLoadErrorBanner retry and LeagueContext.refreshLeagues — did
+ * nothing at all for 30 seconds, replaying the same failure and looking
+ * like a dead button. Deduplication is still worth having; caching a
+ * failure is not. Evict any settled value that carries an error.
+ */
+function resolvedWithError(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'error' in value &&
+    (value as { error: unknown }).error != null
+  );
+}
+
 function getLeagueCachedOrFetch<T>(cacheKey: string, fetcher: () => Promise<T>): Promise<T> {
   const existing = leagueRequestCache.get(cacheKey);
   if (existing && Date.now() - existing.timestamp < LEAGUE_CACHE_TTL) {
     return existing.promise as Promise<T>;
   }
-  const promise = fetcher().finally(() => {
-    setTimeout(() => {
-      const entry = leagueRequestCache.get(cacheKey);
-      if (entry && entry.promise === promise) {
-        leagueRequestCache.delete(cacheKey);
-      }
-    }, LEAGUE_CACHE_TTL);
-  });
+
+  const evict = () => {
+    const entry = leagueRequestCache.get(cacheKey);
+    if (entry && entry.promise === promise) {
+      leagueRequestCache.delete(cacheKey);
+    }
+  };
+
+  // The `: never` annotation on the rejection handler matters: without
+  // it TypeScript widens the result to `T | undefined` and every caller
+  // of this helper loses its return type (it inferred `unknown` and
+  // produced ~10 downstream errors when this was first written).
+  const promise: Promise<T> = fetcher().then(
+    (value: T) => {
+      // Resolved-but-failed: drop it immediately so the next call retries.
+      if (resolvedWithError(value)) evict();
+      return value;
+    },
+    (err: unknown): never => {
+      // A genuine rejection must not be replayed either.
+      evict();
+      throw err;
+    },
+  );
+
+  // Successful entries still expire on the normal TTL. The trailing
+  // catch is required: `promise` is returned to the caller who handles
+  // rejection, but this second chain would otherwise surface the same
+  // rejection a second time as an unhandled promise rejection.
+  void promise
+    .finally(() => {
+      setTimeout(evict, LEAGUE_CACHE_TTL);
+    })
+    .catch(() => {});
+
   leagueRequestCache.set(cacheKey, { promise, timestamp: Date.now() });
   return promise;
 }

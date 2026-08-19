@@ -125,7 +125,7 @@ const Admin = () => {
 
       <Navbar />
       <main className="max-w-[1280px] mx-auto py-12 px-6">
-          <div className="text-center font-jbmono text-[12px] tracking-wider uppercase text-white/45">Loading admin panel...</div>
+          <div className="text-center font-jbmono text-[12px] tracking-wider uppercase text-white/55">Loading admin panel...</div>
         </main>
       </DarkLayout>
     );

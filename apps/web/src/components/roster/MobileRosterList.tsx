@@ -221,7 +221,10 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
           // can never disagree with its own background (see the map).
           "w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center font-varsity text-[11px] font-black tracking-wide",
           "ring-1 active:scale-95 transition-transform cursor-pointer",
-          posColor[slotPosition] || 'bg-white/40 text-pastel-forest',
+          // 2026-08-19: the fallback chip was bg-white/40 (mid-grey once
+          // composited on the dark page) with pastel-forest text — the
+          // one combination in this map that failed its own rule above.
+          posColor[slotPosition] || 'bg-white/15 text-pastel-cream',
           posRingColor[slotPosition] || 'ring-white/20',
           isEligibleTarget && !isSwapSelected && "!ring-pastel-sage !ring-2 animate-pulse",
           isSwapSelected && "!ring-pastel-orange !ring-2",
@@ -298,7 +301,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                   ) : player.nextGame.gameTime ? (
                     <>
                       <span className="text-white/25 flex-shrink-0">·</span>
-                      <span className="text-white/45 font-medium flex-shrink-0">
+                      <span className="text-white/55 font-medium flex-shrink-0">
                         {player.nextGame.gameTime}
                       </span>
                     </>
@@ -320,13 +323,13 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 </span>
                 <span className={cn(
                   "text-[9px] font-display font-semibold uppercase leading-tight mt-0.5",
-                  isLiveOrFinal ? "text-emerald-600/70" : "text-white/40"
+                  isLiveOrFinal ? "text-emerald-600/70" : "text-white/55"
                 )}>
                   {isLiveOrFinal ? (gameStatus === 'final' ? 'final' : 'live') : 'proj'}
                 </span>
               </div>
             ) : (
-              <span className="text-[11px] text-white/30 font-display">—</span>
+              <span className="text-[11px] text-white/55 font-display">—</span>
             )}
           </div>
         </>

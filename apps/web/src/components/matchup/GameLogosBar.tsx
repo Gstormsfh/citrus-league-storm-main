@@ -373,7 +373,7 @@ export const GameLogosBar = ({ games, playerTeam, selectedDate }: GameLogosBarPr
               {/* Date Display */}
               <span className={`text-[8px] lg:text-[9px] leading-tight whitespace-nowrap font-display font-semibold ${
                 isPlayed
-                  ? 'text-white/40'
+                  ? 'text-white/55'
                   : isSelectedDate && (isSelectedDateScheduled || isLive)
                     ? 'text-pastel-cream'
                     : 'text-white/60'

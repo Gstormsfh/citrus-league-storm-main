@@ -7,6 +7,30 @@ import { useState, useEffect } from 'react';
 import { PlayerContract, formatCap, formatCapFull } from '@/types/captracker';
 import PlayerAvatar from './PlayerAvatar';
 
+/* 2026-08-19 visual audit — muted-text correction.
+   text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
+   original CREAM theme. At 20-70% opacity on the dark #1A2A20 tiles it
+   composites to near-invisible (team codes on this page measured
+   1.47:1). Remapped to cream at the alpha that preserves the intended
+   hierarchy while clearing 4.5:1 on a dark tile. */
+
+
+/* 2026-08-19 visual audit: light "glass" surface on a dark page — see
+   the surface-correction note in the armchair-gm components. bg-white/50
+   composites to mid-grey on #0F1F15, where neither light nor dark text
+   reaches 4.5:1. Uses the dark tile family instead. */
+
+
+/* 2026-08-19 visual audit — surface correction.
+   These panels used bg-white/55..80 ("frosted glass") on the #0F1F15
+   dark page. Composited, that lands around rgb(159,165,161) — a MID-GREY
+   dead zone where nothing reads: cream text measured 2.37:1 and the dark
+   labels 1.58:1 against it. There is no text colour that fixes a
+   mid-grey surface; the surface itself is the bug. Swapped to the dark
+   tile family the rest of the app uses (ui/card.tsx is
+   bg-pastel-surface-tile + ring-white/10), so cream text lands at 13:1. */
+
+
 // Hook to detect mobile/tablet
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
@@ -30,7 +54,7 @@ const statusColor: Record<string, string> = {
   UFA: 'bg-red-500 text-white',
   RFA: 'bg-amber-500 text-white',
   ELC: 'bg-blue-500 text-white',
-  Signed: 'bg-citrus-sage text-citrus-forest',
+  Signed: 'bg-citrus-sage text-pastel-forest',
   '35+': 'bg-purple-500 text-white',
 };
 
@@ -60,8 +84,8 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
           "relative rounded-2xl overflow-hidden transition-all duration-200 cursor-default group",
           "border-2 shadow-patch",
           isNonNHL
-            ? "bg-white/50 border-citrus-charcoal/15 opacity-80 hover:opacity-100"
-            : "bg-white/80 backdrop-blur-sm border-citrus-sage/40 hover:border-citrus-sage hover:shadow-varsity",
+            ? "bg-white/5 border-citrus-charcoal/15 opacity-80 hover:opacity-100"
+            : "bg-pastel-surface-tile backdrop-blur-sm border-citrus-sage/40 hover:border-citrus-sage hover:shadow-varsity",
         )}>
           {/* ─── Top accent stripe ─── */}
           <div className="h-[3px] bg-gradient-to-r from-citrus-sage via-[#7CB518] to-citrus-sage" />
@@ -74,7 +98,7 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
             }} />
 
             {/* Position badge - top right */}
-            <Badge className="absolute top-1 right-1 md:top-1.5 md:right-1.5 bg-gradient-to-br from-citrus-sage to-[#7CB518] border md:border-2 border-citrus-forest/80 text-citrus-forest font-varsity shadow-patch text-[7px] md:text-[9px] tracking-wider font-black h-4 md:h-5 px-1 md:px-2 z-10">
+            <Badge className="absolute top-1 right-1 md:top-1.5 md:right-1.5 bg-gradient-to-br from-citrus-sage to-[#7CB518] border md:border-2 border-citrus-forest/80 text-pastel-cream font-varsity shadow-patch text-[7px] md:text-[9px] tracking-wider font-black h-4 md:h-5 px-1 md:px-2 z-10">
               {player.position}
             </Badge>
 
@@ -102,7 +126,7 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
               </div>
 
               <div className="min-w-0 flex-1 pr-6 md:pr-7">
-                <div className="font-display font-extrabold text-[10px] md:text-[11px] leading-tight text-citrus-forest truncate group-hover:text-[#7CB518] transition-colors">
+                <div className="font-display font-extrabold text-[10px] md:text-[11px] leading-tight text-pastel-cream truncate group-hover:text-[#7CB518] transition-colors">
                   {player.name}
                 </div>
                 <div className="flex items-center gap-1 md:gap-1.5 mt-0.5">
@@ -113,15 +137,15 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
                   )}
                   {player.age > 0 && (
                     <>
-                      <span className="text-[7px] text-citrus-charcoal/20">|</span>
-                      <span className="text-[8px] md:text-[9px] text-citrus-charcoal/50 font-display font-semibold">
+                      <span className="text-[7px] text-pastel-cream/60">|</span>
+                      <span className="text-[8px] md:text-[9px] text-pastel-cream/65 font-display font-semibold">
                         {player.age}yr
                       </span>
                     </>
                   )}
                   {player.clause && (
                     <>
-                      <span className="hidden md:inline text-[7px] text-citrus-charcoal/20">|</span>
+                      <span className="hidden md:inline text-[7px] text-pastel-cream/60">|</span>
                       <Badge className={cn("hidden md:flex text-[6px] h-3.5 px-1 font-varsity font-bold border items-center gap-0.5", clauseConfig[player.clause].color)}>
                         {clauseConfig[player.clause].icon && <Lock className="w-2 h-2" />}
                         {clauseConfig[player.clause].label}
@@ -137,7 +161,7 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
           <div className="px-2 md:px-2.5 py-1.5 md:py-2 border-t-2 border-citrus-sage/20 bg-gradient-to-br from-white/60 to-citrus-cream/30">
             {/* Cap hit + Status badge */}
             <div className="flex items-baseline justify-between gap-1">
-              <span className="font-varsity text-xs md:text-base text-citrus-forest leading-none tracking-tight">
+              <span className="font-varsity text-xs md:text-base text-pastel-cream leading-none tracking-tight">
                 {formatCap(player.capHit)}
               </span>
               <Badge className={cn("text-[6px] md:text-[7px] h-3.5 md:h-4 px-1 md:px-1.5 font-varsity font-bold tracking-wider border-0 shadow-sm", statusColor[player.expiryStatus])}>
@@ -162,10 +186,10 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
 
             {/* Term + Expiry */}
             <div className="flex items-center justify-between mt-1 md:mt-1.5">
-              <span className="text-[8px] md:text-[9px] text-citrus-charcoal/50 font-display font-semibold">
+              <span className="text-[8px] md:text-[9px] text-pastel-cream/65 font-display font-semibold">
                 {player.yearsRemaining}yr
               </span>
-              <span className="text-[8px] md:text-[9px] text-citrus-charcoal/40 font-display">
+              <span className="text-[8px] md:text-[9px] text-pastel-cream/60 font-display">
                 exp. {player.expiryYear}
               </span>
             </div>

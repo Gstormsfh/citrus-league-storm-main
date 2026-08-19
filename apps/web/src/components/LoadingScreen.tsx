@@ -38,7 +38,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
         <div className="w-12 h-12 rounded-full border-4 border-white/10 border-t-pastel-orange animate-spin" />
         <p className="text-white/55 text-sm">{message}</p>
         {showTapHint && (
-          <p className="text-white/45 text-xs animate-pulse">Tap anywhere to continue</p>
+          <p className="text-white/55 text-xs animate-pulse">Tap anywhere to continue</p>
         )}
       </div>
     </div>

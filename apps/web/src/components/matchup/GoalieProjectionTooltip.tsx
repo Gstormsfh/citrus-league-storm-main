@@ -14,6 +14,12 @@ import { MatchupPlayer } from "./types";
 import { useState, useEffect, ReactNode } from "react";
 import { X } from "lucide-react";
 
+/* 2026-08-19 visual audit: light "glass" surface on a dark page — see
+   the surface-correction note in the armchair-gm components. bg-white/50
+   composites to mid-grey on #0F1F15, where neither light nor dark text
+   reaches 4.5:1. Uses the dark tile family instead. */
+
+
 // Hook to detect mobile
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
@@ -72,9 +78,9 @@ export const GoalieProjectionTooltip = ({ projection, children }: GoalieProjecti
       {/* Stats grid */}
       <div className="p-3 grid grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto">
         {stats.map((stat) => (
-          <div key={stat.label} className="p-2 bg-white/50 rounded-lg border border-citrus-sage/30">
+          <div key={stat.label} className="p-2 bg-white/5 rounded-lg border border-citrus-sage/30">
             <div className="text-[10px] text-citrus-sage uppercase font-bold mb-0.5">{stat.label}</div>
-            <div className="font-bold text-lg text-citrus-forest">{stat.value}</div>
+            <div className="font-bold text-lg text-pastel-cream">{stat.value}</div>
           </div>
         ))}
       </div>
@@ -93,7 +99,7 @@ export const GoalieProjectionTooltip = ({ projection, children }: GoalieProjecti
       {/* Footer */}
       <div className="bg-gradient-to-r from-citrus-peach via-citrus-orange/50 to-citrus-peach px-4 py-3 rounded-b-xl border-t-2 border-citrus-forest">
         <div className="flex justify-between items-center">
-          <span className="font-bold text-xs text-citrus-forest uppercase">Projected Total</span>
+          <span className="font-bold text-xs text-pastel-cream uppercase">Projected Total</span>
           <span className="font-black text-2xl text-citrus-orange">{projection.total_projected_points.toFixed(1)}</span>
         </div>
       </div>
@@ -102,7 +108,7 @@ export const GoalieProjectionTooltip = ({ projection, children }: GoalieProjecti
 
   // Default trigger: the projected points value as a tappable/hoverable badge
   const defaultTrigger = (
-    <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-citrus-forest transition-all">
+    <span className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-pastel-cream transition-all">
       {projection.total_projected_points.toFixed(1)} pts
     </span>
   );

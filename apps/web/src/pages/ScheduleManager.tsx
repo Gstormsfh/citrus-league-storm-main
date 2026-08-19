@@ -259,7 +259,7 @@ const ScheduleManager = () => {
                                 />
                               </div>
                               <div className="w-12 shrink-0 text-right font-mono text-xs tabular-nums text-pastel-cream font-bold">
-                                {games}<span className="text-white/40 ml-0.5 font-normal">G</span>
+                                {games}<span className="text-white/55 ml-0.5 font-normal">G</span>
                               </div>
                             </div>
                           );
@@ -314,7 +314,7 @@ const ScheduleManager = () => {
                             </div>
                             <div className="font-mono text-[10px] text-amber-300 tabular-nums">
                               {format(new Date(b2b.from + 'T00:00:00'), 'MMM d')}
-                              <span className="text-white/40 mx-1">→</span>
+                              <span className="text-white/55 mx-1">→</span>
                               {format(new Date(b2b.to + 'T00:00:00'), 'MMM d')}
                             </div>
                           </div>
@@ -542,7 +542,7 @@ const ScheduleManager = () => {
                       <span className="text-[11px] text-white/55">Heaviest day</span>
                       <span className="font-jbmono text-[11px] text-pastel-orange tabular-nums font-bold">
                         {Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '—'}
-                        <span className="text-white/40 ml-1">
+                        <span className="text-white/55 ml-1">
                           ({Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]?.[1] || 0})
                         </span>
                       </span>

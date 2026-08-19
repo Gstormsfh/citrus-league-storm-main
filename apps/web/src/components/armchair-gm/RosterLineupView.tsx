@@ -6,6 +6,22 @@ import CapPlayerCard from './CapPlayerCard';
 import PlayerAvatar from './PlayerAvatar';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
+/* 2026-08-19 visual audit: light "glass" surface on a dark page — see
+   the surface-correction note in the armchair-gm components. bg-white/50
+   composites to mid-grey on #0F1F15, where neither light nor dark text
+   reaches 4.5:1. Uses the dark tile family instead. */
+
+
+/* 2026-08-19 visual audit — surface correction.
+   These panels used bg-white/55..80 ("frosted glass") on the #0F1F15
+   dark page. Composited, that lands around rgb(159,165,161) — a MID-GREY
+   dead zone where nothing reads: cream text measured 2.37:1 and the dark
+   labels 1.58:1 against it. There is no text colour that fixes a
+   mid-grey surface; the surface itself is the bug. Swapped to the dark
+   tile family the rest of the app uses (ui/card.tsx is
+   bg-pastel-surface-tile + ring-white/10), so cream text lands at 13:1. */
+
+
 interface RosterLineupViewProps {
   data: TeamCapData;
 }
@@ -126,7 +142,7 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                   </span>
                 </div>
                 <div className="flex-1 h-px bg-gradient-to-r from-pastel-sage/30 to-transparent" />
-                <span className="text-[9px] font-varsity text-white/40">
+                <span className="text-[9px] font-varsity text-white/55">
                   {formatCap(line.lineCap)}
                 </span>
               </div>
@@ -141,7 +157,7 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                   player ? (
                     <CompactPlayerRow key={player.name} player={player} maxCapHit={lineup.maxCapHit} />
                   ) : (
-                    <div key={pos} className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-dashed border-pastel-sage/20 bg-white/5/20">
+                    <div key={pos} className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-dashed border-pastel-sage/20 bg-white/20">
                       <span className="text-[10px] font-varsity text-pastel-sage/40 w-7 text-center">{pos}</span>
                       <span className="text-[10px] font-display text-white/25">Open Slot</span>
                     </div>
@@ -218,7 +234,7 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                   </span>
                 </div>
                 <div className="flex-1 h-px bg-gradient-to-r from-blue-300/30 to-transparent" />
-                <span className="text-[9px] font-varsity text-white/40">
+                <span className="text-[9px] font-varsity text-white/55">
                   {formatCap(pair.pairCap)}
                 </span>
               </div>
@@ -229,7 +245,7 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                 {pair.rd ? (
                   <CompactPlayerRow player={pair.rd} maxCapHit={lineup.maxCapHit} />
                 ) : (
-                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-dashed border-pastel-sage/20 bg-white/5/20">
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-dashed border-pastel-sage/20 bg-white/20">
                     <span className="text-[10px] font-varsity text-pastel-sage/40 w-7 text-center">D</span>
                     <span className="text-[10px] font-display text-white/25">Open Slot</span>
                   </div>
@@ -341,7 +357,7 @@ function LineupSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-pastel-sage/30 shadow-varsity overflow-hidden">
+    <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-pastel-sage/30 shadow-varsity overflow-hidden">
       {/* Section Header */}
       <div className="px-4 md:px-5 py-3 bg-gradient-to-r from-pastel-sage/25 via-pastel-sage/15 to-pastel-sage/25 border-b-2 border-pastel-sage/40 flex items-center gap-3">
         <span className="text-xl">{icon}</span>
@@ -407,7 +423,7 @@ function CollapsibleLineupSection({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-white/50 backdrop-blur-sm rounded-2xl border-2 border-white/10/15 shadow-sm overflow-hidden">
+    <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-white/15 shadow-sm overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full px-4 md:px-5 py-3 bg-gradient-to-r from-white/5 via-transparent to-white/5 border-b border-white/10 flex items-center gap-3 hover:from-pastel-sage/10 hover:to-pastel-sage/10 transition-colors"
@@ -422,7 +438,7 @@ function CollapsibleLineupSection({
           </span>
         </div>
         <div className="text-right flex-shrink-0 mr-2">
-          <div className="text-[8px] text-white/40 uppercase font-display font-bold tracking-wider">
+          <div className="text-[8px] text-white/55 uppercase font-display font-bold tracking-wider">
             Total Cap
           </div>
           <div className="font-varsity text-sm text-white/60">
@@ -430,9 +446,9 @@ function CollapsibleLineupSection({
           </div>
         </div>
         {expanded ? (
-          <ChevronUp className="w-5 h-5 text-white/40 flex-shrink-0" />
+          <ChevronUp className="w-5 h-5 text-white/55 flex-shrink-0" />
         ) : (
-          <ChevronDown className="w-5 h-5 text-white/40 flex-shrink-0" />
+          <ChevronDown className="w-5 h-5 text-white/55 flex-shrink-0" />
         )}
       </button>
 
@@ -463,11 +479,11 @@ function ExtraPlayersSection({
   return (
     <div className="mt-4 pt-4 border-t border-dashed border-pastel-sage/20">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-[10px] font-varsity text-white/40 uppercase tracking-wider">
+        <span className="text-[10px] font-varsity text-white/55 uppercase tracking-wider">
           {label}
         </span>
         <div className="flex-1 h-px bg-pastel-sage/15" />
-        <span className="text-[9px] font-varsity text-white/30">
+        <span className="text-[9px] font-varsity text-white/55">
           {formatCap(totalCap)}
         </span>
       </div>
@@ -493,7 +509,7 @@ function ExtraPlayersSection({
 
 function EmptySlot({ position }: { position: string }) {
   return (
-    <div className="rounded-2xl border-2 border-dashed border-pastel-sage/20 bg-white/5/20 flex flex-col items-center justify-center py-8 md:py-10">
+    <div className="rounded-2xl border-2 border-dashed border-pastel-sage/20 bg-white/20 flex flex-col items-center justify-center py-8 md:py-10">
       <div className="w-8 h-8 rounded-full bg-pastel-sage/10 border border-dashed border-pastel-sage/30 flex items-center justify-center mb-1.5">
         <span className="text-[10px] font-varsity text-pastel-sage/40">{position}</span>
       </div>
@@ -531,8 +547,8 @@ function CompactPlayerRow({ player, maxCapHit }: { player: PlayerContract; maxCa
     <div className={cn(
       "flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all",
       isNonNHL
-        ? "bg-white/40 border-white/10 opacity-80"
-        : "bg-white/70 border-pastel-sage/30",
+        ? "bg-white/5 border-white/10 opacity-80"
+        : "bg-pastel-surface-tile border-pastel-sage/30",
     )}>
       {/* Position pill */}
       <span className="text-[9px] font-varsity font-black text-pastel-cream bg-pastel-sage/20 border border-pastel-sage/30 rounded-md px-1.5 py-0.5 w-7 text-center flex-shrink-0">
@@ -552,7 +568,7 @@ function CompactPlayerRow({ player, maxCapHit }: { player: PlayerContract; maxCa
           )}
         </div>
         {/* Mini cap bar */}
-        <div className="h-1 mt-0.5 bg-white/5/60 rounded-full overflow-hidden">
+        <div className="h-1 mt-0.5 bg-white/15 rounded-full overflow-hidden">
           <div
             className={cn(
               "h-full rounded-full",
@@ -574,7 +590,7 @@ function CompactPlayerRow({ player, maxCapHit }: { player: PlayerContract; maxCa
           <span className={cn("text-[8px] font-varsity font-bold", statusColorCompact[player.expiryStatus])}>
             {player.expiryStatus}
           </span>
-          <span className="text-[8px] text-white/40 font-display">
+          <span className="text-[8px] text-white/55 font-display">
             {player.yearsRemaining}yr
           </span>
         </div>

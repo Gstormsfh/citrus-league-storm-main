@@ -124,7 +124,7 @@ export default function About() {
                 <div className="font-calistoga text-[20px] text-pastel-cream group-hover:text-pastel-orange-soft transition-colors">
                   {m.name}
                 </div>
-                <div className="text-[12px] text-white/45 leading-snug mt-1 max-w-[200px] mx-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="text-[12px] text-white/55 leading-snug mt-1 max-w-[200px] mx-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                   {m.tagline}
                 </div>
               </div>

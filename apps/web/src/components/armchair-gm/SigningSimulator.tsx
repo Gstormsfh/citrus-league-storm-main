@@ -8,6 +8,24 @@ import {
 import { getTeamCapData } from '@/services/NHLCapService';
 import { Badge } from '@/components/ui/badge';
 import {
+
+/* 2026-08-19 visual audit — muted-text correction.
+   text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
+   original CREAM theme. At 20-70% opacity on the dark #1A2A20 tiles it
+   composites to near-invisible (team codes on this page measured
+   1.47:1). Remapped to cream at the alpha that preserves the intended
+   hierarchy while clearing 4.5:1 on a dark tile. */
+
+
+/* 2026-08-19 visual audit — surface correction.
+   These panels used bg-white/55..80 ("frosted glass") on the #0F1F15
+   dark page. Composited, that lands around rgb(159,165,161) — a MID-GREY
+   dead zone where nothing reads: cream text measured 2.37:1 and the dark
+   labels 1.58:1 against it. There is no text colour that fixes a
+   mid-grey surface; the surface itself is the bug. Swapped to the dark
+   tile family the rest of the app uses (ui/card.tsx is
+   bg-pastel-surface-tile + ring-white/10), so cream text lands at 13:1. */
+
   PenLine, ChevronDown, Loader2, Shield, Plus, Trash2,
   TrendingUp, TrendingDown, UserPlus, RotateCcw, AlertTriangle,
 } from 'lucide-react';
@@ -159,10 +177,10 @@ export default function SigningSimulator() {
     <div className="space-y-6">
       {/* Instructions */}
       {!selectedTeam && (
-        <div className="text-center py-8 bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-dashed border-citrus-sage/40">
+        <div className="text-center py-8 bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-dashed border-citrus-sage/40">
           <PenLine className="w-10 h-10 text-citrus-sage/50 mx-auto mb-3" />
-          <h3 className="font-varsity text-lg text-citrus-forest mb-1">Signing Simulator</h3>
-          <p className="text-sm text-citrus-charcoal/60 font-display max-w-md mx-auto">
+          <h3 className="font-varsity text-lg text-pastel-cream mb-1">Signing Simulator</h3>
+          <p className="text-sm text-pastel-cream/70 font-display max-w-md mx-auto">
             Add hypothetical signings to any team. Re-sign expiring players or add free agents
             and see real-time cap impact.
           </p>
@@ -173,7 +191,7 @@ export default function SigningSimulator() {
         {/* Left Panel: Team + Signing Controls */}
         <div className="lg:col-span-2 space-y-4">
           {/* Team Selector */}
-          <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
+          <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
             <button
               onClick={() => setShowTeamPicker(!showTeamPicker)}
               className="w-full px-4 py-3 bg-gradient-to-r from-citrus-sage/20 to-citrus-sage/10 flex items-center gap-3 hover:from-citrus-sage/25 transition-colors"
@@ -186,12 +204,12 @@ export default function SigningSimulator() {
                 </div>
               )}
               <div className="flex-1 text-left">
-                <div className="text-[10px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider">Team</div>
-                <div className="font-varsity text-sm text-citrus-forest">
+                <div className="text-[10px] text-pastel-cream/65 uppercase font-display font-bold tracking-wider">Team</div>
+                <div className="font-varsity text-sm text-pastel-cream">
                   {teamInfo ? teamInfo.fullName : 'Select a team'}
                 </div>
               </div>
-              <ChevronDown className={cn("w-4 h-4 text-citrus-charcoal/40 transition-transform", showTeamPicker && "rotate-180")} />
+              <ChevronDown className={cn("w-4 h-4 text-pastel-cream/60 transition-transform", showTeamPicker && "rotate-180")} />
             </button>
             {showTeamPicker && (
               <div className="p-2 border-t border-citrus-sage/20 max-h-48 overflow-y-auto">
@@ -206,7 +224,7 @@ export default function SigningSimulator() {
                       )}
                     >
                       <img loading="lazy" decoding="async" src={t.logoUrl} alt={t.abbrev} className="w-6 h-6 object-contain" />
-                      <span className="text-[8px] font-varsity text-citrus-forest">{t.abbrev}</span>
+                      <span className="text-[8px] font-varsity text-pastel-cream">{t.abbrev}</span>
                     </button>
                   ))}
                 </div>
@@ -223,8 +241,8 @@ export default function SigningSimulator() {
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all font-display font-bold text-sm",
                   showForm && !showResignPicker
-                    ? "bg-citrus-sage/20 border-citrus-sage text-citrus-forest"
-                    : "bg-white/60 border-citrus-sage/30 text-citrus-forest hover:bg-citrus-sage/10"
+                    ? "bg-citrus-sage/20 border-citrus-sage text-pastel-cream"
+                    : "bg-pastel-surface-tile border-citrus-sage/30 text-pastel-cream hover:bg-citrus-sage/10"
                 )}
               >
                 <UserPlus className="w-5 h-5 text-citrus-sage" />
@@ -238,8 +256,8 @@ export default function SigningSimulator() {
                   className={cn(
                     "w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all font-display font-bold text-sm",
                     showResignPicker
-                      ? "bg-citrus-sage/20 border-citrus-sage text-citrus-forest"
-                      : "bg-white/60 border-citrus-sage/30 text-citrus-forest hover:bg-citrus-sage/10"
+                      ? "bg-citrus-sage/20 border-citrus-sage text-pastel-cream"
+                      : "bg-pastel-surface-tile border-citrus-sage/30 text-pastel-cream hover:bg-citrus-sage/10"
                   )}
                 >
                   <PenLine className="w-5 h-5 text-citrus-sage" />
@@ -252,13 +270,13 @@ export default function SigningSimulator() {
 
               {/* New Signing Form */}
               {showForm && !showResignPicker && (
-                <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <h4 className="font-varsity text-sm text-citrus-forest">
+                <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <h4 className="font-varsity text-sm text-pastel-cream">
                     {resignTarget ? `Re-sign ${resignTarget.name}` : 'New Free Agent Signing'}
                   </h4>
                   {resignTarget && (
-                    <div className="text-[10px] text-citrus-charcoal/50 font-display -mt-2">
-                      Current cap hit: <span className="font-varsity text-citrus-forest">{formatCap(resignTarget.capHit)}</span>
+                    <div className="text-[10px] text-pastel-cream/65 font-display -mt-2">
+                      Current cap hit: <span className="font-varsity text-pastel-cream">{formatCap(resignTarget.capHit)}</span>
                     </div>
                   )}
 
@@ -268,7 +286,7 @@ export default function SigningSimulator() {
                       placeholder="Player name..."
                       value={formName}
                       onChange={e => setFormName(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-citrus-sage/30 bg-white/60 text-xs font-display text-citrus-forest placeholder:text-citrus-charcoal/40 focus:outline-none focus:border-citrus-sage"
+                      className="w-full px-3 py-2 rounded-lg border border-citrus-sage/30 bg-pastel-surface-tile text-xs font-display text-pastel-cream placeholder:text-pastel-cream/60 focus:outline-none focus:border-citrus-sage"
                     />
                   )}
 
@@ -276,7 +294,7 @@ export default function SigningSimulator() {
                     <select
                       value={formPosition}
                       onChange={e => setFormPosition(e.target.value)}
-                      className="px-1.5 sm:px-2 py-2 rounded-lg border border-citrus-sage/30 bg-white/60 text-xs font-display text-citrus-forest focus:outline-none focus:border-citrus-sage"
+                      className="px-1.5 sm:px-2 py-2 rounded-lg border border-citrus-sage/30 bg-pastel-surface-tile text-xs font-display text-pastel-cream focus:outline-none focus:border-citrus-sage"
                     >
                       {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
@@ -285,14 +303,14 @@ export default function SigningSimulator() {
                       placeholder="AAV ($M)"
                       value={formAAV}
                       onChange={e => setFormAAV(e.target.value)}
-                      className="px-2 py-2 rounded-lg border border-citrus-sage/30 bg-white/60 text-xs font-display text-citrus-forest placeholder:text-citrus-charcoal/40 focus:outline-none focus:border-citrus-sage min-w-0"
+                      className="px-2 py-2 rounded-lg border border-citrus-sage/30 bg-pastel-surface-tile text-xs font-display text-pastel-cream placeholder:text-pastel-cream/60 focus:outline-none focus:border-citrus-sage min-w-0"
                     />
                     <input
                       type="text"
                       placeholder="Yrs"
                       value={formTerm}
                       onChange={e => setFormTerm(e.target.value)}
-                      className="px-1.5 sm:px-2 py-2 rounded-lg border border-citrus-sage/30 bg-white/60 text-xs font-display text-citrus-forest placeholder:text-citrus-charcoal/40 focus:outline-none focus:border-citrus-sage min-w-0"
+                      className="px-1.5 sm:px-2 py-2 rounded-lg border border-citrus-sage/30 bg-pastel-surface-tile text-xs font-display text-pastel-cream placeholder:text-pastel-cream/60 focus:outline-none focus:border-citrus-sage min-w-0"
                     />
                   </div>
 
@@ -314,7 +332,7 @@ export default function SigningSimulator() {
                     </button>
                     <button
                       onClick={resetForm}
-                      className="px-3 py-2 rounded-lg border border-citrus-sage/30 text-citrus-charcoal/60 text-xs font-display hover:bg-citrus-sage/10 transition-colors"
+                      className="px-3 py-2 rounded-lg border border-citrus-sage/30 text-pastel-cream/70 text-xs font-display hover:bg-citrus-sage/10 transition-colors"
                     >
                       Cancel
                     </button>
@@ -324,9 +342,9 @@ export default function SigningSimulator() {
 
               {/* Re-sign Picker */}
               {showResignPicker && (
-                <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                   <div className="px-4 py-2.5 bg-citrus-sage/10 border-b border-citrus-sage/20">
-                    <span className="text-[10px] text-citrus-charcoal/60 uppercase font-display font-bold tracking-wider">
+                    <span className="text-[10px] text-pastel-cream/70 uppercase font-display font-bold tracking-wider">
                       Select expiring player to re-sign
                     </span>
                   </div>
@@ -354,22 +372,22 @@ export default function SigningSimulator() {
                           )}
                         >
                           <div className="flex-1 min-w-0">
-                            <div className="font-display font-bold text-[11px] text-citrus-forest truncate">{p.name}</div>
+                            <div className="font-display font-bold text-[11px] text-pastel-cream truncate">{p.name}</div>
                             <div className="flex items-center gap-1">
-                              <Badge className="bg-citrus-sage/20 text-citrus-forest text-[7px] h-3.5 px-1 font-varsity border border-citrus-sage/40">{p.position}</Badge>
+                              <Badge className="bg-citrus-sage/20 text-pastel-cream text-[7px] h-3.5 px-1 font-varsity border border-citrus-sage/40">{p.position}</Badge>
                               <Badge className={cn("text-[7px] h-3.5 px-1 font-varsity", p.expiryStatus === 'UFA' ? "bg-red-500/80 text-white" : "bg-amber-500/80 text-white")}>{p.expiryStatus}</Badge>
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-varsity text-xs text-citrus-forest">{formatCap(p.capHit)}</div>
-                            <div className="text-[8px] text-citrus-charcoal/50 font-display">current</div>
+                            <div className="font-varsity text-xs text-pastel-cream">{formatCap(p.capHit)}</div>
+                            <div className="text-[8px] text-pastel-cream/65 font-display">current</div>
                           </div>
                         </button>
                       );
                     })}
                   </div>
                   <div className="px-3 py-2 border-t border-citrus-sage/20">
-                    <button onClick={resetForm} className="text-xs text-citrus-charcoal/50 font-display hover:text-citrus-forest transition-colors">
+                    <button onClick={resetForm} className="text-xs text-pastel-cream/65 font-display hover:text-pastel-cream transition-colors">
                       Cancel
                     </button>
                   </div>
@@ -401,7 +419,7 @@ export default function SigningSimulator() {
           {teamData && impact && (
             <>
               {/* Cap Impact Dashboard */}
-              <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
+              <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
                 <div className="px-4 md:px-6 py-3 bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {teamInfo && <img loading="lazy" decoding="async" src={teamInfo.logoUrl} alt={teamInfo.abbrev} className="w-8 h-8 object-contain" />}
@@ -416,19 +434,19 @@ export default function SigningSimulator() {
                   {/* Before / After comparison */}
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="bg-citrus-cream/40 rounded-xl border border-citrus-sage/20 p-3">
-                      <div className="text-[9px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider mb-2">Current</div>
+                      <div className="text-[9px] text-pastel-cream/65 uppercase font-display font-bold tracking-wider mb-2">Current</div>
                       <div className="space-y-1.5">
                         <div className="flex justify-between">
-                          <span className="text-[10px] text-citrus-charcoal/60 font-display">Cap Hit</span>
-                          <span className="font-varsity text-xs text-citrus-forest">{formatCap(impact.currentHit)}</span>
+                          <span className="text-[10px] text-pastel-cream/70 font-display">Cap Hit</span>
+                          <span className="font-varsity text-xs text-pastel-cream">{formatCap(impact.currentHit)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-[10px] text-citrus-charcoal/60 font-display">Cap Space</span>
+                          <span className="text-[10px] text-pastel-cream/70 font-display">Cap Space</span>
                           <span className={cn("font-varsity text-xs", impact.currentSpace < 0 ? "text-red-600" : "text-green-600")}>{formatCap(impact.currentSpace)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-[10px] text-citrus-charcoal/60 font-display">Contracts</span>
-                          <span className="font-varsity text-xs text-citrus-forest">{teamData.totalContracts} / {MAX_CONTRACTS}</span>
+                          <span className="text-[10px] text-pastel-cream/70 font-display">Contracts</span>
+                          <span className="font-varsity text-xs text-pastel-cream">{teamData.totalContracts} / {MAX_CONTRACTS}</span>
                         </div>
                       </div>
                     </div>
@@ -438,23 +456,23 @@ export default function SigningSimulator() {
                       signings.length === 0 ? "bg-citrus-cream/40 border-citrus-sage/20" :
                       impact.isOverCap ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
                     )}>
-                      <div className="text-[9px] text-citrus-charcoal/50 uppercase font-display font-bold tracking-wider mb-2">
+                      <div className="text-[9px] text-pastel-cream/65 uppercase font-display font-bold tracking-wider mb-2">
                         {signings.length === 0 ? 'Projected' : 'After Signings'}
                       </div>
                       <div className="space-y-1.5">
                         <div className="flex justify-between">
-                          <span className="text-[10px] text-citrus-charcoal/60 font-display">Cap Hit</span>
-                          <span className="font-varsity text-xs text-citrus-forest">{formatCap(impact.newProjected)}</span>
+                          <span className="text-[10px] text-pastel-cream/70 font-display">Cap Hit</span>
+                          <span className="font-varsity text-xs text-pastel-cream">{formatCap(impact.newProjected)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-[10px] text-citrus-charcoal/60 font-display">Cap Space</span>
+                          <span className="text-[10px] text-pastel-cream/70 font-display">Cap Space</span>
                           <span className={cn("font-varsity text-xs", impact.newSpace < 0 ? "text-red-600" : "text-green-600")}>
                             {impact.newSpace < 0 ? '-' : ''}{formatCap(Math.abs(impact.newSpace))}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-[10px] text-citrus-charcoal/60 font-display">Contracts</span>
-                          <span className={cn("font-varsity text-xs", impact.isOverContracts ? "text-red-600" : "text-citrus-forest")}>
+                          <span className="text-[10px] text-pastel-cream/70 font-display">Contracts</span>
+                          <span className={cn("font-varsity text-xs", impact.isOverContracts ? "text-red-600" : "text-pastel-cream")}>
                             {impact.newContracts} / {MAX_CONTRACTS}
                           </span>
                         </div>
@@ -468,7 +486,7 @@ export default function SigningSimulator() {
                       "flex items-center justify-between px-4 py-2.5 rounded-xl border-2",
                       impact.netChange > 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
                     )}>
-                      <span className="text-xs font-display font-bold text-citrus-charcoal/70">Net Cap Change</span>
+                      <span className="text-xs font-display font-bold text-pastel-cream/75">Net Cap Change</span>
                       <div className="flex items-center gap-1.5">
                         {impact.netChange > 0 ? (
                           <TrendingUp className="w-4 h-4 text-red-600" />
@@ -496,9 +514,9 @@ export default function SigningSimulator() {
 
               {/* Signings List */}
               {signings.length > 0 && (
-                <div className="bg-white/60 backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
+                <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
                   <div className="px-4 py-3 bg-gradient-to-r from-citrus-sage/20 to-citrus-sage/10 border-b-2 border-citrus-sage/30">
-                    <h4 className="font-varsity text-base text-citrus-forest">
+                    <h4 className="font-varsity text-base text-pastel-cream">
                       Hypothetical Signings ({signings.length})
                     </h4>
                   </div>
@@ -513,7 +531,7 @@ export default function SigningSimulator() {
                         key={sig.id}
                         className={cn(
                           "flex items-center gap-3 px-4 py-3 border-b border-citrus-sage/10",
-                          i % 2 === 0 ? "bg-white/40" : "bg-citrus-cream/30"
+                          i % 2 === 0 ? "bg-white/5" : "bg-citrus-cream/30"
                         )}
                       >
                         <div className="w-8 h-8 rounded-full bg-citrus-sage/20 flex items-center justify-center flex-shrink-0">
@@ -525,14 +543,14 @@ export default function SigningSimulator() {
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="font-display font-bold text-xs text-citrus-forest truncate">{sig.name}</div>
+                          <div className="font-display font-bold text-xs text-pastel-cream truncate">{sig.name}</div>
                           <div className="flex items-center gap-1.5">
-                            <Badge className="bg-citrus-sage/20 text-citrus-forest text-[7px] h-3.5 px-1 font-varsity border border-citrus-sage/40">
+                            <Badge className="bg-citrus-sage/20 text-pastel-cream text-[7px] h-3.5 px-1 font-varsity border border-citrus-sage/40">
                               {sig.position}
                             </Badge>
-                            <span className="text-[9px] text-citrus-charcoal/50 font-display">{sig.term}yr</span>
+                            <span className="text-[9px] text-pastel-cream/65 font-display">{sig.term}yr</span>
                             {sig.isResign && oldPlayer && (
-                              <span className="text-[8px] text-citrus-charcoal/40 font-display">
+                              <span className="text-[8px] text-pastel-cream/60 font-display">
                                 (was {formatCap(oldPlayer.capHit)})
                               </span>
                             )}
@@ -540,8 +558,8 @@ export default function SigningSimulator() {
                         </div>
 
                         <div className="text-right">
-                          <div className="font-varsity text-sm text-citrus-forest">{formatCap(sig.aav)}</div>
-                          <div className="text-[8px] text-citrus-charcoal/50 font-display">
+                          <div className="font-varsity text-sm text-pastel-cream">{formatCap(sig.aav)}</div>
+                          <div className="text-[8px] text-pastel-cream/65 font-display">
                             {sig.isResign ? 'Re-sign' : 'New'}
                           </div>
                         </div>
@@ -557,10 +575,10 @@ export default function SigningSimulator() {
                   })}
 
                   <div className="px-4 py-3 bg-gradient-to-r from-citrus-sage/15 to-citrus-sage/10 border-t-2 border-citrus-sage/30 flex items-center justify-between">
-                    <span className="text-xs font-display font-bold text-citrus-charcoal/60 uppercase tracking-wider">
+                    <span className="text-xs font-display font-bold text-pastel-cream/70 uppercase tracking-wider">
                       Total New Cap
                     </span>
-                    <span className="font-varsity text-base text-citrus-forest">
+                    <span className="font-varsity text-base text-pastel-cream">
                       {formatCap(impact.totalNewCap)}
                     </span>
                   </div>
@@ -569,10 +587,10 @@ export default function SigningSimulator() {
 
               {/* Empty State */}
               {signings.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-12 bg-white/40 rounded-2xl border-2 border-dashed border-citrus-sage/30">
+                <div className="flex flex-col items-center justify-center py-12 bg-white/5 rounded-2xl border-2 border-dashed border-citrus-sage/30">
                   <PenLine className="w-8 h-8 text-citrus-sage/30 mb-2" />
-                  <p className="text-sm text-citrus-charcoal/50 font-display mb-1">No signings yet</p>
-                  <p className="text-[10px] text-citrus-charcoal/40 font-display">
+                  <p className="text-sm text-pastel-cream/65 font-display mb-1">No signings yet</p>
+                  <p className="text-[10px] text-pastel-cream/60 font-display">
                     Use the buttons above to add signings
                   </p>
                 </div>
@@ -581,9 +599,9 @@ export default function SigningSimulator() {
           )}
 
           {!selectedTeam && (
-            <div className="flex flex-col items-center justify-center py-20 bg-white/40 rounded-2xl border-2 border-dashed border-citrus-sage/30">
+            <div className="flex flex-col items-center justify-center py-20 bg-white/5 rounded-2xl border-2 border-dashed border-citrus-sage/30">
               <PenLine className="w-8 h-8 text-citrus-sage/30 mb-2" />
-              <p className="text-sm text-citrus-charcoal/50 font-display">Select a team to start signing players</p>
+              <p className="text-sm text-pastel-cream/65 font-display">Select a team to start signing players</p>
             </div>
           )}
         </div>

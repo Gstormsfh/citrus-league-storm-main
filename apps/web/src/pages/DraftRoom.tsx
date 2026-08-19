@@ -255,6 +255,16 @@ const DraftRoomInner = () => {
     isMyTurnToNominate: boolean;
     bidHistory?: Array<{ team_id: string; bid_amount: number; created_at: string }>;
   } | null>(null);
+  // 2026-08-18 launch audit: AuctionDraftService.getAuctionState returns
+  // null on ANY API error instead of throwing, so `if (aState)` silently
+  // fell through and left the placeholder state installed above
+  // (budgets: [], currentNomination: null, isMyTurnToNominate: false).
+  // The UI then rendered "Waiting for nomination… Another team is
+  // selecting a player to nominate." — a flatly false statement — with no
+  // budgets, no nominate button, and no error. The recovery poll
+  // early-returns when currentNomination is null, so nothing ever
+  // refetched it: the auction was unrecoverable without a full reload.
+  const [auctionLoadFailed, setAuctionLoadFailed] = useState(false);
   const [bidAmount, setBidAmount] = useState(1);
   const [auctionTimeRemaining, setAuctionTimeRemaining] = useState<number | null>(null);
   const [draftSettings, setDraftSettings] = useState<DraftSettings>({
@@ -636,10 +646,18 @@ const DraftRoomInner = () => {
                 if (aState.current_nomination?.id) {
                   setAuctionNominationId(aState.current_nomination.id);
                 }
+                setAuctionLoadFailed(false);
+              } else {
+                // null = the fetch failed (the service swallows and
+                // returns null). Do NOT leave the placeholder state
+                // masquerading as "waiting for another team".
+                logger.error('DraftRoom: auction state unavailable for session', activeSessionId);
+                setAuctionLoadFailed(true);
               }
             }
           } catch (auctionErr) {
             logger.error('DraftRoom: Error loading auction state:', auctionErr);
+            setAuctionLoadFailed(true);
           }
         }
       }
@@ -3940,7 +3958,7 @@ const DraftRoomInner = () => {
                         {selectedPlayer.position === 'G' ? (
                           <>
                             <span className="flex-shrink-0 font-bold text-primary">{selectedPlayer.wins || 0}W</span>
-                            <span className="text-white/30">|</span>
+                            <span className="text-white/55">|</span>
                             <span className="flex-shrink-0">{selectedPlayer.losses || 0}L</span>
                             <span className="flex-shrink-0">{selectedPlayer.goals_against_average ? selectedPlayer.goals_against_average.toFixed(2) : '0.00'} GAA</span>
                             <span className="flex-shrink-0">{selectedPlayer.save_percentage ? (selectedPlayer.save_percentage * 100).toFixed(1) : '0.0'}%</span>
@@ -3950,7 +3968,7 @@ const DraftRoomInner = () => {
                         ) : (
                           <>
                             <span className="flex-shrink-0 font-bold text-primary">{selectedPlayer.points} PTS</span>
-                            <span className="text-white/30">|</span>
+                            <span className="text-white/55">|</span>
                             <span className="flex-shrink-0">{selectedPlayer.goals}G</span>
                             <span className="flex-shrink-0">{selectedPlayer.assists}A</span>
                             <span className="flex-shrink-0">{selectedPlayer.plus_minus > 0 ? '+' : ''}{selectedPlayer.plus_minus}</span>
@@ -4212,6 +4230,24 @@ const DraftRoomInner = () => {
                                 <p className="font-medium text-amber-600">Your turn to nominate!</p>
                                 <p className="text-xs mt-1">Select a player below to nominate them for bidding.</p>
                               </>
+                            ) : auctionLoadFailed ? (
+                              <div data-testid="auction-state-error">
+                                <p className="font-medium text-destructive">
+                                  Couldn&apos;t load the auction state.
+                                </p>
+                                <p className="text-xs mt-1">
+                                  This is a connection problem — the auction is still running.
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="mt-2"
+                                  data-testid="auction-state-retry"
+                                  onClick={() => window.location.reload()}
+                                >
+                                  Reload the room
+                                </Button>
+                              </div>
                             ) : (
                               <>
                                 <p className="font-medium">Waiting for nomination...</p>

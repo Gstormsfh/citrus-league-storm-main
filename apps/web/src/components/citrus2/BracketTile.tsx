@@ -34,7 +34,7 @@ export function BracketTile({
     <div className="bg-pastel-surface-tile border border-white/10 rounded-2xl p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
         <div>
-          <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/45 font-bold flex items-center gap-2">
+          <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 font-bold flex items-center gap-2">
             {isLive && <LivePulse size="xs" />}
             {round}{isLive ? ' · Live' : ''}
           </div>
@@ -58,7 +58,7 @@ export function BracketTile({
         ))}
       </div>
 
-      <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between font-jbmono text-[10px] text-white/45 tracking-wide">
+      <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between font-jbmono text-[10px] text-white/55 tracking-wide">
         <span>Best of 7 · Updated {updatedAgo} ago</span>
         {cupPick && <span className="text-pastel-sage">Your Cup pick: {cupPick} →</span>}
       </div>

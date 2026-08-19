@@ -94,21 +94,51 @@ export default function DraftRoomV2() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      // 2026-08-18 launch audit: this used to swallow every error and
+      // leave myTeamId at its null default — which the rest of the room
+      // reads as "legitimate spectator" (useMyTeamIdCrossCheck.ts:61
+      // returns early on null, so the fail-loud banner never fires).
+      // One transient blip at mount therefore made the owner a SILENT
+      // spectator for the entire draft: no on-clock highlight, no alarm,
+      // server-side autopick queue disabled, and a false "It's not your
+      // turn" on every pick attempt — every pick lost to autopick, which
+      // is a direct violation of the I1 never-lose-a-pick invariant.
+      //
+      // Now: retry the transient case, and if it still fails, say so.
+      // A SUCCESSFUL response carrying no id is a real spectator and is
+      // still handled silently — only genuine fetch failure is loud.
       try {
         const { apiClient } = await import('@/api/client');
         const path = `/api/leagues/${encodeURIComponent(leagueId)}/my-team`;
-        const response = await apiClient.get<{ id?: string }>(path);
-        if (cancelled) return;
-        const payload = response.data ?? (response as unknown as { id?: string });
-        const teamId =
-          payload && typeof payload === 'object' && typeof payload.id === 'string'
-            ? payload.id
-            : null;
-        useDraftClientStore.getState().setMyTeamId(teamId);
-      } catch (err) {
-        // Non-fatal; spectator flow. Reachable in dev via network tab.
-        void err;
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (cancelled) return;
+          try {
+            const response = await apiClient.get<{ id?: string }>(path);
+            if (cancelled) return;
+            const payload = response.data ?? (response as unknown as { id?: string });
+            const teamId =
+              payload && typeof payload === 'object' && typeof payload.id === 'string'
+                ? payload.id
+                : null;
+            useDraftClientStore.getState().setMyTeamId(teamId);
+            // Un-latch a banner raised by an earlier failed attempt.
+            if (useDraftClientStore.getState().identityFailure?.reason === 'my_team_unverifiable') {
+              useDraftClientStore.getState().setIdentityFailure(null);
+            }
+            return;
+          } catch {
+            if (attempt < 2) {
+              await new Promise((resolve) => setTimeout(resolve, 400 * 2 ** attempt));
+            }
+          }
+        }
+      } catch {
+        // Fall through to the loud failure below (covers a dynamic
+        // import failure as well as an exhausted retry loop).
       }
+      if (cancelled) return;
+      useDraftClientStore.getState().setIdentityFailure({ reason: 'my_team_unverifiable' });
     })();
     return () => {
       cancelled = true;
@@ -120,6 +150,17 @@ export default function DraftRoomV2() {
   // produce empty teams[] until this resolves and re-renders happen
   // via setTeams triggering re-derivation upstream.
   const [teams, setTeams] = useState<FetchedTeam[]>([]);
+  // 2026-08-18 launch audit: this catch used to be bare. That was the
+  // SAME silent-no-button failure the lobby's league fetch was hardened
+  // against — and worse, because the lobby derives commissioner status
+  // from this list: teams=[] => myUserId=null => isCommissioner=false =>
+  // the Start button is never rendered, under the copy "0 of 0 teams
+  // joined · waiting for the commissioner to start". The commissioner
+  // sits waiting for themselves, with nothing on screen saying why.
+  // Now it is loud and retryable, mirroring leagueError/leagueFetchNonce.
+  const [teamsError, setTeamsError] = useState<string | null>(null);
+  const [teamsFetchNonce, setTeamsFetchNonce] = useState(0);
+  const retryTeamsFetch = useCallback(() => setTeamsFetchNonce((n) => n + 1), []);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -132,20 +173,36 @@ export default function DraftRoomV2() {
           ? response.data
           : Array.isArray(response as unknown as FetchedTeam[])
           ? (response as unknown as FetchedTeam[])
-          : [];
+          : null;
+        if (payload === null) {
+          setTeamsError('The team list came back in an unexpected shape.');
+          return;
+        }
         setTeams(payload);
+        setTeamsError(null);
       } catch {
-        // Non-fatal; adapters fall through to empty teams and each
-        // roster entry renders with teamId prefix as the name.
+        if (!cancelled) {
+          setTeamsError("Couldn't load this league's teams — the Start button needs them.");
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [leagueId]);
+  }, [leagueId, teamsFetchNonce]);
 
   // DR-3 (2026-07-29) — pre-fetch all players non-blocking.
-  const { playersById, isLoading: playersLoading } = usePreloadedPlayers();
+  // 2026-08-18 launch audit: `error` used to be destructured away, so a
+  // failed player_directory load rendered an empty pool under the words
+  // "No players found. Try adjusting your filters." The user was told to
+  // fix their filters when in fact nothing had loaded and they could not
+  // draft at all.
+  const {
+    playersById,
+    isLoading: playersLoading,
+    error: playersError,
+    reload: reloadPlayers,
+  } = usePreloadedPlayers();
 
   // Mount / unmount: runner lifecycle (unchanged from DR-1b/DR-2).
   useEffect(() => {
@@ -210,12 +267,31 @@ export default function DraftRoomV2() {
           if (typeof snapshot.serverReceivedAtMs === 'number') {
             updateOffset(Date.now(), snapshot.serverReceivedAtMs);
           }
-          void fetchDraftOrderMatrix(
-            leagueId,
-            snapshot.stateSnapshot.totalPicks,
-          ).then((matrix) => {
-            store.setMatrix(matrix);
-          });
+          // 2026-08-18 launch audit: fetchDraftOrderMatrix's own comment
+          // says "caller retries with backoff" — no caller ever did.
+          // Without a matrix, deriveDraftState cannot compute
+          // onClockTeamId or currentPickNumber, so a single failure here
+          // left the room showing "Status: in progress" with nobody ever
+          // on the clock and no way to pick. Retry properly.
+          void (async () => {
+            for (let attempt = 0; attempt < 4; attempt++) {
+              const matrix = await fetchDraftOrderMatrix(
+                leagueId,
+                snapshot.stateSnapshot.totalPicks,
+              );
+              if (matrix !== null) {
+                store.setMatrix(matrix);
+                return;
+              }
+              if (attempt < 3) {
+                await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt));
+              }
+            }
+            // Exhausted. setMatrix(null) is a no-op when a good matrix
+            // is already installed (see store), so this only reports a
+            // genuine cold-start failure.
+            store.setMatrix(null);
+          })();
         },
         onEvent: (event) => {
           const clientReceiveMs = Date.now();
@@ -341,12 +417,19 @@ export default function DraftRoomV2() {
         clockOffsetMs={clockOffsetMs}
       />
       <IdentityFailureBanner />
-      <DraftLobbyV2 leagueId={leagueId} teams={teams} />
+      <DraftLobbyV2
+        leagueId={leagueId}
+        teams={teams}
+        teamsError={teamsError}
+        onRetryTeams={retryTeamsFetch}
+      />
       <DraftRoomBody
         leagueId={leagueId}
         teams={teams}
         playersById={playersById}
         playersLoading={playersLoading}
+        playersError={playersError}
+        onRetryPlayers={reloadPlayers}
         clockOffsetMs={clockOffsetMs}
       />
     </div>
@@ -468,9 +551,12 @@ function describeStatus(
 interface DraftLobbyV2Props {
   leagueId: string;
   teams: FetchedTeam[];
+  /** Loud, retryable teams-fetch failure. Null when the list loaded. */
+  teamsError: string | null;
+  onRetryTeams: () => void;
 }
 
-function DraftLobbyV2({ leagueId, teams }: DraftLobbyV2Props) {
+function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV2Props) {
   const connectionState = useDraftConnectionState();
   const myTeamId = useMyTeamId();
   const [isStarting, setIsStarting] = useState(false);
@@ -626,11 +712,20 @@ function DraftLobbyV2({ leagueId, teams }: DraftLobbyV2Props) {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-lg font-bold">Draft Lobby</h2>
+          {/* When the teams fetch failed we do NOT claim "0 of 0 teams
+              joined · waiting for the commissioner" — that sentence sent
+              a commissioner off to wait for himself. Say what happened. */}
           <p className="text-sm text-muted-foreground">
-            {joinedHumans.length} of {teams.length} team{teams.length === 1 ? '' : 's'} joined
-            {isCommissioner
-              ? ' · start when everyone is in'
-              : ' · waiting for the commissioner to start'}
+            {teamsError ? (
+              'Team list unavailable — see below.'
+            ) : (
+              <>
+                {joinedHumans.length} of {teams.length} team{teams.length === 1 ? '' : 's'} joined
+                {isCommissioner
+                  ? ' · start when everyone is in'
+                  : ' · waiting for the commissioner to start'}
+              </>
+            )}
           </p>
         </div>
         {isCommissioner && (
@@ -655,6 +750,22 @@ function DraftLobbyV2({ leagueId, teams }: DraftLobbyV2Props) {
             size="sm"
             onClick={() => setLeagueFetchNonce((n) => n + 1)}
             data-testid="draft-lobby-v2-retry"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+      {teamsError && (
+        <div
+          className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2"
+          data-testid="draft-lobby-v2-teams-error"
+        >
+          <p className="text-sm text-destructive">{teamsError}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRetryTeams}
+            data-testid="draft-lobby-v2-teams-retry"
           >
             Retry
           </Button>
@@ -735,6 +846,8 @@ interface DraftRoomBodyProps {
   teams: FetchedTeam[];
   playersById: ReadonlyMap<string, Player>;
   playersLoading: boolean;
+  playersError: Error | null;
+  onRetryPlayers: () => void;
   /**
    * Entry 87 Fix C — threaded from DraftRoomV2's estimator so
    * OnClockActionBar reads the SAME offset instance that DraftTimerV2
@@ -749,6 +862,8 @@ function DraftRoomBody({
   teams,
   playersById,
   playersLoading,
+  playersError,
+  onRetryPlayers,
   clockOffsetMs,
 }: DraftRoomBodyProps) {
   /*
@@ -844,6 +959,8 @@ function DraftRoomBody({
           teams={teams}
           playersById={playersById}
           playersLoading={playersLoading}
+          playersError={playersError}
+          onRetryPlayers={onRetryPlayers}
           myTeamId={myTeamId}
           clockOffsetMs={clockOffsetMs}
           queue={queue}
@@ -885,6 +1002,8 @@ interface MainTabsProps {
   teams: FetchedTeam[];
   playersById: ReadonlyMap<string, Player>;
   playersLoading: boolean;
+  playersError: Error | null;
+  onRetryPlayers: () => void;
   myTeamId: string | null;
   clockOffsetMs: number;
   /** QUEUE-REACH (2026-08-13) — owned by DraftRoomBody, shared with the sidebar. */
@@ -897,6 +1016,8 @@ function MainTabs({
   teams,
   playersById,
   playersLoading,
+  playersError,
+  onRetryPlayers,
   myTeamId,
   clockOffsetMs,
   queue,
@@ -1306,6 +1427,8 @@ function MainTabs({
               draftedPlayers={draftedIds}
               isDraftActive={isDraftActive}
               availablePlayers={availablePlayers}
+              loadError={playersError}
+              onRetryLoad={onRetryPlayers}
               isYourTurn={amIOnClock}
               isSubmitPending={isSubmitPending}
               /* QUEUE-REACH (2026-08-13) — the two props that make the

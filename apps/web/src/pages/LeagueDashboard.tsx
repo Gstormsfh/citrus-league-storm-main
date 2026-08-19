@@ -15,6 +15,7 @@ import {
   MascotPortrait,
 } from '@/components/citrus2';
 import { StormyLoading } from '@/components/citrus2/StormyLoading';
+import { getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { LeagueService, League, Team } from '@/services/LeagueService';
@@ -132,17 +133,23 @@ const LeagueDashboard = () => {
       }
       if (!leagueData) throw new Error('League not found');
 
-      // Guard: redirect pool leagues to their proper pages
+      // Guard: redirect pool leagues to their proper pages.
+      //
+      // 2026-08-18 launch audit: this used a LOCAL copy of the pool-route
+      // map covering only pickem / survivor / confidence-pool. The three
+      // playoff pool types were missing, so the lookup returned undefined,
+      // the `if (poolRoute)` guard fell through, and a
+      // playoff-bracket-pickem / playoff-confidence-pool /
+      // playoff-roster-pool league opened at /league/:id rendered the
+      // FANTASY dashboard — wrong page, wrong data shape. Use the
+      // canonical helper, which covers all six.
       const leagueTypeFromSettings = (leagueData.settings as LeagueSettings)?.leagueType;
       if (leagueTypeFromSettings && leagueTypeFromSettings !== 'fantasy') {
-        const poolRoutes: Record<string, string> = {
-          'pickem': '/pool/pickem',
-          'survivor': '/pool/survivor',
-          'confidence-pool': '/pool/confidence',
-        };
-        const poolRoute = poolRoutes[leagueTypeFromSettings as string];
-        if (poolRoute) {
-          navigate(`${poolRoute}?league=${leagueId}`);
+        const poolRoute = getPoolRoute(leagueTypeFromSettings as string, leagueId as string);
+        // getPoolRoute falls back to `/league/:id` for an unknown type —
+        // navigating there would loop, so only redirect on a real match.
+        if (poolRoute && !poolRoute.startsWith('/league/')) {
+          navigate(poolRoute);
           return;
         }
       }
@@ -1356,7 +1363,7 @@ Your Commissioner`);
               <CardContent className="relative z-10">
                 <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">
                   {teams.length}
-                  <span className="text-white/40 mx-1.5 text-2xl md:text-3xl">/</span>
+                  <span className="text-white/55 mx-1.5 text-2xl md:text-3xl">/</span>
                   <span className="text-pastel-orange">{league.settings?.teamsCount || 12}</span>
                 </div>
                 <p className="text-xs text-white/55 mt-2">Filled · max {league.settings?.teamsCount || 12}</p>

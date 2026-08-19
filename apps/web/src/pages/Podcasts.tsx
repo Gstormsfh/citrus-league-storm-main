@@ -161,7 +161,7 @@ const Podcasts = () => {
                       {episode.description}
                     </p>
                     <div className="flex items-center justify-between">
-                      <span className="font-jbmono text-[10px] uppercase tracking-wider text-white/45 tabular-nums">
+                      <span className="font-jbmono text-[10px] uppercase tracking-wider text-white/55 tabular-nums">
                         {episode.duration} · {episode.date}
                       </span>
                       <button className="inline-flex items-center gap-1.5 text-[12px] font-bold text-pastel-orange-soft hover:text-pastel-orange transition-colors">

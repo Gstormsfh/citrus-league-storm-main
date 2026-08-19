@@ -2,6 +2,13 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { History } from 'lucide-react';
 
+/* 2026-08-19 visual audit: this panel was still on the ORIGINAL light
+   theme (fantasy-surface #FFFFFF, fantasy-dark #1E293B, fantasy-light
+   #FFF1DB) while the draft room around it renders on #0F1F15. It read as
+   a white box pasted into a dark app. Migrated to the pastel dark
+   surface tokens the rest of the room already uses. */
+
+
 interface DraftPick {
   id: string;
   teamId: string;
@@ -38,9 +45,9 @@ export const DraftHistory = ({ draftHistory, onPlayerClick }: DraftHistoryProps)
       {draftHistory.length > 0 ? (
         <>
           {/* Mobile: Compact card list */}
-          <div className="md:hidden border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm max-h-[60vh] overflow-y-auto scrollbar-styled">
+          <div className="md:hidden border border-white/10 rounded-lg overflow-hidden bg-pastel-surface-tile backdrop-blur-sm max-h-[60vh] overflow-y-auto scrollbar-styled">
             {sortedHistory.map((pick) => (
-              <div key={pick.id} className="border-b border-fantasy-border/50 px-3 py-2 flex items-center gap-2">
+              <div key={pick.id} className="border-b border-white/10 px-3 py-2 flex items-center gap-2">
                 <span className="text-xs font-bold text-primary w-8 flex-shrink-0">#{pick.pick}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
@@ -59,10 +66,10 @@ export const DraftHistory = ({ draftHistory, onPlayerClick }: DraftHistoryProps)
           </div>
 
           {/* Desktop: Full table */}
-          <div className="hidden md:block border border-fantasy-border rounded-lg overflow-hidden bg-[#E8EED9]/50 backdrop-blur-sm">
+          <div className="hidden md:block border border-white/10 rounded-lg overflow-hidden bg-pastel-surface-tile backdrop-blur-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-fantasy-light/50 border-b border-fantasy-border">
+                <thead className="bg-white/5 border-b border-white/10">
                   <tr>
                     <th className="px-3 py-2 text-left font-semibold">Pick</th>
                     <th className="px-3 py-2 text-left font-semibold">Player</th>
@@ -76,7 +83,7 @@ export const DraftHistory = ({ draftHistory, onPlayerClick }: DraftHistoryProps)
                   {sortedHistory.map((pick) => (
                     <tr
                       key={pick.id}
-                      className="border-b border-fantasy-border/50 hover:bg-fantasy-light/30 transition-colors"
+                      className="border-b border-white/10 hover:bg-white/5 transition-colors"
                     >
                       <td className="px-3 py-2 text-center font-medium text-primary">
                         #{pick.pick}

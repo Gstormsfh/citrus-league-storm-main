@@ -17,6 +17,12 @@ import {
 import type { Player } from '@/services/PlayerService';
 import type { LeagueTeam } from '@/services/LeagueService';
 
+/* 2026-08-19 visual audit: light "glass" surface on a dark page — see
+   the surface-correction note in the armchair-gm components. bg-white/50
+   composites to mid-grey on #0F1F15, where neither light nor dark text
+   reaches 4.5:1. Uses the dark tile family instead. */
+
+
 interface TradeGridViewProps {
   myTeamRoster: Player[];
   opponentTeams: LeagueTeam[];
@@ -84,7 +90,7 @@ const PlayerCell = ({
       tabIndex={0}
     >
       <div className="flex items-start justify-between gap-1 mb-1">
-        <Badge variant="outline" className="h-4 px-1 text-[9px] font-semibold bg-white/70 border-black/10">
+        <Badge variant="outline" className="h-4 px-1 text-[9px] font-semibold bg-pastel-surface-tile border-black/10">
           {(player.position || '').toUpperCase()}
         </Badge>
         {isSelected && (
@@ -108,7 +114,7 @@ const PlayerCell = ({
               ? selectionTone === 'send'
                 ? 'bg-red-500 hover:bg-red-600 text-white'
                 : 'bg-green-600 hover:bg-green-500 text-white'
-              : 'bg-white/80'
+              : 'bg-pastel-surface-tile'
           }`}
           onClick={(e) => {
             e.stopPropagation();
@@ -130,7 +136,7 @@ const PlayerCell = ({
         <Button
           size="icon"
           variant="ghost"
-          className="h-6 w-6 bg-white/60 hover:bg-white/90"
+          className="h-6 w-6 bg-white/5 hover:bg-white/10"
           onClick={(e) => {
             e.stopPropagation();
             onOpenCard();

@@ -1,5 +1,13 @@
 import { cn } from '@/lib/utils';
 
+/* 2026-08-19 visual audit — muted-text correction.
+   text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
+   original CREAM theme. At 20-70% opacity on the dark #1A2A20 tiles it
+   composites to near-invisible (team codes on this page measured
+   1.47:1). Remapped to cream at the alpha that preserves the intended
+   hierarchy while clearing 4.5:1 on a dark tile. */
+
+
 interface PlayerAvatarProps {
   name: string;
   position: string;
@@ -9,9 +17,9 @@ interface PlayerAvatarProps {
 }
 
 const positionColors: Record<string, { bg: string; border: string; text: string }> = {
-  C: { bg: 'from-citrus-sage/40 to-[#7CB518]/30', border: 'border-citrus-sage', text: 'text-citrus-forest' },
-  LW: { bg: 'from-[#7CB518]/40 to-citrus-sage/30', border: 'border-[#7CB518]/70', text: 'text-citrus-forest' },
-  RW: { bg: 'from-citrus-orange/30 to-citrus-peach/40', border: 'border-citrus-orange/60', text: 'text-citrus-forest' },
+  C: { bg: 'from-citrus-sage/40 to-[#7CB518]/30', border: 'border-citrus-sage', text: 'text-pastel-cream' },
+  LW: { bg: 'from-[#7CB518]/40 to-citrus-sage/30', border: 'border-[#7CB518]/70', text: 'text-pastel-cream' },
+  RW: { bg: 'from-citrus-orange/30 to-citrus-peach/40', border: 'border-citrus-orange/60', text: 'text-pastel-cream' },
   D: { bg: 'from-blue-200/50 to-blue-300/30', border: 'border-blue-400/60', text: 'text-blue-900' },
   G: { bg: 'from-purple-200/50 to-purple-300/30', border: 'border-purple-400/60', text: 'text-purple-900' },
 };
@@ -70,7 +78,7 @@ export default function PlayerAvatar({ name, position, jerseyNumber, size = 'md'
 
       {/* Jersey number (only show on md and lg) */}
       {jerseyNumber !== undefined && jerseyNumber > 0 && (size === 'md' || size === 'lg') && (
-        <span className={cn(sizing.number, "text-citrus-charcoal/50 font-display font-bold leading-none relative z-10 -mt-px")}>
+        <span className={cn(sizing.number, "text-pastel-cream/65 font-display font-bold leading-none relative z-10 -mt-px")}>
           #{jerseyNumber}
         </span>
       )}
