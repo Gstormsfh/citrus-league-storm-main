@@ -157,22 +157,46 @@ When context is provided, you may see:
 ## Week Structure
 - Fantasy weeks run **Sunday through Saturday**.
 
+## SEASON STATUS — READ THIS BEFORE USING ANY TIME-BASED LANGUAGE
+
+The stat rows you are given are the most recent COMPLETED season. Unless the
+context block explicitly shows live games or a current week, assume the season
+is over and the next one has not started.
+
+That means, unless live data says otherwise:
+- Do NOT say "rest of season", "ROS", "this week", "remaining games", "tonight",
+  or "down the stretch". There is no remainder to project.
+- Do NOT recommend start/sit or waiver moves for "this week". There is no week.
+- Frame everything in the past tense: what a player DID last season, and what
+  that implies for a draft.
+- "Who should I take?" in the offseason is a DRAFT question. Answer it that way.
+
+Citrus does not currently publish a rest-of-season projection number. If you are
+about to cite one, you are inventing it. Do not.
+
 ## RULE 0 — GROUNDING (OUTRANKS EVERY OTHER RULE BELOW)
 
-Everything you know about players comes from the "## Current User Context" block
-at the end of this prompt. Nothing else. You do NOT have a live database
-connection, and you cannot look anything up.
+Every number you state must come from a block in this prompt: the VERIFIED
+PLAYER DATA block, or the "## Current User Context" block. Nothing else. You have
+no memory of any player's statistics that you are permitted to use.
 
-**If a player is not named in that context block, you do not have their stats.**
-You may still discuss them from general hockey knowledge — but you MUST NOT state
-any specific number for them (GP, G, A, PTS, PPG, SOG, xG, xG/60, GSAx, a
-"finishing multiplier", or any figure presented as measured). Not an estimate,
-not a plausible-looking figure, not "roughly". None.
+When a question names players, Citrus looks them up in its database and injects
+the rows into a VERIFIED PLAYER DATA block below. Those numbers are the truth.
+Use them exactly as written. Do not round them into different numbers, do not
+"correct" them against what you think you remember, and do not blend them with
+recollection.
+
+**If a player is not in either block, you do not have their stats.** The lookup
+block will name anyone it could not find. You may still discuss such a player
+from general hockey knowledge — but you MUST NOT state any specific number for
+them (GP, G, A, PTS, PPG, SOG, xG, xG/60, GSAx, a "finishing multiplier", or any
+figure presented as measured). Not an estimate, not a plausible-looking figure,
+not "roughly". None.
 
 Say so plainly instead, in one short line, then answer with what you do have:
 
-  "Matthews isn't in your league context, so I don't have his Citrus numbers in
-   front of me — here's the read without them:"
+  "Marner is not in the Citrus database for that season, so I do not have his
+   numbers in front of me — here is the read without them:"
 
 This OVERRIDES Rules 2, 7 and 8 below. Those rules exist to stop you being vague
 about data you HAVE. They are not permission to invent data you LACK. When the
@@ -183,8 +207,8 @@ credibility — Citrus's entire claim is that its numbers are real. A confident
 wrong number about a real player, shown to someone who knows that player, is the
 worst output you can produce. Being unable to answer is strictly better.
 
-If the context block is empty, missing, or says "Empty roster": say that the
-league has no data loaded yet, and answer generally without inventing numbers.
+If both blocks are empty or missing: say the data has not loaded, and answer
+generally without inventing numbers.
 
 ## Response Rules (NON-NEGOTIABLE)
 1. **DECIDE FIRST.** Give your recommendation in the first sentence. Then explain why.
@@ -276,6 +300,168 @@ async function logUsage(
   } catch { /* non-critical */ }
 }
 
+
+// ── Player lookup ────────────────────────────────────────────────
+// The whole reason Stormy used to fabricate: the client only ever sent
+// roster-scoped context, so any question about a player the user does not
+// roster arrived with NOTHING attached -- and the model filled the hole from
+// memory. Prompt rules alone could not fix that; there was no data to obey.
+// Now we read the names out of the question and fetch the real rows.
+
+const NAME_STOPWORDS = new Set([
+  "The","This","That","These","Those","Should","Would","Could","Shall","Might",
+  "What","Who","Whom","Which","When","Where","Why","How","Take","Give","Start",
+  "Sit","Trade","Drop","Pick","Add","Keep","Best","Better","Worse","Good","Bad",
+  "Week","Team","Teams","League","Player","Players","Points","Goals","Assists",
+  "Shots","Blocks","Hits","Fantasy","Hockey","Draft","Roster","Lineup","Bench",
+  "And","But","For","With","From","About","Versus","Vs","Or","Is","Are","Was",
+  "Were","Do","Does","Did","Can","Will","Yes","No","Please","Thanks","Thank",
+  "Hey","Hi","Hello","Okay","Stormy","Citrus","NHL","GM","My","Me","Your","You",
+  "His","Her","Their","Our","One","Two","Three","Next","Last","Season","Year",
+  "Game","Games","Night","Tonight","Today","Tomorrow","Now","Also","Just",
+]);
+
+/** Pull plausible player names out of a free-text question. */
+function candidateNames(message: string): string[] {
+  const out = new Set<string>();
+  // Two or three capitalised words in a row -> a full name.
+  const full = message.match(/\b\p{Lu}[\p{L}'’.-]+(?:\s+\p{Lu}[\p{L}'’.-]+){1,2}\b/gu) ?? [];
+  for (const m of full) out.add(m.trim());
+  // A lone capitalised word -> possibly a surname. Stopwords filter the noise;
+  // anything that is not a real player simply returns no rows.
+  const single = message.match(/\b\p{Lu}[\p{L}'’-]{3,}\b/gu) ?? [];
+  for (const m of single) if (!NAME_STOPWORDS.has(m)) out.add(m.trim());
+  return [...out].slice(0, 8);
+}
+
+interface LookupRow {
+  full_name: string; team_abbrev: string | null; position_code: string | null;
+  is_goalie: boolean | null; season: number;
+  games_played: number | null; goals: number | null; assists: number | null;
+  points: number | null; shots_on_goal: number | null; hits: number | null;
+  blocks: number | null; pim: number | null; ppp: number | null;
+  wins: number | null; saves: number | null; save_pct: number | null;
+  shutouts: number | null; goals_against: number | null;
+  xg_per_60: number | null; xg_rating: string | null;
+}
+
+/**
+ * Look the named players up and render a block of REAL numbers.
+ * Returns "" when the message names nobody recognisable.
+ */
+async function lookupPlayers(
+  svc: ReturnType<typeof createClient>,
+  message: string,
+): Promise<string> {
+  const names = candidateNames(message);
+  if (!names.length) return "";
+
+  try {
+    // Strip characters that would break PostgREST's or() grammar.
+    const filter = names
+      .map((n) => n.replace(/[(),*%]/g, "").trim())
+      .filter((n) => n.length >= 3)
+      .map((n) => `full_name.ilike.%${n}%`)
+      .join(",");
+    if (!filter) return "";
+
+    const { data: dir, error: dirErr } = await svc
+      .from("player_directory")
+      .select("player_id, full_name, team_abbrev, position_code, is_goalie, season")
+      .or(filter)
+      .limit(40);
+    if (dirErr || !dir || !dir.length) {
+      return names.length
+        ? `\n\n### VERIFIED PLAYER DATA\nNo database match for: ${names.join(", ")}. You do NOT have stats for them (see RULE 0).\n`
+        : "";
+    }
+
+    // Keep one directory entry per player -- the table is keyed (season,
+    // player_id) and carries a row for the upcoming season too, which has no
+    // stats attached. Prefer the newest row for identity.
+    const byId = new Map<number, Record<string, unknown>>();
+    for (const r of dir as Array<Record<string, unknown>>) {
+      const id = r.player_id as number;
+      const prev = byId.get(id);
+      if (!prev || (r.season as number) > (prev.season as number)) byId.set(id, r);
+    }
+    const ids = [...byId.keys()].slice(0, 12);
+    if (!ids.length) return "";
+
+    const { data: stats } = await svc
+      .from("player_season_stats")
+      .select("player_id, season, games_played, goals, primary_assists, secondary_assists, points, shots_on_goal, hits, blocks, pim, ppp, wins, saves, save_pct, shutouts, goals_against, is_goalie")
+      .in("player_id", ids)
+      .order("season", { ascending: false });
+
+    const { data: talent } = await svc
+      .from("player_talent_metrics")
+      .select("player_id, season, xg_per_60, xg_rating")
+      .in("player_id", ids)
+      .order("season", { ascending: false });
+
+    // Newest season that actually has games played.
+    const statById = new Map<number, Record<string, unknown>>();
+    for (const r of (stats ?? []) as Array<Record<string, unknown>>) {
+      const id = r.player_id as number;
+      if (!statById.has(id) && (r.games_played as number | null)) statById.set(id, r);
+    }
+    const talentById = new Map<number, Record<string, unknown>>();
+    for (const r of (talent ?? []) as Array<Record<string, unknown>>) {
+      const id = r.player_id as number;
+      if (!talentById.has(id)) talentById.set(id, r);
+    }
+
+    const lines: string[] = [];
+    const noStats: string[] = [];
+    let statSeason: number | null = null;
+
+    for (const id of ids) {
+      const d = byId.get(id)!;
+      const st = statById.get(id);
+      const tl = talentById.get(id);
+      const who = `${d.full_name}${d.team_abbrev ? " (" + d.team_abbrev : ""}${d.position_code ? ", " + d.position_code + ")" : d.team_abbrev ? ")" : ""}`;
+      if (!st) { noStats.push(String(d.full_name)); continue; }
+      statSeason = statSeason ?? (st.season as number);
+
+      const gp = st.games_played as number;
+      if (st.is_goalie || d.is_goalie) {
+        const sv = st.save_pct as number | null;
+        lines.push(
+          `- ${who} — ${gp} GP, ${st.wins ?? 0} W, ${st.saves ?? 0} SV, ` +
+          `${sv != null ? "SV% " + Number(sv).toFixed(3) : "SV% n/a"}, ` +
+          `${st.shutouts ?? 0} SO, ${st.goals_against ?? 0} GA`,
+        );
+      } else {
+        const ast = (Number(st.primary_assists ?? 0) + Number(st.secondary_assists ?? 0));
+        const pts = st.points as number | null;
+        const ppg = pts != null && gp ? (Number(pts) / gp).toFixed(2) : "n/a";
+        const xg = tl?.xg_per_60 != null
+          ? `, xG/60 ${Number(tl.xg_per_60).toFixed(2)}${tl.xg_rating ? " [" + tl.xg_rating + "]" : ""}`
+          : "";
+        lines.push(
+          `- ${who} — ${gp} GP, ${st.goals ?? 0} G, ${ast} A, ${pts ?? 0} PTS, ` +
+          `${ppg} PPG, ${st.shots_on_goal ?? 0} SOG, ${st.hits ?? 0} HIT, ` +
+          `${st.blocks ?? 0} BLK, ${st.ppp ?? 0} PPP${xg}`,
+        );
+      }
+    }
+
+    if (!lines.length && !noStats.length) return "";
+
+    const label = statSeason ? `${statSeason}-${String(statSeason + 1).slice(2)}` : "most recent";
+    let block = `\n\n### VERIFIED PLAYER DATA — from the Citrus database. These numbers are REAL. Use them exactly.\nSeason ${label} (COMPLETED — see SEASON STATUS above; there is no rest-of-season)\n`;
+    if (lines.length) block += lines.join("\n") + "\n";
+    if (noStats.length) {
+      block += `\nNO STATS ON FILE for: ${noStats.join(", ")}. You do NOT have their numbers — say so rather than estimating (RULE 0).\n`;
+    }
+    return block;
+  } catch (err) {
+    console.warn("lookupPlayers failed:", err instanceof Error ? err.message : String(err));
+    return ""; // never break the chat over a lookup
+  }
+}
+
 // ── Main Handler ─────────────────────────────────────────────────
 serve(async (req) => {
   // Set per-request CORS headers from origin
@@ -349,6 +535,16 @@ serve(async (req) => {
 
     // ── Build system prompt + context (capped) ─────────────────
     let systemPrompt = SYSTEM_PROMPT;
+
+    // Fetch real rows for any player named in the question. This is what stops
+    // the model answering from memory when the roster context does not cover
+    // the player being asked about.
+    if (supabaseServiceKey) {
+      const svcLookup = createClient(supabaseUrl, supabaseServiceKey);
+      const verified = await lookupPlayers(svcLookup, message);
+      if (verified) systemPrompt += verified;
+    }
+
     if (context && typeof context === "string" && context.length > 0) {
       systemPrompt += "\n\n## Current User Context\n" + context.substring(0, 8000);
     }
@@ -368,8 +564,12 @@ serve(async (req) => {
     }
     messages.push({ role: "user", content: message.substring(0, 1000) });
 
-    // ── Call Claude API (streaming) ────────────────────────────
-    console.log(`Stormy: ${CLAUDE_MODEL} | ${messages.length} msgs | ctx ${context ? Math.min(context.length, 8000) : 0} chars | streaming`);
+    // ── Call Claude API (non-streaming) ────────────────────────
+    // Reverted from SSE: the deployed web client could not parse the stream
+    // ("I couldn't process that"). Its JSON path is documented and reliable,
+    // and a working answer beats a token-by-token one. Re-enable streaming
+    // only once a client build that reads it is actually deployed.
+    console.log(`Stormy: ${CLAUDE_MODEL} | ${messages.length} msgs | ctx ${context ? Math.min(context.length, 8000) : 0} chars `);
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -383,7 +583,6 @@ serve(async (req) => {
         max_tokens: MAX_RESPONSE_TOKENS,
         system: systemPrompt,
         messages,
-        stream: true,
       }),
     });
 
@@ -393,58 +592,20 @@ serve(async (req) => {
       throw new Error(`AI service error (${response.status}). Try again in a moment.`);
     }
 
-    if (!response.body) {
-      throw new Error("Claude returned empty stream body");
+    const data = await response.json();
+    const aiResponse = data.content?.[0]?.text ?? "Sorry, I couldn't generate a response.";
+    const inputTokens = data.usage?.input_tokens ?? 0;
+    const outputTokens = data.usage?.output_tokens ?? 0;
+    const tokensUsed = inputTokens + outputTokens;
+
+    if (user && supabaseServiceKey) {
+      const svc = createClient(supabaseUrl, supabaseServiceKey);
+      logUsage(svc, user.id, tokensUsed, message);
     }
 
-    // Forward Anthropic's SSE stream to the client AS chunks arrive — that's
-    // the whole point of streaming. We also peek at chunks to extract token
-    // counts (carried in message_start input_tokens + message_delta usage)
-    // so we can log usage after the stream ends, without buffering the
-    // entire response.
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let leftover = ""; // bytes that arrive split mid-line
-    const decoder = new TextDecoder();
-    const userId = user?.id ?? null;
-
-    const transform = new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        controller.enqueue(chunk); // forward unchanged
-        // Best-effort token extraction. Failures here just skip logging.
-        try {
-          const text = leftover + decoder.decode(chunk, { stream: true });
-          const lines = text.split("\n");
-          leftover = lines.pop() ?? "";
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const data = line.slice(6);
-            if (!data || data === "[DONE]") continue;
-            const evt = JSON.parse(data);
-            if (evt?.message?.usage?.input_tokens != null) {
-              inputTokens = evt.message.usage.input_tokens;
-            }
-            if (evt?.usage?.output_tokens != null) {
-              outputTokens = evt.usage.output_tokens;
-            }
-          }
-        } catch { /* malformed chunk — keep streaming, just skip parsing */ }
-      },
-      flush() {
-        if (userId && supabaseServiceKey) {
-          const svc = createClient(supabaseUrl, supabaseServiceKey);
-          // Fire and forget — logUsage already swallows its own errors.
-          logUsage(svc, userId, inputTokens + outputTokens, message);
-        }
-      },
-    });
-
-    return new Response(response.body.pipeThrough(transform), {
-      headers: {
-        ...requestCorsHeaders,
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-      },
+    return makeJsonResponse({
+      response: aiResponse,
+      usage: { weeklyLimit: WEEKLY_MESSAGE_LIMIT, inputTokens, outputTokens },
     });
   } catch (error) {
     console.error("Error in stormy-chat:", error);
