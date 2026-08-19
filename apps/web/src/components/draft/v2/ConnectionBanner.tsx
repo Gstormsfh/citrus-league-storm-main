@@ -45,6 +45,29 @@ interface ConnectionBannerProps {
 export function ConnectionBanner({ onRetryNow }: ConnectionBannerProps) {
   const state = useDraftConnectionState();
 
+  // 2026-08-19 — mirror of the lobby's latch (DraftRoomV2). While the
+  // draft has not started, the discovery poll cycles through `connecting`
+  // every ~3s. Without this, the transient "Connecting to draft..."
+  // indicator appeared and vanished on that same cadence, directly above
+  // a lobby that was sitting there perfectly happy. Nothing is wrong
+  // during that blip, so say nothing.
+  const [lobbyMode, setLobbyMode] = useState(false);
+  useEffect(() => {
+    if (state.kind === 'reconnecting' && state.waitingForStart === true) {
+      setLobbyMode(true);
+    } else if (
+      state.kind === 'connected' ||
+      state.kind === 'fatal' ||
+      state.kind === 'terminal_completed'
+    ) {
+      setLobbyMode(false);
+    }
+  }, [state]);
+
+  if (lobbyMode && (state.kind === 'connecting' || state.kind === 'fetching_token')) {
+    return null;
+  }
+
   switch (state.kind) {
     case 'idle':
     case 'connected':
@@ -72,6 +95,21 @@ export function ConnectionBanner({ onRetryNow }: ConnectionBannerProps) {
         />
       );
     case 'reconnecting':
+      // 2026-08-19 — DO NOT double up on the pre-ignition state.
+      //
+      // `waitingForStart` means the engine answered "this draft has not
+      // started yet". That is not a connection problem, and the Draft
+      // Lobby below is the dedicated surface for it: it names the teams,
+      // shows who has joined, and gives the commissioner the Start
+      // button. Rendering this banner too produced two stacked panels
+      // saying the same thing, the upper one headed "Waiting for the
+      // draft to start" with a "RETRY NOW" button — which invites the
+      // commissioner to retry a connection that is working perfectly,
+      // when the actual next action is the Start button underneath it.
+      //
+      // Genuine reconnects (kind === 'reconnecting' WITHOUT
+      // waitingForStart) still show the banner, countdown and retry.
+      if (state.waitingForStart === true) return null;
       return (
         <ReconnectingBanner state={state} onRetryNow={onRetryNow} />
       );

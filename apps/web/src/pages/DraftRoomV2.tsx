@@ -578,8 +578,42 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
   // Every live-draft state — INCLUDING the "started, awaiting pick 1"
   // window where derived.draftStatus still reads 'not_started' — has a
   // live `connected` connection, so this is false there.
-  const waitingForStart =
+  const rawWaitingForStart =
     connectionState.kind === 'reconnecting' && connectionState.waitingForStart === true;
+
+  // 2026-08-19 — LATCH. Deriving the lobby's visibility straight from the
+  // live connection state made the ENTIRE lobby unmount and remount on
+  // every discovery poll, because the state legitimately cycles
+  //     reconnecting(waitingForStart) -> connecting -> reconnecting(...)
+  // roughly every 3 seconds while the draft has not started.
+  //
+  // Measured on production: 4 full teardown/rebuild cycles in 12 seconds,
+  // with "Connecting to draft...", "Waiting for the draft to start" and
+  // "Draft Lobby" all being re-added to the DOM each time. That is the
+  // flicker — and it is not merely cosmetic: the Start button itself was
+  // being destroyed and recreated under the commissioner's cursor, so a
+  // click landing mid-remount would simply do nothing.
+  //
+  // Once we know we are pre-ignition, STAY in lobby mode. Only a decisive
+  // transition leaves it: the draft actually going live (`connected`),
+  // finishing, or dying (`fatal`). Transient blips between polls no longer
+  // touch the UI at all.
+  const [lobbyLatched, setLobbyLatched] = useState(false);
+  useEffect(() => {
+    if (rawWaitingForStart) {
+      setLobbyLatched(true);
+      return;
+    }
+    if (
+      connectionState.kind === 'connected' ||
+      connectionState.kind === 'fatal' ||
+      connectionState.kind === 'terminal_completed'
+    ) {
+      setLobbyLatched(false);
+    }
+  }, [rawWaitingForStart, connectionState.kind]);
+
+  const waitingForStart = rawWaitingForStart || lobbyLatched;
 
   // Fetch the league record ONLY while we are actually the pre-draft
   // lobby. Gating on waitingForStart keeps the in-draft render path free
@@ -707,41 +741,108 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
     }
   };
 
+  // Draft settings, shown as a strip so everyone can see the format they
+  // are about to be locked into. Falls back gracefully while the league
+  // record is still loading.
+  const draftTypeLabel = String(
+    (league?.settings as { draftType?: string } | null)?.draftType ?? 'snake',
+  );
+  const pickSeconds = Number(
+    (league?.settings as { pickTimeLimit?: number | string } | null)?.pickTimeLimit ?? 0,
+  );
+  const rounds = league?.draft_rounds ?? null;
+  const totalPicks = rounds && teams.length ? rounds * teams.length : null;
+
   return (
-    <Card className="p-5 mb-4 border-2 border-pastel-sage/40" data-testid="draft-lobby-v2">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-lg font-bold">Draft Lobby</h2>
-          {/* When the teams fetch failed we do NOT claim "0 of 0 teams
-              joined · waiting for the commissioner" — that sentence sent
-              a commissioner off to wait for himself. Say what happened. */}
-          <p className="text-sm text-muted-foreground">
-            {teamsError ? (
-              'Team list unavailable — see below.'
-            ) : (
-              <>
-                {joinedHumans.length} of {teams.length} team{teams.length === 1 ? '' : 's'} joined
-                {isCommissioner
-                  ? ' · start when everyone is in'
-                  : ' · waiting for the commissioner to start'}
-              </>
-            )}
-          </p>
+    <Card
+      className="mb-4 overflow-hidden border-0 bg-pastel-surface-tile p-0 ring-1 ring-white/10 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.6)]"
+      data-testid="draft-lobby-v2"
+    >
+      {/* Hero — this is the last screen before a live draft, so it should
+          feel like an event rather than a status readout. */}
+      <div className="relative px-5 pt-5 pb-4 sm:px-7 sm:pt-6">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-24 -right-16 h-56 w-56 rounded-full opacity-20 blur-3xl"
+          style={{ background: 'radial-gradient(circle, #FF6B1A 0%, transparent 70%)' }}
+        />
+        <div className="relative flex items-start justify-between gap-5 flex-wrap">
+          <div className="min-w-0">
+            <div className="font-jbmono text-[10px] font-bold uppercase tracking-[0.32em] text-pastel-orange-soft">
+              {isCommissioner ? "You're the commissioner" : 'Draft lobby'}
+            </div>
+            <h2 className="mt-1.5 font-sans text-[1.75rem] sm:text-[2.25rem] font-black leading-none tracking-[-0.03em] text-pastel-cream">
+              {roomFull ? (
+                <>Everyone&apos;s here.</>
+              ) : (
+                <>Waiting on the <span className="text-pastel-orange">room</span>.</>
+              )}
+            </h2>
+            <p className="mt-2 text-sm text-white/55">
+              {teamsError ? (
+                'Team list unavailable — see below.'
+              ) : (
+                <>
+                  <span className="font-semibold text-pastel-cream">
+                    {joinedHumans.length} of {teams.length}
+                  </span>{' '}
+                  {teams.length === 1 ? 'manager' : 'managers'} in the room
+                  {isCommissioner
+                    ? ' · start whenever you’re ready'
+                    : ' · the commissioner starts when everyone’s in'}
+                </>
+              )}
+            </p>
+          </div>
+
+          {isCommissioner && (
+            <div className="flex flex-col items-end gap-1.5">
+              <Button
+                onClick={handleStart}
+                disabled={isStarting || !roomFull}
+                data-testid="draft-lobby-v2-start"
+                size="lg"
+                className="bg-pastel-orange text-[#2A0F00] hover:bg-pastel-orange-soft border-0 rounded-full px-8 font-black tracking-tight shadow-[0_8px_24px_-6px_rgba(255,107,26,0.55)] disabled:shadow-none"
+              >
+                {isStarting ? 'Starting…' : 'Start Draft'}
+              </Button>
+              {roomFull && !isStarting && (
+                <span className="font-jbmono text-[10px] uppercase tracking-[0.18em] text-white/55">
+                  This goes live immediately
+                </span>
+              )}
+            </div>
+          )}
         </div>
-        {isCommissioner && (
-          <Button
-            onClick={handleStart}
-            disabled={isStarting || !roomFull}
-            data-testid="draft-lobby-v2-start"
-            size="lg"
-          >
-            {isStarting ? "Starting…" : "Start Draft"}
-          </Button>
-        )}
+
+        {/* Format strip — snake / rounds / clock, so nobody is surprised. */}
+        <div className="relative mt-5 flex flex-wrap items-center gap-2">
+          {[
+            { label: 'Format', value: draftTypeLabel === 'auction' ? 'Auction' : 'Snake' },
+            rounds ? { label: 'Rounds', value: String(rounds) } : null,
+            pickSeconds ? { label: 'Per pick', value: `${pickSeconds}s` } : null,
+            totalPicks ? { label: 'Total picks', value: String(totalPicks) } : null,
+          ]
+            .filter(Boolean)
+            .map((chip) => {
+              const c = chip as { label: string; value: string };
+              return (
+                <div
+                  key={c.label}
+                  className="rounded-lg bg-white/5 px-3 py-1.5 ring-1 ring-white/10"
+                >
+                  <span className="font-jbmono text-[9px] uppercase tracking-[0.18em] text-white/55">
+                    {c.label}
+                  </span>
+                  <span className="ml-2 text-sm font-bold text-pastel-cream">{c.value}</span>
+                </div>
+              );
+            })}
+        </div>
       </div>
       {leagueError && (
         <div
-          className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2"
+          className="mx-5 sm:mx-7 mb-4 flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2"
           data-testid="draft-lobby-v2-error"
         >
           <p className="text-sm text-destructive">{leagueError}</p>
@@ -757,7 +858,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
       )}
       {teamsError && (
         <div
-          className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2"
+          className="mx-5 sm:mx-7 mb-4 flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2"
           data-testid="draft-lobby-v2-teams-error"
         >
           <p className="text-sm text-destructive">{teamsError}</p>
@@ -771,24 +872,61 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
           </Button>
         </div>
       )}
-      <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {teams.map((t) => (
-          <div
-            key={t.id}
-            className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+      {/* Draft order slots. Numbered, because in a snake draft the order
+          IS the story — a manager should be able to see where they pick
+          before the clock ever starts. */}
+      <div className="border-t border-white/5 bg-black/15 px-5 py-4 sm:px-7">
+        <div className="mb-3 font-jbmono text-[10px] font-bold uppercase tracking-[0.28em] text-white/55">
+          The room
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {teams.map((t, i) => {
+            const isMine = t.id === myTeamId;
+            return (
+              <div
+                key={t.id}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ring-1 transition-colors ${
+                  isMine
+                    ? 'bg-pastel-orange/10 ring-pastel-orange/40'
+                    : 'bg-white/5 ring-white/10'
+                }`}
+              >
+                <span
+                  className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg font-jbmono text-[11px] font-bold ${
+                    isMine
+                      ? 'bg-pastel-orange text-[#2A0F00]'
+                      : 'bg-white/10 text-white/55'
+                  }`}
+                >
+                  {i + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-bold text-pastel-cream">
+                  {t.team_name}
+                </span>
+                {isMine && (
+                  <span className="font-jbmono text-[9px] font-bold uppercase tracking-[0.16em] text-pastel-orange-soft">
+                    You
+                  </span>
+                )}
+                <span
+                  className={`h-2 w-2 flex-shrink-0 rounded-full ${
+                    t.owner_id ? 'bg-pastel-sage' : 'bg-white/20'
+                  }`}
+                  title={t.owner_id ? 'Manager ready' : 'Seat open'}
+                />
+              </div>
+            );
+          })}
+        </div>
+        {isCommissioner && startBlockedReason && (
+          <p
+            className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-xs text-white/55 ring-1 ring-white/10"
+            data-testid="draft-lobby-v2-blocked"
           >
-            <span
-              className={`h-2 w-2 rounded-full ${t.owner_id ? 'bg-green-500' : 'bg-muted-foreground/40'}`}
-            />
-            <span className="truncate font-medium">{t.team_name}</span>
-          </div>
-        ))}
+            {startBlockedReason}
+          </p>
+        )}
       </div>
-      {isCommissioner && startBlockedReason && (
-        <p className="mt-3 text-xs text-muted-foreground" data-testid="draft-lobby-v2-blocked">
-          {startBlockedReason}
-        </p>
-      )}
     </Card>
   );
 }
