@@ -23,6 +23,7 @@ import { supabase } from '@/integrations/supabase/client';
 // errors. The 2026-08-15 sweep that introduced API_BASE_URL missed this
 // file. Prefixed with API_BASE_URL, matching PoolPlayoffRoster.tsx.
 import { API_BASE_URL } from '@/api/client';
+import { onTeamColor } from '@/utils/teamColorContrast';
 
 interface Seed {
   team_id: number;
@@ -353,7 +354,7 @@ export default function PoolPlayoffBracket() {
                             {/* Team abbrev badge in team's primary color */}
                             <div
                               className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-calistoga font-black text-white flex-shrink-0 shadow-sm"
-                              style={info ? { background: info.primaryColor } : { background: '#6b7280' }}
+                              style={info ? { background: info.primaryColor, color: onTeamColor(info.primaryColor) } : { background: '#6b7280', color: onTeamColor('#6b7280') }}
                             >
                               {team?.team_abbrev || '?'}
                             </div>
@@ -371,7 +372,7 @@ export default function PoolPlayoffBracket() {
                               </div>
                             </div>
                             {picked && (
-                              <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={info ? { background: info.primaryColor } : { background: '#7A9B7A' }}>
+                              <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={info ? { background: info.primaryColor, color: onTeamColor(info.primaryColor) } : { background: '#7A9B7A', color: onTeamColor('#7A9B7A') }}>
                                 <Check className="w-3 h-3 text-white" aria-hidden="true" />
                               </div>
                             )}

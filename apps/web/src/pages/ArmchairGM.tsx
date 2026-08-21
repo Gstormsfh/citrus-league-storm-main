@@ -105,7 +105,16 @@ const ArmchairGM = () => {
 
           {/* Tab Bar */}
           <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 relative z-10">
-            <div className="flex gap-1 -mb-[2px] overflow-x-auto scrollbar-hide pb-[2px]">
+            {/* 2026-08-19 — was `overflow-x-auto scrollbar-hide`. Measured
+                on production at a 943px viewport: the row needed 973px in
+                an 895px container, so "Cap Projection" and "Mock Draft"
+                sat entirely offscreen — with the scrollbar deliberately
+                hidden and no fade or arrow, there was no way for a user
+                to know those two tools existed at all. Two whole features
+                invisible. Wrapping guarantees every tab is reachable at
+                every width; it costs one extra row on narrow screens,
+                which is a trade worth making against hiding a feature. */}
+            <div className="flex flex-wrap gap-1 -mb-[2px] pb-[2px]">
               {TABS.map(tab => (
                 <button
                   key={tab.id}

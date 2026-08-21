@@ -90,7 +90,10 @@ const News = () => {
         </div>
 
         {/* Category Filters */}
-        <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide mb-6">
+        {/* 2026-08-19 — same hidden-scrollbar trap as the ArmchairGM tab
+            row: filters that overflow with no visible scrollbar and no
+            affordance simply vanish. Wrap instead. */}
+        <div className="flex flex-wrap gap-2 pb-4 mb-6">
           {NEWS_CATEGORIES.map((cat) => (
             <Button
               key={cat.key}

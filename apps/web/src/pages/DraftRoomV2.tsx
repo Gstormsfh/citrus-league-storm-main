@@ -556,8 +556,51 @@ interface DraftLobbyV2Props {
   onRetryTeams: () => void;
 }
 
-function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV2Props) {
+/**
+ * 2026-08-19 — the LATCH, extracted to a hook (2026-08-20) because the
+ * disease had a second site. Deriving pre-start visibility straight
+ * from the live connection state flickers, because the state
+ * legitimately cycles
+ *     reconnecting(waitingForStart) -> connecting -> reconnecting(...)
+ * roughly every 3 seconds while the draft has not started.
+ *
+ * Measured on production (2026-08-19): 4 full lobby teardown/rebuild
+ * cycles in 12 seconds — the Start button itself was being destroyed
+ * and recreated under the commissioner's cursor. The lobby got the
+ * latch that night; the "draft hasn't started yet" fallback line in
+ * DraftRoomBody did NOT, kept reading the raw state, and flickered
+ * between its two strings on every poll (reported on production
+ * 2026-08-20, pre-proving-draft). Same defect: a FIXED surface paired
+ * with a FLAPPING signal. One latch, shared by both consumers, so a
+ * third site can never re-derive it raw.
+ *
+ * Once pre-ignition is observed, STAY latched. Only a decisive
+ * transition leaves: the draft actually going live (`connected`),
+ * finishing (`terminal_completed`), or dying (`fatal`). Transient
+ * blips between polls never touch the UI.
+ */
+function useLatchedWaitingForStart(): boolean {
   const connectionState = useDraftConnectionState();
+  const rawWaitingForStart =
+    connectionState.kind === 'reconnecting' && connectionState.waitingForStart === true;
+  const [lobbyLatched, setLobbyLatched] = useState(false);
+  useEffect(() => {
+    if (rawWaitingForStart) {
+      setLobbyLatched(true);
+      return;
+    }
+    if (
+      connectionState.kind === 'connected' ||
+      connectionState.kind === 'fatal' ||
+      connectionState.kind === 'terminal_completed'
+    ) {
+      setLobbyLatched(false);
+    }
+  }, [rawWaitingForStart, connectionState.kind]);
+  return rawWaitingForStart || lobbyLatched;
+}
+
+function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV2Props) {
   const myTeamId = useMyTeamId();
   const [isStarting, setIsStarting] = useState(false);
   const [league, setLeague] = useState<
@@ -575,45 +618,9 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
   // discovery answers 409 with status `not_started` (commissioner hasn't
   // pressed Start), which puts the client in `reconnecting` with
   // `waitingForStart`. That is the ONLY genuinely pre-ignition state.
-  // Every live-draft state — INCLUDING the "started, awaiting pick 1"
-  // window where derived.draftStatus still reads 'not_started' — has a
-  // live `connected` connection, so this is false there.
-  const rawWaitingForStart =
-    connectionState.kind === 'reconnecting' && connectionState.waitingForStart === true;
-
-  // 2026-08-19 — LATCH. Deriving the lobby's visibility straight from the
-  // live connection state made the ENTIRE lobby unmount and remount on
-  // every discovery poll, because the state legitimately cycles
-  //     reconnecting(waitingForStart) -> connecting -> reconnecting(...)
-  // roughly every 3 seconds while the draft has not started.
-  //
-  // Measured on production: 4 full teardown/rebuild cycles in 12 seconds,
-  // with "Connecting to draft...", "Waiting for the draft to start" and
-  // "Draft Lobby" all being re-added to the DOM each time. That is the
-  // flicker — and it is not merely cosmetic: the Start button itself was
-  // being destroyed and recreated under the commissioner's cursor, so a
-  // click landing mid-remount would simply do nothing.
-  //
-  // Once we know we are pre-ignition, STAY in lobby mode. Only a decisive
-  // transition leaves it: the draft actually going live (`connected`),
-  // finishing, or dying (`fatal`). Transient blips between polls no longer
-  // touch the UI at all.
-  const [lobbyLatched, setLobbyLatched] = useState(false);
-  useEffect(() => {
-    if (rawWaitingForStart) {
-      setLobbyLatched(true);
-      return;
-    }
-    if (
-      connectionState.kind === 'connected' ||
-      connectionState.kind === 'fatal' ||
-      connectionState.kind === 'terminal_completed'
-    ) {
-      setLobbyLatched(false);
-    }
-  }, [rawWaitingForStart, connectionState.kind]);
-
-  const waitingForStart = rawWaitingForStart || lobbyLatched;
+  // Latching (see useLatchedWaitingForStart) keeps it stable across the
+  // poll cycle's transient blips.
+  const waitingForStart = useLatchedWaitingForStart();
 
   // Fetch the league record ONLY while we are actually the pre-draft
   // lobby. Gating on waitingForStart keeps the in-draft render path free
@@ -1040,6 +1047,10 @@ function DraftRoomBody({
   // is done; snapshot fetch in flight) from a genuine pre-first-
   // snapshot wait.
   const connectionState = useDraftConnectionState();
+  // 2026-08-20 — latched pre-ignition signal, shared with DraftLobbyV2.
+  // See useLatchedWaitingForStart for why the raw state must never
+  // drive render decisions directly.
+  const waitingForStart = useLatchedWaitingForStart();
   // F14(b) (2026-08-03): when the client-side identity cross-check
   // has failed, refuse to render draft controls by forcing myTeamId
   // to null downstream. Every downstream gate already checks
@@ -1065,22 +1076,21 @@ function DraftRoomBody({
         </div>
       );
     }
-    // ARCHITECT 2026-08-12 (LOBBY-WAIT / inbox E124) — the same
-    // reasoning as the ConnectionBanner variant. "Waiting for draft
-    // state…" is engine vocabulary; a manager waiting on his
-    // commissioner should be told that in his own language, and the
-    // room should read as ready rather than broken.
-    if (
-      connectionState.kind === 'reconnecting' &&
-      connectionState.waitingForStart
-    ) {
-      return (
-        <div className="text-muted-foreground" data-testid="draft-waiting-for-start">
-          The draft hasn&apos;t started yet. This page will open on its own
-          as soon as your commissioner starts it — you don&apos;t need to
-          refresh.
-        </div>
-      );
+    // ARCHITECT 2026-08-12 (LOBBY-WAIT / inbox E124), reworked
+    // 2026-08-20: this branch used to render its own "the draft
+    // hasn't started yet" line, gated on the RAW connection state.
+    // Two defects in one: (a) raw state flaps every poll cycle, so
+    // the line flickered between two strings — the exact disease the
+    // lobby latch fixed one component up; (b) it narrated the
+    // pre-start state UNDERNEATH DraftLobbyV2, which already owns
+    // that surface completely (headline, format strip, draft order,
+    // Start button). Duplicate narration is how the doubled
+    // "RETRY NOW" banner happened.
+    //
+    // While pre-ignition (latched, so poll blips cannot flap it), the
+    // body renders NOTHING and the lobby is the single voice.
+    if (waitingForStart) {
+      return null;
     }
     return (
       <div className="text-muted-foreground" data-testid="draft-loading">

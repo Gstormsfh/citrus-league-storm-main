@@ -28,6 +28,7 @@ import {
 // errors. The 2026-08-15 sweep that introduced API_BASE_URL missed this
 // file. Prefixed with API_BASE_URL, matching PoolPlayoffRoster.tsx.
 import { API_BASE_URL } from '@/api/client';
+import { onTeamColor } from '@/utils/teamColorContrast';
 
 interface Seed {
   team_id: number;
@@ -390,7 +391,7 @@ function BracketTeamRow({
       {info && <TeamColorBar abbrev={info.abbrev} className="!h-full !w-1" />}
       <div
         className="w-8 h-8 rounded ring-1 ring-white/20 flex items-center justify-center text-[9px] font-jbmono font-black text-white flex-shrink-0"
-        style={{ background: info?.primaryColor || '#6b7280' }}
+        style={{ background: info?.primaryColor || '#6b7280', color: onTeamColor(info?.primaryColor || '#6b7280') }}
       >
         {team.team_abbrev}
       </div>

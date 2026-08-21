@@ -25,6 +25,7 @@ import {
   LivePulse,
   PickemIcon,
 } from '@/components/citrus2';
+import { onTeamColor } from '@/utils/teamColorContrast';
 
 function getInfo(a: string) {
   return getTeamInfo(a) || { abbrev: a, name: a, fullName: a, primaryColor: '#666', secondaryColor: '#999' };
@@ -112,7 +113,7 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
       >
         {/* Monogram */}
         <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-[9px] shrink-0 shadow-sm"
-          style={{ background: away.primaryColor }}>
+          style={{ background: away.primaryColor, color: onTeamColor(away.primaryColor) }}>
           {game.away_team}
         </div>
         {/* Name + record */}
@@ -136,7 +137,7 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         )}
         {isLive && <span className="font-bold text-lg shrink-0 text-pastel-orange tabular-nums">{game.away_score}</span>}
         {pickedAway && !isFinal && !isLive && (
-          <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: away.primaryColor }}>
+          <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: away.primaryColor, color: onTeamColor(away.primaryColor) }}>
             <Check className="w-2.5 h-2.5 text-white" aria-hidden="true" />
           </div>
         )}
@@ -205,7 +206,7 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         disabled={!!locked}
       >
         <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-[9px] shrink-0 shadow-sm"
-          style={{ background: home.primaryColor }}>
+          style={{ background: home.primaryColor, color: onTeamColor(home.primaryColor) }}>
           {game.home_team}
         </div>
         <div className="flex-1 text-left min-w-0">
@@ -227,7 +228,7 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         )}
         {isLive && <span className="font-bold text-lg shrink-0 text-pastel-orange tabular-nums">{game.home_score}</span>}
         {pickedHome && !isFinal && !isLive && (
-          <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: home.primaryColor }}>
+          <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: home.primaryColor, color: onTeamColor(home.primaryColor) }}>
             <Check className="w-2.5 h-2.5 text-white" aria-hidden="true" />
           </div>
         )}

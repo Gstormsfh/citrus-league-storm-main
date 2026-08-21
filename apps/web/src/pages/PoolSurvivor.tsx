@@ -23,6 +23,7 @@ import {
   GlowCard,
   SurvivorIcon,
 } from '@/components/citrus2';
+import { onTeamColor } from '@/utils/teamColorContrast';
 
 const NHL_TEAMS = [
   'ANA','BOS','BUF','CGY','CAR','CHI','COL','CBJ','DAL','DET','EDM','FLA',
@@ -230,7 +231,7 @@ const PoolSurvivor = () => {
                             className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs tracking-wide shadow-sm ${
                               isSelected ? 'bg-white/20 text-white' : isUsed ? 'bg-white/10 text-white/55' : 'text-white'
                             }`}
-                            style={!isSelected && !isUsed ? { background: info.primaryColor } : {}}
+                            style={!isSelected && !isUsed ? { background: info.primaryColor, color: onTeamColor(info.primaryColor) } : {}}
                           >
                             {team}
                           </div>
@@ -277,7 +278,7 @@ const PoolSurvivor = () => {
                         <span className="flex items-center gap-2">
                           <span className="font-jbmono text-[10px] uppercase tracking-wider text-white/55">Selected:</span>
                           <span className="inline-flex items-center gap-1.5 font-bold text-white px-2.5 py-0.5 rounded-md text-xs"
-                            style={{ background: getInfo(selectedTeam).primaryColor }}>
+                            style={{ background: getInfo(selectedTeam).primaryColor, color: onTeamColor(getInfo(selectedTeam).primaryColor) }}>
                             {selectedTeam} {getInfo(selectedTeam).name}
                           </span>
                         </span>
@@ -345,7 +346,7 @@ const PoolSurvivor = () => {
                             <TableCell className="text-right hidden sm:table-cell">
                               {s.current_pick ? (
                                 <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-md text-white"
-                                  style={{ background: getInfo(s.current_pick).primaryColor }}>
+                                  style={{ background: getInfo(s.current_pick).primaryColor, color: onTeamColor(getInfo(s.current_pick).primaryColor) }}>
                                   {s.current_pick}
                                 </span>
                               ) : <span className="text-white/55">-</span>}

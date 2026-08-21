@@ -34,6 +34,7 @@ import { logger } from '@/utils/logger';
 // errors. The 2026-08-15 sweep that introduced API_BASE_URL missed this
 // file. Prefixed with API_BASE_URL, matching PoolPlayoffRoster.tsx.
 import { API_BASE_URL } from '@/api/client';
+import { onTeamColor } from '@/utils/teamColorContrast';
 
 interface Team {
   id: string;
@@ -570,7 +571,7 @@ export default function PoolPlayoffHub() {
                                 <div className="grid grid-cols-[1fr_auto_1fr] items-stretch">
                                   <div
                                     className="flex items-center justify-center py-3 px-2 text-white font-calistoga font-black text-xl tracking-tight"
-                                    style={{ background: awayInfo?.primaryColor || '#7A9B7A' }}
+                                    style={{ background: awayInfo?.primaryColor || '#7A9B7A', color: onTeamColor(awayInfo?.primaryColor || '#7A9B7A') }}
                                   >
                                     {g.away_team}
                                   </div>
@@ -602,7 +603,7 @@ export default function PoolPlayoffHub() {
                                   </div>
                                   <div
                                     className="flex items-center justify-center py-3 px-2 text-white font-calistoga font-black text-xl tracking-tight"
-                                    style={{ background: homeInfo?.primaryColor || '#7A9B7A' }}
+                                    style={{ background: homeInfo?.primaryColor || '#7A9B7A', color: onTeamColor(homeInfo?.primaryColor || '#7A9B7A') }}
                                   >
                                     {g.home_team}
                                   </div>
@@ -824,7 +825,7 @@ export default function PoolPlayoffHub() {
                               <>
                                 <div
                                   className="w-7 h-7 rounded flex items-center justify-center text-[9px] font-calistoga font-black text-white flex-shrink-0"
-                                  style={{ background: pickedInfo.primaryColor }}
+                                  style={{ background: pickedInfo.primaryColor, color: onTeamColor(pickedInfo.primaryColor) }}
                                 >
                                   {pickedInfo.abbrev}
                                 </div>

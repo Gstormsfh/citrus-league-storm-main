@@ -26,6 +26,7 @@ import {
   LivePulse,
   XGModelIcon,
 } from '@/components/citrus2';
+import { onTeamColor } from '@/utils/teamColorContrast';
 
 interface PickWithConfidence {
   game_id: string;
@@ -62,7 +63,7 @@ function TeamMonogram({ abbrev, size = 36 }: { abbrev: string; size?: number }) 
   const info = getInfo(abbrev);
   return (
     <div className="rounded-lg flex items-center justify-center font-bold text-white tracking-wide shadow-sm"
-      style={{ width: size, height: size, background: info.primaryColor, fontSize: size * 0.32 }}>
+      style={{ width: size, height: size, background: info.primaryColor, fontSize: size * 0.32, color: onTeamColor(info.primaryColor) }}>
       {abbrev}
     </div>
   );

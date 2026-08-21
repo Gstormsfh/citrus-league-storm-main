@@ -255,6 +255,28 @@ if [ -z "${SUPABASE_ANON_KEY}" ]; then
 fi
 echo "  loaded (length ${#SUPABASE_ANON_KEY})"
 
+# ── Step 3a: secrets fingerprint (2026-08-19) ─────────────────────────────────
+# WHY: the Step 4c idempotency skip below used to consider ONLY image
+# digests and the Caddyfile. Secrets are baked into the container env
+# at `docker run`, so a secret rotation followed by a VM reboot hit the
+# skip branch (or --restart=always simply resurrected the old
+# container) and the engine kept running with the STALE value forever.
+#
+# Measured in prod, 2026-08-19: supabase-db-url was corrected in Secret
+# Manager at ~21:15Z and the VM was stop/started - the engine came back
+# still holding the old password (container created=05:31Z,
+# started=21:26Z). Combined with Supabase's fail2ban (bans the IP after
+# 2 straight failed logins), that produced 16 hours of
+# connect ECONNREFUSED with green health checks.
+#
+# THE FIX: fingerprint the secret VALUES into a sha256 (values are
+# never logged - only the hash), stamp it on the container as a label
+# at run time, and require the running container's label to match
+# before taking the idempotent-skip branch. A rotated secret now forces
+# a replace on the next converge; an unchanged stack still skips.
+SECRETS_SHA="$(printf '%s' "${SUPABASE_JWT_SECRET}${SUPABASE_DB_URL}${SUPABASE_SERVICE_ROLE_KEY}${SUPABASE_ANON_KEY}${SUPABASE_URL_VALUE}" | sha256sum | awk '{print $1}')"
+echo "  secrets fingerprint: ${SECRETS_SHA:0:12}..."
+
 # ── Step 3b: Pre-flight assertions ───────────────────────────────────
 # Fail-loud on misconfigurations BEFORE attempting to start the
 # container. Most important: block pooled SUPABASE_DB_URL patterns
@@ -368,10 +390,15 @@ if [ -n "${RUNNING_CONTAINER_ID}" ] && [ -n "${RUNNING_CADDY_ID}" ]; then
   CURRENT_IMAGE_DIGEST="$(docker image inspect --format='{{.Id}}' "${IMAGE_URI}" 2>/dev/null || echo "")"
   RUNNING_CADDY_DIGEST="$(docker inspect --format='{{.Image}}' "${RUNNING_CADDY_ID}" 2>/dev/null || echo "")"
   CURRENT_CADDY_DIGEST="$(docker image inspect --format='{{.Id}}' "${CADDY_IMAGE}" 2>/dev/null || echo "")"
+  # 2026-08-19: the running engine's secrets fingerprint. Empty on
+  # containers created before this patch, which correctly forces one
+  # replace and self-heals the fleet onto labeled containers.
+  RUNNING_SECRETS_SHA="$(docker inspect --format='{{index .Config.Labels "secrets-sha"}}' "${RUNNING_CONTAINER_ID}" 2>/dev/null || echo "")"
   if [ -n "${RUNNING_IMAGE_DIGEST}" ] && [ -n "${CURRENT_IMAGE_DIGEST}" ] && \
      [ -n "${RUNNING_CADDY_DIGEST}" ] && [ -n "${CURRENT_CADDY_DIGEST}" ] && \
      [ "${RUNNING_IMAGE_DIGEST}" = "${CURRENT_IMAGE_DIGEST}" ] && \
-     [ "${RUNNING_CADDY_DIGEST}" = "${CURRENT_CADDY_DIGEST}" ]; then
+     [ "${RUNNING_CADDY_DIGEST}" = "${CURRENT_CADDY_DIGEST}" ] && \
+     [ "${RUNNING_SECRETS_SHA}" = "${SECRETS_SHA}" ]; then
     if [ "${CADDYFILE_CHANGED}" = "true" ]; then
       # Images match but Caddyfile changed — attempt in-place reload.
       # Falls through to full replace if the reload fails.
@@ -388,7 +415,7 @@ if [ -n "${RUNNING_CONTAINER_ID}" ] && [ -n "${RUNNING_CADDY_ID}" ]; then
       exit 0
     fi
   fi
-  echo "One or both containers are on a different image. Replacing..."
+  echo "Image, Caddyfile, or secrets fingerprint changed (running secrets-sha: ${RUNNING_SECRETS_SHA:-none}). Replacing..."
 fi
 
 # ── Step 5: Stop + remove any existing containers with these names ──
@@ -427,6 +454,7 @@ docker run -d \
   --log-opt labels=app,environment \
   --label app=citrus-draft-engine \
   --label environment="${ENVIRONMENT}" \
+  --label secrets-sha="${SECRETS_SHA}" \
   -p "${HONO_HOST_PORT}:3001" \
   -p "${DRAFT_WS_HOST_PORT}:3002" \
   -e SUPABASE_JWT_SECRET="${SUPABASE_JWT_SECRET}" \
