@@ -38,7 +38,7 @@ import { ManagerPresencePanel } from '@/components/draft/v2/ManagerPresencePanel
 import { DraftBoard } from '@/components/draft/DraftBoard';
 import { PlayerPool } from '@/components/draft/PlayerPool';
 import { PlayerCardDialog } from '@/components/draft/PlayerCardDialog';
-import { ScoringCalculator } from '@citrus/shared';
+import { ScoringCalculator, type ScoringSettings } from '@citrus/shared';
 import { DraftHistory } from '@/components/draft/DraftHistory';
 import { TeamRosters } from '@/components/draft/TeamRosters';
 import { DraftQueue } from '@/components/draft/DraftQueue';
@@ -1239,6 +1239,34 @@ function MainTabs({
 }: MainTabsProps) {
   const derived = useDerivedDraftState();
   const snapshot = useDraftSnapshot();
+
+  // LEAGUE-SCORING WIRE (2026-08-23 final audit): the pool previously
+  // ranked EVERY league with DEFAULT_SCORING — a custom league (e.g.
+  // 1 pt G / 1 pt A) drafted off rankings computed for the default
+  // categories. One GET at mount; ScoringCalculator accepts the raw
+  // leagues.scoring_settings JSON. Fetch failure falls back to default
+  // scoring — never block the pool on this request.
+  const [leagueScoring, setLeagueScoring] = useState<ScoringSettings | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { apiClient } = await import('@/api/client');
+        const response = await apiClient.get<{ scoring_settings?: ScoringSettings | null }>(
+          `/api/leagues/${encodeURIComponent(leagueId)}`,
+        );
+        const payload = (response.data ?? response) as { scoring_settings?: ScoringSettings | null };
+        if (!cancelled && payload?.scoring_settings) {
+          setLeagueScoring(payload.scoring_settings);
+        }
+      } catch {
+        /* default scoring remains */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
   // Entry 87 Fix C — clamp source for OnClockActionBar's countdown.
   // Same store selector StickyHeader reads for DraftTimerV2 so the
   // sticky bar and the header timer agree frame-for-frame.
@@ -1541,10 +1569,11 @@ function MainTabs({
       const queuedId = queue.find(id => availSet.has(id));
       let target = queuedId ? availablePlayers.find(p => p.id === queuedId) : undefined;
       if (!target) {
-        // Mirror PlayerPool's rankMap: season FPTS via the default
-        // ScoringCalculator (v2 passes no league scoringSettings to the
-        // pool either, so this matches the visible #1 exactly).
-        const scorer = new ScoringCalculator(undefined);
+        // Mirror PlayerPool's rankMap: season FPTS via the LEAGUE's
+        // scoring settings (wired 2026-08-23 — both the pool and this
+        // fallback previously used default scoring for every league),
+        // so autodraft still matches the visible #1 exactly.
+        const scorer = new ScoringCalculator(leagueScoring ?? undefined);
         const scored = availablePlayers.map((p) => {
           const isG = p.position === 'G';
           const f = scorer.calculatePoints(
@@ -1586,7 +1615,7 @@ function MainTabs({
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [autodraftOn, amIOnClock, isSubmitPending, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool, rosterCaps, myTeamId, playersById]);
+  }, [autodraftOn, amIOnClock, isSubmitPending, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool, rosterCaps, myTeamId, playersById, leagueScoring]);
 
   return (
     <div className="space-y-3">
@@ -1703,6 +1732,9 @@ function MainTabs({
               onRetryLoad={onRetryPlayers}
               isYourTurn={amIOnClock}
               isSubmitPending={isSubmitPending}
+              /* LEAGUE-SCORING WIRE (2026-08-23) — rankings/FPTS follow
+                 this league's categories instead of default scoring. */
+              scoringSettings={leagueScoring}
               /* QUEUE-REACH (2026-08-13) — the two props that make the
                  per-row star appear. `onAddToQueue` is optional in
                  PlayerPool and the star is gated on it being defined,

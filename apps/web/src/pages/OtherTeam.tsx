@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import { PlayerService } from '@/services/PlayerService';
 import { LeagueService, Team, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
 import { DemoLeagueService } from '@/services/DemoLeagueService';
-import { DraftService } from '@/services/DraftService';
+import { MatchupService } from '@/services/MatchupService';
 import { ScheduleService } from '@/services/ScheduleService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
@@ -329,62 +329,22 @@ const OtherTeam = () => {
 
         // Get all players from staging files
         const allPlayers = await PlayerService.getAllPlayers();
-        
-        // Get draft picks for this team
-        const { picks: draftPicks } = await DraftService.getDraftPicks(activeLeagueId, user.id);
-        const teamPicks = draftPicks.filter(p => p.team_id === teamId);
-        
-        if (teamPicks.length === 0) {
+
+        // CURRENT roster — roster_assignments via the admin-backed API,
+        // with a draft_picks fallback inside MatchupService.getTeamRoster.
+        // (Found in the 2026-08-23 final audit: this page previously
+        // mapped draft_picks directly, which renders the DRAFT-DAY
+        // roster — stale after any trade/waiver/FA move, and empty for
+        // leagues whose rosters weren't built by an engine draft.)
+        const transformedPlayers: HockeyPlayer[] =
+          await MatchupService.getTeamRoster(teamId, activeLeagueId, allPlayers);
+
+        if (transformedPlayers.length === 0) {
+          logger.error(`OtherTeam: Team ${teamId} - no players on current roster.`);
           setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
           setLoading(false);
           return;
         }
-
-        // Map draft picks to players
-        const playerIds = teamPicks.map(p => p.player_id);
-        const teamPlayers = allPlayers.filter(p => playerIds.includes(p.id));
-
-        // CRITICAL: If no players loaded, something is wrong - log and return
-        if (teamPlayers.length === 0) {
-          logger.error(`OtherTeam: Team ${teamId} - ❌ NO PLAYERS LOADED! This team has no players assigned.`);
-          setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
-          setLoading(false);
-          return;
-        }
-
-        // Transform players from staging files to HockeyPlayer format
-        // All data (names, stats, positions, teams) comes from staging files via PlayerService
-        const transformedPlayers: HockeyPlayer[] = teamPlayers.map((p) => ({
-          id: p.id,
-          name: p.full_name, // From staging file
-          position: p.position, // From staging file
-          number: parseInt(p.jersey_number || '0'), // Jersey numbers not in staging, default to 0
-          starter: false,
-          stats: {
-            gamesPlayed: p.games_played || 0,
-            goals: p.goals || 0,
-            assists: p.assists || 0,
-            points: p.points || 0,
-            plusMinus: p.plus_minus || 0,
-            shots: p.shots || 0,
-            hits: p.hits || 0,
-            blockedShots: p.blocks || 0,
-            xGoals: p.xGoals || 0,
-            // corsi/fenwick intentionally removed
-            wins: p.wins || 0,
-            losses: p.losses || 0,
-            otl: p.ot_losses || 0,
-            gaa: p.goals_against_average || 0,
-            savePct: p.save_percentage || 0,
-            shutouts: 0
-          },
-          team: p.team,
-          teamAbbreviation: p.team,
-          status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
-          image: p.headshot_url || undefined,
-          nextGame: undefined, // Will be populated below with real schedule data
-          projectedPoints: 0 // Will be set by daily projections system
-        }));
 
         // Load real NHL schedule data for players (batch instead of per-team)
         const userTimezone = profile?.timezone || 'America/Denver';

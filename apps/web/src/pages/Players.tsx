@@ -339,6 +339,10 @@ const Players = () => {
     const p = searchParams.get('player');
     return p ? parseInt(p, 10) || null : null;
   });
+  // Mobile-only overlay for the dashboard panel (opened by a row tap,
+  // never on load — `selected` defaults to the top scorer, which must
+  // not auto-open a sheet).
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -402,6 +406,9 @@ const Players = () => {
 
   const selectPlayer = (p: DashboardPlayer) => {
     setSelectedId(p.id);
+    // Below lg the dashboard panel sits under the 400-row table where a
+    // tap looks like a no-op — surface it as an overlay instead.
+    setMobilePanelOpen(true);
     const next = new URLSearchParams(searchParams);
     next.set('player', String(p.id));
     setSearchParams(next, { replace: true });
@@ -510,7 +517,10 @@ const Players = () => {
                 <table className="w-full text-sm" data-testid="players-table">
                   <thead>
                     <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                      <th className="sticky top-0 z-10 bg-card px-3 py-2.5">Player</th>
+                      {/* Sticky LEFT as well as top: at phone widths the table
+                          scrolls horizontally inside its container — the name
+                          column must stay in view or swiped stats lose context. */}
+                      <th className="sticky left-0 top-0 z-20 bg-card px-3 py-2.5">Player</th>
                       <th className="sticky top-0 z-10 bg-card px-2 py-2.5 text-right">GP</th>
                       {(group === 'skaters' ? skaterCols : goalieCols).map((col) => (
                         <th key={col.key} className="sticky top-0 z-10 bg-card px-2 py-2.5 text-right">
@@ -539,10 +549,10 @@ const Players = () => {
                           selected?.id === p.id ? 'bg-white/10' : ''
                         }`}
                       >
-                        <td className="px-3 py-2">
+                        <td className={`sticky left-0 z-10 px-3 py-2 ${selected?.id === p.id ? 'bg-muted' : 'bg-card'}`}>
                           <div className="flex items-center gap-2.5">
                             <Headshot player={p} size="sm" />
-                            <div className="min-w-0">
+                            <div className="min-w-0 max-w-[160px]">
                               <div className="truncate font-medium">{p.name}</div>
                               <div className="text-xs text-muted-foreground">
                                 {p.team} · #{p.jersey ?? '—'} · {p.position}
@@ -599,7 +609,7 @@ const Players = () => {
               )}
             </Card>
 
-            <div className="lg:sticky lg:top-4 lg:order-2">
+            <div className="hidden lg:block lg:sticky lg:top-4 lg:order-2">
               {selected ? (
                 <PlayerDashboardPanel player={selected} skaters={skaters} goalies={goalies} />
               ) : (
@@ -607,6 +617,26 @@ const Players = () => {
                   Select a player to open their dashboard.
                 </Card>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Below lg: the side panel above is hidden, so a row tap opens the
+            same dashboard as a dismissible overlay sheet. */}
+        {mobilePanelOpen && selected && (
+          <div
+            className="lg:hidden fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm p-3"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setMobilePanelOpen(false)}
+          >
+            <div className="mx-auto mb-10 mt-4 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-2 flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => setMobilePanelOpen(false)}>
+                  Close
+                </Button>
+              </div>
+              <PlayerDashboardPanel player={selected} skaters={skaters} goalies={goalies} />
             </div>
           </div>
         )}

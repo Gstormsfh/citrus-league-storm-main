@@ -87,6 +87,27 @@ export function getSeasonYearForDate(d: Date): number {
   return _deriveNhlSeasonYear(d);
 }
 
+/**
+ * The season year that ROS PROJECTIONS describe — the season being
+ * played or, in the offseason run-up (July–September, before the flip),
+ * the UPCOMING one.
+ *
+ * Why this exists (found 2026-08-23, final pre-launch audit): actuals
+ * for last season are keyed 2025 while the ingested projections for the
+ * upcoming season are keyed 2026. Any query joining projections on
+ * getCurrentSeason() reads zero rows all summer — the Players dashboard
+ * showed "—" in Proj FP for all 974 players. In-season the two keys
+ * coincide and this function equals getCurrentSeason().
+ */
+export function getProjectionsSeason(d: Date = new Date()): number {
+  const cur = _deriveNhlSeasonYear(d);
+  const byCalendar = d.getMonth() >= 9 ? d.getFullYear() : d.getFullYear() - 1;
+  // An explicit early start already flipped the derived season — keep it.
+  if (cur > byCalendar) return cur;
+  // July (6) through September (8): projections describe next season.
+  return d.getMonth() >= 6 && d.getMonth() <= 8 ? cur + 1 : cur;
+}
+
 /** The numeric season identifier used in DB queries. Evaluated at module
  * load — see LIFECYCLE CAVEAT above. Use `getCurrentSeason()` when a
  * long-lived process must pick up the Oct 1 flip without restart. */

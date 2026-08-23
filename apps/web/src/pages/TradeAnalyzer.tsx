@@ -411,7 +411,13 @@ const TradeAnalyzer = () => {
       // goalie with 31 W / 2.02 GAA next to GP 0 / SV 0 / SO 0.
       gamesPlayed: (p.position === 'G' ? (p.goalie_gp ?? p.games_played) : p.games_played) || 0,
       saves: p.saves || 0,
-      shutouts: p.shutouts || 0
+      shutouts: p.shutouts || 0,
+      // STAT-GRID FIX 2 (2026-08-23 final audit): skater special-teams +
+      // penalty stats were also never wired — McDavid's card showed PPP 0.
+      powerPlayPoints: p.ppp || 0,
+      shortHandedPoints: p.shp || 0,
+      pim: p.pim || 0,
+      xGoals: p.xGoals || 0
     },
     team: p.team,
     teamAbbreviation: p.team,

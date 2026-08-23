@@ -380,7 +380,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
               ) : !imgErr ? (
                 <img loading="lazy" decoding="async" src={teamLogoUrl} alt={teamAbbr} className="w-12 h-12 object-contain" onError={() => setImgErr(true)} />
               ) : (
-                <span className="text-2xl font-varsity font-black text-white/80">{player.number}</span>
+                <span className="text-2xl font-varsity font-black text-white/80">
+                  {player.number || (player.name || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                </span>
               )}
             </div>
 
@@ -394,7 +396,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   {posAbbr}
                 </Badge>
                 <span className="text-white/70 text-sm font-display font-medium">{player.team}</span>
-                <span className="text-white/55 text-sm">#{player.number}</span>
+                {/* Some surfaces (matchup) don't know the sweater number —
+                    hide "#0" rather than showing a wrong number. */}
+                {player.number ? <span className="text-white/55 text-sm">#{player.number}</span> : null}
               </div>
               {/* Status badge */}
               {statusInfo && (

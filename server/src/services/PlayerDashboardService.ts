@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { getCurrentSeason } from '@citrus/shared';
+import { getCurrentSeason, getProjectionsSeason } from '@citrus/shared';
 
 /**
  * PlayerDashboardService — read-model for the league-wide Players
@@ -237,7 +237,11 @@ export class PlayerDashboardService {
       selectAllPaged<StatsRow>(this.supabase, 'player_season_stats', INDEX_STATS_COLS, season),
       selectAllPaged<GarRow>(this.supabase, 'player_gar_components', GAR_COLS, season),
       selectAllPaged<TalentRow>(this.supabase, 'player_talent_metrics', TALENT_COLS, season),
-      selectAllPaged<RosRow>(this.supabase, 'player_ros_projections', ROS_COLS, season),
+      // Projections are keyed to the season they DESCRIBE — in the
+      // offseason that's the upcoming season, not `season` (which still
+      // points at last season's actuals). Joining on `season` here read
+      // zero rows all summer → "Proj FP —" for every player.
+      selectAllPaged<RosRow>(this.supabase, 'player_ros_projections', ROS_COLS, getProjectionsSeason()),
     ]);
 
     const firstError = dirRes.error || statsRes.error || garRes.error || talentRes.error || rosRes.error;

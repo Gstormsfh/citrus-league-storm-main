@@ -1404,7 +1404,9 @@ const FreeAgents = () => {
                         <div className="md:hidden">
                           {topTrending.map(player => (
                             <div key={player.id} className="p-3 border-b flex items-center justify-between">
-                              <div className="flex flex-col">
+                              {/* Name opens the fantasy card — parity with the desktop
+                                  table and the main Available list (mobile). */}
+                              <div className="flex flex-col cursor-pointer active:opacity-70" role="button" tabIndex={0} onClick={() => handlePlayerClick(player)} onKeyDown={(e) => { if (e.key === 'Enter') handlePlayerClick(player); }}>
                                 <span className="font-medium">{player.full_name}</span>
                                 <span className="text-xs text-white/55">{formatPositionForDisplay(player.position)} • {player.team}</span>
                               </div>
@@ -1497,7 +1499,8 @@ const FreeAgents = () => {
                         <div className="md:hidden">
                           {topProjected.map(player => (
                             <div key={player.id} className="p-2 border-b flex items-center gap-2">
-                              <div className="flex-1 min-w-0">
+                              {/* Name opens the fantasy card — parity with desktop. */}
+                              <div className="flex-1 min-w-0 cursor-pointer active:opacity-70" role="button" tabIndex={0} onClick={() => handlePlayerClick(player)} onKeyDown={(e) => { if (e.key === 'Enter') handlePlayerClick(player); }}>
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium text-sm truncate">{player.full_name}</span>
                                   <span className="text-[11px] text-white/55 shrink-0">{formatPositionForDisplay(player.position)}</span>

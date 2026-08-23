@@ -1087,7 +1087,12 @@ const Matchup = () => {
       team: p.team,
       teamAbbreviation: p.team,
       status: null, // Game status not applicable here - use roster_status for IR/SUSP/GTD
-      image: undefined,
+      // Mugshot: prefer whatever the payload carried; otherwise build the
+      // NHL CDN "latest" mug from the player id. PlayerStatsModal has an
+      // onError fallback chain (team logo → initials) if the URL 404s.
+      image: (p as unknown as { image?: string }).image
+        ?? (p as unknown as { headshot_url?: string }).headshot_url
+        ?? (p.id ? `https://assets.nhle.com/mugs/nhl/latest/${p.id}.png` : undefined),
       projectedPoints: 0
     };
   };
