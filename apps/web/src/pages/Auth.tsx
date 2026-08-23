@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Mail, Lock, HelpCircle, Chrome, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, HelpCircle, Chrome, Apple, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
 import Navbar from '@/components/Navbar';
 import {
@@ -98,10 +98,12 @@ const Auth = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
           });
-          const info = (await res.json())?.data || (await res.json());
+          const body = await res.json();
+          const info = body?.data || body;
           if (info?.exists && !info.has_password) {
             const oauthProviders = (info.providers || []).filter((p: string) => p !== 'email');
             if (oauthProviders.includes('google')) { setError("This email signed up with Google — click 'Continue with Google' above."); setLoading(false); return; }
+            if (oauthProviders.includes('apple')) { setError("This email signed up with Apple — click 'Continue with Apple' above."); setLoading(false); return; }
             if (oauthProviders.length > 0) { setError(`This email signed up with ${oauthProviders[0]} — use that option above.`); setLoading(false); return; }
           }
         } catch { /* fall through */ }
@@ -183,14 +185,18 @@ const Auth = () => {
     }
   };
 
-  const handleOAuthSignIn = async (provider: 'google') => {
+  const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
     setError(null);
     setOauthLoading(provider);
+    const providerLabel = provider === 'apple' ? 'Apple' : 'Google';
     try {
       const { error } = await signInWithOAuth(provider);
-      if (error) { setError(error.message || `Couldn't reach ${provider} — try again in a moment.`); setOauthLoading(null); }
+      // Route through getBetterErrorMessage so a provider that is not yet
+      // enabled in Supabase degrades to warm copy ("That sign-in method
+      // isn't hooked up yet…") instead of a raw API string.
+      if (error) { setError(getBetterErrorMessage(error.message || `Couldn't reach ${providerLabel} — try again in a moment.`)); setOauthLoading(null); }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : `Couldn't reach ${provider} — try again in a moment.`;
+      const errorMessage = err instanceof Error ? getBetterErrorMessage(err.message) : `Couldn't reach ${providerLabel} — try again in a moment.`;
       setError(errorMessage);
       setOauthLoading(null);
     }
@@ -252,6 +258,15 @@ const Auth = () => {
               </TabsList>
 
               <TabsContent value="signin" className="space-y-4 mt-0">
+                {/* App Review 4.8: a third-party login (Google) requires an
+                    equivalent privacy-focused option — Sign in with Apple.
+                    Apple's HIG: never render its button less prominently
+                    than other providers, hence first + brand-white style. */}
+                <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('apple')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'apple'} className="bg-white text-[#111111] ring-white/80 hover:bg-white/90 hover:text-black hover:ring-white">
+                  {oauthLoading !== 'apple' && <Apple className="w-4 h-4 fill-current" />}
+                  Continue with Apple
+                </CitrusButton>
+
                 <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('google')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'google'}>
                   {oauthLoading !== 'google' && <Chrome className="w-4 h-4" />}
                   Continue with Google
@@ -333,6 +348,11 @@ const Auth = () => {
               </TabsContent>
 
               <TabsContent value="signup" className="space-y-4 mt-0">
+                <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('apple')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'apple'} className="bg-white text-[#111111] ring-white/80 hover:bg-white/90 hover:text-black hover:ring-white">
+                  {oauthLoading !== 'apple' && <Apple className="w-4 h-4 fill-current" />}
+                  Continue with Apple
+                </CitrusButton>
+
                 <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('google')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'google'}>
                   {oauthLoading !== 'google' && <Chrome className="w-4 h-4" />}
                   Continue with Google

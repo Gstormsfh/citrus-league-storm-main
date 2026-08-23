@@ -576,138 +576,83 @@ export const PlayerPool = memo(({
         </Button>
       </div>
 
-      {/* Mobile: Table view with unified horizontal scroll — scrolls all players as one */}
+      {/* MOBILE CARDS (2026-08-23, launch QA): the phone view used to be a
+          900px-wide 11px-font stats table squeezed behind a horizontal
+          scroll — dense to the point of unusable on draft night. Phones now
+          get card rows: name + key stats + FPTS headline + the same select/
+          queue/card/draft affordances. The full stats table remains the
+          desktop (md+) experience below. */}
       <div className="md:hidden border border-white/10 rounded-lg bg-pastel-surface-tile text-pastel-cream backdrop-blur-sm min-w-0">
-        <div className="overflow-x-auto scrollbar-styled" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <table className="w-full min-w-[900px] text-sm border-collapse">
-            <thead className="bg-pastel-surface-high/60 border-b border-white/10">
-              <tr>
-                <th className="px-1 py-1.5 text-center font-semibold text-pastel-cream sticky left-0 bg-pastel-surface-high z-10 w-[32px] text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projRank')}>#</th>
-                <th className="px-2 py-1.5 text-left font-semibold text-pastel-cream sticky left-[32px] bg-pastel-surface-high z-10 min-w-[100px] text-xs">Player</th>
-                {selectedPosition === 'G' ? (
-                  <>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('wins')}>W</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('losses')}>L</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('gaa')}>GAA</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('savePct')}>SV%</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('saves')}>SV</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('shutouts')}>SO</th>
-                  </>
-                ) : (
-                  <>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('points')}>PTS</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('goals')}>G</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('assists')}>A</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('plusMinus')}>+/-</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('ppp')}>PPP</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('shp')}>SHP</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('shots')}>SOG</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('hits')}>HIT</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('blocks')}>BLK</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('pim')}>PIM</th>
-                    <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px] cursor-pointer" onClick={() => handleHeaderClick('xGoals')}>xG</th>
-                  </>
+        <div className="divide-y divide-white/5">
+          {visiblePlayers.map((player, index) => {
+            const isSelected = selectedPlayer?.id === player.id;
+            const isDrafted = draftedSet.has(player.id);
+            const isInQueue = queue.includes(player.id);
+            const fpts = fptsMap.get(player.id) || 0;
+            const ros = projectedFptsMap.get(player.id)?.total || 0;
+            return (
+              <div
+                key={player.id}
+                className={cn(
+                  'flex items-center gap-2.5 px-3 py-2.5 transition-colors active:bg-pastel-surface-high/60',
+                  !isDrafted && 'cursor-pointer',
+                  isSelected && 'bg-fantasy-primary/10 ring-1 ring-inset ring-fantasy-primary/40',
+                  isDrafted && 'opacity-40'
                 )}
-                <th className="px-1.5 py-1.5 text-center font-bold text-emerald-300 bg-emerald-500/10 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('fpts')}>FPTS</th>
-                <th className="px-1.5 py-1.5 text-center font-bold text-emerald-300 bg-emerald-500/10 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('fptsPerGp')}>F/GP</th>
-                <th className="px-1.5 py-1.5 text-center font-bold text-sky-300 bg-sky-500/10 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projFpts')} title="Rest-of-season projected fantasy points">ROS</th>
-                <th className="px-1.5 py-1.5 text-center font-bold text-sky-300 bg-sky-500/10 text-[11px] cursor-pointer" onClick={() => handleHeaderClick('projFptsPerGp')} title="Projected fantasy points per game (rest of season)">P/GP</th>
-                <th className="px-1.5 py-1.5 text-center font-semibold text-pastel-cream text-[11px]"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {visiblePlayers.map((player, index) => {
-                const isSelected = selectedPlayer?.id === player.id;
-                const isDrafted = draftedSet.has(player.id);
-                const isInQueue = queue.includes(player.id);
-                return (
-                  <tr
-                    key={player.id}
-                    className={cn(
-                      'border-b border-white/5 transition-colors cursor-pointer active:bg-pastel-surface-high/60',
-                      isSelected && 'bg-fantasy-primary/10',
-                      isDrafted && 'opacity-40'
-                    )}
-                    onClick={() => !isDrafted && onPlayerSelect(player)}
-                  >
-                    <td className="px-1 py-1.5 text-center w-[32px] sticky left-0 bg-pastel-surface-tile z-10 text-pastel-cream">
-                      <span className="text-[10px] font-mono text-pastel-cream font-bold">{index + 1}</span>
-                    </td>
-                    <td className="px-1.5 py-1.5 sticky left-[32px] bg-pastel-surface-tile z-10 text-pastel-cream">
-                      <div className="flex items-center gap-1">
-                        {isInQueue && <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />}
-                        <span className="font-medium text-xs truncate max-w-[100px]">{player.full_name}</span>
-                        <Badge variant="outline" className="text-[9px] px-0.5 py-0 flex-shrink-0">{normalizePosition(player.position)}</Badge>
-                      </div>
-                    </td>
+                onClick={() => !isDrafted && onPlayerSelect(player)}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-mono font-bold text-pastel-cream/40 flex-shrink-0">{index + 1}</span>
+                    {isInQueue && <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />}
+                    <span className="font-semibold text-[13px] text-pastel-cream truncate">{player.full_name}</span>
+                    <Badge variant="outline" className="text-[9px] px-1 py-0 flex-shrink-0">{normalizePosition(player.position)}</Badge>
+                    <span className="text-[10px] text-pastel-cream/55 flex-shrink-0 hidden min-[360px]:inline">{player.team}</span>
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-pastel-cream/60 tabular-nums truncate">
                     {player.position === 'G' ? (
-                      <>
-                        <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-pastel-cream">{player.wins || 0}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.losses || 0}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'}%</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.saves || 0}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.shutouts || 0}</td>
-                      </>
+                      <>{player.wins || 0} W · {player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'} GAA · {player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'} SV% · {player.shutouts || 0} SO</>
                     ) : (
-                      <>
-                        <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-pastel-cream">{player.points}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.goals}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.assists}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.plus_minus > 0 ? '+' : ''}{player.plus_minus}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.ppp || 0}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.shp || 0}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.shots}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.hits}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.blocks}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream">{player.pim || 0}</td>
-                        <td className="px-1.5 py-1 text-[11px] text-center text-pastel-cream/70">{player.xGoals.toFixed(1)}</td>
-                      </>
+                      <>{player.goals} G · {player.assists} A · {player.points} PTS · {player.shots} SOG</>
                     )}
-                    <td className="px-1.5 py-1 text-[11px] text-center font-bold text-emerald-300 bg-emerald-500/10">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
-                    <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-emerald-300 bg-emerald-500/10">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(1) : '-'}</td>
-                    <td className="px-1.5 py-1 text-[11px] text-center font-bold text-sky-300 bg-sky-500/10">{(projectedFptsMap.get(player.id)?.total || 0) > 0 ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
-                    <td className="px-1.5 py-1 text-[11px] text-center font-semibold text-sky-300 bg-sky-500/10">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(1) : '-'}</td>
-                    <td className="px-1.5 py-1 text-pastel-cream" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-0.5">
-                        {onShowCard && (
-                          <Button variant="ghost" size="sm" className="h-9 w-9 p-0"
-                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onShowCard(player); }}
-                            title={`View ${player.full_name} card`}
-                            aria-label={`View ${player.full_name} player card`}
-                            data-testid="pool-row-card-button">
-                            <Info className="h-4 w-4 text-pastel-cream/70" />
-                          </Button>
-                        )}
-                        {onAddToQueue && (
-                          <Button variant="ghost" size="sm" className="h-9 w-9 p-0"
-                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onAddToQueue(player.id); }}
-                            title={isInQueue ? 'Remove from queue' : 'Add to queue'}
-                            aria-label={
-                              isInQueue
-                                ? `Remove ${player.full_name} from your queue`
-                                : `Add ${player.full_name} to your queue`
-                            }
-                            aria-pressed={isInQueue}
-                            data-testid="pool-queue-star">
-                            <Star className={cn("h-4 w-4", isInQueue ? "fill-fantasy-tertiary text-fantasy-tertiary" : "text-pastel-cream/70")} />
-                          </Button>
-                        )}
-                        {(isSelected || isYourTurn) && isDraftActive && !isDrafted && (
-                          <Button size="sm" className="h-7 px-2 text-[10px] bg-fantasy-primary hover:bg-fantasy-primary/90"
-                            disabled={isSubmitPending}
-                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onPlayerDraft(player); }}
-                            data-testid="pool-row-draft-button">
-                            {isSubmitPending ? 'Submitting…' : 'Draft'}
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+                <div className="shrink-0 text-right leading-tight">
+                  <div className="text-[15px] font-bold text-emerald-300 tabular-nums">{fpts.toFixed(1)}</div>
+                  <div className="text-[8px] uppercase tracking-wide text-pastel-cream/45">{ros > 0 ? `${ros.toFixed(0)} ros` : 'fpts'}</div>
+                </div>
+                <div className="flex shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
+                  {onShowCard && (
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onShowCard(player); }}
+                      title={`View ${player.full_name} card`}
+                      aria-label={`View ${player.full_name} player card`}
+                      data-testid="pool-row-card-button">
+                      <Info className="h-4 w-4 text-pastel-cream/70" />
+                    </Button>
+                  )}
+                  {onAddToQueue && (
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onAddToQueue(player.id); }}
+                      title={isInQueue ? 'Remove from queue' : 'Add to queue'}
+                      aria-label={isInQueue ? `Remove ${player.full_name} from your queue` : `Add ${player.full_name} to your queue`}
+                      aria-pressed={isInQueue}
+                      data-testid="pool-queue-star">
+                      <Star className={cn('h-4 w-4', isInQueue ? 'fill-fantasy-tertiary text-fantasy-tertiary' : 'text-pastel-cream/70')} />
+                    </Button>
+                  )}
+                  {(isSelected || isYourTurn) && isDraftActive && !isDrafted && (
+                    <Button size="sm" className="h-8 px-2 text-[10px] font-bold bg-fantasy-primary hover:bg-fantasy-primary/90"
+                      disabled={isSubmitPending}
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onPlayerDraft(player); }}
+                      data-testid="pool-row-draft-button">
+                      {isSubmitPending ? 'Submitting…' : 'Draft'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
         {hasMore && (
           <button

@@ -557,7 +557,13 @@ const Standings = () => {
               {/* League selector removed - use global Navbar selector instead */}
             </div>
             
-            <div className="flex items-center space-x-4 animated-element animate">
+            {/* MOBILE FIX (2026-08-23, found in the 390px sweep): this
+                toolbar is ~470px wide and its ancestor clips — on phones the
+                Season select was half-cut off the LEFT edge and Export was
+                unreachable off the RIGHT. flex-wrap lets the buttons drop to
+                a second row instead of clipping; gap replaces space-x so
+                wrapped rows keep vertical spacing too. */}
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 animated-element animate">
               <div className="w-40">
                 <Select defaultValue={season} onValueChange={setSeason}>
                   <SelectTrigger className="w-full bg-pastel-surface-tile rounded-full border-white/15 text-pastel-cream hover:border-pastel-orange/40 transition-colors">

@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { HockeyFooter } from '@/components/citrus2';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
@@ -39,7 +39,15 @@ const OtherTeam = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: profile } = useProfile();
-  const { userLeagueState, activeLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId: contextLeagueId } = useLeague();
+  // DEEP-LINK FIX (2026-08-23, found live on prod during launch QA): this
+  // page looked teams up ONLY through the global active-league context, so
+  // any /team/<id>?league=<id> link — from League Activity, a share, or a
+  // user whose context sits on a different league — rendered "Team Not
+  // Found" for a team that exists. Honor the explicit ?league= param first;
+  // the context stays the fallback for the in-app Standings click path.
+  const [searchParams] = useSearchParams();
+  const activeLeagueId = searchParams.get('league') || contextLeagueId;
   const [loading, setLoading] = useState(true);
   const [roster, setRoster] = useState<{
     starters: HockeyPlayer[];

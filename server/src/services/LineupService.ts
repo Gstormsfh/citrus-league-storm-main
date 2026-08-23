@@ -112,7 +112,42 @@ export class LineupService {
       .eq('id', leagueId)
       .single();
     const slotConfig = resolveSlotConfig(slotLeague?.settings as Record<string, unknown>);
-    const verdict = validateSlotAssignments(lineup.slot_assignments, slotConfig);
+
+    // POSITION-MATCH FIX (2026-08-23, found live on prod during launch QA):
+    // fetch each assigned player's eligible positions so the validator can
+    // reject a goalie parked in slot-C-1 (previously a 200). Dedupe by
+    // player_id — player_directory is a per-SEASON index (the same trap
+    // that half-disabled the autopick roster guard). Any read failure
+    // leaves the map empty and the validator fails OPEN on eligibility.
+    const eligibleById: Record<string, string[]> = {};
+    try {
+      const assignedIds = Object.keys(lineup.slot_assignments ?? {})
+        .map((id) => Number(id))
+        .filter((n) => Number.isFinite(n));
+      if (assignedIds.length > 0) {
+        const { data: posRows } = await this.supabase
+          .from('player_directory')
+          .select('player_id, position_code, eligible_positions')
+          .in('player_id', assignedIds);
+        const seen = new Set<number>();
+        for (const row of (posRows ?? []) as Array<{
+          player_id: number;
+          position_code: string | null;
+          eligible_positions: string[] | null;
+        }>) {
+          if (seen.has(row.player_id)) continue;
+          seen.add(row.player_id);
+          const elig = (row.eligible_positions && row.eligible_positions.length > 0)
+            ? row.eligible_positions
+            : (row.position_code ? [row.position_code] : []);
+          if (elig.length > 0) eligibleById[String(row.player_id)] = elig.map((e) => String(e).toUpperCase());
+        }
+      }
+    } catch (posErr) {
+      logger.warn('[LineupService.saveLineup] position lookup for slot validation failed open:', posErr);
+    }
+
+    const verdict = validateSlotAssignments(lineup.slot_assignments, slotConfig, eligibleById);
     if (!verdict.ok) {
       return { success: false, error: verdict.error };
     }

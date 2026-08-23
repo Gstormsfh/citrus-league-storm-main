@@ -177,3 +177,42 @@ describe('evaluateGameLock — locked at puck drop, fail-open on bad data', () =
     expect(evaluateGameLock([], 'EDM', NOON)).toBe(false);
   });
 });
+
+describe('validateSlotAssignments — position-match enforcement (POSITION-MATCH FIX 2026-08-23)', () => {
+  const cfg = { slots: { C: 2, LW: 2, RW: 2, D: 4, G: 2 }, utilCount: 1, irCount: 2 };
+
+  it('rejects a goalie parked in a center slot (the prod 200 that started this)', () => {
+    const v = validateSlotAssignments({ p1: 'slot-C-1' }, cfg, { p1: ['G'] });
+    expect(v.ok).toBe(false);
+    expect(v.error).toMatch(/cannot fill slot-C-1/i);
+  });
+
+  it('rejects a skater parked in a goalie slot', () => {
+    const v = validateSlotAssignments({ p1: 'slot-G-1' }, cfg, { p1: ['C'] });
+    expect(v.ok).toBe(false);
+  });
+
+  it('allows dual-eligibility: an LW/RW player in an RW slot', () => {
+    const v = validateSlotAssignments({ p1: 'slot-RW-1' }, cfg, { p1: ['LW', 'RW'] });
+    expect(v.ok).toBe(true);
+  });
+
+  it('allows any skater in UTIL but never a goalie', () => {
+    expect(validateSlotAssignments({ p1: 'slot-UTIL' }, cfg, { p1: ['D'] }).ok).toBe(true);
+    const v = validateSlotAssignments({ p1: 'slot-UTIL' }, cfg, { p1: ['G'] });
+    expect(v.ok).toBe(false);
+    expect(v.error).toMatch(/goalie/i);
+  });
+
+  it('accepts C/LW/RW in a forward-family F slot, rejects D and G', () => {
+    const fwd = { slots: { F: 6, D: 4, G: 2 }, utilCount: 0, irCount: 2 };
+    expect(validateSlotAssignments({ p1: 'slot-F-1' }, fwd, { p1: ['LW'] }).ok).toBe(true);
+    expect(validateSlotAssignments({ p1: 'slot-F-1' }, fwd, { p1: ['D'] }).ok).toBe(false);
+  });
+
+  it('fails OPEN when the map is absent or the player is unknown — eligibility must never block on a lookup gap', () => {
+    expect(validateSlotAssignments({ p1: 'slot-C-1' }, cfg).ok).toBe(true);
+    expect(validateSlotAssignments({ p1: 'slot-C-1' }, cfg, {}).ok).toBe(true);
+    expect(validateSlotAssignments({ p1: 'slot-C-1' }, cfg, { other: ['G'] }).ok).toBe(true);
+  });
+});

@@ -228,8 +228,14 @@ export const StormyChatBubble = () => {
         style={{
           position: 'fixed',
           bottom: isMobile ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem)' : '1.5rem',
-          right: isMobile ? '1rem' : 'auto',
-          left: isMobile ? 'auto' : '1.5rem',
+          // MOBILE FIX (2026-08-23, found in the 390px sweep): on the RIGHT
+          // edge the FAB sat directly on top of right-aligned row actions —
+          // the Free Agents "+" add buttons and Trade Center info buttons —
+          // so taps meant for those controls hit Stormy instead. Left side
+          // only overlaps avatars/names (which open the player card), the
+          // least destructive collision. Desktop already lives bottom-left.
+          left: isMobile ? '1rem' : '1.5rem',
+          right: 'auto',
           zIndex: 100,
         }}
       >

@@ -74,6 +74,17 @@ export interface SlotValidationResult {
 export function validateSlotAssignments(
   assignments: Record<string, string>,
   config: RosterSlotConfig,
+  /**
+   * POSITION-MATCH FIX (2026-08-23, found live on prod during launch QA):
+   * this validator checked that SLOTS were legal for the league but never
+   * that the PLAYER fits the slot — a direct API call could start a goalie
+   * at slot-C-1 and McDavid in net, and the save returned 200. When the
+   * caller provides eligible positions per player id, position-mismatched
+   * assignments now REJECT the save. Omitted entries (directory gaps) and
+   * an omitted map entirely fail OPEN — eligibility enforcement must never
+   * block saves because a lookup hiccuped.
+   */
+  eligibleById?: Record<string, string[]>,
 ): SlotValidationResult {
   const strip: string[] = [];
   const counts: Record<string, number> = {};
@@ -109,6 +120,38 @@ export function validateSlotAssignments(
         error: `Slot ${slotId} exceeds this league's limit of ${cap} ${pos} starter${cap === 1 ? '' : 's'}.`,
       };
     }
+
+    // POSITION-MATCH FIX (2026-08-23): the player must actually play the
+    // slot's position. UTIL accepts any skater (never a goalie); an 'F'
+    // slot (forward-family leagues) accepts C/LW/RW.
+    const eligible = eligibleById?.[playerId];
+    if (eligible && eligible.length > 0) {
+      const isGoalieOnly = eligible.every((e) => e === 'G');
+      if (pos === 'UTIL') {
+        if (isGoalieOnly) {
+          return {
+            ok: false,
+            strip,
+            error: `A goalie cannot fill a UTIL slot (${slotId}).`,
+          };
+        }
+      } else if (pos === 'F') {
+        if (!eligible.some((e) => e === 'C' || e === 'LW' || e === 'RW' || e === 'F')) {
+          return {
+            ok: false,
+            strip,
+            error: `A ${eligible.join('/')} player cannot fill forward slot ${slotId}.`,
+          };
+        }
+      } else if (!eligible.includes(pos)) {
+        return {
+          ok: false,
+          strip,
+          error: `A ${eligible.join('/')} player cannot fill ${slotId}.`,
+        };
+      }
+    }
+
     counts[pos] = (counts[pos] ?? 0) + 1;
     if (counts[pos] > cap) {
       return {
