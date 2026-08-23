@@ -183,8 +183,31 @@ export class LineupService {
     if (targetDate) {
       // Per-day isolation: ONLY write to the target date's fantasy_daily_rosters.
       // Do NOT touch any other date. Each day is independent.
-      await this.createDailyRosterSnapshots(teamId, leagueId, lineup, targetDate);
-      return { success: true, data: { ...lineup, league_id: leagueId, team_id: teamId } };
+      const wroteDaily = await this.createDailyRosterSnapshots(teamId, leagueId, lineup, targetDate);
+      if (wroteDaily) {
+        return { success: true, data: { ...lineup, league_id: leagueId, team_id: teamId } };
+      }
+      // SILENT-NO-OP FIX (2026-08-21, found live on prod during launch QA).
+      //
+      // The client ALWAYS sends target_date (Roster.tsx: selectedDate ||
+      // getTodayMST()), so this branch is the only path UI saves take. The
+      // daily-snapshot writer quietly wrote NOTHING whenever the league had
+      // no matchup for the team (schedule not generated yet) or the target
+      // date fell outside the current matchup week — which is EVERY save in
+      // EVERY league during the pre-season window. This method then returned
+      // success anyway: the user saw "Lineup Updated", the client cleared its
+      // caches and localStorage fallback, and the change evaporated on
+      // reload. Measured live: two 200 PUTs, zero rows written.
+      //
+      // When the per-day path has nowhere to write, the user's intent is
+      // unambiguous - update the BASE lineup - so fall through to the
+      // team_lineups upsert below instead of returning a lying success.
+      // In-season daily edits are unaffected: wroteDaily is true whenever a
+      // matchup-week day row was actually written, and we return above.
+      logger.warn(
+        '[LineupService.saveLineup] daily-roster path wrote nothing (no matchup, or target_date outside matchup week); falling back to base team_lineups',
+        { teamId, leagueId, targetDate },
+      );
     }
 
     // No targetDate — update the base lineup in team_lineups
@@ -637,7 +660,11 @@ export class LineupService {
     lineup: { starters: string[]; bench: string[]; ir: string[]; slot_assignments: Record<string, string> },
     targetDate: string,
     source: 'scheduled_snapshot' | 'user_edit' | 'reconstructed' = 'user_edit',
-  ) {
+  ): Promise<boolean> {
+    // Returns true only when day rows were actually upserted. Callers use
+    // this to detect the nothing-to-write cases (no matchup; target date
+    // outside the matchup week; empty lineup) - see the silent-no-op fix
+    // in saveLineup (2026-08-21).
     // Get current matchup for this team
     const todayStr = getTodayMST();
     const { data: matchups } = await this.supabase
@@ -649,7 +676,7 @@ export class LineupService {
       .order('week_start_date', { ascending: true })
       .limit(1);
 
-    if (!matchups || matchups.length === 0) return;
+    if (!matchups || matchups.length === 0) return false;
 
     const matchup = matchups[0];
     const weekStart = new Date(matchup.week_start_date + 'T00:00:00');
@@ -673,7 +700,7 @@ export class LineupService {
     });
 
     futureDates = futureDates.filter(date => date.toISOString().split('T')[0] === targetDate);
-    if (futureDates.length === 0) return;
+    if (futureDates.length === 0) return false;
 
     // Get player teams for lock checking
     const allPlayerIds = [...lineup.starters, ...lineup.bench, ...lineup.ir].map(id => parseInt(id));
@@ -751,7 +778,7 @@ export class LineupService {
       addRecords(lineup.ir, 'ir');
     }
 
-    if (rosterRecords.length === 0) return;
+    if (rosterRecords.length === 0) return false;
 
     // Delete existing non-locked rows for these dates first, then insert fresh.
     // This prevents stale player rows from accumulating when lineup composition changes.
@@ -779,6 +806,8 @@ export class LineupService {
       });
     if (insertError) {
       logger.error('[LineupService.createDailyRosterSnapshots] Upsert error:', insertError);
+      return false;
     }
+    return true;
   }
 }

@@ -1251,18 +1251,28 @@ const CreateLeague = () => {
                         <Label className="text-base font-semibold">Draft Type</Label>
                         <RadioGroup
                           value={draftType}
-                          onValueChange={(v) => setDraftType(v as DraftType)}
+                          onValueChange={(v) => {
+                            // LAUNCH GATE (2026-08-21): auction is selectable-looking
+                            // but the auction ROOM retired with v1 (2026-08-18) and v2
+                            // has no auction UI yet — an "auction" league silently runs
+                            // as snake (verified live: Round 1 · Pick 1/42, no bidding).
+                            // Until the v2 auction room ships, refuse the selection.
+                            if (v === 'auction') return;
+                            setDraftType(v as DraftType);
+                          }}
                           className="grid grid-cols-1 gap-3"
                         >
                           {(Object.keys(DRAFT_TYPE_LABELS) as DraftType[]).map((type) => (
                             <div key={type}>
-                              <RadioGroupItem value={type} id={`draft-${type}`} className="peer sr-only" />
+                              <RadioGroupItem value={type} id={`draft-${type}`} className="peer sr-only" disabled={type === 'auction'} />
                               <Label
                                 htmlFor={`draft-${type}`}
-                                className={`flex items-start gap-4 rounded-xl border-2 p-4 cursor-pointer transition-all
-                                  ${draftType === type
-                                    ? 'bg-pastel-orange/15 ring-2 ring-pastel-orange/40 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)]'
-                                    : 'bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/30 hover:bg-white/[0.08]'
+                                className={`flex items-start gap-4 rounded-xl border-2 p-4 transition-all
+                                  ${type === 'auction'
+                                    ? 'bg-white/[0.03] ring-1 ring-white/10 opacity-60 cursor-not-allowed'
+                                    : draftType === type
+                                      ? 'bg-pastel-orange/15 ring-2 ring-pastel-orange/40 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)] cursor-pointer'
+                                      : 'bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/30 hover:bg-white/[0.08] cursor-pointer'
                                   }`}
                               >
                                 <div className={`mt-0.5 ${draftType === type ? 'text-pastel-orange' : 'text-white/55'}`}>
@@ -1273,6 +1283,9 @@ const CreateLeague = () => {
                                     <span className="font-semibold">{DRAFT_TYPE_LABELS[type]}</span>
                                     {type === 'snake' && (
                                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Most Popular</Badge>
+                                    )}
+                                    {type === 'auction' && (
+                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-pastel-orange/40 text-pastel-orange-soft">Coming soon</Badge>
                                     )}
                                   </div>
                                   <p className="text-xs text-white/55 mt-1 leading-relaxed">
@@ -1680,15 +1693,19 @@ const CreateLeague = () => {
                             {/* Keeper Toggle */}
                             <div className="flex items-center justify-between">
                               <div>
-                                <Label className="text-base font-semibold">Keeper League</Label>
+                                <div className="flex items-center gap-2">
+                                  <Label className="text-base font-semibold">Keeper League</Label>
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-pastel-orange/40 text-pastel-orange-soft">Coming soon</Badge>
+                                </div>
                                 <p className="text-xs text-white/55 mt-1">
                                   Teams keep a set number of players between seasons.
                                 </p>
                               </div>
-                              <Switch checked={keeperEnabled} onCheckedChange={(v) => {
-                                setKeeperEnabled(v);
-                                if (!v) setDynastyMode(false);
-                              }} />
+                              {/* LAUNCH GATE (2026-08-21): keeper settings persist and the
+                                  server API is complete, but no screen lets a manager
+                                  DESIGNATE a keeper yet — enabling it would sell a feature
+                                  that cannot be used. Disabled until the designation UI ships. */}
+                              <Switch checked={false} disabled onCheckedChange={() => {}} />
                             </div>
 
                             {keeperEnabled && (
