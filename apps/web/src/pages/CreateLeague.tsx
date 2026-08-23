@@ -1258,17 +1258,24 @@ const CreateLeague = () => {
                             // as snake (verified live: Round 1 · Pick 1/42, no bidding).
                             // Until the v2 auction room ships, refuse the selection.
                             if (v === 'auction') return;
+                            // LAUNCH GATE (2026-08-23): offline/manual has NO
+                            // commissioner import mechanism anywhere in the app —
+                            // the create-form copy promises "enter draft results
+                            // after your external draft" but pressing Start on an
+                            // offline league would launch a live engine draft.
+                            // Gated until the pick-entry UI exists.
+                            if (v === 'offline') return;
                             setDraftType(v as DraftType);
                           }}
                           className="grid grid-cols-1 gap-3"
                         >
                           {(Object.keys(DRAFT_TYPE_LABELS) as DraftType[]).map((type) => (
                             <div key={type}>
-                              <RadioGroupItem value={type} id={`draft-${type}`} className="peer sr-only" disabled={type === 'auction'} />
+                              <RadioGroupItem value={type} id={`draft-${type}`} className="peer sr-only" disabled={type === 'auction' || type === 'offline'} />
                               <Label
                                 htmlFor={`draft-${type}`}
                                 className={`flex items-start gap-4 rounded-xl border-2 p-4 transition-all
-                                  ${type === 'auction'
+                                  ${(type === 'auction' || type === 'offline')
                                     ? 'bg-white/[0.03] ring-1 ring-white/10 opacity-60 cursor-not-allowed'
                                     : draftType === type
                                       ? 'bg-pastel-orange/15 ring-2 ring-pastel-orange/40 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)] cursor-pointer'
@@ -1284,7 +1291,7 @@ const CreateLeague = () => {
                                     {type === 'snake' && (
                                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Most Popular</Badge>
                                     )}
-                                    {type === 'auction' && (
+                                    {(type === 'auction' || type === 'offline') && (
                                       <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-pastel-orange/40 text-pastel-orange-soft">Coming soon</Badge>
                                     )}
                                   </div>
@@ -1755,19 +1762,19 @@ const CreateLeague = () => {
                                 <Label className="text-base font-semibold flex items-center gap-2">
                                   <Crown className="w-4 h-4 text-amber-500" />
                                   Dynasty Mode
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-pastel-orange/40 text-pastel-orange-soft">Coming soon</Badge>
                                 </Label>
                                 <p className="text-xs text-white/55 mt-1">
                                   Keep your entire roster between seasons. Only rookies are drafted each year.
                                   The ultimate long-term commitment.
                                 </p>
                               </div>
-                              <Switch checked={dynastyMode} onCheckedChange={(v) => {
-                                setDynastyMode(v);
-                                if (v) {
-                                  setKeeperEnabled(true);
-                                  setKeeperCount('0'); // Dynasty = unlimited keepers (keep entire roster)
-                                }
-                              }} />
+                              {/* LAUNCH GATE (2026-08-22): dynasty rides on the same
+                                  season-rollover machinery keeper needs (roster carryover +
+                                  designation), none of which has a UI yet — and this toggle
+                                  silently switched keeperEnabled on behind the gated keeper
+                                  switch. Gated to match Keeper until rollover ships. */}
+                              <Switch checked={false} disabled onCheckedChange={() => {}} />
                             </div>
                           </div>
                         )}

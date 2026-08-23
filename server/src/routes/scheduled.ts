@@ -233,31 +233,45 @@ scheduledRoutes.post('/waiver-process', async (c) => {
 scheduledRoutes.post('/trade-review-sweep', async (c) => {
   const admin = getSupabaseAdmin();
   try {
-    const nowIso = new Date().toISOString();
-    const { data: expired } = await admin
-      .from('trade_offers')
-      .select('id, league_id, from_team_id, to_team_id')
-      .eq('status', 'under_review')
-      .lt('review_ends_at', nowIso)
-      .limit(50);
-
-    const results: Array<Record<string, unknown>> = [];
-    for (const trade of expired ?? []) {
-      const { data: rpcData, error } = await admin.rpc('execute_trade', {
-        p_trade_offer_id: trade.id,
-      });
-      const inner = rpcData as { success?: boolean; error?: string } | null;
-      if (error || inner?.success === false) {
-        results.push({ tradeId: trade.id, error: error?.message ?? inner?.error ?? 'execute failed' });
-        continue;
-      }
-      await admin
-        .from('trade_offers')
-        .update({ status: 'accepted', processed_at: nowIso })
-        .eq('id', trade.id);
-      results.push({ tradeId: trade.id, executed: true });
+    // VETO-BYPASS FIX (2026-08-23, found during launch QA): this route
+    // used to run its OWN sweep — select expired under_review rows and
+    // execute_trade every one of them, never reading trade_votes. The
+    // veto-aware `process_expired_trade_reviews()` (threshold =
+    // GREATEST(CEIL((teams-2)*veto_threshold),1), stamps vetoed_at,
+    // leaves rosters untouched on veto) existed but had NO caller in
+    // the cron path, so in production a league's veto votes were
+    // cosmetic: the hourly sweep executed the trade anyway. Delegate to
+    // the one implementation that counts votes — verified live on prod
+    // (approve outcome AND veto outcome, 2026-08-22/23).
+    const { data, error } = await admin.rpc('process_expired_trade_reviews');
+    if (error) {
+      logger.error('[scheduled.trade-review-sweep] rpc failed:', error);
+      return fail(c, AppError.internal(error.message));
     }
-    return ok(c, { swept: (expired ?? []).length, results });
+    const results = ((data ?? []) as Array<{ trade_id: string; league_id: string; action: string }>)
+      .map((r) => ({ tradeId: r.trade_id, leagueId: r.league_id, action: r.action }));
+
+    // OFFER-EXPIRY FIX (2026-08-23): expire stale PENDING offers too —
+    // expires_at was written on every proposal but never enforced, so a
+    // week-old offer stayed acceptable forever. The accept path now
+    // refuses expired offers in-line; this sweep tidies the rows so
+    // Trade History tells the truth.
+    const nowIso = new Date().toISOString();
+    const { data: lapsed, error: expireErr } = await admin
+      .from('trade_offers')
+      .update({ status: 'expired', processed_at: nowIso, updated_at: nowIso })
+      .eq('status', 'pending')
+      .lt('expires_at', nowIso)
+      .select('id');
+    if (expireErr) {
+      logger.error('[scheduled.trade-review-sweep] pending-expiry failed:', expireErr);
+    }
+
+    return ok(c, {
+      swept: results.length,
+      results,
+      expiredPending: (lapsed ?? []).length,
+    });
   } catch (e) {
     logger.error('[scheduled.trade-review-sweep] failed:', e);
     return fail(c, AppError.internal(e instanceof Error ? e.message : String(e)));

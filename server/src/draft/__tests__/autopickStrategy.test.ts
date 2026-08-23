@@ -41,6 +41,13 @@ interface MockProjections {
    * player_directory would report it (C/LW/RW/D/G).
    */
   positions?: Record<number, string>;
+  /**
+   * CAPS-INFLATION FIX (2026-08-23): player_directory is a per-season
+   * index — prod carries ~2 rows per player. Setting this to N serves
+   * every directory row N times, which is what the owned-positions
+   * read actually sees in production.
+   */
+  directoryDuplicateSeasons?: number;
   /** E118: player_ids this team already holds. */
   teamOwned?: number[];
   /** E118: league settings.rosterSlots override. */
@@ -100,26 +107,42 @@ function makeMockSupabase(opts: MockProjections): SupabaseClient {
     // exercised — a mock that returns everything regardless of range
     // would pass a loop that pages wrongly.
     if (table === 'player_directory') {
-      const all = Object.entries(opts.positions ?? {}).map(([id, pos]) => ({
+      const perPlayer = Object.entries(opts.positions ?? {}).map(([id, pos]) => ({
         player_id: Number(id),
         position_code: pos,
       }));
+      // CAPS-INFLATION FIX (2026-08-23): serve one row per season per
+      // player, like the real per-season directory does.
+      const copies = Math.max(1, opts.directoryDuplicateSeasons ?? 1);
+      const all = perPlayer.flatMap((row) => Array.from({ length: copies }, () => ({ ...row })));
       const chain: Record<string, unknown> = {};
       let rangeFrom: number | null = null;
       let rangeTo = 0;
+      // CAPS-INFLATION FIX (2026-08-23): the owned-positions read filters
+      // with .in('player_id', ownedIds); a mock that ignores the filter
+      // hands the guard every player's rows and silently breaks the cap
+      // accounting the regression test exists to pin. Honour the filter.
+      let inFilter: number[] | null = null;
       chain.select = () => chain;
-      chain.in = () => chain;
+      chain.in = (_col: string, ids: number[]) => {
+        inFilter = ids;
+        return chain;
+      };
       chain.order = () => chain;
       chain.range = (from: number, to: number) => {
         rangeFrom = from;
         rangeTo = to;
         return chain;
       };
-      chain.then = (resolve: (val: unknown) => void) =>
-        resolve({
-          data: rangeFrom === null ? all : all.slice(rangeFrom, rangeTo + 1),
+      chain.then = (resolve: (val: unknown) => void) => {
+        const filtered = inFilter === null
+          ? all
+          : all.filter((row) => (inFilter as number[]).includes(row.player_id));
+        return resolve({
+          data: rangeFrom === null ? filtered : filtered.slice(rangeFrom, rangeTo + 1),
           error: null,
         });
+      };
       return chain;
     }
     // AUTOPICK-TRUNCATION-2 (2026-08-13) — the projections read is paged
@@ -406,13 +429,16 @@ describe('projectionsStrategy (chunk 11g.4 step 6c)', () => {
     });
   });
 
-  it('E117: a player with no prior-season row is ranked, never zeroed', async () => {
+  it('ROOKIE-VALUE FIX (2026-08-23): no prior-season row ranks conservatively, never beats a proven starter on rate alone', async () => {
     const supabase = makeMockSupabase({
       drafted: [],
       projections: [
-        // Rookie, no season row → DEFAULT_EXPECTED_GAMES (55) → 330.
+        // Rookie, no season row → conservative legacy value (1). Under the
+        // pre-fix behaviour this was 6.0 × 55 = 330 and prospect goalies
+        // drained the live board (prod, 2026-08-23: nine straight goalie
+        // autopicks after caps exhausted).
         { player_id: 900005, total_projected_points: 1, avg_points_per_game: 6.0 },
-        // Veteran with a real row → 2.0 x 82 = 164.
+        // Veteran with a real row → 2.0 x 82 = 164 — must outrank the rookie.
         { player_id: 900006, total_projected_points: 1, avg_points_per_game: 2.0 },
       ],
       seasonGames: [{ player_id: 900006, games_played: 82 }],
@@ -424,10 +450,28 @@ describe('projectionsStrategy (chunk 11g.4 step 6c)', () => {
       supabase,
     });
 
+    expect(result).toEqual({ ok: true, playerId: 900006, source: 'draft_value' });
+  });
+
+  it('ROOKIE-VALUE FIX: a rookie alone on the board is still ranked and picked, never zeroed', async () => {
+    const supabase = makeMockSupabase({
+      drafted: [],
+      projections: [
+        { player_id: 900005, total_projected_points: 1, avg_points_per_game: 6.0 },
+      ],
+      seasonGames: [],
+    });
+
+    const result = await projectionsStrategy({
+      leagueId: 'league-1',
+      teamId: 'team-1',
+      supabase,
+    });
+
     expect(result).toEqual({ ok: true, playerId: 900005, source: 'draft_value' });
   });
 
-  it('E117: season-stats read failure degrades to per-game order, still picks', async () => {
+  it('E117: season-stats read failure degrades to conservative ROS order, still picks', async () => {
     const supabase = makeMockSupabase({
       drafted: [],
       projections: [
@@ -443,9 +487,11 @@ describe('projectionsStrategy (chunk 11g.4 step 6c)', () => {
       supabase,
     });
 
-    // Both fall back to 55 expected games, so the higher rate wins —
-    // degraded, but never stuck (a stuck autopick freezes a draft).
-    expect(result).toEqual({ ok: true, playerId: 900007, source: 'draft_value' });
+    // With no durability signal at all, everyone falls back to the
+    // conservative legacy column (never per-game × an assumed 55 games,
+    // which is how prospect goalies used to jump the board) — degraded,
+    // but never stuck (a stuck autopick freezes a draft).
+    expect(result).toEqual({ ok: true, playerId: 900008, source: 'draft_value' });
   });
 
   it('E117: falls back to total_projected_points when per-game is absent', async () => {
@@ -593,5 +639,39 @@ describe('projectionsStrategy (chunk 11g.4 step 6c)', () => {
     });
 
     expect(result).toEqual({ ok: true, playerId: 700008, source: 'draft_value' });
+  });
+
+  it('CAPS-INFLATION FIX (2026-08-23): per-season directory duplicates must not double-count positions toward caps', async () => {
+    // Prod regression (Claude Linear League, 2026-08-23): the directory
+    // carries ~2 season rows per player, so a team holding ONE center
+    // counted as TWO and every cap looked exhausted mid-draft — the guard
+    // fell through to the value board and an ownerless seat drafted eleven
+    // goalies. Setup: cap C=2, team owns ONE center, directory serves TWO
+    // rows per player. The best available is another center: with the
+    // dedupe he MUST be eligible (held 1 < cap 2) and picked; the pre-fix
+    // code counted held=2 and skipped him for the defenseman.
+    const supabase = makeMockSupabase({
+      drafted: [800001],
+      projections: [
+        { player_id: 800002, total_projected_points: 1, avg_points_per_game: 9.0 }, // C — best available
+        { player_id: 800003, total_projected_points: 1, avg_points_per_game: 5.0 }, // D — the wrong pick
+      ],
+      seasonGames: [
+        { player_id: 800002, games_played: 82 },
+        { player_id: 800003, games_played: 82 },
+      ],
+      positions: { 800001: 'C', 800002: 'C', 800003: 'D' },
+      teamOwned: [800001],
+      rosterSlots: { C: 2, D: 4 },
+      directoryDuplicateSeasons: 2,
+    });
+
+    const result = await projectionsStrategy({
+      leagueId: 'league-1',
+      teamId: 'team-1',
+      supabase,
+    });
+
+    expect(result).toEqual({ ok: true, playerId: 800002, source: 'draft_value' });
   });
 });

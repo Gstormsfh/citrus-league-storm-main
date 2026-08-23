@@ -125,6 +125,67 @@ describe('TradeService', () => {
     });
   });
 
+  describe('acceptTradeOffer — offer expiry (OFFER-EXPIRY FIX 2026-08-23)', () => {
+    it('refuses an offer past its expires_at and marks it expired', async () => {
+      let callCount = 0;
+      const expiredUpdateChain = createChain({ data: null, error: null });
+      mockSupabase.from = vi.fn(() => {
+        callCount++;
+        // 1st from('trade_offers'): the pending-offer load — expired yesterday.
+        if (callCount === 1) {
+          return createChain({
+            data: {
+              id: 'trade-1',
+              league_id: 'league-1',
+              from_team_id: 'team-1',
+              to_team_id: 'team-2',
+              status: 'pending',
+              expires_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+            },
+            error: null,
+          });
+        }
+        // 2nd from('trade_offers'): the status → 'expired' write.
+        return expiredUpdateChain;
+      });
+
+      const result = await service.acceptTradeOffer('trade-1', 'user-2');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('expired');
+      // The row was marked, so Trade History tells the truth.
+      expect(expiredUpdateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'expired' }),
+      );
+    });
+
+    it('proceeds past the expiry guard when expires_at is in the future', async () => {
+      let callCount = 0;
+      mockSupabase.from = vi.fn(() => {
+        callCount++;
+        if (callCount === 1) {
+          return createChain({
+            data: {
+              id: 'trade-1',
+              league_id: 'league-1',
+              from_team_id: 'team-1',
+              to_team_id: 'team-2',
+              status: 'pending',
+              expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+            },
+            error: null,
+          });
+        }
+        // Next read is the to_team ownership check — wrong owner stops the
+        // flow THERE, proving the guard let a live offer through.
+        return createChain({ data: { owner_id: 'other-user' }, error: null });
+      });
+
+      const result = await service.acceptTradeOffer('trade-1', 'user-2');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('recipient');
+    });
+  });
+
   describe('rejectTradeOffer', () => {
     it('rejects when trade not found', async () => {
       mockSupabase.from = vi.fn(() => createChain({ data: null, error: null }));

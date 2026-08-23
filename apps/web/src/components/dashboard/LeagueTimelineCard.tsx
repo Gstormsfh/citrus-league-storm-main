@@ -30,6 +30,7 @@ import {
 } from '@citrus/shared';
 import { leagueApi } from '@/api/leagues';
 import { matchupApi } from '@/api/matchups';
+import { PlayerService } from '@/services/PlayerService';
 import { CitrusCard, CitrusCardEyebrow, CitrusCardTitle } from '@/components/citrus2/CitrusCard';
 import { logger } from '@/utils/logger';
 
@@ -75,13 +76,24 @@ interface MatchupRowFromApi {
 
 // ── Row → input adapters (client-only, per-endpoint shape) ─────────
 
-function toTransactionInputs(rows: LedgerRowFromApi[]): TransactionInput[] {
+function toTransactionInputs(
+  rows: LedgerRowFromApi[],
+  playerNameById: Map<string, string>,
+): TransactionInput[] {
   const out: TransactionInput[] = [];
   for (const r of rows) {
     if (r.status && r.status !== 'processed') continue; // pending/failed excluded
     const rawType = (r.type ?? r.transaction_type ?? '').toUpperCase();
     if (rawType !== 'ADD' && rawType !== 'DROP') continue;
-    const playerName = r.player_name ?? `Player #${r.player_id ?? '?'}`;
+    // NAME FIX (2026-08-22, found live on prod during launch QA): the ledger
+    // endpoint returns player_id only — rendering "Player #8484801" on the
+    // league home page. Resolve through the same player directory the
+    // Roster Transactions tab uses; fall back to a neutral phrase, never a
+    // raw id.
+    const playerName =
+      r.player_name
+      ?? (r.player_id != null ? playerNameById.get(String(r.player_id)) : undefined)
+      ?? 'a player';
     const teamName = r.teams?.team_name ?? r.team_name ?? 'Unknown team';
     const createdAt = r.created_at;
     if (!createdAt) continue;
@@ -183,15 +195,34 @@ export function LeagueTimelineCard({
     enabled: !!leagueId,
   });
 
+  // Player directory for id → name resolution (same source as the Roster
+  // Transactions tab; PlayerService caches, so this is cheap after first load).
+  const playersQuery = useQuery({
+    queryKey: ['league-timeline-players'],
+    queryFn: async () => {
+      try {
+        const players = await PlayerService.getAllPlayers();
+        return new Map(players.map((p) => [String(p.id), p.full_name]));
+      } catch (err) {
+        logger.warn('[LeagueTimelineCard] player directory fetch failed; names fall back', err);
+        return new Map<string, string>();
+      }
+    },
+    staleTime: 10 * 60_000,
+  });
+
   const items: TimelineItem[] = useMemo(() => {
     const draft: DraftCompletionInput | null =
       draftStatus === 'completed' && draftCompletedAt
         ? { completedAt: draftCompletedAt, topPick: topPick ?? null }
         : null;
-    const transactions = toTransactionInputs(transactionsQuery.data ?? []);
+    const transactions = toTransactionInputs(
+      transactionsQuery.data ?? [],
+      playersQuery.data ?? new Map(),
+    );
     const matchups = toMatchupInputs(matchupsQuery.data ?? []);
     return assembleLeagueTimeline({ draft, transactions, matchups });
-  }, [draftStatus, draftCompletedAt, topPick, transactionsQuery.data, matchupsQuery.data]);
+  }, [draftStatus, draftCompletedAt, topPick, transactionsQuery.data, matchupsQuery.data, playersQuery.data]);
 
   const isLoading = transactionsQuery.isLoading || matchupsQuery.isLoading;
 

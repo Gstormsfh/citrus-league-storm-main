@@ -47,7 +47,7 @@ import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSel
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { getTodayMST, getTodayMSTDate, formatWaiverProcessTime, formatMoment, computeNextWaiverProcessMoment } from '@/utils/timezoneUtils';
 import { getCurrentSeason } from '@/utils/seasonConstants';
-import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
+import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate, clampToSeasonStart } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
@@ -1300,7 +1300,10 @@ const Roster = () => {
       const draftCompletionDate = getDraftCompletionDate(activeLeague);
       if (!draftCompletionDate) return;
 
-      const firstWeek = getFirstWeekStartDate(draftCompletionDate);
+      // WEEK-MATH FIX (2026-08-22): clamp to the season start like matchup
+      // generation does — an offseason draft otherwise anchors week labels/
+      // dates at an Aug/Sep calendar week that contradicts the schedule.
+      const firstWeek = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate));
       setFirstWeekStart(firstWeek);
 
       // Fetch all matchups to determine available weeks and find current week by date

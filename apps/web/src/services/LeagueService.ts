@@ -1162,7 +1162,16 @@ async joinLeagueByCode(
         return 'processed';
       };
 
-      const transactions: Transaction[] = (data || []).map((tx) => {
+      // LEDGER DEDUPE (2026-08-22, found live on prod during launch QA):
+      // every executed trade writes TWO ledger rows per player ('Trade out'
+      // on the losing team + 'Trade in' on the gaining team), so the
+      // Transactions tab showed each traded player twice. Keep the
+      // acquiring side's row only — each traded player has exactly one.
+      const dedupedData = (data || []).filter(
+        (tx) => !((tx.type || '').toUpperCase() === 'TRADE' && tx.source === 'Trade out'),
+      );
+
+      const transactions: Transaction[] = dedupedData.map((tx) => {
         const player = playerMap.get(tx.player_id);
         const dropPlayer = tx.drop_player_id ? playerMap.get(tx.drop_player_id) : null;
         return {

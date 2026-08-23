@@ -27,8 +27,9 @@ import { structuredLogger, coerceToNumericPlayerId } from '@citrus/shared';
  */
 const DRAFT_VALUE_REFERENCE_SEASON = 2025;
 
-/** Games assumed for a player with no prior-season row (rookies). */
-const DEFAULT_EXPECTED_GAMES = 55;
+// (ROOKIE-VALUE FIX 2026-08-23: the old DEFAULT_EXPECTED_GAMES=55 rookie
+// assumption is gone — no-prior-season players now rank by the conservative
+// legacy projection column instead of per-game × an assumed 55 games.)
 
 /** Hard cap — an NHL regular season is 82 games. */
 const MAX_SEASON_GAMES = 82;
@@ -196,8 +197,9 @@ export const projectionsStrategy: AutopickStrategy = async ({
   // where `expected_games` is last season's games played (capped at
   // a full 82-game season) — the cheapest available durability +
   // role signal, and the one that separates starters from backups.
-  // Players with no prior-season row fall back to
-  // DEFAULT_EXPECTED_GAMES so rookies are ranked, never zeroed.
+  // Players with no prior-season row rank by the conservative legacy
+  // column (ROOKIE-VALUE FIX 2026-08-23) so rookies are ranked, never
+  // zeroed — and never inflated to 55-game starters.
   //
   // This reads the SAME projections table (no new schema, no
   // dependency on the projections pipeline's internals) plus one
@@ -277,8 +279,8 @@ export const projectionsStrategy: AutopickStrategy = async ({
     }
   }
   if (seasonErr) {
-    // Non-fatal: fall back to DEFAULT_EXPECTED_GAMES for everyone,
-    // which degrades to per-game ordering — the pre-E117 behaviour.
+    // Non-fatal: with no durability signal everyone ranks by the
+    // conservative legacy column (ROOKIE-VALUE FIX 2026-08-23).
     // Logged loudly because it silently changes board quality.
     structuredLogger.warn('autopick.draft_value.season_stats_read_failed', {
       leagueId,
@@ -371,9 +373,24 @@ export const projectionsStrategy: AutopickStrategy = async ({
             message: ownedErr.message ?? null,
           });
         } else {
+          // CAPS-INFLATION FIX (2026-08-23, found live on prod during launch
+          // QA): `player_directory` is a per-SEASON index — most players have
+          // one row per season (prod today: 1,902 rows / 1,085 players). This
+          // read returned every season row per owned player, so each pick
+          // counted ~2× toward its position cap. Mid-draft, every position
+          // looked cap-full, the first pass found nobody eligible, and picks
+          // fell through to the caps_exhausted fallback — the guard was
+          // effectively disabled and an ownerless seat drafted ELEVEN goalies
+          // (Claude Linear League, 2026-08-23). Dedupe to one row per player
+          // before counting.
+          const seenOwned = new Set<number>();
           for (const row of (ownedRows ?? []) as Array<{
+            player_id: number;
             position_code: string | null;
           }>) {
+            const pid = coerceToNumericPlayerId(row.player_id);
+            if (pid === null || seenOwned.has(pid)) continue;
+            seenOwned.add(pid);
             const pos = normalizePosition(row.position_code);
             if (pos) teamCounts.set(pos, (teamCounts.get(pos) ?? 0) + 1);
           }
@@ -433,13 +450,21 @@ export const projectionsStrategy: AutopickStrategy = async ({
   }>)
     .map((row) => {
       const ppg = Number(row.avg_points_per_game ?? 0);
-      const expectedGames = Math.min(
-        gamesByPlayer.get(row.player_id) ?? DEFAULT_EXPECTED_GAMES,
-        MAX_SEASON_GAMES,
-      );
-      // Fall back to the legacy column when per-game data is absent
-      // so a partially-populated projections table still ranks.
-      const value = Number.isFinite(ppg) && ppg > 0
+      const priorGames = gamesByPlayer.get(row.player_id);
+      // ROOKIE-VALUE FIX (2026-08-23, found live on prod during launch QA):
+      // a player with NO prior-season row used to be credited
+      // DEFAULT_EXPECTED_GAMES (55) on whatever small-sample per-game rate
+      // he carried, so unproven prospects — goalies especially — ranked
+      // like 55-game starters. Once the roster-shape guard's caps were
+      // exhausted, the fallback board drained straight into them (nine
+      // consecutive prospect-goalie picks on prod, 2026-08-23). Industry
+      // autopick boards rank no-history players conservatively; do the
+      // same: no prior season → the legacy conservative rest-of-season
+      // value, never per-game × 55.
+      const expectedGames = priorGames !== undefined
+        ? Math.min(priorGames, MAX_SEASON_GAMES)
+        : null;
+      const value = expectedGames !== null && Number.isFinite(ppg) && ppg > 0
         ? ppg * expectedGames
         : Number(row.total_projected_points ?? 0);
       return { playerId: row.player_id, value };

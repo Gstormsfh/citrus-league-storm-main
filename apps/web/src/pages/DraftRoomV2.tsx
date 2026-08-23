@@ -603,6 +603,8 @@ function useLatchedWaitingForStart(): boolean {
 function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV2Props) {
   const myTeamId = useMyTeamId();
   const [isStarting, setIsStarting] = useState(false);
+  // AI-FILL (2026-08-23) — see the button's comment below.
+  const [isFilling, setIsFilling] = useState(false);
   const [league, setLeague] = useState<
     { commissioner_id: string; draft_rounds: number; league_size: number | null; settings: Record<string, unknown> | null } | null
   >(null);
@@ -694,6 +696,36 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
   // has joined) then draftV2Api.startDraftV2 (the F27 start_draft_v2 RPC).
   // Called directly (not through the hook) so the lobby stays free of
   // provider-coupled hooks; ignition semantics are identical.
+  // AI-FILL (2026-08-23) — fills every open seat via the same
+  // commissioner endpoint the v1 lobby used, then re-fetches the team
+  // list so the room flips to "everyone's here" without a reload.
+  const handleFillWithAI = async () => {
+    if (isFilling) return;
+    const size = league?.league_size ?? null;
+    if (size == null || teams.length >= size) return;
+    setIsFilling(true);
+    try {
+      const missing = size - teams.length;
+      const teamNames = Array.from(
+        { length: missing },
+        (_, i) => `AI Team ${teams.length + i + 1}`,
+      );
+      const { apiClient } = await import('@/api/client');
+      await apiClient.post(`/api/leagues/${leagueId}/simulate-fill`, { teamNames });
+      toast.success(
+        missing === 1 ? 'AI team added — room is full.' : `${missing} AI teams added — room is full.`,
+      );
+      onRetryTeams();
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string } }; message?: string };
+      toast.error('Could not add AI teams', {
+        description: e?.response?.data?.error ?? e?.message ?? 'Please try again.',
+      });
+    } finally {
+      setIsFilling(false);
+    }
+  };
+
   const handleStart = async () => {
     if (!myUserId || !league || isStarting) return;
     setIsStarting(true);
@@ -818,6 +850,26 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                   This goes live immediately
                 </span>
               )}
+              {/* AI-FILL (2026-08-23, found live on prod during launch QA):
+                  the create-league page promises "Fill any open slots with
+                  AI opponents at the press of a button" — but the button
+                  only ever existed in the RETIRED v1 lobby. The v2 lobby
+                  left a solo commissioner stuck at "waiting for teams" with
+                  no way to do the thing the banner sold. Same endpoint the
+                  v1 lobby used (POST /simulate-fill). */}
+              {!roomFull && leagueSize != null && teams.length < leagueSize && (
+                <Button
+                  onClick={handleFillWithAI}
+                  disabled={isFilling}
+                  data-testid="draft-lobby-v2-fill-ai"
+                  variant="outline"
+                  className="rounded-full border-white/20 bg-white/5 text-pastel-cream hover:bg-white/10"
+                >
+                  {isFilling
+                    ? 'Adding AI teams…'
+                    : `Fill ${leagueSize - teams.length} open slot${leagueSize - teams.length === 1 ? '' : 's'} with AI`}
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -825,7 +877,21 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
         {/* Format strip — snake / rounds / clock, so nobody is surprised. */}
         <div className="relative mt-5 flex flex-wrap items-center gap-2">
           {[
-            { label: 'Format', value: draftTypeLabel === 'auction' ? 'Auction' : 'Snake' },
+            // FORMAT-LABEL FIX (2026-08-23, found live on prod during launch
+            // QA): everything non-auction rendered as "Snake" — a LINEAR
+            // league's lobby announced the wrong format on the one screen
+            // whose comment says "so nobody is surprised".
+            {
+              label: 'Format',
+              value:
+                ({
+                  snake: 'Snake',
+                  linear: 'Linear',
+                  auction: 'Auction',
+                  autopick: 'Autopick',
+                  offline: 'Offline / Manual',
+                } as Record<string, string>)[draftTypeLabel] ?? 'Snake',
+            },
             rounds ? { label: 'Rounds', value: String(rounds) } : null,
             pickSeconds ? { label: 'Per pick', value: `${pickSeconds}s` } : null,
             totalPicks ? { label: 'Total picks', value: String(totalPicks) } : null,
@@ -1193,6 +1259,41 @@ function MainTabs({
   });
   const lastAutoPickForRef = useRef<number | null>(null);
 
+  // CLIENT-AUTODRAFT SHAPE GUARD (2026-08-23, found live on prod during
+  // launch QA): this loop picked pure best-season-FPTS with zero roster
+  // awareness — a manager who flipped autodraft on drafted NINE centers
+  // and NO goalie (Claude Linear League). The engine's expiry autopick
+  // has carried a roster-shape guard since E118; the client path that
+  // fires FASTER than the engine had none. Mirror the same cap idea:
+  // prefer the best player at a position the roster still needs.
+  const [rosterCaps, setRosterCaps] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { apiClient } = await import('@/api/client');
+        const res = await apiClient.get<{ settings?: { rosterSlots?: Record<string, number> } }>(
+          `/api/leagues/${leagueId}`,
+        );
+        const raw = (res?.data as { settings?: { rosterSlots?: Record<string, number> } } | undefined)
+          ?.settings?.rosterSlots;
+        if (cancelled) return;
+        if (raw && typeof raw === 'object') {
+          const caps: Record<string, number> = {};
+          for (const pos of ['C', 'LW', 'RW', 'D', 'G']) {
+            const n = Number(raw[pos]);
+            if (Number.isFinite(n) && n > 0) caps[pos] = n;
+          }
+          setRosterCaps(Object.keys(caps).length > 0 ? caps : null);
+        }
+      } catch {
+        // Guard is best-effort: with no caps the loop degrades to the
+        // old best-available behaviour rather than blocking autodraft.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [leagueId]);
+
   // Is it my turn? (computed early — feeds alarm + on-clock action bar.)
   const amIOnClock =
     derived !== null &&
@@ -1444,8 +1545,7 @@ function MainTabs({
         // ScoringCalculator (v2 passes no league scoringSettings to the
         // pool either, so this matches the visible #1 exactly).
         const scorer = new ScoringCalculator(undefined);
-        let best = -Infinity;
-        for (const p of availablePlayers) {
+        const scored = availablePlayers.map((p) => {
           const isG = p.position === 'G';
           const f = scorer.calculatePoints(
             isG
@@ -1453,8 +1553,32 @@ function MainTabs({
               : { goals: p.goals || 0, assists: p.assists || 0, shots: p.shots || 0, blocks: p.blocks || 0, hits: p.hits || 0, pim: p.pim || 0, ppp: p.ppp || 0, shp: p.shp || 0 },
             isG,
           );
-          if (f > best) { best = f; target = p; }
+          return { p, f };
+        }).sort((a, b) => b.f - a.f);
+
+        // CLIENT-AUTODRAFT SHAPE GUARD (2026-08-23): count what my team
+        // already holds by position and prefer the best player at a
+        // position still under its cap — exactly the engine's E118 idea.
+        // Queue picks above are exempt on purpose: an explicit ranking
+        // the manager typed outranks the guard (industry standard).
+        let underCap: typeof scored[number] | undefined;
+        if (rosterCaps && myTeamId) {
+          const myEntries =
+            useDraftClientStore.getState().derivedState?.teamRosters.get(myTeamId) ?? [];
+          const counts: Record<string, number> = {};
+          for (const entry of myEntries) {
+            const owned = playersById.get(String(entry.playerId));
+            const pos = owned?.position;
+            if (pos) counts[pos] = (counts[pos] ?? 0) + 1;
+          }
+          underCap = scored.find(({ p }) => {
+            const cap = rosterCaps[p.position];
+            // Positions outside the cap map never block a pick.
+            if (cap === undefined) return true;
+            return (counts[p.position] ?? 0) < cap;
+          });
         }
+        target = (underCap ?? scored[0])?.p;
       }
       if (target) {
         lastAutoPickForRef.current = pickNo;
@@ -1462,7 +1586,7 @@ function MainTabs({
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [autodraftOn, amIOnClock, isSubmitPending, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool]);
+  }, [autodraftOn, amIOnClock, isSubmitPending, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool, rosterCaps, myTeamId, playersById]);
 
   return (
     <div className="space-y-3">

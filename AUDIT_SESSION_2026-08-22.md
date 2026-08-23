@@ -64,14 +64,65 @@ Known-and-unchanged from prior reports: native `confirm()` on Drop Player (freez
 
 ---
 
-## 3. The moment your push lands (I'm polling)
+## 3. ✅ DEPLOY LANDED (d103df2d) — all gated verifications passed same night
 
-1. **Lineup swap persists** — mobile tap-swap Garand ⇄ goalie, reload, screenshot + `team_lineups.updated_at` (the centerpiece; the silent no-op fix makes pre-season saves real).
-2. **Create League page** — Auction disabled + "Coming soon", Keeper toggle disabled — eyes + screenshot.
-3. **Auto Lineup save on desktop** persists after reload.
-4. Final consolidated evidence report.
+Bundle flipped `index-Co5U1JAl.js` → `index-Bt_MElX1.js`; API behavior confirms new server code.
 
-**One human check still wanted:** one desktop drag-and-drop lineup move with a real mouse (automation can't produce trusted drag events for dnd-kit) — 10 seconds when you have the roster page open.
+1. **Silent no-op fix live** — authed PUT with `target_date=2026-08-22` (a matchup-less date, the exact case that wrote zero rows before): 200 AND `team_lineups.updated_at` moved, bench reorder persisted. The base-fallback path works on prod.
+2. **Mobile tap-swap centerpiece** — Ellis ⇄ Garand via position-badge taps → PUT 200 → full page reload → **swap still there** (UI screenshot + `fantasy_daily_rosters` Sep 28: Ellis `active`, Garand `bench`). Both save paths (daily-roster + base-fallback) now proven live.
+3. **Create League gates live** — Auction Draft shows "COMING SOON" and won't select; Keeper League switch `disabled`. Screenshots banked.
+4. **Auto Lineup (desktop)** — click → PUT 200 → 13 daily-roster rows for Sep 28 rewritten, 10 active. Persisted.
+
+**Still wanted:** one human desktop drag-and-drop (trusted pointer events can't be automated) — 10 seconds next time the roster page is open.
+
+---
+
+## 4. Expedited-clock coverage matrix (the honest answer to "every single process?")
+
+**Proven with expedited/simulated clocks or live execution — my eyes + prod DB:**
+
+| Process | How the clock was expedited | Result |
+|---|---|---|
+| Snake draft | Engine pick-clock expiries → 28/28 autopicks; separate genuine manual pick; draft reset | ✅ full draft, rosters materialized |
+| Autopick draft | Same engine run (all-autopick path) | ✅ |
+| Waiver claim → award | Processor invoked directly (as the nightly cron does) | ✅ limit-fail then award, priority rotated to #2 |
+| Waiver 48h window — enforcement | FA add attempted 8h after drop | ✅ refused: "Player is on waivers" |
+| Waiver 48h window — expiry | `dropped_at` backdated 50h, same add retried | ✅ succeeds — window expiry works |
+| Drop → enters waivers | UI drop (confirm dialog bypassed) | ✅ `player_waiver_status` row, roster −1 |
+| FA add | UI + API | ✅ instant, ledger + feed entries |
+| Trade propose / cancel / reject | UI end-to-end | ✅ DB status transitions verified |
+| Trade accept → execute | execute_trade RPC (the accept path's engine) | ✅ rosters moved |
+| Trade review clock — approve | `review_ends_at` backdated, sweeper run | ✅ accepted, rosters moved |
+| Trade review clock — veto | 1 veto ≥ threshold, clock expired, sweeper run | ✅ vetoed, rosters untouched |
+| Multi-player trade (2-for-2) | UI propose + expedited review + sweeper | ✅ all 4 players switched, counts intact |
+| Trade activity feed | New trigger tested with live ledger inserts | ✅ named entries, no raw-id dupes |
+| Lineup save (both paths) | Matchup-date + matchup-less-date saves | ✅ persist + reload-proven |
+| League creation + schedule | UI create; 27-week schedule generated & stable | ✅ |
+
+**Gated OFF for launch (correctly disabled, not broken-but-live):** Auction draft (ran as snake → "Coming soon"), Keeper (no designation UI → disabled), **Dynasty (gated in this round's files — it was still enabled and silently switched keeper settings on; gate ships with your next push)**.
+
+**Cannot be clock-simulated pre-season (no NHL games exist to score):** live scoring (game stats → fantasy points → matchup scores), weekly matchup completion + W-L standings movement, playoff bracket generation, game-lock at puck drop. These run their first real cycle the week of Sep 28. Recommendation: a synthetic-stat dress rehearsal on staging before then, plus live monitoring of week 1.
+
+**Known gaps (documented, non-blocking, honest):** pending trade offers never auto-expire (`expires_at` is written but nothing reads it — a stale offer stays acceptable); trade-deadline enforcement exists in code but wasn't clock-tested; Linear and Offline/Manual draft types are selectable but have never been run end-to-end; side games (Daily Pickem, Survivor, Confidence Pool, Stanley Cup Brackets) — creation proven for Pickem only, gameplay untested; no server-side auto-lineup for absentee teams.
+
+---
+
+## 5. Round-2 fixes delivered tonight (in your folder, ready to push)
+
+All findings A–F turned into code, verified: **lint clean, full build ✓, entire web suite 122 files / 1,924 tests passed.**
+
+| Fix | Files | What changed |
+|---|---|---|
+| A — first-visit matchup race | `MatchupService.ts` | Root cause found: after schedule generation the `matchups:user:` cache prefix was never invalidated, so the page's verify re-read a stale empty result and claimed generation failed. Invalidations added at the generation choke point. |
+| A — error copy | `Matchup.tsx` | "generation may have failed" → "isn't loading yet — refresh," both sites |
+| C — calendar-vs-schedule week math | `Matchup.tsx`, `Roster.tsx`, `FreeAgents.tsx`, `HeadlinesBanner.tsx`, `StormyService.ts`, `MatchupService.ts` | Display anchors now run through the same `clampToSeasonStart` matchup generation uses — kills "WEEK 1/1 · Aug 23-29", "STARTS IN 1 DAY", and the Aug-anchor week-list collapse everywhere |
+| D — raw player IDs on HQ timeline | `LeagueTimelineCard.tsx` | Resolves names through the player directory (same source as the Transactions tab); falls back to "a player", never "#8484801" |
+| E — trades in activity feed | DB migration (**already applied to prod + staging**, file added to `supabase/migrations/`) | Ledger trigger now posts "Trade Completed — X acquired Y via trade" (once per player, acquiring side); legacy raw-id duplicate trigger dropped. Live-tested. |
+| E — duplicate ledger rows | `LeagueService.ts` | Transactions tab keeps only the acquiring side's row per traded player |
+| F — modal stat mixing | `TradeAnalyzer.tsx` | GP / SV / SO were never wired at this call site — W 31 next to GP 0. Wired (goalie GP uses `goalie_gp`). |
+| New — Dynasty gate | `CreateLeague.tsx` | "Coming soon" + disabled, matching Keeper (it also silently enabled keeper settings) |
+
+One `git add -A; git commit; git push` ships all of it — the DB part is already live.
 
 ---
 

@@ -378,6 +378,19 @@ export const MatchupService = {
         forceRegenerate,
       );
 
+      // FIRST-VISIT RACE FIX (2026-08-22, found live on prod during launch QA):
+      // after generating, every cached matchup read for this league is stale —
+      // including `matchups:user:{id}:w{n}`, which the Matchup page's
+      // post-generation verify reads. Callers only invalidated the
+      // `matchups:league:` prefix, so the verify saw the pre-generation empty
+      // result from ~2s earlier and the page showed "matchup generation may
+      // have failed" on a league whose schedule had just been written. This is
+      // the choke point every generation path funnels through, so invalidate
+      // both prefixes here rather than in each caller.
+      matchupApi.invalidate(`matchups:league:${leagueId}`);
+      matchupApi.invalidate(`matchups:user:${leagueId}`);
+      matchupApi.invalidate(`matchups:playoffs:${leagueId}`);
+
       return { error: null };
     } catch (error: unknown) {
       logger.error('[MatchupService] Error generating matchups:', error);
@@ -446,8 +459,9 @@ export const MatchupService = {
       }
 
       // Get first week start date
-      const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
-      const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+      // WEEK-MATH FIX (2026-08-22): clamp to season start like generation does
+      const draftCompletionDate = league.updated_at ? new Date(league.updated_at as string) : new Date();
+      const firstWeekStart = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate));
       const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = matchup.week_number > scheduleLength;
 

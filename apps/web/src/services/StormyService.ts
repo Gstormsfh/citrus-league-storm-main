@@ -14,6 +14,7 @@ import {
   getWeekEndDate,
   getWeekLabel,
   getScheduleLength,
+  clampToSeasonStart,
 } from "@/utils/weekCalculator";
 import { fetchGamesForTeams } from "@/utils/scheduleMaximizer";
 import { getWeeklyProjections } from "@/utils/projectionHelper";
@@ -346,7 +347,7 @@ class StormyServiceImpl {
 
       if (leagueRow?.draft_status === "completed" && leagueRow.updated_at) {
         const draftDate = new Date(leagueRow.updated_at);
-        const firstWeekStart = getFirstWeekStartDate(draftDate);
+        const firstWeekStart = clampToSeasonStart(getFirstWeekStartDate(draftDate)); // WEEK-MATH FIX 2026-08-22: align with schedule generation
         currentWeek = getCurrentWeekNumber(firstWeekStart);
         weekStart = getWeekStartDate(currentWeek, firstWeekStart);
         weekEnd = getWeekEndDate(currentWeek, firstWeekStart);

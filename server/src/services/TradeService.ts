@@ -263,6 +263,22 @@ export class TradeService {
       return { success: false, error: 'Trade not found or already processed' };
     }
 
+    // OFFER-EXPIRY FIX (2026-08-23, found during launch QA): expires_at
+    // was written on every proposal (league setting, default 7 days) but
+    // NOTHING ever read it — a stale offer stayed acceptable forever,
+    // long after the proposer's roster context changed. Enforce it at
+    // the accept gate and mark the row so the history is honest. The
+    // hourly sweep (scheduled.ts) expires lingering rows too; this
+    // in-path check covers the gap between sweeps.
+    if (trade.expires_at && new Date(trade.expires_at as string).getTime() < Date.now()) {
+      await this.supabase
+        .from('trade_offers')
+        .update({ status: 'expired', processed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('id', tradeId)
+        .eq('status', 'pending');
+      return { success: false, error: 'This trade offer has expired' };
+    }
+
     // Verify user owns the to_team
     const { data: toTeam } = await this.supabase
       .from('teams')

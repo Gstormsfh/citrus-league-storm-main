@@ -405,7 +405,13 @@ const TradeAnalyzer = () => {
       losses: p.losses || 0,
       otl: p.ot_losses || 0,
       gaa: p.goals_against_average || 0,
-      savePct: p.save_percentage || 0
+      savePct: p.save_percentage || 0,
+      // STAT-GRID FIX (2026-08-22, found live on prod during launch QA):
+      // these three were never wired here, so the player modal showed a
+      // goalie with 31 W / 2.02 GAA next to GP 0 / SV 0 / SO 0.
+      gamesPlayed: (p.position === 'G' ? (p.goalie_gp ?? p.games_played) : p.games_played) || 0,
+      saves: p.saves || 0,
+      shutouts: p.shutouts || 0
     },
     team: p.team,
     teamAbbreviation: p.team,

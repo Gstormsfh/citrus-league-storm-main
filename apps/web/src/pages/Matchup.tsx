@@ -28,7 +28,7 @@ import { LeagueService, League, Team } from '@/services/LeagueService';
 import { MatchupService, Matchup as MatchupType } from '@/services/MatchupService';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { ScheduleService } from '@/services/ScheduleService';
-import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
+import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate, clampToSeasonStart } from '@/utils/weekCalculator';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { DemoMatchupCacheService, type DemoMatchupPayload } from '@/services/DemoMatchupCacheService';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
@@ -626,9 +626,10 @@ const Matchup = () => {
           const demoLeague = cachedPayload.league as any;
           setLeague(demoLeague as League);
 
-          const { getDraftCompletionDate: gDCD, getFirstWeekStartDate: gFWSD, getAvailableWeeks: gAW, getWeekStartDate: gWSD, getWeekEndDate: gWED } = await import('@/utils/weekCalculator');
+          const { getDraftCompletionDate: gDCD, getFirstWeekStartDate: gFWSD, getAvailableWeeks: gAW, getWeekStartDate: gWSD, getWeekEndDate: gWED, clampToSeasonStart: gCTS } = await import('@/utils/weekCalculator');
           const draftDate = gDCD(demoLeague as any);
-          const firstWeek = draftDate ? gFWSD(draftDate) : getTodayMSTDate();
+          // WEEK-MATH FIX (2026-08-22): clamp to season start like generation does
+          const firstWeek = gCTS(draftDate ? gFWSD(draftDate) : getTodayMSTDate());
           setFirstWeekStart(firstWeek);
 
           const weeks = cachedPayload.availableWeeks.length > 0 ? cachedPayload.availableWeeks : gAW(firstWeek);
@@ -731,14 +732,15 @@ const Matchup = () => {
 
         // Get first week start date from league (uses updated_at when draft_status is 'completed')
         // Use same logic as logged-in users
-        const { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } = await import('@/utils/weekCalculator');
+        const { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate, clampToSeasonStart } = await import('@/utils/weekCalculator');
         const draftCompletionDate = getDraftCompletionDate(demoLeague as any);
         if (!draftCompletionDate) {
           throw new Error('Demo league has no draft completion date (updated_at is missing)');
         }
 
         // Calculate first week start (same as logged-in users)
-        const firstWeek = getFirstWeekStartDate(draftCompletionDate);
+        // WEEK-MATH FIX (2026-08-22): clamp to season start like generation does
+        const firstWeek = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate));
         setFirstWeekStart(firstWeek);
 
         // Get available weeks (same as logged-in users)
@@ -3714,7 +3716,15 @@ const Matchup = () => {
           return;
         }
 
-        const firstWeek = getFirstWeekStartDate(draftCompletionDate);
+        // WEEK-MATH FIX (2026-08-22, found live on prod during launch QA):
+        // clamp the anchor to the season start, exactly like matchup
+        // GENERATION does (MatchupService.generateMatchupsForLeague). An
+        // offseason draft otherwise yields an Aug anchor here, which (a)
+        // renders calendar week dates ("Aug 23-29") that contradict the
+        // schedule's real week 1 (Sep 28), and (b) collapses
+        // getAvailableWeeks to a single week ("WEEK 1/1" for a 27-week
+        // season) because an Aug anchor's season-end lands in the past.
+        const firstWeek = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate));
         setFirstWeekStart(firstWeek);
 
         // Get available weeks
@@ -3975,12 +3985,16 @@ const Matchup = () => {
                 log(' Successfully regenerated and verified matchup exists');
                 // Matchup now exists, continue with normal flow below
               } else {
-                setError(`No matchup found for week ${weekToShow}. The matchup generation may have failed. Please try refreshing the page.`);
+                // COPY FIX (2026-08-22): generation usually SUCCEEDED by this point
+                // (the historical miss was a stale client cache, fixed in
+                // MatchupService.generateMatchupsForLeague). Don't tell the user
+                // generation "failed" — a refresh resolves it.
+                setError(`Your week ${weekToShow} matchup isn't loading yet. Refresh the page to try again.`);
                 setLoading(false);
                 return;
               }
             } else {
-              setError(`No matchup found for week ${weekToShow}. The matchup generation may have failed. Please try refreshing the page.`);
+              setError(`Your week ${weekToShow} matchup isn't loading yet. Refresh the page to try again.`);
               setLoading(false);
               return;
             }
