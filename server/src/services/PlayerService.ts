@@ -229,9 +229,17 @@ export class PlayerService {
 
     const numericIds = playerIds.map((id) => parseInt(String(id), 10)).filter((id) => !isNaN(id));
 
+    // SEASON FILTER (2026-08-23 final audit): these reads had NO season
+    // filter while getAllPlayers() filters all of them to
+    // getCurrentSeason(). player_directory and player_season_stats are
+    // per-SEASON indexes, so the unfiltered .in() returned one row per
+    // season per player and the Map collapse below kept an arbitrary
+    // one — the Free Agents player card showed a different stat line
+    // (another season's) than the pool row for the same player.
     const { data: directory, error } = await this.supabase
       .from('player_directory')
       .select(COLUMNS.PLAYER_DIRECTORY)
+      .eq('season', getCurrentSeason())
       .in('player_id', numericIds);
 
     if (error) {
@@ -244,10 +252,12 @@ export class PlayerService {
       this.supabase
         .from('player_season_stats')
         .select(COLUMNS.PLAYER_STATS)
+        .eq('season', getCurrentSeason())
         .in('player_id', dirIds),
       this.supabase
         .from('player_talent_metrics')
         .select(COLUMNS.PLAYER_TALENT_METRICS)
+        .eq('season', getCurrentSeason())
         .in('player_id', dirIds),
       this.supabase
         .from('goalie_gsax_primary')

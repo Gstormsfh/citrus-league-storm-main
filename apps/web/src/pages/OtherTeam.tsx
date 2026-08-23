@@ -395,9 +395,13 @@ const OtherTeam = () => {
         // If lineup exists but is invalid (especially if starters is empty), force re-assignment
         if (savedLineup && !isValidLineup) {
           logger.error(`OtherTeam: Team ${teamId} - ❌ INVALID LINEUP DETECTED! (${starterCount} starters, ${benchCount} bench). All players on bench! Auto-fixing NOW...`);
-          // Fall through to auto-assignment below - don't use the invalid lineup
-          // The auto-assignment will create a proper lineup and save it (same logic as team 2)
-        } else if (isValidLineup) {
+          // NOTE (2026-08-23 final audit): this used to be the first arm of an
+          // if/else-if chain — "fall through to auto-assignment" fell through
+          // to NOTHING, so a team with an invalid saved lineup rendered a
+          // completely empty page. The auto-assign arm below now actually runs
+          // for this case (the else-if became a standalone if/else).
+        }
+        if (savedLineup && isValidLineup) {
           // Restore saved lineup for this team
           const playerMap = new Map(transformedPlayers.map(p => [String(p.id), p]));
           const savedPlayerIds = new Set([

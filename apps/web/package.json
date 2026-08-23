@@ -22,6 +22,7 @@
     "predeploy": "node -e \"console.error('BLOCKED: bare deploy targets PROD via .firebaserc default. Use npm run deploy:staging (or deliberately remove predeploy for a prod release).'); process.exit(1)\""
   },
   "dependencies": {
+    "@capacitor/android": "8.5.0",
     "@capacitor/app": "8.1.1",
     "@capacitor/browser": "8.0.4",
     "@capacitor/core": "8.5.0",
