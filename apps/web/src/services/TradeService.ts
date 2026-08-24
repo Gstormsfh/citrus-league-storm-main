@@ -93,6 +93,14 @@ export class TradeService {
 
       accountApi.logSecurityEvent('TRADE_ACCEPT', null, { tradeId }).catch(() => { /* non-critical */ });
 
+      // 2026-08-24: an accepted trade moves players on BOTH teams — clear all
+      // client roster caches so every open view refetches the new rosters.
+      // Best-effort: a cache-clear failure must never flip a successful trade.
+      try {
+        const { clearRosterCaches } = await import('@/utils/rosterRefresh');
+        clearRosterCaches();
+      } catch { /* best-effort */ }
+
       // Server may return a message for review-routed trades
       if (result.data?.message) {
         return { success: true, error: result.data.message };

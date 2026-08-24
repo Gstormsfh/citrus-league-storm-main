@@ -46,6 +46,7 @@ import { COLUMNS } from '@/utils/queryColumns';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { GameLogosBar } from '@/components/matchup/GameLogosBar';
 import { logger } from '@/utils/logger';
+import { notifyRosterChanged } from '@/utils/rosterRefresh';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { DropPlayerForAddDialog } from '@/components/freeagents/DropPlayerForAddDialog';
@@ -860,8 +861,10 @@ const FreeAgents = () => {
         await fetchPlayers();
         // Refresh trending data to show updated counts
         await fetchTrendingData();
-        // Notify Roster page (and any other listeners) to refresh without a hard reload
-        window.dispatchEvent(new CustomEvent('citrus:roster-changed'));
+        // Clear roster caches + notify Roster page (and any other listeners)
+        // to refresh without a hard reload (2026-08-24: dispatch alone wasn't
+        // enough — the listener refetched into a stale in-memory cache).
+        notifyRosterChanged(teamData.id, leagueId);
       } else {
         // Check if the error is about a roster/position limit — open atomic swap dialog
         const errorStr = (result.error || '').toLowerCase();

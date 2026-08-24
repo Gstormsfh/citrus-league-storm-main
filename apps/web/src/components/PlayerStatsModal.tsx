@@ -342,6 +342,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
       const { success, error } = await LeagueService.dropPlayer(leagueId, user.id, String(player.id), 'Roster Tab');
       if (success) {
         toast({ title: "Player Dropped", description: `${player.name} has been dropped from your roster.` });
+        // 2026-08-24: broadcast so the Roster/FA pages behind this modal
+        // refetch fresh instead of showing the dropped player until reload.
+        try {
+          const { notifyRosterChanged } = await import('@/utils/rosterRefresh');
+          notifyRosterChanged(undefined, leagueId);
+        } catch { /* best-effort */ }
         onPlayerDropped?.();
         onClose();
       } else {

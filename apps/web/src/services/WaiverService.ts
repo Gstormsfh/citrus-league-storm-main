@@ -200,6 +200,14 @@ export class WaiverService {
           isFreeAgent: true,
         };
       }
+      // 2026-08-24: the add persisted server-side instantly, but the client's
+      // in-memory roster caches kept serving the pre-add roster until a hard
+      // reload. Clear both cache layers on every successful acquisition.
+      // Best-effort: a cache-clear failure must never flip a successful add.
+      try {
+        const { clearRosterCaches } = await import('@/utils/rosterRefresh');
+        clearRosterCaches(teamId, leagueId);
+      } catch { /* best-effort */ }
       return { success: true, isFreeAgent: true };
     } catch (faError: unknown) {
       // Extract the error message from the free agent attempt

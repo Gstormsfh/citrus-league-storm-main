@@ -299,6 +299,12 @@ const TradeAnalyzer = () => {
         title: "Trade Accepted",
         description: "The trade has been completed",
       });
+      // 2026-08-24: an accepted trade changes BOTH rosters — broadcast so the
+      // Roster page (and everything else) refetches fresh, no hard reload.
+      try {
+        const { notifyRosterChanged } = await import('@/utils/rosterRefresh');
+        notifyRosterChanged(undefined, activeLeagueId ?? undefined);
+      } catch { /* best-effort */ }
       if (myTeamId) {
         await loadTradeOffers(myTeamId);
       }

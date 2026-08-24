@@ -50,6 +50,7 @@ import { getCurrentSeason } from '@/utils/seasonConstants';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate, clampToSeasonStart } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';
+import { clearRosterCaches, notifyRosterChanged } from '@/utils/rosterRefresh';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { resolveFantasyPosition, type PositionType, getRosterSlots, DEFAULT_ROSTER_SLOTS, DEFAULT_FDG_ROSTER_SLOTS, getSlotPositions } from '@/utils/rosterUtils';
 
@@ -1280,9 +1281,15 @@ const Roster = () => {
 
   // Listen for cross-page roster-change events (fired by FreeAgents, WaiverWire,
   // Roster drop dialog, etc.) and refresh without requiring a hard reset.
+  // 2026-08-24: the handler used to refetch WITHOUT clearing the in-memory
+  // roster caches, so it faithfully re-rendered the stale copy — the exact
+  // "have to hard-reset the browser to see my add" bug. Clear first, always.
   useEffect(() => {
     const handler = () => {
-      try { loadRoster(true); } catch (e) { logger.error('[Roster] refresh-on-event failed:', e); }
+      try {
+        clearRosterCaches();
+        loadRoster(true);
+      } catch (e) { logger.error('[Roster] refresh-on-event failed:', e); }
     };
     window.addEventListener('citrus:roster-changed', handler);
     return () => window.removeEventListener('citrus:roster-changed', handler);
@@ -3887,8 +3894,8 @@ const Roster = () => {
                         setPendingAddPlayer(null);
                         // Refresh roster without full page reload (keeps current roster visible)
                         refreshRoster();
-                        // Notify other pages (FreeAgents, etc.) to refresh
-                        window.dispatchEvent(new CustomEvent('citrus:roster-changed'));
+                        // Clear caches + notify other pages (FreeAgents, etc.) to refresh
+                        notifyRosterChanged(undefined, userTeam?.league_id ?? undefined);
                       } else {
                         toast({
                           title: result.isFreeAgent === false ? "Claim Failed" : "Add Failed",

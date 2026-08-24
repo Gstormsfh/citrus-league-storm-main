@@ -1372,7 +1372,13 @@ async joinLeagueByCode(
         return { success: false, error: new Error(dropResult.error) };
       }
 
-      MatchupService.clearRosterCache(teamId, leagueId);
+      // 2026-08-24: clear BOTH roster cache layers (RosterCacheService was
+      // missed here, so dropped players lingered on screen until hard reload).
+      // Best-effort: a cache-clear failure must never flip a successful drop.
+      try {
+        const { clearRosterCaches } = await import('@/utils/rosterRefresh');
+        clearRosterCaches(teamId, leagueId);
+      } catch { /* best-effort */ }
       return { success: true, error: null };
     } catch (error) {
       return { success: false, error };
@@ -1417,9 +1423,13 @@ async joinLeagueByCode(
         return { success: false, error: new Error(addResult.error) };
       }
 
-      // Clear roster cache for this team when player is added
-      const { MatchupService } = await import('./MatchupService');
-      MatchupService.clearRosterCache(teamId, leagueId);
+      // Clear BOTH roster cache layers when a player is added (2026-08-24:
+      // RosterCacheService was missed here — stale roster until hard reload).
+      // Best-effort: a cache-clear failure must never flip a successful add.
+      try {
+        const { clearRosterCaches } = await import('@/utils/rosterRefresh');
+        clearRosterCaches(teamId, leagueId);
+      } catch { /* best-effort */ }
 
       return { success: true, error: null };
     } catch (error) {

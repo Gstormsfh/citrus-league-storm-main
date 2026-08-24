@@ -16,6 +16,7 @@ import { WaiverService } from '@/services/WaiverService';
 import { rosterApi } from '@/api/rosters';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
+import { notifyRosterChanged } from '@/utils/rosterRefresh';
 
 export interface DropPlayerForAddDialogProps {
   open: boolean;
@@ -171,7 +172,9 @@ export function DropPlayerForAddDialog({
         });
         onOpenChange(false);
         onSuccess?.();
-        window.dispatchEvent(new CustomEvent('citrus:roster-changed'));
+        // 2026-08-24: clear roster caches before broadcasting, or listeners
+        // refetch straight into the stale in-memory copy.
+        notifyRosterChanged(teamId, leagueId);
       } else {
         toast({
           title: 'Swap Failed',
