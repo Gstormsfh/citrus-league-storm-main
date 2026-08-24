@@ -1,0 +1,139 @@
+CITRUS — ONE RENDER PER PAGE
+Ten images. Each one replaces a plate AND a cut-out.
+
+WHY
+
+The build has been compositing two separately-generated images: an empty
+arena plate, and a character knocked out of a studio render. They were never
+lit together. Different key light, different camera height, different
+horizon, different ground plane. A drop shadow under the skates is a fake
+relationship — it will always read as pasted, because it is pasted.
+
+The fix is not a better cut-out. It is one image where the character is
+already standing in the room, lit by that room's lights, casting that room's
+shadow. Ten of those and the layering problem stops existing.
+
+The build already prefers these. Drop one in and it supersedes both layers
+for that page; the pages without one keep the current two-layer version, so
+you can deliver these one at a time.
+
+
+================================================================
+THE METHOD — reference, don't regenerate
+================================================================
+
+Feed the existing -tor render as the SOURCE IMAGE every time. This is the
+same discipline that kept the sweaters on-model through phases 1 and 2: the
+model is placing a character it can see, not inventing one from a
+description. Describe him in the prompt anyway — belt and braces — but the
+reference image is what keeps him the same character across ten scenes.
+
+--- PRESERVATION BLOCK, paste on every one ---
+
+Use the character in the reference image EXACTLY as he is: same face, same
+eye shape and colour, same expression, same body proportions, same navy and
+white hockey sweater with the same number, same badge, same equipment. Do
+not redesign him, do not restyle him, do not change his colours. Same chunky
+low-poly 3D style throughout.
+
+--- SCENE BLOCK, paste on every one ---
+
+Place him INTO the scene described below as ONE single continuous render —
+not a cut-out on a background. He stands on the scene's floor, lit by the
+scene's own lights, casting a real contact shadow onto that floor, with the
+scene's colour bouncing onto him. Same lens and camera height as the room.
+
+Wide cinematic 16:9, 1920x1080. Deep navy blue (#00205B, #041030) dominant.
+Matte materials, soft bevels, soft studio-quality light.
+
+COMPOSITION IS NOT OPTIONAL: the headline sits on the left, so the LEFT 55%
+of the frame stays dark, low contrast and empty of any focal object. The
+character stands in the RIGHT third. All scene detail lives in the right 45%.
+
+NO OTHER PEOPLE OR CREATURES. ABSOLUTELY NO TEXT, NO LETTERS, NO NUMBERS, NO
+SIGNAGE, NO LOGOS anywhere in the frame — if a surface would normally carry
+writing, leave it blank.
+
+--- end blocks ---
+
+
+================================================================
+THE TEN
+================================================================
+
+ 1. hero-locker.webp     ref: mascot-lemon-tor.webp
+    An empty dressing room. He is sitting on the bench, kit bag open beside
+    him, six pieces of equipment laid out along the bench, stick leaning on
+    the wall. Warm overhead light, deep shadow in the corners.
+
+ 2. hero-bench.webp      ref: mascot-stormy-tor.webp
+    The players' bench at ice level, looking down the boards. She is behind
+    the bench with a blank whiteboard propped beside her. Cool arena light.
+
+ 3. hero-clock.webp      ref: mascot-lemon-tor.webp
+    Under a scoreboard clock housing, display dark and blank. He is looking
+    up at it, stick over his shoulder. Deep arena black behind, one hard
+    light source from the scoreboard itself.
+
+ 4. hero-tunnel.webp     ref: mascot-kiwi-tor.webp
+    The players' tunnel looking out toward bright ice. He is walking out of
+    the dark toward the light, silhouetted at the edges by it.
+
+ 5. hero-ice.webp        ref: mascot-kiwi-tor-win.webp
+    The slot and crease from a low angle, faceoff dot and crease paint,
+    fresh skate cuts. He is crouched at the dot studying the ice.
+
+ 6. hero-podium.webp     ref: mascot-lemon-tor-win.webp
+    Three wooden podium blocks numbered nowhere — blank faces. He is
+    standing on the tallest, arms up, confetti mid-air, dark stage behind.
+
+ 7. hero-card.webp       ref: mascot-lemon-tor.webp
+    A table with blank prediction cards fanned across it, pencil resting on
+    them. He is leaning over the table with one card in hand.
+
+ 8. hero-crease.webp     ref: mascot-pineapple-tor.webp
+    The crease seen from behind the net, mesh soft in the foreground. He is
+    IN the crease in his stance, arena lights beyond, ice reflecting up.
+
+ 9. hero-grid.webp       ref: mascot-kiwi-tor.webp
+    A concourse wall with a nine-square board hanging on it, all nine
+    squares blank. He is standing in front of it, hand on chin, thinking.
+    Warm concourse lighting.
+
+10. hero-board.webp      ref: mascot-lemon-tor.webp
+    An old split-flap standings board, every row blank. He is at a podium in
+    front of it pointing up at the board. Dramatic side light.
+
+
+================================================================
+HOW TO TELL IT WORKED
+================================================================
+
+Only one test matters, and it is not "does the character look right."
+
+  Cover the character with your thumb. Does the light on the floor where he
+  was standing still make sense? Is there a shadow, and does it fall the
+  same way as every other shadow in the room?
+
+If yes, it is one render. If the floor under him is clean and unlit, the
+model pasted him in and you have the same problem in a new file.
+
+Two more, both fatal:
+  - his shadow falls a different direction from the room's other shadows
+  - he is lit from a side the room has no light on
+
+Text appearing anywhere is still the failure mode from phase 1. Say the
+no-text line twice if you have to.
+
+
+================================================================
+DROP THEM IN
+================================================================
+
+    (into apps/web/public/mascots/, then)
+    python3 bake_art.py && python3 build.py
+
+The build takes `hero-*.webp` over the plate-plus-cut-out pair for that page
+automatically, hides the character layer, and drops the fake contact shadow
+with it. Pages without one keep what they have now, so deliver these one at
+a time and watch them replace themselves.

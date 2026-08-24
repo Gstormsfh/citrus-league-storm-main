@@ -1,0 +1,122 @@
+CITRUS — THE ONE THAT MATTERS
+Cut-outs. Transparent background. Nothing else in this file.
+
+WHY THIS ONE
+
+Look at any hero band in the build right now. There is a hard vertical seam
+about two thirds across: the arena plate stops and a different room starts.
+That second room is the dark-green studio background baked into every mascot
+render. The character is not a character sitting on a scene — it is a
+photograph of a character in a box, pasted onto a scene.
+
+That seam is on all nine pages. It is the single most "made by a machine"
+artifact left in the build, and no amount of new scene art fixes it, because
+the scene art is not the problem. The characters are.
+
+Cut them out and the same renders start compositing properly: full body on a
+plate, bust in a 46px avatar, reaction pose over a result card, at any size,
+against any background, with a real drop shadow underneath instead of a
+rectangle of someone else's lighting.
+
+Twelve files. Everything else in the build already works.
+
+
+================================================================
+THE PROMPT
+================================================================
+
+Feed it the existing -tor render as the source image. Edit, do not generate:
+a regenerated character is a different character and the set falls apart.
+
+--- paste this, then the line for the file you are making ---
+
+Edit this exact image. Remove the background completely and output the
+character alone on a fully transparent background (alpha channel, PNG or
+lossless WebP).
+
+PRESERVE EXACTLY, DO NOT REDRAW: the face, the eye shape and colour, the
+expression, the body proportions, the sweater design and its navy and white
+colours, the number on the sweater, the badge, every prop the character is
+holding, and the pose. Same low-poly 3D style, same camera angle, same
+distance.
+
+PRESERVE THE LIGHTING ON THE CHARACTER: keep the key light from the upper
+left and the rim light exactly as they fall now. Do not relight, do not
+flatten, do not add a new light.
+
+REMOVE: the dark green vignette, the studio backdrop, the floor, the cast
+shadow on the floor, and any glow or haze that belongs to the background
+rather than to the character.
+
+The alpha edge must be clean and slightly soft — no white halo, no dark
+fringe, no leftover green spill on the outline. Trim tight to the character
+with a few pixels of padding. 1024x1024.
+
+--- end ---
+
+Then the file. Same name, `-cut` on the end:
+
+ 1. mascot-lemon-tor-cut.webp            from mascot-lemon-tor.webp
+ 2. mascot-kiwi-tor-cut.webp             from mascot-kiwi-tor.webp
+ 3. mascot-pineapple-tor-cut.webp        from mascot-pineapple-tor.webp
+ 4. mascot-stormy-tor-cut.webp           from mascot-stormy-tor.webp
+ 5. mascot-lemon-tor-win-cut.webp        from mascot-lemon-tor-win.webp
+ 6. mascot-lemon-tor-loss-cut.webp       from mascot-lemon-tor-loss.webp
+ 7. mascot-kiwi-tor-win-cut.webp         from mascot-kiwi-tor-win.webp
+ 8. mascot-kiwi-tor-loss-cut.webp        from mascot-kiwi-tor-loss.webp
+ 9. mascot-pineapple-tor-win-cut.webp    from mascot-pineapple-tor-win.webp
+10. mascot-pineapple-tor-loss-cut.webp   from mascot-pineapple-tor-loss.webp
+11. mascot-stormy-tor-win-cut.webp       from mascot-stormy-tor-win.webp
+12. mascot-stormy-tor-loss-cut.webp      from mascot-stormy-tor-loss.webp
+
+
+================================================================
+HOW TO TELL IT WORKED
+================================================================
+
+Open the file on a WHITE background, not a dark one. Every failure mode is
+invisible on navy and obvious on white:
+
+  green spill        a lime rim tracing the outline
+  white halo         a pale outline where the matte was cut too wide
+  dark fringe        a grey outline where it was cut too tight
+  ghost floor        a faint oval under the skates
+  hard alpha         a jagged edge instead of a slightly soft one
+
+If the character's own lighting changed — flatter, or lit from a new side —
+reject it. That is a regeneration wearing the right sweater, and it will not
+sit beside the other eleven.
+
+
+================================================================
+DROP THEM IN
+================================================================
+
+    (into apps/web/public/mascots/, then)
+    python3 bake_art.py && python3 build.py
+
+The build reads a `-cut` file in preference to the boxed one wherever a
+character sits on a plate, and falls back to what is there now for any that
+have not landed. Deliver one or all twelve.
+
+
+================================================================
+WHAT THIS WILL NOT FIX
+================================================================
+
+Being straight with you, because you asked for the prompt that closes the
+gap and this one does not close all of it.
+
+A club's own app leads with players. Faces, names, numbers, photography of
+people who played last night. Yours leads with fruit. That is not a prompt
+problem and no image fixes it — it is a positioning choice, and there is a
+real argument for the fruit: it is the thing MLSE cannot buy from anyone
+else, and every club app on earth already looks like every other club app.
+But it is a choice, and Friday is the room where you make it out loud rather
+than let a screenshot make it for you.
+
+The other half of "AI slop" was never art either. It was pages that were a
+quarter content and three quarters empty navy. Guess the Leaf is fixed — it
+shows all seven clue slots now, locked ones priced, so the page reads as a
+board instead of a form. The same pass is owed to Luck or Skill, Beat the
+Buzzer, and Rank 'Em.
