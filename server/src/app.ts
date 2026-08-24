@@ -12,6 +12,8 @@ import { draftV2Routes } from './routes/draftV2Sync';
 import { draftV2StartRoutes } from './routes/draftV2Start';
 import { draftV2EraRoutes } from './routes/draftV2Era';
 import { draftV2PickRoutes } from './routes/draftV2Pick';
+import { draftV2AuctionRoutes } from './routes/draftV2Auction';
+import { draftV2OfflineRoutes } from './routes/draftV2Offline';
 import { draftV2EventsRoutes } from './routes/draftV2Events';
 import { rosterRoutes } from './routes/rosters';
 import { tradeRoutes } from './routes/trades';
@@ -250,6 +252,8 @@ app.route('/api/drafts', draftsRoutes);
 // Spec: docs/DRAFT_ENGINE_V2_SPEC.md §7 (endpoints).
 app.route('/api/draft/v2', draftV2Routes);        // §7.2 GET /sync
 app.route('/api/draft/v2', draftV2PickRoutes);    // §7.3 POST /pick
+app.route('/api/draft/v2', draftV2AuctionRoutes); // 2026-08-24 POST /nominate + /bid (auction launch)
+app.route('/api/draft/v2', draftV2OfflineRoutes); // 2026-08-24 POST /offline-import (offline draft launch)
 app.route('/api/draft/v2', draftV2EventsRoutes);  // §7.4 GET /events
 app.route('/api/draft/v2', draftV2StartRoutes);   // T7 POST /league/:leagueId/start (F27 commissioner ignition)
 app.route('/api/draft/v2', draftV2EraRoutes);     // E104 GET /league/:leagueId/era (V1-FENCE probe via API)

@@ -681,72 +681,13 @@ describe('WaiverService.recalculateReverseStandingsPriority', () => {
 });
 
 // =============================================================================
-// updateWaiverSettings
+// updateWaiverSettings + processFAABWaivers — REMOVED (2026-08-24 polish).
+// Both methods called endpoints that never existed server-side (PUT
+// /settings and POST /process-faab), so every call 404ed. Their tests
+// asserted the 404-producing transport and went with them. The live
+// waiver-settings path is LeagueService.updateWaiverSettings; FAAB
+// processing runs through processAllPendingWaivers + the nightly cron.
 // =============================================================================
-
-describe('WaiverService.updateWaiverSettings', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('updates settings successfully', async () => {
-    (apiClient.put as any).mockResolvedValue({ data: { success: true } });
-
-    const result = await WaiverService.updateWaiverSettings('league-1', 'commissioner-1', {
-      waiver_type: 'reverse_standings',
-    });
-
-    expect(result.success).toBe(true);
-    expect(apiClient.put).toHaveBeenCalledWith(
-      '/api/waivers/league/league-1/settings',
-      { waiver_type: 'reverse_standings' }
-    );
-  });
-
-  it('returns error when API fails', async () => {
-    (apiClient.put as any).mockRejectedValue(new Error('Update failed'));
-
-    const result = await WaiverService.updateWaiverSettings('league-1', 'commissioner-1', {
-      waiver_game_lock: true,
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Update failed');
-  });
-});
-
-// =============================================================================
-// processFAABWaivers
-// =============================================================================
-
-describe('WaiverService.processFAABWaivers', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns processed results from API', async () => {
-    (apiClient.post as any).mockResolvedValue({
-      data: {
-        processed: 3,
-        results: [
-          { player_id: 101, winner_team_id: 'team-1', bid: 25 },
-        ],
-      },
-    });
-
-    const result = await WaiverService.processFAABWaivers('league-1');
-    expect(result.processed).toBe(3);
-    expect(result.results).toHaveLength(1);
-  });
-
-  it('returns error on API failure', async () => {
-    (apiClient.post as any).mockRejectedValue(new Error('Processing error'));
-
-    const result = await WaiverService.processFAABWaivers('league-1');
-    expect(result.processed).toBe(0);
-    expect(result.error).toContain('Processing error');
-  });
-});
 
 // =============================================================================
 // addPlayer — Smart add (free agent vs waiver claim routing)

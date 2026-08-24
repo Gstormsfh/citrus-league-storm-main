@@ -197,9 +197,13 @@ export class LeagueService {
     LeagueMembershipService.clearCache(league.id, commissionerId);
     const team = teamData as any;
 
-    // Initialize FAAB budget if enabled
+    // Initialize FAAB budget if enabled.
+    // 2026-08-24: accept BOTH key spellings — the settings dialog and the
+    // budget-seeding path write camelCase `faabBudget`; older callers used
+    // snake_case `faab_budget`. Prefer camelCase (JSONB settings convention).
     if (waiverSettings?.waiver_type === 'faab' || settings?.waiver_type === 'faab') {
-      const initialBudget = waiverSettings?.faab_budget || settings?.faab_budget || 100;
+      const initialBudget = waiverSettings?.faabBudget ?? waiverSettings?.faab_budget
+        ?? settings?.faabBudget ?? settings?.faab_budget ?? 100;
       if (team) {
         await this.supabase.from('faab_budgets').insert({
           league_id: league.id,

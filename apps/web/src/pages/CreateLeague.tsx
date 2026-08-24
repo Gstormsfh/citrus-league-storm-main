@@ -969,9 +969,20 @@ const CreateLeague = () => {
                           />
                           <p className="text-xs text-white/55">
                             {leagueType === 'playoff-roster-pool'
-                              ? 'After this time, rosters lock and players cannot be swapped. Default is Round 1 Game 1 puck drop.'
+                              ? 'After this time, rosters lock and players cannot be swapped. Set it to Round 1 Game 1 puck drop.'
                               : 'After this time, picks lock. Typically set to just before the first playoff game.'}
                           </p>
+                          {/* 2026-08-24 polish: the default is "a few days from now",
+                              which is only right when pools are created during playoff
+                              season. Off-season commissioners get an honest nudge
+                              instead of a silently-wrong deadline. */}
+                          {(new Date().getMonth() >= 6 || new Date().getMonth() <= 1) && (
+                            <p className="text-xs text-amber-400">
+                              Heads up: the NHL playoffs start in spring. The pre-filled date is
+                              just a placeholder — set the lock to right before Round&nbsp;1 Game&nbsp;1
+                              (typically mid-April).
+                            </p>
+                          )}
                         </div>
                       )}
 
@@ -1252,32 +1263,30 @@ const CreateLeague = () => {
                         <RadioGroup
                           value={draftType}
                           onValueChange={(v) => {
-                            // LAUNCH GATE (2026-08-21): auction is selectable-looking
-                            // but the auction ROOM retired with v1 (2026-08-18) and v2
-                            // has no auction UI yet — an "auction" league silently runs
-                            // as snake (verified live: Round 1 · Pick 1/42, no bidding).
-                            // Until the v2 auction room ships, refuse the selection.
-                            if (v === 'auction') return;
-                            // LAUNCH GATE (2026-08-23): offline/manual has NO
-                            // commissioner import mechanism anywhere in the app —
-                            // the create-form copy promises "enter draft results
-                            // after your external draft" but pressing Start on an
-                            // offline league would launch a live engine draft.
-                            // Gated until the pick-entry UI exists.
-                            if (v === 'offline') return;
+                            // AUCTION SHIPPED (2026-08-24 launch build): the v2
+                            // auction transport (draftV2Auction routes), engine
+                            // live-apply timer arming, and the AuctionPanel room UI
+                            // are live — the 2026-08-21 gate is retired.
+                            // OFFLINE SHIPPED (2026-08-24 launch build): the
+                            // commissioner results-entry room (OfflineDraftRoom),
+                            // the offline_import_draft_v2 RPC + API route, and the
+                            // draftV2Start offline refusal are live — the
+                            // 2026-08-23 gate is retired.
+                            // AUTOPICK SHIPPED (2026-08-24 launch build): the engine
+                            // now maps draftType='autopick' to a snake lobby with a
+                            // fast per-seat clock (draft/index.ts) — the system
+                            // drafts for every team from queues/rankings.
                             setDraftType(v as DraftType);
                           }}
                           className="grid grid-cols-1 gap-3"
                         >
                           {(Object.keys(DRAFT_TYPE_LABELS) as DraftType[]).map((type) => (
                             <div key={type}>
-                              <RadioGroupItem value={type} id={`draft-${type}`} className="peer sr-only" disabled={type === 'auction' || type === 'offline'} />
+                              <RadioGroupItem value={type} id={`draft-${type}`} className="peer sr-only" />
                               <Label
                                 htmlFor={`draft-${type}`}
                                 className={`flex items-start gap-4 rounded-xl border-2 p-4 transition-all
-                                  ${(type === 'auction' || type === 'offline')
-                                    ? 'bg-white/[0.03] ring-1 ring-white/10 opacity-60 cursor-not-allowed'
-                                    : draftType === type
+                                  ${draftType === type
                                       ? 'bg-pastel-orange/15 ring-2 ring-pastel-orange/40 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)] cursor-pointer'
                                       : 'bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/30 hover:bg-white/[0.08] cursor-pointer'
                                   }`}
@@ -1290,9 +1299,6 @@ const CreateLeague = () => {
                                     <span className="font-semibold">{DRAFT_TYPE_LABELS[type]}</span>
                                     {type === 'snake' && (
                                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Most Popular</Badge>
-                                    )}
-                                    {(type === 'auction' || type === 'offline') && (
-                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-pastel-orange/40 text-pastel-orange-soft">Coming soon</Badge>
                                     )}
                                   </div>
                                   <p className="text-xs text-white/55 mt-1 leading-relaxed">
@@ -1310,7 +1316,9 @@ const CreateLeague = () => {
 
                       {/* Draft Config Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {draftType !== 'offline' && (
+                        {/* Draft Rounds — every type needs it, offline included:
+                            it sizes the commissioner's results-entry grid. */}
+                        {(
                           <div className="space-y-3">
                             <Label>Draft Rounds</Label>
                             <Select value={draftRounds} onValueChange={setDraftRounds}>
@@ -1702,17 +1710,23 @@ const CreateLeague = () => {
                               <div>
                                 <div className="flex items-center gap-2">
                                   <Label className="text-base font-semibold">Keeper League</Label>
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-pastel-orange/40 text-pastel-orange-soft">Coming soon</Badge>
                                 </div>
                                 <p className="text-xs text-white/55 mt-1">
-                                  Teams keep a set number of players between seasons.
+                                  Teams keep a set number of players between seasons. Your first
+                                  draft is a full draft; keepers apply from season two.
                                 </p>
                               </div>
-                              {/* LAUNCH GATE (2026-08-21): keeper settings persist and the
-                                  server API is complete, but no screen lets a manager
-                                  DESIGNATE a keeper yet — enabling it would sell a feature
-                                  that cannot be used. Disabled until the designation UI ships. */}
-                              <Switch checked={false} disabled onCheckedChange={() => {}} />
+                              {/* KEEPER SHIPPED (2026-08-24 launch build): the designation
+                                  surface exists now (KeeperPanel on the league dashboard +
+                                  the Keepers settings tab), so the 2026-08-21 gate is
+                                  retired. */}
+                              <Switch
+                                checked={keeperEnabled}
+                                onCheckedChange={(checked) => {
+                                  setKeeperEnabled(checked);
+                                  if (!checked) setDynastyMode(false);
+                                }}
+                              />
                             </div>
 
                             {keeperEnabled && (
@@ -1762,19 +1776,27 @@ const CreateLeague = () => {
                                 <Label className="text-base font-semibold flex items-center gap-2">
                                   <Crown className="w-4 h-4 text-amber-500" />
                                   Dynasty Mode
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-pastel-orange/40 text-pastel-orange-soft">Coming soon</Badge>
                                 </Label>
                                 <p className="text-xs text-white/55 mt-1">
                                   Keep your entire roster between seasons. Only rookies are drafted each year.
                                   The ultimate long-term commitment.
                                 </p>
                               </div>
-                              {/* LAUNCH GATE (2026-08-22): dynasty rides on the same
-                                  season-rollover machinery keeper needs (roster carryover +
-                                  designation), none of which has a UI yet — and this toggle
-                                  silently switched keeperEnabled on behind the gated keeper
-                                  switch. Gated to match Keeper until rollover ships. */}
-                              <Switch checked={false} disabled onCheckedChange={() => {}} />
+                              {/* DYNASTY SHIPPED (2026-08-24 launch build): designation +
+                                  settings surfaces exist (KeeperPanel + Keepers tab); dynasty
+                                  is keeper with an unlimited count, and enabling it turns
+                                  keeper on deliberately (that behavior is now intended, not
+                                  the 2026-08-22 accident). */}
+                              <Switch
+                                checked={dynastyMode}
+                                onCheckedChange={(checked) => {
+                                  setDynastyMode(checked);
+                                  if (checked) {
+                                    setKeeperEnabled(true);
+                                    setKeeperCount("0");
+                                  }
+                                }}
+                              />
                             </div>
                           </div>
                         )}
@@ -2021,7 +2043,10 @@ const CreateLeague = () => {
                       {isFantasy && <Badge variant="outline">{DRAFT_TYPE_LABELS[draftType]}</Badge>}
                       {keeperEnabled && <Badge variant="secondary">Keeper</Badge>}
                       {dynastyMode && <Badge variant="secondary">Dynasty</Badge>}
-                      {bestBallEnabled && <Badge variant="secondary">Best Ball</Badge>}
+                      {/* 2026-08-24 polish: the best-ball SCORING format already renders
+                          its own chip above — only show this add-on chip when best ball
+                          rides on a different scoring format. */}
+                      {bestBallEnabled && scoringFormat !== 'best-ball' && <Badge variant="secondary">Best Ball</Badge>}
                     </div>
 
                     <Button

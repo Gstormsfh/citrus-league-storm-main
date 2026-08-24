@@ -1785,7 +1785,7 @@ const Profile = () => {
                                       <RefreshCw className="h-4 w-4 text-pastel-orange" />
                                       Sync Rosters from Draft
                                     </Label>
-                                    <p className="text-xs text-white/55">Re-sync roster assignments from draft picks</p>
+                                    <p className="text-xs text-white/55">Rebuild team rosters from the completed draft results (safety net)</p>
                                   </div>
                                   <Button
                                     size="sm"

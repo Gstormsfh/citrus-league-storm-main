@@ -6090,6 +6090,20 @@ export class LobbyManager {
         //   without any client-side network noise.
         const applyStart = Date.now();
         this.applyEventDuringBootstrap(event);
+        // ── AUCTION LIVE-APPLY TIMER ARMING (2026-08-24, launch build) ──
+        //
+        // The defect class this closes is the same one E113/10c-2 fixed
+        // for picks: the per-type appliers deliberately do NOT arm timers
+        // (bootstrap's init() owns post-replay arming), so an auction
+        // action arriving over the HTTP-RPC-NOTIFY rail (a USER nomination
+        // or bid from the new /api/draft/v2 auction routes) mutated state
+        // but left no timer armed — a user nomination would sit open
+        // forever, and after a close no next nomination window ever
+        // started. Engine-authored actions are unaffected (their handlers
+        // arm inline and their NOTIFY echo is deduped by lastAppliedSeq
+        // before reaching this loop). Live-mode only by construction —
+        // bootstrap replay never runs through processExternalEvent.
+        this.armAuctionTimersAfterLiveApply(event.event_type);
         const applyMs = Date.now() - applyStart;
         // Chunk 10c-2 batch 3 (2026-07-27): touch activity clock. Any
         // external event applied is proof this lobby is being written
@@ -6213,6 +6227,72 @@ export class LobbyManager {
         // corruption.
         return;
       }
+    }
+  }
+
+  /**
+   * Arm/re-arm auction timers after a LIVE externally-applied event
+   * (2026-08-24 launch build — see the call site in
+   * `processExternalEvent` for the defect history). No-op for
+   * snake/linear lobbies and for auction lobbies that are paused,
+   * completed, or not in progress. `setPickDeadline` supersedes any
+   * previously-armed timer, so arming here after the generic
+   * `draft_started` case armed a 'pick' timer corrects the kind for
+   * auction lobbies (last arm wins).
+   */
+  private armAuctionTimersAfterLiveApply(eventType: string): void {
+    if (this.format !== 'auction') return;
+    if (this.pauseState !== null) return;
+    if (this.draftStatus !== 'in_progress') return;
+
+    switch (eventType) {
+      case 'draft_started': {
+        // Auction ignition over the live rail: the generic
+        // 'draft_started' case armed a 'pick' timer from
+        // first_pick_deadline — wrong kind for auction. Arm the first
+        // nomination window instead.
+        const deadline = new Date(Date.now() + this.nominationWindowMs);
+        this.setPickDeadline(deadline, 'nomination_window');
+        break;
+      }
+      case 'auction_nomination_started':
+      case 'auction_auto_nominated':
+      case 'auction_bid_extends_timer': {
+        // Applier set/extended currentNomination.expiresAt from the
+        // event payload — arm the bid window to that deadline.
+        if (this.currentNomination !== null) {
+          this.setPickDeadline(this.currentNomination.expiresAt, 'bid_window');
+        }
+        break;
+      }
+      case 'auction_nomination_closed':
+      case 'auction_nomination_expired':
+      case 'auction_nomination_skipped': {
+        // Applier cleared currentNomination and advanced the rotation.
+        // If the auction is still going, open the next nominator's
+        // window. (When the applier detected completion it flipped
+        // draftStatus to 'completed' and the guard above already
+        // returned.)
+        const deadline = new Date(Date.now() + this.nominationWindowMs);
+        this.setPickDeadline(deadline, 'nomination_window');
+        break;
+      }
+      case 'auction_resumed': {
+        // Applier restored currentNomination/expiresAt state. Re-arm
+        // whichever window applies.
+        if (this.currentNomination !== null) {
+          this.setPickDeadline(this.currentNomination.expiresAt, 'bid_window');
+        } else {
+          const deadline = new Date(Date.now() + this.nominationWindowMs);
+          this.setPickDeadline(deadline, 'nomination_window');
+        }
+        break;
+      }
+      default:
+        // auction_bid_placed (no deadline change — extensions arrive
+        // as their own event), auction_paused (timer teardown is the
+        // applier's job), pick/lifecycle events: nothing to arm.
+        break;
     }
   }
 

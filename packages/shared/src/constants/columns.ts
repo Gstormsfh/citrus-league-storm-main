@@ -29,7 +29,12 @@ export const MATCHUP_COLUMNS_SLIM = 'id, league_id, week_number, team1_id, team2
 // LEAGUE TABLE COLUMNS  
 // ============================================================================
 // Based on League interface in LeagueService.ts
-export const LEAGUE_COLUMNS = 'id, name, commissioner_id, draft_status, join_code, roster_size, draft_rounds, league_size, settings, scoring_settings, scheduled_draft_time, created_at, updated_at';
+// 2026-08-24: waiver/trade columns added — the commissioner settings dialog
+// hydrates from leagueData.waiver_type etc.; omitting them here made every
+// league read as defaults ('rolling', 2:00 AM, 48h) in that dialog, and a
+// commissioner pressing Save then silently REVERTED the league's real
+// waiver configuration to those defaults.
+export const LEAGUE_COLUMNS = 'id, name, commissioner_id, draft_status, join_code, roster_size, draft_rounds, league_size, settings, scoring_settings, scheduled_draft_time, waiver_type, waiver_process_time, waiver_period_hours, waiver_game_lock, allow_trades_during_games, trade_review_type, created_at, updated_at';
 
 // Slim version for list views
 export const LEAGUE_COLUMNS_SLIM = 'id, name, commissioner_id, draft_status, roster_size, league_size, settings, scoring_settings, scheduled_draft_time';

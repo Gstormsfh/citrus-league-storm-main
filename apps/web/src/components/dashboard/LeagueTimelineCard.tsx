@@ -60,6 +60,8 @@ interface LedgerRowFromApi {
   team_name?: string;
   created_at?: string;
   status?: string;
+  /** Ledger source ('Waiver Processing', 'Roster Tab', 'Trade in'/'Trade out'). */
+  source?: string | null;
 }
 
 // Shape returned by matchupApi.getLeagueMatchups.
@@ -84,7 +86,7 @@ function toTransactionInputs(
   for (const r of rows) {
     if (r.status && r.status !== 'processed') continue; // pending/failed excluded
     const rawType = (r.type ?? r.transaction_type ?? '').toUpperCase();
-    if (rawType !== 'ADD' && rawType !== 'DROP') continue;
+    if (rawType !== 'ADD' && rawType !== 'DROP' && rawType !== 'TRADE') continue;
     // NAME FIX (2026-08-22, found live on prod during launch QA): the ledger
     // endpoint returns player_id only — rendering "Player #8484801" on the
     // league home page. Resolve through the same player directory the
@@ -97,7 +99,13 @@ function toTransactionInputs(
     const teamName = r.teams?.team_name ?? r.team_name ?? 'Unknown team';
     const createdAt = r.created_at;
     if (!createdAt) continue;
-    out.push({ type: rawType as 'ADD' | 'DROP', playerName, teamName, createdAt });
+    out.push({
+      type: rawType as 'ADD' | 'DROP' | 'TRADE',
+      playerName,
+      teamName,
+      createdAt,
+      source: r.source ?? null,
+    });
   }
   return out;
 }
@@ -128,6 +136,7 @@ const KIND_GLYPH: Record<TimelineItem['kind'], string> = {
   draft_completed: '⭐',
   transaction_add: '＋',
   transaction_drop: '－',
+  transaction_trade: '⇄',
   matchup_result: '🏒',
 };
 

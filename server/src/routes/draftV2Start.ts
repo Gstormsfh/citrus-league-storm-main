@@ -78,6 +78,38 @@ draftV2StartRoutes.post(
       // for retry-safe semantics across network partitions.
       crypto.randomUUID();
 
+    // OFFLINE GUARD (2026-08-24 launch build). Offline leagues must
+    // NEVER ignite a live draft: the engine's format gate only speaks
+    // snake/linear/auction, so an in_progress offline league would
+    // NOTIFY-create a lobby that throws on bootstrap and crash-loops
+    // the WS (the exact pre-fix autopick brick). Results enter via
+    // POST /offline-import instead (draftV2Offline.ts).
+    //
+    // Fail OPEN on probe failure: this is defense-in-depth (CreateLeague
+    // never routes offline leagues here and the draft room hides Start
+    // for them) — a transient league-fetch error must not block a real
+    // live draft's ignition.
+    try {
+      const { data: leagueRow } = await supabase
+        .from('leagues')
+        .select('settings')
+        .eq('id', leagueId)
+        .maybeSingle();
+      const draftType = ((leagueRow?.settings ?? {}) as { draftType?: string })
+        .draftType;
+      if (draftType === 'offline') {
+        return fail(
+          c,
+          AppError.badRequest(
+            'illegal_state reason:offline_draft',
+            'Offline leagues do not run a live draft. Enter the results from the draft page instead.',
+          ),
+        );
+      }
+    } catch {
+      // Probe failed — proceed; start_draft_v2 and the engine gate remain.
+    }
+
     // Construct actor JSONB per F27 contract (start_draft_v2's p_actor).
     // commissionerMiddleware above has verified commissionership; the
     // RPC's actor gate additionally requires kind='commissioner' for

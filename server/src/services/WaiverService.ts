@@ -327,7 +327,9 @@ export class WaiverService {
       .eq('id', leagueId)
       .single();
 
-    const initialBudget = league?.settings?.faab_budget || 100;
+    // 2026-08-24: accept both key spellings — settings dialog + seeding
+    // write camelCase `faabBudget`; snake_case `faab_budget` is legacy.
+    const initialBudget = league?.settings?.faabBudget ?? league?.settings?.faab_budget ?? 100;
 
     const { data: claims, error: claimsError } = await this.supabase
       .from('waiver_claims')
@@ -353,12 +355,29 @@ export class WaiverService {
       .eq('id', leagueId)
       .single();
 
-    const initialBudget = league?.settings?.faab_budget || 100;
+    // 2026-08-24: accept both key spellings — settings dialog + seeding
+    // write camelCase `faabBudget`; snake_case `faab_budget` is legacy.
+    const initialBudget = league?.settings?.faabBudget ?? league?.settings?.faab_budget ?? 100;
 
     const { data: teams } = await this.supabase
       .from('teams')
       .select('id, team_name')
       .eq('league_id', leagueId);
+
+    // 2026-08-24: faab_budgets is the PROCESSING truth — the waiver RPC
+    // checks and deducts against it. This method used to derive
+    // (initial − successful bids) and ignore the table, so a mid-season
+    // budget edit made the UI meter disagree with what processing would
+    // actually allow. Read the table first; derive only for teams that
+    // have no budget row yet.
+    const { data: budgetRows } = await this.supabase
+      .from('faab_budgets')
+      .select('team_id, initial_budget, remaining_budget')
+      .eq('league_id', leagueId);
+    const budgetByTeam = new Map<string, { initial: number; remaining: number }>();
+    for (const b of (budgetRows || []) as Array<{ team_id: string; initial_budget: number; remaining_budget: number }>) {
+      budgetByTeam.set(b.team_id, { initial: Number(b.initial_budget), remaining: Number(b.remaining_budget) });
+    }
 
     const { data: claims, error: claimsError } = await this.supabase
       .from('waiver_claims')
@@ -372,7 +391,7 @@ export class WaiverService {
       return (teams || []).map((t: { id: string; team_name: string }) => ({
         team_id: t.id,
         team_name: t.team_name,
-        remaining_budget: initialBudget,
+        remaining_budget: budgetByTeam.get(t.id)?.remaining ?? initialBudget,
         total_spent: 0,
       }));
     }
@@ -383,12 +402,15 @@ export class WaiverService {
       spentByTeam.set(claim.team_id, current + (claim.bid_amount || 0));
     }
 
-    return (teams || []).map((t: any) => ({
-      team_id: t.id,
-      team_name: t.team_name,
-      remaining_budget: initialBudget - (spentByTeam.get(t.id) || 0),
-      total_spent: spentByTeam.get(t.id) || 0,
-    }));
+    return (teams || []).map((t: any) => {
+      const row = budgetByTeam.get(t.id);
+      return {
+        team_id: t.id,
+        team_name: t.team_name,
+        remaining_budget: row ? row.remaining : initialBudget - (spentByTeam.get(t.id) || 0),
+        total_spent: row ? row.initial - row.remaining : spentByTeam.get(t.id) || 0,
+      };
+    });
   }
 
   /** Get waiver priority for all teams in a league */

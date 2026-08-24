@@ -12,7 +12,7 @@ import { logger } from '@citrus/shared';
 type SecurityEventType =
   | 'AUTH_LOGIN' | 'AUTH_LOGOUT' | 'AUTH_FAILED'
   | 'LEAGUE_CREATE' | 'LEAGUE_DELETE' | 'LEAGUE_JOIN' | 'LEAGUE_LEAVE'
-  | 'DRAFT_START' | 'DRAFT_COMPLETE' | 'DRAFT_RESET'
+  | 'DRAFT_START' | 'DRAFT_COMPLETE' | 'DRAFT_RESET' | 'DRAFT_OFFLINE_IMPORT'
   | 'ROSTER_MOVE' | 'ROSTER_MOVE_FAILED'
   | 'TRADE_OFFER' | 'TRADE_ACCEPT' | 'TRADE_REJECT'
   | 'WAIVER_CLAIM' | 'WAIVER_PROCESS'
@@ -83,7 +83,7 @@ export class AuditService {
   }
 
   async logDraftEvent(
-    eventType: 'DRAFT_START' | 'DRAFT_COMPLETE' | 'DRAFT_RESET',
+    eventType: 'DRAFT_START' | 'DRAFT_COMPLETE' | 'DRAFT_RESET' | 'DRAFT_OFFLINE_IMPORT',
     leagueId: string,
     details?: Record<string, unknown>,
   ) {

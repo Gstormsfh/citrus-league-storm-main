@@ -173,7 +173,11 @@ export class TradeService {
       .eq('id', leagueId)
       .single();
 
-    if (league?.settings?.scoring_format === 'best-ball') {
+    // 2026-08-24: CreateLeague writes camelCase `scoringFormat` — the old
+    // snake_case-only read meant this rule NEVER fired for real best-ball
+    // leagues. Accept both spellings.
+    const fmt = league?.settings?.scoringFormat ?? league?.settings?.scoring_format;
+    if (fmt === 'best-ball') {
       return { success: false, error: 'Trades are not allowed in Best Ball leagues' };
     }
 

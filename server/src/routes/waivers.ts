@@ -136,7 +136,9 @@ waiverRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schema
   const audit = new AuditService(supabase);
   audit.log('WAIVER_CLAIM', leagueId, { claimId, playerId: body.playerId, teamId: body.teamId, dropPlayerId: body.dropPlayerId });
 
-  return created(c, { claimId });
+  // 2026-08-24: include explicit success — clients read it, and the bare
+  // { claimId } body made successful claims render "failed" toasts.
+  return created(c, { success: true, claimId });
 });
 
 // POST /api/waivers/league/:leagueId/faab-bid — Submit a FAAB bid
@@ -169,7 +171,8 @@ waiverRoutes.post('/league/:leagueId/faab-bid', membershipMiddleware, validateBo
   const audit = new AuditService(supabase);
   audit.log('WAIVER_CLAIM', leagueId, { claimId, playerId: body.playerId, teamId: body.teamId, bidAmount: body.bidAmount, type: 'faab' });
 
-  return created(c, { claimId });
+  // 2026-08-24: include explicit success — see submit-claim route above.
+  return created(c, { success: true, claimId });
 });
 
 // POST /api/waivers/league/:leagueId/add-free-agent — Add free agent (instant)

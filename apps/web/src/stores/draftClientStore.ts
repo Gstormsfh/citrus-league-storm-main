@@ -39,6 +39,13 @@ import {
   foldEvents,
   type DerivedDraftState,
 } from '@/lib/draftClient/deriveDraftState';
+// Auction launch build (2026-08-24): parallel auction derivation —
+// seeded from snapshot.auctionState, folded with live auction events.
+import {
+  seedAuctionState,
+  foldAuctionEvents,
+  type DerivedAuctionState,
+} from '@/lib/draftClient/deriveAuctionState';
 import type { DraftOrderSlot } from '@/lib/draftClient/fetchDraftOrderMatrix';
 
 // ── Store state ────────────────────────────────────────────────────
@@ -157,6 +164,15 @@ interface DraftClientStoreState {
     | { reason: 'my_team_unverifiable' }
     | null;
 
+  /**
+   * Auction launch build (2026-08-24) — derived auction view for
+   * `format === 'auction'` lobbies. Null for snake/linear lobbies and
+   * before the first snapshot. Seeded from `snapshot.auctionState`
+   * (authoritative budgets survive ring-buffer eviction), folded
+   * forward in applyEvent/applyEvents alongside the pick fold.
+   */
+  auctionDerived: DerivedAuctionState | null;
+
   // ── Setters / reducers ─────────────────────────────────────────
   setConnectionState: (state: DraftClientState) => void;
   /** DR-2 (2026-07-29) — set the caller's teamId in this league. */
@@ -235,6 +251,7 @@ const initialState: Omit<
   lastError: null,
   identityFailure: null,
   pickTimeLimitSec: null,
+  auctionDerived: null,
 };
 
 // Entry 87 Fix C — pull pickTimeLimitSeconds out of a draft_started
@@ -292,6 +309,9 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
         lastFoldGaps: foldResult.gaps,
         presentUserIds: seededPresence,
         pickTimeLimitSec: nextPickTimeLimitSec,
+        // Auction launch build (2026-08-24): re-seed the auction view
+        // from the fresh snapshot (null for snake/linear lobbies).
+        auctionDerived: seedAuctionState(snapshot),
         // Reconcile any pending actions whose correlationIds appear
         // in the snapshot's recent events (path 2 / path 4 of the
         // reconciliation contract per `optimistic.ts`).
@@ -329,6 +349,10 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
         const foldResult = foldEvents(prev.derivedState, [event], prev.matrix);
         next.derivedState = foldResult.state;
         next.lastFoldGaps = foldResult.gaps;
+      }
+      // Auction launch build (2026-08-24): fold auction events too.
+      if (prev.auctionDerived !== null) {
+        next.auctionDerived = foldAuctionEvents(prev.auctionDerived, [event]);
       }
       // Append the event to the snapshot's recentEvents if a
       // snapshot is loaded — keeps the in-memory view fresh for the
@@ -375,6 +399,10 @@ export const useDraftClientStore = create<DraftClientStoreState>((set) => ({
         const foldResult = foldEvents(prev.derivedState, events, prev.matrix);
         next.derivedState = foldResult.state;
         next.lastFoldGaps = foldResult.gaps;
+      }
+      // Auction launch build (2026-08-24): fold auction events too.
+      if (prev.auctionDerived !== null && events.length > 0) {
+        next.auctionDerived = foldAuctionEvents(prev.auctionDerived, events);
       }
       next.pendingActions = reconcileOnResync(prev.pendingActions, events);
       next.snapshot =
@@ -556,3 +584,12 @@ export const useIdentityFailure = () =>
 export const usePickTimeLimitSec = () =>
   useDraftClientStore((s) => s.pickTimeLimitSec);
 
+
+/**
+ * Auction launch build (2026-08-24) — the derived auction view for
+ * auction-format lobbies. Null for snake/linear lobbies and before the
+ * first snapshot lands. Components render the auction room FROM this
+ * (current nomination, budgets, rotation progress, history feed).
+ */
+export const useAuctionDerived = () =>
+  useDraftClientStore((s) => s.auctionDerived);

@@ -20,14 +20,21 @@
  */
 import { MatchupService } from '@/services/MatchupService';
 import { RosterCacheService } from '@/services/RosterCacheService';
+import { rosterApi } from '@/api/rosters';
 
-/** Clear both client-side roster caches. No event. Safe to over-clear. */
+/** Clear all client-side roster caches. No event. Safe to over-clear. */
 export function clearRosterCaches(teamId?: string, leagueId?: string): void {
   try {
     MatchupService.clearRosterCache(teamId, leagueId);
   } catch { /* cache clearing is best-effort */ }
   try {
     RosterCacheService.clearCache(teamId, leagueId);
+  } catch { /* best-effort */ }
+  try {
+    // 2026-08-24: third cache layer — rosterApi's 30s TTL cache serves
+    // getTeamRoster/getLineup/getLeagueRosters. Without this, drop-player
+    // dialogs and waiver-wire rosters can be 30s stale after a mutation.
+    rosterApi.invalidate('rosters:');
   } catch { /* best-effort */ }
 }
 

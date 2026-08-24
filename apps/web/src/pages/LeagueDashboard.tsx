@@ -22,6 +22,7 @@ import { LeagueService, League, Team } from '@/services/LeagueService';
 import { WaiverService } from '@/services/WaiverService';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
+import { waiverApi } from '@/api/waivers';
 import Navbar from '@/components/Navbar';
 import { LeagueTimelineCard } from '@/components/dashboard/LeagueTimelineCard';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { ScoringRulesEditor } from '@/components/league/ScoringRulesEditor';
+import { KeeperPanel } from '@/components/league/KeeperPanel';
 import { TradeService } from '@/services/TradeService';
 import { extractFormatSettings, AVAILABLE_CATEGORIES, DEFAULT_ROSTER_SLOTS, type LeagueSettings } from '@/types/leagueTypes';
 import { logger } from '@/utils/logger';
@@ -67,6 +69,7 @@ const LeagueDashboard = () => {
     allow_trades_during_games: true,
     weeklyAddLimit: 0,
     seasonAddLimit: 0,
+    faabBudget: 100,
   });
   
   // Draft settings state
@@ -166,7 +169,29 @@ const LeagueDashboard = () => {
         allow_trades_during_games: leagueData.allow_trades_during_games ?? true,
         weeklyAddLimit: (leagueSettings.weeklyAddLimit as number) ?? 0,
         seasonAddLimit: (leagueSettings.seasonAddLimit as number) ?? 0,
+        faabBudget: ((leagueSettings as Record<string, unknown>).faabBudget as number) ?? 100,
       });
+
+      // 2026-08-24: leagueData arrives via COLUMNS.LEAGUE, which omitted the
+      // waiver columns — so the block above always fell back to defaults
+      // ('rolling', 2:00 AM, 48h). The dialog then DISPLAYED defaults for a
+      // FAAB league, and pressing Save wrote those defaults back, silently
+      // reverting the league's real waiver configuration. Hydrate from the
+      // waivers settings endpoint, which selects the actual columns.
+      // Best-effort: on failure keep the leagueData-derived values.
+      try {
+        const ws = await WaiverService.getLeagueWaiverSettings(leagueId as string, user?.id || '');
+        if (ws) {
+          setWaiverSettings(prev => ({
+            ...prev,
+            waiver_process_time: ws.waiver_process_time || prev.waiver_process_time,
+            waiver_period_hours: ws.waiver_period_hours ?? prev.waiver_period_hours,
+            waiver_game_lock: ws.waiver_game_lock ?? prev.waiver_game_lock,
+            waiver_type: (ws.waiver_type as typeof prev.waiver_type) || prev.waiver_type,
+            allow_trades_during_games: ws.allow_trades_during_games ?? prev.allow_trades_during_games,
+          }));
+        }
+      } catch { /* keep leagueData-derived values */ }
       
       // Update draft settings from league data
       setDraftSettings({
@@ -391,15 +416,15 @@ const LeagueDashboard = () => {
         saved = success;
         errorMessage = (saveError as Error)?.message || 'Failed to save waiver settings';
 
-        // Also persist transaction limits into JSONB settings column
+        // Also persist transaction limits + FAAB budget into JSONB settings column
         if (saved) {
-          const { weeklyAddLimit = 0, seasonAddLimit = 0 } = waiverSettings;
+          const { weeklyAddLimit = 0, seasonAddLimit = 0, faabBudget = 100 } = waiverSettings;
           const leagueResponse = await leagueApi.getLeague(leagueId);
           const currentLeague = leagueResponse.data as Record<string, unknown> | undefined;
           if (currentLeague) {
             const currentSettings = (currentLeague.settings as LeagueSettings) || {};
             await leagueApi.updateSettings(leagueId, {
-              settings: { ...currentSettings, weeklyAddLimit, seasonAddLimit },
+              settings: { ...currentSettings, weeklyAddLimit, seasonAddLimit, faabBudget },
             });
           }
         }
@@ -502,6 +527,16 @@ const LeagueDashboard = () => {
   // Determine if user is commissioner (needs to be before handler functions that use it)
   const isCommissioner = league?.commissioner_id === user?.id;
 
+  // Category leagues (H2H categories / roto) edit their category list, not
+  // point values — the settings dialog swaps the Scoring tab for a
+  // Categories tab (2026-08-24 polish: the categories save branch was
+  // unreachable because no tab ever set activeSettingsTab='categories').
+  const leagueScoringFormat = league
+    ? extractFormatSettings((league.settings as LeagueSettings) || {}).scoringFormat
+    : null;
+  const isCategoryLeague =
+    leagueScoringFormat === 'h2h-categories' || leagueScoringFormat === 'roto';
+
   // Process waivers manually (commissioner only)
   const handleProcessWaivers = async () => {
     if (!leagueId || !user || !isCommissioner) return;
@@ -523,15 +558,32 @@ const LeagueDashboard = () => {
       const leagueResult = result.results.find(r => r.league_id === leagueId);
       
       if (leagueResult && leagueResult.total_processed > 0) {
+        const n = leagueResult.total_processed;
         toast({
           title: 'Waivers Processed',
-          description: `Processed ${leagueResult.total_processed} claims: ${leagueResult.successful} successful, ${leagueResult.failed} failed`,
+          description: `Processed ${n} ${n === 1 ? 'claim' : 'claims'}: ${leagueResult.successful} successful, ${leagueResult.failed} failed`,
         });
       } else {
-        toast({
-          title: 'No Pending Claims',
-          description: 'There are no pending waiver claims to process.',
-        });
+        // 2026-08-24: nothing processed does NOT mean nothing pending — claims
+        // for players still inside their waiver window are (correctly) skipped
+        // by the processor. Saying "no pending claims" made commissioners think
+        // submitted claims were lost. Check and say what actually happened.
+        let stillWaiting = 0;
+        try {
+          const { data: pendingClaims } = await waiverApi.getLeagueWaivers(leagueId, 'pending');
+          stillWaiting = Array.isArray(pendingClaims) ? pendingClaims.length : 0;
+        } catch { /* fall through to the generic message */ }
+        if (stillWaiting > 0) {
+          toast({
+            title: 'No Claims Ready Yet',
+            description: `${stillWaiting} pending ${stillWaiting === 1 ? 'claim is' : 'claims are'} still inside the waiver window. Claims process once their player clears waivers.`,
+          });
+        } else {
+          toast({
+            title: 'No Pending Claims',
+            description: 'There are no pending waiver claims to process.',
+          });
+        }
       }
     } catch (err: unknown) {
       toast({
@@ -706,13 +758,16 @@ const LeagueDashboard = () => {
                       <Tabs value={activeSettingsTab} onValueChange={setActiveSettingsTab} className="w-full">
                         <div className="overflow-x-auto -mx-2 px-2">
                           <TabsList className="inline-flex w-auto min-w-full bg-[#0F1F15] ring-1 ring-white/10 p-1 rounded-xl">
-                            {(['waivers','scoring','draft','trades','rosterslots','playoffs','rosters'] as const).map((tab) => (
+                            {(isCategoryLeague
+                              ? (['waivers','categories','draft','trades','keeper','rosterslots','playoffs','rosters'] as const)
+                              : (['waivers','scoring','draft','trades','keeper','rosterslots','playoffs','rosters'] as const)
+                            ).map((tab) => (
                               <TabsTrigger
                                 key={tab}
                                 value={tab}
                                 className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                               >
-                                {tab === 'rosterslots' ? 'Roster Slots' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                                {tab === 'rosterslots' ? 'Roster Slots' : tab === 'keeper' ? 'Keepers' : tab.charAt(0).toUpperCase() + tab.slice(1)}
                               </TabsTrigger>
                             ))}
                           </TabsList>
@@ -792,9 +847,34 @@ const LeagueDashboard = () => {
                             </SelectContent>
                           </Select>
                           <p className="text-xs text-white/55">
-                            Join Order: seeded by when teams joined. Reverse Draft Order: the last round-one pick holds waiver 1. Both roll — the claimant drops to the back. Reverse Standings: recomputed weekly, worst record first.
+                            Join Order: seeded by when teams joined. Reverse Draft Order: the last round-one pick holds waiver 1. Both roll — the claimant drops to the back. Reverse Standings: recomputed weekly, worst record first. FAAB: teams bid from a season budget — highest bid wins, ties go to the worse record.
                           </p>
                         </div>
+
+                        {/* FAAB Budget (only relevant for FAAB leagues) */}
+                        {waiverSettings.waiver_type === 'faab' && (
+                          <div className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                              <Layers className="h-4 w-4" aria-hidden="true" />
+                              FAAB Budget ($)
+                            </Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={100000}
+                              value={waiverSettings.faabBudget}
+                              onChange={(e) => {
+                                const val = Math.floor(Number(e.target.value) || 0);
+                                setWaiverSettings(prev => ({ ...prev, faabBudget: Math.min(Math.max(val, 1), 100000) }));
+                              }}
+                              className="w-40"
+                            />
+                            <p className="text-xs text-white/55">
+                              Season bidding budget per team (default $100). Set this before the season — teams that
+                              have already placed a bid keep the budget they started with.
+                            </p>
+                          </div>
+                        )}
 
                         {/* Game Lock */}
                         <div className="flex items-center justify-between">
@@ -925,7 +1005,8 @@ const LeagueDashboard = () => {
                                 Sync Rosters from Draft
                               </Label>
                               <p className="text-xs text-white/55">
-                                Re-sync roster_assignments from draft_picks (safety net)
+                                Rebuild team rosters from the completed draft results (safety net —
+                                covers live, auction, and offline drafts)
                               </p>
                             </div>
                             <Button 
@@ -970,6 +1051,61 @@ const LeagueDashboard = () => {
                           )}
                         </TabsContent>
                         
+                        {/* Category Settings Tab (2026-08-24 polish) — only offered
+                            to category leagues (H2H categories / roto); the tab list
+                            swaps it in for Scoring. Saves via the existing
+                            activeSettingsTab==='categories' branch →
+                            LeagueService.updateCategorySettings. */}
+                        <TabsContent value="categories" className="space-y-6 py-4">
+                          <div className="space-y-4">
+                            <div>
+                              <h3 className="text-lg font-semibold mb-1">Scoring Categories</h3>
+                              <p className="text-xs text-white/55">
+                                Pick the stat categories this league competes in. Standings
+                                recompute from these categories.
+                                {categorySettings.length === 0 &&
+                                  ' (Currently using the default category set.)'}
+                              </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {AVAILABLE_CATEGORIES.map((cat) => {
+                                const checked = categorySettings.includes(cat.id);
+                                return (
+                                  <label
+                                    key={cat.id}
+                                    className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm cursor-pointer ring-1 transition-colors ${
+                                      checked
+                                        ? 'bg-pastel-orange/15 ring-pastel-orange/40'
+                                        : 'bg-white/5 ring-white/10 hover:bg-white/[0.08]'
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={(e) =>
+                                        setCategorySettings((prev) =>
+                                          e.target.checked
+                                            ? [...prev, cat.id]
+                                            : prev.filter((id) => id !== cat.id),
+                                        )
+                                      }
+                                    />
+                                    <span className="font-medium">{cat.abbreviation}</span>
+                                    <span className="text-white/55 text-xs truncate">
+                                      {cat.name}
+                                      {cat.isGoalie ? ' (G)' : ''}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            <p className="text-xs text-white/55">
+                              Goalie categories are marked (G). Changes apply to standings
+                              from the next recompute.
+                            </p>
+                          </div>
+                        </TabsContent>
+
                         {/* Draft Settings Tab */}
                         <TabsContent value="draft" className="space-y-6 py-4">
                           <div className="space-y-4">
@@ -1084,6 +1220,112 @@ const LeagueDashboard = () => {
                                   </p>
                                 </div>
                               </>
+                            )}
+                          </div>
+                        </TabsContent>
+
+                        {/* Keeper / Dynasty Settings Tab (2026-08-24 launch build) */}
+                        <TabsContent value="keeper" className="space-y-6 py-4">
+                          <div className="space-y-6">
+                            <div>
+                              <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
+                                <Crown className="h-4 w-4 text-amber-400" aria-hidden="true" />
+                                Keeper &amp; Dynasty Settings
+                              </h3>
+                              <p className="text-xs text-white/55">
+                                Keepers carry into next season&apos;s draft. This season&apos;s draft is a
+                                full draft; managers designate keepers from the Keepers panel on the
+                                league page, and you lock them before next season&apos;s draft.
+                              </p>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <Label className="text-base font-semibold">Keeper League</Label>
+                                <p className="text-xs text-white/55 mt-1">
+                                  Teams keep a set number of players between seasons.
+                                </p>
+                              </div>
+                              <Switch
+                                checked={keeperSettings.keeperEnabled}
+                                onCheckedChange={(checked) =>
+                                  setKeeperSettings(prev => ({
+                                    ...prev,
+                                    keeperEnabled: checked,
+                                    ...(checked ? {} : { dynastyMode: false }),
+                                  }))
+                                }
+                              />
+                            </div>
+
+                            {keeperSettings.keeperEnabled && !keeperSettings.dynastyMode && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-pastel-orange/30">
+                                <div className="space-y-2">
+                                  <Label>Keepers Per Team</Label>
+                                  <Select
+                                    value={String(keeperSettings.keeperCount || 3)}
+                                    onValueChange={(v) =>
+                                      setKeeperSettings(prev => ({ ...prev, keeperCount: parseInt(v) || 0 }))
+                                    }
+                                  >
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="1">1 Keeper</SelectItem>
+                                      <SelectItem value="2">2 Keepers</SelectItem>
+                                      <SelectItem value="3">3 Keepers</SelectItem>
+                                      <SelectItem value="5">5 Keepers</SelectItem>
+                                      <SelectItem value="8">8 Keepers</SelectItem>
+                                      <SelectItem value="10">10 Keepers</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Keeper Draft Penalty</Label>
+                                  <Select
+                                    value={keeperSettings.keeperPenalty}
+                                    onValueChange={(v) =>
+                                      setKeeperSettings(prev => ({
+                                        ...prev,
+                                        keeperPenalty: v as 'none' | 'round-cost' | 'round-escalation',
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">No Penalty (free keepers)</SelectItem>
+                                      <SelectItem value="round-cost">Round Cost (kept at drafted round)</SelectItem>
+                                      <SelectItem value="round-escalation">Escalation (+1 round each year)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                              <div>
+                                <Label className="text-base font-semibold flex items-center gap-2">
+                                  <Crown className="w-4 h-4 text-amber-500" aria-hidden="true" />
+                                  Dynasty Mode
+                                </Label>
+                                <p className="text-xs text-white/55 mt-1">
+                                  Entire roster carries over between seasons — unlimited keepers.
+                                </p>
+                              </div>
+                              <Switch
+                                checked={keeperSettings.dynastyMode}
+                                onCheckedChange={(checked) =>
+                                  setKeeperSettings(prev => ({
+                                    ...prev,
+                                    dynastyMode: checked,
+                                    ...(checked ? { keeperEnabled: true } : {}),
+                                  }))
+                                }
+                              />
+                            </div>
+                            {keeperSettings.dynastyMode && (
+                              <p className="text-xs text-amber-400 font-medium">
+                                Dynasty mode: every rostered player is kept between seasons.
+                              </p>
                             )}
                           </div>
                         </TabsContent>
@@ -1527,7 +1769,16 @@ Your Commissioner`);
               <LeagueTimelineCard
                 leagueId={leagueId}
                 draftStatus={league?.draft_status ?? null}
-                draftCompletedAt={league?.updated_at ?? null}
+                // 2026-08-24 polish: updated_at bumps on EVERY league-row
+                // write, so "Draft complete · just now" re-bumped after any
+                // settings save or roster sync. settings.draftCompletedAt is
+                // the stable stamp (written at finalize by the completion
+                // trigger, backfilled for existing leagues); updated_at is
+                // only the last-resort fallback for pre-stamp leagues.
+                draftCompletedAt={
+                  ((league?.settings as { draftCompletedAt?: string } | null)
+                    ?.draftCompletedAt) ?? league?.updated_at ?? null
+                }
                 topPick={null}
               />
             </div>
@@ -1596,6 +1847,20 @@ Your Commissioner`);
               )}
             </CardContent>
           </Card>
+
+          {/* Keeper / Dynasty panel (2026-08-24 launch build) — the
+              designation surface. Rendered for every member when the
+              commissioner has keeper mode on. */}
+          {Boolean((league.settings as { keeperEnabled?: boolean } | null)?.keeperEnabled) && (
+            <KeeperPanel
+              leagueId={leagueId ?? ''}
+              myTeamId={teams.find((t) => t.owner_id === user?.id)?.id ?? null}
+              teams={teams}
+              isCommissioner={isCommissioner}
+              keeperCount={Number((league.settings as { keeperCount?: number } | null)?.keeperCount ?? 0)}
+              dynastyMode={Boolean((league.settings as { dynastyMode?: boolean } | null)?.dynastyMode)}
+            />
+          )}
             </div>
 
             {/* Left Sidebar - At bottom on mobile, left on desktop */}

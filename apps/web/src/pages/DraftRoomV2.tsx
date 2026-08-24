@@ -34,6 +34,8 @@ import {
   useClockOffsetEstimator,
 } from '@/components/draft/v2/DraftTimerV2';
 import { OnClockActionBar } from '@/components/draft/v2/OnClockActionBar';
+import { AuctionPanel } from '@/components/draft/v2/AuctionPanel';
+import { OfflineDraftRoom } from '@/components/draft/v2/OfflineDraftRoom';
 import { ManagerPresencePanel } from '@/components/draft/v2/ManagerPresencePanel';
 import { DraftBoard } from '@/components/draft/DraftBoard';
 import { PlayerPool } from '@/components/draft/PlayerPool';
@@ -204,8 +206,75 @@ export default function DraftRoomV2() {
     reload: reloadPlayers,
   } = usePreloadedPlayers();
 
+  // OFFLINE DRAFT BRANCH (2026-08-24 launch build). Offline leagues
+  // (settings.draftType === 'offline') never run a live engine lobby —
+  // the commissioner types in the in-person results instead. The room
+  // ASSUMES live and connects immediately (identical to pre-offline
+  // behavior — zero added latency for real drafts); a parallel probe of
+  // the league record flips to the offline entry room when it confirms
+  // draftType='offline', and the connect effect's cleanup tears the
+  // runner down on that flip. The brief discovery attempt an offline
+  // league makes before the flip is harmless: the engine refuses
+  // not_started/completed leagues at discovery without creating a
+  // lobby (the format gate that bricked the autopick league only runs
+  // at ignition, which draftV2Start now refuses for offline).
+  const [offlineMeta, setOfflineMeta] = useState<
+    | { kind: 'live' }
+    | {
+        kind: 'offline';
+        commissionerId: string;
+        draftRounds: number;
+        draftStatus: string;
+      }
+  >({ kind: 'live' });
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { apiClient } = await import('@/api/client');
+        const response = await apiClient.get<{
+          commissioner_id?: string;
+          draft_rounds?: number;
+          draft_status?: string;
+          settings?: Record<string, unknown> | null;
+        }>(`/api/leagues/${encodeURIComponent(leagueId)}`);
+        if (cancelled) return;
+        const payload =
+          response.data ??
+          (response as unknown as {
+            commissioner_id?: string;
+            draft_rounds?: number;
+            draft_status?: string;
+            settings?: Record<string, unknown> | null;
+          });
+        const draftType = (payload?.settings as { draftType?: string } | null)
+          ?.draftType;
+        if (draftType === 'offline') {
+          setOfflineMeta({
+            kind: 'offline',
+            commissionerId: String(payload?.commissioner_id ?? ''),
+            draftRounds: Number(payload?.draft_rounds ?? 0) || 14,
+            draftStatus: String(payload?.draft_status ?? 'not_started'),
+          });
+        }
+        // Non-offline (or shape surprise): stay 'live' — no state churn.
+      } catch {
+        // Probe failure: stay 'live' (fail open — a transient API blip
+        // must never lock a real live draft out of its room).
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
+
   // Mount / unmount: runner lifecycle (unchanged from DR-1b/DR-2).
   useEffect(() => {
+    // Offline leagues never keep a WS runner: when the probe flips
+    // kind to 'offline', this effect re-runs — the PREVIOUS run's
+    // cleanup disconnects the runner, and this early return prevents
+    // a reconnect.
+    if (offlineMeta.kind !== 'live') return;
     const runner = new DraftClientRunner();
     runnerRef.current = runner;
 
@@ -349,7 +418,7 @@ export default function DraftRoomV2() {
       store.reset();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leagueId, draftId]);
+  }, [leagueId, draftId, offlineMeta.kind]);
 
   // DR-1b F1 — matrix refetch on not_started → in_progress.
   const derivedForRefetch = useDerivedDraftState();
@@ -409,6 +478,29 @@ export default function DraftRoomV2() {
     },
     [leagueId, draftId],
   );
+
+  // OFFLINE DRAFT BRANCH (2026-08-24): offline leagues get the results
+  // entry room instead of the live draft room — no WS, no lobby, no
+  // start button. Rendered as soon as the format probe resolves.
+  if (offlineMeta.kind === 'offline') {
+    return (
+      <div className="container mx-auto p-4" data-testid="draft-room-v2">
+        <OfflineDraftRoom
+          leagueId={leagueId}
+          teams={teams}
+          teamsError={teamsError}
+          onRetryTeams={retryTeamsFetch}
+          playersById={playersById}
+          playersLoading={playersLoading}
+          playersError={playersError}
+          onRetryPlayers={reloadPlayers}
+          commissionerId={offlineMeta.commissionerId}
+          draftRounds={offlineMeta.draftRounds}
+          initialDraftStatus={offlineMeta.draftStatus}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-4" data-testid="draft-room-v2">
@@ -1168,6 +1260,18 @@ function DraftRoomBody({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
       <div className="lg:col-span-3 space-y-4">
+        {/* Auction launch build (2026-08-24): the live auction surface —
+            nomination block, bid controls, budgets, sales feed. Renders
+            only for auction-format lobbies (useAuctionDerived is null
+            otherwise, and the component returns null). */}
+        {snapshot.format === 'auction' && (
+          <AuctionPanel
+            leagueId={leagueId}
+            teams={teams}
+            playersById={playersById}
+            myTeamId={myTeamId}
+          />
+        )}
         <MainTabs
           leagueId={leagueId}
           teams={teams}

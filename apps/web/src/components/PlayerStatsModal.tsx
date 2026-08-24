@@ -437,7 +437,18 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
               ) : (
                 <>
                   <Snowflake className="w-4 h-4 text-white/55" />
-                  <span className="text-white/55 text-sm font-display italic">No upcoming games</span>
+                  {/* 2026-08-24 polish: during the off-season EVERY card
+                      hit this branch and read like a data failure
+                      ("No upcoming games · PROJ —", spotted in trade QA).
+                      Jul–Sep is the NHL off-season — say so instead. */}
+                  <span className="text-white/55 text-sm font-display italic">
+                    {(() => {
+                      const m = new Date().getMonth();
+                      return m >= 6 && m <= 8
+                        ? 'Off-season — games return in October'
+                        : 'No upcoming games';
+                    })()}
+                  </span>
                 </>
               )}
             </div>

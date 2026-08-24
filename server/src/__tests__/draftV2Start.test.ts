@@ -37,10 +37,23 @@ vi.mock('../middleware/membership', () => ({
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let mockUserClientRpc: ReturnType<typeof vi.fn<(...args: any[]) => Promise<any>>>;
+// Settings returned by the route's offline-guard league probe
+// (2026-08-24). Tests set this to exercise the guard both ways.
+let mockLeagueSettings: Record<string, unknown> | null = {};
 
 vi.mock('../lib/supabase', () => ({
   createUserClient: () => ({
     rpc: (...args: any[]) => mockUserClientRpc(...args),
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({
+            data: mockLeagueSettings === null ? null : { settings: mockLeagueSettings },
+            error: null,
+          }),
+        }),
+      }),
+    }),
   }),
 }));
 
@@ -76,6 +89,7 @@ describe('POST /api/draft/v2/league/:leagueId/start — actor contract (Entry 79
   });
 
   beforeEach(() => {
+    mockLeagueSettings = { draftType: 'snake' };
     mockUserClientRpc = vi.fn().mockResolvedValue({
       data: {
         event_id: 1,
@@ -85,6 +99,23 @@ describe('POST /api/draft/v2/league/:leagueId/start — actor contract (Entry 79
       },
       error: null,
     });
+  });
+
+  it('refuses to ignite an offline league (2026-08-24 offline-draft guard)', async () => {
+    mockLeagueSettings = { draftType: 'offline' };
+    const app = await getApp();
+    const res = await app.request(START_PATH, {
+      method: 'POST',
+      headers: authedHeaders(),
+      body: JSON.stringify({ idempotency_key: VALID_KEY }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(JSON.stringify(body)).toContain('offline_draft');
+    // The RPC must never be reached — an in_progress offline league
+    // would NOTIFY-create an engine lobby that throws on bootstrap.
+    expect(mockUserClientRpc).not.toHaveBeenCalled();
   });
 
   it('passes p_actor.kind === "commissioner" to start_draft_v2 RPC (Entry 79 fix lock)', async () => {

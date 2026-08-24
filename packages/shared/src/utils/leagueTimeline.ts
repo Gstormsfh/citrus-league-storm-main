@@ -50,14 +50,21 @@ export interface DraftCompletionInput {
 }
 
 export interface TransactionInput {
-  /** 'ADD' or 'DROP' — matches WaiverService.ts:540/630 ledger writes. */
-  type: 'ADD' | 'DROP';
+  /** 'ADD', 'DROP', or 'TRADE' — matches transaction_ledger.type writes. */
+  type: 'ADD' | 'DROP' | 'TRADE';
   /** Display name for the player (resolved upstream). */
   playerName: string;
   /** Display name for the team that added/dropped. */
   teamName: string;
   /** ISO timestamp — the `created_at` column of transaction_ledger. */
   createdAt: string;
+  /**
+   * The ledger's `source` column ('Waiver Processing', 'Roster Tab',
+   * 'Trade in', 'Trade out', …). 2026-08-24 polish: distinguishes a
+   * won waiver claim from a plain free-agent pickup, and trade
+   * direction. Optional — absent sources render the generic labels.
+   */
+  source?: string | null;
 }
 
 export interface MatchupResultInput {
@@ -82,6 +89,7 @@ export type TimelineItemKind =
   | 'draft_completed'
   | 'transaction_add'
   | 'transaction_drop'
+  | 'transaction_trade'
   | 'matchup_result';
 
 export interface TimelineItem {
@@ -148,24 +156,41 @@ export function assembleLeagueTimeline(
   }
 
   // Transactions — one item per ledger row.
+  //
+  // 2026-08-24 polish: the sub line now honors the ledger's `source`.
+  // Waiver-won adds were labeled "Free agent pickup" — wrong story for
+  // a claim that sat through a waiver window and beat other priorities.
   for (const t of input.transactions) {
     if (t.type === 'ADD') {
+      const viaWaivers = t.source === 'Waiver Processing';
       items.push({
         kind: 'transaction_add',
         when: t.createdAt,
         headline: `${t.teamName} added ${t.playerName}`,
-        sub: 'Free agent pickup',
+        sub: viaWaivers ? 'Waiver claim' : 'Free agent pickup',
       });
     } else if (t.type === 'DROP') {
+      const viaWaivers = t.source === 'Waiver Processing';
       items.push({
         kind: 'transaction_drop',
         when: t.createdAt,
         headline: `${t.teamName} dropped ${t.playerName}`,
-        sub: 'Roster move',
+        sub: viaWaivers ? 'Dropped in waiver claim' : 'Roster move',
+      });
+    } else if (t.type === 'TRADE') {
+      // Ledger writes one row per side: 'Trade in' on the receiving
+      // team, 'Trade out' on the sending team. Render the receiving
+      // side only — one feed item per player movement, not two.
+      if (t.source === 'Trade out') continue;
+      items.push({
+        kind: 'transaction_trade',
+        when: t.createdAt,
+        headline: `${t.teamName} acquired ${t.playerName}`,
+        sub: 'Trade',
       });
     }
     // Other type values are silently ignored — new ledger types
-    // (TRADE, IR, etc.) get their own explicit cases later.
+    // (IR, etc.) get their own explicit cases later.
   }
 
   // Matchup results.

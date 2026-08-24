@@ -125,7 +125,10 @@ export class WaiverService {
         teamId,
       });
 
-      return (data as { success: boolean; error?: string }) ?? { success: true };
+      // 2026-08-24: this route DOES send { success: true }, but map defensively
+      // like the claim/bid routes — only an explicit `success: false` fails.
+      const d = (data ?? {}) as { success?: boolean; error?: string };
+      return { success: d.success !== false, error: d.error };
     } catch (error: unknown) {
       logger.error('Error adding free agent:', error);
       accountApi.logSecurityEvent('ROSTER_MOVE_FAILED', leagueId, {
@@ -157,12 +160,14 @@ export class WaiverService {
         dropPlayerId: dropPlayerId ? String(dropPlayerId) : null,
       });
 
-      const result = data as { success: boolean; error?: string; claimId?: string } | undefined;
+      // 2026-08-24: route returns 201 { data: { claimId } } with no `success`
+      // field; failures throw. Same false-"failed" disease as submitFAABBid.
+      const result = (data ?? {}) as { success?: boolean; error?: string; claimId?: string };
       accountApi.logSecurityEvent('WAIVER_CLAIM', leagueId, {
-        claimId: result?.claimId, teamId, playerId, dropPlayerId
+        claimId: result.claimId, teamId, playerId, dropPlayerId
       });
 
-      return result ?? { success: true };
+      return { success: result.success !== false, error: result.error, claimId: result.claimId };
     } catch (error: unknown) {
       logger.error('Error submitting waiver claim:', error);
       return {
@@ -511,7 +516,13 @@ export class WaiverService {
         isConditionalDrop,
       });
 
-      return (data as { success: boolean; error?: string; claimId?: string }) ?? { success: true };
+      // 2026-08-24: the route returns 201 { data: { claimId } } — no `success`
+      // field. Casting and reading `.success` yielded undefined (falsy), so a
+      // RECORDED bid showed a "Bid Failed" toast. Failures THROW (apiClient
+      // raises on non-2xx) and land in the catch — so success here means the
+      // server accepted the bid unless it explicitly said otherwise.
+      const d = (data ?? {}) as { success?: boolean; error?: string; claimId?: string };
+      return { success: d.success !== false, error: d.error, claimId: d.claimId };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error('[WaiverService] submitFAABBid error:', msg);
@@ -554,23 +565,11 @@ export class WaiverService {
     }
   }
 
-  /**
-   * Process FAAB waivers for a league.
-   * Server handles the full FAAB processing logic (bidding, tiebreakers, budget deduction).
-   */
-  static async processFAABWaivers(
-    leagueId: string
-  ): Promise<{ processed: number; results: Array<{ player_id: number; winner_team_id: string; bid: number }>; error?: string }> {
-    try {
-      const { data } = await apiClient.post(`/api/waivers/league/${leagueId}/process-faab`);
-
-      return (data as { processed: number; results: Array<{ player_id: number; winner_team_id: string; bid: number }>; error?: string }) ?? { processed: 0, results: [] };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      logger.error('[WaiverService] processFAABWaivers error:', msg);
-      return { processed: 0, results: [], error: msg };
-    }
-  }
+  // 2026-08-24 polish: processFAABWaivers was REMOVED. It POSTed to
+  // /api/waivers/league/:id/process-faab, a route that does not exist —
+  // every call 404ed. FAAB processing runs through the same
+  // processAllPendingWaivers path as standard waivers (server decides
+  // per league settings), plus the nightly pg_cron job.
 
   // ============================================================================
   // REVERSE STANDINGS WAIVER SUPPORT
@@ -592,23 +591,11 @@ export class WaiverService {
     }
   }
 
-  /**
-   * Commissioner: update waiver settings for the league.
-   * Server handles commissioner verification, notification, and reverse standings recalculation.
-   */
-  static async updateWaiverSettings(
-    leagueId: string,
-    _commissionerId: string,
-    settings: Partial<LeagueWaiverSettings>
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { data } = await apiClient.put(`/api/waivers/league/${leagueId}/settings`, settings);
-      return (data as { success: boolean; error?: string }) ?? { success: true };
-    } catch (error: unknown) {
-      logger.error('[WaiverService] updateWaiverSettings error:', error);
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  }
+  // 2026-08-24 polish: updateWaiverSettings was REMOVED. It PUT to
+  // /api/waivers/league/:id/settings, which only exists as a GET —
+  // every call 404ed. The LIVE path commissioners actually use is
+  // LeagueService.updateWaiverSettings → LeagueSettingsService →
+  // leagueApi.updateWaiverSettings (LeagueDashboard waivers tab).
 }
 
 export default WaiverService;

@@ -288,14 +288,24 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
         draftRounds?: number;
       }
     | null;
-  const draftType = settings?.draftType;
+  const rawDraftType = settings?.draftType;
+  // AUTOPICK LAUNCH MAPPING (2026-08-24): 'autopick' is snake order
+  // where the system drafts for everyone from pre-set rankings. The
+  // engine runs it as a snake lobby with a short pick clock — every
+  // seat's deadline fires fast and `handleAutopickTimeout` drafts via
+  // the existing strategy chain (queue → rankings → best available).
+  // Users who are present can still pick manually before the clock.
+  // Pre-mapping behavior: the throw below fired for autopick leagues,
+  // closing every room WebSocket 1011 and bricking the league.
+  const draftType = rawDraftType === 'autopick' ? 'snake' : rawDraftType;
   if (draftType !== 'snake' && draftType !== 'linear' && draftType !== 'auction') {
     throw new Error(
-      `league ${leagueId} draftType=${draftType ?? 'undefined'} is not a live format ` +
-        `(expected snake | linear | auction)`,
+      `league ${leagueId} draftType=${rawDraftType ?? 'undefined'} is not a live format ` +
+        `(expected snake | linear | auction | autopick)`,
     );
   }
   const format: DraftFormat = draftType;
+  const isAutopickLeague = rawDraftType === 'autopick';
 
   // Snake/linear: pickClockSeconds = pickTimeLimit + 1 (RPC pad).
   // Auction (chunk 11g.6 sub-step 6c3): pickClockSeconds is unused
@@ -316,9 +326,17 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
   const pickTimeLimit =
     format === 'auction'
       ? auctionBidWindowSeconds
-      : typeof settings?.pickTimeLimit === 'number'
-        ? settings.pickTimeLimit
-        : DEFAULT_PICK_TIME_LIMIT_SECONDS;
+      : isAutopickLeague
+        ? // AUTOPICK LAUNCH MAPPING (2026-08-24): short per-seat clock so
+          // the engine's autopick fires quickly for every team. 4s/pick
+          // keeps a 42-pick draft under ~4 minutes while leaving a beat
+          // for a present user to click first. NOT configurable via
+          // pickTimeLimit — an autopick league's whole point is that the
+          // system drafts on its own cadence.
+          4
+        : typeof settings?.pickTimeLimit === 'number'
+          ? settings.pickTimeLimit
+          : DEFAULT_PICK_TIME_LIMIT_SECONDS;
   const pickClockSeconds = pickTimeLimit + PICK_CLOCK_PAD_SECONDS;
 
   const initialPickDeadline = leagueRow.pick_deadline

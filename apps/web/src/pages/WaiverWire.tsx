@@ -34,6 +34,7 @@ import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { formatWaiverProcessTime, formatMoment, computeNextWaiverProcessMoment } from '@/utils/timezoneUtils';
 import { ScheduleService } from '@/services/ScheduleService';
+import { supabase } from '@/integrations/supabase/client';
 import { Zap, Lock } from 'lucide-react';
 
 const WaiverWire = () => {
@@ -73,6 +74,10 @@ const WaiverWire = () => {
 
   // Game-locked teams (players from these teams go through waivers)
   const [lockedTeams, setLockedTeams] = useState<Set<string>>(new Set());
+  // 2026-08-24 polish: players actually ON waivers (recently dropped,
+  // waiver window still open). player_id → clears-at ISO. The badge used
+  // to be game-lock-only, so a just-dropped player showed "Free Agent".
+  const [onWaiversClearsAt, setOnWaiversClearsAt] = useState<Map<string, string>>(new Map());
 
   // FAAB state
   const [isFAAB, setIsFAAB] = useState(false);
@@ -122,16 +127,16 @@ const WaiverWire = () => {
           setClaimPlayers(new Map());
         }
 
-        // Load roster for drop selection (team_lineups uses JSONB arrays)
-        const { data: lineup } = await rosterApi.getLineup(activeLeagueId, team.id) as { data?: { starters: string[]; bench: string[]; ir: string[] } };
-        
-        if (lineup) {
-          // Get all player IDs from JSONB arrays
-          const allPlayerIds: string[] = [
-            ...((lineup.starters as string[]) || []),
-            ...((lineup.bench as string[]) || []),
-            ...((lineup.ir as string[]) || [])
-          ].filter(id => id && !isNaN(Number(id)));
+        // Load roster for drop selection.
+        // 2026-08-24: source the FULL roster (roster_assignments), not team_lineups —
+        // lineups only exist after a user saves one, so teams that never arranged a
+        // lineup got an empty (or stale) drop list here while owning a full roster.
+        try {
+          const rosterResp = await rosterApi.getTeamRoster(activeLeagueId, team.id);
+          const assignments = (rosterResp.data as Array<{ player_id: string | number }>) || [];
+          const allPlayerIds = assignments
+            .map(a => String(a.player_id))
+            .filter(id => id && !isNaN(Number(id)));
 
           if (allPlayerIds.length > 0) {
             // Use PlayerService to get player details (handles all data correctly)
@@ -147,7 +152,7 @@ const WaiverWire = () => {
           } else {
             setMyRoster([]);
           }
-        } else {
+        } catch {
           setMyRoster([]);
         }
       }
@@ -283,6 +288,36 @@ const WaiverWire = () => {
         } catch {
           // Non-critical — just won't show lock indicators
         }
+      }
+
+      // Real on-waivers state (2026-08-24 polish): recently dropped
+      // players inside the league's waiver window. Same source +
+      // window math as the Free Agents page enrichment.
+      try {
+        const { data: waiverRows } = await supabase
+          .from('player_waiver_status')
+          .select('player_id, dropped_at')
+          .eq('league_id', activeLeagueId)
+          .is('cleared_at', null);
+        const { data: periodRow } = await supabase
+          .from('leagues')
+          .select('waiver_period_hours')
+          .eq('id', activeLeagueId)
+          .single();
+        const windowMs =
+          (((periodRow as { waiver_period_hours?: number | null } | null)
+            ?.waiver_period_hours) ?? 48) * 60 * 60 * 1000;
+        const nowMs = Date.now();
+        const map = new Map<string, string>();
+        for (const r of (waiverRows ?? []) as Array<{ player_id: number | string; dropped_at: string }>) {
+          const droppedMs = new Date(r.dropped_at).getTime();
+          if (nowMs - droppedMs < windowMs) {
+            map.set(String(r.player_id), new Date(droppedMs + windowMs).toISOString());
+          }
+        }
+        setOnWaiversClearsAt(map);
+      } catch {
+        // Non-critical — badge falls back to game-lock signal only
       }
     } catch (error) {
       logger.error('Error searching players:', error);
@@ -648,6 +683,12 @@ const WaiverWire = () => {
                   <div className="space-y-2">
                     {availablePlayers.map((player) => {
                       const isGameLocked = lockedTeams.has(player.team_abbrev);
+                      // 2026-08-24 polish: a player is on the wire when
+                      // EITHER signal says so — recently dropped (real
+                      // waiver window) or team game-locked.
+                      const waiverClearsAt = onWaiversClearsAt.get(String(player.player_id)) ?? null;
+                      const isOnWaivers = waiverClearsAt !== null;
+                      const treatAsWaiver = isGameLocked || isOnWaivers;
                       return (
                       <div key={player.player_id} className="flex items-center justify-between gap-3 p-4 bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/40 hover:bg-white/[0.07] rounded-xl transition-all">
                         <div className="flex-1 min-w-0">
@@ -655,10 +696,13 @@ const WaiverWire = () => {
                             <span className="font-bold text-pastel-cream truncate">
                               {player.full_name}
                             </span>
-                            {isGameLocked ? (
-                              <Badge className="bg-amber-400/20 ring-1 ring-amber-400/40 text-amber-300 border-0 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold gap-1 h-5">
+                            {treatAsWaiver ? (
+                              <Badge
+                                className="bg-amber-400/20 ring-1 ring-amber-400/40 text-amber-300 border-0 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold gap-1 h-5"
+                                title={isOnWaivers ? `Waiver window clears ${formatMoment(waiverClearsAt) ?? ''}` : 'Game-locked — claims process through waivers'}
+                              >
                                 <Lock className="w-3 h-3" />
-                                Waiver
+                                {isOnWaivers ? 'On Waivers' : 'Waiver'}
                               </Badge>
                             ) : (
                               <Badge className="bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold gap-1 h-5">
@@ -669,17 +713,20 @@ const WaiverWire = () => {
                           </div>
                           <div className="text-xs text-white/55 mt-1 tabular-nums">
                             {player.position_code} · {player.team_abbrev} · #{player.jersey_number}
+                            {isOnWaivers && (
+                              <span className="text-amber-300/80"> · clears {formatMoment(waiverClearsAt)}</span>
+                            )}
                           </div>
                         </div>
                         <Button
                           onClick={() => setSelectedPlayer(player)}
                           size="sm"
-                          className={isGameLocked
+                          className={treatAsWaiver
                             ? "bg-amber-400/20 ring-1 ring-amber-400/40 text-amber-300 hover:bg-amber-400/30 font-bold shrink-0"
                             : "bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] shrink-0"
                           }
                         >
-                          {isGameLocked ? 'Claim' : 'Add'}
+                          {treatAsWaiver ? 'Claim' : 'Add'}
                         </Button>
                       </div>
                     );})}
