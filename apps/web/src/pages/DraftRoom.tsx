@@ -3933,7 +3933,7 @@ const DraftRoomInner = () => {
                             p.isCurrent
                               ? 'bg-primary text-primary-foreground'
                               : p.team.owner_id === user?.id
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                ? 'bg-green-900/30 text-green-400'
                                 : 'bg-white/5 text-white/55'
                           )}
                         >
@@ -4100,10 +4100,10 @@ const DraftRoomInner = () => {
 
                     {/* Auction Draft Bidding Panel */}
                     {isAuctionDraft && auctionState && draftPhase === DraftPhase.ACTIVE && (
-                      <div className="mb-4 p-4 rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
+                      <div className="mb-4 p-4 rounded-lg border-2 border-amber-400/60 bg-amber-900/20">
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="font-bold text-sm flex items-center gap-2">
-                            <span className="text-amber-600">$</span> Auction Draft
+                            <span className="text-amber-400">$</span> Auction Draft
                           </h3>
                           <Badge variant="outline" className="text-xs font-bold">
                             Budget: ${auctionState.myBudget}
@@ -4112,11 +4112,11 @@ const DraftRoomInner = () => {
 
                         {auctionState.currentNomination ? (
                           <div className="space-y-3">
-                            <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-background border">
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
                               <div>
                                 <div className="font-bold">{auctionState.currentNomination.player_name}</div>
                                 <div className="text-xs text-white/55">
-                                  Current bid: <span className="font-bold text-amber-600">${auctionState.currentNomination.current_high_bid}</span>
+                                  Current bid: <span className="font-bold text-amber-400">${auctionState.currentNomination.current_high_bid}</span>
                                 </div>
                                 <div className={`text-[10px] font-bold ${(auctionTimeRemaining ?? 99) <= 10 ? 'text-red-500 animate-pulse' : 'text-white/55'}`}>
                                   {auctionTimeRemaining !== null ? `${auctionTimeRemaining}s remaining` : `Expires: ${new Date(auctionState.currentNomination.expires_at).toLocaleTimeString()}`}
@@ -4227,7 +4227,7 @@ const DraftRoomInner = () => {
                               </Button>
                             ) : auctionState.isMyTurnToNominate ? (
                               <>
-                                <p className="font-medium text-amber-600">Your turn to nominate!</p>
+                                <p className="font-medium text-amber-400">Your turn to nominate!</p>
                                 <p className="text-xs mt-1">Select a player below to nominate them for bidding.</p>
                               </>
                             ) : auctionLoadFailed ? (
@@ -4265,10 +4265,10 @@ const DraftRoomInner = () => {
                               {auctionState.bidHistory.map((bid, i) => {
                                 const teamName = auctionState.budgets.find(b => b.team_id === bid.team_id)?.team_name || 'Unknown';
                                 return (
-                                  <div key={i} className={`flex justify-between text-xs p-1.5 rounded ${i === 0 ? 'bg-amber-100 dark:bg-amber-900/30 font-bold' : 'bg-white/5'}`}>
+                                  <div key={i} className={`flex justify-between text-xs p-1.5 rounded ${i === 0 ? 'bg-amber-900/30 font-bold' : 'bg-white/5'}`}>
                                     <span className="truncate">{teamName}</span>
                                     <div className="flex items-center gap-2">
-                                      <span className="font-bold text-amber-600">${bid.bid_amount}</span>
+                                      <span className="font-bold text-amber-400">${bid.bid_amount}</span>
                                       {bid.created_at && <span className="text-white/55">{new Date(bid.created_at).toLocaleTimeString()}</span>}
                                     </div>
                                   </div>
@@ -4400,7 +4400,7 @@ const DraftRoomInner = () => {
                             </div>
                             <Button
                               onClick={(e) => { e.stopPropagation(); handlePlayerDraft(selectedPlayer); }}
-                              className="w-full bg-fantasy-primary hover:bg-fantasy-primary/90 py-4"
+                              className="w-full font-bold bg-fantasy-primary text-[#0F1F15] hover:bg-fantasy-primary/90 py-4"
                               size="lg"
                               disabled={pickInProgress || draftedPlayerIds.has(selectedPlayer.id)}
                             >
@@ -4562,7 +4562,7 @@ const DraftRoomInner = () => {
                           e.stopPropagation();
                           handlePlayerDraft(selectedPlayer);
                         }}
-                        className="w-full bg-fantasy-primary hover:bg-fantasy-primary/90 text-lg py-6 relative z-20 pointer-events-auto"
+                        className="w-full font-bold bg-fantasy-primary text-[#0F1F15] hover:bg-fantasy-primary/90 text-lg py-6 relative z-20 pointer-events-auto"
                         size="lg"
                         disabled={pickInProgress || draftedPlayerIds.has(selectedPlayer.id)}
                       >
@@ -4732,7 +4732,7 @@ const DraftRoomInner = () => {
         {!loading && !error && draftPhase === DraftPhase.COMPLETED && (
           <div className="container mx-auto px-4 py-8">
             <Card className="max-w-2xl mx-auto text-center p-8 mb-8">
-              <div className="inline-flex items-center justify-center p-4 bg-green-100 text-green-700 rounded-full mb-6">
+              <div className="inline-flex items-center justify-center p-4 bg-green-900/30 text-green-400 rounded-full mb-6">
                 <CheckCircle className="h-12 w-12" />
               </div>
               <h1 className="text-4xl font-bold mb-4">Congratulations!</h1>
@@ -4755,7 +4755,7 @@ const DraftRoomInner = () => {
                   variant="default" 
                   onClick={handleViewDraftSnapshot}
                   disabled={savingSnapshot}
-                  className="bg-fantasy-primary hover:bg-fantasy-primary/90"
+                  className="font-bold bg-fantasy-primary text-[#0F1F15] hover:bg-fantasy-primary/90"
                 >
                   <Camera className="h-4 w-4 mr-2" />
                   {savingSnapshot ? 'Saving...' : 'View Draft Results'}

@@ -70,6 +70,14 @@ const normalizePosition = (pos: string): string => {
   return upper;
 };
 
+/** "Nathan MacKinnon" -> "N. MacKinnon" — first initial + full last name
+ * (multi-word surnames keep every word: "J. van Riemsdyk"). */
+const shortName = (full: string): string => {
+  const parts = (full || '').trim().split(/\s+/);
+  if (parts.length < 2) return full;
+  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
+};
+
 export const PlayerPool = memo(({
   onPlayerSelect,
   onPlayerDraft,
@@ -326,11 +334,21 @@ export const PlayerPool = memo(({
           </span>
         </td>
         <td className="px-2 py-2 sticky left-[44px] bg-pastel-surface-tile z-10 text-pastel-cream">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            {player.headshot_url && (
+              <img
+                src={player.headshot_url}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="h-6 w-6 rounded-full object-cover ring-1 ring-white/15 bg-white/5 flex-shrink-0"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+            )}
             {isInQueue && (
               <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary" />
             )}
-            <span className="font-medium text-sm truncate max-w-[140px]">{player.full_name}</span>
+            <span className="font-medium text-sm truncate max-w-[140px]">{shortName(player.full_name)}</span>
           </div>
         </td>
         <td className="px-2 py-1.5 text-pastel-cream">
@@ -416,7 +434,7 @@ export const PlayerPool = memo(({
             {(isSelected || isYourTurn) && isDraftActive && !isDrafted && (
               <Button
                 size="sm"
-                className="h-7 px-3 text-xs bg-fantasy-primary hover:bg-fantasy-primary/90 relative z-20 pointer-events-auto"
+                className="h-7 px-3 text-xs font-bold bg-fantasy-primary text-[#0F1F15] hover:bg-fantasy-primary/90 relative z-20 pointer-events-auto"
                 disabled={isSubmitPending}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -594,20 +612,30 @@ export const PlayerPool = memo(({
               <div
                 key={player.id}
                 className={cn(
-                  'flex items-center gap-2.5 px-3 py-2.5 transition-colors active:bg-pastel-surface-high/60',
+                  'flex items-center gap-2 px-2.5 py-2.5 transition-colors active:bg-pastel-surface-high/60',
                   !isDrafted && 'cursor-pointer',
                   isSelected && 'bg-fantasy-primary/10 ring-1 ring-inset ring-fantasy-primary/40',
                   isDrafted && 'opacity-40'
                 )}
                 onClick={() => !isDrafted && onPlayerSelect(player)}
               >
+                {player.headshot_url && (
+                  <img
+                    src={player.headshot_url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-[26px] w-[26px] rounded-full object-cover ring-1 ring-white/15 bg-white/5 flex-shrink-0"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[9px] font-mono font-bold text-pastel-cream/40 flex-shrink-0">{index + 1}</span>
                     {isInQueue && <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />}
-                    <span className="font-semibold text-[13px] text-pastel-cream truncate">{player.full_name}</span>
+                    <span className="font-semibold text-[13px] text-pastel-cream truncate">{shortName(player.full_name)}</span>
                     <Badge variant="outline" className="text-[9px] px-1 py-0 flex-shrink-0">{normalizePosition(player.position)}</Badge>
-                    <span className="text-[10px] text-pastel-cream/55 flex-shrink-0 hidden min-[360px]:inline">{player.team}</span>
+                    <span className="text-[10px] text-pastel-cream/55 flex-shrink-0 hidden min-[400px]:inline">{player.team}</span>
                   </div>
                   <div className="mt-0.5 text-[11px] text-pastel-cream/60 tabular-nums truncate">
                     {player.position === 'G' ? (
@@ -642,7 +670,7 @@ export const PlayerPool = memo(({
                     </Button>
                   )}
                   {(isSelected || isYourTurn) && isDraftActive && !isDrafted && (
-                    <Button size="sm" className="h-8 px-2 text-[10px] font-bold bg-fantasy-primary hover:bg-fantasy-primary/90"
+                    <Button size="sm" className="h-8 px-2 text-[10px] font-bold bg-fantasy-primary text-[#0F1F15] hover:bg-fantasy-primary/90"
                       disabled={isSubmitPending}
                       onClick={(e) => { e.stopPropagation(); e.preventDefault(); onPlayerDraft(player); }}
                       data-testid="pool-row-draft-button">

@@ -505,7 +505,7 @@ const Standings = () => {
               : "lg:grid-cols-[200px_1fr] xl:grid-cols-[220px_1fr]"
           )}>
             {/* Scene hero — Lemon at the top of the league standings */}
-            <div className="lg:col-start-2 lg:col-span-1 px-3 lg:px-6 pt-4 lg:pt-2 mb-6 order-0">
+            <div className="lg:col-start-2 lg:row-start-1 lg:col-span-1 px-3 lg:px-6 pt-4 lg:pt-2 mb-6 order-0">
               <div className="relative w-full aspect-[24/9] sm:aspect-[28/9] rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
                 <img
                   src="/mascots/scene-standings.webp"
@@ -530,7 +530,7 @@ const Standings = () => {
             </div>
 
             {/* Main Content */}
-            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-3 lg:px-6 order-1 lg:order-2">
+            <div className="min-w-0 lg:col-start-2 lg:row-start-2 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-3 lg:px-6 order-1 lg:order-2">
           
           {userLeagueState === 'logged-in-no-league' && (
             <div className="max-w-3xl mx-auto mb-12">
@@ -946,7 +946,7 @@ const Standings = () => {
               </div>
 
             {/* Left Sidebar - Hidden on mobile */}
-            <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
+            <aside className="hidden lg:block w-full lg:w-auto lg:col-start-1 lg:row-start-1 lg:row-span-2 order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
                 {/* Sleeper-style standings tips tile — replaces legacy AdSpace */}
                 <div className="bg-pastel-surface-tile ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
@@ -964,7 +964,7 @@ const Standings = () => {
 
             {/* Right Sidebar - Notifications (hidden on mobile) */}
             {userLeagueState === 'active-user' && activeLeagueId && (
-              <aside className="hidden lg:block order-3">
+              <aside className="hidden lg:block lg:col-start-3 lg:row-start-1 lg:row-span-2 order-3">
                 <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>

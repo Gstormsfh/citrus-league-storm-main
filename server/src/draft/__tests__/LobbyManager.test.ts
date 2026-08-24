@@ -2141,6 +2141,8 @@ describe('LobbyManager (chunk 11g.4 step 6a)', () => {
         const chain: Record<string, unknown> = {};
         let offset: number | null = null;
         chain.select = () => chain;
+        // Season-sweep 2026-08-24: the strategy now filters .eq('season', …).
+        chain.eq = () => chain;
         chain.order = () => chain;
         chain.range = (from: number) => {
           offset = from;

@@ -75,10 +75,17 @@ export const LeagueSettingsService = {
     leagueId: string,
   ): Promise<{ stats: ScoringCatalogEntry[]; error: unknown }> {
     try {
-      const data = (await leagueApi.getScoringRules(leagueId)) as {
+      // ENVELOPE FIX (2026-08-24 click-sweep): apiClient wraps payloads as
+      // { data: T } — reading `.stats` off the ENVELOPE always came back
+      // undefined, so the commissioner Scoring tab rendered "No scoring
+      // catalog found" for every league while the API was returning all
+      // 35 stats with a 200. Unwrap the envelope (and tolerate a bare
+      // payload if the wire shape ever flattens).
+      const resp = (await leagueApi.getScoringRules(leagueId)) as {
+        data?: { stats?: ScoringCatalogEntry[] };
         stats?: ScoringCatalogEntry[];
       };
-      return { stats: data?.stats ?? [], error: null };
+      return { stats: resp?.data?.stats ?? resp?.stats ?? [], error: null };
     } catch (error) {
       logger.error('Error fetching scoring rules:', error);
       return { stats: [], error };

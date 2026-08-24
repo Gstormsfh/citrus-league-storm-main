@@ -428,7 +428,7 @@ const WaiverWire = () => {
                   ✦ Off the Wire
                 </div>
                 <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none">
-                  {isFAAB ? 'Bid on the difference-maker.' : 'Claim before kickoff.'}
+                  {isFAAB ? 'Bid on the difference-maker.' : 'Claim before puck drop.'}
                 </h1>
                 <p className="text-sm text-white/55 mt-2">
                   {isFAAB ? 'Place FAAB bids on free agents' : 'Manage waiver claims and priorities'}

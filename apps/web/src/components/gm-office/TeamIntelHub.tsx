@@ -619,7 +619,7 @@ export const TeamIntelHub = () => {
                       text-center py-1.5 px-0.5 rounded-md border transition-all
                       ${isToday ? 'ring-2 ring-citrus-orange/50 shadow-sm' : ''}
                       ${isOffNight
-                        ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
+                        ? 'bg-red-950/20 border-red-800/40'
                         : 'bg-muted/30 border-border hover:bg-muted/50'
                       }
                     `}

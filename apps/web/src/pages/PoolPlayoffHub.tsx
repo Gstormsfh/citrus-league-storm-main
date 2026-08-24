@@ -561,7 +561,7 @@ export default function PoolPlayoffHub() {
 
                           return (
                             <div key={g.game_id} className={cn(
-                              'relative rounded-xl border-2 overflow-hidden bg-white transition-all',
+                              'relative rounded-xl border-2 overflow-hidden bg-white/5 transition-all',
                               isLive && 'border-red-400 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]',
                               isFinal && 'border-pastel-sage/30',
                               !isLive && !isFinal && 'border-pastel-sage/20'
@@ -610,7 +610,7 @@ export default function PoolPlayoffHub() {
                                 </div>
                                 {/* Live period/clock strip — only during live play */}
                                 {isLive && (
-                                  <div className="bg-red-50 border-t border-red-200 px-3 py-1 text-center text-[11px] font-display font-bold text-red-700 tabular-nums">
+                                  <div className="bg-red-950/40 border-t border-red-400/30 px-3 py-1 text-center text-[11px] font-display font-bold text-red-400 tabular-nums">
                                     {timeLabel}
                                   </div>
                                 )}
@@ -638,9 +638,9 @@ export default function PoolPlayoffHub() {
                                 </div>
                                 {g.myPlayers.map(p => {
                                   const posColor = p.is_goalie
-                                    ? 'bg-purple-100 text-purple-800 border-purple-200'
+                                    ? 'bg-purple-950/30 text-purple-400 border-purple-400/30'
                                     : p.position === 'D'
-                                    ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                    ? 'bg-blue-950/30 text-blue-400 border-blue-400/30'
                                     : 'bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0';
                                   return (
                                     <div key={p.player_id} className="flex items-center justify-between gap-2 text-xs">
@@ -733,7 +733,7 @@ export default function PoolPlayoffHub() {
                           return (
                             <div key={g.game_id} className={cn(
                               'relative rounded-lg border p-3 transition-colors',
-                              isLive ? 'border-red-400 bg-red-50/40 ring-1 ring-red-400/30' :
+                              isLive ? 'border-red-400 bg-red-950/30 ring-1 ring-red-400/30' :
                               isFinal ? 'ring-1 ring-white/10 bg-white/5' :
                               'ring-1 ring-pastel-sage/30 bg-[#1A2A20]'
                             )}>
@@ -759,7 +759,7 @@ export default function PoolPlayoffHub() {
                               <div className="flex items-center justify-between">
                                 <div className={cn(
                                   'text-sm font-mono font-semibold',
-                                  isLive && 'text-red-700',
+                                  isLive && 'text-red-400',
                                   isFinal && 'text-white/70',
                                 )}>
                                   {g.away_score}–{g.home_score}
@@ -815,8 +815,8 @@ export default function PoolPlayoffHub() {
                         return (
                           <div key={s.series_id} className={cn(
                             'flex items-center gap-2 p-2 rounded border',
-                            isCorrect && 'border-green-400 bg-green-50/50',
-                            isWrong && 'border-red-300 bg-red-50/30',
+                            isCorrect && 'border-green-400 bg-green-950/40',
+                            isWrong && 'border-red-400/60 bg-red-950/30',
                             !isFinal && pick && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/8',
                             !pick && 'border-2 border-dashed border-white/15 bg-white/5'
                           )}>
@@ -838,7 +838,7 @@ export default function PoolPlayoffHub() {
                                 </div>
                                 {isCorrect && <Check className="h-4 w-4 text-green-500 flex-shrink-0" aria-hidden="true" />}
                                 {isFinal && pick.points_earned != null && (
-                                  <span className={cn('text-xs font-bold flex-shrink-0', isCorrect ? 'text-green-600' : 'text-white/55')}>
+                                  <span className={cn('text-xs font-bold flex-shrink-0', isCorrect ? 'text-green-400' : 'text-white/55')}>
                                     +{pick.points_earned}
                                   </span>
                                 )}
@@ -952,7 +952,7 @@ export default function PoolPlayoffHub() {
                     className="w-full flex items-center justify-between p-2 rounded ring-1 ring-pastel-sage/30 bg-pastel-sage/8 hover:bg-pastel-sage/15 transition-colors"
                   >
                     <span className="text-lg font-mono font-bold text-pastel-cream tracking-wider">{league.join_code}</span>
-                    {copied ? <Check className="h-4 w-4 text-green-600" aria-hidden="true" /> : <Copy className="h-4 w-4 text-white/50" aria-hidden="true" />}
+                    {copied ? <Check className="h-4 w-4 text-green-400" aria-hidden="true" /> : <Copy className="h-4 w-4 text-white/50" aria-hidden="true" />}
                   </button>
 
                   <div className="pt-2 grid grid-cols-1 gap-1.5">

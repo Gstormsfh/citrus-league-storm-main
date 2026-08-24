@@ -34,7 +34,7 @@
 // Per ADR-002 §3.4 + §4.2.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { structuredLogger } from '@citrus/shared';
+import { structuredLogger, getProjectionsSeason } from '@citrus/shared';
 
 /** Input to every auction auto-nominate strategy. */
 export interface AuctionAutoNominateInput {
@@ -152,6 +152,8 @@ export const projectionsAuctionStrategy: AuctionAutoNominateStrategy = async ({
   const { data: projections, error: projErr } = await supabase
     .from('player_ros_projections')
     .select('player_id, total_projected_points')
+    // Season-sweep 2026-08-24: see autopickStrategy — never mix seasons.
+    .eq('season', getProjectionsSeason())
     .order('total_projected_points', { ascending: false, nullsFirst: false })
     .order('player_id', { ascending: true });
   if (projErr) {

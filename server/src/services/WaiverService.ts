@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, logger } from '@citrus/shared';
+import { COLUMNS, logger, getCurrentSeason } from '@citrus/shared';
 import { resolveAddLimits, evaluateGameLock } from '../lib/leagueRules';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { LeagueMembershipService } from './LeagueMembershipService';
@@ -593,6 +593,8 @@ export class WaiverService {
           .from('player_directory')
           .select('is_goalie')
           .eq('player_id', addPlayerId)
+          // Per-season index: prefer the newest season's row.
+          .order('season', { ascending: false })
           .limit(1)
           .maybeSingle();
 
@@ -720,7 +722,10 @@ export class WaiverService {
       .in('player_id', playerIds)
       .eq('is_goalie', true);
 
-    return (goalies || []).map((g: { player_id: number }) => g.player_id);
+    // Per-season index returns one row per season per player — dedupe so
+    // callers counting goalies don't double-count (same family as the
+    // autopick caps-inflation bug).
+    return [...new Set((goalies || []).map((g: { player_id: number }) => g.player_id))];
   }
 
   /** Add free agent (instant pickup via RPC) */

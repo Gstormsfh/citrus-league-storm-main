@@ -97,8 +97,12 @@ const getPositionAbbr = (pos: string) => {
 };
 
 // ─── Stat cell helper ────────────────────────────────────────────────
+// 2026-08-24 dead-dark-variant sweep: bg-[#E8EED9]/40 (cream wash) put
+// pastel-cream text on a cream surface — the washed-out stat boxes. The
+// .dark remap layer that was supposed to darken it never applies because
+// no .dark class exists on <html>. Dark-first tile instead.
 const StatCell = ({ label, value, highlight, sub }: { label: string; value: string | number; highlight?: boolean; sub?: string }) => (
-  <div className="flex flex-col items-center p-3 bg-[#E8EED9]/40 rounded-xl border border-citrus-sage/20">
+  <div className="flex flex-col items-center p-3 bg-white/5 rounded-xl border border-citrus-sage/20">
     <span className="text-[10px] font-display font-semibold text-pastel-cream/65 uppercase tracking-wider mb-1">{label}</span>
     <span className={cn(
       "text-xl font-varsity font-black leading-none",
@@ -320,10 +324,10 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   const heroGameCount = futureGames.length;
 
   const statusConfig: Record<string, { label: string; cls: string; icon: typeof AlertCircle }> = {
-    IR:   { label: 'Injury Reserve', cls: 'bg-red-500/10 text-red-600 border-red-200', icon: AlertCircle },
-    SUSP: { label: 'Suspended', cls: 'bg-orange-500/10 text-orange-600 border-orange-200', icon: AlertCircle },
-    GTD:  { label: 'Game Time Decision', cls: 'bg-yellow-500/10 text-yellow-700 border-yellow-200', icon: Clock },
-    WVR:  { label: 'Waiver', cls: 'bg-blue-500/10 text-blue-600 border-blue-200', icon: AlertCircle },
+    IR:   { label: 'Injury Reserve', cls: 'bg-red-500/10 text-red-400 border-red-400/40', icon: AlertCircle },
+    SUSP: { label: 'Suspended', cls: 'bg-orange-500/10 text-orange-400 border-orange-400/40', icon: AlertCircle },
+    GTD:  { label: 'Game Time Decision', cls: 'bg-yellow-500/10 text-yellow-400 border-yellow-400/40', icon: Clock },
+    WVR:  { label: 'Waiver', cls: 'bg-blue-500/10 text-blue-400 border-blue-400/40', icon: AlertCircle },
   };
   const statusInfo = player.status ? statusConfig[player.status] : null;
 
@@ -458,7 +462,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         {/* ═══ Body ═══ */}
         <div className="px-5 py-4 max-h-[55vh] overflow-y-auto">
           <Tabs defaultValue="stats">
-            <TabsList className="grid w-full grid-cols-3 bg-citrus-cream/60 border border-citrus-sage/20 rounded-xl h-9 mb-4">
+            <TabsList className="grid w-full grid-cols-3 bg-white/5 border border-citrus-sage/20 rounded-xl h-9 mb-4">
               <TabsTrigger value="stats" className="text-xs font-display font-semibold rounded-lg data-[state=active]:bg-citrus-sage data-[state=active]:text-white">Overview</TabsTrigger>
               <TabsTrigger value="advanced" className="text-xs font-display font-semibold rounded-lg data-[state=active]:bg-citrus-sage data-[state=active]:text-white">Detailed</TabsTrigger>
               <TabsTrigger value="gamelog" className="text-xs font-display font-semibold rounded-lg data-[state=active]:bg-citrus-sage data-[state=active]:text-white">Game Log</TabsTrigger>
@@ -499,7 +503,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
               {/* Bio quick view */}
               {(player.age || player.height || player.weight) && (
-                <div className="flex items-center gap-4 py-2.5 px-3 bg-citrus-cream/30 rounded-xl border border-citrus-sage/15 text-sm">
+                <div className="flex items-center gap-4 py-2.5 px-3 bg-white/5 rounded-xl border border-citrus-sage/15 text-sm">
                   {player.age && (
                     <div className="flex items-center gap-1.5">
                       <span className="text-pastel-cream/60 text-xs font-display">Age</span>
@@ -651,8 +655,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                           "rounded-xl border overflow-hidden transition-all",
                           gp.isToday ? "border-citrus-orange bg-citrus-peach/5"
                             : hasActuals ? "border-citrus-sage/20 bg-card"
-                            : gp.isPast ? "border-citrus-sage/15 bg-citrus-cream/20 opacity-50"
-                            : "border-citrus-sage/20 bg-[#E8EED9]/30"
+                            : gp.isPast ? "border-citrus-sage/15 bg-white/[0.03] opacity-50"
+                            : "border-citrus-sage/20 bg-white/5"
                         )}
                       >
                         {/* Game header row */}
@@ -748,7 +752,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   { label: 'GAA', value: (gp.projection.projected_gaa as number | undefined)?.toFixed(2) },
                                   { label: 'SV%', value: gp.projection.projected_save_pct ? `${(Number(gp.projection.projected_save_pct) * 100).toFixed(1)}` : '—' },
                                 ].map((s, i) => (
-                                  <div key={i} className="flex flex-col items-center py-1 bg-[#E8EED9]/40 rounded border border-citrus-sage/10">
+                                  <div key={i} className="flex flex-col items-center py-1 bg-white/5 rounded border border-citrus-sage/10">
                                     <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
                                     <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '—'}</span>
                                   </div>
@@ -766,7 +770,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   { label: 'HIT', value: (gp.projection.projected_hits as number | undefined)?.toFixed(1) },
                                   { label: 'PIM', value: (gp.projection.projected_pim as number | undefined)?.toFixed(1) },
                                 ].map((s, i) => (
-                                  <div key={i} className="flex flex-col items-center py-1 bg-[#E8EED9]/40 rounded border border-citrus-sage/10">
+                                  <div key={i} className="flex flex-col items-center py-1 bg-white/5 rounded border border-citrus-sage/10">
                                     <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
                                     <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '—'}</span>
                                   </div>
@@ -816,13 +820,13 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
         {/* ═══ Footer Actions ═══ */}
         {leagueId && user && isOnRoster && (
-          <div className="px-5 py-3 border-t border-citrus-sage/15 bg-citrus-cream/30">
+          <div className="px-5 py-3 border-t border-citrus-sage/15 bg-white/[0.03]">
             <Button
               variant="outline"
               size="sm"
               onClick={handleDropPlayer}
               disabled={isDropping}
-              className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 font-display font-semibold"
+              className="w-full text-red-400 border-red-400/40 bg-transparent hover:bg-red-500/10 hover:border-red-400/60 hover:text-red-300 font-display font-semibold"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               {isDropping ? 'Dropping...' : 'Drop Player'}

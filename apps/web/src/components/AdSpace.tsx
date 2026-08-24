@@ -132,7 +132,7 @@ function AdSpacePlaceholder({
   return (
     <Card
       className={cn(
-        "overflow-hidden bg-gradient-to-br from-citrus-sage/10 via-citrus-cream to-citrus-peach/10 corduroy-texture border-4 border-citrus-orange rounded-[1.5rem] shadow-[0_6px_0_rgba(223,117,54,0.3)] relative hover:shadow-[0_8px_0_rgba(223,117,54,0.4)] hover:-translate-y-1 transition-all duration-300",
+        "overflow-hidden bg-gradient-to-br from-citrus-sage/10 via-[#1A2A20] to-citrus-peach/10 border-4 border-citrus-orange rounded-[1.5rem] shadow-[0_6px_0_rgba(223,117,54,0.3)] relative hover:shadow-[0_8px_0_rgba(223,117,54,0.4)] hover:-translate-y-1 transition-all duration-300",
         config.container,
         className
       )}
@@ -164,7 +164,7 @@ function AdSpacePlaceholder({
 
         {/* Main Ad Container */}
         <div className={cn(
-          "w-full bg-[#E8EED9]/50 backdrop-blur-sm rounded-xl border-3 border-citrus-sage shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] flex flex-col items-center justify-center",
+          "w-full bg-white/5 rounded-xl border-3 border-citrus-sage/40 shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] flex flex-col items-center justify-center",
           config.inner,
           isHorizontal ? "mb-0" : "mb-3"
         )}>

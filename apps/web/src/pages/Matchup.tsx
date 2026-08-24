@@ -5127,12 +5127,12 @@ const Matchup = () => {
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-0 lg:px-4 order-1 lg:order-2">
               {/* Playoff status banner — only for fantasy leagues with a generated bracket */}
               {(league?.id || activeLeagueId) && playoffChampion.status === 'completed' && (
-                <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950/40 dark:via-yellow-950/40 dark:to-orange-950/40">
+                <Card className="mb-4 border-amber-700/60 bg-gradient-to-br from-amber-950/40 via-yellow-950/40 to-orange-950/40">
                   <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4">
                     <div className="flex items-center gap-3">
-                      <Trophy className="w-6 h-6 text-amber-600 shrink-0" aria-hidden="true" />
+                      <Trophy className="w-6 h-6 text-amber-400 shrink-0" aria-hidden="true" />
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-amber-400">
                           Season Complete
                         </div>
                         <div className="text-base font-bold text-pastel-cream">

@@ -19,7 +19,7 @@
 // any of those without an entry-point refactor.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { structuredLogger, coerceToNumericPlayerId } from '@citrus/shared';
+import { structuredLogger, coerceToNumericPlayerId, getProjectionsSeason } from '@citrus/shared';
 
 /**
  * Prior season used as the durability/role signal for draft value
@@ -228,6 +228,11 @@ export const projectionsStrategy: AutopickStrategy = async ({
       const { data, error: projErr } = await supabase
         .from('player_ros_projections')
         .select('player_id, avg_points_per_game, total_projected_points')
+        // FUTURE-PROOF (2026-08-24 season-sweep): the table holds one
+        // season today, but the moment a second season's projections are
+        // ingested an unfiltered read would mix seasons on the board —
+        // the same per-season-index trap as the caps-inflation bug.
+        .eq('season', getProjectionsSeason())
         .order('player_id', { ascending: true })
         .range(offset, offset + PAGE - 1);
       if (projErr) {
@@ -365,6 +370,8 @@ export const projectionsStrategy: AutopickStrategy = async ({
         const { data: ownedRows, error: ownedErr } = await supabase
           .from('player_directory')
           .select('player_id, position_code')
+          // Newest season's position wins the dedupe below.
+          .order('season', { ascending: false })
           .in('player_id', ownedIds);
         if (ownedErr) {
           structuredLogger.warn('autopick.roster_guard.owned_positions_read_failed', {

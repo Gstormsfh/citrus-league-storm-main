@@ -395,8 +395,8 @@ export default function PoolPlayoffBracket() {
                     const gameIsFinal = seriesGame && seriesGame.status === 'final';
 
                     return (
-                      <div key={s.series_id} className={cn('border-2 rounded-xl p-3 space-y-2 bg-white relative',
-                          gameIsLive && 'border-red-400 bg-red-50/20 ring-1 ring-red-400/20',
+                      <div key={s.series_id} className={cn('border-2 rounded-xl p-3 space-y-2 bg-white/5 relative',
+                          gameIsLive && 'border-red-400 bg-red-950/30 ring-1 ring-red-400/20',
                           locked && s.series_status === 'final' && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/8',
                           !gameIsLive && !locked && 'border-fantasy-border',
                       )}>
@@ -414,7 +414,7 @@ export default function PoolPlayoffBracket() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] uppercase font-display font-bold text-white/55">Series {String.fromCharCode(64 + s.bracket_slot)}</span>
                             {s.conference && (
-                              <Badge variant="outline" className={cn('text-[9px] px-1 py-0', s.conference === 'Eastern' ? 'border-blue-300 text-blue-700' : 'border-orange-300 text-orange-700')}>
+                              <Badge variant="outline" className={cn('text-[9px] px-1 py-0', s.conference === 'Eastern' ? 'border-blue-400/50 text-blue-400' : 'border-orange-400/50 text-orange-400')}>
                                 {s.conference === 'Eastern' ? 'EAST' : 'WEST'}
                               </Badge>
                             )}
@@ -430,7 +430,7 @@ export default function PoolPlayoffBracket() {
                             gameIsLive ? 'bg-red-400/20 ring-1 ring-red-400/40' : 'bg-pastel-sage/10 ring-1 ring-pastel-sage/30'
                           )}>
                             <span className="font-mono font-bold">{seriesGame.away_team} {seriesGame.away_score}</span>
-                            <span className={cn('text-[10px] font-display', gameIsLive && 'text-red-700 font-bold animate-pulse')}>
+                            <span className={cn('text-[10px] font-display', gameIsLive && 'text-red-400 font-bold animate-pulse')}>
                               {gameIsLive ? `${seriesGame.period || ''} ${seriesGame.period_time || ''}`.trim() : 'Final'}
                             </span>
                             <span className="font-mono font-bold">{seriesGame.home_score} {seriesGame.home_team}</span>

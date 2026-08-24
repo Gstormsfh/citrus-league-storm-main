@@ -77,7 +77,7 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
     return (
       <div className={cn(
         'flex items-center justify-between px-3 py-2 rounded-md transition-all',
-        isCompleted && isWinner && 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800',
+        isCompleted && isWinner && 'bg-green-950/30 border border-green-800/60',
         isCompleted && !isWinner && 'bg-white/5 ring-1 ring-white/10 text-white/55 line-through opacity-60',
         !isCompleted && 'bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/30',
         isChampionship && isCompleted && isWinner && 'bg-amber-400/15 ring-1 ring-amber-400/40 shadow-[0_8px_24px_-12px_rgba(251,191,36,0.4)]',
@@ -130,9 +130,9 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
       <div className={cn(
         'px-3 py-1 text-xs font-bold uppercase tracking-wider text-center',
         series.status === 'active' && 'bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft',
-        series.status === 'completed' && 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
+        series.status === 'completed' && 'bg-green-900/30 text-green-400',
         series.status === 'pending' && 'bg-white/5 ring-1 ring-white/10 text-white/55',
-        series.status === 'bye' && 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+        series.status === 'bye' && 'bg-blue-900/20 text-blue-400',
       )}>
         {series.status === 'active' && 'Live'}
         {series.status === 'completed' && 'Final'}
@@ -457,7 +457,7 @@ const SeedList: React.FC<{
                   {seed.regular_season_ties > 0 ? `-${seed.regular_season_ties}` : ''}
                 </span>
                 {hasBye && (
-                  <span className="text-[9px] font-bold text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">
+                  <span className="text-[9px] font-bold text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded">
                     BYE
                   </span>
                 )}

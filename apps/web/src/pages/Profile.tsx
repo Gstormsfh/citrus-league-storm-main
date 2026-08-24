@@ -54,9 +54,7 @@ import {
   RefreshCw,
   Play,
   Loader2,
-  Sun,
   Moon,
-  Monitor,
   FileText,
   Download,
   ExternalLink,
@@ -183,9 +181,13 @@ const Profile = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
-    return (localStorage.getItem('citrus-theme') as 'light' | 'dark' | 'system') || 'light';
-  });
+  // 2026-08-24 click-sweep: the Light/Dark/System appearance toggle is gone.
+  // The shipped design system is single-theme — the forest-dark palette lives
+  // on the :root tokens. Adding `.dark` flipped every token to an unmaintained
+  // legacy warm-brown palette (off-brand instant re-theme), "Light" visibly
+  // did nothing, and "System" made two users see two different apps depending
+  // on their OS. The cleanup effect below also scrubs any stored preference
+  // and stray `.dark` class left behind for users who had toggled it.
   
   // Animation observer setup
   useEffect(() => {
@@ -212,31 +214,12 @@ const Profile = () => {
     };
   }, [activeTab]);
   
-  // Theme effect
+  // Theme cleanup: remove the legacy `.dark` class / stored preference so
+  // users who toggled the old switch come back to the real Citrus theme.
   useEffect(() => {
-    const root = document.documentElement;
-    localStorage.setItem('citrus-theme', theme);
-
-    const applyTheme = (prefersDark?: boolean) => {
-      if (theme === 'dark') {
-        root.classList.add('dark');
-      } else if (theme === 'system') {
-        const dark = prefersDark ?? window.matchMedia('(prefers-color-scheme: dark)').matches;
-        root.classList.toggle('dark', dark);
-      } else {
-        root.classList.remove('dark');
-      }
-    };
-
-    applyTheme();
-
-    if (theme === 'system') {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches);
-      mq.addEventListener('change', handler);
-      return () => mq.removeEventListener('change', handler);
-    }
-  }, [theme]);
+    document.documentElement.classList.remove('dark');
+    try { localStorage.removeItem('citrus-theme'); } catch { /* private mode */ }
+  }, []);
 
   // User & Team Data - Initialize from profile
   const [formData, setFormData] = useState({
@@ -1457,28 +1440,15 @@ const Profile = () => {
                         <div className="space-y-4">
                           <div className="space-y-2">
                             <Label className="flex items-center gap-2 text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">
-                              <Sun className="h-3.5 w-3.5" />
+                              <Moon className="h-3.5 w-3.5" />
                               Appearance
                             </Label>
-                            <div className="flex gap-2">
-                              {([
-                                { value: 'light' as const, label: 'Light', icon: Sun },
-                                { value: 'dark' as const, label: 'Dark', icon: Moon },
-                                { value: 'system' as const, label: 'System', icon: Monitor },
-                              ]).map(({ value, label, icon: Icon }) => (
-                                <Button
-                                  key={value}
-                                  variant={theme === value ? 'default' : 'outline'}
-                                  onClick={() => setTheme(value)}
-                                  className={`flex-1 font-bold ${theme === value
-                                    ? 'bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]'
-                                    : 'bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50'}`}
-                                  size="sm"
-                                >
-                                  <Icon className="mr-1.5 h-3.5 w-3.5" />
-                                  {label}
-                                </Button>
-                              ))}
+                            <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/5 ring-1 ring-white/10">
+                              <Moon className="h-4 w-4 text-pastel-orange shrink-0" />
+                              <div className="min-w-0">
+                                <div className="text-sm font-bold text-pastel-cream">Citrus Dark</div>
+                                <div className="text-xs text-white/55">Rink-side dark, tuned for the whole app. One look, no surprises.</div>
+                              </div>
                             </div>
                           </div>
                         </div>

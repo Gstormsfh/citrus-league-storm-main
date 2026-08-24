@@ -272,7 +272,7 @@ poolRoutes.get('/pickem/:leagueId/standings', membershipMiddleware, async (c) =>
   try {
     const service = createPoolService(c);
     const leagueId = c.req.param('leagueId');
-    const standings = await service.getPickemStandings(leagueId);
+    const standings = await service.getPickemStandings(leagueId, c.get('userId'));
     return ok(c, standings);
   } catch (err) {
     return handleError(c, err, 'Failed to fetch standings');

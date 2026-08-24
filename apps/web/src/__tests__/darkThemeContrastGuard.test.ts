@@ -152,4 +152,31 @@ describe('dark-theme contrast guard', () => {
     expect(src).not.toMatch(/bg-fantasy-primary\s+text-white/);
     expect(src).not.toMatch(/text-fantasy-primary/);
   });
+
+  it('global varsity color rules must exclude buttons', () => {
+    // BUTTON-VISIBILITY ROOT FIX (2026-08-24). The shadcn Button base
+    // includes `font-varsity`. A global `.dark .font-varsity { color }`
+    // rule (specificity 0-2-0) silently overrode EVERY text-* utility on
+    // EVERY button in dark mode — cream-on-lemon Draft buttons measured
+    // ~1.4:1. Any selector that colors .font-varsity must carry
+    // :not(button) so buttons keep the color their variant/call site set.
+    const css = readFileSync(INDEX_CSS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const offenders: string[] = [];
+    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const sel = m[1].trim();
+      const body = m[2];
+      if (!/\.font-varsity/.test(sel)) continue;
+      const setsColor = /(^|[^-])color\s*:/.test(body) || /@apply[^;]*text-(pastel|citrus|white|\[)/.test(body);
+      if (!setsColor) continue;
+      for (const part of sel.split(',')) {
+        if (part.includes('.font-varsity') && !part.includes(':not(button)')) {
+          offenders.push(part.trim());
+        }
+      }
+    }
+    expect(
+      offenders,
+      `font-varsity color rules missing :not(button) — these force text color onto buttons:\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
 });

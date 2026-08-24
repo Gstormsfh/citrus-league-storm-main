@@ -270,9 +270,9 @@ export default function PoolPlayoffConfidence() {
                     return (
                       <div key={s.series_id} className={cn(
                         'border rounded-lg p-3 space-y-2 transition-colors relative',
-                        gameIsLive && 'border-red-400 bg-red-50/20 ring-1 ring-red-400/20',
-                        isCorrect && 'border-green-400 bg-green-50/50',
-                        isWrong && 'border-red-300 bg-red-50/30',
+                        gameIsLive && 'border-red-400 bg-red-950/30 ring-1 ring-red-400/20',
+                        isCorrect && 'border-green-400 bg-green-950/40',
+                        isWrong && 'border-red-400/60 bg-red-950/30',
                         locked && !isCorrect && !isWrong && !gameIsLive && 'opacity-70 bg-white/5 ring-1 ring-white/10',
                       )}>
                         {gameIsLive && (
@@ -297,7 +297,7 @@ export default function PoolPlayoffConfidence() {
                             gameIsLive ? 'bg-red-400/20 ring-1 ring-red-400/40' : 'bg-pastel-sage/10 ring-1 ring-pastel-sage/30'
                           )}>
                             <span className="font-mono font-bold">{seriesGame.away_team} {seriesGame.away_score}</span>
-                            <span className={cn('text-[10px]', gameIsLive && 'text-red-700 font-bold animate-pulse')}>
+                            <span className={cn('text-[10px]', gameIsLive && 'text-red-400 font-bold animate-pulse')}>
                               {gameIsLive ? `${seriesGame.period || ''} ${seriesGame.period_time || ''}`.trim() : 'Final'}
                             </span>
                             <span className="font-mono font-bold">{seriesGame.home_score} {seriesGame.home_team}</span>

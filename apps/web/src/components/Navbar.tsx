@@ -24,9 +24,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 import { useNotificationStore } from '@/stores/notificationStore';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // 2026-08-24 click-sweep: the bell used to navigate(`/matchup/...`) — a stub.
+  // The notifications feed only rendered in `hidden lg:block` desktop rails, so
+  // on phones a badged bell dropped you on the matchup page with no feed in
+  // sight. The bell now opens the real feed in a slide-over on every viewport.
+  const [notifOpen, setNotifOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -266,7 +272,7 @@ const Navbar = () => {
               <>
                 {/* Notifications */}
                 <button
-                  onClick={() => activeLeagueId && navigate(`/matchup/${activeLeagueId}`)}
+                  onClick={() => activeLeagueId && setNotifOpen(true)}
                   className="focus-citrus relative p-2.5 rounded-md hover:bg-white/5 transition-colors"
                   aria-label="Notifications"
                 >
@@ -388,7 +394,7 @@ const Navbar = () => {
             {user && (
               <button
                 className="focus-citrus p-3 rounded-md text-pastel-cream/80 hover:text-pastel-cream relative transition-colors"
-                onClick={() => activeLeagueId && navigate(`/matchup/${activeLeagueId}`)}
+                onClick={() => { if (activeLeagueId) { setNotifOpen(true); setMobileMenuOpen(false); } }}
                 aria-label="Notifications"
               >
                 <Bell className="h-5 w-5" />
@@ -572,6 +578,42 @@ const Navbar = () => {
                   <Link to="/auth" onClick={closeMobileMenu}>Sign In</Link>
                 </Button>
               )}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {/* ===== Notifications slide-over (all viewports) =====
+          Portaled to <body> for the same containing-block reason as the
+          mobile menu above: the header's backdrop-blur would otherwise trap
+          this fixed panel inside the ~60px navbar box. */}
+      {notifOpen && activeLeagueId && createPortal(
+        <div
+          className="fixed inset-0 z-[80] bg-black/60 animate-in fade-in duration-150"
+          onClick={() => setNotifOpen(false)}
+        >
+          <div
+            className="absolute right-0 top-0 h-full w-full max-w-md bg-[#0F1F15] border-l border-white/10 shadow-2xl animate-in slide-in-from-right duration-200"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="League notifications"
+          >
+            <div className="flex items-center justify-between px-4 h-14 border-b border-white/10">
+              <span className="flex items-center gap-2 font-varsity font-black text-pastel-cream uppercase tracking-wide">
+                <Bell className="h-4 w-4 text-pastel-orange" />
+                Notifications
+              </span>
+              <button
+                onClick={() => setNotifOpen(false)}
+                aria-label="Close notifications"
+                className="focus-citrus p-2 rounded-md hover:bg-white/5 text-white/70 hover:text-pastel-cream transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="h-[calc(100%-3.5rem)] overflow-hidden">
+              <LeagueNotifications leagueId={activeLeagueId} />
             </div>
           </div>
         </div>,

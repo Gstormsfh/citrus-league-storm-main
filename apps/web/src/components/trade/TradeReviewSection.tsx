@@ -192,7 +192,7 @@ export const TradeReviewSection = ({ tradeOffers, myTeamId, onVoted }: TradeRevi
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <Badge variant="outline" className="border-amber-500/60 text-amber-700 dark:text-amber-300">
+                    <Badge variant="outline" className="border-amber-500/60 text-amber-300">
                       Under Review
                     </Badge>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -247,7 +247,7 @@ export const TradeReviewSection = ({ tradeOffers, myTeamId, onVoted }: TradeRevi
                   </div>
                   <Progress value={progress} className="h-2" />
                   {vetoCount >= votesNeeded && votesNeeded > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                    <div className="flex items-center gap-1 text-xs text-red-400">
                       <AlertCircle className="h-3 w-3" /> Veto threshold reached — trade will be rejected
                     </div>
                   )}

@@ -196,7 +196,7 @@ function SortableQueueItem({
           <Button
             size="sm"
             onClick={onDraft}
-            className="h-7 text-xs bg-fantasy-primary hover:bg-fantasy-primary/90 shadow-sm"
+            className="h-7 text-xs font-bold bg-fantasy-primary text-[#0F1F15] hover:bg-fantasy-primary/90 shadow-sm"
           >
             <Play className="h-3 w-3 mr-1" />
             Draft Now
@@ -442,7 +442,7 @@ export const DraftQueue = ({
               Draft Queue
             </CardTitle>
             {isYourTurn && availableQueuePlayers.length > 0 && (
-              <Badge className="bg-fantasy-primary text-white animate-pulse">
+              <Badge className="bg-fantasy-primary text-[#0F1F15] font-bold animate-pulse">
                 <Zap className="h-3 w-3 mr-1" />
                 Your Turn
               </Badge>

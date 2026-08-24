@@ -48,8 +48,8 @@ const IndividualIRSlot = ({
         "p-2 transition-all rounded-lg min-h-[140px] w-full",
         "border-2",
         isOver && "border-red-500 bg-red-500/10 shadow-lg",
-        isEmpty && !isOver && "border-dashed border-red-400/30 bg-[#E8EED9]/50 backdrop-blur-sm/50",
-        !isEmpty && !isOver && "border-red-400/30 bg-[#E8EED9]/50 backdrop-blur-sm shadow-sm"
+        isEmpty && !isOver && "border-dashed border-red-400/30 bg-white/[0.03]",
+        !isEmpty && !isOver && "border-red-400/30 bg-white/5 shadow-sm"
       )}
     >
       {/* Slot Header */}
@@ -58,7 +58,7 @@ const IndividualIRSlot = ({
           variant="outline" 
           className={cn(
             "text-[9px] font-bold px-1 py-0 h-4",
-            isEmpty ? "text-muted-foreground border-muted-foreground/30" : "text-red-600 border-red-500/50 bg-red-500/10"
+            isEmpty ? "text-muted-foreground border-muted-foreground/30" : "text-red-400 border-red-500/50 bg-red-500/10"
           )}
         >
           IR {slotNumber}
@@ -79,7 +79,7 @@ const IndividualIRSlot = ({
       ) : (
         <div className={cn(
           "flex items-center justify-center h-[110px] rounded border border-dashed transition-all",
-          isOver ? "border-red-500 bg-red-500/10 border-2" : "border-red-300/30 bg-red-50/20 dark:bg-red-950/5"
+          isOver ? "border-red-500 bg-red-500/10 border-2" : "border-red-300/30 bg-red-950/20"
         )}>
           <div className="text-center">
             <Plus className={cn(

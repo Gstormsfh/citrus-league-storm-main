@@ -38,6 +38,8 @@ function makeStubSupabase(opts: {
       if (table === 'player_ros_projections') {
         const builder: Record<string, unknown> = {};
         builder.select = vi.fn(() => builder);
+        // Season-sweep 2026-08-24: the strategy now filters .eq('season', …).
+        builder.eq = vi.fn(() => builder);
         builder.order = vi.fn(() => builder);
         // After two .order() calls, the builder resolves with data.
         // We model this by making `.order()` thenable on the second call.

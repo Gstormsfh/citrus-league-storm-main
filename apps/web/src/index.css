@@ -433,18 +433,33 @@
   color: hsl(40 50% 93%);
   }
 
-  .dark h1, .dark h2, .dark .font-varsity {
+  /* BUTTON-VISIBILITY ROOT FIX (2026-08-24): this rule used to hit
+     `.dark .font-varsity` unqualified — and the shadcn Button base
+     includes font-varsity, so its 0-2-0 specificity FORCED cream text
+     onto every button in dark mode, overriding any text-* utility the
+     call site set. Cream-on-lemon Draft buttons measured ~1.4:1
+     (effectively invisible). Buttons own their text color; this
+     heading-readability rule now excludes them. */
+  .dark h1, .dark h2, .dark .font-varsity:not(button) {
   color: hsl(40 50% 93%);
   }
   
-  /* Vintage Varsity Typography Hierarchy */
+  /* Vintage Varsity Typography Hierarchy — typography applies to
+     EVERYTHING varsity, buttons included (they want the Graduate face). */
   h1, h2, .font-varsity {
   font-family: 'Graduate', 'Alfa Slab One', serif;
   text-transform: uppercase;
   letter-spacing: -0.025em; /* tracking-tighter for block letters */
   font-weight: 900;
-  /* 2026-08-19: dark-on-dark. The draft room's "ROSTERS ARE SET" hero
+  }
+
+  /* COLOR is split out and excludes buttons (BUTTON-VISIBILITY ROOT
+     FIX, 2026-08-24 — see the .dark rule above): buttons declare their
+     own text color per variant/utility; forcing cream here made
+     light-filled buttons unreadable.
+     2026-08-19: dark-on-dark. The draft room's "ROSTERS ARE SET" hero
      headline was rendering at 2.2:1 — effectively invisible. */
+  h1, h2, .font-varsity:not(button) {
   @apply text-pastel-cream;
   }
   

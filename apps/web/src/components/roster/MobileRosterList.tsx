@@ -162,7 +162,7 @@ const GameStatusBadge = ({ status, score }: { status?: string; score?: string })
 
   if (status === 'live' || status === 'intermission') {
     return (
-      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-600 uppercase animate-pulse">
+      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-400 uppercase animate-pulse">
         {status === 'intermission' ? 'INT' : 'LIVE'}{score ? ` ${score}` : ''}
       </span>
     );

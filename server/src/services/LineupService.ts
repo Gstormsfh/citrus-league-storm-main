@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, logger, getTodayMST, getTodayMSTDate, getTodayNhlScheduleDate } from '@citrus/shared';
+import { COLUMNS, logger, getTodayMST, getTodayMSTDate, getTodayNhlScheduleDate, getCurrentSeason } from '@citrus/shared';
 import { resolveSlotConfig, validateSlotAssignments } from '../lib/leagueRules';
 
 /**
@@ -128,6 +128,7 @@ export class LineupService {
         const { data: posRows } = await this.supabase
           .from('player_directory')
           .select('player_id, position_code, eligible_positions')
+          .order('season', { ascending: false })
           .in('player_id', assignedIds);
         const seen = new Set<number>();
         for (const row of (posRows ?? []) as Array<{
@@ -339,6 +340,7 @@ export class LineupService {
     const { data: players } = await this.supabase
       .from('player_directory')
       .select('player_id, team_abbrev')
+      .eq('season', getCurrentSeason())
       .in('player_id', playerIds);
 
     if (!players || players.length === 0) return true;
@@ -559,12 +561,14 @@ export class LineupService {
     const { data: players } = await this.supabase
       .from('player_directory')
       .select('player_id, position_code')
+      .eq('season', getCurrentSeason())
       .in('player_id', playerIds.map((id: string) => parseInt(String(id))));
 
     // Get roster status from player_talent_metrics (roster_status lives here, not in player_directory)
     const { data: talentMetrics } = await this.supabase
       .from('player_talent_metrics')
       .select('player_id, roster_status')
+      .eq('season', getCurrentSeason())
       .in('player_id', playerIds.map((id: string) => parseInt(String(id))));
 
     if (!players || players.length === 0) {
@@ -744,6 +748,7 @@ export class LineupService {
       const { data: players } = await this.supabase
         .from('player_directory')
         .select('player_id, team_abbrev')
+        .eq('season', getCurrentSeason())
         .in('player_id', allPlayerIds);
       if (players) {
         for (const p of players) {

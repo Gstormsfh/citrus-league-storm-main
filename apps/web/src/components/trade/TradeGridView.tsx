@@ -95,7 +95,7 @@ const PlayerCell = ({
         </Badge>
         {isSelected && (
           <CheckCircle2
-            className={`h-3.5 w-3.5 ${selectionTone === 'send' ? 'text-red-500' : 'text-green-600'}`}
+            className={`h-3.5 w-3.5 ${selectionTone === 'send' ? 'text-red-400' : 'text-green-400'}`}
           />
         )}
       </div>
@@ -202,7 +202,7 @@ const TeamRosterGrid = ({
             </Button>
           )}
           {isCurrentPartner && (
-            <Badge variant="outline" className="text-[10px] border-green-500/60 text-green-700 bg-green-50">
+            <Badge variant="outline" className="text-[10px] border-green-500/60 text-green-400 bg-green-950/30">
               Active partner
             </Badge>
           )}
@@ -288,7 +288,7 @@ export const TradeGridView = ({
             {/* You Receive */}
             <div className="rounded-md border bg-green-500/5 border-green-500/20 p-2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-semibold text-green-700 flex items-center gap-1">
+                <span className="text-xs font-semibold text-green-400 flex items-center gap-1">
                   <TrendingUp className="h-3 w-3" /> You Receive
                 </span>
                 <span className="text-[10px] font-mono text-muted-foreground">Val: {theirTotalValue}</span>
@@ -303,7 +303,7 @@ export const TradeGridView = ({
                     <Badge
                       key={p.id}
                       variant="outline"
-                      className="bg-white text-[10px] py-0.5 cursor-pointer hover:bg-red-50"
+                      className="bg-white/5 text-[10px] py-0.5 cursor-pointer hover:bg-red-500/15"
                       onClick={() => onToggleTheirPlayer(p.id)}
                     >
                       {(p.position || '').toUpperCase()} {p.full_name}
@@ -316,7 +316,7 @@ export const TradeGridView = ({
             {/* You Send */}
             <div className="rounded-md border bg-red-500/5 border-red-500/20 p-2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-semibold text-red-600 flex items-center gap-1">
+                <span className="text-xs font-semibold text-red-400 flex items-center gap-1">
                   <TrendingDown className="h-3 w-3" /> You Send
                 </span>
                 <span className="text-[10px] font-mono text-muted-foreground">Val: {myTotalValue}</span>
@@ -331,7 +331,7 @@ export const TradeGridView = ({
                     <Badge
                       key={p.id}
                       variant="outline"
-                      className="bg-white text-[10px] py-0.5 cursor-pointer hover:bg-red-50"
+                      className="bg-white/5 text-[10px] py-0.5 cursor-pointer hover:bg-red-500/15"
                       onClick={() => onToggleMyPlayer(p.id)}
                     >
                       {(p.position || '').toUpperCase()} {p.full_name}

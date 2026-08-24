@@ -679,8 +679,13 @@ const TradeAnalyzer = () => {
             </div>
           </div>
 
+        {/* 2026-08-24 click-sweep fix: the fixed h-[calc(100vh-240px)] applied at
+            ALL widths, but the 12-col layout only exists at lg+. Below lg the
+            three stacked cards overflowed the fixed-height grid and painted
+            straight through the translucent footer. Height is now lg-scoped so
+            mobile/tablet flows naturally. */}
         {viewMode === 'list' ? (
-        <div className="grid lg:grid-cols-12 gap-6 h-[calc(100vh-240px)] min-h-[600px]">
+        <div className="grid lg:grid-cols-12 gap-6 lg:h-[calc(100vh-240px)] lg:min-h-[600px]">
           {/* Left Column: My Team */}
           <Card className="lg:col-span-3 flex flex-col h-full bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
             <CardHeader className="pb-3">

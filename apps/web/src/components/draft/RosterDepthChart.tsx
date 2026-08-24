@@ -50,9 +50,9 @@ const positionColors: Record<string, string> = {
   'LW': 'bg-fantasy-secondary/10',
   'RW': 'bg-fantasy-tertiary/10',
   'F': 'bg-fantasy-primary/10',
-  'D': 'bg-blue-50',
-  'G': 'bg-purple-50',
-  'UTIL': 'bg-yellow-50',
+  'D': 'bg-blue-950/20',
+  'G': 'bg-purple-950/20',
+  'UTIL': 'bg-yellow-950/20',
 };
 
 export const RosterDepthChart = ({

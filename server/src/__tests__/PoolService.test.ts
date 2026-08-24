@@ -277,8 +277,9 @@ describe('PoolService', () => {
         return createChain({ data: profiles, error: null });
       });
 
-      const standings = await service.getPickemStandings('league-1');
+      const standings = await service.getPickemStandings('league-1', 'u1');
 
+      expect(mockRequireMembership).toHaveBeenCalledWith('league-1', 'u1');
       expect(standings).toHaveLength(2);
       expect(standings[0].display_name).toBe('Alice');
       expect(standings[0].correct_picks).toBe(2);
@@ -289,7 +290,7 @@ describe('PoolService', () => {
     it('returns empty array when no scored picks exist', async () => {
       mockSupabase.from = vi.fn(() => createChain({ data: [], error: null }));
 
-      const standings = await service.getPickemStandings('league-1');
+      const standings = await service.getPickemStandings('league-1', 'u1');
 
       expect(standings).toEqual([]);
     });

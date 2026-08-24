@@ -95,17 +95,17 @@ export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButto
   }
 
   return (
-    <div className="bg-white rounded-xl border border-citrus-sage/20 shadow-lg p-4 w-72">
+    <div className="bg-[#1A2A20] rounded-xl border border-citrus-sage/20 shadow-lg p-4 w-72">
       <div className="flex items-center justify-between mb-3">
         <span className="font-display font-bold text-sm text-pastel-cream">Invite Players</span>
-        <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600">
+        <button onClick={() => setOpen(false)} className="text-white/55 hover:text-pastel-cream">
           <X className="w-4 h-4" />
         </button>
       </div>
 
       {/* Join code */}
-      <div className="flex items-center gap-2 mb-3 p-2 bg-slate-50 rounded-lg">
-        <span className="text-xs font-display text-slate-500">Code:</span>
+      <div className="flex items-center gap-2 mb-3 p-2 bg-white/5 rounded-lg">
+        <span className="text-xs font-display text-white/55">Code:</span>
         <Badge variant="outline" className="font-mono text-sm tracking-wider">{joinCode}</Badge>
         <Button variant="ghost" size="icon" className="h-7 w-7 ml-auto" onClick={handleCopyCode}>
           <Copy className="w-3.5 h-3.5" />

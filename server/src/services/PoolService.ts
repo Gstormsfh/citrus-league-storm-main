@@ -209,9 +209,21 @@ export class PoolService {
     return { scored };
   }
 
-  /** Get cumulative Pick'em standings. */
-  async getPickemStandings(leagueId: string) {
-    await this.membership.requireMembership(leagueId, this.getCurrentUserId());
+  /**
+   * Get cumulative Pick'em standings.
+   *
+   * 2026-08-24 click-sweep fix: this method used to call
+   * requireMembership(leagueId, this.getCurrentUserId()) — and
+   * getCurrentUserId() is a placeholder that always returns ''. Every
+   * standings request therefore threw "SECURITY ERROR: checkMembership
+   * called with invalid userId" and the client swallowed it into an empty
+   * table: pick'em standings were dead on arrival for every league. The
+   * route (GET /pickem/:leagueId/standings) already runs
+   * membershipMiddleware before this handler, so the caller passes the
+   * verified userId in for the defense-in-depth check instead.
+   */
+  async getPickemStandings(leagueId: string, userId: string) {
+    await this.membership.requireMembership(leagueId, userId);
 
     const { data: picks, error } = await this.supabase
       .from('pool_picks')
@@ -607,10 +619,4 @@ export class PoolService {
     }));
   }
 
-  /** Placeholder — in routes, userId comes from context, not from the service. */
-  private getCurrentUserId(): string {
-    // This is overridden by the route handler which passes userId explicitly.
-    // Standings methods that need membership checking receive userId from the route.
-    return '';
-  }
 }

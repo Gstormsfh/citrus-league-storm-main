@@ -960,6 +960,7 @@ export class MatchupService {
     const { data: players } = await admin
       .from('player_directory')
       .select('player_id, full_name, position_code, is_goalie, team_abbrev, headshot_url')
+      .eq('season', getCurrentSeason())
       .in('player_id', uniquePlayerIds);
 
     interface PlayerDirectoryRow {

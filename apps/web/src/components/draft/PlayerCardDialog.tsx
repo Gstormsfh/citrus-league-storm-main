@@ -169,7 +169,7 @@ export const PlayerCardDialog = ({
 
         {onDraft && canDraft && (
           <Button
-            className="w-full bg-fantasy-primary hover:bg-fantasy-primary/90"
+            className="w-full font-bold bg-fantasy-primary text-[#0F1F15] hover:bg-fantasy-primary/90"
             disabled={isSubmitPending}
             onClick={() => { onDraft(player); onClose(); }}
             data-testid="player-card-draft-button"

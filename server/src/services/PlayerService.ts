@@ -295,6 +295,10 @@ export class PlayerService {
     const { data, error } = await this.supabase
       .from('player_directory')
       .select(COLUMNS.PLAYER_DIRECTORY)
+      // SEASON FILTER (2026-08-24 sweep): without it the per-season index
+      // returns one row per season and .single() THROWS on any player
+      // with more than one season row.
+      .eq('season', getCurrentSeason())
       .eq('player_id', parseInt(String(playerId), 10))
       .single();
 

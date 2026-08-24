@@ -156,6 +156,8 @@ function makeMockSupabase(opts: MockProjections): SupabaseClient {
       let rangeFrom: number | null = null;
       let rangeTo = 0;
       chain.select = () => chain;
+      // Season-sweep 2026-08-24: the strategy now filters .eq('season', …).
+      chain.eq = () => chain;
       chain.order = () => chain;
       chain.range = (from: number, to: number) => {
         rangeFrom = from;

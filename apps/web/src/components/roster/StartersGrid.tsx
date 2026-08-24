@@ -238,12 +238,16 @@ const PositionSlot = ({
   const playerIds = players.map(p => p.id);
 
   // Position-specific styling
+  /* 2026-08-24 dead-dark-variant sweep: the light-first classes were what
+     actually rendered (no .dark class ever exists on <html>), washing the
+     slots out with 50%-opacity light tints. Dark-first now; the dark:
+     variants were dead code and are gone. */
   const positionStyles: Record<string, string> = {
-    'LW': 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/50 dark:border-blue-800/30',
-    'C': 'bg-primary/10 dark:bg-primary/5 border-primary/30 dark:border-primary/20',
-    'RW': 'bg-purple-50/50 dark:bg-purple-950/20 border-purple-200/50 dark:border-purple-800/30',
-    'UTIL': 'bg-orange-50/50 dark:bg-orange-950/20 border-orange-200/50 dark:border-orange-800/30',
-    'F': 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/50 dark:border-emerald-800/30',
+    'LW': 'bg-blue-950/20 border-blue-800/30',
+    'C': 'bg-primary/5 border-primary/20',
+    'RW': 'bg-purple-950/20 border-purple-800/30',
+    'UTIL': 'bg-orange-950/20 border-orange-800/30',
+    'F': 'bg-emerald-950/20 border-emerald-800/30',
   };
 
   const getPositionStyle = () => {
@@ -265,8 +269,8 @@ const PositionSlot = ({
         "border-2",
         "min-h-[140px]",
         isOver && "border-citrus-sage bg-citrus-sage/10 shadow-lg",
-        isEmpty && !isEligibleTarget && "border-dashed border-citrus-charcoal/20 bg-[#E8EED9]/50 backdrop-blur-sm/50",
-        isFull && !isOver && !isSlotSelected && !isEligibleTarget && "border-citrus-sage/30 bg-[#E8EED9]/50 backdrop-blur-sm shadow-sm",
+        isEmpty && !isEligibleTarget && "border-dashed border-white/15 bg-white/[0.03]",
+        isFull && !isOver && !isSlotSelected && !isEligibleTarget && "border-citrus-sage/30 bg-white/5 shadow-sm",
         isSlotSelected && "!border-citrus-orange !bg-citrus-orange/10 shadow-lg",
         isEligibleTarget && !isSlotSelected && "!border-citrus-sage !bg-citrus-sage/15 !border-solid shadow-md cursor-pointer animate-pulse",
       )}
