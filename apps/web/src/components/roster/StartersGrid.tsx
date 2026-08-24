@@ -135,11 +135,15 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             Forwards
           </h3>
+          {/* DESKTOP DENSITY FIX (2026-08-24): md:grid-cols-6 crushed six
+              forward cards into ~105px each inside the three-column app
+              shell (~675px main column) — stat lines were unreadable soup.
+              Three per row gives ~215px cards; forwards wrap to two rows. */}
           <div className={cn(
             "grid gap-2",
             isForward
-              ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6"
-              : "grid-cols-2 sm:grid-cols-3 md:grid-cols-6"
+              ? "grid-cols-2 sm:grid-cols-3"
+              : "grid-cols-2 sm:grid-cols-3"
           )}>
             {forwardRow.map(slot => {
               // Add colored left border based on position
@@ -165,7 +169,9 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             Defense
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-2">
+          {/* Same density fix: 4-across defense was ~160px per card in the
+              shell column — match the forwards' ~215px readable width. */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {defenseRow.map(slot => renderSlot(slot))}
           </div>
         </div>

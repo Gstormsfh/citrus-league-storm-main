@@ -1,8 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Trophy } from 'lucide-react';
+import { Users } from 'lucide-react';
 
 interface DraftPick {
   id: string;
@@ -55,58 +53,63 @@ export const TeamRosters = ({ teams, draftHistory, userTeamId, onPlayerClick }: 
     };
 
     return (
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div 
-              className="w-4 h-4 rounded-full flex-shrink-0"
+      <Card className="p-3.5">
+        <div className="flex items-center justify-between mb-3 gap-2">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div
+              className="w-3 h-3 rounded-full flex-shrink-0"
               style={{ backgroundColor: team.color }}
             />
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold truncate">{team.name}</h3>
-              <p className="text-sm text-muted-foreground truncate">{team.owner}</p>
+              <h3 className="font-semibold text-sm leading-tight truncate">{team.name}</h3>
+              <p className="text-xs text-muted-foreground truncate">{team.owner}</p>
             </div>
           </div>
-          <div className="text-right flex-shrink-0 ml-2">
-            <div className="text-lg font-bold">{picks.length}</div>
-            <div className="text-xs text-muted-foreground">picks</div>
+          <div className="flex items-baseline gap-1 flex-shrink-0">
+            <span className="text-base font-bold leading-none">{picks.length}</span>
+            <span className="text-[10px] text-muted-foreground">{picks.length === 1 ? 'pick' : 'picks'}</span>
           </div>
         </div>
 
-        {/* Position Summary */}
-        <div className="grid grid-cols-5 gap-2 mb-4">
+        {/* Position Summary — single chip row (RAIL FIX 2026-08-23: the
+            old 5-col grid + viewport-based lg:grid-cols-4 wrapper crushed
+            these cards to ~60px inside the 300px sidebar). */}
+        <div className="flex flex-wrap gap-1 mb-3">
           {Object.entries(positionCounts).map(([position, count]) => (
-            <div key={position} className="text-center">
-              <div className="text-xs text-muted-foreground">{position}</div>
-              <div className="text-sm font-medium">{count}</div>
+            <div
+              key={position}
+              className={`flex items-center gap-1 rounded px-1.5 py-0.5 ring-1 ${count > 0 ? 'bg-white/10 ring-white/15' : 'bg-white/[0.03] ring-white/5'}`}
+            >
+              <span className={`text-[10px] font-bold tracking-wide ${count > 0 ? 'text-foreground/80' : 'text-muted-foreground/50'}`}>{position}</span>
+              <span className={`text-[11px] font-semibold tabular-nums ${count > 0 ? '' : 'text-muted-foreground/50'}`}>{count}</span>
             </div>
           ))}
         </div>
 
         {/* Draft Picks List */}
-        <div className="space-y-2 max-h-60 overflow-y-auto">
+        <div className="space-y-1 max-h-60 overflow-y-auto">
           {picks.length > 0 ? (
             picks.map(pick => (
-              <div 
-                key={pick.id} 
-                className={`flex items-center justify-between p-2 bg-muted/30 rounded ${onPlayerClick ? 'cursor-pointer hover:bg-muted/50 transition-colors' : ''}`}
+              <div
+                key={pick.id}
+                className={`flex items-center justify-between px-2 py-1.5 bg-muted/30 rounded ${onPlayerClick ? 'cursor-pointer hover:bg-muted/50 transition-colors' : ''}`}
                 onClick={() => onPlayerClick?.(pick.playerId)}
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className="text-xs text-muted-foreground w-8 flex-shrink-0">
+                  <div className="text-[10px] tabular-nums text-muted-foreground w-7 flex-shrink-0">
                     {pick.round}.{pick.pick % teams.length || teams.length}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium truncate">{pick.playerName}</div>
+                    <div className="text-[13px] font-medium truncate">{pick.playerName}</div>
                   </div>
                 </div>
-                <Badge variant="outline" className="text-xs flex-shrink-0 ml-2">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 flex-shrink-0 ml-2">
                   {pick.position}
                 </Badge>
               </div>
             ))
           ) : (
-            <div className="text-center py-4 text-muted-foreground text-sm">
+            <div className="text-center py-3 text-muted-foreground text-xs">
               No picks yet
             </div>
           )}
@@ -116,30 +119,35 @@ export const TeamRosters = ({ teams, draftHistory, userTeamId, onPlayerClick }: 
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <Users className="h-5 w-5 text-primary" />
-          Team Rosters
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-base font-semibold flex items-center gap-2 min-w-0">
+          <Users className="h-4 w-4 text-primary flex-shrink-0" />
+          <span className="truncate">Team Rosters</span>
         </h2>
-        <div className="text-sm text-muted-foreground">
+        <div className="text-xs text-muted-foreground whitespace-nowrap">
           {draftHistory.length} total picks made
         </div>
       </div>
 
       {/* My Team Section */}
       {userTeam && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-primary">My Team</h3>
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-primary">My Team</h3>
           <TeamRosterCard team={userTeam} onPlayerClick={onPlayerClick} />
         </div>
       )}
 
-      {/* Other Teams Section */}
+      {/* Other Teams Section.
+          RAIL FIX (2026-08-23, found by Garrett on prod): this grid was
+          `md:grid-cols-2 lg:grid-cols-4` — viewport breakpoints, but the
+          only consumer is the v2 draft room's ~300px sidebar, so desktop
+          windows crushed each card to ~60px of unreadable soup. The rail
+          is single-column, full stop. */}
       {otherTeams.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">View Others</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold">View Others</h3>
+          <div className="grid grid-cols-1 gap-3">
             {otherTeams.map(team => (
               <TeamRosterCard key={team.id} team={team} onPlayerClick={onPlayerClick} />
             ))}
