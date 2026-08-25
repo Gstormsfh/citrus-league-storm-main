@@ -59,9 +59,17 @@ cd demo/src
 python3 bake_art.py && python3 build.py
 ```
 
-`bake_art.py` inlines anything in `art/` as base64; `build.py` joins
-`index.html` and `app.js` into the single file. Art lives in
-`apps/web/public/mascots/` and is copied into `demo/src/art/` before baking.
+`bake_art.py` inlines the art as base64; `build.py` joins `index.html` and
+`app.js` into the single file. **There is no copy step any more.** The baker
+looks in `demo/src/art/`, then in `apps/web/public/mascots/`, and tries a
+`-tor` suffix, which is how the renders are actually named.
+
+It also refuses to shrink. A bake can only ever add: if a run would drop a key
+that is already inlined it writes nothing and tells you where it looked. That
+guard exists because without it, running this one command from the wrong
+directory deleted 1.56 MB of inlined art from `app.js` in silence and printed
+`0 of 41 keys baked` as though that were fine. Pass `--allow-shrink` when a
+removal is genuinely what you mean.
 
 ## Verify it
 
