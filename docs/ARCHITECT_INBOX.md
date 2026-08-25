@@ -1297,6 +1297,8 @@ Recon anchors: discovery fetch = runner.ts:442/:760 (`/api/drafts/:id/server`), 
 
 ## Entry 116 — 🚨 STRATEGIC FIND (autonomous audit): PRODUCTION HAS NO V2 DRAFT SYSTEM. Where the twelve draft is now a live decision with a 9-day clock. Full gap analysis delivered to Garrett; terminal read this before planning anything else.
 
+**⚠️ STALE ON EVERY SCHEMA CLAIM — superseded by the CORRECTION at the END of this file (2026-08-24, chunk 11g.9 audit).** Prod now has **3/3 v2 tables and 3/3 v2 RPCs**, 200 draft_events / 188 draft_picks_v2 rows, and v2 event streams in 7 leagues. The "0/3" figures below were true when written and are not true now; anyone acting on them makes the inverse mistake. **Still true:** no prod engine VM, and the prod CSP `connect-src` still names only the staging engine host. Read the tail correction before planning against this entry.
+
 **Verified (both DBs, read-only on prod):** prod has **0/3 v2 tables** (draft_events, draft_picks_v2, draft_snapshots), **0/3 v2 RPCs** (start_draft_v2, submit_pick_v2, append_draft_event), **0 of 12 v2-family migrations** in its applied history (167 applied migrations, all pipeline/security/scoring — a genuinely diverged schema), **no prod engine VM** (only citrus-draft-engine-staging exists), and its CSP names the STAGING engine host. Prod is a live system: **72 users, 39 leagues, 557 v1 picks, 0 new leagues in 30 days.** By design — DRAFT_ENGINE_V2_PLAN.md §Phase 8a explicitly holds prod untouched until a shadow-mode rollout. The twelve's date landed inside that window; plan and calendar now disagree.
 
 **Consequence, stated plainly: if the twelve draft on citrusfantasysports.com they get the V1 CLIENT-SIDE ROOM — the glitchy-timer room that hijacked Run 1 and that E80's fence exists to exile. Everything from this week (five-checkpoint corridor, race-proof ignition, instant autopick, permanent history, self-updating SW) lives on staging only.**
@@ -4437,3 +4439,13 @@ Garrett reported the pick clock frozen. Two rounds of investigation:
 
 **The discipline point:** three static analyses all said "this should work," and all three were right. Twice today the answer only appeared by opening the running app. It did not appear this time either — so the honest state is *unreproduced*, not *fixed*.
 
+
+---
+
+**⚠️ CORRECTION — the "prod has no v2" entry (~line 1300) is stale on every schema claim (2026-08-24, chunk 11g.9 audit).** That entry states prod has 0/3 v2 tables, 0/3 v2 RPCs, and none of the v2 migrations applied. Verified against live prod (iezwazccqqrhrjupxzvf) today: **all 3 v2 tables present, all 3 v2 RPCs present, 200 draft_events / 188 draft_picks_v2 rows, 7 leagues with v2 event streams — newest league and draft event are from today.** Anyone acting on the old entry will make the inverse mistake.
+
+**What REMAINS true, and now gates chunk 11g.9:** no prod engine VM exists; prod web CSP `connect-src` permits only `wss://draft-staging.citrusfantasysports.com`; `draft_snapshots` on prod = 6 rows lifetime. Meanwhile **62 of prod's 121 lifetime autopicks were fired by the draft-autopick Edge worker** (`autopick_fired` is written only by that function) and `safety_net_hit` fired 106× in the last 7 days. The Edge worker IS prod's primary autopick.
+
+**Consequence:** migration `20260824214500`-family sibling `20260824230000_chunk_11g9_decommission_pgmq_autopick.sql` (unschedules the keepalive, strips pgmq.send from draft_deadline_sweep, drops the wrapper RPCs) is **STAGING-ONLY** until (1) a durable prod engine exists, (2) its host is in the prod CSP, (3) `draft_snapshots` growth + a flat `autopick_fired` prove the engine owns prod autopick. The in-engine replacement (`server/src/draft/orphanedDraftScanner.ts`, merged to master in b3e7497b's PR) runs inside the engine process and physically cannot cover prod until then. Full three-track runbook in the 11g.9 deliverable; migration header carries the same gate.
+
+**Also shipped 2026-08-24 (chunk 11g.9, merged + deployed):** stormy-chat → `POST /api/stormy/chat` (ported from DEPLOYED v33 — the repo copy had lost RULE 0 grounding and still had the reverted SSE path); demo-matchup-cache → `GET /api/demo/matchup` (fixes the player_directory `id`/`status` query that 42703'd on every request since deploy); pipeline-deadman + fetch-spreads deleted (freshness SLA covers the former; the latter was never deployed). The three retired functions are deleted from prod Supabase; `draft-autopick` deliberately kept, per the gate above.
