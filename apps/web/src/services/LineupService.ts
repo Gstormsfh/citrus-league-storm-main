@@ -96,7 +96,15 @@ export const LineupService = {
   ): Promise<{ backfilledCount: number; error: unknown }> {
     try {
       const result = await rosterApi.backfillDailyRosters(leagueId, String(teamId), matchupId);
-      return { backfilledCount: result?.backfilledCount || 0, error: result?.error || null };
+      // The payload is under `.data` — the server wraps every success in
+      // `{ data: ... }`. Reading result.backfilledCount directly returned
+      // undefined, so this reported 0 backfilled no matter what the server did.
+      // result.error is the transport-level error (a string); the service-level
+      // one comes back inside the payload.
+      return {
+        backfilledCount: result?.data?.backfilledCount ?? 0,
+        error: result?.data?.error ?? result?.error ?? null,
+      };
     } catch (error) {
       logger.error('[backfillMissingDailyRosters] API error:', error);
       return { backfilledCount: 0, error };
@@ -113,10 +121,13 @@ export const LineupService = {
   }> {
     try {
       const result = await rosterApi.backfillAllMatchups(leagueId);
+      // Same envelope bug as backfillMissingDailyRosters above: all three
+      // fields live under `.data`, so this used to report 0 / 0 / [] for every
+      // call — including ones where the server had recorded real failures.
       return {
-        totalBackfilled: result?.totalBackfilled || 0,
-        matchupsProcessed: result?.matchupsProcessed || 0,
-        errors: result?.errors || [],
+        totalBackfilled: result?.data?.totalBackfilled ?? 0,
+        matchupsProcessed: result?.data?.matchupsProcessed ?? 0,
+        errors: result?.data?.errors ?? [],
       };
     } catch (error) {
       logger.error('[backfillAllMatchupsForLeague] API error:', error);
@@ -144,7 +155,11 @@ export const LineupService = {
       if (allPlayerIds.length === 0) return true;
 
       const result = await rosterApi.canUpdateRoster(dateStr, allPlayerIds);
-      return result?.canUpdate ?? true;
+      // `.data` — the server answers ok(c, { canUpdate }). Read off the
+      // envelope root this was undefined on every call, so `?? true` fired
+      // every time and the game-lock check never actually blocked anything:
+      // a started player could still be moved out of the lineup.
+      return result?.data?.canUpdate ?? true;
     } catch (error) {
       logger.error('[canUpdateRosterForDate] API error:', error);
       return true; // On error, allow update (fail open)
@@ -349,17 +364,24 @@ export const LineupService = {
   }> {
     try {
       const result = await rosterApi.initializeLineup(leagueId, teamId);
+      // `.data` again — the server answers ok(c, result.lineup). Reading the
+      // envelope root meant starters/bench/ir/slot_assignments were all
+      // undefined, so the `|| []` fallbacks fired and this returned an EMPTY
+      // lineup no matter what the server computed. getLineup() a few hundred
+      // lines up already unwraps `.data` (with an `as any` and a comment
+      // saying so) — the same discovery was made once and never generalised.
+      const lineup = result?.data;
 
-      if (!result) {
+      if (!lineup) {
         return { lineup: null, error: null };
       }
 
       return {
         lineup: {
-          starters: result.starters || [],
-          bench: result.bench || [],
-          ir: result.ir || [],
-          slotAssignments: result.slot_assignments || {},
+          starters: lineup.starters || [],
+          bench: lineup.bench || [],
+          ir: lineup.ir || [],
+          slotAssignments: lineup.slot_assignments || {},
         },
         error: null,
       };

@@ -301,9 +301,14 @@ export function foldEvents(
           // should stay total. Clamp and continue.
           picksMade = 0;
         }
-        if (draftStatus === 'completed') {
-          draftStatus = 'in_progress';
-        }
+        // There is deliberately no completed -> in_progress revert here.
+        // The generalized monotonicity guard above absorbs EVERY frame once
+        // draftStatus is terminal, so a pick_undone can never reach this line
+        // with draftStatus === 'completed' — the check that used to sit here
+        // was unreachable and implied a transition the guard forbids. The
+        // divergence from the server's applyPickUndoneEvent is intentional and
+        // documented at that guard; a post-completion undo is picked up by a
+        // fresh snapshot re-derive, not by mutating state mid-fold.
         if (picksMade === 0) {
           draftStatus = 'not_started';
         }
