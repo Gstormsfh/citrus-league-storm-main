@@ -2259,7 +2259,19 @@ table.h2h td.bar{width:34%;padding:7px 10px}
   border-radius:3px;padding:2px 6px;margin-right:9px;vertical-align:1px}
 .atok{background:var(--citrus);color:#1B0C00}
 .atwait{border:1px solid var(--line);color:var(--ink3)}
+/* This one sits inside a sentence -- "...the eras they played in. [Play
+   the all-time board]" -- which is why it is small. Small is fine for a
+   mouse and 24px is not a tap target, so on anything with a finger it
+   stops being inline and takes its own line at a real height.
+
+   Keyed on pointer:coarse rather than a width, because the constraint is
+   a thumb and not a narrow screen. A touch laptop gets the big one too,
+   which is right; a 1440px mouse-driven desktop keeps the inline one. */
 .atbtn{margin-left:8px;padding:5px 10px !important;font-size:11.5px !important}
+@media (pointer:coarse){
+  .atbtn{display:block;width:100%;margin:11px 0 1px;
+    padding:12px 14px !important;font-size:13px !important}
+}
 
 /* ═══ PAGE HEADERS ═════════════════════════════════════════════════
    Every page used to open with a three-line paragraph explaining the

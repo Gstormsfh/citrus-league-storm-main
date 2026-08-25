@@ -93,7 +93,13 @@ powershell -ExecutionPolicy Bypass -File checks.ps1 -Rebake
 - `art/crest.svg` replaces every drawn maple leaf in the build
 - `art/hs-<lastname>.png` swaps every row, slate and picker to the real man
 - `art/leafs-alltime.json` turns on a second Immaculate Grid going back to
-  1917, and the panel stops saying it is waiting
+  1917, and the panel stops saying it is waiting. **It is in the repo** --
+  1,099 men, Armstrong to today, 65 KB. Re-run the fetch to refresh it.
+
+`records.nhl.com/site/api/franchise-*-records`, which is what everything on
+the internet still tells you to use for this, is gone. The live source is
+`api.nhle.com/stats/rest/en/{skater,goalie}/summary`; see ALLTIME-LEAFS.md
+for the shape, and `probe-alltime.mjs` for when it moves again.
 
 Each is independent and a partial delivery is a partial upgrade: anybody
 whose face did not come down keeps his numbered sweater, and no row breaks.

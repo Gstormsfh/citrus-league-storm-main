@@ -21,7 +21,7 @@ done
 # the seven Carlton layers and the mascot cut-outs are new to this demo
 # the cropped faces and the club mark: 356 KB, and the reason the repo can
 # carry the real players without carrying 6.7 MB of full-size league mugs
-for f in art/hs-*.webp art/crest.svg; do
+for f in art/hs-*.webp art/crest.svg art/leafs-alltime.json; do
   [ -f "$f" ] && cp "$f" out/src/art/
 done
 for f in art/carlton-base.webp art/carlton-hit.webp art/carlton-a.webp \
