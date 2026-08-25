@@ -24,7 +24,11 @@ import { fileURLToPath } from 'node:url';
  */
 
 const HERE = resolve(fileURLToPath(import.meta.url), '..');
-const SRC = resolve(HERE, '..');
+// Posix separators from here down. SRC is the prefix REL() strips off every
+// FILES entry, so the two have to speak the same dialect or the strip is only
+// accidentally right. Windows path APIs accept forward slashes, and resolve()
+// re-normalises whatever it is handed, so nothing downstream cares.
+const SRC = resolve(HERE, '..').replace(/\\/g, '/');
 const INDEX_CSS = resolve(SRC, 'index.css');
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -49,8 +53,21 @@ function code(text: string): string {
     .join('\n');
 }
 
-const FILES = walk(SRC).filter((f) => !f.includes('__tests__'));
-const REL = (f: string) => f.slice(SRC.length + 1).replace(/\\/g, '/');
+// Normalised ONCE here, to match SRC above, so every guard below — including
+// the Preview* `inScope` exemption — matches identically on Windows (walk()
+// joins with backslashes there) and on the ubuntu CI runners. Because SRC is
+// normalised too, REL is a plain prefix strip and `f.startsWith(SRC)` holds
+// for anyone who reaches for it later.
+//
+// Pre-fix defect (2026-08-24): the exemption regex required '/', never
+// matched a Windows path, and the glass-surface guard failed on every
+// local Windows run while passing on CI — a permanently-red local test
+// is a guard nobody reads, which is the exact failure mode this file
+// exists to prevent.
+const FILES = walk(SRC)
+  .map((f) => f.replace(/\\/g, '/'))
+  .filter((f) => !f.includes('__tests__'));
+const REL = (f: string) => f.slice(SRC.length + 1);
 
 // Dev-only preview pages are stripped from the production bundle by the
 // import.meta.env.DEV gate in App.tsx, so they are out of scope.
