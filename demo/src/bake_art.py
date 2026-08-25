@@ -34,13 +34,19 @@ ART_DIRS = [
 
 
 def find_art(fname):
-    """art/eq-stick.webp, else .../mascots/eq-stick.webp, else -tor."""
-    stem, ext = os.path.splitext(fname)
-    for d in ART_DIRS:
-        for cand in (fname, stem + '-tor' + ext):
-            path = os.path.join(d, cand)
-            if os.path.exists(path):
-                return path
+    """art/eq-stick.webp, else .../mascots/eq-stick.webp, else -tor.
+
+    A key may name more than one acceptable file: the club crest arrives as
+    an SVG about as often as a PNG, and there is no reason to make somebody
+    rasterise it first when the page inlines either one just as happily."""
+    names = (fname,) if isinstance(fname, str) else tuple(fname)
+    for want in names:
+        stem, ext = os.path.splitext(want)
+        for d in ART_DIRS:
+            for cand in (want, stem + '-tor' + ext):
+                path = os.path.join(d, cand)
+                if os.path.exists(path):
+                    return path
     return None
 
 
@@ -57,7 +63,7 @@ END     = '/* ==== END BAKED ART ==== */'
 FILES = {
     # --- the club crest. Drop the real asset in as art/crest.png (or .svg
     #     converted to png) and it replaces every drawn leaf in the build. ---
-    'crest':         'crest.png',
+    'crest':         ('crest.png', 'crest.svg'),
     # --- CITRUS CARLTON, the paper doll on Game 01. Seven transparent
     #     layers on ONE canvas so they stack: the bear in his sweater,
     #     then one layer per piece of kit. All seven or none, because a
@@ -146,7 +152,8 @@ FILES = {
     # 'state_done':    'state-done.webp',   # wired to nothing
 }
 
-MIME = {'.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg'}
+MIME = {'.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml'}
 
 # Keys whose art is composited straight onto the page with no container of
 # its own. If one of these is opaque it will render as a rectangle on navy,
@@ -198,7 +205,7 @@ def main():
     for key, fname in FILES.items():
         path = find_art(fname)
         if not path:
-            missing.append(fname)
+            missing.append(fname if isinstance(fname, str) else fname[0])
             continue
         if key.startswith(NEEDS_ALPHA):
             a = has_alpha(path)
@@ -208,7 +215,7 @@ def main():
                          % (os.path.basename(path), key))
         raw = open(path, 'rb').read()
         total += len(raw)
-        mime = MIME.get(os.path.splitext(fname)[1].lower(), 'image/webp')
+        mime = MIME.get(os.path.splitext(path)[1].lower(), 'image/webp')
         found[key] = 'data:%s;base64,%s' % (mime, base64.b64encode(raw).decode())
         print('  baked  %-16s <- %-26s %6.0f KB' % (key, os.path.basename(path), len(raw) / 1024))
 

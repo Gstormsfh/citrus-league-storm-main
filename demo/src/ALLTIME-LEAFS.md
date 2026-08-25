@@ -9,8 +9,21 @@ second set of boards appears with era, longevity and position squares
 generated from the roster. Until then the panel says so plainly instead of
 pretending the boards exist.
 
-Neither Claude sandbox has outbound network, which is why this is a job for
-your terminal rather than something already done.
+Neither Claude sandbox has outbound access to nhle.com -- verified, not
+assumed: the container reaches npm and GitHub and gets nothing at all from
+api-web.nhle.com, assets.nhle.com or records.nhl.com. That is why this is a
+job for your terminal rather than something already done.
+
+**There is now one command for this and the other two.** `fetch-assets.mjs`
+gets the crest, the faces and this roster in one go:
+
+```
+node fetch-assets.mjs
+powershell -ExecutionPolicy Bypass -File checks.ps1 -Rebake
+```
+
+The rest of this file is the roster half on its own, kept because it
+documents the schema and because two requests are worth understanding.
 
 ---
 

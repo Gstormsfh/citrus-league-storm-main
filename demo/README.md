@@ -78,6 +78,28 @@ directory deleted 1.56 MB of inlined art from `app.js` in silence and printed
 `0 of 41 keys baked` as though that were fine. Pass `--allow-shrink` when a
 removal is genuinely what you mean.
 
+## The three things that need a network
+
+The crest, the players' faces and the all-time Leafs roster are all wired
+and waiting on files that nhle.com has and this sandbox cannot reach. One
+command, on a machine with a network:
+
+```
+cd demo/src
+node fetch-assets.mjs
+powershell -ExecutionPolicy Bypass -File checks.ps1 -Rebake
+```
+
+- `art/crest.svg` replaces every drawn maple leaf in the build
+- `art/hs-<lastname>.png` swaps every row, slate and picker to the real man
+- `art/leafs-alltime.json` turns on a second Immaculate Grid going back to
+  1917, and the panel stops saying it is waiting
+
+Each is independent and a partial delivery is a partial upgrade: anybody
+whose face did not come down keeps his numbered sweater, and no row breaks.
+The whole path is tested with stand-in files, so the only thing unproven
+until you run it is the download itself.
+
 ## Build it and check it
 
 From `demo/src`, on Windows:

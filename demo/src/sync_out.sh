@@ -7,6 +7,7 @@ cd "$(dirname "$0")"
 mkdir -p out/src/art out/src/scripts out/src/grid2 out/src/live
 cp Toronto_GameDay_Citrus.html out/
 for f in app.js index.html build.py bake_art.py carve.py serve.mjs \
+         fetch-assets.mjs \
          players.json shots.json \
          realsite.mjs verify.mjs mobplay.mjs mobsweep.mjs offline.mjs \
          classcheck.mjs audit_hub.mjs shots_all.mjs proof.mjs leak.mjs \
