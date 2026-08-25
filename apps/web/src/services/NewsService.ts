@@ -37,8 +37,27 @@
  * list is returned and the page renders an honest empty state.
  */
 
-import { apiClient } from '@/api/client';
 import { logger } from '@/utils/logger';
+
+/**
+ * apiClient is imported LAZILY, inside the call, and that is deliberate.
+ *
+ * `@/api/client` pulls in the Supabase client, which THROWS at module load
+ * when VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are unset. CI's "Run web
+ * tests" step passes no VITE_* env (only the build step does), so a top-level
+ * import here takes down every test that so much as imports this module —
+ * including tests that never touch the network. That is what broke the
+ * pre-deploy gate on 2026-08-25.
+ *
+ * The codebase already knew about this trap: ScoreCard.test.tsx mocks
+ * WinProbabilityBar for exactly this reason. Deferring the import keeps this
+ * module side-effect-free to load, which is the property a service should have
+ * regardless of how any one test is written.
+ */
+async function getApiClient() {
+  const mod = await import('@/api/client');
+  return mod.apiClient;
+}
 
 export interface NewsArticle {
   id: string;
@@ -67,6 +86,7 @@ export async function getNewsArticles(): Promise<NewsArticle[]> {
   }
 
   try {
+    const apiClient = await getApiClient();
     const response = await apiClient.get<{ articles: NewsArticle[] }>('/api/news');
     const articles = response.data?.articles ?? [];
 
