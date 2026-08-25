@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import type { Env } from '../app';
-import { ok } from '../lib/responses';
+import { ok, fail } from '../lib/responses';
+import { AppError } from '../lib/errors';
+import { getSupabaseAdmin } from '../lib/supabase';
 import { logger } from '@citrus/shared';
 
 /**
@@ -154,20 +156,97 @@ async function fetchESPN(): Promise<NewsArticle[]> {
  * a fallback, so an honest empty list replaces it and the client renders a
  * real empty state.
  */
+/**
+ * Citrus notes, shaped as articles so the News feed can render one list.
+ *
+ * These are OURS — generated from our own shot-quality data by
+ * CitrusNewsService — so they carry source 'Citrus' and are never presented as
+ * anyone else's reporting. They also survive when the wires are down, which
+ * means the page has something true to show instead of an empty state.
+ */
+async function fetchCitrusNotes(limit = 30): Promise<NewsArticle[]> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('citrus_news')
+      .select('id, kind, player_id, headline, body, analysis, severity, published_at')
+      .order('published_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      logger.warn('[news] citrus_news query failed:', error.message);
+      return [];
+    }
+
+    return (data || []).map((row: Record<string, any>) => ({
+      id: `citrus-${row.id}`,
+      title: String(row.headline),
+      description: String(row.body),
+      // Citrus notes are not hosted articles; the player card is where the
+      // full note lives, so link there rather than inventing a URL.
+      url: row.player_id ? `/players?player=${row.player_id}` : '/news',
+      imageUrl: '',
+      source: 'Citrus',
+      category: row.kind === 'goalie-workload' ? 'fantasy' : 'fantasy',
+      publishedAt: String(row.published_at),
+    }));
+  } catch (error) {
+    logger.warn('[news] citrus_news unavailable:', error);
+    return [];
+  }
+}
+
+/**
+ * GET /api/news/player/:playerId — Citrus notes for one player.
+ *
+ * Feeds the "Latest News" block on the player card, the same slot Sleeper
+ * fills with Rotowire copy.
+ */
+newsRoutes.get('/player/:playerId', async (c) => {
+  const raw = c.req.param('playerId');
+  const playerId = Number.parseInt(raw, 10);
+  if (!Number.isFinite(playerId)) {
+    return fail(c, AppError.badRequest('playerId must be an integer NHL player id'));
+  }
+
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('citrus_news')
+      .select('id, kind, headline, body, analysis, severity, tags, published_at, season')
+      .eq('player_id', playerId)
+      .order('published_at', { ascending: false })
+      .limit(5);
+
+    if (error) {
+      logger.warn(`[news] player notes query failed for ${playerId}:`, error.message);
+      return ok(c, { notes: [] });
+    }
+    return ok(c, { notes: data || [] });
+  } catch (error) {
+    logger.warn(`[news] player notes unavailable for ${playerId}:`, error);
+    return ok(c, { notes: [] });
+  }
+});
+
 newsRoutes.get('/', async (c) => {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
     return ok(c, { articles: cache.articles, cached: true });
   }
 
-  const [nhl, espn] = await Promise.all([fetchNHL(), fetchESPN()]);
+  const [nhl, espn, citrus] = await Promise.all([fetchNHL(), fetchESPN(), fetchCitrusNotes()]);
 
   const cutoff = Date.now() - MAX_ARTICLE_AGE_MS;
-  const articles = [...nhl, ...espn]
-    .filter((a) => {
+  // Citrus notes bypass the staleness window on purpose: a bounce-back read on
+  // last season is still true in August, whereas a wire headline from August
+  // is not still true in December. The two have different shelf lives.
+  const articles = [
+    ...[...nhl, ...espn].filter((a) => {
       const t = new Date(a.publishedAt).getTime();
       return !Number.isNaN(t) && t > cutoff;
-    })
-    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    }),
+    ...citrus,
+  ].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 
   // Only cache a real result. Caching an empty list would hold the page empty
   // for ten minutes past a transient upstream blip.

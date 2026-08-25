@@ -2,7 +2,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Star, AlertCircle, Clock, Trash2, Flame, Snowflake, CalendarDays, Loader2, CheckCircle2 } from 'lucide-react';
+import { Star, AlertCircle, Clock, Trash2, Flame, Snowflake, CalendarDays, Loader2, CheckCircle2, Newspaper } from 'lucide-react';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { cn } from '@/lib/utils';
 import { LeagueService } from '@/services/LeagueService';
@@ -19,6 +19,7 @@ import { matchupApi } from '@/api/matchups';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { generatePlayerWriteup, WriteupTone } from '@/utils/playerWriteup';
 import { getUpcomingSeasonStartDate } from '@citrus/shared';
+import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 
 /* 2026-08-19 visual audit — muted-text correction.
    text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
@@ -319,6 +320,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     fetchGameLog();
   }, [isOpen, player]);
 
+  // MUST sit above the `if (!player) return null` below — a hook called after
+  // an early return runs conditionally, which breaks the Rules of Hooks and
+  // desyncs every hook after it the moment `player` goes null on close.
+  const { notes: citrusNotes } = useCitrusPlayerNotes(player?.id, isOpen);
+
   if (!player) return null;
 
   const isGoalie = player.position === 'Goalie' || player.position === 'G';
@@ -555,6 +561,55 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   </div>
                 )}
               </div>
+
+              {/* Latest News — Citrus notes generated from our own shot-quality
+                  data (citrus_news). Same slot Sleeper fills with Rotowire.
+                  Renders nothing at all when there are no notes; an empty
+                  "Latest News" header would imply the feed had failed. */}
+              {citrusNotes.length > 0 && (
+                <div className="py-3 px-3.5 bg-white/5 rounded-xl border border-citrus-sage/15">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Newspaper className="w-3 h-3 text-citrus-orange" aria-hidden="true" />
+                      <span className="text-[9px] font-display uppercase tracking-[0.18em] text-pastel-cream/60">
+                        Latest News
+                      </span>
+                    </div>
+                    <span className="text-[9px] font-display text-white/55 flex-shrink-0">via Citrus</span>
+                  </div>
+                  <div className="space-y-3">
+                    {citrusNotes.map((note) => (
+                      <div key={note.id}>
+                        <div className="flex items-start gap-1.5">
+                          <span
+                            className={cn(
+                              'w-1 h-1 rounded-full flex-shrink-0 mt-1.5',
+                              note.severity === 'caution'
+                                ? 'bg-amber-400'
+                                : note.severity === 'positive'
+                                  ? 'bg-pastel-sage'
+                                  : 'bg-pastel-cream/70',
+                            )}
+                            aria-hidden="true"
+                          />
+                          <div className="min-w-0">
+                            <div className="text-sm font-display font-bold text-pastel-cream leading-snug">
+                              {note.headline}
+                            </div>
+                            <p className="mt-1 text-[13px] leading-relaxed text-white/70">{note.body}</p>
+                            {note.analysis && (
+                              <p className="mt-1.5 text-[13px] leading-relaxed text-white/70">
+                                <span className="font-display font-bold text-pastel-cream">Analysis: </span>
+                                {note.analysis}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Key stats grid */}
               {isGoalie ? (
