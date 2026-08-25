@@ -122,7 +122,8 @@ All five are live in `iezwazccqqrhrjupxzvf` and mirrored into
 
 ## 3 · FILE MANIFEST (all delivered to your repo folder)
 
-**Server** (deploys with your git push — API + engine):
+**Server** — NOTE: the first two files are ENGINE code and ship ONLY via the
+manual engine build in §4. The rest are API and ship via the master push:
 - `server/src/draft/LobbyManager.ts` — auction live-apply timer arming
 - `server/src/draft/index.ts` — autopick→snake+4s mapping
 - `server/src/routes/draftV2Auction.ts` — NEW nominate/bid routes
@@ -135,7 +136,7 @@ All five are live in `iezwazccqqrhrjupxzvf` and mirrored into
 **Shared** (builds into both):
 - `packages/shared/src/utils/leagueTimeline.ts` — waiver/trade labels
 
-**Web** (deploys with your web build+deploy):
+**Web** (deploys via the master push — CI builds and deploys it, after the API):
 - `apps/web/src/lib/draftClient/deriveAuctionState.ts` — NEW
 - `apps/web/src/lib/draftClient/submitAuctionAction.ts` — NEW
 - `apps/web/src/stores/draftClientStore.ts` — auctionDerived wiring
@@ -163,31 +164,106 @@ All five are live in `iezwazccqqrhrjupxzvf` and mirrored into
 
 ---
 
-## 4 · DEPLOY — ORDER MATTERS
+## 4 · DEPLOY — TWO SEPARATE PATHS (corrected 2026-08-24 21:45 UTC)
 
-**Server FIRST** (auction/offline routes + engine arming live in the API/
-engine deploy; the web build ungates the UI — web before server would let
-users create auction leagues whose actions 404).
+> The first version of this section was WRONG on two counts and is
+> replaced below. It claimed (a) the draft engine deploys with `git push`
+> and (b) the web needs a manual `firebase deploy` afterwards. Neither is
+> true. Both errors were caught by reading `production-deploy.yml` and
+> `phase-b-provision-draft-engine.ps1` before deploying, not after.
+
+### The two paths
+
+| What | How it deploys | Trigger |
+|---|---|---|
+| API (Cloud Run `citrus-api`) | `production-deploy.yml` | push to **`master`** |
+| Supabase edge functions | `production-deploy.yml` | push to **`master`** |
+| Web (Firebase Hosting, live) | `production-deploy.yml` | push to **`master`** |
+| **Draft engine (GCE VM)** | **manual — nothing in CI touches it** | **you, by hand** |
+
+`production-deploy.yml` is `on: push: branches: [master]` only — pushing
+any other branch runs CI and deploys NOTHING. The web job is gated
+`needs: [gate, deploy-api]`, so **CI already deploys the API before the
+web**; no manual Firebase step, and no ordering for you to manage.
+
+### ENGINE FIRST, then master
+
+The engine is a Docker container on `citrus-draft-engine-prod`
+(`northamerica-northeast1-a`) that pulls from Artifact Registry. It only
+changes when you build, push, and recycle it yourself.
+
+Engine-first is the correct order and is zero-risk: engine changes are
+inert for existing drafts (auction arming early-returns unless
+`format === 'auction'`; the autopick mapping only fires on a draft type
+the web still gates), so shipping it early avoids the window where the
+web ungates auction while the engine can't run it.
+
+**Before resetting the VM, confirm nothing is live:**
+```sql
+SELECT id, name, draft_status FROM leagues WHERE draft_status = 'in_progress';
+```
+Empty = the reset interrupts nobody.
 
 ```powershell
-# From C:\Users\garre\Documents\citrus-league-storm-phase45
+cd C:\Users\garre\Documents\citrus-league-storm-phase45
 
-# 1) Commit + push  → API auto-deploys (~30–40 min) + draft engine deploys
 git add -A
-git commit -m "Launch build: auction + autopick + offline + keeper/dynasty NOW; polish list to zero"
-git push
+git commit -m "<message>"          # MUST happen before $sha is read
 
-# 2) WAIT for the API deploy to finish (~30–40 min after push).
-#    Spot-check the new route exists (expect 401 Unauthorized, NOT 404):
-curl.exe -s -o NUL -w "%{http_code}" https://api.citrusfantasysports.com/api/draft/v2/league/00000000-0000-0000-0000-000000000000/offline-import -X POST
-#    404 = deploy not done yet, wait. 401 = routes are live, proceed.
+$project = "citrus-fantasy-prod"
+$region  = "northamerica-northeast1"
+$zone    = "northamerica-northeast1-a"
+$sha     = git rev-parse --short HEAD
+$img     = "$region-docker.pkg.dev/$project/citrus-draft-engine/draft-engine:$sha-draft"
+Write-Host "NEW SHA: $sha"
 
-# 3) THEN web build + deploy:
-cd apps\web
-npm run build
-cd ..\..
-firebase deploy --only hosting --project citrus-fantasy-prod
+gcloud auth configure-docker "$region-docker.pkg.dev" --quiet
+docker build -f server/Dockerfile.draft-engine -t $img .
+docker push $img
+if ($LASTEXITCODE -ne 0) { Write-Host "PUSH FAILED - run: gcloud auth login, then re-run" -ForegroundColor Red; return }
+
+# image-tag drives the pull; image-sha/commit-sha only feed the fingerprint log
+gcloud compute instances add-metadata citrus-draft-engine-prod `
+  --zone=$zone --project=$project `
+  --metadata="image-tag=$sha-draft,commit-sha=$(git rev-parse HEAD)"
+
+gcloud compute instances reset citrus-draft-engine-prod --zone=$zone --project=$project
+Start-Sleep -Seconds 100
+.\check-engine.ps1
 ```
+
+Then land the same commit on `master` — that one push does API + edge
+functions + web, in the right order, by itself.
+
+### Verifying the engine deploy — three things, all required
+
+1. **`CONTAINER` created and started within seconds of each other.**
+   Far apart = only RESTARTED = old code still running.
+2. **`IMAGE` shows the new `<sha>-draft` tag**, not the previous one.
+3. **`HEALTH` `ok:true`** with a recent `lastSelfTestOkAt`, and
+   `event_subscription.self_test_succeeded` in the log tail.
+
+### Two traps this deploy actually hit
+
+**Trap 1 — a failed `docker push` produces a convincing green deploy.**
+`docker push` failed with `Reauthentication failed. cannot prompt during
+non-interactive execution`, but `add-metadata` and `reset` both succeeded
+right after (they prompt interactively). The VM then tried to pull a tag
+that did not exist in the registry, the startup script bailed, and
+`--restart=always` resurrected the OLD container. `check-engine.ps1`
+reported a RUNNING, healthy engine — on 39-hour-old code. **Always check
+the push exit code; healthy ≠ current.**
+
+**Trap 2 — `deployment.fingerprint` does NOT report the running code.**
+`imageSha` / `commitSha` come from the VM metadata keys `image-sha` and
+`commit-sha` (startup script L139-140, injected as `-e` at L465-466).
+`Dockerfile.draft-engine` bakes neither; the engine just echoes
+`process.env.COMMIT_SHA ?? 'unset'`. Update `image-tag` alone and the
+fingerprint keeps printing the previous deploy's SHA forever — which
+looks exactly like a failed deploy. Set `commit-sha` in the same
+`add-metadata` call (the block above does) and it tells the truth from
+the next boot on. **The container created/started delta plus the IMAGE
+tag are the real evidence, not the fingerprint.**
 
 ## 5 · AFTER YOUR DEPLOY — my live prod E2E plan
 1. **Auction**: create auction league → fill with AI → start → nominate from

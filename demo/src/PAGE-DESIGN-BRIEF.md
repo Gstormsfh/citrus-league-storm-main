@@ -87,90 +87,32 @@ unevenly:
 | Page | State after this pass | What to look at |
 |---|---|---|
 | **Locker room** | Dense list, LIVE badges, club mark per row | Does the list earn a whole screen, or should the six live games separate from the four that are not? |
-| **Ultimate Leaf** | Citrus Carlton, six kit rows beside him | Answered: rows. See CARLTON-BRIEF.md. The page is a paper doll now, the figure is the picker, and the tiles are a single column of rows next to it. |
+| **Ultimate Leaf** | Six kit tiles, summary bar in flow below | The tiles are the only page in the build using a 2x3 card grid. Does it hold next to the lists, or should it be rows? |
 | **Beat Stormy** | header → both lineups → the pool → action bar → matchup (hidden until five are iced) | The two lineup cards are still the tallest thing above the fold. Can the matchup live in the same card as the lineups? |
 | **Who Goes Off** | Six cards, two columns, action bar | Closest to right of anything here. Use it as the reference. |
-| **Guess the Leaf** | Clue board is seven rows; the answer column holds the answer and both things that cost points | Done. |
+| **Guess the Leaf** | Two columns: clue board / answer, with a round record | The seven clue tiles wrap 3-3-1. Should be a single column of seven rows. |
 | **Heat Check** | Six over/under rows, action bar | The four-column row breaks to two rows under 720px. Check the break. |
-| **Rank 'Em** | Four rows standing in the live order, each with a race bar | Done, and the density number was pointing at it for the wrong reason. See below. |
-| **Pick'em** | Ten fixture rows, three lines each below 900px | Done, and not by grouping. See below. |
+| **Rank 'Em** | Four rows, action bar | Thinnest page in the build. It is a four-item list and nothing else. |
+| **Pick'em** | Ten fixture rows | Long. Consider grouping by month. |
 | **Beat the Buzzer** | Clock is the hero: 104px countdown, drain bar, live stat line | Rebuilt. Density .83 to .92. |
 | **Immaculate Grid** | 3x3 board, search, all-time strip | The board is good. The all-time strip below it competes with it. |
 | **Call It** | Pick three Leafs, drop three pins on the ice, closest wins | The map game. Picking a man on a phone scrolls the ice back into view; check that on a real device. |
 | **Player pages** | Four sections behind a segmented control | Rebuilt. 2988px to 1424px, roster and player header pinned above the tabs. |
 | **Leaderboard** | Four tabs, rows | Fine. |
 
-Measured density (ink over panel height, higher is denser): home .96, call .94,
-dash .94, fx .93, ult .92, stormy .92, hl .92, bz .92, grid .92, luck .90,
-guess .92, lb .88, rank .87. Nothing has a vertical gap over 90px any more.
-
-**A warning about that column, from working the page it named.** Rank 'Em sat
-at .86 and was called the page to fix. The number was pointing at the right
-page for the wrong reason, and reading it as "this page needs more facts"
-would have made it worse. What was actually wrong:
-
-1. `rkRow` called `prow` without `frac`, so the one component in this build
-   that draws a bar drew none. On a 2,000px row that is roughly 1,100px of
-   nothing between a man's name and his number. Every other list passes
-   `frac`; this was the only page that did not, and it is the only page where
-   `prow` runs at full width instead of inside a 500px sheet.
-2. The page was giving away the answer. See the rule below.
-
-Fixing both took it from 641px to 570px and from .86 to .87. Barely a move on
-the metric, because the page was never short of ink; it was short of a bar and
-it was broken. **Do not chase this column with chips and summary strips.** A
-density number can tell you where to look and nothing else.
+Measured density (ink over panel height, higher is denser): home .96, dash .97,
+fx .93, grid .93, stormy .92, ult .92, hl .92, call .91, luck .90, guess .89,
+lb .88, rank .86, bz .83. **Rank 'Em and Beat the Buzzer are the two to work
+on.** Nothing has a vertical gap over 90px any more.
 
 ---
 
-## What is left on these thirteen
+## Two structural jobs worth doing that I did not
 
-Nothing structural. Three open questions remain in the table above and all
-three are judgement calls that want eyes on a running build rather than a
-measurement: whether the locker room should split the six live games from the
-four that are not, whether Beat Stormy's matchup can live in the same card as
-the lineups, and whether the all-time strip under the Immaculate Grid board
-competes with it. None is a defect.
-
----
-
-## The last two pages, and why one of the two suggestions was wrong
-
-**Guess the Leaf.** The clue board is revealed a tile at a time, so it passes
-through every count from one to seven. On the three-wide grid it was ragged at
-one, two, four, five and seven, which is five of the seven states a fan
-actually sees, and the note in this file only caught the last of them. One
-column is ragged at none. Each clue is now a stat line, label left and value
-right, because a 555px row holding a 30px chip and a two-line stack is the
-same empty middle Rank 'Em had.
-
-Two things found while in there. The locked-clue icon was `ART.state_locked`,
-an illustrated padlock, drawn into a 30px chip: at that size an illustration
-is a brown smudge and six of them down the board read as a rendering fault. It
-is three shapes of SVG now. And the two buttons that cost points sat under the
-clue board, splitting the page into seven things you know on the left against
-one input on the right, 549px to 183px. They belong with the answer: the left
-column is what the game has told you, the right is everything you can do about
-it, and both things you can do cost you.
-
-**Pick'em, where the suggestion in this file would have made it worse.** The
-note said "long, consider grouping by month". Ten fixtures run 29 September to
-19 October, so grouping gives two groups, eight rows and two, and adds two
-headers. Longer, for nothing.
-
-The real defect was underneath. Below 900px `.fxrow` collapsed to a single
-column and stacked four blocks, taking the row from 74px to 208px and the page
-to 2,516px on a tablet -- taller than the player pages were before they were
-rebuilt for being too tall, and nothing in this file had noticed because the
-desktop layout is one of the best in the build. The row is three lines now:
-the fixture and the crowd's verdict share the first, the two calls take the
-second, the crowd bar takes the third. 2,516px to 1,720px on a tablet and
-2,292px to 1,654px on a phone, with nothing removed.
-
-**Both pages are a pattern.** Twice now a note in this file has named the right
-page and the wrong problem, and twice the fix it suggested would have added
-height or ink to a page whose actual fault was elsewhere. Measure the page at
-every width it ships at before believing a note about it, this one included.
+Both of these are now done. What is left is smaller and listed in the table:
+Rank 'Em is still a four-item list and nothing else, Guess the Leaf wraps its
+seven clue tiles 3-3-1 where a single column of seven would read better, and
+Pick'em is ten fixture rows that could group by month.
 
 ---
 
@@ -186,41 +128,10 @@ every width it ships at before believing a note about it, this one included.
   the anchor. That bug shipped twice here (the Ultimate Leaf summary, then the
   slate action bar on phones, where it covered row two). Action bars stay in
   flow.
-- Class names collide in this file. Nine have already shipped and been fixed
-  (`.tag`, `.mark`, `.foot`, `.h2h`, `.sk`, `.grow`, `.clside`, a `<header>`
-  inside a panel inheriting the site header, and `.cp`, which was the header's
-  Citrus-points chip and a Carlton kit piece at the same time, running the
-  chip at 50% opacity on all thirteen pages). **Run `node classcheck.mjs`
-  before you finish** and scope any new selector. It now walks the whole
-  document rather than panel subtrees, because that is how `.cp` hid.
-- Two horizontal strips scrolled with the scrollbar hidden and no other sign
-  that they moved: the thirteen game tabs, and the fixture chips on Game 01.
-  Eight of ten games and two of four chips were behind an invisible gesture.
-  The tabs now carry an edge fade at whichever end still has something parked
-  there, plus a chevron on pointer devices. The chip strip was cut to two
-  chips and wraps. **If you add another sideways strip, give it an
-  affordance.**
-- A test that measures an empty page measures nothing. `mobsweep.mjs` passed a
-  Game 01 that ran 117px past the right edge of a phone as soon as a slot was
-  filled, because the live strip does not exist until somebody is in the slot.
-  It fills the kit and runs the clock now. **Play the page, then measure.**
-- **A live game must never show a fan something the buzzer has not decided.**
-  Rank 'Em sorted its four rows by the final box score the instant the fan
-  locked, numbered them 1 to 4, and did it with fifty minutes still to play.
-  Lock at 5:00 of the first period and the game was over on screen. Proved
-  against the feed: Nylander sat second on a live 0 while Matthews sat third
-  on a live 1, an order only the final answer explains. The rows now stand in
-  the LIVE order off the same events the fan can see, with their own call
-  pinned to each row so they can watch it drift, and only the buzzer resolves
-  it. `leak.mjs` locks all three slates a third of the way through and fails
-  on anything matching the final answer early; Who Goes Off and Heat Check
-  were checked and are clean.
-- Points were not live anywhere, although the feed has always computed them.
-  `CLOCK.live()` returns `p` as `g + a` off the shot events; `KIT_LIVE` simply
-  did not list `p`, so a points line sat on "settles at the buzzer" for sixty
-  minutes while the two numbers that make it moved on the page above it. One
-  missing key, three games affected: Rank 'Em, Heat Check and Who Goes Off all
-  take points as a category.
+- Class names collide in this file. Eight have already shipped and been fixed
+  (`.tag`, `.mark`, `.foot`, `.h2h`, `.sk`, `.grow`, `.clside`, and a `<header>`
+  inside a panel inheriting the site header). **Run `node classcheck.mjs`
+  before you finish** and scope any new selector.
 
 ## Keep these green
 
@@ -234,8 +145,4 @@ node mobsweep.mjs      # no horizontal overflow at 390px
 node offline.mjs       # external requests: NONE
 node classcheck.mjs    # class-name collisions
 node shots_all.mjs     # per-panel density and gap report
-node proof.mjs         # 13 panels x 2 viewports: overflow, clipped text, and
-                       # any sideways strip with no scroll affordance
-node leak.mjs          # locks every live slate a third of the way through and
-                       # fails on anything that shows the final answer early
 ```
