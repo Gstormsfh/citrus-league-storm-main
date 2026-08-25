@@ -23,6 +23,18 @@ interface MatchupComparisonProps {
   weeklyOpponentTotal?: number;
   // League scoring settings for dynamic calculations
   scoringSettings?: ScoringSettings;
+  // Team identity for the sticky column header (2026-08-25). Before this,
+  // team names appeared ONLY in the ScoreCard at the top of the page — scroll
+  // down into the lineup and both columns were anonymous, so "which side is
+  // mine" had to be remembered rather than read.
+  userTeamName?: string;
+  opponentTeamName?: string;
+  /**
+   * True only when the LEFT column is the viewer's own team. False when
+   * viewing another matchup from the league dropdown — see the note on
+   * ScoreCard's identically-named prop.
+   */
+  isOwnTeam?: boolean;
 }
 
 export const MatchupComparison = ({
@@ -39,7 +51,10 @@ export const MatchupComparison = ({
   calculatedDailyTotals,
   weeklyUserTotal,
   weeklyOpponentTotal,
-  scoringSettings
+  scoringSettings,
+  userTeamName,
+  opponentTeamName,
+  isOwnTeam = false
 }: MatchupComparisonProps) => {
   // Create scoring calculator with league-specific settings
   const scorer = useMemo(() => new ScoringCalculator(scoringSettings), [scoringSettings]);
@@ -245,6 +260,37 @@ export const MatchupComparison = ({
 
   return (
     <div className="w-full">
+      {/* Sticky team header — the only place below the fold that answers
+          "which column is mine". Mirrors the grid's 47%/6%/47% columns so
+          each label sits over its own side. Orange + YOU on the left is the
+          same identity signal used in Standings and the ScoreCard. */}
+      {(userTeamName || opponentTeamName) && (
+        <div className="matchup-team-header bg-[#1A2A20]/95 backdrop-blur-sm border-b border-white/10 mb-1">
+          <div className="matchup-team-header-side matchup-team-header-user">
+            {isOwnTeam && (
+              <span className="inline-flex items-center bg-pastel-orange/20 text-pastel-orange-soft ring-1 ring-pastel-orange/40 rounded-md font-jbmono uppercase font-bold text-[8px] px-1 py-0 tracking-wide flex-shrink-0">
+                You
+              </span>
+            )}
+            <span
+              className={`font-varsity text-[11px] md:text-xs uppercase truncate ${
+                isOwnTeam ? 'text-pastel-orange-soft' : 'text-pastel-cream'
+              }`}
+            >
+              {userTeamName || 'My Team'}
+            </span>
+          </div>
+          <div className="matchup-team-header-center">
+            <span className="font-mono text-[9px] text-white/55 uppercase">vs</span>
+          </div>
+          <div className="matchup-team-header-side matchup-team-header-opponent">
+            <span className="font-varsity text-[11px] md:text-xs uppercase truncate text-pastel-cream">
+              {opponentTeamName || 'Opponent'}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="matchup-position-group">
         <MatchupPositionGroup
           userPlayers={allUserPlayers}
