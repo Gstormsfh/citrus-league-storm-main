@@ -1,0 +1,106 @@
+1|18|S|0|B. Sennecke|78|4|12|16.1|5v5||||wrist
+1|121|M|1|N. Robertson|86|-6|7|17.8|5v5||||tip-in
+1|139|S|1|J. Tavares|82|2|7|16.0|5v5||||wrist
+1|161|S|1|M. Domi|61|29|40|0.9|5v5||||wrist
+1|176|S|0|M. McTavish|31|29|65|1.3|5v5||||wrist
+1|207|S|0|R. Poehling|82|0|7|10.4|5v5||||tip-in
+1|264|S|1|E. Cowan|34|-40|68|0.1|5v5||||backhand
+1|283|M|0|D. Helleson|84|-14|15|6.2|5v5|r|||wrist
+1|302|M|0|P. Mintyukov|66|-17|29|6.5|5v5||||wrist
+1|327|S|0|R. Gudas|31|2|58|2.4|5v5||||slap
+1|346|S|0|B. Sennecke|85|3|5|24.4|5v5||||backhand
+1|397|S|0|J. Trouba|47|-26|49|1.2|5v5||||slap
+1|439|G|1|M. Maccelli|56|-24|41|1.7|5v5||||wrist
+1|473|S|0|P. Mintyukov|82|4|8|11.8|5v5||||slap
+1|499|S|0|J. Trouba|26|-19|66|2.4|5v5||||slap
+1|513|S|0|L. Carlsson|51|6|38|6.7|5v5||||snap
+1|517|S|1|B. Carlo|83|18|19|4.4|5v5||||wrist
+1|532|S|0|L. Carlsson|55|-37|50|0.5|5v5||||wrist
+1|600|S|0|B. Sennecke|86|8|9|4.2|5v5||||backhand
+1|606|M|0|M. McTavish|74|2|15|8.2|5v5||||tip-in
+1|617|M|0|B. Sennecke|40|13|51|3.0|5v4||||wrist
+1|658|M|0|C. Gauthier|55|-23|41|5.3|5v4||||snap
+1|670|M|0|C. Gauthier|73|-24|29|13.0|5v4||||snap
+1|699|M|0|C. Gauthier|77|-18|22|19.0|5v4||||snap
+1|710|M|0|C. Kreider|83|-3|7|18.7|5v4||||tip-in
+1|724|S|0|C. Kreider|69|12|23|12.2|5v4||||wrist
+1|731|M|0|L. Carlsson|73|-4|16|10.5|5v5||||tip-in
+1|736|M|0|C. Kreider|84|5|7|21.4|5v5||||wrist
+1|739|G|0|C. Gauthier|84|-8|9|23.8|5v5|r|C. Kreider|J. LaCombe|wrist
+1|759|S|1|E. Cowan|64|2|25|10.4|5v5||||wrist
+1|792|S|0|A. Killorn|84|-3|6|17.2|5v5||||wrist
+1|801|M|0|J. Viel|76|-4|14|6.3|5v5||||tip-in
+1|819|S|0|O. Zellweger|33|-10|57|2.0|5v5||||slap
+1|844|S|0|I. Moore|48|-37|55|0.8|5v5||||wrist
+1|857|S|0|I. Moore|88|-9|9|4.7|5v5||||backhand
+1|866|G|0|I. Moore|66|-10|25|13.9|5v5||J. Harkins||snap
+1|883|S|1|J. McCabe|41|15|50|1.4|5v5||||wrist
+1|953|S|0|C. Gauthier|77|-15|19|20.7|5v4||||snap
+1|1032|S|0|M. Granlund|70|40|44|0.1|5v5||||wrist
+1|1053|M|1|E. Cowan|76|26|29|1.6|5v5||||wrist
+1|1056|M|1|A. Matthews|82|-2|7|18.2|5v5|r|||tip-in
+1|1137|S|1|A. Matthews|80|-21|23|3.9|5v4||||wrist
+1|1138|M|1|J. Tavares|80|-3|9|12.3|5v4|r|||wrist
+1|1155|M|1|A. Matthews|81|-22|23|11.4|5v4||||snap
+1|1168|M|1|J. Tavares|84|0|5|21.3|5v4||||tip-in
+2|1245|S|1|J. McCabe|42|32|57|0.5|5v5||||wrist
+2|1299|M|0|B. Sennecke|83|10|12|12.4|5v5||||deflected
+2|1323|M|0|O. Zellweger|60|37|47|0.6|5v5||||wrist
+2|1335|M|1|M. Knies|81|4|9|17.5|5v5||||wrist
+2|1375|G|0|P. Mintyukov|67|14|26|12.7|5v5||R. Poehling|J. Viel|snap
+2|1410|S|0|I. Moore|57|22|39|2.6|5v5||||wrist
+2|1474|M|0|C. Gauthier|71|3|18|11.1|5v5||||wrist
+2|1477|M|0|R. Gudas|47|-41|59|0.0|5v5|r|||wrist
+2|1508|M|0|B. Sennecke|38|4|51|2.5|5v5||||wrist
+2|1538|S|1|M. Domi|79|24|26|1.3|5v5||||wrist
+2|1560|S|1|O. Ekman-Larsson|57|20|38|3.2|5v5||||wrist
+2|1592|M|1|N. Robertson|51|16|41|4.3|5v5||||snap
+2|1689|M|1|B. Groulx|53|32|48|1.3|4v5||||snap
+2|1725|S|0|J. Trouba|11|-27|83|0.1|5v4||||deflected
+2|1734|S|0|M. Granlund|66|-26|35|5.0|5v4||||wrist
+2|1738|M|0|A. Killorn|73|-6|17|5.3|5v5||||tip-in
+2|1757|S|1|W. Nylander|79|20|22|1.5|5v5||||backhand
+2|1800|S|1|O. Ekman-Larsson|52|-16|40|3.0|5v4||||wrist
+2|1828|S|1|J. Tavares|83|-9|11|8.6|5v4||||wrist
+2|1832|S|1|J. Tavares|83|-6|8|13.9|5v4||||wrist
+2|1847|G|1|A. Matthews|71|-19|26|13.0|5v4||M. Knies|W. Nylander|wrist
+2|1882|S|0|P. Mintyukov|42|-21|51|1.3|5v5||||snap
+2|1916|M|0|B. Sennecke|63|-9|28|10.9|5v5||||wrist
+2|1922|S|0|J. Trouba|29|7|60|3.0|5v5||||slap
+2|1953|M|1|O. Ekman-Larsson|70|1|19|11.9|5v5||||wrist
+2|2114|M|0|C. Gauthier|73|-28|32|1.9|5v5||||wrist
+2|2183|M|1|M. Maccelli|83|-9|11|8.6|5v4||||wrist
+2|2186|G|1|J. Tavares|46|21|48|1.5|5v4|r|M. Maccelli|M. Knies|wrist
+2|2396|M|1|E. Cowan|73|-21|26|7.0|5v4||||wrist
+2|2399|S|1|N. Robertson|62|-6|28|9.7|5v4|r|||wrist
+3|2420|S|0|A. Killorn|23|-39|77|0.1|4v5||||wrist
+3|2436|G|1|W. Nylander|81|6|10|20.6|5v4||M. Knies|M. Maccelli|wrist
+3|2446|S|1|C. Jarnkrok|64|9|27|9.9|5v4||||wrist
+3|2450|S|1|N. Robertson|41|31|57|0.8|5v5||||wrist
+3|2495|M|1|W. Nylander|47|4|42|2.9|5v4||||wrist
+3|2654|S|1|C. Jarnkrok|79|12|16|11.5|5v5||||wrist
+3|2685|M|0|B. Sennecke|75|12|18|6.4|5v5||||wrist
+3|2721|S|0|P. Mintyukov|50|30|49|0.8|5v5||||wrist
+3|2762|S|0|T. Washe|3|17|88|0.0|5v5||||wrist
+3|2797|S|0|J. Trouba|79|-1|10|17.7|5v5||||backhand
+3|2877|M|1|B. Carlo|27|-35|71|0.5|5v5||||snap
+3|2888|M|0|M. McTavish|47|-7|43|3.0|5v5||||wrist
+3|2915|G|1|B. Groulx|62|11|29|8.0|4v5||B. Carlo||wrist
+3|2920|S|1|B. Carlo|72|-1|17|19.4|4v5|u|||wrist
+3|2951|S|0|P. Mintyukov|43|23|51|3.8|5v4||||wrist
+3|3036|S|1|O. Ekman-Larsson|37|-5|52|3.7|5v5||||slap
+3|3063|M|1|B. Carlo|38|-32|60|1.0|5v5||||wrist
+3|3146|S|0|M. Granlund|65|-18|30|8.1|4v4||||wrist
+3|3224|S|0|L. Carlsson|57|24|40|4.1|5v4||||wrist
+3|3250|S|0|B. Sennecke|80|-6|11|13.7|6v4||||snap
+3|3438|S|1|J. McCabe|75|-6|15|6.7|5v4||||bat
+3|3461|S|1|W. Nylander|1|-17|90|0.0|5v5||||wrist
+3|3470|S|0|M. McTavish|33|12|57|1.4|5v5||||wrist
+3|3475|S|0|B. Sennecke|86|4|5|4.1|6v5||||wrap-around
+3|3477|S|0|M. Granlund|81|-1|8|21.9|6v5|r|||wrist
+3|3480|M|1|W. Nylander|49|23|46|54.7|5v6|e|||tip-in
+3|3492|G|1|M. Knies|22|-22|71|52.5|5v6|e|J. McCabe|J. Tavares|wrist
+3|3574|G|0|A. Killorn|55|6|35|9.8|5v5||J. Viel|J. Trouba|wrist
+3|3585|S|0|L. Carlsson|78|2|11|18.5|6v5||||wrist
+3|3589|M|0|J. Trouba|49|-10|41|5.4|6v5||||wrist
+3|3595|S|0|J. Trouba|41|4|48|2.0|6v5||||wrist
