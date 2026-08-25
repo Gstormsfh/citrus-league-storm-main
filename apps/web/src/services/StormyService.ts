@@ -2,11 +2,17 @@
  * StormyService — Client-side service for Citrus Stormy AI assistant.
  *
  * Gathers league / roster / matchup context via API server (3-tier),
- * sends it to the Supabase edge function (which proxies the Claude API),
- * and returns the AI response with usage tracking.
+ * sends it to POST /api/stormy/chat (which owns the Claude call, the
+ * spend guards and the RULE 0 verified-player lookup), and returns the
+ * AI response with usage tracking.
+ *
+ * Chunk 11g.9 (2026-08-24): repointed off `supabase.functions.invoke
+ * ("stormy-chat")`. Stormy is server-side now — there is no edge
+ * function behind this any more.
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { apiClient, ApiError } from "@/api/client";
 import {
   getFirstWeekStartDate,
   getCurrentWeekNumber,
@@ -91,29 +97,34 @@ class StormyServiceImpl {
         ? StormyServiceImpl.buildContextString(context)
         : "";
 
-      // Edge function invocation is acceptable client-side
-      const { data, error } = await supabase.functions.invoke("stormy-chat", {
-        body: {
+      // Server route owns the Claude call, the three spend guards and
+      // the RULE 0 verified-player lookup. Rate-limit rejections come
+      // back as HTTP 429 with a user-facing message, so surface that
+      // message rather than a generic failure — the copy ("you've used
+      // your N questions this week") IS the product behaviour.
+      let envelope: { data?: { response?: string; usage?: unknown } };
+      try {
+        envelope = await apiClient.post("/api/stormy/chat", {
           message,
           conversationHistory: history.map((m) => ({
             role: m.role,
             content: m.content,
           })),
           context: contextString,
-        },
-      });
-
-      if (data?.error) {
-        return { response: "", error: data.error };
-      }
-
-      if (error) {
-        throw new Error(error.message || "Failed to reach Stormy");
+        });
+      } catch (err) {
+        if (err instanceof ApiError) {
+          const serverMessage =
+            (err.data as { error?: { message?: string } } | undefined)?.error?.message ??
+            err.message;
+          return { response: "", error: serverMessage };
+        }
+        throw err;
       }
 
       return {
-        response: data.response ?? "",
-        usage: data.usage,
+        response: envelope?.data?.response ?? "",
+        usage: envelope?.data?.usage as StormyResponse["usage"],
       };
     } catch (err: unknown) {
       const msg =
@@ -122,142 +133,6 @@ class StormyServiceImpl {
         response: "",
         error: msg,
       };
-    }
-  }
-
-  /**
-   * Streaming variant of sendMessage. Token-by-token rendering instead of
-   * a 5–8 second silent wait followed by a wall of text. Calls onDelta
-   * for each `text_delta` chunk Anthropic sends. Returns the final
-   * accumulated response when the stream closes.
-   *
-   * Uses raw fetch instead of supabase.functions.invoke() because the
-   * supabase JS client buffers the entire response before resolving,
-   * which defeats the point of streaming.
-   */
-  async sendMessageStream(
-    message: string,
-    history: StormyMessage[],
-    context: StormyContext | undefined,
-    onDelta: (textChunk: string) => void,
-  ): Promise<StormyResponse> {
-    try {
-      // Auth + guest throttle (mirrors sendMessage)
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        this.guestMessageCount++;
-        if (this.guestMessageCount > StormyServiceImpl.GUEST_LIMIT) {
-          return {
-            response: "",
-            error:
-              "Want more from Stormy? Sign up for a free account to get 3 questions per matchup week!",
-          };
-        }
-      }
-
-      const contextString = context
-        ? StormyServiceImpl.buildContextString(context)
-        : "";
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-      const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-      if (!supabaseUrl || !supabaseAnon) {
-        return { response: "", error: "Stormy is not configured." };
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token ?? supabaseAnon;
-
-      const res = await fetch(`${supabaseUrl}/functions/v1/stormy-chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-          apikey: supabaseAnon,
-        },
-        body: JSON.stringify({
-          message,
-          conversationHistory: history.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          context: contextString,
-        }),
-      });
-
-      // Error response: 429 (rate-limited), 500 (server), etc come back as JSON.
-      // Edge function MAY also still be running in non-streaming mode (until
-      // the SSE-streaming edge function deploys), in which case it returns
-      // a 200 with `{ response: "..." }` and Content-Type: application/json.
-      // We treat that as a successful one-shot reply: call onDelta with the
-      // whole string and return — same shape as if it had streamed.
-      const contentType = res.headers.get("content-type") || "";
-      if (!res.ok || contentType.includes("application/json")) {
-        try {
-          const body = await res.json();
-          if (res.ok && typeof body?.response === "string") {
-            // Non-streaming fallback path. Surface the full text via onDelta
-            // in one call so the UI still shows it correctly.
-            const text = body.response as string;
-            if (text) onDelta(text);
-            return { response: text, usage: body?.usage };
-          }
-          return { response: "", error: body?.error || `Stormy error (${res.status})` };
-        } catch {
-          return { response: "", error: `Stormy error (${res.status})` };
-        }
-      }
-
-      if (!res.body) {
-        return { response: "", error: "Stormy returned empty stream." };
-      }
-
-      // Parse Anthropic's SSE stream and surface each text_delta to the caller.
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullText = "";
-
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          // SSE events are separated by blank lines. Within an event, the
-          // payload line starts with "data: ". Anthropic emits one JSON
-          // object per data line. Process complete lines; keep the partial
-          // last line for the next chunk.
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-
-          for (const raw of lines) {
-            const line = raw.trim();
-            if (!line.startsWith("data:")) continue;
-            const payload = line.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
-            try {
-              const evt = JSON.parse(payload);
-              if (evt?.type === "content_block_delta" && evt.delta?.type === "text_delta") {
-                const t = String(evt.delta.text ?? "");
-                if (t) {
-                  fullText += t;
-                  onDelta(t);
-                }
-              }
-            } catch {
-              // Skip malformed events; keep streaming.
-            }
-          }
-        }
-      } finally {
-        try { reader.releaseLock(); } catch { /* ignore */ }
-      }
-
-      return { response: fullText };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Something went wrong.";
-      return { response: "", error: msg };
     }
   }
 
