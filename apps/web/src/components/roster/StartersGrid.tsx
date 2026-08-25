@@ -1,5 +1,3 @@
-import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -40,17 +38,18 @@ const createIndividualSlots = (position: string, count: number): PositionSlot[] 
 interface StartersGridProps {
   players: HockeyPlayer[];
   slotAssignments?: Record<string | number, string>; // Map of Player ID -> Slot ID
-  onPlayerClick?: (player: HockeyPlayer) => void;
+  onPlayerClick?: (player: HockeyPlayer) => void; // View player detail (name/headshot tap)
+  onPlayerTap?: (player: HockeyPlayer) => void; // Tap-to-swap: select player, or complete a swap (card body tap)
   className?: string;
   lockedPlayerIds?: Set<string>; // Set of locked player IDs
-  tapSelectedPlayerId?: string | number | null; // Mobile tap-to-swap: currently selected player
-  tapEligibleSlots?: Set<string>; // Mobile tap-to-swap: slots this player can move to
-  onSlotTap?: (slotId: string) => void; // Mobile tap-to-swap: handler when an eligible slot is tapped
+  tapSelectedPlayerId?: string | number | null; // Tap-to-swap: currently selected player
+  tapEligibleSlots?: Set<string>; // Tap-to-swap: slots this player can move to
+  onSlotTap?: (slotId: string) => void; // Tap-to-swap: handler when an eligible slot is tapped
   positionType?: PositionType; // 'individual' (C/LW/RW/D/G) or 'forward' (F/D/G)
   rosterSlots?: Record<string, number>; // Custom roster slot counts
 }
 
-const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, tapEligibleSlots = new Set(), onSlotTap, positionType = 'individual', rosterSlots }: StartersGridProps) => {
+const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, onPlayerTap, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, tapEligibleSlots = new Set(), onSlotTap, positionType = 'individual', rosterSlots }: StartersGridProps) => {
 
   const getPlayerInSlot = (slotId: string) => {
     // Look for key in slotAssignments where value is slotId
@@ -78,6 +77,7 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
            isFull={isFull}
            isEmpty={isEmpty}
            onPlayerClick={onPlayerClick}
+           onPlayerTap={onPlayerTap}
            lockedPlayerIds={lockedPlayerIds}
            tapSelectedPlayerId={tapSelectedPlayerId}
            isEligibleTarget={isEligibleTarget}
@@ -145,22 +145,11 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
               ? "grid-cols-2 sm:grid-cols-3"
               : "grid-cols-2 sm:grid-cols-3"
           )}>
-            {forwardRow.map(slot => {
-              // Add colored left border based on position
-              const getBorderColor = () => {
-                if (slot.position === 'F') return 'border-l-2 border-emerald-500 pl-1';
-                if (slot.position === 'LW') return 'border-l-2 border-blue-500 pl-1';
-                if (slot.position === 'C') return 'border-l-2 border-primary pl-1';
-                if (slot.position === 'RW') return 'border-l-2 border-purple-500 pl-1';
-                return '';
-              };
-
-              return (
-                <div key={slot.id} className={getBorderColor()}>
-                  {renderSlot(slot)}
-                </div>
-              );
-            })}
+            {/* Position colour now lives on the card itself (its left spine) —
+                consistent everywhere it renders, instead of a wrapper border
+                that this row remembered to apply and the defense/goalie rows
+                below did not. */}
+            {forwardRow.map(slot => renderSlot(slot))}
           </div>
         </div>
 
@@ -182,17 +171,7 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, className,
             Goalies & Utility
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-2">
-            {bottomRow.map(slot => {
-              // Add colored left border for Utility
-              if (slot.position === 'UTIL') {
-                return (
-                  <div key={slot.id} className="border-l-2 border-orange-500 pl-1">
-                    {renderSlot(slot)}
-                  </div>
-                );
-              }
-              return renderSlot(slot);
-            })}
+            {bottomRow.map(slot => renderSlot(slot))}
           </div>
         </div>
 
@@ -207,6 +186,7 @@ interface PositionSlotProps {
   isFull: boolean;
   isEmpty: boolean;
   onPlayerClick?: (player: HockeyPlayer) => void;
+  onPlayerTap?: (player: HockeyPlayer) => void;
   lockedPlayerIds?: Set<string>;
   tapSelectedPlayerId?: string | number | null;
   isEligibleTarget?: boolean;
@@ -220,41 +200,13 @@ const PositionSlot = ({
   isFull,
   isEmpty,
   onPlayerClick,
+  onPlayerTap,
   lockedPlayerIds = new Set(),
   tapSelectedPlayerId = null,
   isEligibleTarget = false,
   isSlotSelected = false,
   onSlotTap,
 }: PositionSlotProps) => {
-  const { setNodeRef, isOver } = useDroppable({
-    id: slot.id,
-    data: {
-      type: 'starter-slot',
-      position: slot.position,
-      maxPlayers: slot.maxPlayers,
-    },
-  });
-
-  const playerIds = players.map(p => p.id);
-
-  // Position-specific styling
-  /* 2026-08-24 dead-dark-variant sweep: the light-first classes were what
-     actually rendered (no .dark class ever exists on <html>), washing the
-     slots out with 50%-opacity light tints. Dark-first now; the dark:
-     variants were dead code and are gone. */
-  const positionStyles: Record<string, string> = {
-    'LW': 'bg-blue-950/20 border-blue-800/30',
-    'C': 'bg-primary/5 border-primary/20',
-    'RW': 'bg-purple-950/20 border-purple-800/30',
-    'UTIL': 'bg-orange-950/20 border-orange-800/30',
-    'F': 'bg-emerald-950/20 border-emerald-800/30',
-  };
-
-  const getPositionStyle = () => {
-    if (isEmpty || isOver || isFull) return '';
-    return positionStyles[slot.position] || 'border-border/50 bg-card/50';
-  };
-
   const handleSlotTap = () => {
     if (isEligibleTarget && onSlotTap) {
       onSlotTap(slot.id);
@@ -263,18 +215,19 @@ const PositionSlot = ({
 
   return (
     <Card
-      ref={setNodeRef}
       className={cn(
         "p-2 transition-all rounded-lg w-full",
         "border-2",
         "min-h-[140px]",
-        isOver && "border-citrus-sage bg-citrus-sage/10 shadow-lg",
         isEmpty && !isEligibleTarget && "border-dashed border-white/15 bg-white/[0.03]",
-        isFull && !isOver && !isSlotSelected && !isEligibleTarget && "border-citrus-sage/30 bg-white/5 shadow-sm",
+        isFull && !isSlotSelected && !isEligibleTarget && "border-citrus-sage/30 bg-white/5 shadow-sm",
         isSlotSelected && "!border-citrus-orange !bg-citrus-orange/10 shadow-lg",
         isEligibleTarget && !isSlotSelected && "!border-citrus-sage !bg-citrus-sage/15 !border-solid shadow-md cursor-pointer animate-pulse",
       )}
-      onClick={isEligibleTarget ? handleSlotTap : undefined}
+      // Only the outer Card handles the tap when the slot is EMPTY — when it's
+      // full, the HockeyPlayerCard inside owns its own tap (onSwapTap below).
+      // Wiring both here too would double-fire on click-bubble.
+      onClick={isEmpty && isEligibleTarget ? handleSlotTap : undefined}
     >
       {/* Compact Slot Header */}
       <div className="flex items-center justify-between mb-1">
@@ -295,41 +248,36 @@ const PositionSlot = ({
 
       {/* Players Grid */}
       {players.length > 0 ? (
-        <SortableContext items={playerIds} strategy={verticalListSortingStrategy}>
-          <div className="space-y-1">
-            {players.map((player) => (
-              <HockeyPlayerCard
-                key={player.id}
-                player={player}
-                isInSlot={true}
-                isLocked={lockedPlayerIds.has(String(player.id))}
-                onClick={() => onPlayerClick?.(player)}
-                className="border-0 shadow-none bg-transparent"
-                isSwapSelected={player.id === tapSelectedPlayerId}
-                isSwapTarget={isEligibleTarget && player.id !== tapSelectedPlayerId}
-              />
-            ))}
-          </div>
-        </SortableContext>
+        <div className="space-y-1">
+          {players.map((player) => (
+            <HockeyPlayerCard
+              key={player.id}
+              player={player}
+              isInSlot={true}
+              isLocked={lockedPlayerIds.has(String(player.id))}
+              onClick={() => onPlayerClick?.(player)}
+              onSwapTap={() => onPlayerTap?.(player)}
+              className="border-0 shadow-none bg-transparent"
+              isSwapSelected={player.id === tapSelectedPlayerId}
+              isSwapTarget={isEligibleTarget && player.id !== tapSelectedPlayerId}
+            />
+          ))}
+        </div>
       ) : (
         <div
           className={cn(
             "flex items-center justify-center h-[130px] rounded border border-dashed transition-all",
-            isEligibleTarget ? "border-citrus-sage bg-citrus-sage/10 border-2 cursor-pointer" :
-            isOver ? "border-primary bg-primary/10 border-2" : "border-muted-foreground/20 bg-muted/5"
+            isEligibleTarget ? "border-citrus-sage bg-citrus-sage/10 border-2 cursor-pointer" : "border-muted-foreground/20 bg-muted/5"
           )}
-          onClick={isEligibleTarget ? handleSlotTap : undefined}
         >
           <div className="text-center">
             <Plus className={cn(
               "h-4 w-4 mx-auto mb-1 transition-colors",
-              isEligibleTarget ? "text-citrus-sage" :
-              isOver ? "text-primary" : "text-muted-foreground/40"
+              isEligibleTarget ? "text-citrus-sage" : "text-muted-foreground/40"
             )} />
             <p className={cn(
               "text-[9px] font-medium",
-              isEligibleTarget ? "text-citrus-sage" :
-              isOver ? "text-primary" : "text-muted-foreground/40"
+              isEligibleTarget ? "text-citrus-sage" : "text-muted-foreground/40"
             )}>
               {isEligibleTarget ? "Move here" : "Empty"}
             </p>

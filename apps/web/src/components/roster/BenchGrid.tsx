@@ -1,5 +1,3 @@
-import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -16,49 +14,20 @@ import { CitrusLeaf } from "@/components/icons/CitrusIcons";
 
 interface BenchGridProps {
   players: HockeyPlayer[];
-  onPlayerClick?: (player: HockeyPlayer) => void;
+  onPlayerClick?: (player: HockeyPlayer) => void; // View player detail (name/headshot tap)
+  onPlayerTap?: (player: HockeyPlayer) => void; // Tap-to-swap: select player, or complete a swap (card body tap)
   className?: string;
   lockedPlayerIds?: Set<string>; // Set of locked player IDs
   tapSelectedPlayerId?: string | number | null;
-  isEligibleTarget?: boolean; // Whether bench is a valid drop target for selected player
-  onBenchTap?: () => void; // Handler when bench is tapped as a swap target
+  tapEligibleSlots?: Set<string>; // Tap-to-swap: slots the selected player can move to
+  onBenchTap?: () => void; // Handler when the bench's empty space is tapped as a swap target
 }
 
-// Helper to normalize position to standard abbreviations
-const normalizePosition = (position: string): string => {
-  const pos = position?.toUpperCase() || '';
-  
-  if (['C', 'CENTRE', 'CENTER'].includes(pos)) return 'C';
-  if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(pos)) return 'LW';
-  if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(pos)) return 'RW';
-  if (['D', 'DEFENCE', 'DEFENSE'].includes(pos)) return 'D';
-  if (['G', 'GOALIE'].includes(pos)) return 'G';
-  
-  return pos.substring(0, 2);
-};
-
-// Get position border color (matching StartersGrid)
-const getPositionBorderColor = (position: string): string => {
-  const pos = normalizePosition(position);
-  switch (pos) {
-    case 'LW': return 'border-l-2 border-blue-500';
-    case 'C': return 'border-l-2 border-primary';
-    case 'RW': return 'border-l-2 border-purple-500';
-    case 'D': return 'border-l-2 border-slate-400';
-    case 'G': return 'border-l-2 border-amber-500';
-    default: return 'border-l-2 border-border';
-  }
-};
-
-const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, isEligibleTarget = false, onBenchTap }: BenchGridProps) => {
-  const { setNodeRef, isOver } = useDroppable({
-    id: 'bench-grid',
-    data: {
-      type: 'bench',
-    },
-  });
-
-  const playerIds = players.map(p => p.id);
+const BenchGrid = ({ players, onPlayerClick, onPlayerTap, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, tapEligibleSlots = new Set(), onBenchTap }: BenchGridProps) => {
+  // Bench accepts anyone, so it's "the" target the moment any player is
+  // selected and bench is in their eligible set — individual cards below
+  // are each their own target too (tap one to swap directly against them).
+  const isEligibleTarget = tapSelectedPlayerId != null && tapEligibleSlots.has('bench-grid');
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -73,13 +42,11 @@ const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Se
       </div>
 
       <Card
-        ref={setNodeRef}
         className={cn(
           "p-3 transition-all rounded-lg",
           "border-2",
-          isOver && "border-citrus-sage bg-citrus-sage/10 shadow-lg",
-          isEligibleTarget && !isOver && "!border-citrus-sage !bg-citrus-sage/15 shadow-md",
-          !isOver && !isEligibleTarget && "border-citrus-sage/30 bg-white/5 shadow-sm"
+          isEligibleTarget && "!border-citrus-sage !bg-citrus-sage/15 shadow-md",
+          !isEligibleTarget && "border-citrus-sage/30 bg-white/5 shadow-sm"
         )}
         onClick={isEligibleTarget && onBenchTap ? onBenchTap : undefined}
       >
@@ -89,47 +56,44 @@ const BenchGrid = ({ players, onPlayerClick, className, lockedPlayerIds = new Se
           </div>
         )}
         {players.length > 0 ? (
-          <SortableContext items={playerIds} strategy={rectSortingStrategy}>
-            {/* Flexbox with fixed-width cards - centered when wrapping to new rows */}
-            <div className="flex flex-wrap justify-center gap-1.5">
-              {players.map((player) => {
-                const borderColor = getPositionBorderColor(player.position);
-                return (
-                  <div key={player.id} className={cn(borderColor, "pl-1 flex-shrink-0 w-[140px]")}>
-                    <HockeyPlayerCard
-                      player={player}
-                      isInSlot={false}
-                      isLocked={lockedPlayerIds.has(String(player.id))}
-                      onClick={() => onPlayerClick?.(player)}
-                      isSwapSelected={player.id === tapSelectedPlayerId}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </SortableContext>
+          /* Flexbox with fixed-width cards - centered when wrapping to new rows */
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {players.map((player) => (
+              <div key={player.id} className="flex-shrink-0 w-[140px]">
+                <HockeyPlayerCard
+                  player={player}
+                  isInSlot={false}
+                  isLocked={lockedPlayerIds.has(String(player.id))}
+                  onClick={() => onPlayerClick?.(player)}
+                  onSwapTap={() => onPlayerTap?.(player)}
+                  isSwapSelected={player.id === tapSelectedPlayerId}
+                  isSwapTarget={isEligibleTarget && player.id !== tapSelectedPlayerId}
+                />
+              </div>
+            ))}
+          </div>
         ) : (
           <div className={cn(
             "flex items-center justify-center h-[140px] rounded-lg border-2 border-dashed relative overflow-hidden",
-            isOver ? "border-citrus-sage bg-citrus-sage/10" : "border-citrus-sage/30 bg-white/[0.03]"
+            isEligibleTarget ? "border-citrus-sage bg-citrus-sage/10" : "border-citrus-sage/30 bg-white/[0.03]"
           )}>
             {/* Decorative citrus slices in background */}
             <CitrusLeaf className="absolute top-4 left-4 w-16 h-16 text-citrus-sage opacity-10 rotate-12" />
             <CitrusLeaf className="absolute bottom-4 right-4 w-20 h-20 text-citrus-peach opacity-10 -rotate-45" />
-            
+
             <div className="text-center relative z-10">
               <CitrusLeaf className={cn(
                 "w-12 h-12 mx-auto mb-3 transition-colors",
-                isOver ? "text-citrus-sage" : "text-pastel-cream/60"
+                isEligibleTarget ? "text-citrus-sage" : "text-pastel-cream/60"
               )} />
               <p className={cn(
                 "text-sm font-varsity font-bold mb-1 uppercase tracking-wide",
-                isOver ? "text-pastel-cream" : "text-pastel-cream/70"
+                isEligibleTarget ? "text-pastel-cream" : "text-pastel-cream/70"
               )}>
-                {isOver ? "Drop players here" : "No bench players"}
+                {isEligibleTarget ? "Tap to move here" : "No bench players"}
               </p>
               <p className="text-xs font-display text-pastel-cream/65">
-                Drag players from starters or add from free agents
+                {isEligibleTarget ? "This player can be benched" : "Add players from free agents"}
               </p>
             </div>
           </div>
