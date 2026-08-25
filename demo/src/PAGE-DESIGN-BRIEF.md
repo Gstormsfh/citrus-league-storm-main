@@ -92,7 +92,7 @@ unevenly:
 | **Who Goes Off** | Six cards, two columns, action bar | Closest to right of anything here. Use it as the reference. |
 | **Guess the Leaf** | Two columns: clue board / answer, with a round record | The seven clue tiles wrap 3-3-1. Should be a single column of seven rows. |
 | **Heat Check** | Six over/under rows, action bar | The four-column row breaks to two rows under 720px. Check the break. |
-| **Rank 'Em** | Four rows, action bar | Thinnest page in the build. It is a four-item list and nothing else. |
+| **Rank 'Em** | Four rows standing in the live order, each with a race bar | Done, and the density number was pointing at it for the wrong reason. See below. |
 | **Pick'em** | Ten fixture rows | Long. Consider grouping by month. |
 | **Beat the Buzzer** | Clock is the hero: 104px countdown, drain bar, live stat line | Rebuilt. Density .83 to .92. |
 | **Immaculate Grid** | 3x3 board, search, all-time strip | The board is good. The all-time strip below it competes with it. |
@@ -102,8 +102,24 @@ unevenly:
 
 Measured density (ink over panel height, higher is denser): home .96, call .94,
 dash .94, fx .93, ult .92, stormy .92, hl .92, bz .92, grid .92, luck .90,
-guess .89, lb .88, rank .86. **Rank 'Em is the one left to work on.** Nothing
-has a vertical gap over 90px any more.
+guess .89, lb .88, rank .87. Nothing has a vertical gap over 90px any more.
+
+**A warning about that column, from working the page it named.** Rank 'Em sat
+at .86 and was called the page to fix. The number was pointing at the right
+page for the wrong reason, and reading it as "this page needs more facts"
+would have made it worse. What was actually wrong:
+
+1. `rkRow` called `prow` without `frac`, so the one component in this build
+   that draws a bar drew none. On a 2,000px row that is roughly 1,100px of
+   nothing between a man's name and his number. Every other list passes
+   `frac`; this was the only page that did not, and it is the only page where
+   `prow` runs at full width instead of inside a 500px sheet.
+2. The page was giving away the answer. See the rule below.
+
+Fixing both took it from 641px to 570px and from .86 to .87. Barely a move on
+the metric, because the page was never short of ink; it was short of a bar and
+it was broken. **Do not chase this column with chips and summary strips.** A
+density number can tell you where to look and nothing else.
 
 ---
 
@@ -146,6 +162,23 @@ Pick'em is ten fixture rows that could group by month.
   Game 01 that ran 117px past the right edge of a phone as soon as a slot was
   filled, because the live strip does not exist until somebody is in the slot.
   It fills the kit and runs the clock now. **Play the page, then measure.**
+- **A live game must never show a fan something the buzzer has not decided.**
+  Rank 'Em sorted its four rows by the final box score the instant the fan
+  locked, numbered them 1 to 4, and did it with fifty minutes still to play.
+  Lock at 5:00 of the first period and the game was over on screen. Proved
+  against the feed: Nylander sat second on a live 0 while Matthews sat third
+  on a live 1, an order only the final answer explains. The rows now stand in
+  the LIVE order off the same events the fan can see, with their own call
+  pinned to each row so they can watch it drift, and only the buzzer resolves
+  it. `leak.mjs` locks all three slates a third of the way through and fails
+  on anything matching the final answer early; Who Goes Off and Heat Check
+  were checked and are clean.
+- Points were not live anywhere, although the feed has always computed them.
+  `CLOCK.live()` returns `p` as `g + a` off the shot events; `KIT_LIVE` simply
+  did not list `p`, so a points line sat on "settles at the buzzer" for sixty
+  minutes while the two numbers that make it moved on the page above it. One
+  missing key, three games affected: Rank 'Em, Heat Check and Who Goes Off all
+  take points as a category.
 
 ## Keep these green
 
@@ -159,4 +192,8 @@ node mobsweep.mjs      # no horizontal overflow at 390px
 node offline.mjs       # external requests: NONE
 node classcheck.mjs    # class-name collisions
 node shots_all.mjs     # per-panel density and gap report
+node proof.mjs         # 13 panels x 2 viewports: overflow, clipped text, and
+                       # any sideways strip with no scroll affordance
+node leak.mjs          # locks every live slate a third of the way through and
+                       # fails on anything that shows the final answer early
 ```

@@ -140,6 +140,29 @@ seven layers, and to put on a title slide.
 Save as `art/carlton-key.png`. **It is reference, not a build asset.** The
 baker does not read it and it is not wired to anything, on purpose.
 
+### The key art is in. Read this before you trace it.
+
+`art/carlton-key.png` landed and it is good. It clears every item on the
+reject list: no text, no numbers, no maple leaf, one hard navy outline, flat
+fills, the citrus slice is the focal point, and the palette is navy, white and
+the one orange.
+
+**Do not trace it straight into the seven layers, because two of the six
+pieces are not in it.** It shows the stick, the gloves, the shin pads and the
+skates. It has no shoulder caps (the white on the shoulders is the sweater's
+yoke, which belongs to the base layer) and no puck. Trace it for the
+character, the proportions and the line weight, then add those two from the
+vector in the build, which has all six.
+
+Two smaller divergences, both fine to keep or drop, but decide on purpose
+rather than by accident:
+
+- it carries a **white keyline** around the whole silhouette. The build sits
+  the figure directly on navy with no halo, so the vector has none. If you
+  keep the halo, keep it on every layer or the kit will look cut out.
+- the sweater blue reads brighter than `#00286E`. Against the page it is fine;
+  match the token if you want the figure and the rest of the build to agree.
+
 **Reject and regenerate if:** any text appears, the outline goes soft or
 variable, it renders as 3D or plush, the crest is a maple leaf instead of a
 citrus slice, or a colour outside the palette shows up.

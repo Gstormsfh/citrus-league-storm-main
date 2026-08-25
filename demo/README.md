@@ -29,7 +29,7 @@ against the official box score.
 | 03 | Who Goes Off | the box score at the buzzer |
 | 04 | Guess the Leaf | five trivia rounds |
 | 05 | Heat Check | the box score at the buzzer |
-| 06 | Rank 'Em | the box score at the buzzer |
+| 06 | Rank 'Em | live standing, resolved at the buzzer |
 | 07 | Opening Night Pick'em | the 2026-27 season |
 | 08 | Beat the Buzzer | sixty seconds |
 | 09 | Immaculate Grid | nine guesses |
@@ -73,6 +73,8 @@ node mobplay.mjs    # every game played on a phone with real taps only
 node verify.mjs     # every game played end to end
 node proof.mjs      # every panel, desktop and phone: overflow, clipped text,
                     # and any sideways strip with no scroll affordance
+node leak.mjs       # locks every live slate a third of the way through the
+                    # game and fails on anything that shows the final answer
 node audit_hub.mjs  # contrast, both skins (SKIN=bc for the second)
 node mobsweep.mjs   # no horizontal overflow at 390px, kit filled first
 node offline.mjs    # zero external requests

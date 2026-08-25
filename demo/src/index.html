@@ -1645,6 +1645,34 @@ nav .navitem .lab{padding:12px 15px !important;display:block}
 }
 @media (prefers-reduced-motion:reduce){.hscroll>*{scroll-behavior:auto}}
 
+/* ── Rank 'Em: the bar is the race ────────────────────────────────
+   prow was built for the picker, a 500px sheet where a 74px bar at the
+   right edge reads fine. Rank 'Em is the only place in the build it runs
+   the full width of the page, and at 2,000px it left roughly 1,100px of
+   nothing between a man's name and his number. That gap, not a shortage
+   of facts, is why this page measured the thinnest in the build.
+
+   The bar takes the room instead. Four men, four bars against whoever is
+   leading right now, and it moves when the feed moves. Below 700px the
+   row goes back to the standard prow, where the name needs the width
+   more than the race does. */
+@media (min-width:700px){
+  #rkOpts .prow{grid-template-columns:42px minmax(0,1fr) minmax(0,46%) !important}
+  #rkOpts .prow .rt{display:grid;grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;column-gap:16px}
+  #rkOpts .prow .rt b{grid-column:2;grid-row:1;text-align:right}
+  #rkOpts .prow .rt .sh{grid-column:2;grid-row:2;text-align:right;margin-top:2px}
+  #rkOpts .prow .bar{grid-column:1;grid-row:1 / span 2;width:auto;height:6px;
+    margin:0;align-self:center;
+    /* At 74px an empty track is a detail. At 780px it is a full-width bar,
+       and a man on nothing read as a man on everything until you looked at
+       the colour. The track drops back so the fill is the only thing with
+       weight on it. */
+    background:rgba(255,255,255,.07)}
+}
+#rkOpts .prow .bar i{transition:width var(--t-med) var(--e-in)}
+@media (prefers-reduced-motion:reduce){#rkOpts .prow .bar i{transition:none}}
+
 /* ══ CITRUS CARLTON ═══════════════════════════════════════════════
    The paper doll. Six cards on a grid told you what the slots were; it
    never told you what filling them was FOR. Carlton stands in the middle
@@ -2496,11 +2524,10 @@ table.h2h td.bar{width:34%;padding:7px 10px}
     <div class="phead">
     <div class="peyebrow">Game 06 &middot; live</div>
     <h2>Rank 'Em</h2>
-    <p class="sub">Four Leafs, one stat. Put them in the order they finish tonight.</p>
-    <div class="gmeta"><span>4 Leafs</span><span>One stat</span><span>Settles at the buzzer</span></div>
+    <p class="sub">Tap four Leafs in the order they finish tonight, most first.</p>
+    <div class="gmeta"><span>4 Leafs</span><span id="rkPrompt">One stat</span><span id="rkSettle">Settles at the buzzer</span></div>
   </div>
 
-  <div class="card" style="margin-bottom:14px"><div class="part" id="rkPrompt"></div></div>
   <div id="rkOpts"></div>
   <div class="actionbar">
     <div class="abmeta"><b id="rkScore">0</b><span>points banked</span><div id="rkLadder"></div></div>

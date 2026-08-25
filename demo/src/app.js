@@ -1760,7 +1760,13 @@ function tally(){
    the game. Hits, blocks and takeaways only exist in the official box
    score, so they arrive at the final buzzer and the panel says so
    rather than pretending to know them early.                        */
-const KIT_LIVE = {g:1, a:1, sog:1};          // provable mid-game
+/* Provable mid-game from the shot feed. Points belong here and were
+   missing: CLOCK.live() already returns p as g + a off the same events,
+   so a points line sat on "settles at the buzzer" for sixty minutes
+   while the two numbers that make it moved on the page above it. That
+   gate ran three games, not one -- Rank 'Em, Heat Check and Who Goes
+   Off all take points as a category. */
+const KIT_LIVE = {g:1, a:1, p:1, sog:1};
 function ultLive(){
   const host = $('#ultLive'); if (!host) return;
   let total = 0, any = false;
@@ -2361,7 +2367,7 @@ function heatFinal(){
 /* ══ GAME 6: RANK 'EM ═══════════════════════════════════════════
    Same idea, forward: order four Leafs by where they finish tonight. */
 const RK_CATS = SLATE_CATS;
-let rkSet = [], rkCat = null, rkOrder = [], rkLock = false, rkScore = 0;
+let rkSet = [], rkCat = null, rkOrder = [], rkLock = false, rkScore = 0, rkShown = '';
 function rkNew(){
   rkLock = false; rkOrder = []; $('#rkMsg').textContent = '';
   const f = $('#rkFinal'); if (f) f.remove();
@@ -2375,8 +2381,18 @@ function rkNew(){
     const seen = new Set(); rkSet = [];
     for (const p of byRate){ if (seen.has(p[rkCat.k])) continue; seen.add(p[rkCat.k]); rkSet.push(p); if (rkSet.length === 4) break; }
   }
-  $('#rkPrompt').innerHTML = 'Order these four by <b>' + rkCat.l +
-    '</b> tonight, most first. Their season rate is on every row.';
+  /* This used to be a whole card holding one sentence that restated the
+     subtitle above it. The stat is the game's one parameter, so it sits in
+     the header chips where the other parameters already are. */
+  $('#rkPrompt').textContent = 'Ranking by ' + rkCat.l;
+  /* Two of the four categories exist in the shot feed and two only exist
+     in the box score, so half the time this page can show a race moving
+     and half the time it genuinely cannot. Say which before the fan
+     picks, rather than letting them lock and then wonder why nothing
+     moves for an hour. */
+  const s = $('#rkSettle');
+  if (s) s.textContent = KIT_LIVE[rkCat.k] ? 'Live from the feed' : 'Settles at the buzzer';
+  rkShown = '';
   rkDraw();
 }
 /* Use prow, the row every other game already uses. The hand-rolled version
@@ -2384,12 +2400,24 @@ function rkNew(){
    name came out as UA black on navy at 1.43:1. Reusing the component is also
    how the sweater, the position chip and the value bar stay identical to the
    rest of the build. */
+const NTH = ['1st','2nd','3rd','4th'];
+/* The bar every other game draws and this one did not. rkRow called prow
+   without frac, so the middle 1,100px of a four-row page was empty and
+   the page measured as the thinnest in the build. The bar is the race:
+   each man against whoever is leading the four right now. */
+function rkFrac(p){
+  const vals = rkSet.map(x => liveVal(x.name, rkCat.k)).filter(v => v !== null);
+  const max = vals.length ? Math.max(...vals) : 0;
+  const v = liveVal(p.name, rkCat.k);
+  return (v === null || !max) ? 0 : v / max;
+}
 function rkRow(p, opts){
   const v = liveVal(p.name, rkCat.k);
   const r = prow(p, {
     on: opts.on,
     val: v === null ? null : v,
     unit: v === null ? null : rkCat.l,
+    frac: v === null ? null : rkFrac(p),
     line: (opts.n ? '<em class="slotord">' + opts.n + '</em><s>&middot;</s>' : '') +
           '<em>' + perGame(p.name, rkCat.k).toFixed(2) + '</em> a game this season' +
           (v === null ? ' <s>&middot;</s><em>settles at the buzzer</em>' : '') +
@@ -2398,15 +2426,45 @@ function rkRow(p, opts){
   if (opts.cls) r.className += opts.cls;
   return r;
 }
+/* The order on screen, and the ONE rule that matters here.
+
+   This used to sort by p[rkCat.k] the moment the fan locked, and that is
+   the FINAL box-score number. Lock at 5:00 of the first and the four rows
+   re-sorted into the finishing order, numbered 1 to 4, with fifty minutes
+   still to play. The game was over before the buzzer and it said so on
+   screen. Verified against the feed: Nylander sat second on a live 0 while
+   Matthews sat third on a live 1, which is only explicable as the final
+   answer leaking.
+
+   Locked and live, the rows now stand in the LIVE order, off the same
+   feed the fan can see, with their own call pinned to each man so they
+   can watch it drift. Ties hold the fan's own order so the list does not
+   jitter between events. Only at the buzzer does the truth decide it. */
+function rkStanding(){
+  return [...rkSet].sort((a, b) => {
+    const va = liveVal(a.name, rkCat.k), vb = liveVal(b.name, rkCat.k);
+    if (va === null && vb === null) return rkOrder.indexOf(a) - rkOrder.indexOf(b);
+    if (va === null) return 1;
+    if (vb === null) return -1;
+    return (vb - va) || (rkOrder.indexOf(a) - rkOrder.indexOf(b));
+  });
+}
 function rkDraw(){
   const box = $('#rkOpts'); box.innerHTML = '';
   if (rkLock){
-    const truth = [...rkSet].sort((a,b) => b[rkCat.k] - a[rkCat.k]);
-    truth.forEach((p, slot) => {
-      const ok = rkOrder[slot] === p;
-      box.appendChild(rkRow(p, { n: slot+1, cls: CLOCK.over ? (ok ? ' ok' : ' bad') : '',
-        extra: CLOCK.over ? (ok ? ' <s>&middot;</s><em style="color:var(--good)">you had him here</em>'
-             : ' <s>&middot;</s><em style="color:var(--bad)">you had ' + last(rkOrder[slot].name) + '</em>') : '' }));
+    if (CLOCK.over){
+      const truth = [...rkSet].sort((a,b) => b[rkCat.k] - a[rkCat.k]);
+      truth.forEach((p, slot) => {
+        const ok = rkOrder[slot] === p;
+        box.appendChild(rkRow(p, { n: slot+1, cls: ok ? ' ok' : ' bad',
+          extra: ok ? ' <s>&middot;</s><em style="color:var(--good)">you had him here</em>'
+                    : ' <s>&middot;</s><em style="color:var(--bad)">you had ' + last(rkOrder[slot].name) + '</em>' }));
+      });
+      return;
+    }
+    rkStanding().forEach((p, slot) => {
+      box.appendChild(rkRow(p, { n: slot+1,
+        extra: ' <s>&middot;</s><em>you had him ' + NTH[rkOrder.indexOf(p)] + '</em>' }));
     });
     return;
   }
@@ -2421,10 +2479,29 @@ function rkDraw(){
     box.appendChild(r);
   });
 }
+/* Numbers in place between events; a full redraw only when the standing
+   actually changes hands. Rebuilding four rows on every tick throws away
+   the bar's transition and makes a still page look like it is flickering,
+   and this build has already shipped one bug from redrawing on a tick. */
+function rkValues(){
+  if (!rkLock || CLOCK.over) return;
+  const order = rkStanding().map(p => p.name).join('|');
+  if (order !== rkShown){ rkShown = order; rkDraw(); return; }
+  const rows = document.querySelectorAll('#rkOpts .prow');
+  rkStanding().forEach((p, i) => {
+    const row = rows[i]; if (!row) return;
+    const v = liveVal(p.name, rkCat.k);
+    const b = row.querySelector('.rt b'); if (b && v !== null) b.textContent = v;
+    const bar = row.querySelector('.rt .bar i');
+    if (bar && v !== null) bar.style.width = Math.round(rkFrac(p) * 100) + '%';
+  });
+}
 function rkLockIn(){
   rkLock = true; Snd.ding && Snd.ding(); rkDraw();
+  rkShown = rkStanding().map(p => p.name).join('|');
   $('#rkMsg').innerHTML = CLOCK.over ? '' :
-    '<span class="sk">Locked. It settles at the final buzzer.</span>';
+    '<span class="sk">Locked. The rows below stand in tonight\u2019s order as it happens. ' +
+    'It settles at the final buzzer.</span>';
   if (!CLOCK.running && !CLOCK.over) CLOCK.start();
   if (CLOCK.over) rkFinal();
 }
@@ -2459,7 +2536,7 @@ CLOCK.on(kind => {
   if (kind === 'tick'){
     /* numbers only. A full redraw here rips the card out from under a thumb. */
     h2hValues(); heatValues();
-    if (rkLock) rkDraw();
+    if (rkLock) rkValues();
     return;
   }
   if (kind === 'reset') ['#hlFinal','#lkFinal','#rkFinal'].forEach(s => { const n = $(s); if (n) n.remove(); });
