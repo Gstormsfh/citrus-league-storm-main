@@ -169,12 +169,14 @@ line = ('const CARL_LAY = {\n'
         '};') % tuple(','.join(fmt(v) for v in rects[k])
                       for k in ['hit','a','blk','tk','g','sog'])
 try:
-    src = io.open('app.js', encoding='utf-8').read()
+    # newline='' both ways: see build.py. A carve on Windows would
+    # otherwise rewrite every line of app.js as well as the one it means to
+    src = io.open('app.js', encoding='utf-8', newline='').read()
     i = src.index('const CARL_LAY = {'); j = src.index('};', i) + 2
     if src[i:j] == line:
         print('app.js CARL_LAY already matches')
     else:
-        io.open('app.js','w',encoding='utf-8').write(src[:i] + line + src[j:])
+        io.open('app.js','w',encoding='utf-8',newline='').write(src[:i] + line + src[j:])
         print('app.js CARL_LAY updated')
 except (IOError, ValueError) as e:
     print('could not patch app.js (%s). Paste this in yourself:' % e)

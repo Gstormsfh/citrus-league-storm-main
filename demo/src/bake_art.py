@@ -231,7 +231,9 @@ def main():
         print('  baked  all-time Leafs   %d players, %d to %d'
               % (len(keep), min(p['y0'] for p in keep), max(p['y1'] for p in keep)))
 
-    src = open(JS, encoding='utf-8').read()
+    # newline='' both ways, or a bake on Windows rewrites every line of
+    # app.js with \r\n and the diff is the whole file
+    src = open(JS, encoding='utf-8', newline='').read()
 
     # ── the guard ─────────────────────────────────────────────────────
     # This script strips the old block and writes a new one, so a run that
@@ -279,7 +281,7 @@ def main():
             sys.exit('anchor not found in %s — did the hero-crop block move?' % JS)
         src = src.replace(anchor, block + anchor, 1)
 
-    open(JS, 'w', encoding='utf-8').write(src)
+    open(JS, 'w', encoding='utf-8', newline='').write(src)
 
     gained = sorted(set(found) - before)
     print('\n%d of %d keys baked, %.1f MB of art inlined' % (len(found), len(FILES), total / 1048576))
