@@ -25,6 +25,18 @@ powershell -ExecutionPolicy Bypass -File checks.ps1 -Rebake
 The rest of this file is the roster half on its own, kept because it
 documents the schema and because two requests are worth understanding.
 
+> **The endpoint below is gone.** Run from a real network on 2026-08-25,
+> `records.nhl.com/site/api/franchise-skater-records` answered 404 with a
+> Jetty error page -- with the franchise filter and without it, and the
+> goalie half the same. The path moved, or the whole `/site/api` prefix
+> did. `probe-alltime.mjs` asks a spread of candidates and prints what each
+> actually returns, including whether it carries the five fields the grid
+> needs. The schema further down is unchanged and is still the target; only
+> the source has to be found again.
+>
+> Until then the grid runs on 2017-18 onward, which is what it has always
+> done, and the panel says so plainly rather than pretending otherwise.
+
 ---
 
 ## What to run
