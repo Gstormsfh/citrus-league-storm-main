@@ -224,6 +224,56 @@ describe('generatePlayerWriteup — availability outranks production', () => {
   });
 });
 
+describe('cardNote — the one-liner roster cards render', () => {
+  it('carries the RATE, which the card stat grid (GP/G/A/SOG totals) never shows', () => {
+    const w = generatePlayerWriteup(skater());
+    expect(w.cardNote).toBe('Star forward · 1.43 P/GP');
+    expect(w.cardTone).toBe('positive');
+  });
+
+  it('uses save percentage for goalies, in hockey notation', () => {
+    const w = generatePlayerWriteup({
+      id: 30, name: 'Test Goalie', position: 'G', number: 1, starter: true, team: 'X',
+      stats: { gamesPlayed: 50, savePct: 0.925, gaa: 2.35, wins: 30, losses: 15 },
+    } as HockeyPlayer);
+    expect(w.cardNote).toBe('Starting-calibre goalie · .925 SV%');
+  });
+
+  it('stays short enough for a truncating one-line card slot', () => {
+    // Longest realistic band + rate. Cards truncate, but a note that ALWAYS
+    // truncates communicates nothing.
+    const d = generatePlayerWriteup(skater({ position: 'D' }, { gamesPlayed: 70, points: 60, goals: 15, assists: 45 }));
+    expect(d.cardNote).toBe('Elite offensive defenceman · 0.86 P/GP');
+    expect(d.cardNote.length).toBeLessThanOrEqual(45);
+  });
+
+  it('gives the line to availability when the player cannot play', () => {
+    expect(generatePlayerWriteup(skater({ status: 'IR' })).cardNote).toBe('On injured reserve');
+    expect(generatePlayerWriteup(skater({ status: 'GTD' })).cardNote).toBe('Game-time decision');
+    expect(generatePlayerWriteup(skater({ status: 'SUSP' })).cardNote).toBe('Suspended — unavailable');
+    for (const status of ['IR', 'GTD', 'SUSP'] as const) {
+      expect(generatePlayerWriteup(skater({ status })).cardTone).toBe('caution');
+    }
+  });
+
+  it('states the sample size instead of a rate when the sample is thin', () => {
+    expect(generatePlayerWriteup(skater({}, { gamesPlayed: 3 })).cardNote).toBe('Only 3 games played');
+    expect(generatePlayerWriteup(skater({}, { gamesPlayed: 1 })).cardNote).toBe('Only 1 game played');
+    expect(generatePlayerWriteup(skater({}, { gamesPlayed: 0 })).cardNote).toBe('No games played yet');
+  });
+
+  it('is empty for a null player so cards render nothing rather than a stray dot', () => {
+    expect(generatePlayerWriteup(null).cardNote).toBe('');
+  });
+
+  it('never contains NaN/undefined for an empty stat line', () => {
+    const w = generatePlayerWriteup({
+      id: 9, name: 'Empty Guy', position: 'LW', number: 1, starter: false, team: 'X', stats: {},
+    } as HockeyPlayer);
+    expect(w.cardNote).not.toMatch(/NaN|Infinity|undefined|null/);
+  });
+});
+
 describe('generatePlayerWriteup — determinism', () => {
   it('returns identical output for identical input (safe to call per render)', () => {
     const p = skater();

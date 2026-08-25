@@ -154,6 +154,7 @@ interface HockeyPlayerCardProps {
 }
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { generatePlayerWriteup } from "@/utils/playerWriteup";
 
 // Position group accent — the single source of truth for "which slot is this."
 // Applied directly on the card (left spine + badge tint) so it's guaranteed
@@ -346,6 +347,8 @@ const HockeyPlayerCardContent = ({
   // Accent keys off the PRIMARY position (not the "C/LW" dual-eligible display
   // string) so it always resolves, even when getPositionDisplay() joins two.
   const accent = POSITION_ACCENT[getPositionAbbreviation(player.position)] || DEFAULT_ACCENT;
+  // Pure arithmetic over player.stats — no fetch, no async, safe per render.
+  const writeup = generatePlayerWriteup(player);
   const teamAbbr = getTeamAbbreviation();
   const teamLogoUrl = `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg`;
 
@@ -521,6 +524,29 @@ const HockeyPlayerCardContent = ({
           );
         })()}
       </div>
+
+      {/* Scouting note — the Sleeper/Yahoo/ESPN one-liner under the stat line.
+          Single row, truncated: the full writeup lives in the player modal.
+          Derived from the same stats rendered above it, so the note and the
+          numbers cannot disagree (see utils/playerWriteup). */}
+      {writeup.cardNote && (
+        <div className="px-2 py-0.5 bg-[#1A2A20]/50 border-t border-pastel-sage/25 flex items-center gap-1.5">
+          <span
+            className={cn(
+              'w-1 h-1 rounded-full flex-shrink-0',
+              writeup.cardTone === 'caution'
+                ? 'bg-amber-400'
+                : writeup.cardTone === 'positive'
+                  ? 'bg-pastel-sage'
+                  : 'bg-white/55',
+            )}
+            aria-hidden="true"
+          />
+          <span className="text-[8px] leading-tight font-display text-white/70 truncate">
+            {writeup.cardNote}
+          </span>
+        </div>
+      )}
 
       {/* Projected Points / Game Bar - VARSITY SCOREBOARD STYLE */}
       <div className="relative px-2 pb-2 pt-1.5 bg-gradient-to-br from-pastel-sage/18 via-pastel-sage/28 to-pastel-sage/12 flex flex-col justify-center gap-1.5 border-t-2 border-pastel-sage/40 min-h-[32px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-pastel-sage before:to-transparent before:opacity-60">

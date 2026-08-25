@@ -26,7 +26,13 @@
  * instead of extrapolating a 2-game hot streak into "elite producer".
  */
 
-import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+// `import type`, NOT a value import. HockeyPlayerCard.tsx imports
+// generatePlayerWriteup from this module, so a value import here would close a
+// real cycle (card -> writeup -> card). A type-only import is erased at
+// compile time, so no cycle survives into the bundle — relying on esbuild to
+// notice the import is unused at runtime would be a latent
+// "cannot access before initialization" waiting for a production build.
+import type { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 
 export type WriteupTone = 'positive' | 'neutral' | 'caution';
 
@@ -44,6 +50,22 @@ export interface PlayerWriteup {
   tags: WriteupTag[];
   /** False when the sample is too small to characterise the player. */
   hasEnoughData: boolean;
+  /**
+   * ONE line for a roster card, e.g. "Star forward · 1.43 P/GP".
+   *
+   * Roster cards are ~134px tall and already carry a headshot, name, team,
+   * position badge, a four-stat grid and a projection bar. The full `summary`
+   * would double the card height and bury the stat line the user came for,
+   * so the card gets this instead — the same read, compressed, the way
+   * Sleeper/Yahoo/ESPN put a single note line on a player row.
+   *
+   * Deliberately carries the RATE, which the card's totals-based stat grid
+   * (GP/G/A/SOG) does not show anywhere — so the line adds information
+   * rather than restating what is already on screen.
+   */
+  cardNote: string;
+  /** Tone for the card note's status dot. */
+  cardTone: WriteupTone;
 }
 
 /**
@@ -119,21 +141,28 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
           : `No games played yet this season, so there's nothing to judge ${name} on beyond his role.`,
       tags: [{ label: 'Limited sample', tone: 'neutral' }],
       hasEnoughData: false,
+      cardNote: gp > 0 ? `Only ${gp} appearance${gp === 1 ? '' : 's'}` : 'No appearances yet',
+      cardTone: 'neutral',
     };
   }
 
   let headline: string;
+  let cardTone: WriteupTone;
   if (savePct >= 0.92) {
     headline = 'Starting-calibre goalie';
+    cardTone = 'positive';
     tags.push({ label: 'Elite save rate', tone: 'positive' });
   } else if (savePct >= 0.91) {
     headline = 'Steady starter';
+    cardTone = 'positive';
     tags.push({ label: 'Reliable', tone: 'positive' });
   } else if (savePct >= 0.9) {
     headline = 'Streaky netminder';
+    cardTone = 'neutral';
     tags.push({ label: 'Matchup-dependent', tone: 'neutral' });
   } else {
     headline = 'Struggling in net';
+    cardTone = 'caution';
     tags.push({ label: 'Below league average', tone: 'caution' });
   }
 
@@ -165,7 +194,14 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
     tags.push({ label: `${s.shutouts} shutouts`, tone: 'positive' });
   }
 
-  return { headline, summary: parts.join(' '), tags, hasEnoughData: true };
+  return {
+    headline,
+    summary: parts.join(' '),
+    tags,
+    hasEnoughData: true,
+    cardNote: `${headline} · ${fmtSavePct(savePct)} SV%`,
+    cardTone,
+  };
 }
 
 function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
@@ -185,6 +221,8 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
           : `${name} hasn't played yet this season, so there's no production to judge.`,
       tags: [{ label: 'Limited sample', tone: 'neutral' }],
       hasEnoughData: false,
+      cardNote: gp > 0 ? `Only ${gp} game${gp === 1 ? '' : 's'} played` : 'No games played yet',
+      cardTone: 'neutral',
     };
   }
 
@@ -202,31 +240,41 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
   // blueliner is a genuine star, while the same rate from a winger is middle
   // six. Using one scale for both would systematically undersell every D.
   let headline: string;
+  let cardTone: WriteupTone;
   if (defenceman) {
     if (ppg >= 0.75) {
       headline = 'Elite offensive defenceman';
+      cardTone = 'positive';
       tags.push({ label: 'Point producer', tone: 'positive' });
     } else if (ppg >= 0.5) {
       headline = 'Top-pair contributor';
+      cardTone = 'positive';
       tags.push({ label: 'Steady offence', tone: 'positive' });
     } else if (ppg >= 0.3) {
       headline = 'Two-way blueliner';
+      cardTone = 'neutral';
     } else {
       headline = 'Defensive specialist';
+      cardTone = 'neutral';
     }
   } else {
     if (ppg >= 1.0) {
       headline = 'Star forward';
+      cardTone = 'positive';
       tags.push({ label: 'Elite producer', tone: 'positive' });
     } else if (ppg >= 0.75) {
       headline = 'Top-line producer';
+      cardTone = 'positive';
       tags.push({ label: 'Reliable scorer', tone: 'positive' });
     } else if (ppg >= 0.5) {
       headline = 'Middle-six contributor';
+      cardTone = 'neutral';
     } else if (ppg >= 0.3) {
       headline = 'Depth forward';
+      cardTone = 'neutral';
     } else {
       headline = 'Bottom-six role player';
+      cardTone = 'neutral';
     }
   }
 
@@ -276,7 +324,14 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
     tags.push({ label: 'Power-play role', tone: 'positive' });
   }
 
-  return { headline, summary: parts.join(' '), tags, hasEnoughData: true };
+  return {
+    headline,
+    summary: parts.join(' '),
+    tags,
+    hasEnoughData: true,
+    cardNote: `${headline} · ${fmt(ppg, 2)} P/GP`,
+    cardTone,
+  };
 }
 
 /**
@@ -291,6 +346,8 @@ export function generatePlayerWriteup(player: HockeyPlayer | null | undefined): 
       summary: 'Select a player to see their scouting summary.',
       tags: [],
       hasEnoughData: false,
+      cardNote: '',
+      cardTone: 'neutral',
     };
   }
 
@@ -298,11 +355,15 @@ export function generatePlayerWriteup(player: HockeyPlayer | null | undefined): 
 
   // Injury status outranks anything the stat line says: a 1.2 PPG winger on IR
   // is a bench decision tonight regardless of how good the season has been.
+  // The card has room for ONE line, so availability takes it: whether he can
+  // play tonight beats how good the season has been.
   if (player.status === 'IR') {
     return {
       ...writeup,
       tags: [{ label: 'Injured reserve', tone: 'caution' }, ...writeup.tags],
       summary: `Currently on injured reserve. ${writeup.summary}`,
+      cardNote: 'On injured reserve',
+      cardTone: 'caution',
     };
   }
   if (player.status === 'GTD') {
@@ -310,6 +371,8 @@ export function generatePlayerWriteup(player: HockeyPlayer | null | undefined): 
       ...writeup,
       tags: [{ label: 'Game-time decision', tone: 'caution' }, ...writeup.tags],
       summary: `Listed as a game-time decision — check status before puck drop. ${writeup.summary}`,
+      cardNote: 'Game-time decision',
+      cardTone: 'caution',
     };
   }
   if (player.status === 'SUSP') {
@@ -317,6 +380,8 @@ export function generatePlayerWriteup(player: HockeyPlayer | null | undefined): 
       ...writeup,
       tags: [{ label: 'Suspended', tone: 'caution' }, ...writeup.tags],
       summary: `Currently suspended and unavailable. ${writeup.summary}`,
+      cardNote: 'Suspended — unavailable',
+      cardTone: 'caution',
     };
   }
 
