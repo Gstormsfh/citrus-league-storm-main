@@ -201,6 +201,7 @@ it, who leads it tonight -- and an empty one names the piece to go and tap.
 | Hover a piece | Both halves of a pair light together. |
 | Tab to a piece | Same lighting, plus a dashed citrus outline on the target. Six stops, in the order the list reads. |
 | Tap it, or Enter, or Space | Opens that slot's picker. Escape lands back on the piece it opened. |
+| Click the row beside him | That piece flashes citrus for two beats, and its ring pulses with it. The row points; it does not open. |
 | Slot filled | That piece goes to 100%, and its ring becomes the pip. |
 | Puck drops | The pip carries the live number for that piece. |
 | The number moves | The pip's ring goes citrus. |
@@ -208,6 +209,15 @@ it, who leads it tonight -- and an empty one names the piece to go and tap.
 
 The ring and the pip are the same dot in two states, which is why an empty
 piece can never show both an invitation and a number.
+
+The row click is a rescue, not an affordance. Somebody in a room will click
+a card-shaped object, and a card that eats a click and does nothing reads as
+broken -- so the row points at the piece it names instead. The cursor stays
+an arrow and there is no hover lift, because advertising it would put two
+things back in the running for the same slot, which is the thing this whole
+change was undoing. On a phone the figure is above the list, so a row near
+the bottom scrolls it back into view first; the flash runs 1.8s and the
+scroll lands well inside that.
 
 **The targets are not the art.** A region measured to the outline of a shin
 pad is not a tap target, it is a dexterity test, so `CARL_HIT` grows every
@@ -239,5 +249,6 @@ node offline.mjs       # external requests: NONE
 node classcheck.mjs    # class-name collisions, nine have shipped already
 node figcheck.mjs      # every piece owns its region, and a keyboard can reach it
 node vecfall.mjs       # the vector fallback is the same control as the render
+node rowcheck.mjs      # the rows point at a piece, and open nothing
 node shots_all.mjs     # density and gap report
 ```

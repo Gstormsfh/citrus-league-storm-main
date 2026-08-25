@@ -46,8 +46,9 @@ the puck drops the pip carries what that man has actually done tonight.
 
 The six rows beside him are a read-out, not a menu. They say what each slot
 is worth and who is leading it, and an empty one tells you which piece to
-go and tap. Keyboard works too: Tab reaches all six pieces in the order the
-rows read, Enter or Space opens one, Escape comes back to it.
+go and tap. Click a row and the piece it names flashes citrus on Carlton --
+it points, it does not open. Keyboard works too: Tab reaches all six pieces
+in the order the rows read, Enter or Space opens one, Escape comes back.
 
 Carlton is MLSE's mascot and MLSE's trademark, down to the 60 he wears for 60
 Carlton Street. This is a Citrus rendering of somebody else's character shown

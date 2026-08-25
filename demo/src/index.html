@@ -1914,10 +1914,29 @@ nav .navitem .lab{padding:12px 15px !important;display:block}
   100%{box-shadow:0 0 0 0 rgba(255,107,26,0)}
 }
 
+/* the row pointing at its piece. Two beats of citrus glow on the piece
+   itself, and a louder version of the ring if the slot is still empty. */
+.carl .kitp.nudge{animation:knudge .9s var(--e-in) 2}
+@keyframes knudge{
+  0%,100%{filter:none}
+  45%    {filter:drop-shadow(0 0 8px var(--citrus)) drop-shadow(0 0 3px var(--citrus))}
+}
+.carlrender image.kitp.nudge{opacity:1}
+.kitpin.ask.nudge{animation:kloud .9s var(--e-in) 2;animation-delay:0s;
+  border-color:var(--citrus)}
+@keyframes kloud{
+  0%  {box-shadow:0 0 0 0 rgba(255,107,26,.9)}
+  60% {box-shadow:0 0 0 15px rgba(255,107,26,0)}
+  100%{box-shadow:0 0 0 0 rgba(255,107,26,0)}
+}
+
 @media (prefers-reduced-motion:reduce){
   .kitp,.kitpin{transition:none}
   /* the ring stays, the breathing stops */
   .kitpin.ask{animation:none}
+  /* and the nudge holds the glow rather than flashing it */
+  .carl .kitp.nudge{animation:none;filter:drop-shadow(0 0 8px var(--citrus))}
+  .kitpin.ask.nudge{animation:none}
 }
 
 /* Side by side once there is width for it. The tiles become rows next

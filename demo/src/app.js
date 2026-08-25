@@ -1833,6 +1833,35 @@ function carlPips(){
   });
 }
 
+/* Clicking a row does not open anything -- the piece on Carlton is the
+   control and there is only one of those. But a card-shaped object that
+   eats a click and does nothing reads as broken, and in a room somebody
+   WILL click the card. So the row points instead: the piece it names
+   flashes, and if the slot is empty its ring pulses along with it.
+
+   A rescue, not an affordance. The cursor stays an arrow and there is no
+   hover lift, because advertising this would put us back where we were,
+   with two things claiming to be the same control. */
+let nudgeT = 0;
+function nudgePiece(id){
+  const host = $('#carl'); if (!host) return;
+  const r = host.getBoundingClientRect();
+  /* on a phone the figure is above the list, so a row near the bottom
+     points at something off screen unless we go and fetch it */
+  const slow = matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if (r.bottom < 40 || r.top > innerHeight - 40)
+    host.scrollIntoView({block:'center', behavior: slow ? 'auto' : 'smooth'});
+  clearTimeout(nudgeT);
+  host.querySelectorAll('.nudge').forEach(n => n.classList.remove('nudge'));
+  /* a reflow between the two, or clicking the same row twice never
+     restarts the animation and the second click looks broken as well */
+  void host.offsetWidth;
+  host.querySelectorAll('.kitp[data-id="' + id + '"],.kitpin[data-id="' + id + '"]')
+      .forEach(n => n.classList.add('nudge'));
+  nudgeT = setTimeout(() =>
+    host.querySelectorAll('.nudge').forEach(n => n.classList.remove('nudge')), 1900);
+}
+
 /* ── the kit ──────────────────────────────────────────────────────
    Not doors any more. These six were buttons and they were the whole
    game: "+ Pick a Leaf" six times, with Carlton standing beside them
@@ -1850,6 +1879,7 @@ function drawParts(){
     const lead   = [...KIT_POOL].sort((a,b) => b[P.k] - a[P.k])[0];
     const t = el('div','eq'+(chosen?' filled':''));
     t.dataset.id = P.id;          /* the row and the piece are the same slot */
+    t.onclick = () => nudgePiece(P.id);   /* points at it, does not open it */
     t.style.setProperty('--eqc','var('+PART_C[P.id]+')');
     t.innerHTML =
       '<div class="prop">'+eqArt(P.id)+'</div>'+
