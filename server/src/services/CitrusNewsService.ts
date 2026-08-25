@@ -693,6 +693,18 @@ const ROS_COLUMNS =
   'projected_hits, projected_blocks, projected_ppp, avg_points_per_game, ' +
   'projected_wins_ros, projected_saves_ros, projected_shutouts_ros';
 
+/**
+ * "a, b and c" — an English list, not a run of "and"s.
+ *
+ * The naive version produced "35 wins and 1336 saves and 3.0 shutouts",
+ * which reads like a machine wrote it. It did, but it shouldn't sound like it.
+ */
+function sentenceList(parts: string[]): string {
+  const items = parts.filter(Boolean);
+  if (items.length <= 1) return items[0] ?? '';
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
 /** "2026-27" from 2026. */
 function seasonLabel(season: number): string {
   return `${season}-${String((season + 1) % 100).padStart(2, '0')}`;
@@ -755,8 +767,14 @@ const seasonOutlookDetector: Detector = {
           season: outlookSeason,
           headline: `${label} Outlook: ${tier}`,
           body:
-            `${name} projects for ${gp} appearances in ${label}, with ${Math.round(wins)} wins and ` +
-            `${Math.round(saves)} saves${shutouts >= 1 ? ` and ${shutouts.toFixed(1)} shutouts` : ''}.`,
+            `${name} projects for ${gp} appearances in ${label}, with ` +
+            `${sentenceList([
+              `${Math.round(wins)} wins`,
+              `${Math.round(saves)} saves`,
+              // Shutouts are a projected average; a "3.0" reads like a
+              // measurement rather than an estimate, so round it.
+              shutouts >= 1 ? `${Math.round(shutouts)} shutouts` : '',
+            ])}.`,
           analysis: verdict,
           severity: gp >= 45 ? 'positive' : 'info',
           tags: [`${label} Outlook`, 'Goalie', tier],
@@ -803,7 +821,7 @@ const seasonOutlookDetector: Detector = {
       if (ppp >= 25) extras.push(`${Math.round(ppp)} power-play points`);
 
       const extraSentence = extras.length
-        ? ` The projection also has him at ${extras.join(', ')}, which matters more in category leagues than the headline rate does.`
+        ? ` The projection also has him at ${sentenceList(extras)}, which matters more in category leagues than the headline rate does.`
         : '';
 
       notes.push({
