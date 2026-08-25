@@ -23,6 +23,18 @@ FILES = {
     # --- the club crest. Drop the real asset in as art/crest.png (or .svg
     #     converted to png) and it replaces every drawn leaf in the build. ---
     'crest':         'crest.png',
+    # --- CITRUS CARLTON, the paper doll on Game 01. Seven transparent
+    #     layers on ONE canvas so they stack: the bear in his sweater,
+    #     then one layer per piece of kit. All seven or none, because a
+    #     rendered bear wearing six drawn pieces would be worse than the
+    #     vector he replaces. See CARLTON-BRIEF.md. ---
+    'carl_base':     'carlton-base.png',
+    'carl_g':        'carlton-stick.png',
+    'carl_a':        'carlton-gloves.png',
+    'carl_sog':      'carlton-puck.png',
+    'carl_hit':      'carlton-shoulders.png',
+    'carl_blk':      'carlton-shins.png',
+    'carl_tk':       'carlton-skates.png',
     # --- the kit: six props, Game 01. Highest impact, do these first. ---
     'eq_g':          'eq-stick.webp',
     'eq_a':          'eq-gloves.webp',

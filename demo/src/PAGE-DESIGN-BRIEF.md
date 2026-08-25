@@ -87,7 +87,7 @@ unevenly:
 | Page | State after this pass | What to look at |
 |---|---|---|
 | **Locker room** | Dense list, LIVE badges, club mark per row | Does the list earn a whole screen, or should the six live games separate from the four that are not? |
-| **Ultimate Leaf** | Six kit tiles, summary bar in flow below | The tiles are the only page in the build using a 2x3 card grid. Does it hold next to the lists, or should it be rows? |
+| **Ultimate Leaf** | Citrus Carlton, six kit rows beside him | Answered: rows. See CARLTON-BRIEF.md. The page is a paper doll now, the figure is the picker, and the tiles are a single column of rows next to it. |
 | **Beat Stormy** | header → both lineups → the pool → action bar → matchup (hidden until five are iced) | The two lineup cards are still the tallest thing above the fold. Can the matchup live in the same card as the lineups? |
 | **Who Goes Off** | Six cards, two columns, action bar | Closest to right of anything here. Use it as the reference. |
 | **Guess the Leaf** | Two columns: clue board / answer, with a round record | The seven clue tiles wrap 3-3-1. Should be a single column of seven rows. |
@@ -100,10 +100,10 @@ unevenly:
 | **Player pages** | Four sections behind a segmented control | Rebuilt. 2988px to 1424px, roster and player header pinned above the tabs. |
 | **Leaderboard** | Four tabs, rows | Fine. |
 
-Measured density (ink over panel height, higher is denser): home .96, dash .97,
-fx .93, grid .93, stormy .92, ult .92, hl .92, call .91, luck .90, guess .89,
-lb .88, rank .86, bz .83. **Rank 'Em and Beat the Buzzer are the two to work
-on.** Nothing has a vertical gap over 90px any more.
+Measured density (ink over panel height, higher is denser): home .96, call .94,
+dash .94, fx .93, ult .92, stormy .92, hl .92, bz .92, grid .92, luck .90,
+guess .89, lb .88, rank .86. **Rank 'Em is the one left to work on.** Nothing
+has a vertical gap over 90px any more.
 
 ---
 
@@ -128,10 +128,24 @@ Pick'em is ten fixture rows that could group by month.
   the anchor. That bug shipped twice here (the Ultimate Leaf summary, then the
   slate action bar on phones, where it covered row two). Action bars stay in
   flow.
-- Class names collide in this file. Eight have already shipped and been fixed
-  (`.tag`, `.mark`, `.foot`, `.h2h`, `.sk`, `.grow`, `.clside`, and a `<header>`
-  inside a panel inheriting the site header). **Run `node classcheck.mjs`
-  before you finish** and scope any new selector.
+- Class names collide in this file. Nine have already shipped and been fixed
+  (`.tag`, `.mark`, `.foot`, `.h2h`, `.sk`, `.grow`, `.clside`, a `<header>`
+  inside a panel inheriting the site header, and `.cp`, which was the header's
+  Citrus-points chip and a Carlton kit piece at the same time, running the
+  chip at 50% opacity on all thirteen pages). **Run `node classcheck.mjs`
+  before you finish** and scope any new selector. It now walks the whole
+  document rather than panel subtrees, because that is how `.cp` hid.
+- Two horizontal strips scrolled with the scrollbar hidden and no other sign
+  that they moved: the thirteen game tabs, and the fixture chips on Game 01.
+  Eight of ten games and two of four chips were behind an invisible gesture.
+  The tabs now carry an edge fade at whichever end still has something parked
+  there, plus a chevron on pointer devices. The chip strip was cut to two
+  chips and wraps. **If you add another sideways strip, give it an
+  affordance.**
+- A test that measures an empty page measures nothing. `mobsweep.mjs` passed a
+  Game 01 that ran 117px past the right edge of a phone as soon as a slot was
+  filled, because the live strip does not exist until somebody is in the slot.
+  It fills the kit and runs the clock now. **Play the page, then measure.**
 
 ## Keep these green
 

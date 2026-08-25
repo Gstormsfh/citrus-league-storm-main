@@ -1053,13 +1053,24 @@ html[data-skin="bc"] .pinwin{border-width:1px;border-radius:12px;box-shadow:0 20
   .eq .nmcat{flex:1;min-width:0}
   .eq .pt{font-size:16.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .eq .pcat{margin-top:1px;font-size:8.5px}
-  .eq .slot{margin:0;border-top:none;padding:0;min-height:0;flex:none;max-width:52%}
-  .eq .who{gap:6px;justify-content:flex-end}
-  .eq .who .nm2{font-size:12.5px;flex:0 1 auto}
+  /* Splitting a 346px row between the piece and the player truncated both
+     at once: "The shoul..." against "William Nyl...". The player takes his
+     own line, which costs about eight pixels of row and no words. */
+  .eq .slot{order:8;flex:0 0 100%;max-width:none;margin:0;min-height:0;
+    padding-top:8px;border-top:1px solid var(--line)}
+  .eq .who{gap:7px;width:100%}
+  .eq .who .nm2{font-size:13px;flex:1 1 auto}
+  .eq .who .val{margin-left:auto}
   .eq .who .val{font-size:17px}
   .eq .empty{font-size:11.5px;color:var(--fy);white-space:nowrap}
   .eq .lead{display:none}
   .eq.filled::after{display:none}
+  /* The live strip is appended to the tile once a slot is filled, and in
+     a nowrap row its own min-content width pushed the row 117px past the
+     screen. It has been doing that since the strip shipped; mobsweep
+     measured an empty kit, so nothing caught it. It gets its own line. */
+  .eq{flex-wrap:wrap}
+  .eq .eqlive{order:9;flex:0 0 100%;margin-top:0;padding-top:7px}
 
   /* the band was 180px of dark with a sliver of a character in it */
   .ghero{min-height:0;margin-bottom:16px}
@@ -1072,11 +1083,10 @@ html[data-skin="bc"] .pinwin{border-width:1px;border-radius:12px;box-shadow:0 20
     mask-image:radial-gradient(120% 120% at 82% 50%,#000 46%,transparent 82%)}
   .ghero>img.bg{filter:blur(30px) saturate(1.3) brightness(.5)}
 
-  /* fixture facts scroll sideways instead of stacking three deep */
-  .gday{flex-wrap:nowrap;overflow-x:auto;margin:-6px -14px 14px;padding:0 14px 3px;
-        scrollbar-width:none}
-  .gday::-webkit-scrollbar{display:none}
-  .gday .gd{flex:none}
+  /* This strip used to scroll sideways with the scrollbar hidden, which
+     on a phone meant two of its four chips did not exist as far as a fan
+     could tell. It is two chips now and it wraps. */
+  .gday{margin:-6px 0 14px}
 
   /* two rows of header, not four */
   .hbar{padding:10px 14px;gap:8px;row-gap:8px}
@@ -1589,6 +1599,191 @@ nav::-webkit-scrollbar{display:none}
 nav .navitem{gap:0 !important;padding:0 !important;flex:0 0 auto !important}
 nav .navitem .lab{padding:12px 15px !important;display:block}
 
+/* ── the rail scrolls, and now it says so ──────────────────────────
+   Thirteen tabs measure 1436px. On a 1440 laptop that is already over
+   the container, and on a phone it is four times the screen. It has
+   always scrolled. It has never once looked like it could, because
+   the scrollbar is hidden and nav::after was switched off, so eight of
+   the ten games sat behind a gesture with no sign that a gesture
+   existed. A fade marks the edge that still has something behind it,
+   and on a pointer device two chevrons do the scrolling, because a
+   mouse has no swipe. Both are driven by the real scroll position, so
+   neither ever points at nothing. */
+/* One mechanism, used by every strip in the build that scrolls sideways:
+   the game tabs, the roster rail on a player page, and that page's four
+   section tabs. Overlay rather than a mask, because all three carry a 1px
+   rule underneath that a mask would fade out along with the content, and
+   a divider that stops short of the edge looks like a bug. */
+.hscroll{position:relative;margin:0 0 30px}
+.hscroll>*{margin:0;scroll-behavior:smooth}
+.hscroll::before,.hscroll::after{content:'';position:absolute;top:0;bottom:1px;width:38px;
+  pointer-events:none;z-index:2;opacity:0;transition:opacity var(--t-med) var(--e-in)}
+.hscroll::before{left:0;background:linear-gradient(90deg,var(--bg) 22%,rgba(0,32,91,0))}
+.hscroll::after{right:0;background:linear-gradient(270deg,var(--bg) 22%,rgba(0,32,91,0))}
+.hscroll.canl::before,.hscroll.canr::after{opacity:1}
+/* the roster rail and the section tabs sit inside a page, not above it */
+.hscroll.inpage{margin:0}
+.hscroll.inpage>#dashRoster{margin-bottom:6px}
+.hscroll.inpage>.segbar{margin:18px 0 16px}
+.navarrow{position:absolute;top:calc(50% - 1px);transform:translateY(-50%);z-index:3;
+  width:30px;height:30px;padding:0;display:none;align-items:center;justify-content:center;
+  border:1px solid var(--line);border-radius:50%;background:var(--surf2);color:var(--ink);
+  cursor:pointer;transition:background var(--t-fast),border-color var(--t-fast)}
+.navarrow svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round}
+/* data attributes, not .l and .r: a one-letter class name in a file this
+   size is a collision waiting to happen, and .l is already the label
+   inside the Citrus-points chip. */
+.navarrow[data-d=l]{left:1px}
+.navarrow[data-d=r]{right:1px}
+.navarrow:hover{background:var(--citrus);border-color:var(--citrus);color:var(--deep)}
+/* pointer only. A thumb already knows how to swipe, and two 30px buttons
+   would eat a tab and a half of a 346px strip. */
+@media (hover:hover) and (pointer:fine){
+  .hscroll.canl::before,.hscroll.canr::after{width:56px}
+  .navwrap.canl .navarrow[data-d=l],.navwrap.canr .navarrow[data-d=r]{display:flex}
+}
+@media (prefers-reduced-motion:reduce){.hscroll>*{scroll-behavior:auto}}
+
+/* ══ CITRUS CARLTON ═══════════════════════════════════════════════
+   The paper doll. Six cards on a grid told you what the slots were; it
+   never told you what filling them was FOR. Carlton stands in the middle
+   of the page in nothing but the sweater and gets dressed as you pick,
+   and every piece carries what that Leaf has actually done tonight.
+
+   He is deliberately quiet: two tones of ice-blue fur, the club's blue
+   on the sweater, and the accent kept for the crest and for gear that
+   has a man behind it. An empty piece is hollow and half-lit, so at a
+   glance the figure tells you how far through the build you are without
+   a single number.
+
+   The vector is the fallback, not the plan. CARLTON-BRIEF.md specifies
+   seven transparent layers on one canvas; when all seven land the
+   figure swaps whole and every rule below still drives it. */
+.kitwrap{display:block}
+.carlbox{margin:0 0 16px}
+.carl{position:relative;width:100%;max-width:330px;margin:0 auto;
+  aspect-ratio:380/470;display:block}
+.carlsvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.carlpaper{position:absolute;inset:0}
+.carlpaper .cl{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.carlcap{text-align:center;font:600 12.5px var(--sans);color:var(--ink3);
+  margin:8px auto 0;max-width:44ch;line-height:1.5}
+.carlcap b{color:var(--ink);font-weight:800}
+
+/* the bear */
+.cshade{fill:rgba(0,10,32,.42)}
+.cfur{fill:var(--ink2);stroke:var(--deep);stroke-width:5}
+.cear{fill:var(--ink3);stroke:none}
+.cmuz{fill:#FFFFFF;stroke:var(--deep);stroke-width:4.5}
+.cink{fill:var(--deep);stroke:none}
+.cglint{fill:#FFFFFF;stroke:none}
+.cline{fill:none;stroke:var(--deep);stroke-width:5;stroke-linecap:round}
+/* the sweater: club blue, white yoke and hem bands, one hard outline */
+.csweat{fill:var(--surf2)}
+.csweatln{fill:none;stroke:var(--deep);stroke-width:5;stroke-linejoin:round}
+.cyoke{fill:#FFFFFF}
+.cpant{fill:var(--surf);stroke:var(--deep);stroke-width:5;stroke-linejoin:round}
+.cstripe{fill:none;stroke:var(--line);stroke-width:6;stroke-linecap:round}
+.csleeveo{fill:none;stroke:var(--deep);stroke-linecap:round}
+.csleeve{fill:none;stroke:var(--surf2);stroke-linecap:round}
+.ccuff{fill:none;stroke:#FFFFFF;stroke-linecap:round}
+.cnum{fill:var(--ink3);font:800 17px var(--sans);text-anchor:middle}
+/* the crest: a citrus slice where the club's own mark goes. The single
+   place in this build where the accent is the subject, not a state. */
+.ccrestw{fill:#FFFFFF;stroke:var(--deep);stroke-width:4}
+.ccrest{fill:var(--citrus);stroke:none}
+.ccrestseg path{fill:none;stroke:#FFFFFF;stroke-width:3.4;stroke-linecap:round}
+
+/* the six pieces: hollow and half-lit until a Leaf is behind them */
+.kitp{cursor:pointer;opacity:.5;transition:opacity var(--t-med) var(--e-in)}
+/* every piece keeps a target a thumb can find. The stick is a 10px line
+   and the puck is 32px across; without these the only way to hit either
+   is to hit it exactly, which is not a tap target, it is a dexterity
+   test. Invisible, and ordered so the hand beats the shaft under it. */
+.kitp .hitz{fill:transparent;stroke:transparent;pointer-events:all}
+.kitp .k{fill:var(--surf);stroke:var(--deep);stroke-width:5;stroke-linejoin:round}
+.kitp .ka{fill:var(--line);stroke:var(--deep);stroke-width:4;stroke-linejoin:round}
+.kitp .ks{fill:none;stroke:var(--deep);stroke-linecap:round;stroke-linejoin:round}
+.kitp .kso{fill:none;stroke:var(--deep);stroke-linecap:round}
+.kitp .ksf{fill:none;stroke:var(--surf);stroke-linecap:round}
+.kitp .kta{fill:none;stroke:var(--line);stroke-linecap:round}
+/* a puck is black. It keeps its own colour in both states and says
+   which one it is in with the rim, because a pale puck is not a puck. */
+.kitp .kpuck{fill:var(--deep);stroke:var(--line);stroke-width:5}
+.kitp.on .kpuck{stroke:var(--ink)}
+.carl .kitp.hot .kpuck{stroke:var(--ink3)}
+.kitp.on{opacity:1}
+.kitp.on .k{fill:var(--ink2)}
+.kitp.on .ksf{stroke:var(--ink2)}
+.kitp.on .ka{fill:var(--ink);stroke:var(--deep)}
+.kitp.on .kta{stroke:var(--ink)}
+.carl .kitp.hot{opacity:1}
+.carl .kitp.hot .k{fill:var(--ink3)}
+.carl .kitp.hot .ksf{stroke:var(--ink3)}
+
+/* the pip: what that piece has done tonight, on the piece itself */
+.kitpin{position:absolute;transform:translate(-50%,-50%);width:0;height:0;
+  display:grid;place-items:center;border-radius:50%;overflow:hidden;
+  font:800 12px var(--sans);font-variant-numeric:tabular-nums;
+  color:var(--deep);background:var(--ink);border:0 solid var(--deep);
+  pointer-events:none;z-index:3;transition:width var(--t-med) var(--e-plant),
+  height var(--t-med) var(--e-plant),background var(--t-fast)}
+.kitpin.on{width:24px;height:24px;border-width:2.5px}
+.kitpin.hot{border-color:var(--citrus)}
+
+@media (prefers-reduced-motion:reduce){
+  .kitp,.kitpin{transition:none}
+}
+
+/* Side by side once there is width for it. The tiles become rows next
+   to the figure, which also answers the open question in the design
+   brief: this page was the only 2x3 card grid in a build made of lists,
+   and beside a figure a list is plainly the right half. */
+/* The row form starts as soon as there is width for it, not at 900. In
+   between it was a 2x3 grid of 253px-wide cards 245px tall, which is the
+   one shape a card should never be. */
+@media (min-width:561px){
+  .kitwrap .kit{grid-template-columns:1fr;gap:9px}
+  /* wrap, or the live strip's 100% basis crushes the name column to
+     nothing and shoves the row off its own left edge. It shipped that
+     way for exactly one screenshot. */
+  .kitwrap .eq{display:flex;flex-wrap:wrap;align-items:center;gap:13px;
+    padding:11px 14px;border-radius:15px;min-height:74px}
+  .kitwrap .eq .prop{margin:0}
+  .kitwrap .chipart{width:46px;height:46px;border-radius:13px;border-width:2.5px}
+  .kitwrap .chipart.eqmark[data-n="1"]{font-size:25px}
+  .kitwrap .chipart.eqmark[data-n="3"]{font-size:13.5px}
+  .kitwrap .eq .nmcat{flex:1;min-width:0}
+  .kitwrap .eq .pt{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kitwrap .eq .pcat{margin-top:1px;font-size:8.5px}
+  .kitwrap .eq .slot{margin:0;border-top:none;padding:0;min-height:0;flex:none;max-width:50%}
+  .kitwrap .eq .who{gap:7px;justify-content:flex-end}
+  .kitwrap .eq .who .nm2{font-size:13px;flex:0 1 auto}
+  .kitwrap .eq .who .val{font-size:18px}
+  .kitwrap .eq .empty{font-size:12px;white-space:nowrap}
+  .kitwrap .eq .lead{display:none}
+  .kitwrap .eq.filled::after{display:none}
+  /* the live strip is appended to the tile, so in a row it has to break
+     to its own line rather than fight the name for the same 50% */
+  .kitwrap .eq .eqlive{order:9;flex:0 0 100%;margin-top:0;padding-top:7px}
+}
+/* Side by side once the page can hold a figure and a list at once. */
+@media (min-width:900px){
+  .kitwrap{display:grid;grid-template-columns:minmax(0,352px) minmax(0,1fr);
+    gap:26px;align-items:start}
+  .carlbox{position:sticky;top:96px;margin:0}
+}
+/* Two up was tried and reverted. The page is 1180 wide, so two columns
+   beside the figure are 375px each, and at 375px both ends of the row
+   truncate at once: "The shoul..." against "William Nyl...". One column
+   of 700px rows fits every label whole, which is the entire reason the
+   tiles became rows. */
+@media (max-width:899px){
+  .carl{max-width:250px}
+  .carlbox{margin-bottom:14px}
+}
+
 /* ── the kit, scoring live ────────────────────────────────────── */
 .big.live{color:var(--citrus)}
 .settle{font-size:11.5px;color:var(--ink3);margin:-4px 0 12px}
@@ -2035,7 +2230,11 @@ table.h2h td.bar{width:34%;padding:7px 10px}
   <div class="bugtick" id="bugTick"></div>
 </div>
 
-<nav role="tablist" aria-label="Games"></nav>
+<div class="hscroll navwrap">
+  <button class="navarrow" data-d="l" type="button" tabindex="-1" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <nav role="tablist" aria-label="Games"></nav>
+  <button class="navarrow" data-d="r" type="button" tabindex="-1" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+</div>
 
 
 <section class="panel on" id="p-home" role="tabpanel" tabindex="0" aria-label="home">
@@ -2060,11 +2259,17 @@ table.h2h td.bar{width:34%;padding:7px 10px}
     <div class="gmeta"><span>6 slots</span><span>One Leaf per slot</span><span>Scores live</span><span>90 sec</span></div>
   </div>
   <div class="gday" id="ultDay"></div>
-  <div class="kit" id="parts"></div>
+  <div class="kitwrap">
+    <div class="carlbox">
+      <div class="carl" id="carl"></div>
+      <div class="carlcap" id="carlCap"></div>
+    </div>
+    <div class="kit" id="parts"></div>
+  </div>
   <div class="buildbar">
     <div class="stop">
-      <div><div class="lbl">Projected tonight</div><div class="big" id="ultTotal">0.0</div></div>
-      <div><div class="lbl">Scoring live</div><div class="big live" id="ultLive">0.0</div></div>
+      <div><div class="lbl">Season rate</div><div class="big" id="ultTotal">0.0</div></div>
+      <div><div class="lbl">Tonight, live</div><div class="big live" id="ultLive">0.0</div></div>
       <div style="text-align:right"><div class="lbl">vs best real Leaf</div><div class="stat" id="ultDelta">not built yet</div></div>
     </div>
     <div class="settle" id="ultSettle"></div>

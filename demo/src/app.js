@@ -79,8 +79,11 @@ const FX = [
 {"d":"2026-10-17","h":"TOR","a":"NYI","hn":"Maple Leafs","an":"Islanders","home":true},
 {"d":"2026-10-19","h":"TOR","a":"SJS","hn":"Maple Leafs","an":"Sharks","home":true}
 ];
-const PSK = PR.filter(p => !p.gk);
-const PGK = PR.filter(p =>  p.gk);
+/* PR is the Citrus Projections 2.0 roster for opening night, 29 September
+   against Montreal. Every live game on this page settles against a game
+   played on 12 March, so nothing here builds a pool out of it any more.
+   It survives for the one place a September projection belongs: the
+   "Projected tonight" card on a player's own page.                     */
 const SC = {g:3, a:2, ppp:1, sog:.4, blk:.5, hit:.2, pim:.5, tk:1};
 /* Citrus Projections 2.0 does not carry takeaways, so the rate here is the
    plain one: this season's takeaways over this season's games, out of the
@@ -675,6 +678,55 @@ function buildRail(){
   item(DASH.t, DASH.short, DASH.art);
   item(BOARD.t, BOARD.short, BOARD.t);
 }
+/* ── strips that scroll sideways say so ───────────────────────────
+   Three of them in this build, and not one of them looked scrollable:
+   the thirteen game tabs (1436px of them, so eight of the ten games were
+   behind an invisible gesture at every width), the roster rail on a
+   player page, and that page's four section tabs. All three hide the
+   scrollbar, which is right, and none of them replaced it, which is not.
+
+   A fade appears on whichever side still has something parked on it, off
+   the real scroll position so it can never point at nothing, and on a
+   pointer device the tabs also get a chevron, because a mouse has no
+   swipe. On a phone the chevrons stay off: a thumb already knows how to
+   swipe and two 30px buttons would eat a tab and a half of a 346px
+   strip.                                                              */
+const HINTED = [];
+function hintScroll(node, wrapCls){
+  if (!node || node.__hinted) return;
+  node.__hinted = 1;
+  let w = node.parentElement;
+  if (!w || !w.classList.contains('hscroll')){
+    w = el('div', 'hscroll' + (wrapCls ? ' ' + wrapCls : ''));
+    node.parentNode.insertBefore(w, node);
+    w.appendChild(node);
+  }
+  const upd = () => {
+    const max = node.scrollWidth - node.clientWidth;
+    w.classList.toggle('canl', max > 2 && node.scrollLeft > 2);
+    w.classList.toggle('canr', max > 2 && node.scrollLeft < max - 2);
+  };
+  node.addEventListener('scroll', upd, {passive:true});
+  HINTED.push(upd);
+  upd();
+}
+/* every strip is redrawn by the game that owns it, so the state is
+   recomputed on a resize and on every panel change rather than trusting
+   a width measured before the list existed */
+function hintAll(){ HINTED.forEach(f => f()); }
+addEventListener('resize', hintAll);
+
+function wireNavScroll(){
+  const w = document.querySelector('.navwrap'), n = $('nav');
+  if (!w || !n) return;
+  hintScroll(n);
+  w.querySelectorAll('.navarrow').forEach(b => {
+    /* three quarters of a screen, so the tab you were reading stays on
+       screen as an anchor instead of the strip jumping past it */
+    b.onclick = () => n.scrollBy({left:(b.dataset.d === 'l' ? -1 : 1) *
+      Math.max(160, Math.round(n.clientWidth * .74)), behavior:'smooth'});
+  });
+}
 function markPlayed(){
   document.querySelectorAll('nav .navitem').forEach(b =>
     b.querySelector('.tile').classList.toggle('played', !!GAME_CP[b.dataset.t]));
@@ -707,6 +759,7 @@ function go(t, fromHash){
   const foot = document.querySelector('.wrap > .foot');
   if (foot) foot.style.display = (t === 'home') ? '' : 'none';
   if (t === 'home') drawLocker();
+  hintAll();
   window.scrollTo({top:0, behavior:'smooth'});
 }
 /* left/right arrows walk the rail, which is what a tablist owes a
@@ -1096,27 +1149,8 @@ const PARTS = [
 const val    = (p,k) => p[k] * SC[k];
 const sixCat = p => PARTS.reduce((s,P) => s + val(p,P.k), 0);
 
-/* The ceiling is NOT the sum of the six category leaders. Matthews leads
-   goals and shots and can only fill one slot. This is the exact best legal
-   assignment of six different skaters to six slots, branch-and-bound.     */
-const PERFECT = (() => {
-  const cap = PARTS.map(P => Math.max(...PSK.map(p => val(p,P.k))));
-  let best = 0, bestBuild = null; const used = new Set(), cur = [];
-  (function dfs(i, acc){
-    if (i === PARTS.length){ if (acc > best){ best = acc; bestBuild = [...cur]; } return; }
-    let bound = acc; for (let j = i; j < PARTS.length; j++) bound += cap[j];
-    if (bound <= best) return;
-    for (const p of [...PSK].sort((a,b) => b[PARTS[i].k] - a[PARTS[i].k])){
-      if (used.has(p.name)) continue;
-      used.add(p.name); cur.push(p);
-      dfs(i + 1, acc + val(p, PARTS[i].k));
-      cur.pop(); used.delete(p.name);
-    }
-  })(0,0);
-  return { total: +best.toFixed(2), build: bestBuild };
-})();
-const GREEDY   = +PARTS.reduce((s,P) => s + Math.max(...PSK.map(p => val(p,P.k))), 0).toFixed(2);
-const BEST_ONE = PSK.reduce((m,p) => sixCat(p) > sixCat(m) ? p : m, PSK[0]);
+/* The pool, the ceiling and the best single Leaf are all built further
+   down, next to the season helper they read from. See KIT_POOL.        */
 
 const pick = {};
 let ultBanked = false, ultOpen = null;
@@ -1296,6 +1330,53 @@ const perGame = (name, k) => {
   return isFinite(r) ? r : 0;
 };
 const lineFor = (name, k) => Math.floor(perGame(name, k)) + 0.5;
+
+/* ── the kit pool ─────────────────────────────────────────────────
+   This was the twenty-three skaters of the Citrus Projections 2.0
+   opening-night roster, and it was the wrong list. The page says
+   "Game 01, live" and settles the six slots against the game the
+   score bug is replaying, Anaheim at Toronto. That roster and this
+   one overlap by ten men: thirteen of the twenty-three were not in
+   the building. Pick one and the slot could never settle, so it sat
+   on a tick to the final buzzer and said nothing about why.
+
+   The pool is now the seventeen who dressed for this game and have a
+   season behind them, which is the same seventeen Beat Stormy and the
+   three slates already use. One roster across every live game.
+
+   The number on a row moves with it. A projection built for 29
+   September cannot be shown against a game played on 12 March, so the
+   row carries the man's own season rate, per game, out of the same
+   roster file every other season number on this page comes from. It is
+   labelled as a rate everywhere it appears, never as a projection.  */
+const KIT_POOL = SLATE.map(r => {
+  const s = SEASON[r.name];
+  const o = { name: s.name, pos: s.pos, num: s.num || r.num };
+  PARTS.forEach(P => { o[P.k] = +perGame(s.name, P.k).toFixed(2); });
+  return o;
+});
+
+/* The ceiling is NOT the sum of the six category leaders. Matthews leads
+   goals and shots and can only fill one slot. This is the exact best legal
+   assignment of six different skaters to six slots, branch-and-bound.     */
+const PERFECT = (() => {
+  const cap = PARTS.map(P => Math.max(...KIT_POOL.map(p => val(p,P.k))));
+  let best = 0, bestBuild = null; const used = new Set(), cur = [];
+  (function dfs(i, acc){
+    if (i === PARTS.length){ if (acc > best){ best = acc; bestBuild = [...cur]; } return; }
+    let bound = acc; for (let j = i; j < PARTS.length; j++) bound += cap[j];
+    if (bound <= best) return;
+    for (const p of [...KIT_POOL].sort((a,b) => b[PARTS[i].k] - a[PARTS[i].k])){
+      if (used.has(p.name)) continue;
+      used.add(p.name); cur.push(p);
+      dfs(i + 1, acc + val(p, PARTS[i].k));
+      cur.pop(); used.delete(p.name);
+    }
+  })(0,0);
+  return { total: +best.toFixed(2), build: bestBuild };
+})();
+const GREEDY   = +PARTS.reduce((s,P) => s + Math.max(...KIT_POOL.map(p => val(p,P.k))), 0).toFixed(2);
+const BEST_ONE = KIT_POOL.reduce((m,p) => sixCat(p) > sixCat(m) ? p : m, KIT_POOL[0]);
 const SLATE_CATS = [
   {k:'sog', l:'shots on goal', s:'SOG'}, {k:'hit', l:'hits',      s:'HIT'},
   {k:'blk', l:'blocks',        s:'BLK'}, {k:'p',   l:'points',    s:'PTS'},
@@ -1354,6 +1435,213 @@ function prow(p, o){
   return b;
 }
 
+/* ══ CITRUS CARLTON ══════════════════════════════════════════════
+   The kit page used to be six cards on a grid, which is a form, not a
+   character. It is now a paper doll: the club's own bear, drawn in the
+   Citrus house style, standing in the middle of the page with nothing
+   on but a sweater, and six pieces of gear that arrive as you fill the
+   slots. Every piece is dim and hollow until a Leaf is behind it, then
+   it fills in and, once the puck drops, carries what that man has
+   actually done tonight.
+
+   Two things about him worth saying out loud in the room.
+
+   Carlton is MLSE's mascot and their trademark, right down to the 60
+   on his back for 60 Carlton Street. This is a Citrus rendering of
+   someone else's character, shown back to the people who own him.
+   That is normal pitch practice and it is worth saying rather than
+   letting a screenshot say it.
+
+   And the drawing is honest about being a drawing. Six PNG layers on a
+   shared canvas -- carlton-base plus one per piece of kit -- swap the
+   whole figure the moment they land, and until every one of the seven
+   is on disk the build keeps the vector, because half a paper doll is
+   worse than none. See CARLTON-BRIEF.md.                            */
+const CARL_IDS = ['base','g','a','sog','hit','blk','tk'];
+const CARL_ART = () => typeof ART !== 'undefined' &&
+  CARL_IDS.every(k => ART['carl_' + k]);
+
+/* anchors for the live pips, as a share of the 380 x 470 box, so the
+   badge sits on the piece it is talking about at any figure size */
+const CARL_PIN = {
+  hit:[67.9,44.3], a:[23.2,63.8], g:[73.1,72.1],
+  sog:[90.5,77.0], blk:[33.2,78.3], tk:[57.4,88.9]
+};
+
+/* two-pass limbs and stick: the same path stroked wide in the outline
+   colour and again narrow in the fill colour. It gives a limb a real
+   silhouette without hand-solving the outline of a bent tube. */
+const cS = (cls, d, w) => '<path class="' + cls + '" d="' + d + '" stroke-width="' + w + '"/>';
+
+function carlBoot(dx){                       /* one skate, dx apart */
+  const t = 'transform="translate(' + dx + ' 0)"';
+  return '<g ' + t + '>' +
+    '<path class="k" d="M119 398 h42 q14 0 15 13 l1 15 q1 12 -12 12 h-46 q-12 0 -12 -12 v-16 q0 -12 11 -12 z"/>' +
+    '<rect class="k" x="118" y="434" width="10" height="9" rx="2"/>' +
+    '<rect class="k" x="156" y="434" width="10" height="9" rx="2"/>' +
+    '<rect class="ka" x="104" y="440" width="70" height="9" rx="4.5"/>' +
+    '<path class="ks" d="M124 410 h34 M124 422 h34" stroke-width="4"/></g>';
+}
+function carlShin(dx){                       /* one shin pad */
+  const t = 'transform="translate(' + dx + ' 0)"';
+  return '<g ' + t + '>' +
+    '<circle class="k" cx="140" cy="344" r="18"/>' +
+    '<path class="k" d="M116 336 h48 q10 0 10 10 v50 q0 10 -10 10 h-48 q-10 0 -10 -10 v-50 q0 -10 10 -10 z"/>' +
+    '<rect class="ka" x="104" y="356" width="70" height="8" rx="4"/>' +
+    '<rect class="ka" x="104" y="380" width="70" height="8" rx="4"/></g>';
+}
+function carlGlove(x, y, tx){                /* one mitt, tx = thumb side */
+  return '<g>' +
+    '<rect class="k" x="' + (x + (tx < 0 ? -10 : 44)) + '" y="' + (y + 10) + '" width="18" height="30" rx="9"/>' +
+    '<rect class="k" x="' + x + '" y="' + y + '" width="52" height="54" rx="16"/>' +
+    '<rect class="ka" x="' + (x - 4) + '" y="' + (y + 40) + '" width="60" height="17" rx="7"/>' +
+    '<path class="ks" d="M' + (x + 14) + ' ' + (y + 8) + ' v30 M' + (x + 28) + ' ' + (y + 8) + ' v30" stroke-width="3.6"/></g>';
+}
+function carlCap(mirror){                    /* one shoulder cap */
+  const t = mirror ? ' transform="translate(352 0) scale(-1 1)"' : '';
+  return '<g' + t + '>' +
+    '<path class="k" d="M142 166 q-6 -10 -18 -8 q-30 6 -35 32 q-4 22 17 25 l30 -6 q8 -22 6 -43 z"/>' +
+    '<path class="ks" d="M95 186 q18 -5 34 -2" stroke-width="4"/></g>';
+}
+
+function carltonSVG(){
+  if (CARL_ART()) return '<div class="carlpaper">' +
+    CARL_IDS.map(k => '<img class="cl' + (k === 'base' ? ' base' : ' kitp kitp-' + k) +
+      '" data-id="' + (k === 'base' ? '' : k) + '" src="' + ART['carl_' + k].src + '" alt="">').join('') +
+    '</div>';
+  return '<svg class="carlsvg" viewBox="0 0 380 470" role="img" aria-hidden="true">' +
+  '<defs><clipPath id="carlTorso"><path d="M118 196 q2 -22 22 -27 l30 -8 q6 6 12 0 l30 8 q20 5 22 27 l8 76 q2 14 -13 14 h-106 q-15 0 -13 -14 z"/></clipPath></defs>' +
+
+  '<ellipse class="cshade" cx="176" cy="452" rx="106" ry="14"/>' +
+
+  /* ── the skates ── */
+  '<g class="kitp" data-id="tk"><rect class="hitz" x="176" y="390" width="84" height="62"/>' + carlBoot(76) + '</g>' +
+  '<g class="kitp" data-id="tk"><rect class="hitz" x="100" y="390" width="84" height="62"/>' + carlBoot(0) + '</g>' +
+  /* ── the shin pads ── */
+  '<g class="kitp" data-id="blk"><rect class="hitz" x="98" y="336" width="84" height="78"/>' + carlShin(0) + '</g>' +
+  '<g class="kitp" data-id="blk"><rect class="hitz" x="180" y="336" width="84" height="78"/>' + carlShin(76) + '</g>' +
+
+  /* pants, over the top of the pads the way they sit on a real leg */
+  '<path class="cpant" d="M124 276 h104 q14 0 16 13 l5 38 q2 13 -12 13 h-122 q-14 0 -12 -13 l5 -38 q2 -13 16 -13 z"/>' +
+  '<path class="cstripe" d="M112 312 h128"/>' +
+
+  /* the sweater */
+  '<path class="csweat" d="M118 196 q2 -22 22 -27 l30 -8 q6 6 12 0 l30 8 q20 5 22 27 l8 76 q2 14 -13 14 h-106 q-15 0 -13 -14 z"/>' +
+  '<g clip-path="url(#carlTorso)">' +
+    '<path class="cyoke" d="M104 200 q12 -24 36 -31 l36 -10 l36 10 q24 7 36 31 l-7 15 q-13 -20 -33 -25 l-32 -9 l-32 9 q-20 5 -33 25 z"/>' +
+    '<rect class="cyoke" x="100" y="252" width="160" height="11"/>' +
+    '<rect class="cyoke" x="100" y="269" width="160" height="6"/>' +
+  '</g>' +
+  '<path class="csweatln" d="M118 196 q2 -22 22 -27 l30 -8 q6 6 12 0 l30 8 q20 5 22 27 l8 76 q2 14 -13 14 h-106 q-15 0 -13 -14 z"/>' +
+
+  /* the crest. Where the club's own mark goes, a citrus slice: this is
+     the one place in the build the accent is allowed to be the subject */
+  '<circle class="ccrestw" cx="176" cy="220" r="28"/>' +
+  '<circle class="ccrest"  cx="176" cy="220" r="21"/>' +
+  '<g class="ccrestseg">' +
+    '<path d="M179 220 L196 220"/><path d="M177.5 222.6 L186 237.3"/>' +
+    '<path d="M174.5 222.6 L166 237.3"/><path d="M173 220 L156 220"/>' +
+    '<path d="M174.5 217.4 L166 202.7"/><path d="M177.5 217.4 L186 202.7"/>' +
+  '</g>' +
+  '<circle class="ccrestw" cx="176" cy="220" r="4"/>' +
+
+  /* sleeves */
+  cS('csleeveo', 'M126 198 C 106 216, 94 244, 93 266', 38) +
+  cS('csleeve',  'M126 198 C 106 216, 94 244, 93 266', 30) +
+  cS('ccuff',    'M97 246 C 95 254, 93 260, 93 266', 30) +
+  cS('csleeveo', 'M226 198 C 246 216, 258 238, 260 260', 38) +
+  cS('csleeve',  'M226 198 C 246 216, 258 238, 260 260', 30) +
+  cS('ccuff',    'M255 242 C 258 250, 259 255, 260 260', 30) +
+
+  /* ── the shoulders ── */
+  '<g class="kitp" data-id="hit"><rect class="hitz" x="210" y="166" width="58" height="66"/>' + carlCap(1) + '</g>' +
+  '<g class="kitp" data-id="hit"><rect class="hitz" x="88" y="166" width="58" height="66"/>' + carlCap(0) + '</g>' +
+
+  /* ── the stick ── */
+  '<g class="kitp" data-id="g">' +
+    cS('hitz', 'M262 250 L288 398', 42) +
+    cS('kso', 'M262 250 L288 398', 17) + cS('ksf', 'M262 250 L288 398', 10) +
+    cS('kso', 'M286 400 L328 411', 19) + cS('ksf', 'M286 400 L328 411', 12) +
+    cS('kta', 'M268 278 L274 306', 11) +
+  '</g>' +
+
+  /* ── the hands ── */
+  '<g class="kitp" data-id="a"><rect class="hitz" x="48" y="248" width="82" height="76"/>' + carlGlove(66, 258, -1) + '</g>' +
+  '<g class="kitp" data-id="a"><rect class="hitz" x="226" y="240" width="82" height="76"/>' + carlGlove(236, 250, 1) + '</g>' +
+
+  /* ── the release ── */
+  '<g class="kitp" data-id="sog"><rect class="hitz" x="316" y="334" width="60" height="60"/>' +
+    '<circle class="kpuck" cx="344" cy="362" r="24"/>' +
+  '</g>' +
+
+  /* the bear */
+  '<g class="chead">' +
+    '<circle class="cfur" cx="122" cy="40" r="27"/><circle class="cear" cx="122" cy="40" r="13"/>' +
+    '<circle class="cfur" cx="230" cy="40" r="27"/><circle class="cear" cx="230" cy="40" r="13"/>' +
+    '<circle class="cfur" cx="176" cy="98" r="68"/>' +
+    '<ellipse class="cmuz" cx="176" cy="126" rx="41" ry="30"/>' +
+    '<ellipse class="cink" cx="176" cy="110" rx="14" ry="10.5"/>' +
+    '<path class="cline" d="M176 121 v9 M176 130 q-13 13 -25 2 M176 130 q13 13 25 2"/>' +
+    '<circle class="cink" cx="146" cy="82" r="9"/><circle class="cink" cx="206" cy="82" r="9"/>' +
+    '<circle class="cglint" cx="149.5" cy="78" r="3.2"/><circle class="cglint" cx="209.5" cy="78" r="3.2"/>' +
+  '</g>' +
+  '</svg>';
+}
+
+/* the figure, the pips and the caption. Rebuilt only when the kit
+   changes; the pips update in place on the clock. */
+let carlBuilt = false;
+function drawCarl(){
+  const host = $('#carl'); if (!host) return;
+  if (!carlBuilt){
+    host.innerHTML = carltonSVG() +
+      PARTS.map(P => '<span class="kitpin" data-id="' + P.id + '" style="left:' +
+        CARL_PIN[P.id][0] + '%;top:' + CARL_PIN[P.id][1] + '%"></span>').join('') ;
+    host.addEventListener('click', e => {
+      const g = e.target.closest('.kitp'); if (!g || !g.dataset.id) return;
+      const P = PARTS.find(x => x.id === g.dataset.id); if (P) openPicker(P);
+    });
+    /* a pair is two groups, so lighting one skate on hover and not the
+       other would read as a bug. Done here rather than with :has(),
+       which this file cannot assume in a browser it has never met. */
+    const hot = g => { const id = g && g.dataset.id;
+      host.querySelectorAll('.kitp').forEach(x =>
+        x.classList.toggle('hot', !!id && x.dataset.id === id)); };
+    host.addEventListener('mouseover', e => hot(e.target.closest('.kitp')));
+    host.addEventListener('mouseleave', () => hot(null));
+    carlBuilt = true;
+  }
+  PARTS.forEach(P => {
+    const on = !!pick[P.id];
+    host.querySelectorAll('.kitp[data-id="' + P.id + '"]').forEach(g => g.classList.toggle('on', on));
+  });
+  carlPips();
+  const cap = $('#carlCap'); if (!cap) return;
+  const n = Object.keys(pick).length;
+  cap.innerHTML = n === 0
+    ? 'Carlton has the sweater and nothing else. Pick a Leaf for a piece to put it on him.'
+    : n < 6 ? '<b>' + n + ' of 6</b> pieces on Carlton. ' + (6 - n) + ' to go.'
+    : CLOCK.over ? '<b>Dressed, and final.</b> Every piece has settled.'
+                 : '<b>Dressed.</b> Every piece scores as the game goes.';
+}
+/* the pip carries the live number for the piece it sits on, and a tick
+   when the slot is filled but the number does not exist until the
+   buzzer. It never carries a zero dressed up as a fact. */
+function carlPips(){
+  const host = $('#carl'); if (!host) return;
+  PARTS.forEach(P => {
+    const pin = host.querySelector('.kitpin[data-id="' + P.id + '"]'); if (!pin) return;
+    const chosen = pick[P.id];
+    if (!chosen){ pin.className = 'kitpin'; pin.textContent = ''; pin.dataset.id = P.id; return; }
+    const known = !!KIT_LIVE[P.k] || CLOCK.over;
+    const n = !BOXF[chosen.name] ? null
+      : (KIT_LIVE[P.k] ? CLOCK.live(chosen.name)[P.k] : BOXF[chosen.name][P.k]);
+    pin.className = 'kitpin on' + (known && n > 0 ? ' hot' : '');
+    pin.textContent = known && n != null ? String(n) : '✓';
+    pin.dataset.id = P.id;
+  });
+}
+
 /* ── the kit ──────────────────────────────────────────────────────
    Six doors. A tile shows what is behind it (the leader's number)
    before you open it, and who you put in it after. */
@@ -1361,7 +1649,7 @@ function drawParts(){
   const box = $('#parts'); box.innerHTML = '';
   PARTS.forEach(P => {
     const chosen = pick[P.id];
-    const lead   = [...PSK].sort((a,b) => b[P.k] - a[P.k])[0];
+    const lead   = [...KIT_POOL].sort((a,b) => b[P.k] - a[P.k])[0];
     const t = el('button','eq'+(chosen?' filled':''));
     t.type = 'button';
     t.style.setProperty('--eqc','var('+PART_C[P.id]+')');
@@ -1380,6 +1668,7 @@ function drawParts(){
     t.onclick = () => openPicker(P);
     box.appendChild(t);
   });
+  drawCarl();
 }
 
 /* ── the picker ───────────────────────────────────────────────────
@@ -1392,11 +1681,11 @@ function openPicker(P){
   sheet.querySelector('.shcard').style.setProperty('--eqc','var('+PART_C[P.id]+')');
   sheet.querySelector('.shcard').style.setProperty('--ac','var('+PART_C[P.id]+')');
   $('#shTitle').textContent = P.part;
-  $('#shSub').textContent   = P.cat + ' · projected tonight vs Montreal';
+  $('#shSub').textContent   = P.cat + ' · per game this season';
   const chosen = pick[P.id];
   const takenBy = {};
   Object.entries(pick).forEach(([id,p]) => { if (id !== P.id) takenBy[p.name] = PARTS.find(x=>x.id===id).part; });
-  const ranked = [...PSK].sort((a,b) => b[P.k] - a[P.k]);
+  const ranked = [...KIT_POOL].sort((a,b) => b[P.k] - a[P.k]);
   const top = ranked[0][P.k] || 1;
   $('#shNote').innerHTML = 'Every Leaf fills one slot only, ' +
     (Object.keys(takenBy).length ? '<b>'+Object.keys(takenBy).length+'</b> already placed and greyed below.'
@@ -1436,10 +1725,13 @@ document.addEventListener('keydown', e => {
 function drawGameDay(){
   const box = $('#ultDay'); if (!box) return;
   box.innerHTML =
-    '<span class="gd"><i>Puck drop</i><b>Tue 29 Sep · 7:00 PM ET</b></span>'+
-    '<span class="gd"><i>Opponent</i><b>vs Montreal</b></span>'+
+    /* The fixture used to live here in two chips. The score bug is sticky
+       on every page and already says Anaheim at Toronto, 12 March 2026,
+       Scotiabank Arena, so these were the same three facts twice, and on
+       a phone they pushed the two chips that are actually about YOUR
+       build off the side of a strip with no sign it scrolled. */
     '<span class="gd"><i>Slots filled</i><b id="ultFilled">0 of 6</b></span>'+
-    '<span class="gd"><i>Ceiling tonight</i><b>'+PERFECT.total.toFixed(2)+' fpts</b></span>';
+    '<span class="gd"><i>Perfect build</i><b>'+PERFECT.total.toFixed(2)+' fpts</b></span>';
 }
 
 function tally(){
@@ -1488,6 +1780,7 @@ function ultLive(){
     : CLOCK.over ? '<b>Final.</b> Every slot has settled.'
     : '<b>' + BOX_ONLY_NOTE + '</b> Goals, assists and shots are live.';
   drawKitLive();
+  carlPips();
 }
 function drawKitLive(){
   document.querySelectorAll('#parts .eq').forEach((tile, i) => {
@@ -1505,7 +1798,13 @@ function drawKitLive(){
       : '<b>&nbsp;</b> ' + P.cat.toLowerCase() + '<span class="fin">AT THE BUZZER</span>';
   });
 }
-CLOCK.on((kind) => { if (kind === 'tick' || kind === 'final' || kind === 'reset') ultLive(); });
+CLOCK.on((kind) => {
+  if (kind !== 'tick' && kind !== 'final' && kind !== 'reset') return;
+  ultLive();
+  /* the caption reads "dressed, and final" only at the buzzer, so it has
+     to be rebuilt on the two events that move it, and never on a tick */
+  if (kind !== 'tick') drawCarl();
+});
 
 /* ══ GAME 2: BEAT STORMY ════════════════════════════════════════
    This used to compare a projection against a projection, which means
@@ -2431,7 +2730,7 @@ function drawLB(){
   $('#lbCap').textContent = lbView==='cp'
     ? 'One score across all ten games. This is the number a fan comes back to move.'
     : lbView==='ult'
-      ? 'Six slots, six different Leafs, tonight’s projections. Perfect is '+PERFECT.total.toFixed(2)+
+      ? 'Six slots, six different Leafs, season rates per game. Perfect is '+PERFECT.total.toFixed(2)+
         '. The best legal assignment, not the sum of the category leaders ('+GREEDY.toFixed(2)+
         ', which no build can reach). The best single Leaf tonight is '+last(BEST_ONE.name)+' at '+sixCat(BEST_ONE).toFixed(2)+'.'
       : 'Three forwards and a pair against Stormy’s five, six categories, 3-3 is a draw. Across all 3,300 legal lineups: 33.2% win, 18.7% draw, 48.1% loss. A 6-0 sweep exists in 28 of them.';
@@ -3614,6 +3913,9 @@ $('#igIn').addEventListener('keydown', e => {
   if (pn && hd) { hd.id = 'h-' + g.t; pn.setAttribute('aria-labelledby', 'h-' + g.t); pn.removeAttribute('aria-label'); }
 });
 buildRail();
+wireNavScroll();
+hintScroll($('#dashRoster'), 'inpage');
+hintScroll(document.querySelector('.segbar'), 'inpage');
 (function(){ const m = $('#brandMark');   // header bug, club colours
   if (m) m.innerHTML = leafSVG(26,'#FFFFFF'); })();
 drawGameDay(); drawParts(); tally(); drawStormy(); bzIdle(); clIdle();

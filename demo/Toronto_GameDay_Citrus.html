@@ -1053,13 +1053,24 @@ html[data-skin="bc"] .pinwin{border-width:1px;border-radius:12px;box-shadow:0 20
   .eq .nmcat{flex:1;min-width:0}
   .eq .pt{font-size:16.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .eq .pcat{margin-top:1px;font-size:8.5px}
-  .eq .slot{margin:0;border-top:none;padding:0;min-height:0;flex:none;max-width:52%}
-  .eq .who{gap:6px;justify-content:flex-end}
-  .eq .who .nm2{font-size:12.5px;flex:0 1 auto}
+  /* Splitting a 346px row between the piece and the player truncated both
+     at once: "The shoul..." against "William Nyl...". The player takes his
+     own line, which costs about eight pixels of row and no words. */
+  .eq .slot{order:8;flex:0 0 100%;max-width:none;margin:0;min-height:0;
+    padding-top:8px;border-top:1px solid var(--line)}
+  .eq .who{gap:7px;width:100%}
+  .eq .who .nm2{font-size:13px;flex:1 1 auto}
+  .eq .who .val{margin-left:auto}
   .eq .who .val{font-size:17px}
   .eq .empty{font-size:11.5px;color:var(--fy);white-space:nowrap}
   .eq .lead{display:none}
   .eq.filled::after{display:none}
+  /* The live strip is appended to the tile once a slot is filled, and in
+     a nowrap row its own min-content width pushed the row 117px past the
+     screen. It has been doing that since the strip shipped; mobsweep
+     measured an empty kit, so nothing caught it. It gets its own line. */
+  .eq{flex-wrap:wrap}
+  .eq .eqlive{order:9;flex:0 0 100%;margin-top:0;padding-top:7px}
 
   /* the band was 180px of dark with a sliver of a character in it */
   .ghero{min-height:0;margin-bottom:16px}
@@ -1072,11 +1083,10 @@ html[data-skin="bc"] .pinwin{border-width:1px;border-radius:12px;box-shadow:0 20
     mask-image:radial-gradient(120% 120% at 82% 50%,#000 46%,transparent 82%)}
   .ghero>img.bg{filter:blur(30px) saturate(1.3) brightness(.5)}
 
-  /* fixture facts scroll sideways instead of stacking three deep */
-  .gday{flex-wrap:nowrap;overflow-x:auto;margin:-6px -14px 14px;padding:0 14px 3px;
-        scrollbar-width:none}
-  .gday::-webkit-scrollbar{display:none}
-  .gday .gd{flex:none}
+  /* This strip used to scroll sideways with the scrollbar hidden, which
+     on a phone meant two of its four chips did not exist as far as a fan
+     could tell. It is two chips now and it wraps. */
+  .gday{margin:-6px 0 14px}
 
   /* two rows of header, not four */
   .hbar{padding:10px 14px;gap:8px;row-gap:8px}
@@ -1589,6 +1599,191 @@ nav::-webkit-scrollbar{display:none}
 nav .navitem{gap:0 !important;padding:0 !important;flex:0 0 auto !important}
 nav .navitem .lab{padding:12px 15px !important;display:block}
 
+/* ── the rail scrolls, and now it says so ──────────────────────────
+   Thirteen tabs measure 1436px. On a 1440 laptop that is already over
+   the container, and on a phone it is four times the screen. It has
+   always scrolled. It has never once looked like it could, because
+   the scrollbar is hidden and nav::after was switched off, so eight of
+   the ten games sat behind a gesture with no sign that a gesture
+   existed. A fade marks the edge that still has something behind it,
+   and on a pointer device two chevrons do the scrolling, because a
+   mouse has no swipe. Both are driven by the real scroll position, so
+   neither ever points at nothing. */
+/* One mechanism, used by every strip in the build that scrolls sideways:
+   the game tabs, the roster rail on a player page, and that page's four
+   section tabs. Overlay rather than a mask, because all three carry a 1px
+   rule underneath that a mask would fade out along with the content, and
+   a divider that stops short of the edge looks like a bug. */
+.hscroll{position:relative;margin:0 0 30px}
+.hscroll>*{margin:0;scroll-behavior:smooth}
+.hscroll::before,.hscroll::after{content:'';position:absolute;top:0;bottom:1px;width:38px;
+  pointer-events:none;z-index:2;opacity:0;transition:opacity var(--t-med) var(--e-in)}
+.hscroll::before{left:0;background:linear-gradient(90deg,var(--bg) 22%,rgba(0,32,91,0))}
+.hscroll::after{right:0;background:linear-gradient(270deg,var(--bg) 22%,rgba(0,32,91,0))}
+.hscroll.canl::before,.hscroll.canr::after{opacity:1}
+/* the roster rail and the section tabs sit inside a page, not above it */
+.hscroll.inpage{margin:0}
+.hscroll.inpage>#dashRoster{margin-bottom:6px}
+.hscroll.inpage>.segbar{margin:18px 0 16px}
+.navarrow{position:absolute;top:calc(50% - 1px);transform:translateY(-50%);z-index:3;
+  width:30px;height:30px;padding:0;display:none;align-items:center;justify-content:center;
+  border:1px solid var(--line);border-radius:50%;background:var(--surf2);color:var(--ink);
+  cursor:pointer;transition:background var(--t-fast),border-color var(--t-fast)}
+.navarrow svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round}
+/* data attributes, not .l and .r: a one-letter class name in a file this
+   size is a collision waiting to happen, and .l is already the label
+   inside the Citrus-points chip. */
+.navarrow[data-d=l]{left:1px}
+.navarrow[data-d=r]{right:1px}
+.navarrow:hover{background:var(--citrus);border-color:var(--citrus);color:var(--deep)}
+/* pointer only. A thumb already knows how to swipe, and two 30px buttons
+   would eat a tab and a half of a 346px strip. */
+@media (hover:hover) and (pointer:fine){
+  .hscroll.canl::before,.hscroll.canr::after{width:56px}
+  .navwrap.canl .navarrow[data-d=l],.navwrap.canr .navarrow[data-d=r]{display:flex}
+}
+@media (prefers-reduced-motion:reduce){.hscroll>*{scroll-behavior:auto}}
+
+/* ══ CITRUS CARLTON ═══════════════════════════════════════════════
+   The paper doll. Six cards on a grid told you what the slots were; it
+   never told you what filling them was FOR. Carlton stands in the middle
+   of the page in nothing but the sweater and gets dressed as you pick,
+   and every piece carries what that Leaf has actually done tonight.
+
+   He is deliberately quiet: two tones of ice-blue fur, the club's blue
+   on the sweater, and the accent kept for the crest and for gear that
+   has a man behind it. An empty piece is hollow and half-lit, so at a
+   glance the figure tells you how far through the build you are without
+   a single number.
+
+   The vector is the fallback, not the plan. CARLTON-BRIEF.md specifies
+   seven transparent layers on one canvas; when all seven land the
+   figure swaps whole and every rule below still drives it. */
+.kitwrap{display:block}
+.carlbox{margin:0 0 16px}
+.carl{position:relative;width:100%;max-width:330px;margin:0 auto;
+  aspect-ratio:380/470;display:block}
+.carlsvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.carlpaper{position:absolute;inset:0}
+.carlpaper .cl{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.carlcap{text-align:center;font:600 12.5px var(--sans);color:var(--ink3);
+  margin:8px auto 0;max-width:44ch;line-height:1.5}
+.carlcap b{color:var(--ink);font-weight:800}
+
+/* the bear */
+.cshade{fill:rgba(0,10,32,.42)}
+.cfur{fill:var(--ink2);stroke:var(--deep);stroke-width:5}
+.cear{fill:var(--ink3);stroke:none}
+.cmuz{fill:#FFFFFF;stroke:var(--deep);stroke-width:4.5}
+.cink{fill:var(--deep);stroke:none}
+.cglint{fill:#FFFFFF;stroke:none}
+.cline{fill:none;stroke:var(--deep);stroke-width:5;stroke-linecap:round}
+/* the sweater: club blue, white yoke and hem bands, one hard outline */
+.csweat{fill:var(--surf2)}
+.csweatln{fill:none;stroke:var(--deep);stroke-width:5;stroke-linejoin:round}
+.cyoke{fill:#FFFFFF}
+.cpant{fill:var(--surf);stroke:var(--deep);stroke-width:5;stroke-linejoin:round}
+.cstripe{fill:none;stroke:var(--line);stroke-width:6;stroke-linecap:round}
+.csleeveo{fill:none;stroke:var(--deep);stroke-linecap:round}
+.csleeve{fill:none;stroke:var(--surf2);stroke-linecap:round}
+.ccuff{fill:none;stroke:#FFFFFF;stroke-linecap:round}
+.cnum{fill:var(--ink3);font:800 17px var(--sans);text-anchor:middle}
+/* the crest: a citrus slice where the club's own mark goes. The single
+   place in this build where the accent is the subject, not a state. */
+.ccrestw{fill:#FFFFFF;stroke:var(--deep);stroke-width:4}
+.ccrest{fill:var(--citrus);stroke:none}
+.ccrestseg path{fill:none;stroke:#FFFFFF;stroke-width:3.4;stroke-linecap:round}
+
+/* the six pieces: hollow and half-lit until a Leaf is behind them */
+.kitp{cursor:pointer;opacity:.5;transition:opacity var(--t-med) var(--e-in)}
+/* every piece keeps a target a thumb can find. The stick is a 10px line
+   and the puck is 32px across; without these the only way to hit either
+   is to hit it exactly, which is not a tap target, it is a dexterity
+   test. Invisible, and ordered so the hand beats the shaft under it. */
+.kitp .hitz{fill:transparent;stroke:transparent;pointer-events:all}
+.kitp .k{fill:var(--surf);stroke:var(--deep);stroke-width:5;stroke-linejoin:round}
+.kitp .ka{fill:var(--line);stroke:var(--deep);stroke-width:4;stroke-linejoin:round}
+.kitp .ks{fill:none;stroke:var(--deep);stroke-linecap:round;stroke-linejoin:round}
+.kitp .kso{fill:none;stroke:var(--deep);stroke-linecap:round}
+.kitp .ksf{fill:none;stroke:var(--surf);stroke-linecap:round}
+.kitp .kta{fill:none;stroke:var(--line);stroke-linecap:round}
+/* a puck is black. It keeps its own colour in both states and says
+   which one it is in with the rim, because a pale puck is not a puck. */
+.kitp .kpuck{fill:var(--deep);stroke:var(--line);stroke-width:5}
+.kitp.on .kpuck{stroke:var(--ink)}
+.carl .kitp.hot .kpuck{stroke:var(--ink3)}
+.kitp.on{opacity:1}
+.kitp.on .k{fill:var(--ink2)}
+.kitp.on .ksf{stroke:var(--ink2)}
+.kitp.on .ka{fill:var(--ink);stroke:var(--deep)}
+.kitp.on .kta{stroke:var(--ink)}
+.carl .kitp.hot{opacity:1}
+.carl .kitp.hot .k{fill:var(--ink3)}
+.carl .kitp.hot .ksf{stroke:var(--ink3)}
+
+/* the pip: what that piece has done tonight, on the piece itself */
+.kitpin{position:absolute;transform:translate(-50%,-50%);width:0;height:0;
+  display:grid;place-items:center;border-radius:50%;overflow:hidden;
+  font:800 12px var(--sans);font-variant-numeric:tabular-nums;
+  color:var(--deep);background:var(--ink);border:0 solid var(--deep);
+  pointer-events:none;z-index:3;transition:width var(--t-med) var(--e-plant),
+  height var(--t-med) var(--e-plant),background var(--t-fast)}
+.kitpin.on{width:24px;height:24px;border-width:2.5px}
+.kitpin.hot{border-color:var(--citrus)}
+
+@media (prefers-reduced-motion:reduce){
+  .kitp,.kitpin{transition:none}
+}
+
+/* Side by side once there is width for it. The tiles become rows next
+   to the figure, which also answers the open question in the design
+   brief: this page was the only 2x3 card grid in a build made of lists,
+   and beside a figure a list is plainly the right half. */
+/* The row form starts as soon as there is width for it, not at 900. In
+   between it was a 2x3 grid of 253px-wide cards 245px tall, which is the
+   one shape a card should never be. */
+@media (min-width:561px){
+  .kitwrap .kit{grid-template-columns:1fr;gap:9px}
+  /* wrap, or the live strip's 100% basis crushes the name column to
+     nothing and shoves the row off its own left edge. It shipped that
+     way for exactly one screenshot. */
+  .kitwrap .eq{display:flex;flex-wrap:wrap;align-items:center;gap:13px;
+    padding:11px 14px;border-radius:15px;min-height:74px}
+  .kitwrap .eq .prop{margin:0}
+  .kitwrap .chipart{width:46px;height:46px;border-radius:13px;border-width:2.5px}
+  .kitwrap .chipart.eqmark[data-n="1"]{font-size:25px}
+  .kitwrap .chipart.eqmark[data-n="3"]{font-size:13.5px}
+  .kitwrap .eq .nmcat{flex:1;min-width:0}
+  .kitwrap .eq .pt{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kitwrap .eq .pcat{margin-top:1px;font-size:8.5px}
+  .kitwrap .eq .slot{margin:0;border-top:none;padding:0;min-height:0;flex:none;max-width:50%}
+  .kitwrap .eq .who{gap:7px;justify-content:flex-end}
+  .kitwrap .eq .who .nm2{font-size:13px;flex:0 1 auto}
+  .kitwrap .eq .who .val{font-size:18px}
+  .kitwrap .eq .empty{font-size:12px;white-space:nowrap}
+  .kitwrap .eq .lead{display:none}
+  .kitwrap .eq.filled::after{display:none}
+  /* the live strip is appended to the tile, so in a row it has to break
+     to its own line rather than fight the name for the same 50% */
+  .kitwrap .eq .eqlive{order:9;flex:0 0 100%;margin-top:0;padding-top:7px}
+}
+/* Side by side once the page can hold a figure and a list at once. */
+@media (min-width:900px){
+  .kitwrap{display:grid;grid-template-columns:minmax(0,352px) minmax(0,1fr);
+    gap:26px;align-items:start}
+  .carlbox{position:sticky;top:96px;margin:0}
+}
+/* Two up was tried and reverted. The page is 1180 wide, so two columns
+   beside the figure are 375px each, and at 375px both ends of the row
+   truncate at once: "The shoul..." against "William Nyl...". One column
+   of 700px rows fits every label whole, which is the entire reason the
+   tiles became rows. */
+@media (max-width:899px){
+  .carl{max-width:250px}
+  .carlbox{margin-bottom:14px}
+}
+
 /* ── the kit, scoring live ────────────────────────────────────── */
 .big.live{color:var(--citrus)}
 .settle{font-size:11.5px;color:var(--ink3);margin:-4px 0 12px}
@@ -2035,7 +2230,11 @@ table.h2h td.bar{width:34%;padding:7px 10px}
   <div class="bugtick" id="bugTick"></div>
 </div>
 
-<nav role="tablist" aria-label="Games"></nav>
+<div class="hscroll navwrap">
+  <button class="navarrow" data-d="l" type="button" tabindex="-1" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <nav role="tablist" aria-label="Games"></nav>
+  <button class="navarrow" data-d="r" type="button" tabindex="-1" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+</div>
 
 
 <section class="panel on" id="p-home" role="tabpanel" tabindex="0" aria-label="home">
@@ -2060,11 +2259,17 @@ table.h2h td.bar{width:34%;padding:7px 10px}
     <div class="gmeta"><span>6 slots</span><span>One Leaf per slot</span><span>Scores live</span><span>90 sec</span></div>
   </div>
   <div class="gday" id="ultDay"></div>
-  <div class="kit" id="parts"></div>
+  <div class="kitwrap">
+    <div class="carlbox">
+      <div class="carl" id="carl"></div>
+      <div class="carlcap" id="carlCap"></div>
+    </div>
+    <div class="kit" id="parts"></div>
+  </div>
   <div class="buildbar">
     <div class="stop">
-      <div><div class="lbl">Projected tonight</div><div class="big" id="ultTotal">0.0</div></div>
-      <div><div class="lbl">Scoring live</div><div class="big live" id="ultLive">0.0</div></div>
+      <div><div class="lbl">Season rate</div><div class="big" id="ultTotal">0.0</div></div>
+      <div><div class="lbl">Tonight, live</div><div class="big live" id="ultLive">0.0</div></div>
       <div style="text-align:right"><div class="lbl">vs best real Leaf</div><div class="stat" id="ultDelta">not built yet</div></div>
     </div>
     <div class="settle" id="ultSettle"></div>
@@ -2568,8 +2773,11 @@ const FX = [
 {"d":"2026-10-17","h":"TOR","a":"NYI","hn":"Maple Leafs","an":"Islanders","home":true},
 {"d":"2026-10-19","h":"TOR","a":"SJS","hn":"Maple Leafs","an":"Sharks","home":true}
 ];
-const PSK = PR.filter(p => !p.gk);
-const PGK = PR.filter(p =>  p.gk);
+/* PR is the Citrus Projections 2.0 roster for opening night, 29 September
+   against Montreal. Every live game on this page settles against a game
+   played on 12 March, so nothing here builds a pool out of it any more.
+   It survives for the one place a September projection belongs: the
+   "Projected tonight" card on a player's own page.                     */
 const SC = {g:3, a:2, ppp:1, sog:.4, blk:.5, hit:.2, pim:.5, tk:1};
 /* Citrus Projections 2.0 does not carry takeaways, so the rate here is the
    plain one: this season's takeaways over this season's games, out of the
@@ -3164,6 +3372,55 @@ function buildRail(){
   item(DASH.t, DASH.short, DASH.art);
   item(BOARD.t, BOARD.short, BOARD.t);
 }
+/* ── strips that scroll sideways say so ───────────────────────────
+   Three of them in this build, and not one of them looked scrollable:
+   the thirteen game tabs (1436px of them, so eight of the ten games were
+   behind an invisible gesture at every width), the roster rail on a
+   player page, and that page's four section tabs. All three hide the
+   scrollbar, which is right, and none of them replaced it, which is not.
+
+   A fade appears on whichever side still has something parked on it, off
+   the real scroll position so it can never point at nothing, and on a
+   pointer device the tabs also get a chevron, because a mouse has no
+   swipe. On a phone the chevrons stay off: a thumb already knows how to
+   swipe and two 30px buttons would eat a tab and a half of a 346px
+   strip.                                                              */
+const HINTED = [];
+function hintScroll(node, wrapCls){
+  if (!node || node.__hinted) return;
+  node.__hinted = 1;
+  let w = node.parentElement;
+  if (!w || !w.classList.contains('hscroll')){
+    w = el('div', 'hscroll' + (wrapCls ? ' ' + wrapCls : ''));
+    node.parentNode.insertBefore(w, node);
+    w.appendChild(node);
+  }
+  const upd = () => {
+    const max = node.scrollWidth - node.clientWidth;
+    w.classList.toggle('canl', max > 2 && node.scrollLeft > 2);
+    w.classList.toggle('canr', max > 2 && node.scrollLeft < max - 2);
+  };
+  node.addEventListener('scroll', upd, {passive:true});
+  HINTED.push(upd);
+  upd();
+}
+/* every strip is redrawn by the game that owns it, so the state is
+   recomputed on a resize and on every panel change rather than trusting
+   a width measured before the list existed */
+function hintAll(){ HINTED.forEach(f => f()); }
+addEventListener('resize', hintAll);
+
+function wireNavScroll(){
+  const w = document.querySelector('.navwrap'), n = $('nav');
+  if (!w || !n) return;
+  hintScroll(n);
+  w.querySelectorAll('.navarrow').forEach(b => {
+    /* three quarters of a screen, so the tab you were reading stays on
+       screen as an anchor instead of the strip jumping past it */
+    b.onclick = () => n.scrollBy({left:(b.dataset.d === 'l' ? -1 : 1) *
+      Math.max(160, Math.round(n.clientWidth * .74)), behavior:'smooth'});
+  });
+}
 function markPlayed(){
   document.querySelectorAll('nav .navitem').forEach(b =>
     b.querySelector('.tile').classList.toggle('played', !!GAME_CP[b.dataset.t]));
@@ -3196,6 +3453,7 @@ function go(t, fromHash){
   const foot = document.querySelector('.wrap > .foot');
   if (foot) foot.style.display = (t === 'home') ? '' : 'none';
   if (t === 'home') drawLocker();
+  hintAll();
   window.scrollTo({top:0, behavior:'smooth'});
 }
 /* left/right arrows walk the rail, which is what a tablist owes a
@@ -3585,27 +3843,8 @@ const PARTS = [
 const val    = (p,k) => p[k] * SC[k];
 const sixCat = p => PARTS.reduce((s,P) => s + val(p,P.k), 0);
 
-/* The ceiling is NOT the sum of the six category leaders. Matthews leads
-   goals and shots and can only fill one slot. This is the exact best legal
-   assignment of six different skaters to six slots, branch-and-bound.     */
-const PERFECT = (() => {
-  const cap = PARTS.map(P => Math.max(...PSK.map(p => val(p,P.k))));
-  let best = 0, bestBuild = null; const used = new Set(), cur = [];
-  (function dfs(i, acc){
-    if (i === PARTS.length){ if (acc > best){ best = acc; bestBuild = [...cur]; } return; }
-    let bound = acc; for (let j = i; j < PARTS.length; j++) bound += cap[j];
-    if (bound <= best) return;
-    for (const p of [...PSK].sort((a,b) => b[PARTS[i].k] - a[PARTS[i].k])){
-      if (used.has(p.name)) continue;
-      used.add(p.name); cur.push(p);
-      dfs(i + 1, acc + val(p, PARTS[i].k));
-      cur.pop(); used.delete(p.name);
-    }
-  })(0,0);
-  return { total: +best.toFixed(2), build: bestBuild };
-})();
-const GREEDY   = +PARTS.reduce((s,P) => s + Math.max(...PSK.map(p => val(p,P.k))), 0).toFixed(2);
-const BEST_ONE = PSK.reduce((m,p) => sixCat(p) > sixCat(m) ? p : m, PSK[0]);
+/* The pool, the ceiling and the best single Leaf are all built further
+   down, next to the season helper they read from. See KIT_POOL.        */
 
 const pick = {};
 let ultBanked = false, ultOpen = null;
@@ -3785,6 +4024,53 @@ const perGame = (name, k) => {
   return isFinite(r) ? r : 0;
 };
 const lineFor = (name, k) => Math.floor(perGame(name, k)) + 0.5;
+
+/* ── the kit pool ─────────────────────────────────────────────────
+   This was the twenty-three skaters of the Citrus Projections 2.0
+   opening-night roster, and it was the wrong list. The page says
+   "Game 01, live" and settles the six slots against the game the
+   score bug is replaying, Anaheim at Toronto. That roster and this
+   one overlap by ten men: thirteen of the twenty-three were not in
+   the building. Pick one and the slot could never settle, so it sat
+   on a tick to the final buzzer and said nothing about why.
+
+   The pool is now the seventeen who dressed for this game and have a
+   season behind them, which is the same seventeen Beat Stormy and the
+   three slates already use. One roster across every live game.
+
+   The number on a row moves with it. A projection built for 29
+   September cannot be shown against a game played on 12 March, so the
+   row carries the man's own season rate, per game, out of the same
+   roster file every other season number on this page comes from. It is
+   labelled as a rate everywhere it appears, never as a projection.  */
+const KIT_POOL = SLATE.map(r => {
+  const s = SEASON[r.name];
+  const o = { name: s.name, pos: s.pos, num: s.num || r.num };
+  PARTS.forEach(P => { o[P.k] = +perGame(s.name, P.k).toFixed(2); });
+  return o;
+});
+
+/* The ceiling is NOT the sum of the six category leaders. Matthews leads
+   goals and shots and can only fill one slot. This is the exact best legal
+   assignment of six different skaters to six slots, branch-and-bound.     */
+const PERFECT = (() => {
+  const cap = PARTS.map(P => Math.max(...KIT_POOL.map(p => val(p,P.k))));
+  let best = 0, bestBuild = null; const used = new Set(), cur = [];
+  (function dfs(i, acc){
+    if (i === PARTS.length){ if (acc > best){ best = acc; bestBuild = [...cur]; } return; }
+    let bound = acc; for (let j = i; j < PARTS.length; j++) bound += cap[j];
+    if (bound <= best) return;
+    for (const p of [...KIT_POOL].sort((a,b) => b[PARTS[i].k] - a[PARTS[i].k])){
+      if (used.has(p.name)) continue;
+      used.add(p.name); cur.push(p);
+      dfs(i + 1, acc + val(p, PARTS[i].k));
+      cur.pop(); used.delete(p.name);
+    }
+  })(0,0);
+  return { total: +best.toFixed(2), build: bestBuild };
+})();
+const GREEDY   = +PARTS.reduce((s,P) => s + Math.max(...KIT_POOL.map(p => val(p,P.k))), 0).toFixed(2);
+const BEST_ONE = KIT_POOL.reduce((m,p) => sixCat(p) > sixCat(m) ? p : m, KIT_POOL[0]);
 const SLATE_CATS = [
   {k:'sog', l:'shots on goal', s:'SOG'}, {k:'hit', l:'hits',      s:'HIT'},
   {k:'blk', l:'blocks',        s:'BLK'}, {k:'p',   l:'points',    s:'PTS'},
@@ -3843,6 +4129,213 @@ function prow(p, o){
   return b;
 }
 
+/* ══ CITRUS CARLTON ══════════════════════════════════════════════
+   The kit page used to be six cards on a grid, which is a form, not a
+   character. It is now a paper doll: the club's own bear, drawn in the
+   Citrus house style, standing in the middle of the page with nothing
+   on but a sweater, and six pieces of gear that arrive as you fill the
+   slots. Every piece is dim and hollow until a Leaf is behind it, then
+   it fills in and, once the puck drops, carries what that man has
+   actually done tonight.
+
+   Two things about him worth saying out loud in the room.
+
+   Carlton is MLSE's mascot and their trademark, right down to the 60
+   on his back for 60 Carlton Street. This is a Citrus rendering of
+   someone else's character, shown back to the people who own him.
+   That is normal pitch practice and it is worth saying rather than
+   letting a screenshot say it.
+
+   And the drawing is honest about being a drawing. Six PNG layers on a
+   shared canvas -- carlton-base plus one per piece of kit -- swap the
+   whole figure the moment they land, and until every one of the seven
+   is on disk the build keeps the vector, because half a paper doll is
+   worse than none. See CARLTON-BRIEF.md.                            */
+const CARL_IDS = ['base','g','a','sog','hit','blk','tk'];
+const CARL_ART = () => typeof ART !== 'undefined' &&
+  CARL_IDS.every(k => ART['carl_' + k]);
+
+/* anchors for the live pips, as a share of the 380 x 470 box, so the
+   badge sits on the piece it is talking about at any figure size */
+const CARL_PIN = {
+  hit:[67.9,44.3], a:[23.2,63.8], g:[73.1,72.1],
+  sog:[90.5,77.0], blk:[33.2,78.3], tk:[57.4,88.9]
+};
+
+/* two-pass limbs and stick: the same path stroked wide in the outline
+   colour and again narrow in the fill colour. It gives a limb a real
+   silhouette without hand-solving the outline of a bent tube. */
+const cS = (cls, d, w) => '<path class="' + cls + '" d="' + d + '" stroke-width="' + w + '"/>';
+
+function carlBoot(dx){                       /* one skate, dx apart */
+  const t = 'transform="translate(' + dx + ' 0)"';
+  return '<g ' + t + '>' +
+    '<path class="k" d="M119 398 h42 q14 0 15 13 l1 15 q1 12 -12 12 h-46 q-12 0 -12 -12 v-16 q0 -12 11 -12 z"/>' +
+    '<rect class="k" x="118" y="434" width="10" height="9" rx="2"/>' +
+    '<rect class="k" x="156" y="434" width="10" height="9" rx="2"/>' +
+    '<rect class="ka" x="104" y="440" width="70" height="9" rx="4.5"/>' +
+    '<path class="ks" d="M124 410 h34 M124 422 h34" stroke-width="4"/></g>';
+}
+function carlShin(dx){                       /* one shin pad */
+  const t = 'transform="translate(' + dx + ' 0)"';
+  return '<g ' + t + '>' +
+    '<circle class="k" cx="140" cy="344" r="18"/>' +
+    '<path class="k" d="M116 336 h48 q10 0 10 10 v50 q0 10 -10 10 h-48 q-10 0 -10 -10 v-50 q0 -10 10 -10 z"/>' +
+    '<rect class="ka" x="104" y="356" width="70" height="8" rx="4"/>' +
+    '<rect class="ka" x="104" y="380" width="70" height="8" rx="4"/></g>';
+}
+function carlGlove(x, y, tx){                /* one mitt, tx = thumb side */
+  return '<g>' +
+    '<rect class="k" x="' + (x + (tx < 0 ? -10 : 44)) + '" y="' + (y + 10) + '" width="18" height="30" rx="9"/>' +
+    '<rect class="k" x="' + x + '" y="' + y + '" width="52" height="54" rx="16"/>' +
+    '<rect class="ka" x="' + (x - 4) + '" y="' + (y + 40) + '" width="60" height="17" rx="7"/>' +
+    '<path class="ks" d="M' + (x + 14) + ' ' + (y + 8) + ' v30 M' + (x + 28) + ' ' + (y + 8) + ' v30" stroke-width="3.6"/></g>';
+}
+function carlCap(mirror){                    /* one shoulder cap */
+  const t = mirror ? ' transform="translate(352 0) scale(-1 1)"' : '';
+  return '<g' + t + '>' +
+    '<path class="k" d="M142 166 q-6 -10 -18 -8 q-30 6 -35 32 q-4 22 17 25 l30 -6 q8 -22 6 -43 z"/>' +
+    '<path class="ks" d="M95 186 q18 -5 34 -2" stroke-width="4"/></g>';
+}
+
+function carltonSVG(){
+  if (CARL_ART()) return '<div class="carlpaper">' +
+    CARL_IDS.map(k => '<img class="cl' + (k === 'base' ? ' base' : ' kitp kitp-' + k) +
+      '" data-id="' + (k === 'base' ? '' : k) + '" src="' + ART['carl_' + k].src + '" alt="">').join('') +
+    '</div>';
+  return '<svg class="carlsvg" viewBox="0 0 380 470" role="img" aria-hidden="true">' +
+  '<defs><clipPath id="carlTorso"><path d="M118 196 q2 -22 22 -27 l30 -8 q6 6 12 0 l30 8 q20 5 22 27 l8 76 q2 14 -13 14 h-106 q-15 0 -13 -14 z"/></clipPath></defs>' +
+
+  '<ellipse class="cshade" cx="176" cy="452" rx="106" ry="14"/>' +
+
+  /* ── the skates ── */
+  '<g class="kitp" data-id="tk"><rect class="hitz" x="176" y="390" width="84" height="62"/>' + carlBoot(76) + '</g>' +
+  '<g class="kitp" data-id="tk"><rect class="hitz" x="100" y="390" width="84" height="62"/>' + carlBoot(0) + '</g>' +
+  /* ── the shin pads ── */
+  '<g class="kitp" data-id="blk"><rect class="hitz" x="98" y="336" width="84" height="78"/>' + carlShin(0) + '</g>' +
+  '<g class="kitp" data-id="blk"><rect class="hitz" x="180" y="336" width="84" height="78"/>' + carlShin(76) + '</g>' +
+
+  /* pants, over the top of the pads the way they sit on a real leg */
+  '<path class="cpant" d="M124 276 h104 q14 0 16 13 l5 38 q2 13 -12 13 h-122 q-14 0 -12 -13 l5 -38 q2 -13 16 -13 z"/>' +
+  '<path class="cstripe" d="M112 312 h128"/>' +
+
+  /* the sweater */
+  '<path class="csweat" d="M118 196 q2 -22 22 -27 l30 -8 q6 6 12 0 l30 8 q20 5 22 27 l8 76 q2 14 -13 14 h-106 q-15 0 -13 -14 z"/>' +
+  '<g clip-path="url(#carlTorso)">' +
+    '<path class="cyoke" d="M104 200 q12 -24 36 -31 l36 -10 l36 10 q24 7 36 31 l-7 15 q-13 -20 -33 -25 l-32 -9 l-32 9 q-20 5 -33 25 z"/>' +
+    '<rect class="cyoke" x="100" y="252" width="160" height="11"/>' +
+    '<rect class="cyoke" x="100" y="269" width="160" height="6"/>' +
+  '</g>' +
+  '<path class="csweatln" d="M118 196 q2 -22 22 -27 l30 -8 q6 6 12 0 l30 8 q20 5 22 27 l8 76 q2 14 -13 14 h-106 q-15 0 -13 -14 z"/>' +
+
+  /* the crest. Where the club's own mark goes, a citrus slice: this is
+     the one place in the build the accent is allowed to be the subject */
+  '<circle class="ccrestw" cx="176" cy="220" r="28"/>' +
+  '<circle class="ccrest"  cx="176" cy="220" r="21"/>' +
+  '<g class="ccrestseg">' +
+    '<path d="M179 220 L196 220"/><path d="M177.5 222.6 L186 237.3"/>' +
+    '<path d="M174.5 222.6 L166 237.3"/><path d="M173 220 L156 220"/>' +
+    '<path d="M174.5 217.4 L166 202.7"/><path d="M177.5 217.4 L186 202.7"/>' +
+  '</g>' +
+  '<circle class="ccrestw" cx="176" cy="220" r="4"/>' +
+
+  /* sleeves */
+  cS('csleeveo', 'M126 198 C 106 216, 94 244, 93 266', 38) +
+  cS('csleeve',  'M126 198 C 106 216, 94 244, 93 266', 30) +
+  cS('ccuff',    'M97 246 C 95 254, 93 260, 93 266', 30) +
+  cS('csleeveo', 'M226 198 C 246 216, 258 238, 260 260', 38) +
+  cS('csleeve',  'M226 198 C 246 216, 258 238, 260 260', 30) +
+  cS('ccuff',    'M255 242 C 258 250, 259 255, 260 260', 30) +
+
+  /* ── the shoulders ── */
+  '<g class="kitp" data-id="hit"><rect class="hitz" x="210" y="166" width="58" height="66"/>' + carlCap(1) + '</g>' +
+  '<g class="kitp" data-id="hit"><rect class="hitz" x="88" y="166" width="58" height="66"/>' + carlCap(0) + '</g>' +
+
+  /* ── the stick ── */
+  '<g class="kitp" data-id="g">' +
+    cS('hitz', 'M262 250 L288 398', 42) +
+    cS('kso', 'M262 250 L288 398', 17) + cS('ksf', 'M262 250 L288 398', 10) +
+    cS('kso', 'M286 400 L328 411', 19) + cS('ksf', 'M286 400 L328 411', 12) +
+    cS('kta', 'M268 278 L274 306', 11) +
+  '</g>' +
+
+  /* ── the hands ── */
+  '<g class="kitp" data-id="a"><rect class="hitz" x="48" y="248" width="82" height="76"/>' + carlGlove(66, 258, -1) + '</g>' +
+  '<g class="kitp" data-id="a"><rect class="hitz" x="226" y="240" width="82" height="76"/>' + carlGlove(236, 250, 1) + '</g>' +
+
+  /* ── the release ── */
+  '<g class="kitp" data-id="sog"><rect class="hitz" x="316" y="334" width="60" height="60"/>' +
+    '<circle class="kpuck" cx="344" cy="362" r="24"/>' +
+  '</g>' +
+
+  /* the bear */
+  '<g class="chead">' +
+    '<circle class="cfur" cx="122" cy="40" r="27"/><circle class="cear" cx="122" cy="40" r="13"/>' +
+    '<circle class="cfur" cx="230" cy="40" r="27"/><circle class="cear" cx="230" cy="40" r="13"/>' +
+    '<circle class="cfur" cx="176" cy="98" r="68"/>' +
+    '<ellipse class="cmuz" cx="176" cy="126" rx="41" ry="30"/>' +
+    '<ellipse class="cink" cx="176" cy="110" rx="14" ry="10.5"/>' +
+    '<path class="cline" d="M176 121 v9 M176 130 q-13 13 -25 2 M176 130 q13 13 25 2"/>' +
+    '<circle class="cink" cx="146" cy="82" r="9"/><circle class="cink" cx="206" cy="82" r="9"/>' +
+    '<circle class="cglint" cx="149.5" cy="78" r="3.2"/><circle class="cglint" cx="209.5" cy="78" r="3.2"/>' +
+  '</g>' +
+  '</svg>';
+}
+
+/* the figure, the pips and the caption. Rebuilt only when the kit
+   changes; the pips update in place on the clock. */
+let carlBuilt = false;
+function drawCarl(){
+  const host = $('#carl'); if (!host) return;
+  if (!carlBuilt){
+    host.innerHTML = carltonSVG() +
+      PARTS.map(P => '<span class="kitpin" data-id="' + P.id + '" style="left:' +
+        CARL_PIN[P.id][0] + '%;top:' + CARL_PIN[P.id][1] + '%"></span>').join('') ;
+    host.addEventListener('click', e => {
+      const g = e.target.closest('.kitp'); if (!g || !g.dataset.id) return;
+      const P = PARTS.find(x => x.id === g.dataset.id); if (P) openPicker(P);
+    });
+    /* a pair is two groups, so lighting one skate on hover and not the
+       other would read as a bug. Done here rather than with :has(),
+       which this file cannot assume in a browser it has never met. */
+    const hot = g => { const id = g && g.dataset.id;
+      host.querySelectorAll('.kitp').forEach(x =>
+        x.classList.toggle('hot', !!id && x.dataset.id === id)); };
+    host.addEventListener('mouseover', e => hot(e.target.closest('.kitp')));
+    host.addEventListener('mouseleave', () => hot(null));
+    carlBuilt = true;
+  }
+  PARTS.forEach(P => {
+    const on = !!pick[P.id];
+    host.querySelectorAll('.kitp[data-id="' + P.id + '"]').forEach(g => g.classList.toggle('on', on));
+  });
+  carlPips();
+  const cap = $('#carlCap'); if (!cap) return;
+  const n = Object.keys(pick).length;
+  cap.innerHTML = n === 0
+    ? 'Carlton has the sweater and nothing else. Pick a Leaf for a piece to put it on him.'
+    : n < 6 ? '<b>' + n + ' of 6</b> pieces on Carlton. ' + (6 - n) + ' to go.'
+    : CLOCK.over ? '<b>Dressed, and final.</b> Every piece has settled.'
+                 : '<b>Dressed.</b> Every piece scores as the game goes.';
+}
+/* the pip carries the live number for the piece it sits on, and a tick
+   when the slot is filled but the number does not exist until the
+   buzzer. It never carries a zero dressed up as a fact. */
+function carlPips(){
+  const host = $('#carl'); if (!host) return;
+  PARTS.forEach(P => {
+    const pin = host.querySelector('.kitpin[data-id="' + P.id + '"]'); if (!pin) return;
+    const chosen = pick[P.id];
+    if (!chosen){ pin.className = 'kitpin'; pin.textContent = ''; pin.dataset.id = P.id; return; }
+    const known = !!KIT_LIVE[P.k] || CLOCK.over;
+    const n = !BOXF[chosen.name] ? null
+      : (KIT_LIVE[P.k] ? CLOCK.live(chosen.name)[P.k] : BOXF[chosen.name][P.k]);
+    pin.className = 'kitpin on' + (known && n > 0 ? ' hot' : '');
+    pin.textContent = known && n != null ? String(n) : '✓';
+    pin.dataset.id = P.id;
+  });
+}
+
 /* ── the kit ──────────────────────────────────────────────────────
    Six doors. A tile shows what is behind it (the leader's number)
    before you open it, and who you put in it after. */
@@ -3850,7 +4343,7 @@ function drawParts(){
   const box = $('#parts'); box.innerHTML = '';
   PARTS.forEach(P => {
     const chosen = pick[P.id];
-    const lead   = [...PSK].sort((a,b) => b[P.k] - a[P.k])[0];
+    const lead   = [...KIT_POOL].sort((a,b) => b[P.k] - a[P.k])[0];
     const t = el('button','eq'+(chosen?' filled':''));
     t.type = 'button';
     t.style.setProperty('--eqc','var('+PART_C[P.id]+')');
@@ -3869,6 +4362,7 @@ function drawParts(){
     t.onclick = () => openPicker(P);
     box.appendChild(t);
   });
+  drawCarl();
 }
 
 /* ── the picker ───────────────────────────────────────────────────
@@ -3881,11 +4375,11 @@ function openPicker(P){
   sheet.querySelector('.shcard').style.setProperty('--eqc','var('+PART_C[P.id]+')');
   sheet.querySelector('.shcard').style.setProperty('--ac','var('+PART_C[P.id]+')');
   $('#shTitle').textContent = P.part;
-  $('#shSub').textContent   = P.cat + ' · projected tonight vs Montreal';
+  $('#shSub').textContent   = P.cat + ' · per game this season';
   const chosen = pick[P.id];
   const takenBy = {};
   Object.entries(pick).forEach(([id,p]) => { if (id !== P.id) takenBy[p.name] = PARTS.find(x=>x.id===id).part; });
-  const ranked = [...PSK].sort((a,b) => b[P.k] - a[P.k]);
+  const ranked = [...KIT_POOL].sort((a,b) => b[P.k] - a[P.k]);
   const top = ranked[0][P.k] || 1;
   $('#shNote').innerHTML = 'Every Leaf fills one slot only, ' +
     (Object.keys(takenBy).length ? '<b>'+Object.keys(takenBy).length+'</b> already placed and greyed below.'
@@ -3925,10 +4419,13 @@ document.addEventListener('keydown', e => {
 function drawGameDay(){
   const box = $('#ultDay'); if (!box) return;
   box.innerHTML =
-    '<span class="gd"><i>Puck drop</i><b>Tue 29 Sep · 7:00 PM ET</b></span>'+
-    '<span class="gd"><i>Opponent</i><b>vs Montreal</b></span>'+
+    /* The fixture used to live here in two chips. The score bug is sticky
+       on every page and already says Anaheim at Toronto, 12 March 2026,
+       Scotiabank Arena, so these were the same three facts twice, and on
+       a phone they pushed the two chips that are actually about YOUR
+       build off the side of a strip with no sign it scrolled. */
     '<span class="gd"><i>Slots filled</i><b id="ultFilled">0 of 6</b></span>'+
-    '<span class="gd"><i>Ceiling tonight</i><b>'+PERFECT.total.toFixed(2)+' fpts</b></span>';
+    '<span class="gd"><i>Perfect build</i><b>'+PERFECT.total.toFixed(2)+' fpts</b></span>';
 }
 
 function tally(){
@@ -3977,6 +4474,7 @@ function ultLive(){
     : CLOCK.over ? '<b>Final.</b> Every slot has settled.'
     : '<b>' + BOX_ONLY_NOTE + '</b> Goals, assists and shots are live.';
   drawKitLive();
+  carlPips();
 }
 function drawKitLive(){
   document.querySelectorAll('#parts .eq').forEach((tile, i) => {
@@ -3994,7 +4492,13 @@ function drawKitLive(){
       : '<b>&nbsp;</b> ' + P.cat.toLowerCase() + '<span class="fin">AT THE BUZZER</span>';
   });
 }
-CLOCK.on((kind) => { if (kind === 'tick' || kind === 'final' || kind === 'reset') ultLive(); });
+CLOCK.on((kind) => {
+  if (kind !== 'tick' && kind !== 'final' && kind !== 'reset') return;
+  ultLive();
+  /* the caption reads "dressed, and final" only at the buzzer, so it has
+     to be rebuilt on the two events that move it, and never on a tick */
+  if (kind !== 'tick') drawCarl();
+});
 
 /* ══ GAME 2: BEAT STORMY ════════════════════════════════════════
    This used to compare a projection against a projection, which means
@@ -4920,7 +5424,7 @@ function drawLB(){
   $('#lbCap').textContent = lbView==='cp'
     ? 'One score across all ten games. This is the number a fan comes back to move.'
     : lbView==='ult'
-      ? 'Six slots, six different Leafs, tonight’s projections. Perfect is '+PERFECT.total.toFixed(2)+
+      ? 'Six slots, six different Leafs, season rates per game. Perfect is '+PERFECT.total.toFixed(2)+
         '. The best legal assignment, not the sum of the category leaders ('+GREEDY.toFixed(2)+
         ', which no build can reach). The best single Leaf tonight is '+last(BEST_ONE.name)+' at '+sixCat(BEST_ONE).toFixed(2)+'.'
       : 'Three forwards and a pair against Stormy’s five, six categories, 3-3 is a draw. Across all 3,300 legal lineups: 33.2% win, 18.7% draw, 48.1% loss. A 6-0 sweep exists in 28 of them.';
@@ -6103,6 +6607,9 @@ $('#igIn').addEventListener('keydown', e => {
   if (pn && hd) { hd.id = 'h-' + g.t; pn.setAttribute('aria-labelledby', 'h-' + g.t); pn.removeAttribute('aria-label'); }
 });
 buildRail();
+wireNavScroll();
+hintScroll($('#dashRoster'), 'inpage');
+hintScroll(document.querySelector('.segbar'), 'inpage');
 (function(){ const m = $('#brandMark');   // header bug, club colours
   if (m) m.innerHTML = leafSVG(26,'#FFFFFF'); })();
 drawGameDay(); drawParts(); tally(); drawStormy(); bzIdle(); clIdle();

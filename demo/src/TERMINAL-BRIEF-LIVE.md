@@ -176,6 +176,19 @@ image to read the type, the composition failed and no amount of CSS fixes it.
 
 ---
 
+## Job 4: Citrus Carlton, and it has its own file
+
+Game 01 is a paper doll now: the club's bear, and six pieces of kit that
+arrive as you fill the slots. There is a drawn vector Carlton in the build
+that holds up at every width, so nothing is blocked. The upgrade is seven
+transparent layers on one canvas, which is a vector job rather than a render
+job, plus one piece of key art that IS a Nano Banana job.
+
+**See `CARLTON-BRIEF.md`.** It has the canvas, the palette, the seven
+filenames and the one prompt.
+
+---
+
 ## What not to spend time on
 
 - **more mascot renders.** Twelve exist and they are good. They are on the
