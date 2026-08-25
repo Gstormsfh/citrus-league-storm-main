@@ -260,7 +260,12 @@ export const DraftService = {
             const { getLeagueFormat } = await import('./LeagueService');
             const { FORMAT_HAS_MATCHUPS } = await import('@/types/leagueTypes');
 
-            const { league } = await LS.getLeague(leagueId, _userId);
+            // NOTE: no _userId in scope here — makePick never took one. This
+            // read `_userId` and threw ReferenceError on every draft
+            // completion, inside a Promise.allSettled that swallowed it, so
+            // matchups silently never generated. getLeague's second parameter
+            // is optional and unused anyway (auth is JWT, server-side).
+            const { league } = await LS.getLeague(leagueId);
             if (league) {
               const fmt = getLeagueFormat(league);
               const needsMatchups = FORMAT_HAS_MATCHUPS[fmt.scoringFormat] ?? true;

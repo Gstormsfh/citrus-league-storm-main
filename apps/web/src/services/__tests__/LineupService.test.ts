@@ -197,7 +197,7 @@ describe('LineupService.canUpdateRosterForDate', () => {
   });
 
   it('returns true when API says roster can be updated', async () => {
-    mockRosterApi.canUpdateRoster.mockResolvedValue({ canUpdate: true });
+    mockRosterApi.canUpdateRoster.mockResolvedValue({ data: { canUpdate: true } });
 
     const result = await LineupService.canUpdateRosterForDate(
       'team-1',
@@ -209,8 +209,13 @@ describe('LineupService.canUpdateRosterForDate', () => {
     expect(mockRosterApi.canUpdateRoster).toHaveBeenCalledWith('2026-03-08', [101]);
   });
 
+  // This is the test that made the bug invisible. It mocked { canUpdate: false }
+  // FLAT, which the API never returns — the real body is { data: { canUpdate } }.
+  // Against the flat mock the old `result?.canUpdate ?? true` read false and the
+  // test went green, while in production it read undefined, fell through to
+  // `?? true`, and let anyone move a player whose game had already started.
   it('returns false when API says roster cannot be updated', async () => {
-    mockRosterApi.canUpdateRoster.mockResolvedValue({ canUpdate: false });
+    mockRosterApi.canUpdateRoster.mockResolvedValue({ data: { canUpdate: false } });
 
     const result = await LineupService.canUpdateRosterForDate(
       'team-1',
@@ -219,6 +224,22 @@ describe('LineupService.canUpdateRosterForDate', () => {
     );
 
     expect(result).toBe(false);
+  });
+
+  it('fails open on a flat body — proof it reads .data and not the root', async () => {
+    // If someone reverts to reading the envelope root, the mock below starts
+    // returning false again and this test fails.
+    mockRosterApi.canUpdateRoster.mockResolvedValue(
+      { canUpdate: false } as unknown as { data: { canUpdate: boolean } },
+    );
+
+    const result = await LineupService.canUpdateRosterForDate(
+      'team-1',
+      new Date('2026-03-08'),
+      { starters: ['101'], bench: [], ir: [] }
+    );
+
+    expect(result).toBe(true);
   });
 
   it('returns true on error (fail open)', async () => {
@@ -336,10 +357,16 @@ describe('LineupService.loadDailyRoster', () => {
 // =============================================================================
 
 describe('LineupService.backfillMissingDailyRosters', () => {
+  // ENVELOPE (2026-08-25). Every server route answers with ok(c, payload),
+  // which serialises as { data: payload }, and apiClient resolves to that JSON
+  // verbatim. These mocks used to return the payload FLAT — a shape the real
+  // API has never produced — so they passed while the service read
+  // result.backfilledCount, got undefined, and reported 0 for every call.
+  // A test that mocks a fictional response shape cannot fail when the code
+  // reads the real one wrong, which is exactly what happened here.
   it('returns result from API', async () => {
     mockRosterApi.backfillDailyRosters.mockResolvedValue({
-      backfilledCount: 5,
-      error: null,
+      data: { backfilledCount: 5, error: null },
     });
 
     const result = await LineupService.backfillMissingDailyRosters('team-1', 'league-1', 'matchup-1');
@@ -351,6 +378,29 @@ describe('LineupService.backfillMissingDailyRosters', () => {
 
   it('returns 0 when API returns no data', async () => {
     mockRosterApi.backfillDailyRosters.mockResolvedValue(null);
+
+    const result = await LineupService.backfillMissingDailyRosters('team-1', 'league-1', 'matchup-1');
+
+    expect(result.backfilledCount).toBe(0);
+  });
+
+  it('surfaces a service-level error carried inside the payload', async () => {
+    mockRosterApi.backfillDailyRosters.mockResolvedValue({
+      data: { backfilledCount: 0, error: 'Matchup not found' },
+    });
+
+    const result = await LineupService.backfillMissingDailyRosters('team-1', 'league-1', 'matchup-1');
+
+    expect(result.error).toBe('Matchup not found');
+  });
+
+  it('reads the payload from .data, never from the envelope root', async () => {
+    // Regression guard. A flat body is what the old mocks pretended the API
+    // returned; if the service ever reads the root again this goes green-to-red.
+    mockRosterApi.backfillDailyRosters.mockResolvedValue({
+      backfilledCount: 5,
+      error: null,
+    } as unknown as { data: { backfilledCount: number; error: string | null } });
 
     const result = await LineupService.backfillMissingDailyRosters('team-1', 'league-1', 'matchup-1');
 
@@ -374,9 +424,7 @@ describe('LineupService.backfillMissingDailyRosters', () => {
 describe('LineupService.backfillAllMatchupsForLeague', () => {
   it('returns result from API', async () => {
     mockRosterApi.backfillAllMatchups.mockResolvedValue({
-      totalBackfilled: 10,
-      matchupsProcessed: 3,
-      errors: [],
+      data: { totalBackfilled: 10, matchupsProcessed: 3, errors: [] },
     });
 
     const result = await LineupService.backfillAllMatchupsForLeague('league-1');
@@ -405,6 +453,25 @@ describe('LineupService.backfillAllMatchupsForLeague', () => {
     expect(result.totalBackfilled).toBe(0);
     expect(result.matchupsProcessed).toBe(0);
     expect(result.errors).toHaveLength(1);
+  });
+
+  it('passes through per-matchup errors the server collected', async () => {
+    // The whole point of the endpoint: tell the commissioner WHICH teams
+    // failed. Reading the wrong level of the envelope returned [] every time,
+    // so a half-broken backfill looked identical to a clean one.
+    mockRosterApi.backfillAllMatchups.mockResolvedValue({
+      data: {
+        totalBackfilled: 4,
+        matchupsProcessed: 3,
+        errors: [{ matchup: 'm-2', team: 'team2_id', error: 'insert failed' }],
+      },
+    });
+
+    const result = await LineupService.backfillAllMatchupsForLeague('league-1');
+
+    expect(result.totalBackfilled).toBe(4);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].matchup).toBe('m-2');
   });
 });
 
@@ -495,10 +562,12 @@ describe('LineupService.saveLineup', () => {
 describe('LineupService.initializeTeamLineup', () => {
   it('returns lineup from API', async () => {
     mockRosterApi.initializeLineup.mockResolvedValue({
-      starters: ['101', '102'],
-      bench: ['201'],
-      ir: [],
-      slot_assignments: { '101': 'slot-C-1', '102': 'slot-LW-1' },
+      data: {
+        starters: ['101', '102'],
+        bench: ['201'],
+        ir: [],
+        slot_assignments: { '101': 'slot-C-1', '102': 'slot-LW-1' },
+      },
     });
 
     const result = await LineupService.initializeTeamLineup('team-1', 'league-1', [], 'user-1');
@@ -518,6 +587,31 @@ describe('LineupService.initializeTeamLineup', () => {
 
     expect(result.lineup).toBeNull();
     expect(result.error).toBeNull();
+  });
+
+  it('returns null lineup when the server computed none ({ data: null })', async () => {
+    mockRosterApi.initializeLineup.mockResolvedValue({ data: null });
+
+    const result = await LineupService.initializeTeamLineup('team-1', 'league-1', [], 'user-1');
+
+    expect(result.lineup).toBeNull();
+    expect(result.error).toBeNull();
+  });
+
+  it('ignores a flat body — proof it reads .data and not the root', async () => {
+    // The old mock shape. Reading the envelope root produced a lineup whose
+    // every field was undefined, which the `|| []` fallbacks turned into an
+    // empty lineup — the server's slot computation thrown away in silence.
+    mockRosterApi.initializeLineup.mockResolvedValue({
+      starters: ['101'],
+      bench: [],
+      ir: [],
+      slot_assignments: {},
+    } as unknown as { data: null });
+
+    const result = await LineupService.initializeTeamLineup('team-1', 'league-1', [], 'user-1');
+
+    expect(result.lineup).toBeNull();
   });
 
   it('handles exceptions gracefully', async () => {

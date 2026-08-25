@@ -9,6 +9,33 @@ import { createApiCache, CACHE_TTL } from './cache';
 
 const c = createApiCache();
 
+/**
+ * Server payloads for the two backfill endpoints.
+ *
+ * Both routes answer with `ok(c, result)` (server/src/lib/responses.ts), which
+ * serialises as `{ data: <result> }` — so apiClient resolves to
+ * ApiResponse<T> and the fields below live under `.data`, NOT at the top
+ * level. Typing them here is what makes reading `result.totalBackfilled`
+ * directly a compile error instead of a silent `undefined`.
+ */
+export interface BackfillResult {
+  backfilledCount: number;
+  error: string | null;
+}
+
+export interface LineupPayload {
+  starters: string[];
+  bench: string[];
+  ir: string[];
+  slot_assignments: Record<string, string>;
+}
+
+export interface BackfillAllResult {
+  totalBackfilled: number;
+  matchupsProcessed: number;
+  errors: Array<{ matchup?: string; team?: string; error: unknown }>;
+}
+
 export const rosterApi = {
   /** Get roster for a specific team */
   getTeamRoster(leagueId: string, teamId: string) {
@@ -85,23 +112,23 @@ export const rosterApi = {
   /** Check if roster can be updated for a date */
   canUpdateRoster(date: string, playerIds: number[]) {
     const idsParam = playerIds.join(',');
-    return apiClient.get(`/api/rosters/can-update?date=${date}&player_ids=${idsParam}`);
+    return apiClient.get<{ canUpdate: boolean }>(`/api/rosters/can-update?date=${date}&player_ids=${idsParam}`);
   },
 
   /** Backfill missing daily rosters for a matchup */
   backfillDailyRosters(leagueId: string, teamId: string, matchupId: string) {
-    return apiClient.post(`/api/rosters/league/${leagueId}/team/${teamId}/backfill`, { matchup_id: matchupId });
+    return apiClient.post<BackfillResult>(`/api/rosters/league/${leagueId}/team/${teamId}/backfill`, { matchup_id: matchupId });
   },
 
   /** Backfill daily rosters for all matchups in a league */
   backfillAllMatchups(leagueId: string) {
-    return apiClient.post(`/api/rosters/league/${leagueId}/backfill-all`, {});
+    return apiClient.post<BackfillAllResult>(`/api/rosters/league/${leagueId}/backfill-all`, {});
   },
 
   /** Initialize lineup from roster assignments (server-side slot computation) */
   initializeLineup(leagueId: string, teamId: string) {
     c.invalidate(`rosters:${leagueId}:${teamId}`);
-    return apiClient.post(`/api/rosters/league/${leagueId}/team/${teamId}/initialize`, {});
+    return apiClient.post<LineupPayload | null>(`/api/rosters/league/${leagueId}/team/${teamId}/initialize`, {});
   },
 
   /** Get roster count for a team */
