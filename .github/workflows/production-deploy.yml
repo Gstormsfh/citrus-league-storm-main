@@ -239,7 +239,33 @@ jobs:
             echo "::error::Revision $LATEST_CREATED was created but never became ready. Cloud Run is still serving $SERVING. Check the revision logs."
             exit 1
           fi
-          if [ "${SERVING_IMAGE##*:}" != "${{ github.sha }}" ]; then
+          # Cloud Run pins a deployed image by DIGEST, so the serving image
+          # comes back as `...server@sha256:<hex>` rather than carrying the
+          # `:<git-sha>` tag we pushed. The original check stripped to the
+          # last colon, which on a digest yields the sha256 hex — a value
+          # that can never equal a commit SHA. Result: this step failed
+          # EVERY deploy while the deploy itself had succeeded (2026-08-25:
+          # serving, latestReady and latestCreated all agreed on the new
+          # revision, /api/news served the new build, and the job still went
+          # red — which then skipped the web deploy entirely).
+          #
+          # Compare digest-to-digest when a digest is what we are handed, and
+          # keep the tag comparison for the case where it isn't.
+          if [[ "$SERVING_IMAGE" == *"@sha256:"* ]]; then
+            SERVING_DIGEST="${SERVING_IMAGE##*@}"
+            EXPECTED_DIGEST=$(gcloud artifacts docker images describe "$IMAGE" \
+              --format='value(image_summary.digest)' 2>/dev/null || true)
+            echo "serving digest   : $SERVING_DIGEST"
+            echo "expected digest  : $EXPECTED_DIGEST"
+            if [ -z "$EXPECTED_DIGEST" ]; then
+              echo "::error::Could not resolve a digest for $IMAGE — cannot prove which build is serving."
+              exit 1
+            fi
+            if [ "$SERVING_DIGEST" != "$EXPECTED_DIGEST" ]; then
+              echo "::error::Traffic is on digest $SERVING_DIGEST, expected $EXPECTED_DIGEST. The deploy did not take effect."
+              exit 1
+            fi
+          elif [ "${SERVING_IMAGE##*:}" != "${{ github.sha }}" ]; then
             echo "::error::Traffic is on image tag ${SERVING_IMAGE##*:}, expected ${{ github.sha }}. The deploy did not take effect."
             exit 1
           fi
