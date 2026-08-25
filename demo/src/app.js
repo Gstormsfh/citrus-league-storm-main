@@ -2028,6 +2028,9 @@ const CLUE_SK=[p=>['Position',p.pos],p=>['Games played',p.gp],p=>['Goals',p.g],
 const CLUE_GK=[p=>['Position','Goaltender'],p=>['Games played',p.gp],p=>['Wins',p.w],
                p=>['Save %',p.svp!=null?p.svp.toFixed(3):'-'],p=>['Saves',p.sv],
                p=>['Shutouts',p.so],p=>['Jersey','#'+p.num]];
+const LOCK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" class="lockg">' +
+  '<rect x="4.5" y="10" width="15" height="10.5" rx="2.6"/>' +
+  '<path d="M8.3 10V7.4a3.7 3.7 0 0 1 7.4 0V10"/></svg>';
 let gT=null,gN=0,gScore=0,gLock=false,gClues=CLUE_SK;
 let gHinted=false;
 /* This game used to run for ever: every answer queued the next player on a
@@ -2076,8 +2079,11 @@ function gDraw(){
              '<div><span>'+c[0]+'</span><b>'+c[1]+'</b></div></div>';
     }
     const cost = i === gN ? '&minus;10 to open' : 'locked';
-    return '<div class="clue lk"><div class="ci">'+
-      (ART.state_locked ? '<img src="'+ART.state_locked.src+'" alt="">' : (i+1))+
+    /* This was ART.state_locked, an illustrated padlock, drawn into a 30px
+       chip. An illustration at 30px is a brown smudge; six of them down the
+       board looked like a rendering fault. Three shapes of SVG say locked
+       at any size, which is the whole reason icons exist. */
+    return '<div class="clue lk"><div class="ci">' + LOCK_SVG +
       '</div><div><span>Clue '+(i+1)+'</span><b>'+cost+'</b></div></div>';
   }).join('')+'</div>';
   rollNum($('#gWorth'), gWorth(), 0, 300);

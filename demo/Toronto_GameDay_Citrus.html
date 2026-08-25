@@ -437,7 +437,26 @@ tr.you .bar i{background:var(--accent)}
   overflow:hidden;display:flex}
 .fxcon .cbar i{display:block;height:100%;background:var(--ft)}
 .fxcon .cbar i.b{background:var(--fo);margin-left:auto}
-@media(max-width:900px){.fxrow{grid-template-columns:1fr}.fxcon{order:3}}
+/* Below 900 this row used to collapse to a single column, which stacked
+   four blocks and took it from 74px to 208px. Ten of those is a 2,516px
+   page on a tablet -- taller than the player pages were before they were
+   rebuilt for being too tall. The date and the crowd's verdict share the
+   first line, the two calls take the second, the crowd bar takes the
+   third. Three lines, not four, and the two that matter are side by side. */
+@media(max-width:900px){
+  .fxrow{grid-template-columns:minmax(0,1fr) auto;gap:9px 12px;align-items:center}
+  .fxd{grid-column:1;grid-row:1;min-width:0}
+  .fxpct{grid-column:2;grid-row:1;text-align:right;min-width:0}
+  .fxbtns{grid-column:1/-1;grid-row:2}
+  .fxbtns .fxb{flex:1}
+  .fxcon{grid-column:1/-1;grid-row:3}
+  /* date and opponent share a line rather than stacking: the fixture is one
+     fact, and stacked it set the height of the whole first row for no gain */
+  .fxd b,.fxd span{display:inline}
+  /* nbsp both sides: a plain space in a pseudo-element collapses, and it
+     rendered as "Sep 29 \00b7vs Canadiens" */
+  .fxd b::after{content:"\00a0\00b7\00a0";color:var(--ink3);font-weight:400}
+}
 .fxpct span{opacity:.7}
 
 /* buzzer */
@@ -680,9 +699,13 @@ button.ghost.tiny{padding:7px 12px;font-size:11.5px;width:100%;margin-top:2px}
   /* pick'em: date on the first line, the two calls under it, the fan
      percentage last and left-aligned so nothing is pinned to a right edge
      that does not exist on a phone */
-  .fxrow{grid-template-columns:1fr;gap:9px}
-  .fxpct{text-align:left;min-width:0}
-  .fxbtns .fxb{flex:1}
+  /* the same three lines hold down to 360; the verdict stays on the right
+     of line one where it reads as a summary of the bar below it */
+  .fxrow{gap:8px 10px;padding:10px 12px}
+  .fxpct{font-size:9.5px}
+  /* date and opponent share a line rather than stacking: the fixture is one
+     fact, and stacked it set the height of the whole first row for no gain */
+
   /* leaderboard: the lineup/activity column is the one a thumb can lose.
      Drop it on a phone -- rank, name, bar and total are the board. */
   #p-lb table th:nth-child(3),#p-lb table td:nth-child(3){display:none}
@@ -1983,9 +2006,36 @@ nav .navitem .lab{max-width:none !important;min-height:0 !important;
 }
 
 /* ── Guess the Leaf ───────────────────────────────────────────── */
-.guesswrap{display:grid;grid-template-columns:1.25fr .75fr;gap:18px;align-items:start;margin:18px 0 22px}
+.guesswrap{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:start;margin:18px 0 22px}
 @media (max-width:840px){.guesswrap{grid-template-columns:1fr}}
 .guessleft,.guessright{border:1px solid var(--line);border-radius:8px;background:var(--surf);padding:15px}
+/* The clue board is revealed one tile at a time, so it passes through every
+   count from one to seven. On a three-wide grid it is ragged at one, two,
+   four, five and seven -- five of those seven states -- and the seventh clue
+   sat alone on its own row. One column is ragged at none of them, and it
+   reads the way a clue board should: a list growing downward as the fan
+   spends. */
+#gClues .clues{grid-template-columns:1fr;gap:8px}
+#gClues .clue{padding:7px 12px}
+/* A 555px row holding a 30px icon and a two-line stack is the same empty
+   middle Rank 'Em had. Label left, value right, one line: a clue board is a
+   stat line, so it reads like one, and the seven rows cost less height than
+   the stacked three-wide grid they replaced. */
+/* :not(.ci) matters -- the numbered chip is also a direct child div, and
+   without it the 30px square stretched into a 460px pill. */
+#gClues .clue > div:not(.ci){flex:1;min-width:0;display:flex;align-items:baseline;
+  justify-content:space-between;gap:16px}
+#gClues .clue span,#gClues .clue b{margin-top:0}
+#gClues .clue b{text-align:right;white-space:nowrap}
+#gClues .clue.lk b{font-size:11.5px}
+/* both calls cost points, so they stack and each says its price */
+.gactions{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.gactions .ghost{width:100%;justify-content:center}
+/* three shapes, legible at 30px, where an illustrated padlock was mud */
+.clue .ci .lockg{width:15px;height:15px;fill:var(--ink3);stroke:var(--ink3);
+  stroke-width:2;stroke-linecap:round;display:block}
+.clue.lk .ci .lockg{opacity:.85}
+.clue .ci .lockg path{fill:none}
 #gClues{display:grid;gap:7px}
 #gClues .clue{margin:0}
 .gdots{display:flex;gap:4px;align-items:center;height:26px}
@@ -2474,18 +2524,23 @@ table.h2h td.bar{width:34%;padding:7px 10px}
     <div class="guessleft">
       <div class="cat" style="margin-bottom:10px">The clue board</div>
       <div id="gClues"></div>
-      <div class="actions" style="margin-top:12px">
-        <button class="ghost" id="gMore">Reveal another clue &middot; -10</button>
-        <button class="ghost" id="gHint">Show me four names &middot; -15</button>
-      </div>
     </div>
     <div class="guessright">
+      <!-- The two buttons used to sit under the clue board, which split the
+           page into "seven things you know" on the left and one input on the
+           right, 549px against 183px. They belong here: the left column is
+           what the game has told you, the right column is everything you can
+           DO about it, and both things you can do cost points. -->
       <div class="cat" style="margin-bottom:10px">Your answer</div>
       <div class="igsearch">
         <input id="gIn" type="text" autocomplete="off" spellcheck="false" placeholder="Type his name&hellip;" aria-label="Your guess">
         <div class="iglist" id="gList"></div>
       </div>
       <div class="opts" id="gOpts" style="margin-top:12px"></div>
+      <div class="actions gactions">
+        <button class="ghost" id="gMore">Reveal another clue &middot; -10</button>
+        <button class="ghost" id="gHint">Show me four names &middot; -15</button>
+      </div>
       <div id="gMsg" style="min-height:28px;font-weight:650;margin-top:14px"></div>
       <div class="gcard" id="gSoFar"></div>
     </div>
@@ -4749,6 +4804,9 @@ const CLUE_SK=[p=>['Position',p.pos],p=>['Games played',p.gp],p=>['Goals',p.g],
 const CLUE_GK=[p=>['Position','Goaltender'],p=>['Games played',p.gp],p=>['Wins',p.w],
                p=>['Save %',p.svp!=null?p.svp.toFixed(3):'-'],p=>['Saves',p.sv],
                p=>['Shutouts',p.so],p=>['Jersey','#'+p.num]];
+const LOCK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" class="lockg">' +
+  '<rect x="4.5" y="10" width="15" height="10.5" rx="2.6"/>' +
+  '<path d="M8.3 10V7.4a3.7 3.7 0 0 1 7.4 0V10"/></svg>';
 let gT=null,gN=0,gScore=0,gLock=false,gClues=CLUE_SK;
 let gHinted=false;
 /* This game used to run for ever: every answer queued the next player on a
@@ -4797,8 +4855,11 @@ function gDraw(){
              '<div><span>'+c[0]+'</span><b>'+c[1]+'</b></div></div>';
     }
     const cost = i === gN ? '&minus;10 to open' : 'locked';
-    return '<div class="clue lk"><div class="ci">'+
-      (ART.state_locked ? '<img src="'+ART.state_locked.src+'" alt="">' : (i+1))+
+    /* This was ART.state_locked, an illustrated padlock, drawn into a 30px
+       chip. An illustration at 30px is a brown smudge; six of them down the
+       board looked like a rendering fault. Three shapes of SVG say locked
+       at any size, which is the whole reason icons exist. */
+    return '<div class="clue lk"><div class="ci">' + LOCK_SVG +
       '</div><div><span>Clue '+(i+1)+'</span><b>'+cost+'</b></div></div>';
   }).join('')+'</div>';
   rollNum($('#gWorth'), gWorth(), 0, 300);
