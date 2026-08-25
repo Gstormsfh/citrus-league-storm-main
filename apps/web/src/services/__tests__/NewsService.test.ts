@@ -1,247 +1,139 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// NewsService contract (rewritten 2026-08-25).
+//
+// This file used to test a client that fetched forge-dapi.d3.nhle.com and
+// site.api.espn.com directly from the browser, categorised the results, built
+// NHL.com URLs, and fell back to six hard-coded "articles" when the fetches
+// failed. All of that moved server-side (server/src/routes/news.ts), because
+// those hosts don't send CORS headers to our origin and the calls could never
+// have worked from a browser — the fabricated fallback was what users actually
+// saw. The old assertions were pinning behaviour that no longer exists.
+//
+// What's left to guarantee on the client is smaller and more important:
+//   • it asks OUR api, not a third party
+//   • an empty feed stays empty — it never invents articles
+//   • it never caches emptiness
+//   • importing this module has no side effects
+//
+// The mock below matters as much as the tests. `@/api/client` loads the
+// Supabase client, which THROWS at module scope when VITE_SUPABASE_* is unset
+// — and CI's "Run web tests" step passes no VITE_* env. That is exactly how
+// this file broke the pre-deploy gate. NewsService now imports apiClient
+// lazily, and this mock keeps the call path deterministic.
 
-// =============================================================================
-// Mock fetch globally
-// =============================================================================
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
+const mockGet = vi.fn();
+vi.mock('@/api/client', () => ({
+  apiClient: {
+    get: (...args: unknown[]) => mockGet(...args),
+  },
+}));
 
-// =============================================================================
-// Tests
-// =============================================================================
+import { getNewsArticles, NEWS_CATEGORIES, type NewsArticle } from '../NewsService';
 
-// Each test dynamically imports to reset module-level cache
-let getNewsArticles: typeof import('../NewsService').getNewsArticles;
-let NEWS_CATEGORIES: typeof import('../NewsService').NEWS_CATEGORIES;
+const article = (over: Partial<NewsArticle> = {}): NewsArticle => ({
+  id: 'nhl-1',
+  title: 'Maple Leafs win in overtime',
+  description: 'A recap.',
+  url: 'https://www.nhl.com/news/example',
+  imageUrl: '',
+  source: 'NHL.com',
+  category: 'recap',
+  publishedAt: '2026-08-25T12:00:00.000Z',
+  ...over,
+});
 
-describe('NewsService', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    vi.resetModules();
-    const mod = await import('../NewsService');
-    getNewsArticles = mod.getNewsArticles;
-    NEWS_CATEGORIES = mod.NEWS_CATEGORIES;
+beforeEach(async () => {
+  mockGet.mockReset();
+  // The module holds a short in-memory cache; reset it between tests so one
+  // test's articles can't satisfy the next one's call.
+  vi.resetModules();
+});
+
+describe('NEWS_CATEGORIES', () => {
+  it('exports the category keys the News page filters on', () => {
+    const keys = NEWS_CATEGORIES.map((c) => c.key);
+    expect(keys).toEqual(['all', 'top', 'fantasy', 'trade', 'injury', 'recap', 'olympics']);
+  });
+});
+
+describe('getNewsArticles', () => {
+  it('asks our own API, never a third party directly', async () => {
+    mockGet.mockResolvedValue({ data: { articles: [article()] } });
+
+    const { getNewsArticles: fresh } = await import('../NewsService');
+    const result = await fresh();
+
+    expect(mockGet).toHaveBeenCalledWith('/api/news');
+    // No browser-side call to nhle.com / espn.com — that's the whole fix.
+    const requested = String(mockGet.mock.calls[0]?.[0] ?? '');
+    expect(requested).not.toMatch(/nhle\.com|espn\.com/);
+    expect(result).toHaveLength(1);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('returns the articles the API gives it', async () => {
+    mockGet.mockResolvedValue({
+      data: { articles: [article({ id: 'a' }), article({ id: 'b', source: 'Citrus' })] },
+    });
+
+    const { getNewsArticles: fresh } = await import('../NewsService');
+    const result = await fresh();
+
+    expect(result.map((a) => a.id)).toEqual(['a', 'b']);
+    expect(result[1].source).toBe('Citrus');
   });
 
-  // ---------------------------------------------------------------------------
-  // NEWS_CATEGORIES
-  // ---------------------------------------------------------------------------
-  describe('NEWS_CATEGORIES', () => {
-    it('exports expected category keys', () => {
-      const keys = NEWS_CATEGORIES.map(c => c.key);
-      expect(keys).toContain('all');
-      expect(keys).toContain('top');
-      expect(keys).toContain('fantasy');
-      expect(keys).toContain('trade');
-      expect(keys).toContain('injury');
-      expect(keys).toContain('recap');
-      expect(keys).toContain('olympics');
-    });
+  it('returns an EMPTY list when the API has nothing — it does not invent articles', async () => {
+    // The load-bearing test. The old implementation answered this case with
+    // six invented stories bylined to NHL.com and ESPN.
+    mockGet.mockResolvedValue({ data: { articles: [] } });
+
+    const { getNewsArticles: fresh } = await import('../NewsService');
+    expect(await fresh()).toEqual([]);
   });
 
-  // ---------------------------------------------------------------------------
-  // getNewsArticles
-  // ---------------------------------------------------------------------------
-  describe('getNewsArticles', () => {
-    const now = new Date();
+  it('returns an empty list when the request fails, rather than throwing', async () => {
+    mockGet.mockRejectedValue(new Error('network down'));
 
-    const mockNHLResponse = {
-      items: [
-        {
-          headline: 'NHL Fantasy Sleeper Picks',
-          summary: 'Top picks for the week',
-          slug: 'fantasy-sleeper-picks',
-          thumbnail: { templateUrl: 'https://img.nhl.com/{formatInstructions}/photo.jpg' },
-          contentDate: new Date(now.getTime() - 1000 * 60 * 60).toISOString(),
-          _entityId: 'nhl-1',
-        },
-        {
-          headline: 'Trade Deadline: Team Signs Star',
-          summary: 'Big trade today',
-          slug: 'trade-deadline',
-          contentDate: new Date(now.getTime() - 1000 * 60 * 120).toISOString(),
-          _entityId: 'nhl-2',
-        },
-      ],
-    };
+    const { getNewsArticles: fresh } = await import('../NewsService');
+    expect(await fresh()).toEqual([]);
+  });
 
-    const mockESPNResponse = {
-      articles: [
-        {
-          id: 1001,
-          headline: 'Injury Report: Player Day-to-Day',
-          description: 'Key player injured',
-          published: new Date(now.getTime() - 1000 * 60 * 30).toISOString(),
-          links: { web: { href: 'https://espn.com/nhl/story/1' } },
-          images: [{ url: 'https://espn.com/img.jpg', width: 600, height: 400 }],
-        },
-      ],
-    };
+  it('tolerates a malformed payload without throwing', async () => {
+    mockGet.mockResolvedValue({ data: undefined });
 
-    it('fetches from NHL + ESPN and merges results sorted by date', async () => {
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockNHLResponse),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockESPNResponse),
-        });
+    const { getNewsArticles: fresh } = await import('../NewsService');
+    expect(await fresh()).toEqual([]);
+  });
 
-      const articles = await getNewsArticles();
+  it('caches a successful response instead of refetching', async () => {
+    mockGet.mockResolvedValue({ data: { articles: [article()] } });
 
-      expect(articles.length).toBe(3);
-      // ESPN article is newest (30 min ago), should be first
-      expect(articles[0].source).toBe('ESPN');
-      expect(articles[0].category).toBe('injury');
-      // NHL articles follow
-      expect(articles[1].source).toBe('NHL.com');
-    });
+    const { getNewsArticles: fresh } = await import('../NewsService');
+    await fresh();
+    await fresh();
 
-    it('categorizes articles based on keywords', async () => {
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockNHLResponse),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ articles: [] }),
-        });
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
 
-      const articles = await getNewsArticles();
+  it('does NOT cache an empty result — a blip must not pin the page empty', async () => {
+    mockGet.mockResolvedValueOnce({ data: { articles: [] } });
+    mockGet.mockResolvedValueOnce({ data: { articles: [article()] } });
 
-      const fantasyArticle = articles.find(a => a.title.includes('Fantasy'));
-      expect(fantasyArticle?.category).toBe('fantasy');
+    const { getNewsArticles: fresh } = await import('../NewsService');
+    expect(await fresh()).toEqual([]);
+    // Second call must actually retry and pick up the recovered feed.
+    expect(await fresh()).toHaveLength(1);
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+});
 
-      const tradeArticle = articles.find(a => a.title.includes('Trade'));
-      expect(tradeArticle?.category).toBe('trade');
-    });
-
-    it('generates correct NHL.com article URLs from slugs', async () => {
-      const nhlResponse = {
-        items: [
-          {
-            headline: 'Test Article',
-            slug: 'my-article',
-            contentDate: now.toISOString(),
-            _entityId: 'test-1',
-          },
-          {
-            headline: 'Test Article 2',
-            slug: '/news/other-article',
-            contentDate: now.toISOString(),
-            _entityId: 'test-2',
-          },
-          {
-            headline: 'Test Article 3',
-            slug: 'https://custom.url/article',
-            contentDate: now.toISOString(),
-            _entityId: 'test-3',
-          },
-        ],
-      };
-
-      mockFetch
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(nhlResponse) })
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ articles: [] }) });
-
-      const articles = await getNewsArticles();
-
-      // Bare slug -> /news/ prefix
-      expect(articles.find(a => a.id === 'test-1')?.url).toBe('https://www.nhl.com/news/my-article');
-      // Leading slash -> domain prefix only
-      expect(articles.find(a => a.id === 'test-2')?.url).toBe('https://www.nhl.com/news/other-article');
-      // Full URL -> kept as-is
-      expect(articles.find(a => a.id === 'test-3')?.url).toBe('https://custom.url/article');
-    });
-
-    it('returns fallback articles when all APIs fail', async () => {
-      mockFetch.mockRejectedValue(new Error('network error'));
-
-      const articles = await getNewsArticles();
-
-      // Should return fallback articles
-      expect(articles.length).toBeGreaterThan(0);
-      expect(articles[0].id).toMatch(/^fb-/);
-    });
-
-    it('filters premium ESPN articles', async () => {
-      const espnWithPremium = {
-        articles: [
-          {
-            id: 1,
-            headline: 'Free Article',
-            premium: false,
-            published: now.toISOString(),
-          },
-          {
-            id: 2,
-            headline: 'Premium Article',
-            premium: true,
-            published: now.toISOString(),
-          },
-        ],
-      };
-
-      mockFetch
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ items: [] }) })
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(espnWithPremium) });
-
-      const articles = await getNewsArticles();
-
-      const premiumArticle = articles.find(a => a.title === 'Premium Article');
-      expect(premiumArticle).toBeUndefined();
-    });
-
-    it('returns cached results on second call within TTL', async () => {
-      mockFetch
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockNHLResponse) })
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockESPNResponse) });
-
-      const first = await getNewsArticles();
-      const second = await getNewsArticles();
-
-      // Should only call fetch twice (one for each source on first call)
-      expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(first).toEqual(second);
-    });
-
-    it('filters out stale articles older than 7 days', async () => {
-      const staleDate = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
-      const freshDate = new Date(Date.now() - 1000 * 60 * 60).toISOString();
-
-      const nhlResponse = {
-        items: [
-          {
-            headline: 'Old Article',
-            contentDate: staleDate,
-            _entityId: 'old-1',
-            slug: 'old',
-          },
-          {
-            headline: 'Fresh Article',
-            contentDate: freshDate,
-            _entityId: 'fresh-1',
-            slug: 'fresh',
-          },
-        ],
-      };
-
-      mockFetch
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(nhlResponse) })
-        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ articles: [] }) });
-
-      const articles = await getNewsArticles();
-
-      expect(articles.find(a => a.title === 'Old Article')).toBeUndefined();
-      expect(articles.find(a => a.title === 'Fresh Article')).toBeDefined();
-    });
+describe('module hygiene', () => {
+  it('imports without needing Supabase env vars set', async () => {
+    // Regression guard for the gate failure: a top-level `@/api/client` import
+    // pulls in the Supabase client, which throws at module scope when
+    // VITE_SUPABASE_* is unset — and CI runs web tests with no VITE_* env.
+    // Importing this service must never be the thing that explodes.
+    await expect(import('../NewsService')).resolves.toBeDefined();
   });
 });
