@@ -156,17 +156,33 @@ jobs:
           service: citrus-api
           region: us-central1
           image: us-central1-docker.pkg.dev/citrus-fantasy-prod/citrus-api/server:${{ github.sha }}
+          # ── env_vars IS A YAML LITERAL BLOCK — NO COMMENTS INSIDE IT ──
+          #
+          # Everything under `env_vars: |` is raw text, not YAML. A line
+          # starting with `#` is NOT a comment there: deploy-cloudrun
+          # splits the block on newlines and hands each line to
+          # `--update-env-vars`, so a comment becomes a garbage variable
+          # and — because the delimiter is `^,^` — the `,` and `=` inside
+          # the prose shred the surrounding real entries too.
+          #
+          # That is exactly what happened on 2026-08-24 (chunk 11g.9): six
+          # comment lines added here produced entries like
+          #   `  Chunk 11g.9: Stormy moved off the Edge Function=`
+          # which swallowed SUPABASE_SERVICE_ROLE_KEY and left
+          # ANTHROPIC_API_KEY empty. The revision failed to become ready,
+          # the job still reported success, and prod silently kept serving
+          # the previous image for 12+ hours while the web bundle moved on
+          # — taking Stormy down. Keep this block to KEY=VALUE lines only.
+          #
+          # Chunk 11g.9: Stormy runs on the API server now, so the
+          # Anthropic key has to reach Cloud Run. Setting it here keeps it
+          # reproducible from the repo; the deploy uses --update-env-vars,
+          # so it merges rather than replacing the service environment.
           env_vars: |
             NODE_ENV=production
             SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
             SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
             SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-            # Chunk 11g.9: Stormy moved off the Edge Function, so the
-            # Anthropic key has to reach the API server. It must be set
-            # HERE rather than by `gcloud run services update` — this
-            # env_vars block REPLACES the service's environment on every
-            # deploy, so a manually-set var is wiped by the next push
-            # (same failure shape as the scaling flags below).
             ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
           # ── Cloud Run scaling config ────────────────────────────────
           # These flags MUST stay in sync with ops/cloudrun/service.yaml.
@@ -186,6 +202,28 @@ jobs:
             --timeout=60s
             --no-cpu-throttling
             --cpu-boost
+
+      # Prove the revision we just built is the one serving traffic.
+      # Without this the job can go green while Cloud Run silently keeps
+      # the previous revision (2026-08-24: 12.6h of unbroken uptime behind
+      # a "successful" deploy). Fail loudly instead.
+      - name: Verify serving revision is this build
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        run: |
+          set -euo pipefail
+          SERVING=$(gcloud run services describe citrus-api \
+            --region=us-central1 \
+            --format='value(status.traffic[0].revisionName)')
+          IMAGE=$(gcloud run services describe citrus-api \
+            --region=us-central1 \
+            --format='value(spec.template.spec.containers[0].image)')
+          echo "serving revision: $SERVING"
+          echo "serving image:    $IMAGE"
+          if [ "${IMAGE##*:}" != "${{ github.sha }}" ]; then
+            echo "::error::Cloud Run is serving image tag ${IMAGE##*:}, expected ${{ github.sha }}. The deploy did not take effect."
+            exit 1
+          fi
+          echo "Serving revision matches this build."
 
       - name: API health check
         if: steps.check-gcp.outputs.has_creds == 'true'
