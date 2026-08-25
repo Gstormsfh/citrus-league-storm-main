@@ -78,14 +78,42 @@ directory deleted 1.56 MB of inlined art from `app.js` in silence and printed
 `0 of 41 keys baked` as though that were fine. Pass `--allow-shrink` when a
 removal is genuinely what you mean.
 
-## Verify it
+## Build it and check it
 
-All of these have to stay green.
+From `demo/src`, on Windows:
+
+```
+powershell -ExecutionPolicy Bypass -File checks.ps1
+```
+
+That joins `index.html` + `app.js`, then runs every suite and prints one
+green or red line each. First run also fetches Playwright and a headless
+Chromium, which is a few minutes and about 150 MB, once.
+
+```
+checks.ps1 -BuildOnly    just rebuild, skip the checks
+checks.ps1 -Rebake       a file in art/ changed
+checks.ps1 -Recarve      a NEW Carlton render landed; re-cut his seven
+                         layers. The only step that needs more than a bare
+                         Python: pip install numpy scipy pillow
+```
+
+Nothing needs `&&`. Windows PowerShell 5.1 does not have it, which is why
+this is a file and not a chain of commands.
+
+### Or one at a time
+
+Each of these runs standalone from `demo/src` and finds the build itself,
+whether it is sitting beside the sources or one level up in the repo.
 
 ```
 node realsite.mjs   # real HTTP, 5 device profiles
 node mobplay.mjs    # every game played on a phone with real taps only
-node verify.mjs     # every game played end to end
+node verify.mjs     # every game played end to end; serves itself
+node figcheck.mjs   # every piece of Carlton's kit owns its own region,
+                    # and a keyboard can reach, name and open each one
+node rowcheck.mjs   # the six rows point at a piece and open nothing
+node vecfall.mjs    # the drawn fallback is the same control as the render
 node proof.mjs      # every panel, desktop and phone: overflow, clipped text,
                     # and any sideways strip with no scroll affordance
 node leak.mjs       # locks every live slate a third of the way through the
@@ -96,6 +124,9 @@ node offline.mjs    # zero external requests
 node classcheck.mjs # class-name collisions, whole document
 node shots_all.mjs  # per-panel density
 ```
+
+`serve.mjs` is only for looking at the page in a browser on
+`http://localhost:4321/`. No harness needs it running any more.
 
 ## Still outstanding
 

@@ -1,7 +1,20 @@
+/* This file used to point at an absolute path on the machine it was
+   written on, which meant not one of these ran anywhere else. ROOT is
+   worked out from the file's own location instead: the build sits beside
+   these sources in the working copy and one level up in the repo, so both
+   are tried. BUILD_URL is a proper file:// URL, because "file://" plus a
+   Windows path is not one. */
+import { fileURLToPath, pathToFileURL } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
+const HERE  = dirname(fileURLToPath(import.meta.url));
+const ROOT  = existsSync(join(HERE, 'Toronto_GameDay_Citrus.html')) ? HERE : join(HERE, '..');
+const BUILD = join(ROOT, 'Toronto_GameDay_Citrus.html');
+const BUILD_URL = pathToFileURL(BUILD).href;
 import http from 'http'; import { readFileSync } from 'fs';
 import { chromium } from 'playwright';
 const srv = http.createServer((q,s)=>{ s.writeHead(200,{'Content-Type':'text/html'});
-  s.end(readFileSync('/home/claude/leafs/Toronto_GameDay_Citrus.html')); });
+  s.end(readFileSync(BUILD)); });
 await new Promise(r=>srv.listen(4420,'127.0.0.1',r));
 const b = await chromium.launch();
 const p = await b.newPage({viewport:{width:1400,height:1000}});

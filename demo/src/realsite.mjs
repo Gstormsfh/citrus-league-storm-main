@@ -1,10 +1,23 @@
 /* Serves the build over real HTTP and drives it like a live site:
    desktop and phone, every panel, every game, watching the network. */
+/* This file used to point at an absolute path on the machine it was
+   written on, which meant not one of these ran anywhere else. ROOT is
+   worked out from the file's own location instead: the build sits beside
+   these sources in the working copy and one level up in the repo, so both
+   are tried. BUILD_URL is a proper file:// URL, because "file://" plus a
+   Windows path is not one. */
+import { fileURLToPath, pathToFileURL } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
+const HERE  = dirname(fileURLToPath(import.meta.url));
+const ROOT  = existsSync(join(HERE, 'Toronto_GameDay_Citrus.html')) ? HERE : join(HERE, '..');
+const BUILD = join(ROOT, 'Toronto_GameDay_Citrus.html');
+const BUILD_URL = pathToFileURL(BUILD).href;
 import http from 'http';
 import { readFileSync, statSync } from 'fs';
 import { chromium, devices } from 'playwright';
 
-const ROOT = '/home/claude/leafs';
+
 const PORT = 4399;
 const hits = [];
 const srv = http.createServer((q, s) => {

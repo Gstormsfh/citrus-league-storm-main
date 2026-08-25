@@ -13,6 +13,11 @@ rather than stacking a second copy.
 """
 import base64, os, sys, re
 
+
+# every path below is relative to this file, not to wherever you ran it
+import os as _os, sys as _sys
+_os.chdir(_os.path.dirname(_os.path.abspath(__file__)))
+
 ART_DIR = 'art'
 JS      = 'app.js'
 

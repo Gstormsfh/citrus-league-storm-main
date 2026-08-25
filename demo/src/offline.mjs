@@ -1,3 +1,16 @@
+/* This file used to point at an absolute path on the machine it was
+   written on, which meant not one of these ran anywhere else. ROOT is
+   worked out from the file's own location instead: the build sits beside
+   these sources in the working copy and one level up in the repo, so both
+   are tried. BUILD_URL is a proper file:// URL, because "file://" plus a
+   Windows path is not one. */
+import { fileURLToPath, pathToFileURL } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
+const HERE  = dirname(fileURLToPath(import.meta.url));
+const ROOT  = existsSync(join(HERE, 'Toronto_GameDay_Citrus.html')) ? HERE : join(HERE, '..');
+const BUILD = join(ROOT, 'Toronto_GameDay_Citrus.html');
+const BUILD_URL = pathToFileURL(BUILD).href;
 import { chromium } from 'playwright';
 const b = await chromium.launch({ args:['--no-sandbox'] });
 const ctx = await b.newContext();
@@ -9,7 +22,7 @@ await ctx.route('**', route => {
 });
 const p = await ctx.newPage();
 const errs = []; p.on('pageerror', e => errs.push(String(e)));
-await p.goto('file:///home/claude/leafs/Toronto_GameDay_Citrus.html', { waitUntil:'load' });
+await p.goto(BUILD_URL, { waitUntil:'load' });
 await p.waitForTimeout(1200);
 await p.click('.lkrow:nth-child(1)'); await p.waitForTimeout(300);
 await p.evaluate(() => go('grid')); await p.waitForTimeout(400);

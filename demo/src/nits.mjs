@@ -1,8 +1,29 @@
 /* Guess the Leaf and Pick'em, measured before touching either. */
+/* This file used to point at an absolute path on the machine it was
+   written on, which meant not one of these ran anywhere else. ROOT is
+   worked out from the file's own location instead: the build sits beside
+   these sources in the working copy and one level up in the repo, so both
+   are tried. BUILD_URL is a proper file:// URL, because "file://" plus a
+   Windows path is not one. */
+import { fileURLToPath, pathToFileURL } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
+const HERE  = dirname(fileURLToPath(import.meta.url));
+const ROOT  = existsSync(join(HERE, 'Toronto_GameDay_Citrus.html')) ? HERE : join(HERE, '..');
+const BUILD = join(ROOT, 'Toronto_GameDay_Citrus.html');
+const BUILD_URL = pathToFileURL(BUILD).href;
+
+/* outputs land beside the harness that made them, in shots/, rather than
+   in whatever directory you happened to be standing in */
+import { mkdirSync } from 'fs';
+const SHOTS = join(HERE, 'shots');
+mkdirSync(SHOTS, { recursive: true });
+const shot = n => join(SHOTS, n);
+
 import http from 'http'; import { readFileSync } from 'fs';
 import { chromium, devices } from 'playwright';
 const srv = http.createServer((q,s)=>{ s.writeHead(200,{'Content-Type':'text/html'});
-  s.end(readFileSync('/home/claude/leafs/Toronto_GameDay_Citrus.html')); });
+  s.end(readFileSync(BUILD)); });
 await new Promise(r=>srv.listen(4630,'127.0.0.1',r));
 const b = await chromium.launch();
 for (const [name, opts] of [['desktop',{viewport:{width:1440,height:1200},deviceScaleFactor:2}],
@@ -37,9 +58,9 @@ for (const [name, opts] of [['desktop',{viewport:{width:1440,height:1200},device
   if (errs.length) console.log('  ERRORS', errs);
   if (name==='desktop'){
     await p.evaluate(()=>go('guess')); await p.waitForTimeout(250);
-    await p.locator('#p-guess').screenshot({path:'nit_guess.png'});
+    await p.locator('#p-guess').screenshot({path:shot('nit_guess.png')});
     await p.evaluate(()=>go('fx')); await p.waitForTimeout(250);
-    await p.locator('#p-fx').screenshot({path:'nit_fx.png'});
+    await p.locator('#p-fx').screenshot({path:shot('nit_fx.png')});
   }
   await ctx.close();
 }

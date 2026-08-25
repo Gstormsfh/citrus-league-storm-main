@@ -18,6 +18,11 @@ import numpy as np
 from PIL import Image, ImageFilter
 from scipy import ndimage as nd
 
+
+# every path below is relative to this file, not to wherever you ran it
+import os as _os, sys as _sys
+_os.chdir(_os.path.dirname(_os.path.abspath(__file__)))
+
 SRC = 'art/carlton-figure.png'
 S   = 3.0                      # image px per viewBox unit (1140/380)
 

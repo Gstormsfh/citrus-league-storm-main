@@ -1,3 +1,16 @@
+/* This file used to point at an absolute path on the machine it was
+   written on, which meant not one of these ran anywhere else. ROOT is
+   worked out from the file's own location instead: the build sits beside
+   these sources in the working copy and one level up in the repo, so both
+   are tried. BUILD_URL is a proper file:// URL, because "file://" plus a
+   Windows path is not one. */
+import { fileURLToPath, pathToFileURL } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
+const HERE  = dirname(fileURLToPath(import.meta.url));
+const ROOT  = existsSync(join(HERE, 'Toronto_GameDay_Citrus.html')) ? HERE : join(HERE, '..');
+const BUILD = join(ROOT, 'Toronto_GameDay_Citrus.html');
+const BUILD_URL = pathToFileURL(BUILD).href;
 import { chromium } from 'playwright';
 const SCORE = `(() => {
   const px=s=>{const m=s.match(/[\\d.]+/g);if(!m)return null;return [+m[0],+m[1],+m[2],m[3]===undefined?1:+m[3]];};
@@ -46,7 +59,7 @@ const SCORE = `(() => {
 const b = await chromium.launch({args:['--no-sandbox']});
 for (const [w,label] of [[1400,'desktop'],[400,'mobile']]){
   const p = await (await b.newContext({viewport:{width:w,height:1100}})).newPage();
-  await p.goto('file:///home/claude/leafs/Toronto_GameDay_Citrus.html',{waitUntil:'load'});
+  await p.goto(BUILD_URL,{waitUntil:'load'});
   const SKIN = process.env.SKIN || 'mascot';
   await p.evaluate(s => document.documentElement.setAttribute('data-skin', s), SKIN);
   await p.waitForTimeout(800);

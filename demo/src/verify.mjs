@@ -1,4 +1,23 @@
+/* This used to expect `node serve.mjs` running in another window on 4321.
+   Forget to start it and every check failed with ERR_CONNECTION_REFUSED,
+   which says nothing about the page. It serves itself now, like the rest. */
+import { fileURLToPath, pathToFileURL } from 'url';
+import { dirname, join } from 'path';
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'fs';
+import http from 'http';
 import { chromium } from 'playwright';
+const HERE  = dirname(fileURLToPath(import.meta.url));
+const ROOT  = existsSync(join(HERE, 'Toronto_GameDay_Citrus.html')) ? HERE : join(HERE, '..');
+const BUILD = join(ROOT, 'Toronto_GameDay_Citrus.html');
+const SHOTS = join(HERE, 'shots');
+mkdirSync(SHOTS, { recursive: true });
+const srv = http.createServer((q,s)=>{ s.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
+  s.end(readFileSync(BUILD)); });
+/* port 0 = whatever is free. It used to sit on 4321, which is also where
+   serve.mjs listens, so having the page open in a browser to look at it
+   made the checks refuse to start. */
+await new Promise(r => srv.listen(0, '127.0.0.1', r));
+const ORIGIN = 'http://127.0.0.1:' + srv.address().port + '/';
 const B = await chromium.launch({ args:['--no-sandbox'] });
 const C = await B.newContext({ viewport:{width:1400,height:1050}, deviceScaleFactor:1.5 });
 const p = await C.newPage();
@@ -6,10 +25,10 @@ const errs=[]; p.on('pageerror',e=>errs.push(String(e)));
 const L=[]; const say=(...a)=>{const s=a.join(' ');L.push(s);console.log(s);};
 const txt=async s=>{const e=await p.$(s);return e?(await e.innerText()).trim().replace(/\s+/g,' '):'(none)';};
 const cp=()=>p.$eval('#cpTotal',e=>e.textContent);
-let n=0; const shot=async(t,sel)=>{n++;const f=`demo/V${String(n).padStart(2,'0')}_${t}.png`;
+let n=0; const shot=async(t,sel)=>{n++;const f=join(SHOTS, `V${String(n).padStart(2,'0')}_${t}.png`);
   const el=sel?await p.$(sel):null; if(el) await el.screenshot({path:f}); else await p.screenshot({path:f}); };
 
-await p.goto('http://localhost:4321/Toronto_GameDay_Citrus.html',{waitUntil:'load'});
+await p.goto(ORIGIN,{waitUntil:'load'});
 await p.waitForTimeout(1600);
 say('LOCKER ROOM — tiles', await p.$$eval('.lkrow',t=>t.length));
 await shot('home');
@@ -198,4 +217,5 @@ say('\nLEADERBOARD rows:', await p.$$eval('#lbBody tr',r=>r.length), '| FINAL CP
 await shot('leaderboard');
 say('\nCONSOLE ERRORS:', errs.length?errs:'none');
 await B.close();
-import('fs').then(f=>f.writeFileSync('demo/VERIFY.txt', L.join('\n')));
+writeFileSync(join(SHOTS, 'VERIFY.txt'), L.join('\n'));
+srv.close();

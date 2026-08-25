@@ -1,8 +1,21 @@
 /* Full visual pass: every panel, desktop and phone, played not empty. */
+/* This file used to point at an absolute path on the machine it was
+   written on, which meant not one of these ran anywhere else. ROOT is
+   worked out from the file's own location instead: the build sits beside
+   these sources in the working copy and one level up in the repo, so both
+   are tried. BUILD_URL is a proper file:// URL, because "file://" plus a
+   Windows path is not one. */
+import { fileURLToPath, pathToFileURL } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
+const HERE  = dirname(fileURLToPath(import.meta.url));
+const ROOT  = existsSync(join(HERE, 'Toronto_GameDay_Citrus.html')) ? HERE : join(HERE, '..');
+const BUILD = join(ROOT, 'Toronto_GameDay_Citrus.html');
+const BUILD_URL = pathToFileURL(BUILD).href;
 import http from 'http'; import { readFileSync } from 'fs';
 import { chromium, devices } from 'playwright';
 const srv = http.createServer((q,s)=>{ s.writeHead(200,{'Content-Type':'text/html'});
-  s.end(readFileSync('/home/claude/leafs/Toronto_GameDay_Citrus.html')); });
+  s.end(readFileSync(BUILD)); });
 await new Promise(r=>srv.listen(4600,'127.0.0.1',r));
 const b = await chromium.launch();
 const PANELS=['home','ult','stormy','hl','guess','luck','rank','fx','bz','grid','call','dash','lb'];
@@ -18,7 +31,7 @@ for (const [name, opts] of [['D',{viewport:{width:1440,height:1000}}],
   const rows=[];
   for (const t of PANELS){
     await p.evaluate(x=>go(x), t); await p.waitForTimeout(320);
-    await p.screenshot({path:`/home/claude/leafs/proof2/${name}_${t}.png`, fullPage:true});
+    await p.screenshot({path:join(ROOT, `proof2/${name}_${t}.png`), fullPage:true});
     const m = await p.evaluate(()=>{
       const doc=document.documentElement;
       const clipped=[...document.querySelectorAll('.panel.on *')].filter(e=>{

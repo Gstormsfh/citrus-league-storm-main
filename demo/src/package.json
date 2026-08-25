@@ -1,0 +1,7 @@
+{
+  "name": "citrus-toronto-gameday-checks",
+  "private": true,
+  "type": "module",
+  "description": "Harnesses for the Toronto Game Day demo. npm install pulls playwright; nothing here ships in the build.",
+  "devDependencies": { "playwright": "^1.47.0" }
+}
