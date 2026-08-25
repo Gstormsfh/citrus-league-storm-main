@@ -937,13 +937,15 @@ html[data-skin="bc"] .sweat{border-width:1px;border-radius:6px}
 .kit{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
 @media(max-width:900px){.kit{grid-template-columns:repeat(2,1fr);gap:11px}}
 @media(max-width:520px){.kit{grid-template-columns:1fr}}
-.eq{position:relative;display:block;width:100%;text-align:left;cursor:pointer;color:var(--ink);
+/* A READ-OUT, NOT A DOOR. These six were buttons that said "+ Pick a
+   Leaf" six times over, with Carlton standing beside them as decoration.
+   The piece on the figure is the control now, so the card keeps its
+   weight and loses every affordance: no pointer, no lift on hover, no
+   press, no focus ring. An empty one names the piece to go and tap. */
+.eq{position:relative;display:block;width:100%;text-align:left;color:var(--ink);
   background:linear-gradient(168deg,var(--surf2) 0%,var(--surf) 62%);
   border:3px solid var(--deep);border-radius:20px;box-shadow:var(--shadow);padding:15px 15px 13px;
-  transition:transform var(--t-fast) var(--e-plant),box-shadow var(--t-fast),border-color var(--t-fast)}
-.eq:hover{transform:translateY(-3px);box-shadow:0 8px 0 var(--deep)}
-.eq:active{transform:translateY(2px);box-shadow:0 1px 0 var(--deep)}
-.eq:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  transition:border-color var(--t-fast)}
 .eq.filled{border-color:var(--eqc)}
 .eq.filled::after{content:'';position:absolute;inset:0;border-radius:17px;pointer-events:none;
   background:radial-gradient(120% 80% at 50% 0%,rgba(255,255,255,.09),transparent 60%)}
@@ -963,8 +965,14 @@ html[data-skin="bc"] .sweat{border-width:1px;border-radius:6px}
   color:var(--eqc);margin-top:4px}
 .eq .slot{margin-top:11px;border-top:2px dashed rgba(255,255,255,.15);padding-top:10px;min-height:50px;
   display:flex;align-items:center}
-.eq .empty{display:flex;align-items:center;gap:7px;font:700 12px var(--sans);color:var(--ink3)}
-.eq .empty svg{width:15px;height:15px;stroke:var(--ink3);stroke-width:2.4;fill:none}
+/* citrus on the dot, not on the sentence: the dot ties the row to the
+   ring pulsing on the figure, and the words stay in ink that clears 4.5
+   in both skins. Citrus type at 11.5px does not, in the second one. */
+.eq .empty{display:flex;align-items:center;gap:8px;font:700 12px var(--sans);color:var(--ink2)}
+.eq .empty b{color:var(--ink);font-weight:800}
+.eq .empty svg{width:16px;height:16px;stroke:var(--citrus);stroke-width:2.2;fill:none;
+  stroke-linecap:round;flex:none}
+.eq .empty .tapdot{fill:var(--citrus);stroke:none}
 .eq .who{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
 .eq .who .nm2{flex:1;min-width:0;font:800 13.5px var(--sans);color:#fff;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1146,7 +1154,7 @@ html[data-skin="bc"] .pinwin{border-width:1px;border-radius:12px;box-shadow:0 20
   .eq .who .nm2{font-size:13px;flex:1 1 auto}
   .eq .who .val{margin-left:auto}
   .eq .who .val{font-size:17px}
-  .eq .empty{font-size:11.5px;color:var(--fy);white-space:nowrap}
+  .eq .empty{font-size:11.5px;white-space:nowrap}
   .eq .lead{display:none}
   .eq.filled::after{display:none}
   /* The live strip is appended to the tile once a slot is filled, and in
@@ -1324,7 +1332,7 @@ nav .tile,.gd,.chipart,.jersey,.sweat,.sweater{
 .card,.eq,.hlcard,.gtile,.shcard,.buildbar,.opt,.fxrow,.brow,.prow,
 .tw,.clue,.pinwin{border-radius:10px !important}
 .ghero{border-radius:12px !important}
-.eq:hover,.hlcard:hover,.gtile:hover{transform:none !important;box-shadow:none !important}
+.hlcard:hover,.gtile:hover{transform:none !important;box-shadow:none !important}
 .eq:active,button:not(:disabled):active{transform:none !important}
 button.act{background:var(--citrus);color:#FFFFFF;font-weight:800;
   letter-spacing:.1px;text-transform:none;border-color:var(--citrus) !important}
@@ -1830,11 +1838,9 @@ nav .navitem .lab{padding:12px 15px !important;display:block}
 .carlrender .kitp{opacity:.26}
 .carlrender .kitp.on{opacity:1}
 .carlrender image{image-rendering:auto}
-/* the layers paint, the rects listen. Separated because the crops overlap
+/* the layers paint, the doors listen. Separated because the crops overlap
    and an image that hit-tests as its box would steal its neighbour's taps. */
 .carlrender image.kitl{pointer-events:none}
-.carlrender rect.kithz{fill:transparent;stroke:none;pointer-events:all;cursor:pointer}
-.carlrender rect.kithz.on,.carlrender rect.kithz.hot{opacity:1}
 /* A mask changes what is PAINTED, not what is HIT: the body image still
    received every click across the whole 380x470 box and swallowed all six
    pieces. clip-path does clip hit-testing, so the kit groups are fine; the
@@ -1849,7 +1855,22 @@ nav .navitem .lab{padding:12px 15px !important;display:block}
    and the puck is 32px across; without these the only way to hit either
    is to hit it exactly, which is not a tap target, it is a dexterity
    test. Invisible, and ordered so the hand beats the shaft under it. */
-.kitp .hitz{fill:transparent;stroke:transparent;pointer-events:all}
+.carl .hitz{fill:transparent;stroke:transparent;pointer-events:all;cursor:pointer}
+
+/* THE PIECE IS THE CONTROL NOW. The six rows beside him used to be
+   buttons and they carried every keyboard stop on this game; they are a
+   read-out, so the figure has to be reachable and it has to show where
+   the focus is. One door per piece, six stops, and the piece lights the
+   way it does on hover so the ring is never the only signal.
+
+   Scoped to rect and path separately because the vector's stick is not a
+   box, it is its own line stroked 42 wide, and a dashed outline round
+   THAT is a citrus plank across the picture. */
+.kitdoor{cursor:pointer}
+.kitdoor:focus{outline:none}
+.kitdoor:focus-visible rect.hitz{stroke:var(--citrus);stroke-width:2.5;
+  stroke-dasharray:6 5;stroke-linejoin:round}
+.kitdoor:focus-visible path.hitz{stroke:var(--citrus);opacity:.28}
 .kitp .k{fill:var(--surf);stroke:var(--deep);stroke-width:5;stroke-linejoin:round}
 .kitp .ka{fill:var(--line);stroke:var(--deep);stroke-width:4;stroke-linejoin:round}
 .kitp .ks{fill:none;stroke:var(--deep);stroke-linecap:round;stroke-linejoin:round}
@@ -1879,9 +1900,24 @@ nav .navitem .lab{padding:12px 15px !important;display:block}
   height var(--t-med) var(--e-plant),background var(--t-fast)}
 .kitpin.on{width:24px;height:24px;border-width:2.5px}
 .kitpin.hot{border-color:var(--citrus)}
+/* the invitation. A piece at 26% does not look like a control, and the
+   figure is the only way in, so an empty slot puts a citrus ring on its
+   own piece and lets it breathe. Staggered by --kd so six of them read
+   as a ripple round the figure rather than a strobe, and gone the
+   instant the slot fills -- the ring and the tick are the same dot. */
+.kitpin.ask{width:19px;height:19px;border-width:2.5px;border-color:var(--citrus);
+  background:transparent;animation:kask 2.6s var(--e-in) infinite;
+  animation-delay:var(--kd,0s)}
+@keyframes kask{
+  0%  {box-shadow:0 0 0 0 rgba(255,107,26,.5)}
+  55% {box-shadow:0 0 0 9px rgba(255,107,26,0)}
+  100%{box-shadow:0 0 0 0 rgba(255,107,26,0)}
+}
 
 @media (prefers-reduced-motion:reduce){
   .kitp,.kitpin{transition:none}
+  /* the ring stays, the breathing stops */
+  .kitpin.ask{animation:none}
 }
 
 /* Side by side once there is width for it. The tiles become rows next

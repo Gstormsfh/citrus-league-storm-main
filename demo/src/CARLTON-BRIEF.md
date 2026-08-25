@@ -190,15 +190,31 @@ navy keyline and a blank smile, and no amount of palette matching fixes that.
 
 ## What the build does with him, so you know what you are drawing for
 
+**The figure is the only way in.** The six rows beside him used to be
+buttons that said "+ Pick a Leaf" six times, with Carlton standing there as
+decoration. They are a read-out now -- what each slot is worth, who is in
+it, who leads it tonight -- and an empty one names the piece to go and tap.
+
 | State | What happens on the figure |
 |---|---|
-| No slots filled | Bear in the sweater. All six pieces ghosted at 26%. |
+| No slots filled | Bear in the sweater. All six pieces ghosted at 26%, each wearing a pulsing citrus ring. |
 | Hover a piece | Both halves of a pair light together. |
-| Tap a piece | Opens that slot's picker. The list and the figure are the same control. |
-| Slot filled | That piece goes to 100% and fills in. |
-| Puck drops | A white pip appears on the piece with the live number on it. |
+| Tab to a piece | Same lighting, plus a dashed citrus outline on the target. Six stops, in the order the list reads. |
+| Tap it, or Enter, or Space | Opens that slot's picker. Escape lands back on the piece it opened. |
+| Slot filled | That piece goes to 100%, and its ring becomes the pip. |
+| Puck drops | The pip carries the live number for that piece. |
 | The number moves | The pip's ring goes citrus. |
 | Final buzzer | Every pip carries its final number. Caption reads "Dressed, and final." |
+
+The ring and the pip are the same dot in two states, which is why an empty
+piece can never show both an invitation and a number.
+
+**The targets are not the art.** A region measured to the outline of a shin
+pad is not a tap target, it is a dexterity test, so `CARL_HIT` grows every
+piece into whatever space is free around it -- the stick's five stepped
+rects collapse into one fat run of shaft plus a blade, and the puck goes
+from 29px across on a phone to 37. Smallest primary target on a 360px
+phone: the puck, 37 x 37. Every pair is checked disjoint.
 
 Six pieces map to six categories: **the stick** goals, **the hands** assists,
 **the release** shots, **the shoulders** hits, **the shin pads** blocks, **the
@@ -221,6 +237,7 @@ SKIN=bc node audit_hub.mjs
 node mobsweep.mjs      # no horizontal overflow at 390px, kit filled first
 node offline.mjs       # external requests: NONE
 node classcheck.mjs    # class-name collisions, nine have shipped already
-node figcheck.mjs      # every piece owns its own region and nothing else does
+node figcheck.mjs      # every piece owns its region, and a keyboard can reach it
+node vecfall.mjs       # the vector fallback is the same control as the render
 node shots_all.mjs     # density and gap report
 ```

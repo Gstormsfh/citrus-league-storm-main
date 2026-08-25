@@ -11,7 +11,8 @@ const errs=[]; p.on('pageerror',e=>errs.push(e.message));
 await p.goto('http://127.0.0.1:4655/'); await p.waitForTimeout(900);
 await p.evaluate(()=>go('ult')); await p.waitForTimeout(500);
 console.log('render active:', await p.evaluate(()=>!!document.querySelector('.carlrender')));
-console.log('slices:', await p.evaluate(()=>document.querySelectorAll('.carlrender .kitp').length));
+console.log('kit layers:', await p.evaluate(()=>document.querySelectorAll('.carlrender image.kitl').length),
+            '| doors:', await p.evaluate(()=>document.querySelectorAll('.carl .kitdoor').length));
 
 const fig = p.locator('.carl').first();
 await fig.scrollIntoViewIfNeeded();

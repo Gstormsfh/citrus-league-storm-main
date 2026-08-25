@@ -1534,24 +1534,32 @@ function prow(p, o){
    Two adjacencies are unavoidable and both are harmless. The shoulder
    caps meet the jaw, so ten units of the caps' inner corner is fur that
    lights with them -- fur beside fur. The stick's butt sits above the
-   right glove, so it gets a rect of its own rather than lighting with
+   right glove, so it gets a region of its own rather than lighting with
    the hands or, worse, staying bright while the shaft below it is dim.
 
-   Everything outside the figure is transparent, so a region being
-   generous costs nothing except where it would overlap another piece.
-   Every pair below is checked clear: no two rects intersect. */
-const CARL_REG = {
-  hit: [[86,156,58,55],  [210,154,57,63]],    // shoulder caps
-  a:   [[53,250,63,66],  [235,250,66,59]],    // gloves, cuffs included
-  blk: [[102,338,74,67], [182,338,71,67]],    // leg pads
-  tk:  [[102,405,75,47], [179,405,76,47]],    // boots and blades
-  /* the shaft leans right as it falls, so it is stepped: butt, then three
-     runs of shaft, then the blade. A single upright rect either lost the
-     bottom of the shaft or ate the leg. */
-  g:   [[255,241,17,9],  [268,309,20,36], [272,345,22,35],
-        [277,380,24,15], [280,395,59,25]],
+   THEN THEY BECAME THE ONLY WAY IN, so they are no longer the art. The
+   six rows beside him used to be buttons and they carried the whole
+   game; now Carlton carries it, and a region measured to the outline of
+   a shin pad is not a tap target, it is a dexterity test. Every region
+   below is grown past its piece into whatever space is free around it:
+   the stick's five stepped rects collapse into one fat run of shaft
+   plus a blade, and the puck goes from 29px across on a phone to 37.
+
+   Nothing outside the figure is painted, so growing a region costs
+   nothing except where it would reach another piece. Every pair is
+   checked clear -- no two rects intersect -- and the smallest primary
+   target on a 360px phone is the puck at 37 x 37. */
+const CARL_HIT = {
+  hit: [[86,152,58,62],  [208,150,60,68]],    // shoulder caps
+  a:   [[50,247,70,72],  [230,249,72,60]],    // gloves, cuffs included
+  blk: [[100,334,76,71], [180,334,76,71]],    // leg pads
+  tk:  [[100,405,77,56], [178,405,78,56]],    // boots and blades
+  /* the butt is 38 x 19 and will never be a real target; it is here so
+     that tapping the visible end of the stick means the stick. The shaft
+     is the one that matters, and it is 42 x 60 on a phone. */
+  g:   [[246,230,38,19], [256,309,64,92], [278,392,62,32]],
+  sog: [[322,334,56,56]],
 };
-const CARL_PUCK = [344, 362, 22];
 
 /* where each cut layer sits in the 380 x 470 box, straight out of carve.py.
    A layer is the piece's own silhouette on a transparent crop, so these are
@@ -1576,26 +1584,39 @@ function carltonRender(){
 
      The pieces paint but do not listen -- their crops overlap (the stick's
      box covers the right glove's) and whichever painted last would eat the
-     other's taps. The hit targets are the CARL_REG rects underneath them,
-     which are measured to be disjoint and are a kinder target on a phone
-     than a shin pad's actual outline. */
+     other's taps. The listening is done by the CARL_HIT rects on top,
+     which are disjoint and bigger than the art.
+
+     Each piece's rects live in ONE group, and the group is the control:
+     tabindex, a role and a name on the group means six tab stops rather
+     than fourteen, and it means "the skates" is one thing to a screen
+     reader rather than a left one and a right one. */
   const box = (cls, id, href, r) =>
     '<image class="' + cls + '" data-id="' + id + '" href="' + href +
     '" x="' + r[0] + '" y="' + r[1] + '" width="' + r[2] + '" height="' + r[3] + '"/>';
-  const hitz = (id, r) =>
-    '<rect class="kitp kithz" data-id="' + id + '" x="' + r[0] + '" y="' + r[1] +
+  const hitz = r =>
+    '<rect class="hitz" x="' + r[0] + '" y="' + r[1] +
     '" width="' + r[2] + '" height="' + r[3] + '"/>';
+  const door = id =>
+    '<g class="kitdoor" data-id="' + id + '" tabindex="0" role="button">' +
+    CARL_HIT[id].map(hitz).join('') + '</g>';
 
-  let pieces = '', targets = '';
+  /* paint in layer order, because the crops overlap and the stick has to
+     land over the glove. Tab in PARTS order, because that is the order of
+     the list beside him and a tab ring that jumps hit, hands, pads, skates,
+     stick, puck against a list that reads stick, hands, shots... is two
+     different games. */
+  let pieces = '', doors = '';
   CARL_LAYERS.forEach(id => { pieces += box('kitp kitl', id, ART['carl_' + id].src, CARL_LAY[id]); });
-  Object.keys(CARL_REG).forEach(id => CARL_REG[id].forEach(r => { targets += hitz(id, r); }));
-  const P = CARL_PUCK;
-  targets += hitz('sog', [P[0]-P[2], P[1]-P[2], P[2]*2, P[2]*2]);
+  PARTS.forEach(P => { doors += door(P.id); });
 
-  return '<svg class="carlsvg carlrender" viewBox="0 0 380 470" role="img" aria-hidden="true">' +
+  /* aria-hidden on the svg root would take the six doors with it, so the
+     root keeps a name and the base image is the thing that is decorative */
+  return '<svg class="carlsvg carlrender" viewBox="0 0 380 470" role="group" ' +
+    'aria-label="Carlton, and his six pieces of kit">' +
     '<ellipse class="cshade" cx="176" cy="452" rx="106" ry="14"/>' +
     '<image class="cbase" href="' + ART.carl_base.src + '" x="0" y="0" width="380" height="470"/>' +
-    pieces + targets + '</svg>';
+    pieces + doors + '</svg>';
 }
 
 /* anchors for the live pips, as a share of the 380 x 470 box, so the
@@ -1729,44 +1750,80 @@ function drawCarl(){
   const host = $('#carl'); if (!host) return;
   if (!carlBuilt){
     host.innerHTML = carltonSVG() +
-      PARTS.map(P => '<span class="kitpin" data-id="' + P.id + '" style="left:' +
-        CARL_PIN[P.id][0] + '%;top:' + CARL_PIN[P.id][1] + '%"></span>').join('') ;
-    host.addEventListener('click', e => {
-      const g = e.target.closest('.kitp'); if (!g || !g.dataset.id) return;
-      const P = PARTS.find(x => x.id === g.dataset.id); if (P) openPicker(P);
+      PARTS.map((P, i) => '<span class="kitpin" data-id="' + P.id + '" style="left:' +
+        CARL_PIN[P.id][0] + '%;top:' + CARL_PIN[P.id][1] + '%;--kd:' +
+        (i * 0.17).toFixed(2) + 's"></span>').join('') ;
+
+    /* One door per piece, whichever figure is on the page. The render
+       emits its own; the vector is ten groups because a pair is two
+       halves, and ten tab stops for six controls is worse than none.
+       The other half stays clickable, it just is not a second stop --
+       and hot() lights both, so the focused piece is never ambiguous. */
+    PARTS.forEach(P => {
+      const d = host.querySelector('.kitdoor[data-id="' + P.id + '"]')
+             || host.querySelector('g.kitp[data-id="' + P.id + '"]');
+      if (!d) return;
+      d.classList.add('kitdoor');
+      d.setAttribute('tabindex', '0');
+      d.setAttribute('role', 'button');
+    });
+
+    const at = e => { const g = e.target.closest('[data-id]');
+      return g && g.dataset.id ? PARTS.find(x => x.id === g.dataset.id) : null; };
+    host.addEventListener('click', e => { const P = at(e); if (P) openPicker(P); });
+    /* a <g> with a tabindex is focusable but it is not a button, so
+       Enter and Space do nothing unless somebody says so */
+    host.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+      const P = at(e); if (!P) return;
+      e.preventDefault(); openPicker(P);
     });
     /* a pair is two groups, so lighting one skate on hover and not the
        other would read as a bug. Done here rather than with :has(),
        which this file cannot assume in a browser it has never met. */
     const hot = g => { const id = g && g.dataset.id;
-      host.querySelectorAll('.kitp').forEach(x =>
+      host.querySelectorAll('.kitp,.kitdoor').forEach(x =>
         x.classList.toggle('hot', !!id && x.dataset.id === id)); };
-    host.addEventListener('mouseover', e => hot(e.target.closest('.kitp')));
+    host.addEventListener('mouseover', e => hot(e.target.closest('[data-id]')));
     host.addEventListener('mouseleave', () => hot(null));
+    host.addEventListener('focusin',  e => hot(e.target.closest('.kitdoor')));
+    host.addEventListener('focusout', () => hot(null));
     carlBuilt = true;
   }
   PARTS.forEach(P => {
-    const on = !!pick[P.id];
-    host.querySelectorAll('.kitp[data-id="' + P.id + '"]').forEach(g => g.classList.toggle('on', on));
+    const chosen = pick[P.id];
+    host.querySelectorAll('.kitp[data-id="' + P.id + '"]')
+        .forEach(g => g.classList.toggle('on', !!chosen));
+    /* the door carries everything the row beside it used to say, because
+       the row is not a control any more and this is */
+    const lead = [...KIT_POOL].sort((a,b) => b[P.k] - a[P.k])[0];
+    const d = host.querySelector('.kitdoor[data-id="' + P.id + '"]');
+    if (d) d.setAttribute('aria-label', P.part + ', ' + P.cat + '. ' + (chosen
+      ? chosen.name + ' is in this slot, worth ' + val(chosen, P.k).toFixed(2) +
+        ' fantasy points. Activate to change him.'
+      : 'Empty. Leader tonight ' + lead.name + ', ' + lead[P.k].toFixed(2) +
+        ' a game. Activate to pick a Leaf.'));
   });
   carlPips();
   const cap = $('#carlCap'); if (!cap) return;
   const n = Object.keys(pick).length;
   cap.innerHTML = n === 0
-    ? 'Carlton has the sweater and nothing else. Pick a Leaf for a piece to put it on him.'
-    : n < 6 ? '<b>' + n + ' of 6</b> pieces on Carlton. ' + (6 - n) + ' to go.'
+    ? 'Carlton has the sweater and nothing else. <b>Tap a piece of his kit</b> to put a Leaf in it.'
+    : n < 6 ? '<b>' + n + ' of 6</b> pieces on Carlton. Tap another, ' + (6 - n) + ' to go.'
     : CLOCK.over ? '<b>Dressed, and final.</b> Every piece has settled.'
                  : '<b>Dressed.</b> Every piece scores as the game goes.';
 }
-/* the pip carries the live number for the piece it sits on, and a tick
-   when the slot is filled but the number does not exist until the
-   buzzer. It never carries a zero dressed up as a fact. */
+/* the pip does two jobs on the same dot. Empty, it is the invitation: a
+   citrus ring on the piece, pulsing, because the figure is the only way
+   in and a piece at 26% does not look like a control. Filled, it is the
+   number that piece has put up tonight. It never carries a zero dressed
+   up as a fact, and it never carries a tick and a ring at once. */
 function carlPips(){
   const host = $('#carl'); if (!host) return;
   PARTS.forEach(P => {
     const pin = host.querySelector('.kitpin[data-id="' + P.id + '"]'); if (!pin) return;
     const chosen = pick[P.id];
-    if (!chosen){ pin.className = 'kitpin'; pin.textContent = ''; pin.dataset.id = P.id; return; }
+    if (!chosen){ pin.className = 'kitpin ask'; pin.textContent = ''; pin.dataset.id = P.id; return; }
     const known = !!KIT_LIVE[P.k] || CLOCK.over;
     const n = !BOXF[chosen.name] ? null
       : (KIT_LIVE[P.k] ? CLOCK.live(chosen.name)[P.k] : BOXF[chosen.name][P.k]);
@@ -1777,17 +1834,23 @@ function carlPips(){
 }
 
 /* ── the kit ──────────────────────────────────────────────────────
-   Six doors. A tile shows what is behind it (the leader's number)
-   before you open it, and who you put in it after. */
+   Not doors any more. These six were buttons and they were the whole
+   game: "+ Pick a Leaf" six times, with Carlton standing beside them
+   as decoration. Carlton is the game now, so the list is a read-out --
+   what each slot is worth, who is in it, who is leading it tonight --
+   and an empty row names the piece to go and tap. A legend, not a menu.
+
+   They keep no role and no tabindex on purpose. The control is the
+   piece on the figure, it carries the same words in its aria-label, and
+   two things claiming to be the same control is worse than one. */
 function drawParts(){
   const box = $('#parts'); box.innerHTML = '';
   PARTS.forEach(P => {
     const chosen = pick[P.id];
     const lead   = [...KIT_POOL].sort((a,b) => b[P.k] - a[P.k])[0];
-    const t = el('button','eq'+(chosen?' filled':''));
-    t.type = 'button';
+    const t = el('div','eq'+(chosen?' filled':''));
+    t.dataset.id = P.id;          /* the row and the piece are the same slot */
     t.style.setProperty('--eqc','var('+PART_C[P.id]+')');
-    t.setAttribute('aria-label', P.part+', '+P.cat+(chosen?', '+chosen.name+' selected':', empty'));
     t.innerHTML =
       '<div class="prop">'+eqArt(P.id)+'</div>'+
       '<div class="nmcat"><div class="pt">'+P.part+'</div><div class="pcat">'+P.cat+'</div></div>'+
@@ -1795,11 +1858,15 @@ function drawParts(){
         ? '<div class="who"><span class="pc '+chosen.pos+'">'+chosen.pos+'</span>'+
           '<span class="nm2">'+chosen.name+'</span>'+
           '<span class="val tnum">'+chosen[P.k].toFixed(2)+'</span></div>'
-        : '<div class="empty"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Pick a Leaf</div>')+
+        /* the sentence is one flex child, not four: a gap meant for the
+           icon was landing between every word and the bold piece name */
+        : '<div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true">'+
+          '<circle class="tapdot" cx="12" cy="12" r="3.1"/>'+
+          '<path d="M18.4 5.6a9 9 0 0 1 0 12.8M5.6 18.4a9 9 0 0 1 0-12.8"/></svg>'+
+          '<span>Tap <b>'+P.part.toLowerCase()+'</b> on Carlton</span></div>')+
       '</div>'+
       (chosen ? '<div class="lead">Worth <b>+'+val(chosen,P.k).toFixed(2)+'</b> fantasy points</div>'
               : '<div class="lead">Leader tonight: '+last(lead.name)+' '+lead[P.k].toFixed(2)+'</div>');
-    t.onclick = () => openPicker(P);
     box.appendChild(t);
   });
   drawCarl();

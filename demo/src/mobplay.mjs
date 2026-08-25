@@ -49,8 +49,24 @@ if (!fails) ok('every button, input and disclosure is at least 30px tall on all 
 // ── 01 Ultimate Leaf ─────────────────────────────────────────────
 console.log('\n— 01 Ultimate Leaf —');
 await nav('ult');
-for (let i=0;i<6;i++){
-  if (!await tap('#parts .eq', i)) break;
+/* The rows stopped being buttons; the kit on Carlton is the way in, and
+   on a phone that figure is 250px wide, so this is also the real test of
+   whether six pieces of a 250px bear are tappable with a thumb.
+
+   A piece can own more than one rect -- two skates, and the stick has a
+   butt and a blade either side of its shaft -- so this taps the biggest,
+   which is the one a thumb goes for and the one the 30px audit should
+   be measuring. */
+const doorIds = await p.$$eval('.carl .kitdoor', d => d.map(x => x.dataset.id));
+for (const id of doorIds){
+  const sel = `.carl .kitdoor[data-id="${id}"] rect.hitz`;
+  const n = await p.$$eval(sel, rs => {
+    let best = 0, area = -1;
+    rs.forEach((r,i) => { const b = r.getBoundingClientRect();
+      if (b.width * b.height > area){ area = b.width * b.height; best = i; } });
+    return best;
+  });
+  if (!await tap(sel, n)) break;
   // the top of the list is greyed once he is placed elsewhere: one Leaf, one slot
   if (!await tap('#shList .prow:not([disabled])', 0)) break;
 }

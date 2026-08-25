@@ -10,7 +10,8 @@ for f in app.js index.html build.py bake_art.py carve.py serve.mjs \
          players.json shots.json \
          realsite.mjs verify.mjs mobplay.mjs mobsweep.mjs offline.mjs \
          classcheck.mjs audit_hub.mjs shots_all.mjs proof.mjs leak.mjs \
-         figcheck.mjs nits.mjs rank4.mjs phone_all.mjs carlshot.mjs ultshot.mjs \
+         figcheck.mjs vecfall.mjs nits.mjs rank4.mjs phone_all.mjs \
+         carlshot.mjs ultshot.mjs tapsize.mjs \
          CARLTON-BRIEF.md CARLTON-PROMPT.txt PAGE-DESIGN-BRIEF.md \
          TERMINAL-BRIEF-LIVE.md ALLTIME-LEAFS.md; do
   [ -f "$f" ] && cp "$f" out/src/ || echo "  missing: $f"

@@ -38,10 +38,16 @@ against the official box score.
 ## Game 01 is a paper doll now
 
 Citrus Carlton stands in the middle of the page in nothing but the sweater,
-and six pieces of kit arrive as you fill the slots. Tap a piece on him or a
-row beside him, either opens that slot. Every piece is hollow and half-lit
-until a Leaf is behind it, then it fills in, and once the puck drops it
-carries a pip with what that man has actually done tonight.
+and six pieces of kit arrive as you fill the slots. **Tap the kit on him** --
+the gloves, the shin pads, the stick -- and that piece's slot opens. Each
+empty piece wears a pulsing citrus ring so it is obvious which ones are
+still waiting; the ring becomes the pip once a Leaf is behind it, and once
+the puck drops the pip carries what that man has actually done tonight.
+
+The six rows beside him are a read-out, not a menu. They say what each slot
+is worth and who is leading it, and an empty one tells you which piece to
+go and tap. Keyboard works too: Tab reaches all six pieces in the order the
+rows read, Enter or Space opens one, Escape comes back to it.
 
 Carlton is MLSE's mascot and MLSE's trademark, down to the 60 he wears for 60
 Carlton Street. This is a Citrus rendering of somebody else's character shown

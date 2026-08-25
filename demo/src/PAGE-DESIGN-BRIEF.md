@@ -87,7 +87,7 @@ unevenly:
 | Page | State after this pass | What to look at |
 |---|---|---|
 | **Locker room** | Dense list, LIVE badges, club mark per row | Does the list earn a whole screen, or should the six live games separate from the four that are not? |
-| **Ultimate Leaf** | Citrus Carlton, six kit rows beside him | Answered: rows. See CARLTON-BRIEF.md. The page is a paper doll now, the figure is the picker, and the tiles are a single column of rows next to it. |
+| **Ultimate Leaf** | Citrus Carlton, six kit rows beside him | Answered: rows, and then answered again. The figure is not just *a* picker, it is the only one -- the rows stopped being buttons and became a read-out, because two controls for one slot is one too many and the bear was the better of the two. See CARLTON-BRIEF.md. |
 | **Beat Stormy** | header → both lineups → the pool → action bar → matchup (hidden until five are iced) | The two lineup cards are still the tallest thing above the fold. Can the matchup live in the same card as the lineups? |
 | **Who Goes Off** | Six cards, two columns, action bar | Closest to right of anything here. Use it as the reference. |
 | **Guess the Leaf** | Clue board is seven rows; the answer column holds the answer and both things that cost points | Done. |

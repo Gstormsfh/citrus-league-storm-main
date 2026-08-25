@@ -1,4 +1,10 @@
-/* The paper doll's six pieces are nested <svg> viewports over one render.
+/* The figure is the control. Not one of the six pieces was reachable
+   without a mouse until the rows beside it stopped being buttons, and a
+   <g> with a tabindex gets no behaviour for free, so this file walks the
+   whole thing: which piece owns which pixel, and whether a keyboard can
+   get to it, name it, open it and come back.
+
+   The paper doll's six pieces are nested <svg> viewports over one render.
    Chrome reports the UNCLIPPED box for those, so getBoundingClientRect is
    useless here and any test that clicks "the middle of the group" lands on
    empty air and silently hits nothing. Real hit-testing is correct; this
@@ -63,11 +69,63 @@ for (const [name, opts] of [['desktop',{viewport:{width:1440,height:1200}}],
     const n = await p.evaluate(()=>document.querySelectorAll('.carlrender image').length);
     if (n !== 7){ bad++; console.log('   FAIL     ' + n + ' images on the figure, expected 7 (a base and six pieces)'); }
   }
+  /* the figure is the only way in now, so it has to be reachable without a
+     mouse: exactly one focusable door per piece, each with a name */
+  const doors = await p.evaluate(()=>[...document.querySelectorAll('.carl .kitdoor')]
+    .map(d=>({id:d.dataset.id, tab:d.getAttribute('tabindex'), role:d.getAttribute('role'),
+              label:(d.getAttribute('aria-label')||'').slice(0,40)})));
+  const ids = doors.map(d=>d.id).sort().join(',');
+  if (ids !== 'a,blk,g,hit,sog,tk'){ bad++; console.log('   FAIL     doors are [' + ids + '], expected one per piece'); }
+  const mute = doors.filter(d=>d.tab!=='0'||d.role!=='button'||!d.label);
+  if (mute.length){ bad++; console.log('   FAIL     ' + mute.length + ' door(s) with no tabindex, role or name'); }
+  else console.log('   ok       six doors, each focusable and named');
+
+  /* A tabindex is not a tab stop and a role is not a behaviour. The six
+     rows beside him used to be real buttons and they got all of this for
+     free; a <g> gets none of it, so it is walked here for real. */
+  if (name === 'desktop'){
+    await p.evaluate(()=>{const h=document.querySelector('#p-ult');
+      h.setAttribute('tabindex','-1'); h.focus();});
+    const walk = [];
+    for (let i=0;i<60 && walk.length<6;i++){
+      await p.keyboard.press('Tab');
+      const a = await p.evaluate(()=>{const e=document.activeElement;
+        return {cls:(e.getAttribute&&e.getAttribute('class'))||'', id:e.dataset?e.dataset.id:''};});
+      if (a.cls.includes('kitdoor')) walk.push(a.id);
+    }
+    const order = walk.join(',');
+    /* PARTS order, which is the order of the list beside him */
+    if (order !== 'g,a,sog,hit,blk,tk'){ bad++;
+      console.log('   FAIL     Tab reaches [' + (order||'nothing') + '], expected g,a,sog,hit,blk,tk'); }
+    else console.log('   ok       Tab walks all six, in the order the list reads');
+
+    const ring = await p.evaluate(()=>{const d=document.activeElement;
+      const r=d.querySelector && d.querySelector('rect.hitz');
+      return r ? getComputedStyle(r).stroke : 'none';});
+    if (ring === 'none' || ring === 'rgba(0, 0, 0, 0)'){ bad++;
+      console.log('   FAIL     a focused piece shows no ring'); }
+    else console.log('   ok       the focused piece is ringed and lit');
+
+    for (const [key,nm] of [['Enter','Enter'],[' ','Space']]){
+      await p.keyboard.press(key); await p.waitForTimeout(320);
+      const open = await p.evaluate(()=>document.querySelector('#pickSheet').classList.contains('on'));
+      if (!open){ bad++; console.log('   FAIL     ' + nm + ' did not open the picker'); }
+      else console.log('   ok       ' + nm + ' opens that piece\'s picker');
+      const y = await p.evaluate(()=>window.scrollY);
+      await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+      const back = await p.evaluate(()=>{const e=document.activeElement;
+        return !!(e && e.classList && e.classList.contains('kitdoor'));});
+      if (!back){ bad++; console.log('   FAIL     Escape did not put focus back on the piece'); }
+      if (nm === 'Space' && y !== await p.evaluate(()=>window.scrollY)){ bad++;
+        console.log('   FAIL     Space scrolled the page as well as opening the picker'); }
+    }
+    console.log('   ok       Escape lands back on the piece it opened');
+  }
   const hits = await p.evaluate(([pts,clr])=>{
     const box=document.querySelector('.carl').getBoundingClientRect();
     const at=(vx,vy)=>{ const e=document.elementFromPoint(
       box.left+vx/380*box.width, box.top+vy/470*box.height);
-      if(!e) return null; const k=e.closest('.kitp'); return k?k.dataset.id:null; };
+      if(!e) return null; const k=e.closest('[data-id]'); return k?k.dataset.id:null; };
     return {on:pts.map(q=>at(q[1],q[2])), off:clr.map(q=>at(q[1],q[2]))};
   }, [POINTS, CLEAR]);
   console.log('\n— ' + name + ' (' + mode + ') —');

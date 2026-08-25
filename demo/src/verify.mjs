@@ -20,10 +20,15 @@ await p.click('nav .navitem[data-t=ult]'); await p.waitForTimeout(700);
 await shot('ult_kit');
 const slots = await p.$$eval('#parts .eq',e=>e.length);
 say('kit pieces on screen:', slots);
+/* The rows are a read-out now, not buttons. The only way into a slot is
+   the piece of kit on Carlton, so that is what this clicks: the first
+   hit rect inside that piece's door. A <g> would centre the click
+   between the two skates, which is air. */
 for (let i=1;i<=slots;i++){
   const part = await p.$eval(`#parts .eq:nth-child(${i}) .pt`, e=>e.textContent);
   const cat  = await p.$eval(`#parts .eq:nth-child(${i}) .pcat`, e=>e.textContent);
-  await p.click(`#parts .eq:nth-child(${i})`); await p.waitForTimeout(500);
+  const id   = await p.$eval(`#parts .eq:nth-child(${i})`, e=>e.dataset.id);
+  await p.click(`.carl .kitdoor[data-id="${id}"] rect.hitz`); await p.waitForTimeout(500);
   const open = await p.$eval('#pickSheet', e=>e.classList.contains('on'));
   const rows = await p.$$eval('#shList .prow', r=>r.length);
   const avail= await p.$$eval('#shList .prow:not([disabled])', r=>r.length);
