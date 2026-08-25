@@ -33,6 +33,7 @@ import { playoffRoutes } from './routes/playoffs';
 import { bestballRoutes } from './routes/bestball';
 import { accountRoutes } from './routes/account';
 import { publicRoutes } from './routes/public';
+import { newsRoutes } from './routes/news';
 import { demoMatchupRoutes } from './routes/demoMatchup';
 import { poolRoutes } from './routes/pools';
 import { nhlPlayoffsRoutes } from './routes/nhl-playoffs';
@@ -273,6 +274,7 @@ app.route('/api/playoffs', playoffRoutes);
 app.route('/api/bestball', bestballRoutes);
 app.route('/api/account', accountRoutes);
 app.route('/api/public', publicRoutes);
+app.route('/api/news', newsRoutes);
 // Chunk 11g.9 (2026-08-24): guest Matchup payload, ported off the
 // retired `demo-matchup-cache` Edge Function. Public + unauthenticated
 // by design (no authMiddleware on the route), still covered by the
