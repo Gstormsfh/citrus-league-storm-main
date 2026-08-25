@@ -108,6 +108,33 @@ export function getProjectionsSeason(d: Date = new Date()): number {
   return d.getMonth() >= 6 && d.getMonth() <= 8 ? cur + 1 : cur;
 }
 
+/**
+ * Local ISO date of the next season opener still in the future, or null once
+ * the season is under way.
+ *
+ * Why (found 2026-08-25, roster/UX audit): "Games This Week" rendered seven
+ * zeros and painted every day with the red OFF-NIGHT treatment. The data was
+ * correct — nhl_games holds 2,738 fixtures spanning 2025-10-07..2027-04-10
+ * and exactly zero between 2026-08-18 and 2026-09-01, because it is August.
+ * Correct numbers presented with no context read as a broken app, which is
+ * the same failure `getProjectionsSeason` exists to fix one screen over.
+ * A UI that knows a week is empty *because the season has not started* can
+ * say so instead of implying the schedule failed to load.
+ *
+ * CAVEAT: derived from SEASON_START_DATES, which only lists seasons opening
+ * BEFORE October (that map exists to correct the month rule, not to be a
+ * complete fixture list). For an ordinary October opener there is no entry
+ * and this returns null — callers must degrade to a generic "no games this
+ * week" message rather than assuming offseason.
+ */
+export function getUpcomingSeasonStartDate(d: Date = new Date()): string | null {
+  const today = _localISODate(d);
+  const upcoming = Object.values(SEASON_START_DATES)
+    .filter((iso) => iso > today)
+    .sort();
+  return upcoming.length > 0 ? upcoming[0] : null;
+}
+
 /** The numeric season identifier used in DB queries. Evaluated at module
  * load — see LIFECYCLE CAVEAT above. Use `getCurrentSeason()` when a
  * long-lived process must pick up the Oct 1 flip without restart. */

@@ -9,6 +9,7 @@ import { WaiverService, WaiverPriority } from '@/services/WaiverService';
 import { Loader2, Calendar, RefreshCw, TrendingUp, AlertCircle, Clock, Shield, Zap, ArrowRight, Users, Trophy } from 'lucide-react';
 import { usePlayerNews, PlayerNewsItem } from '@/hooks/usePlayerNews';
 import { calculateWeekDates, fetchGamesForTeams, calculatePlayerSchedule, getGamesPerDay, getRosterGamesPerDay, calculateScheduleMaximizers, PlayerWithSchedule } from '@/utils/scheduleMaximizer';
+import { getUpcomingSeasonStartDate } from '@citrus/shared';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
@@ -329,6 +330,35 @@ export const TeamIntelHub = () => {
     return days;
   }, [weekStart, weekEnd, gamesPerDay, rosterGamesPerDay]);
 
+  /**
+   * Does this week contain ANY NHL game?
+   *
+   * "Games This Week" used to render seven zeros with every day painted in
+   * the red OFF-NIGHT treatment whenever the week was empty. The numbers were
+   * right — the schedule genuinely has no fixtures between the playoffs and
+   * late September — but seven red zeros with no explanation reads as "the
+   * app failed to load my schedule", which is exactly the impression a new
+   * TestFlight user forms in the offseason.
+   */
+  const weekHasGames = useMemo(
+    () => calendarDays.some((day) => day.totalGames > 0),
+    [calendarDays],
+  );
+
+  /** Non-null only while the season genuinely hasn't started yet. */
+  const upcomingSeasonStartLabel = useMemo(() => {
+    const iso = getUpcomingSeasonStartDate();
+    if (!iso) return null;
+    // Parse as LOCAL midnight — new Date('YYYY-MM-DD') is UTC and renders the
+    // previous day west of Greenwich (the same trap calculatePlayerSchedule
+    // documents for game_date).
+    return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  }, []);
+
   // Generate actionable insights when data changes
   useEffect(() => {
     if (!weekStart || !weekEnd || calendarDays.length === 0) {
@@ -606,6 +636,21 @@ export const TeamIntelHub = () => {
                 <Calendar className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <h3 className="text-sm font-semibold text-foreground">Games This Week</h3>
               </div>
+              {!weekHasGames ? (
+                /* No fixtures anywhere in the week. Say so plainly instead of
+                   showing a grid of zeros flagged as off-nights — the grid is
+                   a comparison tool and there is nothing to compare. */
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-4 text-center">
+                  <div className="text-sm font-semibold text-foreground">
+                    No NHL games this week
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {upcomingSeasonStartLabel
+                      ? `The season opens ${upcomingSeasonStartLabel} — schedule planning lights up then.`
+                      : 'Nothing is scheduled for these dates.'}
+                  </div>
+                </div>
+              ) : (
               <div className="grid grid-cols-7 gap-1">
                 {calendarDays.map((day, idx) => {
                 const isOffNight = day.totalGames <= 3;
@@ -644,7 +689,8 @@ export const TeamIntelHub = () => {
                   </div>
                 );
               })}
-            </div>
+              </div>
+              )}
           </div>
           )}
 
