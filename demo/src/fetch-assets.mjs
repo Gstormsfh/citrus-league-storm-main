@@ -111,78 +111,96 @@ async function faces() {
 }
 
 /* ── 3. every Leaf there has ever been ───────────────────────────────
-   Two requests, not a thousand: records.nhl.com publishes the franchise's
-   all-time skaters and goalies with exactly the four fields the grid
-   reads. See ALLTIME-LEAFS.md for the schema and what it unlocks. */
+   records.nhl.com/site/api/franchise-skater-records is what this used to
+   ask and it is gone -- 404, with the filter and without it, skaters and
+   goalies alike. probe-alltime.mjs went looking and the stats REST api has
+   what the grid needs, in a different shape.
+
+   Per-season rows, not career totals. One request per hundred players per
+   season they played, folded here into one man: sum the games, take the
+   first and last seasonId he appeared in. The aggregate form of the same
+   endpoint gives career games in one row but drops seasonId, and without
+   the years there is no era square and no longevity square, which is most
+   of what an all-time board is for. So: the long way, folded. */
 async function alltime() {
   head('EVERY LEAF THERE HAS EVER BEEN');
-  const base = 'https://records.nhl.com/site/api';
-  /* Two ways of asking, because the filtered form 404'd once and there is
-     no reason for that to cost the whole file. The unfiltered form returns
-     every club and is filtered here instead -- bigger, and it works. */
-  const grab = async t => {
-    const urls = [
-      `${base}/franchise-${t}-records?cayenneExp=franchiseId=${FRANCHISE}`,
-      `${base}/franchise-${t}-records`,
-    ];
-    for (const u of urls) {
-      try {
-        const { data } = await get(u);
-        const mine = (data || []).filter(r =>
-          Number(r.franchiseId) === FRANCHISE || r.franchiseName === 'Toronto Maple Leafs');
-        if (mine.length) { say(t + ': ' + mine.length + ' rows'); return mine; }
-        say(t + ': that URL answered but held no Leafs');
-      } catch (e) { say(t + ': ' + e.message); }
-    }
-    return [];
+  const REST = 'https://api.nhle.com/stats/rest/en';
+  const EXP  = encodeURIComponent(`franchiseId=${FRANCHISE} and gameTypeId=2`);
+
+  /* limit=-1 is honoured by some of these endpoints and ignored by others,
+     so ask for everything once and page through it if that is refused. */
+  const pull = async what => {
+    const page = async (start, limit) => {
+      const u = `${REST}/${what}/summary?isAggregate=false&start=${start}` +
+                `&limit=${limit}&cayenneExp=${EXP}`;
+      const j = await get(u);
+      return { rows: j.data || [], total: Number(j.total) || 0 };
+    };
+    try {
+      const one = await page(0, -1);
+      if (one.rows.length && (!one.total || one.rows.length >= one.total)) {
+        say(`${what}: ${one.rows.length} season lines in one request`);
+        return one.rows;
+      }
+      const all = [...one.rows];
+      const LIMIT = 100;
+      for (let s = all.length; s < (one.total || 0) && s < 20000; s += LIMIT) {
+        const p = await page(s, LIMIT);
+        if (!p.rows.length) break;
+        all.push(...p.rows);
+      }
+      say(`${what}: ${all.length} season lines of ${one.total || '?'}`);
+      return all;
+    } catch (e) { say(`${what}: ${e.message}`); return []; }
   };
+
+  const yr = id => Math.floor(Number(id) / 10000);        // 19261927 -> 1926
+
+  /* one man, however many seasons he wore it */
+  const fold = (rows, isGoalie, into) => {
+    for (const r of rows) {
+      const name = r.skaterFullName || r.goalieFullName ||
+                   [r.firstName, r.lastName].filter(Boolean).join(' ').trim();
+      if (!name || !r.seasonId) continue;
+      const id = r.playerId != null ? 'p' + r.playerId : name.toLowerCase();
+      const y  = yr(r.seasonId);
+      const gp = Number(r.gamesPlayed) || 0;
+      const e  = into.get(id);
+      if (!e) into.set(id, { n: name, pos: isGoalie ? 'G' : (r.positionCode || 'C'),
+                             y0: y, y1: y, gp });
+      else { e.gp += gp; e.y0 = Math.min(e.y0, y); e.y1 = Math.max(e.y1, y); }
+    }
+    return into;
+  };
+
   try {
-    /* NOT Promise.all. The first run of this had them joined, one endpoint
-       404'd, and the failure took the other down with it -- so the output
-       said nothing at all about whether the skaters had come back fine. */
-    const skaters = await grab('skater');
-    const goalies = await grab('goalie');
+    const skaters = await pull('skater');
+    const goalies = await pull('goalie');
     if (!skaters.length && !goalies.length) throw new Error('neither endpoint returned rows');
     if (!goalies.length) say('no goalies; the grid will have no goalie squares');
     if (!skaters.length) say('no skaters, which is most of a franchise');
 
-    /* fail loudly rather than quietly writing another club's roster */
-    const wrong = [...skaters, ...goalies]
-      .find(r => r.franchiseName && r.franchiseName !== 'Toronto Maple Leafs');
-    if (wrong) throw new Error(`franchiseId ${FRANCHISE} returned ${wrong.franchiseName}`);
-
-    const yr  = id => Math.floor(Number(id) / 10000);        // 19261927 -> 1926
-    const row = (r, g) => ({
-      n  : `${r.firstName} ${r.lastName}`.trim(),
-      pos: g ? 'G' : (r.positionCode || 'C'),
-      y0 : yr(r.firstSeasonId),
-      y1 : yr(r.lastSeasonId || r.firstSeasonId),
-      gp : Number(r.gamesPlayed) || 0,
-    });
-
-    const players = [...skaters.map(r => row(r, false)), ...goalies.map(r => row(r, true))]
-      .filter(p => p.n && p.gp > 0 && p.y0 > 1900 && p.y1 >= p.y0)
+    const by = new Map();
+    fold(skaters, false, by);
+    fold(goalies, true,  by);
+    const out = [...by.values()]
+      .filter(p => p.gp > 0 && p.y0 > 1900 && p.y1 >= p.y0)
       .sort((a, b) => b.gp - a.gp);
-
-    /* one name per man: the records API splits a few across stints */
-    const merged = new Map();
-    for (const p of players) {
-      const k = p.n.toLowerCase() + '|' + p.pos;
-      const e = merged.get(k);
-      if (!e) { merged.set(k, p); continue; }
-      e.gp += p.gp; e.y0 = Math.min(e.y0, p.y0); e.y1 = Math.max(e.y1, p.y1);
-    }
-    const out = [...merged.values()].sort((a, b) => b.gp - a.gp);
-    if (out.length < 50) throw new Error('only ' + out.length + ' rows; expected the franchise');
+    if (out.length < 50) throw new Error('only ' + out.length + ' men; expected the franchise');
 
     writeFileSync(join(ART, 'leafs-alltime.json'), JSON.stringify({
       built: new Date().toISOString().slice(0, 10),
-      source: 'records.nhl.com franchise-skater-records + franchise-goalie-records',
+      source: 'api.nhle.com/stats/rest/en/{skater,goalie}/summary, franchiseId=5, regular season',
       players: out,
     }));
     say(out.length + ' Leafs, ' + Math.min(...out.map(p => p.y0)) +
         ' to ' + Math.max(...out.map(p => p.y1)));
     say('top five by games: ' + out.slice(0, 5).map(p => `${p.n} ${p.gp}`).join(', '));
+    /* a franchise that started in 1917 and shows nobody before 1980 means
+       the filter is wrong, not that the years are */
+    if (Math.min(...out.map(p => p.y0)) > 1930)
+      say('WARNING: nobody before ' + Math.min(...out.map(p => p.y0)) +
+          '. That is not the whole franchise.');
   } catch (e) {
     failed++; say('FAILED: ' + e.message);
   }

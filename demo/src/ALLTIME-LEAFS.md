@@ -22,20 +22,29 @@ node fetch-assets.mjs
 powershell -ExecutionPolicy Bypass -File checks.ps1 -Rebake
 ```
 
-The rest of this file is the roster half on its own, kept because it
-documents the schema and because two requests are worth understanding.
-
-> **The endpoint below is gone.** Run from a real network on 2026-08-25,
-> `records.nhl.com/site/api/franchise-skater-records` answered 404 with a
-> Jetty error page -- with the franchise filter and without it, and the
-> goalie half the same. The path moved, or the whole `/site/api` prefix
-> did. `probe-alltime.mjs` asks a spread of candidates and prints what each
-> actually returns, including whether it carries the five fields the grid
-> needs. The schema further down is unchanged and is still the target; only
-> the source has to be found again.
+> **The source moved, and it has been found.** Run from a real network on
+> 2026-08-25, `records.nhl.com/site/api/franchise-skater-records` answers
+> 404 with a Jetty error page -- with the franchise filter and without it,
+> skaters and goalies alike. `probe-alltime.mjs` went looking and the
+> answer is **`api.nhle.com/stats/rest/en/{skater,goalie}/summary`**, which
+> `fetch-assets.mjs` now uses.
 >
-> Until then the grid runs on 2017-18 onward, which is what it has always
-> done, and the panel says so plainly rather than pretending otherwise.
+> It is a different shape and the difference matters. That endpoint returns
+> **one row per player per season**, not a career total, so the fetcher
+> folds them: sum the games, take the first and last `seasonId` he appears
+> in. The `isAggregate=true` form gives career games in a single row but
+> drops `seasonId` -- and without the years there is no era square and no
+> longevity square, which is most of what an all-time board is for. So the
+> long way, folded, paged a hundred at a time.
+>
+> `records.nhl.com/site/api/franchise` is still alive if you need the
+> franchise list; it is only the player records that went. Keep
+> `probe-alltime.mjs` -- when this moves again, it is one command and it
+> reports which candidates answer and whether they carry the five fields.
+
+What follows is the original two-request recipe. **It no longer works** and
+is kept only because it documents the schema, which has not changed and is
+still exactly what the build reads.
 
 ---
 
