@@ -1,5 +1,6 @@
-/* Six class-name collisions have shipped in this build (.tag, .mark, .foot,
-   .h2h, .sk, .grow). This finds the seventh before it does. It renders every
+/* Nine class-name collisions have shipped in this build (.tag, .mark,
+   .foot, .h2h, .sk, .grow, .clside, a bare <header>, and .cp). This finds
+   the tenth before it does. It renders every
    panel, reads the class of every element actually on screen, and reports any
    class that lands on two structurally different components. */
 import http from 'http'; import { readFileSync } from 'fs';
@@ -15,7 +16,11 @@ for (const t of PANELS){
   await p.evaluate(x=>go(x), t); await p.waitForTimeout(200);
   const rows = await p.evaluate(t => {
     const out=[];
-    document.querySelectorAll('#p-'+t+' *').forEach(n=>{
+    /* The whole document, not just the panel. The ninth collision was a
+       kit piece called .cp landing on the header's Citrus-points chip and
+       running it at 50% opacity on all thirteen pages; scanning panel
+       subtrees only, this file could not see it. */
+    document.querySelectorAll('body *').forEach(n=>{
       const pe = n.parentElement;
       const pc = pe ? (typeof pe.className === 'string' ? pe.className : (pe.getAttribute('class')||'')) : '';
       const par = pe ? (pe.id || pc.split(' ')[0] || pe.tagName) : '';

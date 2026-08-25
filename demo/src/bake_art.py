@@ -15,6 +15,36 @@ import base64, os, sys, re
 
 ART_DIR = 'art'
 JS      = 'app.js'
+
+# Where to look for a file, in order. The demo keeps its own art/ directory,
+# but the renders actually live in the app's public folder under a -tor
+# suffix, and the README's "copy them into demo/src/art/ first" was a manual
+# step that nobody was ever going to remember. Look in both, and try the
+# suffix, so the copy step is not load-bearing.
+ART_DIRS = [
+    ART_DIR,
+    os.path.join('..', '..', 'apps', 'web', 'public', 'mascots'),   # from demo/src
+    os.path.join('apps', 'web', 'public', 'mascots'),               # from repo root
+]
+
+
+def find_art(fname):
+    """art/eq-stick.webp, else .../mascots/eq-stick.webp, else -tor."""
+    stem, ext = os.path.splitext(fname)
+    for d in ART_DIRS:
+        for cand in (fname, stem + '-tor' + ext):
+            path = os.path.join(d, cand)
+            if os.path.exists(path):
+                return path
+    return None
+
+
+def baked_keys(src):
+    """The keys currently inlined, so this script can refuse to lose them."""
+    if BEGIN not in src or END not in src:
+        return set()
+    blk = src[src.index(BEGIN):src.index(END)]
+    return set(re.findall(r"[\n{,]\s*([A-Za-z0-9_]+)\s*:\s*\{src:", blk))
 BEGIN   = '/* ==== BAKED ART: written by bake_art.py, do not edit by hand ==== */'
 END     = '/* ==== END BAKED ART ==== */'
 
@@ -23,6 +53,18 @@ FILES = {
     # --- the club crest. Drop the real asset in as art/crest.png (or .svg
     #     converted to png) and it replaces every drawn leaf in the build. ---
     'crest':         'crest.png',
+    # --- CITRUS CARLTON, the paper doll on Game 01. Seven transparent
+    #     layers on ONE canvas so they stack: the bear in his sweater,
+    #     then one layer per piece of kit. All seven or none, because a
+    #     rendered bear wearing six drawn pieces would be worse than the
+    #     vector he replaces. See CARLTON-BRIEF.md. ---
+    'carl_base':     'carlton-base.png',
+    'carl_g':        'carlton-stick.png',
+    'carl_a':        'carlton-gloves.png',
+    'carl_sog':      'carlton-puck.png',
+    'carl_hit':      'carlton-shoulders.png',
+    'carl_blk':      'carlton-shins.png',
+    'carl_tk':       'carlton-skates.png',
     # --- the kit: six props, Game 01. Highest impact, do these first. ---
     'eq_g':          'eq-stick.webp',
     'eq_a':          'eq-gloves.webp',
@@ -90,8 +132,14 @@ def main():
     # The build keys them by last name and falls back to the numbered sweater
     # for anyone who has not been delivered.
     import glob
-    for path in sorted(glob.glob(os.path.join(ART_DIR, 'hs-*.png')) +
-                       glob.glob(os.path.join(ART_DIR, 'hs-*.webp'))):
+    hs = []
+    for d in ART_DIRS:
+        hs += glob.glob(os.path.join(d, 'hs-*.png')) + glob.glob(os.path.join(d, 'hs-*.webp'))
+    seen_hs = set()
+    for path in sorted(hs):
+        if os.path.basename(path).lower() in seen_hs:
+            continue
+        seen_hs.add(os.path.basename(path).lower())
         raw = open(path, 'rb').read()
         total += len(raw)
         ext = os.path.splitext(path)[1].lower()
@@ -101,15 +149,15 @@ def main():
     if found:
         print('  baked  %d headshots' % len(found))
     for key, fname in FILES.items():
-        path = os.path.join(ART_DIR, fname)
-        if not os.path.exists(path):
+        path = find_art(fname)
+        if not path:
             missing.append(fname)
             continue
         raw = open(path, 'rb').read()
         total += len(raw)
         mime = MIME.get(os.path.splitext(fname)[1].lower(), 'image/webp')
         found[key] = 'data:%s;base64,%s' % (mime, base64.b64encode(raw).decode())
-        print('  baked  %-16s <- %-22s %6.0f KB' % (key, fname, len(raw) / 1024))
+        print('  baked  %-16s <- %-26s %6.0f KB' % (key, os.path.basename(path), len(raw) / 1024))
 
     # ── the all-time Leafs roster, inlined as data rather than as an image ──
     at_path = os.path.join(ART_DIR, 'leafs-alltime.json')
@@ -131,6 +179,31 @@ def main():
               % (len(keep), min(p['y0'] for p in keep), max(p['y1'] for p in keep)))
 
     src = open(JS, encoding='utf-8').read()
+
+    # ── the guard ─────────────────────────────────────────────────────
+    # This script strips the old block and writes a new one, so a run that
+    # finds nothing used to delete everything: app.js went from 1.56 MB of
+    # inlined art to none, silently, and printed "0 of 41 keys baked" as if
+    # that were a normal outcome. The only way back was git. It is a
+    # one-command foot-gun sitting in a file three briefs tell people to run.
+    #
+    # A bake can only ever ADD. If this run would lose a key that is already
+    # inlined, nothing is written and the reason is printed. Pass
+    # --allow-shrink when a removal is what you actually meant.
+    before = baked_keys(src)
+    lost = before - set(found)
+    if lost and '--allow-shrink' not in sys.argv:
+        print('\nREFUSING TO WRITE. Nothing has been changed.\n')
+        print('  %s already has %d keys inlined.' % (JS, len(before)))
+        print('  This run found %d, and would delete %d:' % (len(found), len(lost)))
+        print('    ' + ', '.join(sorted(lost)))
+        print('\n  Almost always this means the art is not where the script looked.')
+        print('  It searches, in this order, and also tries a -tor suffix:')
+        for d in ART_DIRS:
+            print('    %-46s %s' % (d, 'exists' if os.path.isdir(d) else 'not here'))
+        print('\n  Run from demo/src, or pass --allow-shrink if you mean it.')
+        sys.exit(1)
+
     src = re.sub(r'^const LEAFS_ALLTIME=.*?;\n', '', src, flags=re.M)
     if at_block:
         mark = '/* ── all-time Leafs ──'
@@ -155,7 +228,10 @@ def main():
 
     open(JS, 'w', encoding='utf-8').write(src)
 
+    gained = sorted(set(found) - before)
     print('\n%d of %d keys baked, %.1f MB of art inlined' % (len(found), len(FILES), total / 1048576))
+    if gained:
+        print('new this run (%d): %s' % (len(gained), ', '.join(gained)))
     if missing:
         print('not delivered yet (%d): %s' % (len(missing), ', '.join(missing)))
     print('\nnow run:  python3 build.py')
