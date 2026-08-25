@@ -17,6 +17,8 @@ import { playerApi } from '@/api/players';
 import { MatchupService } from '@/services/MatchupService';
 import { matchupApi } from '@/api/matchups';
 import { ScoringCalculator } from '@/utils/scoringUtils';
+import { generatePlayerWriteup, WriteupTone } from '@/utils/playerWriteup';
+import { getUpcomingSeasonStartDate } from '@citrus/shared';
 
 /* 2026-08-19 visual audit — muted-text correction.
    text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
@@ -84,6 +86,17 @@ const posColors: Record<string, { bg: string; text: string; border: string }> = 
   RW: { bg: 'bg-citrus-orange', text: 'text-white', border: 'border-citrus-orange' },
   D:  { bg: 'bg-citrus-forest', text: 'text-white', border: 'border-citrus-forest' },
   G:  { bg: 'bg-citrus-peach', text: 'text-pastel-forest', border: 'border-citrus-peach' },
+};
+
+/**
+ * Scouting-tag palette. Caution borrows the amber/red language the status
+ * badges already use for injuries, deliberately NOT orange — orange is spoken
+ * for as the app's "this is you" identity signal (Standings, matchup ScoreCard).
+ */
+const WRITEUP_TAG_STYLES: Record<WriteupTone, string> = {
+  positive: 'bg-pastel-sage/20 text-pastel-cream ring-pastel-sage/40',
+  neutral: 'bg-white/5 text-white/70 ring-white/15',
+  caution: 'bg-amber-500/15 text-amber-200 ring-amber-500/30',
 };
 
 const getPositionAbbr = (pos: string) => {
@@ -310,6 +323,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
   const isGoalie = player.position === 'Goalie' || player.position === 'G';
   const stats = player.stats || {};
+  // Pure function of `player` — cheap enough to run inline, and deliberately
+  // not memoised on a value that changes identity every render anyway.
+  const writeup = generatePlayerWriteup(player);
   const posAbbr = getPositionAbbr(player.position);
   const posStyle = posColors[posAbbr] || posColors['C'];
   const teamAbbr = player.teamAbbreviation || player.team?.split(' ').pop()?.substring(0, 3).toUpperCase() || '';
@@ -443,10 +459,16 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                       Jul–Sep is the NHL off-season — say so instead. */}
                   <span className="text-white/55 text-sm font-display italic">
                     {(() => {
-                      const m = new Date().getMonth();
-                      return m >= 6 && m <= 8
-                        ? 'Off-season — games return in October'
-                        : 'No upcoming games';
+                      // Was hard-coded to "return in October", which is wrong
+                      // for 2026-27: that season opens Sept 29. Read the real
+                      // opener instead of naming a month.
+                      const opener = getUpcomingSeasonStartDate();
+                      if (!opener) return 'No upcoming games';
+                      const label = new Date(`${opener}T00:00:00`).toLocaleDateString(undefined, {
+                        month: 'long',
+                        day: 'numeric',
+                      });
+                      return `Off-season — games return ${label}`;
                     })()}
                   </span>
                 </>
@@ -487,6 +509,40 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
             {/* ─── Overview Tab ─── */}
             <TabsContent value="stats" className="mt-0 space-y-4">
+              {/* Scouting report — leads the tab the way ESPN/Sleeper lead
+                  with a blurb. Derived from the same stat line rendered
+                  directly below it (see utils/playerWriteup), so the prose and
+                  the numbers can never disagree. */}
+              <div className="py-3 px-3.5 bg-white/5 rounded-xl border border-citrus-sage/15">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <CitrusSparkle className="w-3 h-3 text-citrus-orange" aria-hidden="true" />
+                  <span className="text-[9px] font-display uppercase tracking-[0.18em] text-pastel-cream/60">
+                    Scouting Report
+                  </span>
+                </div>
+                <div className="text-sm font-display font-bold text-pastel-cream leading-snug">
+                  {writeup.headline}
+                </div>
+                <p className="mt-1 text-[13px] leading-relaxed text-white/70">
+                  {writeup.summary}
+                </p>
+                {writeup.tags.length > 0 && (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {writeup.tags.map((tag) => (
+                      <span
+                        key={tag.label}
+                        className={cn(
+                          'inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-jbmono uppercase tracking-wider font-bold ring-1',
+                          WRITEUP_TAG_STYLES[tag.tone],
+                        )}
+                      >
+                        {tag.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Key stats grid */}
               {isGoalie ? (
                 <div className="grid grid-cols-3 gap-2">
