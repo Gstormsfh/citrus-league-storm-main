@@ -57,14 +57,21 @@ FILES = {
     #     layers on ONE canvas so they stack: the bear in his sweater,
     #     then one layer per piece of kit. All seven or none, because a
     #     rendered bear wearing six drawn pieces would be worse than the
-    #     vector he replaces. See CARLTON-BRIEF.md. ---
-    'carl_base':     'carlton-base.png',
-    'carl_g':        'carlton-stick.png',
-    'carl_a':        'carlton-gloves.png',
-    'carl_sog':      'carlton-puck.png',
-    'carl_hit':      'carlton-shoulders.png',
-    'carl_blk':      'carlton-shins.png',
-    'carl_tk':       'carlton-skates.png',
+    #     vector he replaces. See CARLTON-BRIEF.md.
+    #
+    #     The seven are CUT, not drawn: carlton-figure.png is one render of
+    #     the dressed bear, and carve.py separates it by material. Rectangles
+    #     over the render were tried first and a dim rectangle draws a hard
+    #     block across the yoke and the jaw -- the piece has to be its own
+    #     silhouette or the ghost state is unusable. Re-run carve.py after
+    #     any new figure lands; do not hand-edit these seven. ---
+    'carl_base':     'carlton-base.webp',
+    'carl_hit':      'carlton-hit.webp',
+    'carl_a':        'carlton-a.webp',
+    'carl_blk':      'carlton-blk.webp',
+    'carl_tk':       'carlton-tk.webp',
+    'carl_g':        'carlton-g.webp',
+    'carl_sog':      'carlton-sog.webp',
     # --- the kit: six props, Game 01. Highest impact, do these first. ---
     'eq_g':          'eq-stick.webp',
     'eq_a':          'eq-gloves.webp',
@@ -95,17 +102,29 @@ FILES = {
     'hero_bz':       'hero-crease.webp',
     'hero_grid':     'hero-grid.webp',
     'hero_lb':       'hero-board.webp',
-    # --- the page bands: wide 16:9 plates behind each hero (fallback) ---
-    'band_ult':      'band-locker.webp',
-    'band_stormy':   'band-bench.webp',
-    'band_hl':       'band-clock.webp',
-    'band_guess':    'band-tunnel.webp',
-    'band_luck':     'band-ice.webp',
-    'band_rank':     'band-podium.webp',
-    'band_fx':       'band-card.webp',
-    'band_bz':       'band-crease.webp',
-    'band_grid':     'band-grid.webp',
-    'band_lb':       'band-board.webp',
+    # --- THE TEN PAGE BANDS ARE GONE. They were still being inlined, 1.18 MB
+    #     of a 3.7 MB file, and nothing rendered them: the .ghero elements
+    #     they attached to were removed when the page headers were rebuilt.
+    #     Measured in the running build -- 0 band images on the page, 0
+    #     .ghero, 0 [data-art]. Put these back only alongside something that
+    #     actually draws them.
+    #
+    # --- the four characters, where they have a job ---
+    #     Stormy is the AI GM you play in Game 02, so his face belongs on his
+    #     own lineup card and on the card that tells you who won. The other
+    #     three carry the locker room list, where twelve identical club marks
+    #     told a fan nothing about which game was which.
+    'cut_stormy':    'mascot-stormy-tor-cut.webp',
+    'cut_lemon':     'mascot-lemon-tor-cut.webp',
+    'cut_kiwi':      'mascot-kiwi-tor-cut.webp',
+    'cut_pineapple': 'mascot-pineapple-tor-cut.webp',
+    #     Stormy reacting. -win is Stormy winning, so it shows when he beats
+    #     you; -loss shows when you beat him. Named from his side, not yours.
+    #     MUST be the -cut files: mascot-stormy-tor-win.webp is RGB with a
+    #     solid dark-green plate baked in, and it rendered as a green box
+    #     sitting on the navy card. Only the -cut variants carry alpha.
+    'stormy_win':    'mascot-stormy-tor-win-cut.webp',
+    'stormy_loss':   'mascot-stormy-tor-loss-cut.webp',
     # --- leaderboard hardware ---
     'badge_1':       'badge-first.webp',
     'badge_2':       'badge-second.webp',
@@ -123,6 +142,29 @@ FILES = {
 }
 
 MIME = {'.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg'}
+
+# Keys whose art is composited straight onto the page with no container of
+# its own. If one of these is opaque it will render as a rectangle on navy,
+# which is exactly what shipped when stormy_win pointed at the RGB file
+# instead of the -cut one. Checked at bake time rather than in a screenshot.
+NEEDS_ALPHA = ('cut_', 'stormy_', 'carl_')
+
+
+def has_alpha(path):
+    try:
+        from PIL import Image
+    except ImportError:
+        return None                      # cannot check; do not block the bake
+    try:
+        im = Image.open(path)
+    except Exception:
+        return None
+    if im.mode not in ('RGBA', 'LA', 'P'):
+        return False
+    im = im.convert('RGBA')
+    w, h = im.size
+    corners = [im.getpixel(c) for c in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1))]
+    return max(px[3] for px in corners) == 0
 
 
 def main():
@@ -153,6 +195,12 @@ def main():
         if not path:
             missing.append(fname)
             continue
+        if key.startswith(NEEDS_ALPHA):
+            a = has_alpha(path)
+            if a is False:
+                sys.exit('\n%s is opaque, and %s is composited straight onto the page.\n'
+                         'It would render as a rectangle on navy. Use the -cut variant.\n'
+                         % (os.path.basename(path), key))
         raw = open(path, 'rb').read()
         total += len(raw)
         mime = MIME.get(os.path.splitext(fname)[1].lower(), 'image/webp')

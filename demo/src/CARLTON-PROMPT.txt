@@ -1,0 +1,105 @@
+════════════════════════════════════════════════════════════════════════
+ CITRUS CARLTON — v2, in the house style this time
+ Attach FOUR reference images: stormy.png, pineapple.png, kiwi.png,
+ lemon.png. The prompt is below the line.
+════════════════════════════════════════════════════════════════════════
+
+WHY V1 WAS WRONG, SO IT DOES NOT HAPPEN AGAIN
+
+The first brief asked for "flat vector, thick uniform dark navy outline on
+every shape, completely flat fills, no gradients, no shading, no texture, no
+highlights." That was written to match the PAGE — Toronto navy, one accent,
+flat UI — and it is the wrong target. The characters are not UI.
+
+Put the four Citrus mascots next to what came back and the gap is the whole
+story. Stormy, Pineapple, Kiwi and Lemon are **3D renders**: low-poly faceted
+surfaces, soft matte shading, a light source up and to the left, gentle
+ambient occlusion in the creases. **Not one of them has an outline.** Their
+palette is muted and slightly earthy — sage green, dusty gold, worn navy — not
+the bright page tokens. Their kit is real: tan wooden sticks, dark textured
+gloves, ribbed pads, proper skates with blades. Their faces have pupils,
+highlights, eyebrows, attitude. Kiwi wears glasses. Lemon looks annoyed.
+
+Carlton v1 is a flat sticker with a hard navy keyline and a blank smile. He
+does not belong to that family and no amount of palette matching fixes it.
+
+────────────────────────────────────────────────────────────────────────
+PASTE FROM HERE
+────────────────────────────────────────────────────────────────────────
+
+The four attached images are the house style. Study them closely and match
+them exactly: stylised 3D character renders with low-poly faceted surfaces,
+soft matte shading, a soft key light from the upper left, gentle ambient
+occlusion, and a slightly gritty hand-finished texture. They have NO
+outlines, NO keylines and NO flat vector fills of any kind — every form reads
+through shading and silhouette alone. Their colours are muted and earthy, not
+bright or saturated.
+
+Create a new character for that same family: CARLTON, a polar bear ice hockey
+mascot. He must look like he was rendered in the same session as the other
+four, by the same hand, in the same engine.
+
+The bear: soft off-white to pale grey fur with a warm cream muzzle and belly,
+faceted low-poly surfacing like the kiwi's skin, small rounded ears, a dark
+matte nose, and an expressive friendly face with real pupils, catchlights and
+eyebrows. Give him a character — warm and a little goofy, the way Lemon is a
+little annoyed. Chunky and rounded, a mascot build, not an athlete's.
+
+His kit, all of it visible and clearly separate from his body: a worn navy
+hockey sweater with a white shoulder yoke and white hem stripes, navy hockey
+pants, shoulder pads sitting proud on top of the sweater, dark textured
+gloves, ribbed leg pads down both shins, and proper skates with visible steel
+blades. He holds a tan wooden hockey stick, blade resting on the ice, and a
+black puck sits beside the blade. Render the kit with the same materials the
+other four have — the pineapple's pads, the kiwi's skates, the lemon's stick.
+
+On his chest, where a team crest would sit: a small orange citrus slice, in
+the same understated way the pineapple carries his orange dot. It is a detail,
+not a billboard.
+
+POSE, AND THIS PART IS NOT STYLE, IT IS MECHANICS: standing square to camera,
+upright, both skates flat on the ice and apart, arms down and slightly away
+from the body, like the pineapple goalie's stance. Every piece of kit must be
+fully visible and not overlapping another piece — the shoulder pads clear of
+the head, both gloves clear of the body, both leg pads clear of each other,
+both skates clear, the stick clear of the legs, the puck clear of the stick.
+Do not use a dynamic or three-quarter pose, however much better it would look.
+The application cuts this figure into six separate pieces and lights them one
+at a time.
+
+Transparent background. No ground, no shadow, no scenery, no backdrop.
+Full body, whole figure in frame with a little air around it. Portrait, 4:5.
+
+NO TEXT, NO LETTERING, NO NUMBERS, NO LOGOS and NO TEAM MARKS of any kind
+other than the small orange citrus slice on his chest. No maple leaf.
+
+────────────────────────────────────────────────────────────────────────
+PASTE TO HERE
+────────────────────────────────────────────────────────────────────────
+
+SAVE AS
+
+  demo/src/art/carlton-figure.png        transparent, as large as it comes
+
+Tell me it has landed and I will re-measure the six regions off the new render
+and rewire it. That takes ten minutes and it is entirely on my side.
+
+REJECT AND RE-RUN IF
+
+  · it has an outline or keyline anywhere — that is v1's failure returning
+  · it reads flat, or like vector art, or like a sticker
+  · the colours are brighter or more saturated than the four references
+  · the pose is dynamic, three-quarter, or has pieces overlapping each other
+  · any two pieces of kit touch — they have to be separable
+  · a piece is missing: shoulder pads, gloves, leg pads, skates, stick, puck
+  · any text, number or maple leaf appears
+  · the background is not transparent, or a shadow is baked in
+
+ONE THING WORTH KNOWING
+
+The pose constraint and the house style pull against each other. The other
+four are posed dynamically because nothing cuts them up. Carlton has to stand
+still because the paper doll takes him apart. If the square-on stance comes
+back stiff next to the others, say so and we can talk about whether the
+mechanic or the pose gives — but do not solve it by posing him, because that
+breaks the game rather than the picture.

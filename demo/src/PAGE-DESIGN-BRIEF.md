@@ -174,6 +174,58 @@ every width it ships at before believing a note about it, this one included.
 
 ---
 
+## The brand, and the characters coming back
+
+**The top left is Citrus's.** It was the club's drawn leaf. The mark there now
+is transcribed from `apps/web/src/components/citrus2/CitrusLogo.tsx`, the
+on-dark variant, so the demo carries the same mark as the product rather than
+something drawn to resemble it. The club has not lost anything: its mark leads
+the score bug directly below, all thirteen page headers, and every row of the
+locker room. Sleeper does not put your club's crest where its own name goes.
+
+Two things to know about that mark. It brings cream `#FFF8F0` and sage
+`#84A57D`, which are not in the page palette, and that is the only exemption
+in the build: a logo owns its own colours. And **there are two Citrus marks in
+the repo that disagree** — `CitrusLogo.tsx` is what the app chrome actually
+uses, while `public/favicon.svg` is an older slice on `#F9A436` with a green
+leaf. Worth reconciling somewhere that is not here.
+
+The wordmark is Calistoga on the site. Calistoga comes from Google Fonts,
+this build has no network, and there is no copy of the file in the repo, so it
+is Archivo 800 with a `--display` token behind it. Drop a woff2 in, add an
+`@font-face`, and the lockup matches exactly.
+
+**POWERED BY CITRUS was `display:none` under 1120px.** On a laptop and on
+every phone, the one line naming the company doing the pitching did not exist.
+It is 16px and it reads from 561px up; below that it is hidden again on
+purpose, because the header is sticky and a fourth row cost 84px of an 844px
+phone permanently to say "Citrus" a second time two rows under a 34px logo.
+
+**The characters are back in two places, and only where they do something.**
+Pulling them out of thirteen page headers was right; a portrait in front of
+every title is a wall of cartoon between a fan and the hockey. But `GAMES`
+names a host for four of the games, and two of those are roles rather than
+captions: Stormy is the AI GM you are playing, so his face sits on his own
+lineup card opposite yours and he reacts on the card that says who won.
+Pineapple is in goal on Beat the Buzzer, standing next to the number you are
+trying to beat. Lemon on Pick'em and Kiwi on the player pages are still just
+hosts; they have not been added, because "host" is not a job.
+
+**It cost nothing.** The ten page bands were still being inlined at 1.18 MB of
+a 3.7 MB file and nothing rendered them — the `.ghero` elements they attached
+to went when the headers were rebuilt. Measured in the running build: 0 band
+images on the page, 0 `.ghero`, 0 `[data-art]`. They are out, six character
+assets are in, and the build went 3.70 MB to 2.81 MB.
+
+Two guards came out of this. `bake_art.py` now refuses to bake an opaque image
+into a slot that is composited straight onto the page: `mascot-stormy-tor-win`
+is RGB with a dark green plate baked in, it rendered as a green box on the
+navy card, and only the `-cut` variants carry alpha. And removing the bands
+tripped the refuse-to-shrink guard, which is what it is for — it made the
+removal explicit with `--allow-shrink` instead of silent.
+
+---
+
 ## Rules that hold
 
 - One file, no network, opens at a rink with the wifi off. Every asset is

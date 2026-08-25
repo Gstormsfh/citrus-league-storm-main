@@ -1,7 +1,8 @@
 # Citrus Carlton: the paper doll on Game 01
 
-**Read this before you generate anything. The first half of this file is a
-vector job, not a render job, and a diffusion model cannot do it.**
+**Read this before you generate anything.** The prompt that produced the
+current figure is `CARLTON-PROMPT.txt`. This file is what happens to the
+render after it lands, and what a replacement has to satisfy.
 
 Game 01 is no longer six cards on a grid. It is a paper doll: the club's own
 bear standing in the middle of the page in nothing but the sweater, and six
@@ -9,10 +10,10 @@ pieces of kit that arrive as you fill the slots. Every piece is hollow and
 half-lit until a Leaf is behind it, then it fills in, and once the puck drops
 it carries what that man has actually done tonight.
 
-**It already works.** There is a drawn vector Carlton in the build right now,
-it holds up at every width from 360 to 1440, and every suite is green. Nothing
-below is needed for the demo to run. This is the upgrade path, and it is worth
-doing, but do not let it block anything.
+**It already works.** The rendered Carlton is in the build, cut into seven
+layers, and every suite is green. A drawn vector Carlton is still in the file
+as the fallback and still holds up at every width from 360 to 1440, so a
+missing or broken layer costs the picture and nothing else.
 
 ---
 
@@ -30,83 +31,111 @@ figure where the orange is the subject rather than a state.
 
 ---
 
-## Job 1: seven layers. A vector job. Do not generate it.
+## Job 1: seven layers. Not a drawing job any more -- a cutting job.
 
 The figure is a paper doll, so the art has to be a paper doll: **one canvas,
-seven transparent PNGs that stack pixel for pixel.** The build turns each kit
-layer on and off, dims it, and lights it. A single flat image of a dressed
-bear cannot do any of that, which is why one flat image is not the ask.
+seven transparent layers that stack pixel for pixel.** The build turns each
+kit layer on and off, dims it, and lights it.
+
+This used to be a brief for a vector artist. It is not any more. The render
+came back as one image of a dressed bear, and `carve.py` separates it:
 
 ```
-art/carlton-base.png        the bear, sweater, pants, arms, head. NO kit.
-art/carlton-stick.png       the stick only
-art/carlton-gloves.png      both gloves only
-art/carlton-puck.png        the puck only
-art/carlton-shoulders.png   both shoulder caps only
-art/carlton-shins.png       both shin pads only
-art/carlton-skates.png      both skates only
+python3 carve.py          # cuts art/carlton-figure.png into the seven
+python3 bake_art.py       # inlines them
+python3 build.py
 ```
 
-**Canvas: 1140 x 1410, transparent, on all seven.** That is exactly three
-times the vector's own 380 x 470 coordinate space, so if you build over the
-vector as a template every piece lands where the build already expects it.
-Export the SVG out of the running build and trace on top of it; that is
-faster than measuring and it cannot drift.
-
-`python3 bake_art.py && python3 build.py` and the figure swaps whole.
-
-**All seven or none.** The baker will inline whatever is on disk, but the
-build only switches to the render when every one of the seven is present. A
-photoreal bear wearing six drawn shin pads is worse than the drawn bear, so
-the check is deliberate and it will not be relaxed.
-
-### Rules on the seven files
-
-- **Flat vector, hard outline.** One `#00102E` outline, roughly 15px at this
-  canvas size. No gradients, no texture, no soft shadow, no rim light. The
-  ground shadow is drawn by the page; do not bake one in.
-- **The kit layers carry no bear.** A shin pad layer is a shin pad and a lot
-  of alpha. If the knee shows through in your file, the piece will look
-  painted on when it is dim.
-- **The kit is `#C7DAF3` with `#FFFFFF` straps, cuffs, blades and tape.**
-  The build recolours nothing; it dims to 50% and brightens to 100%. So draw
-  the LIT state and let the page do the rest.
-- **The puck is `#00102E` with a `#FFFFFF` rim,** drawn face on as a disc,
-  not in perspective. A number gets printed on it at runtime.
-- **The base carries the sweater and the crest.** Sweater `#00286E`, white
-  shoulder yoke and two white hem stripes, `#00102E` outline. Crest: a citrus
-  slice, `#FF6B1A` with white pith, on a white roundel, centred on the chest.
-- **60 on the sweater** if you can place it legibly. The vector dropped it
-  because 17px of type across a 30px sleeve clipped to "6U". At this canvas
-  size there is room. White, on the sleeve or the back of the shoulder.
-- **No other text anywhere.** Every other label in this build is live HTML so
-  it stays correct when the data changes.
-
-### Palette, exactly
-
 ```
-outline      #00102E
-fur          #C7DAF3      muzzle and highlights #FFFFFF
-inner ear    #8FB3E0
-sweater      #00286E      yoke and stripes #FFFFFF
-pants        #001B4D
-kit          #C7DAF3      straps, cuffs, blades, tape #FFFFFF
-puck         #00102E      rim #FFFFFF
-crest        #FF6B1A      pith and roundel #FFFFFF
+art/carlton-base.webp     the bear, sweater, pants, head. Kit removed.
+art/carlton-g.webp        the stick, butt to blade
+art/carlton-a.webp        both gloves
+art/carlton-sog.webp      the puck
+art/carlton-hit.webp      both shoulder caps
+art/carlton-blk.webp      both leg pads
+art/carlton-tk.webp       both skates
 ```
 
-Nothing else. The page is Toronto blue and one orange, and the figure is the
-largest object on it; a seventh colour on Carlton is a seventh colour on the
-whole build.
+`carve.py` writes the seven **and** writes their placement into `app.js`.
+Do not hand-edit either. The crops are trimmed to their own alpha, so a
+change to one mask rule moves the offsets by a pixel, and a number copied
+across by hand goes stale silently -- the figure just quietly softens at
+every seam.
+
+### Why it is cut by material and not by rectangle
+
+The first attempt put six rectangles over the flat render and dimmed those.
+It is worth knowing why that failed, because it looks reasonable on paper
+and it is obviously broken on screen: **a dim rectangle that crosses the
+sweater draws a hard-edged block across the yoke and the jaw.** A region
+only disappears where it covers transparent background, and four of the six
+pieces are attached to the bear. So each piece has to be its own silhouette
+or the ghost state is unusable.
+
+`carve.py` finds each piece by the thing that is actually unique about it:
+
+| piece | what makes it findable |
+|---|---|
+| stick | the only warm wood in the frame |
+| puck  | its own island, and the only one |
+| skates | below the pads there is nothing else |
+| leg pads | the only light material between the pants and the boots |
+| gloves | each one is its own silhouette until it reaches the legs |
+| shoulder caps | the only light panel between the jaw and the sleeve |
+
+Then it checks itself, and both checks have caught a real bug:
+
+- **overlapping masks** -- a pixel in two pieces dims twice and reads as a
+  bright patch.
+- **stranded inside a piece** -- base that survives well inside a piece's
+  outline. A cool bluish facet of the left leg pad failed a neutral-grey
+  rule, stayed in the base, and sat at full brightness inside the ghost.
+  Invisible in a mask preview, obvious on the page.
+
+Seams are cut hard on the base and soft on the piece, overlapping by a
+pixel. Feathering both sides leaves a hole at the seam -- the base gives
+half, the ghost gives a quarter of a half, and the page shows through as a
+dark navy outline around every piece.
+
+**All seven or none.** The build only switches to the render when the base
+and all six pieces are present. A photoreal bear wearing one drawn shin pad
+is worse than the drawn vector, so the check is deliberate and it will not
+be relaxed. `CARL_ART()` in `app.js` is where it lives.
+
+### What a new figure has to satisfy
+
+`carve.py` reads the render, so the pose constraints in `CARLTON-PROMPT.txt`
+are load-bearing, not stylistic. If a new Carlton lands:
+
+- every piece **fully visible and not overlapping another piece**, or two
+  masks fight over the same pixels
+- transparent background, no baked shadow -- the page draws the shadow
+- the same square-on stance, or the mask windows in `carve.py` need moving
+- run `carve.py` and read what it prints. `overlapping masks: none` and
+  `stranded inside a piece: none` are the two lines that matter
+- then `node figcheck.mjs`, which probes sixteen named points on the figure
+  and five that must own nothing
+
+Two adjacencies in the current render are unavoidable and both are
+harmless: the shoulder caps meet the jaw, and the stick's butt sits against
+the right glove. The caps take about ten units of fur with them, which is
+fur beside fur; the butt gets a region of its own so it does not stay bright
+while the shaft below it is dim.
 
 ---
 
-## Job 2: one render. This one IS for Nano Banana.
+## Job 2: the render itself. This one IS for Nano Banana.
 
-A diffusion model will not give you seven registered transparent layers, and
-asking it to is how a week disappears. What it is genuinely good for is **key
-art**: one image of Citrus Carlton fully dressed, to hand to whoever draws the
-seven layers, and to put on a title slide.
+A diffusion model will not give you seven registered transparent layers.
+It does not have to any more -- it gives you one dressed bear and `carve.py`
+does the registering, which is exact by construction because every layer
+comes out of the same pixels.
+
+**The prompt that produced the current figure is in `CARLTON-PROMPT.txt`,
+not here.** What follows is the first prompt, kept because it is the clearest
+statement of what went wrong: it optimised for the page (flat, one outline,
+Toronto navy) when the mascot family is 3D low-poly renders with no outlines
+at all. Carlton v1 came back a flat sticker and did not belong to the family.
 
 **Prompt:**
 
@@ -140,32 +169,22 @@ seven layers, and to put on a title slide.
 Save as `art/carlton-key.png`. **It is reference, not a build asset.** The
 baker does not read it and it is not wired to anything, on purpose.
 
-### The key art is in. Read this before you trace it.
+### That prompt is superseded. Here is what it got wrong.
 
-`art/carlton-key.png` landed and it is good. It clears every item on the
-reject list: no text, no numbers, no maple leaf, one hard navy outline, flat
-fills, the citrus slice is the focal point, and the palette is navy, white and
-the one orange.
+`art/carlton-key.png` came back clean against its own reject list -- no text,
+no maple leaf, one hard navy outline, flat fills, the citrus slice as the
+focal point. It was still the wrong picture, because the reject list was
+checking the wrong thing.
 
-**Do not trace it straight into the seven layers, because two of the six
-pieces are not in it.** It shows the stick, the gloves, the shin pads and the
-skates. It has no shoulder caps (the white on the shoulders is the sweater's
-yoke, which belongs to the base layer) and no puck. Trace it for the
-character, the proportions and the line weight, then add those two from the
-vector in the build, which has all six.
+Put the four Citrus mascots next to it and the gap is the whole story.
+Stormy, Pineapple, Kiwi and Lemon are 3D renders: low-poly faceted surfaces,
+soft matte shading, a key light up and to the left, gentle occlusion in the
+creases. **Not one of them has an outline.** Their palette is muted and
+earthy. Their kit is real -- tan wooden sticks, dark textured gloves, ribbed
+pads, proper skates with blades. Carlton v1 was a flat sticker with a hard
+navy keyline and a blank smile, and no amount of palette matching fixes that.
 
-Two smaller divergences, both fine to keep or drop, but decide on purpose
-rather than by accident:
-
-- it carries a **white keyline** around the whole silhouette. The build sits
-  the figure directly on navy with no halo, so the vector has none. If you
-  keep the halo, keep it on every layer or the kit will look cut out.
-- the sweater blue reads brighter than `#00286E`. Against the page it is fine;
-  match the token if you want the figure and the rest of the build to agree.
-
-**Reject and regenerate if:** any text appears, the outline goes soft or
-variable, it renders as 3D or plush, the crest is a maple leaf instead of a
-citrus slice, or a colour outside the palette shows up.
+`CARLTON-PROMPT.txt` is the rewrite, and v2 is what it produced. Use it.
 
 ---
 
@@ -173,7 +192,7 @@ citrus slice, or a colour outside the palette shows up.
 
 | State | What happens on the figure |
 |---|---|
-| No slots filled | Bear in the sweater. All six pieces at 50%, hollow. |
+| No slots filled | Bear in the sweater. All six pieces ghosted at 26%. |
 | Hover a piece | Both halves of a pair light together. |
 | Tap a piece | Opens that slot's picker. The list and the figure are the same control. |
 | Slot filled | That piece goes to 100% and fills in. |
@@ -193,7 +212,7 @@ six pieces, and the count is load-bearing in three other places.
 ## Keep these green
 
 ```
-python3 bake_art.py && python3 build.py
+python3 carve.py && python3 bake_art.py && python3 build.py
 node realsite.mjs      # 5 device profiles, must print ALL REAL-SITE CHECKS PASSED
 node verify.mjs        # every game end to end, must print CONSOLE ERRORS: none
 node mobplay.mjs       # every game played on a phone by real taps
@@ -202,5 +221,6 @@ SKIN=bc node audit_hub.mjs
 node mobsweep.mjs      # no horizontal overflow at 390px, kit filled first
 node offline.mjs       # external requests: NONE
 node classcheck.mjs    # class-name collisions, nine have shipped already
+node figcheck.mjs      # every piece owns its own region and nothing else does
 node shots_all.mjs     # density and gap report
 ```
