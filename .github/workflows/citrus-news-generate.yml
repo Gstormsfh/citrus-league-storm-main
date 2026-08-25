@@ -1,0 +1,80 @@
+name: Citrus News Generate (citrus_news detectors)
+
+# Runs the Citrus News Engine detectors and persists what they find.
+#
+# Why a workflow rather than a manual curl: the endpoint is gated by the
+# shared secret in X-Scheduled-Secret, which lives as a GitHub repo secret
+# (write-only — GitHub will not show it back) and a Cloud Run env var of the
+# same name. Invoking it from here means nobody has to read the secret out of
+# infrastructure and paste it into a terminal, where it lands in shell history
+# and scrollback. Same pattern as daily-roster-snapshot.yml.
+#
+# Why every 6 hours: the generator is idempotent — dedupe_key is UNIQUE and
+# inserts ignore conflicts, so a run that finds nothing new writes nothing and
+# published_at never moves. The offseason detectors describe a completed
+# season and would be happy with weekly. The in-season detectors set the
+# cadence: they look back 3 days, so a 6-hour beat surfaces a hat trick or a
+# shutout the morning after rather than a day late, and that 3-day window
+# means a missed run catches up on its own instead of losing those events.
+#
+# Manual run:  gh workflow run citrus-news-generate.yml
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      season:
+        description: 'Season to analyse (optional; defaults to the current season)'
+        required: false
+        type: string
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: POST /api/scheduled/generate-news
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          SCHEDULED_TRIGGER_SECRET: ${{ secrets.SCHEDULED_TRIGGER_SECRET }}
+          SEASON: ${{ inputs.season }}
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE_URL:-}" ]; then
+            echo "API_BASE_URL secret not set" >&2
+            exit 1
+          fi
+          if [ -z "${SCHEDULED_TRIGGER_SECRET:-}" ]; then
+            echo "SCHEDULED_TRIGGER_SECRET secret not set" >&2
+            exit 1
+          fi
+
+          # Only send a body when a season was explicitly requested; the
+          # handler defaults to the current season otherwise.
+          if [ -n "${SEASON:-}" ]; then
+            BODY="{\"season\": ${SEASON}}"
+          else
+            BODY='{}'
+          fi
+
+          RESP=$(mktemp)
+          STATUS=$(curl -sS -o "$RESP" -w "%{http_code}" \
+            -X POST "${API_BASE_URL%/}/api/scheduled/generate-news" \
+            -H "X-Scheduled-Secret: ${SCHEDULED_TRIGGER_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d "$BODY" \
+            --max-time 300)
+          echo "HTTP $STATUS"
+          cat "$RESP"
+          echo
+          if [ "$STATUS" != "200" ]; then
+            echo "generate-news failed (status $STATUS)" >&2
+            exit 1
+          fi
+
+          # A detector throwing is reported inside the payload rather than by a
+          # non-200, so one broken detector cannot discard the others' output.
+          # Surface it as a warning — the run itself is still a success.
+          if grep -q '"errors":\[{' "$RESP"; then
+            echo "::warning::One or more detectors reported an error — see the payload above."
+          fi
