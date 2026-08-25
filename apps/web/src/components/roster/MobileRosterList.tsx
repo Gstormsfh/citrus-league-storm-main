@@ -325,7 +325,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                       ? 'bg-amber-400'
                       : writeup.cardTone === 'positive'
                         ? 'bg-pastel-sage'
-                        : 'bg-white/55',
+                        : 'bg-pastel-cream/70',
                   )}
                   aria-hidden="true"
                 />

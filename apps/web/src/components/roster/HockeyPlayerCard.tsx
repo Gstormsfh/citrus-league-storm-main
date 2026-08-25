@@ -538,7 +538,7 @@ const HockeyPlayerCardContent = ({
                 ? 'bg-amber-400'
                 : writeup.cardTone === 'positive'
                   ? 'bg-pastel-sage'
-                  : 'bg-white/55',
+                  : 'bg-pastel-cream/70',
             )}
             aria-hidden="true"
           />

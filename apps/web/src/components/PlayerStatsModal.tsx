@@ -514,10 +514,17 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   directly below it (see utils/playerWriteup), so the prose and
                   the numbers can never disagree. */}
               <div className="py-3 px-3.5 bg-white/5 rounded-xl border border-citrus-sage/15">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <CitrusSparkle className="w-3 h-3 text-citrus-orange" aria-hidden="true" />
-                  <span className="text-[9px] font-display uppercase tracking-[0.18em] text-pastel-cream/60">
-                    Scouting Report
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <CitrusSparkle className="w-3 h-3 text-citrus-orange" aria-hidden="true" />
+                    <span className="text-[9px] font-display uppercase tracking-[0.18em] text-pastel-cream/60">
+                      Player Outlook
+                    </span>
+                  </div>
+                  {/* Bylined, the way Sleeper credits Rotowire. This is our own
+                      analysis, derived from our own numbers — so it says so. */}
+                  <span className="text-[9px] font-display text-white/55 flex-shrink-0">
+                    via Citrus
                   </span>
                 </div>
                 <div className="text-sm font-display font-bold text-pastel-cream leading-snug">
@@ -526,6 +533,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 <p className="mt-1 text-[13px] leading-relaxed text-white/70">
                   {writeup.summary}
                 </p>
+                {writeup.analysis && (
+                  <p className="mt-2 text-[13px] leading-relaxed text-white/70">
+                    <span className="font-display font-bold text-pastel-cream">Analysis: </span>
+                    {writeup.analysis}
+                  </p>
+                )}
                 {writeup.tags.length > 0 && (
                   <div className="mt-2.5 flex flex-wrap gap-1.5">
                     {writeup.tags.map((tag) => (

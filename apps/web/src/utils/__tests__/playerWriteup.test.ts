@@ -139,7 +139,8 @@ describe('generatePlayerWriteup — skater banding uses rates, not totals', () =
       skater({}, { gamesPlayed: 70, points: 50, goals: 20, assists: 30, powerPlayPoints: 25 }),
     );
     expect(w.tags.find((t) => t.label === 'PP-dependent')?.tone).toBe('caution');
-    expect(w.summary).toContain('50% of his production');
+    // Lives in the Analysis paragraph: it's a call to action, not a stat.
+    expect(w.analysis).toContain('50% of his points');
   });
 
   it('flags thin ice time as a caution rather than staying silent', () => {
@@ -271,6 +272,65 @@ describe('cardNote — the one-liner roster cards render', () => {
       id: 9, name: 'Empty Guy', position: 'LW', number: 1, starter: false, team: 'X', stats: {},
     } as HockeyPlayer);
     expect(w.cardNote).not.toMatch(/NaN|Infinity|undefined|null/);
+  });
+});
+
+describe('analysis paragraph — the "what should I do" half', () => {
+  it('every characterised player gets a non-empty analysis paragraph', () => {
+    const cases = [
+      skater(),
+      skater({ position: 'D' }, { gamesPlayed: 70, points: 12, goals: 2, assists: 10, toi: '19:00' }),
+      skater({}, { gamesPlayed: 60, points: 20, goals: 8, assists: 12, toi: '14:00', shots: 90 }),
+    ];
+    for (const p of cases) {
+      const w = generatePlayerWriteup(p);
+      expect(w.analysis.length).toBeGreaterThan(0);
+      expect(w.analysis).not.toMatch(/NaN|Infinity|undefined/);
+    }
+  });
+
+  it('calls out over-performing finishers as regression candidates', () => {
+    const w = generatePlayerWriteup(
+      skater({}, { gamesPlayed: 70, goals: 30, assists: 20, points: 50, xGoals: 15 }),
+    );
+    expect(w.analysis).toMatch(/30 goals on 15 expected/);
+    expect(w.analysis).toMatch(/sell-high/i);
+  });
+
+  it('calls out unlucky finishers as buy-low rather than drop', () => {
+    const w = generatePlayerWriteup(
+      skater({}, { gamesPlayed: 70, goals: 8, assists: 30, points: 38, xGoals: 18 }),
+    );
+    expect(w.analysis).toMatch(/8 goals on 18 expected/);
+    expect(w.analysis).toMatch(/buy-low/i);
+  });
+
+  it('stays silent on finishing luck when xG is missing or a tiny sample', () => {
+    const noXg = generatePlayerWriteup(skater({}, { xGoals: undefined }));
+    expect(noXg.analysis).not.toMatch(/expected/);
+    const tinyXg = generatePlayerWriteup(skater({}, { xGoals: 2, goals: 9 }));
+    expect(tinyXg.analysis).not.toMatch(/expected/);
+  });
+
+  it('always says something useful, even for an unremarkable player', () => {
+    const w = generatePlayerWriteup(
+      skater({}, { gamesPlayed: 60, points: 18, goals: 7, assists: 11, toi: '15:00', shots: 80, hits: 20, blocks: 20, powerPlayPoints: 1, xGoals: undefined }),
+    );
+    expect(w.analysis).toMatch(/streamer|depth/i);
+  });
+
+  it('gives goalies a workload verdict, not just a save-rate restatement', () => {
+    const starter = generatePlayerWriteup({
+      id: 30, name: 'Test Goalie', position: 'G', number: 1, starter: true, team: 'X',
+      stats: { gamesPlayed: 55, savePct: 0.925, gaa: 2.3, wins: 33, losses: 15 },
+    } as HockeyPlayer);
+    expect(starter.analysis).toMatch(/workload/i);
+
+    const backup = generatePlayerWriteup({
+      id: 31, name: 'Backup Guy', position: 'G', number: 2, starter: false, team: 'X',
+      stats: { gamesPlayed: 14, savePct: 0.915, gaa: 2.6, wins: 6, losses: 6 },
+    } as HockeyPlayer);
+    expect(backup.analysis).toMatch(/14 appearances/);
   });
 });
 

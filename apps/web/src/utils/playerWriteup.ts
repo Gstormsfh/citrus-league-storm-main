@@ -44,8 +44,21 @@ export interface WriteupTag {
 export interface PlayerWriteup {
   /** Short role label, e.g. "Top-line producer". */
   headline: string;
-  /** Two or three sentences of plain scouting prose. */
+  /**
+   * Lead paragraph — WHAT HAPPENED. Production, usage, the season to date.
+   *
+   * Mirrors the shape Sleeper/Yahoo/ESPN use on a player card: a news blurb
+   * followed by a separate "Analysis:" paragraph. Theirs comes from a paid
+   * editorial wire (Rotowire); this app has no news feed and no such table, so
+   * the prose is derived from the stat line instead. Same structure, same
+   * reading experience, and it cannot go stale or contradict the numbers.
+   */
   summary: string;
+  /**
+   * Second paragraph — WHAT IT MEANS for the manager deciding to start, sit,
+   * hold or drop. Rendered under an "Analysis:" lead-in, as on Sleeper.
+   */
+  analysis: string;
   /** Short badges for skimming. */
   tags: WriteupTag[];
   /** False when the sample is too small to characterise the player. */
@@ -141,6 +154,8 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
           : `No games played yet this season, so there's nothing to judge ${name} on beyond his role.`,
       tags: [{ label: 'Limited sample', tone: 'neutral' }],
       hasEnoughData: false,
+      analysis:
+        'Not enough of a track record to judge the job or the numbers. Worth watching how the crease is split over the next couple of weeks before committing a roster spot.',
       cardNote: gp > 0 ? `Only ${gp} appearance${gp === 1 ? '' : 's'}` : 'No appearances yet',
       cardTone: 'neutral',
     };
@@ -194,9 +209,32 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
     tags.push({ label: `${s.shutouts} shutouts`, tone: 'positive' });
   }
 
+  // ── Analysis: what a manager should do about it ──
+  const analysis: string[] = [];
+  if (savePct >= 0.915) {
+    analysis.push(
+      `The job looks secure — at this save rate the workload usually follows, and he's a weekly starter in every format.`,
+    );
+  } else if (savePct >= 0.9) {
+    analysis.push(
+      `Goalie wins are the most volatile category in fantasy hockey, and at this save rate he lives and dies with the team in front of him. Stream him on soft matchups rather than starting him blind.`,
+    );
+  } else {
+    analysis.push(
+      `A save rate this far below league average puts the starts themselves at risk — a hot backup is usually all it takes for a crease to become a committee.`,
+    );
+  }
+
+  if (gp >= 40) {
+    analysis.push(`The ${gp} appearances confirm he's carrying a true starter's workload, which is most of a fantasy goalie's value.`);
+  } else if (gp < 20) {
+    analysis.push(`With only ${gp} appearances he hasn't been given a starter's share of the crease, so the counting stats have a low ceiling.`);
+  }
+
   return {
     headline,
     summary: parts.join(' '),
+    analysis: analysis.join(' '),
     tags,
     hasEnoughData: true,
     cardNote: `${headline} · ${fmtSavePct(savePct)} SV%`,
@@ -221,6 +259,8 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
           : `${name} hasn't played yet this season, so there's no production to judge.`,
       tags: [{ label: 'Limited sample', tone: 'neutral' }],
       hasEnoughData: false,
+      analysis:
+        'Too early to draw conclusions in either direction. Watch the ice time over the next handful of games — where a coach deploys him will say more than the box score does at this sample size.',
       cardNote: gp > 0 ? `Only ${gp} game${gp === 1 ? '' : 's'} played` : 'No games played yet',
       cardTone: 'neutral',
     };
@@ -305,28 +345,80 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
     tags.push({ label: 'Shot volume', tone: 'positive' });
   }
 
-  // Peripherals matter enormously in leagues that count them, and are the
-  // whole case for rostering a lot of otherwise unremarkable players.
   const bangers = hitsPerGame + blocksPerGame;
   if (bangers >= 3.5) {
-    parts.push(
-      `He chips in ${fmt(hitsPerGame)} hits and ${fmt(blocksPerGame)} blocks a game, which carries real weight in peripheral leagues.`,
-    );
     tags.push({ label: 'Peripheral value', tone: 'positive' });
   }
 
-  // Power-play dependence is a risk flag: it evaporates the moment the
-  // coach changes units, so a user deciding whether to hold should see it.
-  if (points > 0 && ppPoints / points >= 0.4 && ppPoints >= 5) {
-    parts.push(`${Math.round((ppPoints / points) * 100)}% of his production comes on the power play, so his value is tied to that unit.`);
+  const ppShare = points > 0 ? ppPoints / points : 0;
+  const ppDependent = ppShare >= 0.4 && ppPoints >= 5;
+  if (ppDependent) {
     tags.push({ label: 'PP-dependent', tone: 'caution' });
   } else if (ppPoints >= 10) {
     tags.push({ label: 'Power-play role', tone: 'positive' });
   }
 
+  // ── Analysis: what a manager should DO about it ──
+  // Everything above describes the season. This paragraph is the part a
+  // start/sit decision actually turns on, kept separate so the card can render
+  // it under its own "Analysis:" lead-in the way Sleeper does.
+  const analysis: string[] = [];
+
+  if (toiMinutes !== null) {
+    const heavy = defenceman ? toiMinutes >= 22 : toiMinutes >= 19;
+    const light = defenceman ? toiMinutes < 17 : toiMinutes < 13;
+    if (heavy) {
+      analysis.push(
+        `The ice time is the part that matters most: coaches don't hand ${fmt(toiMinutes)} minutes a night to players they intend to scratch, so the role is about as secure as it gets.`,
+      );
+    } else if (light) {
+      analysis.push(
+        `There's a hard ceiling here until the deployment changes — production can't outrun opportunity, and ${fmt(toiMinutes)} minutes a night isn't enough of it.`,
+      );
+    }
+  }
+
+  if (ppDependent) {
+    analysis.push(
+      `Watch the power play closely: ${Math.round(ppShare * 100)}% of his points come with the man advantage, so a bump off the top unit would take most of his fantasy value with it.`,
+    );
+  }
+
+  // Finishing luck. Comparing goals to expected goals is the single most
+  // useful regression signal available in this data, and it is exactly the
+  // kind of call a real analyst blurb makes.
+  const xg = s.xGoals;
+  if (Number.isFinite(xg as number) && (xg as number) >= 5) {
+    const expected = xg as number;
+    if (goals >= expected * 1.3) {
+      analysis.push(
+        `He's buried ${goals} goals on ${fmt(expected)} expected — finishing well above the quality of his chances, which historically doesn't hold across a full season. Sell-high territory if someone in your league is paying for the goal total.`,
+      );
+    } else if (goals <= expected * 0.7) {
+      analysis.push(
+        `He's got ${goals} goals on ${fmt(expected)} expected — the chances are there and the finishing hasn't been. That gap usually closes, which makes him a buy-low rather than a drop.`,
+      );
+    }
+  }
+
+  if (bangers >= 3.5) {
+    analysis.push(
+      `In any league counting hits and blocks he's worth more than his point total suggests, at ${fmt(hitsPerGame)} hits and ${fmt(blocksPerGame)} blocks a night.`,
+    );
+  }
+
+  if (analysis.length === 0) {
+    analysis.push(
+      ppg >= 0.5
+        ? `Nothing in the profile suggests a role change coming — a steady weekly starter in most formats.`
+        : `Better as a matchup-based streamer or depth piece than a set-and-forget starter.`,
+    );
+  }
+
   return {
     headline,
     summary: parts.join(' '),
+    analysis: analysis.join(' '),
     tags,
     hasEnoughData: true,
     cardNote: `${headline} · ${fmt(ppg, 2)} P/GP`,
@@ -344,6 +436,7 @@ export function generatePlayerWriteup(player: HockeyPlayer | null | undefined): 
     return {
       headline: 'No player selected',
       summary: 'Select a player to see their scouting summary.',
+      analysis: '',
       tags: [],
       hasEnoughData: false,
       cardNote: '',
