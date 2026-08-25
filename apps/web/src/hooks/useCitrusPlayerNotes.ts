@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { apiClient } from '@/api/client';
 import { logger } from '@/utils/logger';
 
 /**
@@ -41,8 +40,13 @@ export function useCitrusPlayerNotes(playerId: number | string | null | undefine
     let cancelled = false;
     setLoading(true);
 
-    apiClient
-      .get<{ notes: CitrusNote[] }>(`/api/news/player/${numericId}`)
+    // Lazy import for the same reason NewsService uses one: `@/api/client`
+    // loads the Supabase client, which throws at module scope without
+    // VITE_SUPABASE_* set, taking down any test that renders a component in
+    // this import chain. Keeping it inside the effect makes this hook safe to
+    // import anywhere.
+    import('@/api/client')
+      .then(({ apiClient }) => apiClient.get<{ notes: CitrusNote[] }>(`/api/news/player/${numericId}`))
       .then((response) => {
         if (cancelled) return;
         setNotes(response.data?.notes ?? []);
