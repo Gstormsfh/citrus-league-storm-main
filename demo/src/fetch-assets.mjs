@@ -18,7 +18,7 @@
  * and a partial headshot delivery is a partial upgrade -- anybody who did
  * not come down keeps his numbered sweater and no row breaks.
  */
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -35,7 +35,13 @@ const head = m => console.log('\n' + m + '\n' + '-'.repeat(m.length));
 
 async function get(url, as = 'json') {
   const r = await fetch(url, { headers: { 'User-Agent': 'citrus-demo' } });
-  if (!r.ok) throw new Error('HTTP ' + r.status + '  ' + url);
+  /* say what the server said, not just the number. A bare 404 on an API
+     that moved tells you nothing about where it moved to. */
+  if (!r.ok) {
+    const body = await r.text().catch(() => '');
+    throw new Error('HTTP ' + r.status + '  ' + url +
+                    (body ? '\n         ' + body.slice(0, 160).replace(/\s+/g, ' ') : ''));
+  }
   return as === 'json' ? r.json()
        : as === 'text' ? r.text()
        : Buffer.from(await r.arrayBuffer());
@@ -92,7 +98,11 @@ async function faces() {
     if (!last || !url) { missed++; continue; }
     try {
       const png = await get(url, 'bin');
-      writeFileSync(join(ART, 'hs-' + key(last) + '.png'), png);
+      const stem = join(ART, 'hs-' + key(last));
+      writeFileSync(stem + '.png', png);
+      /* the baker keeps a cropped .webp beside each mug and prefers it, so
+         a stale one would quietly outrank the face just downloaded */
+      rmSync(stem + '.webp', { force: true });
       got++;
     } catch (e) { missed++; say('  no face for ' + last + ': ' + e.message); }
   }
@@ -107,13 +117,34 @@ async function faces() {
 async function alltime() {
   head('EVERY LEAF THERE HAS EVER BEEN');
   const base = 'https://records.nhl.com/site/api';
+  /* Two ways of asking, because the filtered form 404'd once and there is
+     no reason for that to cost the whole file. The unfiltered form returns
+     every club and is filtered here instead -- bigger, and it works. */
   const grab = async t => {
-    const { data } = await get(`${base}/franchise-${t}-records?cayenneExp=franchiseId=${FRANCHISE}`);
-    if (!data?.length) throw new Error(t + ': no rows');
-    return data;
+    const urls = [
+      `${base}/franchise-${t}-records?cayenneExp=franchiseId=${FRANCHISE}`,
+      `${base}/franchise-${t}-records`,
+    ];
+    for (const u of urls) {
+      try {
+        const { data } = await get(u);
+        const mine = (data || []).filter(r =>
+          Number(r.franchiseId) === FRANCHISE || r.franchiseName === 'Toronto Maple Leafs');
+        if (mine.length) { say(t + ': ' + mine.length + ' rows'); return mine; }
+        say(t + ': that URL answered but held no Leafs');
+      } catch (e) { say(t + ': ' + e.message); }
+    }
+    return [];
   };
   try {
-    const [skaters, goalies] = await Promise.all([grab('skater'), grab('goalie')]);
+    /* NOT Promise.all. The first run of this had them joined, one endpoint
+       404'd, and the failure took the other down with it -- so the output
+       said nothing at all about whether the skaters had come back fine. */
+    const skaters = await grab('skater');
+    const goalies = await grab('goalie');
+    if (!skaters.length && !goalies.length) throw new Error('neither endpoint returned rows');
+    if (!goalies.length) say('no goalies; the grid will have no goalie squares');
+    if (!skaters.length) say('no skaters, which is most of a franchise');
 
     /* fail loudly rather than quietly writing another club's roster */
     const wrong = [...skaters, ...goalies]

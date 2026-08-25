@@ -97,8 +97,20 @@ powershell -ExecutionPolicy Bypass -File checks.ps1 -Rebake
 
 Each is independent and a partial delivery is a partial upgrade: anybody
 whose face did not come down keeps his numbered sweater, and no row breaks.
-The whole path is tested with stand-in files, so the only thing unproven
-until you run it is the download itself.
+
+**The faces are already in the repo, cropped.** A league mug is a 336px
+torso shot around 140 KB, and forty-nine of them inlined whole made the
+single file 12.5 MB -- for a picture the page never draws bigger than 38
+across. Worse, at 26px a full torso is a blue smudge. The baker crops each
+one to 62% of the subject's own height, measured off the alpha channel, and
+writes a 5 KB WebP beside it. 6.7 MB of mugs becomes 230 KB, the face is
+recognisable at 26px, and `art/hs-*.webp` is what ships. Re-running the
+fetch clears the crop so a new mug is not outranked by a stale one.
+
+Seven of Toronto's forty-nine came down as the league's grey silhouette
+placeholder -- the same file each time. Any image two men share is by
+definition not either man, so it is dropped and they keep their sweaters,
+which at least carry a number and the crest.
 
 ## Build it and check it
 

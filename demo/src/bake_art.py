@@ -11,7 +11,7 @@ delivery is a partial upgrade and never a broken page.
 The block this writes is delimited, so running it again replaces the block
 rather than stacking a second copy.
 """
-import base64, os, sys, re
+import base64, io, os, sys, re
 
 
 # every path below is relative to this file, not to wherever you ran it
@@ -179,6 +179,48 @@ def has_alpha(path):
     return max(px[3] for px in corners) == 0
 
 
+# ── headshots are delivered at full size and rendered at 26 to 38 px ──
+#
+# An NHL mug is a 336 px torso shot around 140 KB, and forty-nine of them
+# inlined at that size made the single file 12.5 MB from 3.1 -- for a
+# picture the page never draws bigger than 38 across.
+#
+# Worse than the weight: at 26 px a full torso is a blue smudge. The head
+# occupies the top third of the frame and everything below it is sweater,
+# so the crop is the point and the resize is the bonus. Cropping to 62% of
+# the subject's own height, measured off the alpha channel rather than
+# assumed, keeps the whole head and a sliver of shoulder on every man --
+# tighter and it takes the hair off, looser and the face is small again.
+HS_PX   = 128          # 38 px at 3.4x, which is more than any screen asks
+HS_Q    = 88
+HS_CROP = 0.62         # of the subject's height, from the top of his head
+
+
+def portrait(path):
+    """A mug, cropped to the man and sized for the page. Bytes, or None."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    try:
+        im = Image.open(path).convert('RGBA')
+        bb = im.split()[3].getbbox()
+        if bb:
+            W, H = im.size
+            side = max(32, min(int(round((bb[3] - bb[1]) * HS_CROP)), min(W, H)))
+            top  = min(max(0, bb[1] - int(side * 0.07)), H - side)
+            cx   = (bb[0] + bb[2]) // 2
+            left = max(0, min(cx - side // 2, W - side))
+            im = im.crop((left, top, left + side, top + side))
+        if im.size != (HS_PX, HS_PX):
+            im = im.resize((HS_PX, HS_PX), Image.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, 'WEBP', quality=HS_Q, method=6, exact=True)
+        return buf.getvalue()
+    except Exception:
+        return None
+
+
 def main():
     found, missing, total = {}, [], 0
 
@@ -186,22 +228,71 @@ def main():
     # The build keys them by last name and falls back to the numbered sweater
     # for anyone who has not been delivered.
     import glob
-    hs = []
+    hs, seen_stem = [], set()
     for d in ART_DIRS:
-        hs += glob.glob(os.path.join(d, 'hs-*.png')) + glob.glob(os.path.join(d, 'hs-*.webp'))
-    seen_hs = set()
+        # the cropped WebP wins over the full-size PNG it was made from, so a
+        # delivery can leave both on disk and only the small one is ever used
+        for f in sorted(glob.glob(os.path.join(d, 'hs-*.webp'))):
+            hs.append(f); seen_stem.add(os.path.splitext(os.path.basename(f))[0].lower())
+        for f in sorted(glob.glob(os.path.join(d, 'hs-*.png'))):
+            if os.path.splitext(os.path.basename(f))[0].lower() not in seen_stem:
+                hs.append(f)
+    # The league hands out a grey silhouette for anyone without a real mug,
+    # and it is the same file every time. Seven of Toronto's forty-nine came
+    # down as that. It is worse than what the build already draws: the
+    # numbered sweater carries his number and the club's crest, the
+    # silhouette carries nothing. Any image two men share is by definition
+    # not either man, so it is dropped and they keep their sweaters.
+    import hashlib
+    dup = {}
+    for path in hs:
+        try: dup.setdefault(hashlib.md5(open(path, 'rb').read()).hexdigest(), []).append(path)
+        except OSError: pass
+    shared = {h for h, v in dup.items() if len(v) > 1}
+    placeholders = sum(len(dup[h]) for h in shared)
+
+    seen_hs, kept, shrunk_already = set(), [], True
+    hs_before = hs_after = 0
     for path in sorted(hs):
         if os.path.basename(path).lower() in seen_hs:
             continue
         seen_hs.add(os.path.basename(path).lower())
         raw = open(path, 'rb').read()
-        total += len(raw)
+        if hashlib.md5(raw).hexdigest() in shared:
+            continue
+        hs_before += len(raw)
         ext = os.path.splitext(path)[1].lower()
         key = 'hs_' + os.path.basename(path)[3:-len(ext)].lower()
+        small = portrait(path) if ext != '.webp' else None
+        if small is None and ext != '.webp':
+            shrunk_already = False       # a raw mug went in whole
+        if small is not None:
+            raw, ext = small, '.webp'
+            # keep it: 5 KB beside a 140 KB mug means the repo can carry the
+            # faces without carrying 7 MB of them, and every machine that
+            # builds from the repo gets the identical bytes
+            side = os.path.splitext(path)[0] + '.webp'
+            if not os.path.exists(side):
+                open(side, 'wb').write(raw)
+                kept.append(os.path.basename(side))
+        hs_after += len(raw)
+        total += len(raw)
         found[key] = 'data:%s;base64,%s' % (MIME.get(ext, 'image/png'),
                                             base64.b64encode(raw).decode())
     if found:
-        print('  baked  %d headshots' % len(found))
+        if hs_after < hs_before:
+            print('  baked  %d headshots  %.1f MB of mugs -> %.0f KB, cropped to the man'
+                  % (len(found), hs_before / 1048576, hs_after / 1024))
+        elif shrunk_already:
+            print('  baked  %d headshots  %.0f KB, already cropped' % (len(found), hs_after / 1024))
+        else:
+            print('  baked  %d headshots  %.0f KB, NOT cropped -- no Pillow, so a 336px'
+                  ' torso is going in at full size' % (len(found), hs_after / 1024))
+        if kept:
+            print('         wrote %d cropped .webp beside the mugs, for the repo' % len(kept))
+        if placeholders:
+            print('         skipped %d league placeholders; those men keep their sweaters'
+                  % placeholders)
     for key, fname in FILES.items():
         path = find_art(fname)
         if not path:

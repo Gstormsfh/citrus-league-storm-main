@@ -19,6 +19,11 @@ for f in app.js index.html build.py bake_art.py carve.py serve.mjs \
   [ -f "$f" ] && cp "$f" out/src/ || echo "  missing: $f"
 done
 # the seven Carlton layers and the mascot cut-outs are new to this demo
+# the cropped faces and the club mark: 356 KB, and the reason the repo can
+# carry the real players without carrying 6.7 MB of full-size league mugs
+for f in art/hs-*.webp art/crest.svg; do
+  [ -f "$f" ] && cp "$f" out/src/art/
+done
 for f in art/carlton-base.webp art/carlton-hit.webp art/carlton-a.webp \
          art/carlton-blk.webp art/carlton-tk.webp art/carlton-g.webp \
          art/carlton-sog.webp art/mascot-stormy-tor-win-cut.webp \
