@@ -49,6 +49,17 @@ export interface GeneratedNote {
   analysis: string | null;
   severity: NoteSeverity;
   tags: string[];
+  /**
+   * When the note should claim to have been published, as an ISO string.
+   *
+   * Event detectors set this to the GAME DATE. A three-point night from
+   * Tuesday must be stamped Tuesday even if the generator first runs on
+   * Thursday — stamping it now() would be the same lie about time that the
+   * fabricated news fallback told. Omitted for standing analysis (a
+   * bounce-back read isn't an event), where the insert default of now() is
+   * the honest answer.
+   */
+  publishedAt?: string;
 }
 
 /** Which part of the calendar a detector has something true to say in. */
@@ -58,7 +69,8 @@ export interface Detector {
   kind: string;
   label: string;
   phase: DetectorPhase;
-  run(supabase: SupabaseClient, season: number): Promise<GeneratedNote[]>;
+  /** `now` is injected rather than read from the clock so detectors are testable at a fixed date. */
+  run(supabase: SupabaseClient, season: number, now: Date): Promise<GeneratedNote[]>;
 }
 
 /** One decimal, without a trailing ".0" on whole numbers. */
@@ -379,11 +391,269 @@ const goalieWorkloadDetector: Detector = {
   },
 };
 
+
+// ═══════════════════════════════════════════════════════════════════════
+// IN-SEASON DETECTORS
+// ═══════════════════════════════════════════════════════════════════════
+//
+// These report EVENTS, so two rules apply that the offseason detectors don't
+// need:
+//
+//   1. A LOOKBACK WINDOW. Without one, the first run mid-season would emit a
+//      note for every three-point game played all year — roughly 43 per week
+//      across a full season, which is an archive dump, not a news feed.
+//   2. HONEST TIMESTAMPS. publishedAt is the GAME date, not the moment the
+//      generator happened to run.
+
+/** How far back an event detector looks. Sized to survive a missed cron run. */
+const EVENT_LOOKBACK_DAYS = 3;
+
+/** How much history the streak detector needs to measure a run backwards. */
+const STREAK_LOOKBACK_DAYS = 45;
+
+interface GameRow {
+  player_id: number;
+  game_id: number;
+  game_date: string;
+  team_abbrev: string | null;
+  points: number;
+  goals: number;
+  primary_assists: number;
+  secondary_assists: number;
+  shots_on_goal: number;
+  icetime_seconds: number;
+  saves: number;
+  shots_faced: number;
+  goals_against: number;
+  shutouts: number;
+  wins: number;
+}
+
+const GAME_COLUMNS =
+  'player_id, game_id, game_date, team_abbrev, points, goals, primary_assists, ' +
+  'secondary_assists, shots_on_goal, icetime_seconds, saves, shots_faced, ' +
+  'goals_against, shutouts, wins';
+
+function isoDaysAgo(now: Date, days: number): string {
+  const d = new Date(now.getTime() - days * 86400000);
+  return d.toISOString().slice(0, 10);
+}
+
+/** "Tuesday" — game dates are plain YYYY-MM-DD, so parse at local midnight. */
+function weekdayName(gameDate: string): string {
+  const d = new Date(`${gameDate}T00:00:00`);
+  const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return names[d.getDay()] ?? 'game night';
+}
+
+/** Noon UTC on the game date — inside the day in every timezone the app serves. */
+function gameDateToTimestamp(gameDate: string): string {
+  return `${gameDate}T12:00:00.000Z`;
+}
+
+async function fetchGamesSince(
+  supabase: SupabaseClient,
+  season: number,
+  sinceDate: string,
+  isGoalie: boolean,
+): Promise<GameRow[]> {
+  return fetchAllRows<GameRow>(
+    () =>
+      supabase
+        .from('player_game_stats')
+        .select(GAME_COLUMNS)
+        .eq('season', season)
+        .eq('is_goalie', isGoalie)
+        .gte('game_date', sinceDate),
+    'player_game_stats query',
+  );
+}
+
+// ── Detector 5: multi-point nights ───────────────────────────────────
+// Calibrated on a real week (2026-01-05..11): 43 three-point games in seven
+// days, ~6/day. Enough to keep a feed alive without burying it.
+const bigGameDetector: Detector = {
+  kind: 'big-game',
+  label: 'Multi-point nights',
+  phase: 'inseason',
+  async run(supabase, season, now) {
+    const directory = await loadDirectory(supabase, season);
+    const rows = await fetchGamesSince(supabase, season, isoDaysAgo(now, EVENT_LOOKBACK_DAYS), false);
+
+    const notes: GeneratedNote[] = [];
+    for (const row of rows) {
+      const points = Number(row.points);
+      if (!Number.isFinite(points) || points < 3) continue;
+
+      const person = directory.get(row.player_id);
+      if (!person?.full_name) continue;
+
+      const goals = Number(row.goals) || 0;
+      const assists = (Number(row.primary_assists) || 0) + (Number(row.secondary_assists) || 0);
+      const toiMin = Number(row.icetime_seconds) > 0 ? Number(row.icetime_seconds) / 60 : null;
+      const surname = lastName(person.full_name);
+      const hatTrick = goals >= 3;
+
+      const line = [
+        goals ? `${goals} goal${goals === 1 ? '' : 's'}` : null,
+        assists ? `${assists} assist${assists === 1 ? '' : 's'}` : null,
+      ].filter(Boolean).join(' and ');
+
+      notes.push({
+        dedupeKey: `big-game:${season}:${row.player_id}:${row.game_id}`,
+        kind: 'big-game',
+        playerId: row.player_id,
+        season,
+        headline: hatTrick
+          ? `${person.full_name} scored a hat trick`
+          : `${person.full_name} put up ${points} points`,
+        body:
+          `${surname} recorded ${line} in ${weekdayName(row.game_date)}'s game` +
+          `${row.shots_on_goal ? `, on ${row.shots_on_goal} shot${Number(row.shots_on_goal) === 1 ? '' : 's'} on goal` : ''}` +
+          `${toiMin ? ` across ${fmt(toiMin)} minutes of ice time` : ''}.`,
+        analysis:
+          `One night is one night — a ${points}-point game says more about the night than the player. ` +
+          `What's worth checking is whether the ice time behind it is new: production follows deployment, ` +
+          `and a jump in minutes is the part that lasts after the box score stops being interesting.`,
+        severity: 'positive',
+        tags: hatTrick ? ['Hat trick', 'Big night'] : ['Multi-point', 'Big night'],
+        publishedAt: gameDateToTimestamp(row.game_date),
+      });
+    }
+    return notes;
+  },
+};
+
+// ── Detector 6: goalie gems ──────────────────────────────────────────
+// Shutouts (~1/day) and high-volume wins (~0.5/day) on the same calibration
+// window. Both are the kind of start a manager wants surfaced.
+const goalieGemDetector: Detector = {
+  kind: 'goalie-gem',
+  label: 'Goalie gems',
+  phase: 'inseason',
+  async run(supabase, season, now) {
+    const directory = await loadDirectory(supabase, season);
+    const rows = await fetchGamesSince(supabase, season, isoDaysAgo(now, EVENT_LOOKBACK_DAYS), true);
+
+    const notes: GeneratedNote[] = [];
+    for (const row of rows) {
+      const saves = Number(row.saves) || 0;
+      const shutout = (Number(row.shutouts) || 0) >= 1;
+      const bigWorkloadWin = saves >= 35 && (Number(row.wins) || 0) >= 1;
+      if (!shutout && !bigWorkloadWin) continue;
+
+      const person = directory.get(row.player_id);
+      if (!person?.full_name) continue;
+
+      const shotsFaced = Number(row.shots_faced) || saves + (Number(row.goals_against) || 0);
+      const surname = lastName(person.full_name);
+
+      notes.push({
+        dedupeKey: `goalie-gem:${season}:${row.player_id}:${row.game_id}`,
+        kind: 'goalie-gem',
+        playerId: row.player_id,
+        season,
+        headline: shutout
+          ? `${person.full_name} posted a shutout`
+          : `${person.full_name} made ${saves} saves in a win`,
+        body: shutout
+          ? `${surname} stopped all ${shotsFaced} shots he faced in ${weekdayName(row.game_date)}'s game.`
+          : `${surname} turned aside ${saves} of ${shotsFaced} shots to win ${weekdayName(row.game_date)}'s game.`,
+        analysis:
+          `Goalie starts are the scarcest resource in fantasy hockey, and the useful signal in a night ` +
+          `like this is the workload, not the result — a netminder facing this volume is being trusted ` +
+          `with the crease rather than splitting it.`,
+        severity: 'positive',
+        tags: shutout ? ['Shutout', 'Goalie'] : ['Goalie', 'Workload'],
+        publishedAt: gameDateToTimestamp(row.game_date),
+      });
+    }
+    return notes;
+  },
+};
+
+// ── Detector 7: point streaks ────────────────────────────────────────
+// Published at milestones (5, 10, 15...) rather than every game. A streak that
+// republished nightly would bury the feed under one player, and the dedupe key
+// carries the milestone so an extension is genuinely new rather than a repeat.
+const STREAK_MILESTONE_STEP = 5;
+
+const pointStreakDetector: Detector = {
+  kind: 'point-streak',
+  label: 'Point streaks',
+  phase: 'inseason',
+  async run(supabase, season, now) {
+    const directory = await loadDirectory(supabase, season);
+    const rows = await fetchGamesSince(supabase, season, isoDaysAgo(now, STREAK_LOOKBACK_DAYS), false);
+
+    // Newest game first, per player.
+    const byPlayer = new Map<number, GameRow[]>();
+    for (const row of rows) {
+      const list = byPlayer.get(row.player_id);
+      if (list) list.push(row);
+      else byPlayer.set(row.player_id, [row]);
+    }
+
+    const notes: GeneratedNote[] = [];
+    for (const [playerId, games] of byPlayer) {
+      games.sort((a, b) => (a.game_date < b.game_date ? 1 : a.game_date > b.game_date ? -1 : 0));
+
+      let streak = 0;
+      let goals = 0;
+      let assists = 0;
+      let points = 0;
+      for (const g of games) {
+        if ((Number(g.points) || 0) <= 0) break;
+        streak += 1;
+        points += Number(g.points) || 0;
+        goals += Number(g.goals) || 0;
+        assists += (Number(g.primary_assists) || 0) + (Number(g.secondary_assists) || 0);
+      }
+
+      if (streak < STREAK_MILESTONE_STEP) continue;
+
+      // Only publish AT a milestone, so a 7-game run stays the 5-game note
+      // until it reaches 10 rather than emitting one every night.
+      if (streak % STREAK_MILESTONE_STEP !== 0) continue;
+
+      const person = directory.get(playerId);
+      if (!person?.full_name) continue;
+
+      const surname = lastName(person.full_name);
+      const mostRecent = games[0];
+
+      notes.push({
+        dedupeKey: `point-streak:${season}:${playerId}:${streak}`,
+        kind: 'point-streak',
+        playerId,
+        season,
+        headline: `${person.full_name} has points in ${streak} straight games`,
+        body:
+          `${surname} has ${points} point${points === 1 ? '' : 's'} (${goals}G, ${assists}A) over the run, ` +
+          `which is still active as of ${weekdayName(mostRecent.game_date)}'s game.`,
+        analysis:
+          `Streaks are worth reading as evidence of role rather than as a prediction — the run itself ` +
+          `won't continue indefinitely, but a player producing this consistently is being given the ` +
+          `minutes and linemates to do it. That part usually outlasts the streak.`,
+        severity: 'positive',
+        tags: ['Point streak', 'Hot hand'],
+        publishedAt: gameDateToTimestamp(mostRecent.game_date),
+      });
+    }
+    return notes;
+  },
+};
+
 export const DETECTORS: Detector[] = [
+  // Offseason
   bounceBackDetector,
   regressionRiskDetector,
   usageSurgeDetector,
   goalieWorkloadDetector,
+  // In-season
+  bigGameDetector,
+  goalieGemDetector,
+  pointStreakDetector,
 ];
 
 /**
@@ -446,7 +716,7 @@ export async function generateCitrusNews(
       continue;
     }
     try {
-      const found = await detector.run(supabase, season);
+      const found = await detector.run(supabase, season, now);
       notes.push(...found);
       result.ran.push(detector.kind);
     } catch (error) {
@@ -470,6 +740,9 @@ export async function generateCitrusNews(
     analysis: n.analysis,
     severity: n.severity,
     tags: n.tags,
+    // Only send published_at when a detector actually knows the moment;
+    // otherwise let the column default to now().
+    ...(n.publishedAt ? { published_at: n.publishedAt } : {}),
   }));
 
   // Chunked so a large first run doesn't hit a statement/payload limit.

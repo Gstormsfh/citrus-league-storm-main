@@ -31,7 +31,16 @@ function makeSupabase(tables: Record<string, any[]>, opts: { pageCap?: number } 
           return builder;
         },
         gte: (col: string, val: any) => {
-          filters.push((r) => Number(r[col]) >= Number(val));
+          // PostgREST compares dates lexically, not numerically. Coercing a
+          // 'YYYY-MM-DD' to Number yields NaN, and every comparison against
+          // NaN is false — which silently filtered out every game row.
+          filters.push((r) => {
+            const a = r[col];
+            if (typeof val === 'string' && Number.isNaN(Number(val))) {
+              return String(a) >= val;
+            }
+            return Number(a) >= Number(val);
+          });
           return builder;
         },
         order: () => builder,
@@ -234,6 +243,213 @@ describe('usage-surge detector', () => {
       player_season_stats: [mk(2025, 1000, 22)],
     });
     expect(await detector.run(sb, 2025)).toHaveLength(0);
+  });
+});
+
+// ── In-season detectors ──────────────────────────────────────────────
+
+const IN_SEASON = new Date(2026, 0, 11); // 11 Jan 2026, mid-season
+const gameRow = (over: Record<string, any> = {}) => ({
+  season: 2025,
+  is_goalie: false,
+  player_id: 1000,
+  game_id: 501,
+  game_date: '2026-01-10',
+  team_abbrev: 'TOR',
+  points: 3,
+  goals: 1,
+  primary_assists: 1,
+  secondary_assists: 1,
+  shots_on_goal: 5,
+  icetime_seconds: 20 * 60,
+  saves: 0,
+  shots_faced: 0,
+  goals_against: 0,
+  shutouts: 0,
+  wins: 0,
+  ...over,
+});
+
+describe('big-game detector', () => {
+  const detector = DETECTORS.find((d) => d.kind === 'big-game')!;
+
+  it('fires on a three-point night', async () => {
+    const sb = makeSupabase({ player_directory: directory(1), player_game_stats: [gameRow()] });
+    const notes = await detector.run(sb, 2025, IN_SEASON);
+    expect(notes).toHaveLength(1);
+    expect(notes[0].headline).toContain('3 points');
+  });
+
+  it('does NOT fire on a two-point night', async () => {
+    const sb = makeSupabase({
+      player_directory: directory(1),
+      player_game_stats: [gameRow({ points: 2, goals: 1, primary_assists: 1, secondary_assists: 0 })],
+    });
+    expect(await detector.run(sb, 2025, IN_SEASON)).toHaveLength(0);
+  });
+
+  it('calls three goals a hat trick', async () => {
+    const sb = makeSupabase({
+      player_directory: directory(1),
+      player_game_stats: [gameRow({ points: 3, goals: 3, primary_assists: 0, secondary_assists: 0 })],
+    });
+    const [note] = await detector.run(sb, 2025, IN_SEASON);
+    expect(note.headline).toContain('hat trick');
+    expect(note.tags).toContain('Hat trick');
+  });
+
+  it('stamps the GAME date, not the run time', async () => {
+    // The whole point: a Saturday game reported on Monday is still Saturday's
+    // news. Stamping now() is the lie the fabricated fallback told.
+    const sb = makeSupabase({
+      player_directory: directory(1),
+      player_game_stats: [gameRow({ game_date: '2026-01-10' })],
+    });
+    const [note] = await detector.run(sb, 2025, IN_SEASON);
+    expect(note.publishedAt).toBe('2026-01-10T12:00:00.000Z');
+  });
+
+  it('ignores games outside the lookback window', async () => {
+    const sb = makeSupabase({
+      player_directory: directory(1),
+      player_game_stats: [gameRow({ game_date: '2025-11-01' })],
+    });
+    expect(await detector.run(sb, 2025, IN_SEASON)).toHaveLength(0);
+  });
+
+  it('gives each game its own dedupe key so two big nights both publish', async () => {
+    const sb = makeSupabase({
+      player_directory: directory(1),
+      player_game_stats: [
+        gameRow({ game_id: 501, game_date: '2026-01-09' }),
+        gameRow({ game_id: 502, game_date: '2026-01-10' }),
+      ],
+    });
+    const notes = await detector.run(sb, 2025, IN_SEASON);
+    expect(new Set(notes.map((n) => n.dedupeKey)).size).toBe(2);
+  });
+});
+
+describe('goalie-gem detector', () => {
+  const detector = DETECTORS.find((d) => d.kind === 'goalie-gem')!;
+  const g = (over: Record<string, any> = {}) =>
+    gameRow({ is_goalie: true, points: 0, goals: 0, primary_assists: 0, secondary_assists: 0, ...over });
+
+  it('fires on a shutout', async () => {
+    const sb = makeSupabase({
+      player_directory: directory(1),
+      player_game_stats: [g({ shutouts: 1, saves: 28, shots_faced: 28, wins: 1 })],
+    });
+    const [note] = await detector.run(sb, 2025, IN_SEASON);
+    expect(note.headline).toContain('shutout');
+    expect(note.body).toContain('all 28 shots');
+  });
+
+  it('fires on a high-volume win', async () => {
+    const sb = makeSupabase({
+      player_directory: directory(1),
+      player_game_stats: [g({ saves: 38, shots_faced: 40, goals_against: 2, wins: 1 })],
+    });
+    const [note] = await detector.run(sb, 2025, IN_SEASON);
+    expect(note.headline).toContain('38 saves');
+  });
+
+  it('does NOT fire on a routine start', async () => {
+    const sb = makeSupabase({
+      player_directory: directory(1),
+      player_game_stats: [g({ saves: 22, shots_faced: 25, goals_against: 3, wins: 1 })],
+    });
+    expect(await detector.run(sb, 2025, IN_SEASON)).toHaveLength(0);
+  });
+
+  it('does NOT fire on a big save count in a LOSS', async () => {
+    // 38 saves in a loss is a busy night, not a gem worth surfacing.
+    const sb = makeSupabase({
+      player_directory: directory(1),
+      player_game_stats: [g({ saves: 38, shots_faced: 42, goals_against: 4, wins: 0 })],
+    });
+    expect(await detector.run(sb, 2025, IN_SEASON)).toHaveLength(0);
+  });
+});
+
+describe('point-streak detector', () => {
+  const detector = DETECTORS.find((d) => d.kind === 'point-streak')!;
+
+  /** n consecutive games with a point, most recent first. */
+  const streakGames = (n: number, pointsEach = 1) =>
+    Array.from({ length: n }, (_, i) => {
+      const day = 10 - i;
+      return gameRow({
+        game_id: 600 + i,
+        game_date: `2026-01-${String(day).padStart(2, '0')}`,
+        points: pointsEach,
+        goals: 1,
+        primary_assists: 0,
+        secondary_assists: 0,
+      });
+    });
+
+  it('publishes at the 5-game milestone', async () => {
+    const sb = makeSupabase({ player_directory: directory(1), player_game_stats: streakGames(5) });
+    const notes = await detector.run(sb, 2025, IN_SEASON);
+    expect(notes).toHaveLength(1);
+    expect(notes[0].headline).toContain('5 straight games');
+    expect(notes[0].dedupeKey).toBe('point-streak:2025:1000:5');
+  });
+
+  it('stays silent BETWEEN milestones so one player cannot flood the feed', async () => {
+    // A 7-game run is still the 5-game note until it reaches 10.
+    const sb = makeSupabase({ player_directory: directory(1), player_game_stats: streakGames(7) });
+    expect(await detector.run(sb, 2025, IN_SEASON)).toHaveLength(0);
+  });
+
+  it('publishes again at the next milestone with a distinct key', async () => {
+    const sb = makeSupabase({ player_directory: directory(1), player_game_stats: streakGames(10) });
+    const [note] = await detector.run(sb, 2025, IN_SEASON);
+    expect(note.dedupeKey).toBe('point-streak:2025:1000:10');
+  });
+
+  it('a pointless game breaks the streak', async () => {
+    const games = streakGames(5);
+    games[0] = gameRow({ game_id: 700, game_date: '2026-01-10', points: 0, goals: 0, primary_assists: 0, secondary_assists: 0 });
+    const sb = makeSupabase({ player_directory: directory(1), player_game_stats: games });
+    expect(await detector.run(sb, 2025, IN_SEASON)).toHaveLength(0);
+  });
+
+  it('counts backwards from the most recent game regardless of row order', async () => {
+    const games = streakGames(5);
+    const shuffled = [games[3], games[0], games[4], games[1], games[2]];
+    const sb = makeSupabase({ player_directory: directory(1), player_game_stats: shuffled });
+    const notes = await detector.run(sb, 2025, IN_SEASON);
+    expect(notes).toHaveLength(1);
+    expect(notes[0].headline).toContain('5 straight');
+  });
+});
+
+describe('phase gating', () => {
+  it('offseason runs never emit game-event notes', async () => {
+    const sb = makeSupabase({
+      player_directory: directory(1),
+      player_game_stats: [gameRow()],
+      player_season_stats: [],
+    });
+    const result = await generateCitrusNews(sb, { season: 2025, now: new Date(2026, 7, 25) });
+    expect(result.phase).toBe('offseason');
+    expect(result.skipped).toContain('big-game');
+    expect(result.skipped).toContain('point-streak');
+  });
+
+  it('in-season runs skip the offseason draft-prep detectors', async () => {
+    const sb = makeSupabase({
+      player_directory: directory(1),
+      player_game_stats: [gameRow()],
+      player_season_stats: [],
+    });
+    const result = await generateCitrusNews(sb, { season: 2025, now: IN_SEASON });
+    expect(result.phase).toBe('inseason');
+    expect(result.ran).toContain('big-game');
+    expect(result.skipped).toContain('bounce-back');
+    expect(result.generated).toBeGreaterThan(0);
   });
 });
 
