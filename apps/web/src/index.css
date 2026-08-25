@@ -913,6 +913,49 @@
   /* No border or margin - all players shown together */
 }
 
+/* Sticky team header for the lineup comparison (2026-08-25).
+   Before this, team names lived ONLY in the ScoreCard at the top of the
+   page: scrolling into the lineup left both columns anonymous, so "which
+   side is mine" had to be remembered instead of read. Mirrors
+   .matchup-comparison-row's 47%/6%/47% columns so each label sits directly
+   over its own column, and matches the .user-team/.opponent-team card
+   padding so a name lines up with the player names beneath it. */
+.matchup-team-header {
+  display: grid;
+  grid-template-columns: 47% 6% 47%;
+  align-items: center;
+  width: 100%;
+  padding: 6px 0;
+  /* Sticks BELOW the chrome above it rather than at the viewport top:
+     mobile has its own sticky scoreboard bar (h-14 + safe-area, z-40) and
+     desktop has the fixed navbar the page clears with lg:pt-24. top:0 would
+     park this underneath both. */
+  position: sticky;
+  top: calc(3.5rem + env(safe-area-inset-top));
+  z-index: 20;
+}
+
+@media (min-width: 1024px) {
+  .matchup-team-header {
+    top: 6rem;
+  }
+}
+
+.matchup-team-header-side {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.matchup-team-header-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* ================================================= */
 /* 📱 MOBILE-FIRST DEFAULTS (SIDE-BY-SIDE COMPARISON) */
 /* ================================================= */
@@ -1679,7 +1722,11 @@
     margin: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    overflow-x: hidden !important;
+    /* CLIP, not hidden — same reasoning as the body SCROLL FIX above:
+       overflow-x:hidden forces overflow-y to auto per spec, turning this
+       into a scroll container and killing position:sticky on the lineup's
+       team header. clip clips horizontally without that side effect. */
+    overflow-x: clip !important;
   }
   
   /* Player cards - compact with CONSISTENT HEIGHT and CITRUS COLORS */

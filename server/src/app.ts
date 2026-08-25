@@ -33,13 +33,14 @@ import { playoffRoutes } from './routes/playoffs';
 import { bestballRoutes } from './routes/bestball';
 import { accountRoutes } from './routes/account';
 import { publicRoutes } from './routes/public';
+import { newsRoutes } from './routes/news';
 import { demoMatchupRoutes } from './routes/demoMatchup';
 import { poolRoutes } from './routes/pools';
 import { nhlPlayoffsRoutes } from './routes/nhl-playoffs';
 import { playoffPoolRoutes } from './routes/playoff-pools';
 import { authRoutes } from './routes/auth';
 import { scheduledRoutes } from './routes/scheduled';
-import { standardRateLimit, strictRateLimit, authRateLimit } from './middleware/rateLimit';
+import { standardRateLimit, strictRateLimit, authRateLimit, aiRateLimit } from './middleware/rateLimit';
 import { requestContextMiddleware } from './middleware/requestContext';
 import { metricsMiddleware, metrics } from './middleware/metrics';
 import { cacheControlMiddleware } from './middleware/cacheControl';
@@ -94,7 +95,7 @@ app.use('/api/*', cacheControlMiddleware);
 // Rate limiting — 300 req/min per IP for standard routes (LRU-bounded)
 app.use('/api/*', standardRateLimit);
 // Stricter limit on AI chat — 10 req/min per IP
-app.use('/api/stormy/*', strictRateLimit);
+app.use('/api/stormy/*', aiRateLimit);
 // Strict brute-force protection on signup/login — 5 req/min per IP
 // Applied per-path (not per-prefix) because /api/auth/* may grow to
 // include non-mutating endpoints later; we explicitly protect the
@@ -273,6 +274,7 @@ app.route('/api/playoffs', playoffRoutes);
 app.route('/api/bestball', bestballRoutes);
 app.route('/api/account', accountRoutes);
 app.route('/api/public', publicRoutes);
+app.route('/api/news', newsRoutes);
 // Chunk 11g.9 (2026-08-24): guest Matchup payload, ported off the
 // retired `demo-matchup-cache` Edge Function. Public + unauthenticated
 // by design (no authMiddleware on the route), still covered by the

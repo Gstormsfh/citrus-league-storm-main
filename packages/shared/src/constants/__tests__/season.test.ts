@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getSeasonYearForDate, getProjectionsSeason } from '../season';
+import { getSeasonYearForDate, getProjectionsSeason, getUpcomingSeasonStartDate } from '../season';
 
 // Local-time constructor: month is 1-based here for readability.
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day, 12, 0, 0);
@@ -42,5 +42,31 @@ describe('getProjectionsSeason (Proj FP offseason join fix, 2026-08-23)', () => 
     expect(getProjectionsSeason(d(2027, 5, 15))).toBe(2026);
     expect(getProjectionsSeason(d(2027, 6, 30))).toBe(2026);
     expect(getProjectionsSeason(d(2027, 7, 1))).toBe(2027);
+  });
+});
+
+describe('getUpcomingSeasonStartDate ("Games This Week" zero-grid fix, 2026-08-25)', () => {
+  it('returns the opener while the season is still ahead', () => {
+    // The audit date: nhl_games holds zero fixtures for this week because it
+    // is August, and the widget needs to say WHY rather than show 7 zeros.
+    expect(getUpcomingSeasonStartDate(d(2026, 8, 25))).toBe('2026-09-29');
+    expect(getUpcomingSeasonStartDate(d(2026, 9, 28))).toBe('2026-09-29');
+  });
+
+  it('returns null once the opener has arrived — no stale "season opens" copy', () => {
+    expect(getUpcomingSeasonStartDate(d(2026, 9, 29))).toBeNull();
+    expect(getUpcomingSeasonStartDate(d(2026, 12, 1))).toBeNull();
+  });
+
+  it('returns null for seasons with no early-start entry, so callers degrade', () => {
+    // SEASON_START_DATES only lists pre-October openers. A caller must fall
+    // back to a generic "no games scheduled" message, never assume offseason.
+    expect(getUpcomingSeasonStartDate(d(2027, 8, 1))).toBeNull();
+  });
+
+  it('compares on local calendar dates, not UTC instants', () => {
+    // A late-evening local time on the day before the opener must still count
+    // as "upcoming"; a UTC-based comparison would already have rolled over.
+    expect(getUpcomingSeasonStartDate(new Date(2026, 8, 28, 23, 30, 0))).toBe('2026-09-29');
   });
 });

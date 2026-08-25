@@ -258,6 +258,11 @@ const Matchup = () => {
   // Track viewing team names from matchup data (for viewing other matchups)
   const [viewingTeamName, setViewingTeamName] = useState<string>('');
   const [viewingOpponentTeamName, setViewingOpponentTeamName] = useState<string>('');
+  // Id of the team rendered on the LEFT. Needed because MatchupService's
+  // `userTeam` field is really "the viewing team": when the user isn't in the
+  // matchup they picked from the dropdown, it falls back to team1 — a
+  // stranger's team. Anything that says "this is YOURS" has to check this.
+  const [viewingTeamId, setViewingTeamId] = useState<string | null>(null);
   // Track user's actual matchup ID (for "(Your Matchup)" label)
   const [userMatchupId, setUserMatchupId] = useState<string | null>(null);
   const [firstWeekStart, setFirstWeekStart] = useState<Date | null>(null);
@@ -476,10 +481,13 @@ const Matchup = () => {
       // Use actual viewing team (handles both user and guest viewing)
       // For guest: currentMatchup contains viewing_team_id that UI sets
       // For user: userTeam.id should match one of the matchup teams
-      const viewingTeamId = (currentMatchup as unknown as Record<string, unknown>).viewing_team_id as string | undefined || userTeam?.id || team1Id;
-      
+      // Renamed from `viewingTeamId` (2026-08-25): that name now belongs to
+      // component state, and a same-named local in a 5,500-line file is how
+      // the next edit here silently reads the wrong one.
+      const scoringViewingTeamId = (currentMatchup as unknown as Record<string, unknown>).viewing_team_id as string | undefined || userTeam?.id || team1Id;
+
       // Determine if viewing team is team1 or team2
-      const isViewingTeam1 = viewingTeamId === team1Id;
+      const isViewingTeam1 = scoringViewingTeamId === team1Id;
       
       for (const dateStr of pastDates) {
         const dayStats = dailyStatsByDate.get(dateStr);
@@ -3274,6 +3282,26 @@ const Matchup = () => {
     return score;
   }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, myDailyPoints, myStarters]);
 
+  /**
+   * Is the LEFT column genuinely the viewer's own team?
+   *
+   * Drives the "YOU" badge in the ScoreCard and the lineup's sticky team
+   * header. This is deliberately NOT "the left side, always":
+   * MatchupService.getMatchupDataById falls back to team1 as the "userTeam"
+   * when the viewer isn't a participant, so picking another matchup from the
+   * "View Matchup" dropdown puts two strangers' teams on screen. Labelling
+   * one of them "YOU" would be worse than labelling neither.
+   *
+   * Demo/guest views return true on purpose: the demo casts the visitor as
+   * the left-hand team (Citrus Crushers), and a first-time visitor is
+   * exactly who the badge is for.
+   */
+  const isOwnTeamOnLeft = useMemo(() => {
+    if (userLeagueState !== 'active-user') return true;
+    if (!userTeam?.id || !viewingTeamId) return false;
+    return viewingTeamId === userTeam.id;
+  }, [userLeagueState, userTeam?.id, viewingTeamId]);
+
   const opponentTeamPoints = useMemo(() => {
     if (!currentMatchup) {
       return '0.0';
@@ -4222,6 +4250,9 @@ const Matchup = () => {
         // This ensures correct names are shown when viewing other matchups
         setViewingTeamName(matchupData.userTeam.name);
         setViewingOpponentTeamName(matchupData.opponentTeam?.name || 'Bye Week');
+        // Left-hand team's id — drives the "YOU" identity badge. See the
+        // state declaration for why this can't be assumed to be the user.
+        setViewingTeamId(matchupData.userTeam.id ?? null);
 
         // Only reset selectedDate when matchup actually changes (not just reloading)
         // Check if we're loading a different matchup than currently displayed
@@ -5078,12 +5109,15 @@ const Matchup = () => {
       {/* MOBILE: Sticky scoreboard header — ESPN/Yahoo style */}
       <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-14 px-3">
-          {/* My team score */}
+          {/* My team score — orange is the app-wide "this is you" signal
+              (Standings own-team row, ScoreCard's YOU pill). This bar used to
+              have it backwards: the OPPONENT wore orange and the user wore
+              cream, so the highlighted side was the one that wasn't yours. */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="text-lg font-calistoga font-black text-pastel-cream tabular-nums">
+            <span className="text-lg font-calistoga font-black text-pastel-orange tabular-nums">
               {parseFloat(myTeamPoints || '0').toFixed(1)}
             </span>
-            <span className="text-xs font-jbmono font-semibold text-pastel-cream/70 truncate">
+            <span className="text-xs font-jbmono font-semibold text-pastel-orange-soft truncate">
               {userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
             </span>
           </div>
@@ -5094,12 +5128,12 @@ const Matchup = () => {
             </span>
             <span className="text-xs text-white/55 font-bold">—</span>
           </div>
-          {/* Opponent score + menu */}
+          {/* Opponent score + menu — deliberately the muted side. */}
           <div className="flex items-center gap-1 min-w-0 flex-1 justify-end">
-            <span className="text-xs font-jbmono font-semibold text-pastel-orange-soft truncate text-right">
+            <span className="text-xs font-jbmono font-semibold text-pastel-cream/70 truncate text-right">
               {userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans'}
             </span>
-            <span className="text-lg font-calistoga font-black text-pastel-orange tabular-nums">
+            <span className="text-lg font-calistoga font-black text-pastel-cream tabular-nums">
               {parseFloat(opponentTeamPoints || '0').toFixed(1)}
             </span>
             <MobileMenuButton />
@@ -5322,6 +5356,7 @@ const Matchup = () => {
             opponentTeamGamesRemaining={opponentTeamGamesRemaining}
             myTeamProjection={myTotalProjection}
             opponentTeamProjection={opponentTotalProjection}
+            isOwnTeam={isOwnTeamOnLeft}
           />
           
           {/* Weekly Schedule - Show for both active users AND guests (the weekly date selector they love!) */}
@@ -5399,6 +5434,9 @@ const Matchup = () => {
                     return parseFloat(opponentTeamPoints || '0');
                   })()}
                   scoringSettings={scoringSettings}
+                  userTeamName={userLeagueState === 'active-user' ? (viewingTeamName || userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
+                  opponentTeamName={userLeagueState === 'active-user' ? (viewingOpponentTeamName || opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
+                  isOwnTeam={isOwnTeamOnLeft}
                 />
               </>
             )}

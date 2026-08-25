@@ -165,6 +165,22 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
 /** Strict rate limit for sensitive operations — 10 req/min per IP */
 export const strictRateLimit = rateLimitMiddleware({ maxRequests: 10, windowMs: 60_000 });
 
+/**
+ * AI assistant rate limit — 30 req/min per IP, 20 per user.
+ *
+ * Stormy does NOT need a tight per-minute cap: real abuse protection is the
+ * three-layer spend guard in StormyAssistantService (15 questions per user
+ * per rolling week, 500 across all users per day, and a hard monthly token
+ * budget). Those bound the actual cost.
+ *
+ * What a 10/min PER-IP cap did instead was punish shared IPs — a household,
+ * an office, a coffee shop — and gate a route whose real limits live
+ * elsewhere. It was harmless while nothing called /api/stormy/*; it became
+ * the user-visible failure the moment the client was repointed there
+ * (2026-08-25). This is a burst guard only.
+ */
+export const aiRateLimit = rateLimitMiddleware({ maxRequests: 30, maxUserRequests: 20, windowMs: 60_000 });
+
 /** Auth rate limit — 5 req/min per IP (brute force protection) */
 export const authRateLimit = rateLimitMiddleware({ maxRequests: 5, windowMs: 60_000, perUser: false });
 

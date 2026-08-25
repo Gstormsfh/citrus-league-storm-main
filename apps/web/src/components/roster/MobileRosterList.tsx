@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Lock, Shield, CalendarDays, Skull, AlertCircle } from "lucide-react";
 import { HockeyPlayer } from "./HockeyPlayerCard";
 import { CitrusSparkle, CitrusLeaf } from "@/components/icons/CitrusIcons";
+import { generatePlayerWriteup } from "@/utils/playerWriteup";
 import { useState } from "react";
 
 // ─── Position helpers ────────────────────────────────────────────────
@@ -197,6 +198,9 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
   const displayPts = isLiveOrFinal ? actualPts : projPts;
   const teamAbbr = player?.teamAbbreviation || (player?.team?.split(' ').pop()?.substring(0, 3).toUpperCase()) || '';
   const teamLogoUrl = player ? `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg` : '';
+  // Same one-liner the desktop card carries, so the roster reads identically
+  // on both surfaces. Pure arithmetic over player.stats — no fetch.
+  const writeup = player ? generatePlayerWriteup(player) : null;
 
   const statusBadge = player?.status ? {
     IR: { label: 'IR', cls: 'bg-red-500 text-white' },
@@ -309,6 +313,27 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 </>
               )}
             </div>
+            {/* Line 3: scouting note — the Sleeper/Yahoo/ESPN player-row note.
+                Availability (IR/GTD/SUSP) wins this line when it applies, since
+                that is the decision the manager is actually making. */}
+            {writeup?.cardNote && (
+              <div className="flex items-center gap-1 mt-0.5 overflow-hidden">
+                <span
+                  className={cn(
+                    'w-1 h-1 rounded-full flex-shrink-0',
+                    writeup.cardTone === 'caution'
+                      ? 'bg-amber-400'
+                      : writeup.cardTone === 'positive'
+                        ? 'bg-pastel-sage'
+                        : 'bg-pastel-cream/70',
+                  )}
+                  aria-hidden="true"
+                />
+                <span className="text-[10px] font-display text-white/55 truncate leading-tight">
+                  {writeup.cardNote}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Points column */}

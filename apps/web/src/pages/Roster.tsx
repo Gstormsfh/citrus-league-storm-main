@@ -1,7 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter } from '@dnd-kit/core';
-import { arrayMove } from '@dnd-kit/sortable';
 import { useSearchParams, useLocation, Navigate } from 'react-router-dom';
 import { HockeyFooter, StormyLoading } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,7 +23,6 @@ import MobileRosterList from '@/components/roster/MobileRosterList';
 import MobileMenuButton from '@/components/MobileMenuButton';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useToast } from '@/hooks/use-toast';
-import HockeyPlayerCard from '@/components/roster/HockeyPlayerCard';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, Transaction, LEAGUE_TEAMS_DATA } from '@/services/LeagueService';
 import type { LeagueSettings } from '@/types/leagueTypes';
@@ -53,6 +50,17 @@ import { logger } from '@/utils/logger';
 import { clearRosterCaches, notifyRosterChanged } from '@/utils/rosterRefresh';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { resolveFantasyPosition, type PositionType, getRosterSlots, DEFAULT_ROSTER_SLOTS, DEFAULT_FDG_ROSTER_SLOTS, getSlotPositions } from '@/utils/rosterUtils';
+
+// Plain array move — inlined so this page no longer depends on @dnd-kit at
+// all (2026-08-25 drag-and-drop removal). @dnd-kit/sortable itself is still
+// a real dependency of the draft room (DraftQueue.tsx), so it stays in
+// package.json; this page just doesn't reach for it anymore.
+function arrayMove<T>(list: T[], fromIndex: number, toIndex: number): T[] {
+  const result = list.slice();
+  const [moved] = result.splice(fromIndex, 1);
+  result.splice(toIndex, 0, moved);
+  return result;
+}
 
 /* 2026-08-19 visual audit — surface correction.
    These panels used bg-white/55..80 ("frosted glass") on the #0F1F15
@@ -235,7 +243,6 @@ const Roster = () => {
   const [pendingAddPlayer, setPendingAddPlayer] = useState<{ id: string; name: string } | null>(null);
   const [isDropDialogOpen, setIsDropDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("roster");
-  const [activeId, setActiveId] = useState<string | number | null>(null);
   const [tapSelectedPlayerId, setTapSelectedPlayerId] = useState<string | number | null>(null);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 1024);
   useEffect(() => {
@@ -1556,8 +1563,8 @@ const Roster = () => {
       // Only save if user has a real team (not demo)
       if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
         // Use navigator.sendBeacon or a synchronous save if possible
-        // For now, we'll rely on the saves in handleDragEnd
-        // This is just a safety net - the main saves happen on every drag
+        // For now, we'll rely on the saves in applyPlayerMove
+        // This is just a safety net - the main saves happen on every move
         const lineupToSave = {
           starters: roster.starters.map(p => p.id),
           bench: roster.bench.map(p => p.id),
@@ -1573,7 +1580,7 @@ const Roster = () => {
         });
         
         // Note: This would require a special endpoint that accepts beacons
-        // For now, we rely on the saves in handleDragEnd which happen immediately
+        // For now, we rely on the saves in applyPlayerMove which happen immediately
         // The beforeunload is mainly for user awareness
       }
     };
@@ -1993,6 +2000,23 @@ const Roster = () => {
     };
   }, [roster, projectionsByDate, dailyStatsByDateMap, gameStatusMap, selectedDate, profile?.timezone]);
 
+  /**
+   * Are the daily projections for the selected date actually loaded?
+   *
+   * `displayRoster` treats "no projection row" as "no game" — correct once
+   * the fetch has landed, catastrophic before it. With no entry for the
+   * date, EVERY player enriches to { nextGame: undefined, projectedPoints: 0 },
+   * which makes Auto Lineup's sort a no-op over an all-equal list: Array.sort
+   * is stable, so the existing lineup survives untouched and the button
+   * silently does nothing while reporting success.
+   *
+   * Gate the button on this rather than letting it run against a blank slate.
+   */
+  const projectionsReadyForSelectedDate = useMemo(
+    () => projectionsByDate.has(selectedDate || getTodayMST()),
+    [projectionsByDate, selectedDate],
+  );
+
   // Load CitrusPuck Analytics
   useEffect(() => {
     // Only load if roster is loaded and not already loaded
@@ -2260,17 +2284,55 @@ const Roster = () => {
   }, [searchParams, loading, userTeamId]);
 
   const handleAutoLineup = () => {
+    // Refuse to run against unloaded projections rather than no-op silently.
+    if (!projectionsReadyForSelectedDate) {
+      toast({
+        title: 'Projections still loading',
+        description: "Give it a second — optimizing now would keep your current lineup.",
+      });
+      return;
+    }
+
+    // THE ENRICHMENT LIVES IN `displayRoster`, NOT IN `roster` STATE.
+    //
+    // `roster` is the structural source of truth; `displayRoster` is a
+    // useMemo that layers on the selected date's projections and game info
+    // at render time and never writes back. So `prev.starters` / `prev.bench`
+    // carry `projectedPoints: 0` for EVERY player (set in loadRoster, never
+    // updated) and a `nextGame` that reflects page-load time rather than the
+    // selected date.
+    //
+    // Sorting `prev` therefore compared 0 against 0 on every pair, and the
+    // games-today check only worked by accident on the load date. Stable sort
+    // + all-equal comparator = the lineup never changed. That is the
+    // "center with a game stays benched" bug.
+    //
+    // Fix: read both sort keys off the enriched view, keyed by player id.
+    const enrichedById = new Map<string | number, HockeyPlayer>();
+    for (const p of [...displayRoster.starters, ...displayRoster.bench]) {
+      enrichedById.set(p.id, p);
+    }
+    const enriched = (p: HockeyPlayer): HockeyPlayer => enrichedById.get(p.id) ?? p;
+
+    /** Explicit boolean — `nextGame.isToday` is tri-state (true/false/undefined). */
+    const hasGameToday = (p: HockeyPlayer): boolean =>
+      enriched(p).nextGame?.isToday === true;
+
+    const projectedFor = (p: HockeyPlayer): number =>
+      enriched(p).projectedPoints || 0;
+
     setRoster((prev) => {
       // 1. Gather all active players (exclude IR)
       const allActivePlayers = [...prev.starters, ...prev.bench];
 
-      // 2. Helper to sort players: Games Today > Projected Points
+      // 2. Sort: a player with a game ALWAYS outranks one without, whatever
+      //    the projections say. Projections only break ties inside a group.
       const sortBestPlayers = (players: HockeyPlayer[]) => {
         return [...players].sort((a, b) => {
-          if (a.nextGame?.isToday !== b.nextGame?.isToday) {
-            return a.nextGame?.isToday ? -1 : 1;
-          }
-          return (b.projectedPoints || 0) - (a.projectedPoints || 0);
+          const aPlays = hasGameToday(a);
+          const bPlays = hasGameToday(b);
+          if (aPlays !== bPlays) return aPlays ? -1 : 1;
+          return projectedFor(b) - projectedFor(a);
         });
       };
 
@@ -2391,16 +2453,10 @@ const Roster = () => {
     });
 
     toast({
-      title: "Lineup Optimized",
-      description: "Best players set based on today's games and projections.",
+      title: 'Lineup Optimized',
+      description: "Players with games start first, ranked by projection.",
     });
   };
-
-  // Get active player being dragged
-  const activePlayer = useMemo(() => {
-    if (!activeId) return null;
-    return [...roster.starters, ...roster.bench, ...roster.ir].find(p => p.id === activeId) || null;
-  }, [activeId, roster]);
 
   const handlePlayerClick = useCallback(async (player: HockeyPlayer) => {
     // Fetch fresh season stats using unified helper (same as Matchup and FreeAgents tabs)
@@ -2485,14 +2541,12 @@ const Roster = () => {
     return eligiblePositions.includes(slotPosition);
   };
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string | number);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-
+  // The move engine behind every lineup change on this page — used to be
+  // reached only through a dnd-kit DragEndEvent (drag) or a fake one built
+  // just to satisfy that type (tap-to-swap). It only ever read active.id and
+  // over.id, so those are now just its two real parameters; tap-to-swap
+  // calls it directly (see handleMobileTapPlayer/handleMobileTapSlot below).
+  const applyPlayerMove = (playerId: string | number, targetId: string) => {
     // Best Ball guard: lineups are auto-optimized, no manual changes
     if (bestBallEnabled) {
       toast({
@@ -2503,7 +2557,7 @@ const Roster = () => {
       return;
     }
 
-    // Read-only guard: Block drag-and-drop for guests and demo league
+    // Read-only guard: Block lineup changes for guests and demo league
     if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
       toast({
         title: "Demo League",
@@ -2522,11 +2576,6 @@ const Roster = () => {
       });
       return;
     }
-
-    if (!over) return;
-
-    const playerId = active.id as string | number;
-    const targetId = over.id as string; 
 
     // Check if viewing a past date - prevent all edits
     if (selectedDate) {
@@ -2839,10 +2888,21 @@ const Roster = () => {
     }
     // Bench is always a valid target
     eligible.add('bench-grid');
+    // IR slots (2026-08-25): drag used to be the ONLY way to place a player
+    // on IR — isPositionValid already gates this on is_ir_eligible. Now that
+    // drag is gone everywhere, tap has to cover this too or IR placement
+    // becomes unreachable.
+    for (const irSlotId of ['ir-slot-1', 'ir-slot-2', 'ir-slot-3']) {
+      if (isPositionValid(player, irSlotId)) {
+        eligible.add(irSlotId);
+      }
+    }
     return eligible;
   }, [tapSelectedPlayerId, roster, ALL_STARTER_SLOT_IDS, isPositionValid]);
 
-  // Handle mobile tap-to-swap: player tapped
+  // Tap-to-swap: player tapped (select for swap, or complete a swap against
+  // the currently-selected player). Shared by mobile and desktop — the name
+  // predates desktop tap support.
   const handleMobileTapPlayer = (player: HockeyPlayer) => {
     // Read-only guards
     if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
@@ -2903,50 +2963,26 @@ const Roster = () => {
       return;
     }
 
-    // Perform the swap by simulating a drag end event
-    handleDragEnd({
-      active: { id: sourcePlayer.id, data: { current: {} }, rect: { current: { initial: null, translated: null } } },
-      over: { id: player.id, data: { current: {} }, rect: { width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 } },
-      activatorEvent: new Event('tap'),
-      collisions: [],
-      delta: { x: 0, y: 0 },
-    } as any);
-
+    applyPlayerMove(sourcePlayer.id, player.id);
     setTapSelectedPlayerId(null);
   };
 
-  // Handle mobile tap-to-swap: empty slot tapped
+  // Tap-to-swap: empty (or occupied-but-eligible) slot tapped — shared by
+  // mobile and desktop.
   const handleMobileTapSlot = (slotId: string) => {
     if (!tapSelectedPlayerId) return;
     const allPlayers = [...roster.starters, ...roster.bench, ...roster.ir];
     const sourcePlayer = allPlayers.find(p => p.id === tapSelectedPlayerId);
     if (!sourcePlayer) { setTapSelectedPlayerId(null); return; }
 
-    // Simulate drag end to the slot
-    handleDragEnd({
-      active: { id: sourcePlayer.id, data: { current: {} }, rect: { current: { initial: null, translated: null } } },
-      over: { id: slotId, data: { current: { type: 'starter-slot' } }, rect: { width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 } },
-      activatorEvent: new Event('tap'),
-      collisions: [],
-      delta: { x: 0, y: 0 },
-    } as any);
-
+    applyPlayerMove(sourcePlayer.id, slotId);
     setTapSelectedPlayerId(null);
   };
 
-  // Handle mobile tap-to-swap: bench tapped (move selected player to bench)
+  // Tap-to-swap: bench tapped as a target (move selected player to bench)
   const handleMobileTapBench = () => {
     if (!tapSelectedPlayerId) return;
     handleMobileTapSlot('bench-grid');
-  };
-
-  // Combined player click handler: mobile uses tap-to-swap, desktop opens stats
-  const handlePlayerClickWithSwap = (player: HockeyPlayer) => {
-    if (isMobile) {
-      handleMobileTapPlayer(player);
-    } else {
-      handlePlayerClick(player);
-    }
   };
 
   // Determine if we should show a loading overlay (but don't unmount the component)
@@ -3060,7 +3096,13 @@ const Roster = () => {
                   <Button
                     onClick={handleAutoLineup}
                     variant="outline"
-                    className="flex gap-2 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold"
+                    disabled={!projectionsReadyForSelectedDate}
+                    title={
+                      projectionsReadyForSelectedDate
+                        ? 'Set the best lineup for this date'
+                        : 'Loading projections for this date…'
+                    }
+                    className="flex gap-2 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Wand2 className="w-4 h-4" aria-hidden="true" />
                     Auto Lineup
@@ -3260,11 +3302,13 @@ const Roster = () => {
                     </div>
                   )}
                   {/* Mobile: clean list view with tap-to-swap */}
-                  {/* Desktop: grid with drag-and-drop */}
-                  {/* Demo league: read-only (no DnD, no swap) */}
-                  {isMobile ? (
+                  {/* Desktop: grid with tap-to-swap (2026-08-25: no more drag-and-drop anywhere) */}
+                  {/* Demo league: read-only (no swap) */}
+                  {(() => {
+                    const canEdit = !(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' || (userTeam && isDemoLeague(userTeam.league_id)));
+                    return isMobile ? (
                     <div>
-                      {/* Mobile tap-to-swap cancel bar */}
+                      {/* Tap-to-swap cancel bar */}
                       {tapSelectedPlayerId && (
                         <div className="flex items-center justify-between bg-pastel-orange/15 border border-pastel-orange/30 rounded-lg px-3 py-2 mb-3">
                           <span className="text-sm font-jbmono font-semibold text-pastel-cream">
@@ -3293,72 +3337,58 @@ const Roster = () => {
                         positionType={leaguePositionType}
                       />
                     </div>
-                  ) : userTeam && isDemoLeague(userTeam.league_id) ? (
-                    <div className="space-y-6">
-                      <StartersGrid
-                        players={displayRoster.starters}
-                        slotAssignments={displayRoster.slotAssignments}
-                        onPlayerClick={handlePlayerClick}
-                        lockedPlayerIds={lockedPlayerIds}
-                        positionType={leaguePositionType}
-                        rosterSlots={leagueRosterSlots}
-                      />
-                      <BenchGrid
-                        players={displayRoster.bench}
-                        onPlayerClick={handlePlayerClick}
-                        lockedPlayerIds={lockedPlayerIds}
-                      />
-                      <IRSlot
-                        players={displayRoster.ir}
-                        slotAssignments={displayRoster.slotAssignments}
-                        onPlayerClick={handlePlayerClick}
-                        lockedPlayerIds={lockedPlayerIds}
-                      />
-                    </div>
                   ) : (
-                  <DndContext
-                    collisionDetection={closestCenter}
-                    onDragStart={(userLeagueState === 'guest' || (userLeagueState as string) === 'logged-in-no-league') ? undefined : handleDragStart}
-                    onDragEnd={(userLeagueState === 'guest' || (userLeagueState as string) === 'logged-in-no-league') ? undefined : handleDragEnd}
-                  >
                     <div className="space-y-6">
+                      {/* Tap-to-swap cancel bar — same affordance as mobile */}
+                      {canEdit && tapSelectedPlayerId && (
+                        <div className="flex items-center justify-between bg-pastel-orange/15 border border-pastel-orange/30 rounded-lg px-3 py-2">
+                          <span className="text-sm font-jbmono font-semibold text-pastel-cream">
+                            Click a highlighted slot to move this player
+                          </span>
+                          <button
+                            onClick={() => setTapSelectedPlayerId(null)}
+                            className="text-xs font-bold text-pastel-orange bg-pastel-orange/10 hover:bg-pastel-orange/20 rounded-lg px-3 py-1 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
                       <StartersGrid
                         players={displayRoster.starters}
                         slotAssignments={displayRoster.slotAssignments}
-                        onPlayerClick={handlePlayerClickWithSwap}
+                        onPlayerClick={handlePlayerClick}
+                        onPlayerTap={canEdit ? handleMobileTapPlayer : undefined}
                         lockedPlayerIds={lockedPlayerIds}
-                        tapSelectedPlayerId={null}
-                        tapEligibleSlots={new Set()}
+                        tapSelectedPlayerId={canEdit ? tapSelectedPlayerId : null}
+                        tapEligibleSlots={canEdit ? tapEligibleSlots : new Set()}
+                        onSlotTap={canEdit ? handleMobileTapSlot : undefined}
                         positionType={leaguePositionType}
                         rosterSlots={leagueRosterSlots}
                       />
 
                       <BenchGrid
                         players={displayRoster.bench}
-                        onPlayerClick={handlePlayerClickWithSwap}
+                        onPlayerClick={handlePlayerClick}
+                        onPlayerTap={canEdit ? handleMobileTapPlayer : undefined}
                         lockedPlayerIds={lockedPlayerIds}
+                        tapSelectedPlayerId={canEdit ? tapSelectedPlayerId : null}
+                        tapEligibleSlots={canEdit ? tapEligibleSlots : new Set()}
+                        onBenchTap={canEdit ? handleMobileTapBench : undefined}
                       />
 
                       <IRSlot
                         players={displayRoster.ir}
                         slotAssignments={displayRoster.slotAssignments}
-                        onPlayerClick={handlePlayerClickWithSwap}
+                        onPlayerClick={handlePlayerClick}
+                        onPlayerTap={canEdit ? handleMobileTapPlayer : undefined}
                         lockedPlayerIds={lockedPlayerIds}
+                        tapSelectedPlayerId={canEdit ? tapSelectedPlayerId : null}
+                        tapEligibleSlots={canEdit ? tapEligibleSlots : new Set()}
+                        onSlotTap={canEdit ? handleMobileTapSlot : undefined}
                       />
                     </div>
-
-                    <DragOverlay>
-                      {activePlayer ? (
-                        <div className="opacity-90 rotate-3">
-                          <HockeyPlayerCard
-                            player={activePlayer}
-                            draggable={false}
-                          />
-                        </div>
-                      ) : null}
-                    </DragOverlay>
-                  </DndContext>
-                  )}
+                  );
+                  })()}
                   </>
                   );
                 })()}
@@ -3987,9 +4017,9 @@ const Roster = () => {
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Lineup tips</div>
                   </div>
                   <ul className="text-[11px] text-white/70 space-y-1.5 leading-relaxed">
-                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Drag-and-drop to set your lineup</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Tap a player, then tap a highlighted slot to swap</li>
                     <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Auto-lineup uses xG model projections</li>
-                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Tap a player for full stats + projection</li>
+                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Tap a name for full stats + projection</li>
                   </ul>
                 </div>
               </div>

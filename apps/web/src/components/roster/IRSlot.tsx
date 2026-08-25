@@ -1,5 +1,3 @@
-import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -9,9 +7,13 @@ import { Plus, AlertCircle } from "lucide-react";
 interface IRSlotProps {
   players: HockeyPlayer[];
   slotAssignments?: Record<string | number, string>; // Map of Player ID -> Slot ID
-  onPlayerClick?: (player: HockeyPlayer) => void;
+  onPlayerClick?: (player: HockeyPlayer) => void; // View player detail (name/headshot tap)
+  onPlayerTap?: (player: HockeyPlayer) => void; // Tap-to-swap: select player, or complete a swap (card body tap)
   className?: string;
   lockedPlayerIds?: Set<string>; // Set of locked player IDs
+  tapSelectedPlayerId?: string | number | null; // Tap-to-swap: currently selected player
+  tapEligibleSlots?: Set<string>; // Tap-to-swap: slots the selected player can move to (IR-eligible players only)
+  onSlotTap?: (slotId: string) => void; // Tap-to-swap: handler when an eligible empty IR slot is tapped
 }
 
 interface IndividualIRSlotProps {
@@ -20,77 +22,89 @@ interface IndividualIRSlotProps {
   player: HockeyPlayer | undefined;
   isEmpty: boolean;
   onPlayerClick?: (player: HockeyPlayer) => void;
+  onPlayerTap?: (player: HockeyPlayer) => void;
   lockedPlayerIds?: Set<string>;
+  isEligibleTarget?: boolean;
+  isSlotSelected?: boolean;
+  onSlotTap?: (slotId: string) => void;
 }
 
-const IndividualIRSlot = ({ 
-  slotId, 
+const IndividualIRSlot = ({
+  slotId,
   slotNumber,
-  player, 
+  player,
   isEmpty,
   onPlayerClick,
-  lockedPlayerIds = new Set()
+  onPlayerTap,
+  lockedPlayerIds = new Set(),
+  isEligibleTarget = false,
+  isSlotSelected = false,
+  onSlotTap,
 }: IndividualIRSlotProps) => {
-  const { setNodeRef, isOver } = useDroppable({
-    id: slotId,
-    data: {
-      type: 'ir-slot',
-      slotNumber,
-    },
-  });
-
-  const playerIds = player ? [player.id] : [];
+  const handleSlotTap = () => {
+    if (isEligibleTarget && onSlotTap) {
+      onSlotTap(slotId);
+    }
+  };
 
   return (
     <Card
-      ref={setNodeRef}
       className={cn(
         "p-2 transition-all rounded-lg min-h-[140px] w-full",
         "border-2",
-        isOver && "border-red-500 bg-red-500/10 shadow-lg",
-        isEmpty && !isOver && "border-dashed border-red-400/30 bg-white/[0.03]",
-        !isEmpty && !isOver && "border-red-400/30 bg-white/5 shadow-sm"
+        isEmpty && !isEligibleTarget && "border-dashed border-red-400/30 bg-white/[0.03]",
+        !isEmpty && !isSlotSelected && !isEligibleTarget && "border-red-400/30 bg-white/5 shadow-sm",
+        isSlotSelected && "!border-citrus-orange !bg-citrus-orange/10 shadow-lg",
+        isEligibleTarget && !isSlotSelected && "!border-citrus-sage !bg-citrus-sage/15 !border-solid shadow-md cursor-pointer animate-pulse",
       )}
+      // Only the outer Card handles the tap when the slot is EMPTY — when it's
+      // full, the HockeyPlayerCard inside owns its own tap (onSwapTap below).
+      onClick={isEmpty && isEligibleTarget ? handleSlotTap : undefined}
     >
       {/* Slot Header */}
       <div className="flex items-center justify-between mb-1">
-        <Badge 
-          variant="outline" 
+        <Badge
+          variant="outline"
           className={cn(
             "text-[9px] font-bold px-1 py-0 h-4",
+            isEligibleTarget && !isSlotSelected ? "text-citrus-sage border-citrus-sage" :
             isEmpty ? "text-muted-foreground border-muted-foreground/30" : "text-red-400 border-red-500/50 bg-red-500/10"
           )}
         >
           IR {slotNumber}
         </Badge>
+        {isEligibleTarget && !isSlotSelected && (
+          <span className="text-[8px] font-bold text-citrus-sage uppercase tracking-wide">Tap to move</span>
+        )}
       </div>
 
       {/* Player or Empty State */}
       {player ? (
-        <SortableContext items={playerIds} strategy={verticalListSortingStrategy}>
-          <HockeyPlayerCard
-            player={player}
-            isInSlot={true}
-            isLocked={lockedPlayerIds.has(String(player.id))}
-            onClick={() => onPlayerClick?.(player)}
-            className="border-0 shadow-none bg-transparent"
-          />
-        </SortableContext>
+        <HockeyPlayerCard
+          player={player}
+          isInSlot={true}
+          isLocked={lockedPlayerIds.has(String(player.id))}
+          onClick={() => onPlayerClick?.(player)}
+          onSwapTap={() => onPlayerTap?.(player)}
+          className="border-0 shadow-none bg-transparent"
+          isSwapSelected={isSlotSelected}
+          isSwapTarget={isEligibleTarget && !isSlotSelected}
+        />
       ) : (
         <div className={cn(
           "flex items-center justify-center h-[110px] rounded border border-dashed transition-all",
-          isOver ? "border-red-500 bg-red-500/10 border-2" : "border-red-300/30 bg-red-950/20"
+          isEligibleTarget ? "border-citrus-sage bg-citrus-sage/10 border-2" : "border-red-300/30 bg-red-950/20"
         )}>
           <div className="text-center">
             <Plus className={cn(
               "h-4 w-4 mx-auto mb-1 transition-colors",
-              isOver ? "text-red-500" : "text-muted-foreground/40"
+              isEligibleTarget ? "text-citrus-sage" : "text-muted-foreground/40"
             )} />
             <p className={cn(
               "text-[9px] font-medium",
-              isOver ? "text-red-500" : "text-muted-foreground/60"
+              isEligibleTarget ? "text-citrus-sage" : "text-muted-foreground/60"
             )}>
-              {isOver ? "Drop here" : "Empty"}
+              {isEligibleTarget ? "Move here" : "Empty"}
             </p>
           </div>
         </div>
@@ -99,7 +113,7 @@ const IndividualIRSlot = ({
   );
 };
 
-const IRSlot = ({ players, slotAssignments = {}, onPlayerClick, className, lockedPlayerIds = new Set() }: IRSlotProps) => {
+const IRSlot = ({ players, slotAssignments = {}, onPlayerClick, onPlayerTap, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, tapEligibleSlots = new Set(), onSlotTap }: IRSlotProps) => {
   const getPlayerInSlot = (slotId: string) => {
     const playerId = Object.keys(slotAssignments).find(key => slotAssignments[key] === slotId);
     if (!playerId) return undefined;
@@ -129,6 +143,8 @@ const IRSlot = ({ players, slotAssignments = {}, onPlayerClick, className, locke
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {irSlots.map((slot) => {
           const player = getPlayerInSlot(slot.id);
+          const isEligibleTarget = tapSelectedPlayerId != null && tapEligibleSlots.has(slot.id);
+          const isSlotSelected = player != null && player.id === tapSelectedPlayerId;
           return (
             <IndividualIRSlot
               key={slot.id}
@@ -137,7 +153,11 @@ const IRSlot = ({ players, slotAssignments = {}, onPlayerClick, className, locke
               player={player}
               isEmpty={!player}
               onPlayerClick={onPlayerClick}
+              onPlayerTap={onPlayerTap}
               lockedPlayerIds={lockedPlayerIds}
+              isEligibleTarget={isEligibleTarget}
+              isSlotSelected={isSlotSelected}
+              onSlotTap={onSlotTap}
             />
           );
         })}

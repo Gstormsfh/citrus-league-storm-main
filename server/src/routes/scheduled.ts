@@ -5,6 +5,7 @@ import { MatchupService } from '../services/MatchupService';
 import { AppError } from '../lib/errors';
 import { ok, fail } from '../lib/responses';
 import { logger } from '@citrus/shared';
+import { generateCitrusNews } from '../services/CitrusNewsService';
 
 /**
  * Scheduled / cron routes — NOT authenticated via user JWT.
@@ -366,6 +367,45 @@ scheduledRoutes.post('/matchup-sweep', async (c) => {
     });
   } catch (e) {
     logger.error('[scheduled.matchup-sweep] failed:', e);
+    return fail(c, AppError.internal(e instanceof Error ? e.message : String(e)));
+  }
+});
+
+/**
+ * POST /api/scheduled/generate-news
+ *
+ * Runs the Citrus News detectors and persists whatever they find. Safe to call
+ * on any cadence: dedupe_key is UNIQUE and inserts ignore conflicts, so a note
+ * is published once and its published_at never moves. Re-running is a no-op
+ * rather than a republish — which is the whole point, because a timestamp that
+ * changes on every run is the dishonesty the fabricated news fallback was
+ * guilty of.
+ *
+ * Optional body: { "season": 2025 } to regenerate a specific season.
+ */
+scheduledRoutes.post('/generate-news', async (c) => {
+  try {
+    const admin = getSupabaseAdmin();
+
+    let season: number | undefined;
+    try {
+      const body = await c.req.json<{ season?: number }>();
+      if (body && Number.isFinite(body.season)) season = Number(body.season);
+    } catch {
+      // No body is the normal case for a cron invocation.
+    }
+
+    const result = await generateCitrusNews(admin, season ? { season } : {});
+    logger.info(
+      '[scheduled.generate-news] phase=', result.phase,
+      'season=', result.season,
+      'generated=', result.generated,
+      'inserted=', result.inserted,
+      'errors=', result.errors.length,
+    );
+    return ok(c, result);
+  } catch (e) {
+    logger.error('[scheduled.generate-news] failed:', e);
     return fail(c, AppError.internal(e instanceof Error ? e.message : String(e)));
   }
 });

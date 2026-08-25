@@ -54,7 +54,13 @@ interface ApiResponse<T = unknown> {
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 // Transient HTTP status codes that should be retried automatically.
-const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+// 429 is deliberately NOT retryable. A rate limit is the server saying
+// "slow down"; retrying spends two more slots against the same window and
+// makes the limit bite harder and longer. Only transient upstream failures
+// (bad gateway / unavailable / timeout) are worth a second attempt.
+// (2026-08-25: retrying 429 turned a single throttled Stormy question into
+// three, which is how a 10/min cap started rejecting the 4th question.)
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
 
 interface RequestOptions {
   headers?: Record<string, string>;

@@ -1,9 +1,7 @@
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Shield, CalendarDays, Skull, Plus, Lock, Info } from "lucide-react";
+import { AlertCircle, Shield, CalendarDays, Skull, Lock } from "lucide-react";
 import { useState, memo } from "react";
 
 import { CitrusPuckPlayerData, AggregatedPlayerData } from "@/types/citruspuck";
@@ -146,36 +144,43 @@ export interface HockeyPlayer {
 
 interface HockeyPlayerCardProps {
   player: HockeyPlayer;
-  onClick?: () => void;
-  draggable?: boolean;
+  onClick?: () => void; // View player detail (name/headshot tap)
+  onSwapTap?: () => void; // Tap-to-swap: select this player, or complete a swap against the selected one (card body tap). Falls back to onClick if not provided.
   className?: string;
   isInSlot?: boolean; // Whether the card is in a starter slot
   isLocked?: boolean; // Whether the player's game has started (locked from moves)
-  isSwapSelected?: boolean; // Mobile tap-to-swap: this player is selected for swap
-  isSwapTarget?: boolean; // Mobile tap-to-swap: this player's slot is a valid swap target
+  isSwapSelected?: boolean; // Tap-to-swap: this player is selected for swap
+  isSwapTarget?: boolean; // Tap-to-swap: this player's slot is a valid swap target
 }
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { generatePlayerWriteup } from "@/utils/playerWriteup";
+
+// Position group accent — the single source of truth for "which slot is this."
+// Applied directly on the card (left spine + badge tint) so it's guaranteed
+// present everywhere a card renders (starters, bench, IR), instead of relying
+// on each grid to remember its own wrapper-level border colour.
+const POSITION_ACCENT: Record<string, { spine: string; badge: string }> = {
+  C:    { spine: 'before:bg-primary',        badge: 'from-primary to-primary' },
+  LW:   { spine: 'before:bg-blue-500',       badge: 'from-blue-500 to-blue-600' },
+  RW:   { spine: 'before:bg-purple-500',     badge: 'from-purple-500 to-purple-600' },
+  D:    { spine: 'before:bg-slate-400',      badge: 'from-slate-400 to-slate-500' },
+  G:    { spine: 'before:bg-amber-500',      badge: 'from-amber-500 to-amber-600' },
+  F:    { spine: 'before:bg-emerald-500',    badge: 'from-emerald-500 to-emerald-600' },
+  UTIL: { spine: 'before:bg-orange-500',     badge: 'from-orange-500 to-orange-600' },
+};
+const DEFAULT_ACCENT = { spine: 'before:bg-pastel-sage', badge: 'from-pastel-sage to-[#7CB518]' };
 
 const HockeyPlayerCardContent = ({
   player,
   onClick,
-  draggable = true,
+  onSwapTap,
   className,
   isInSlot = false,
   isLocked = false,
   isSwapSelected = false,
   isSwapTarget = false,
 }: HockeyPlayerCardProps) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: player?.id || 'unknown' });
-  
   const [imageError, setImageError] = useState(false);
   // HEADSHOTS (2026-08-18) — try the player's mug first, fall back to the
   // team crest, then the Shield glyph. `player.image` is the NHL headshot
@@ -183,12 +188,6 @@ const HockeyPlayerCardContent = ({
   const [headshotError, setHeadshotError] = useState(false);
 
   if (!player) return null;
-
-  const style = draggable ? {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  } : undefined;
 
   const getPositionAbbreviation = (position: string): string => {
     const pos = position?.toUpperCase() || '';
@@ -229,10 +228,15 @@ const HockeyPlayerCardContent = ({
 
     const Icon = config.icon;
 
+    // Inline, next to the name — NOT absolutely positioned. This card now
+    // carries two other corner badges (position top-right, and the
+    // headshot itself grew to 44px) — a third floating badge has nowhere
+    // left to sit without covering one of them. Matches MobileRosterList's
+    // already-shipped pattern (status badge inline on the name row).
     return (
-      <Badge 
+      <Badge
         variant={config.variant}
-        className={cn("absolute top-0.5 right-0.5 text-[7px] font-bold h-4 px-1 z-10 gap-0.5 flex items-center", config.color, "text-white")}
+        className={cn("text-[7px] font-bold h-4 px-1 gap-0.5 flex items-center flex-shrink-0", config.color, "text-white")}
       >
         {Icon && <Icon className="w-2 h-2" />}
         {config.label}
@@ -340,6 +344,11 @@ const HockeyPlayerCardContent = ({
   const displayStats = getDisplayStats();
   const isGoalie = player.position === 'Goalie' || player.position === 'G';
   const positionAbbr = getPositionDisplay();
+  // Accent keys off the PRIMARY position (not the "C/LW" dual-eligible display
+  // string) so it always resolves, even when getPositionDisplay() joins two.
+  const accent = POSITION_ACCENT[getPositionAbbreviation(player.position)] || DEFAULT_ACCENT;
+  // Pure arithmetic over player.stats — no fetch, no async, safe per render.
+  const writeup = generatePlayerWriteup(player);
   const teamAbbr = getTeamAbbreviation();
   const teamLogoUrl = `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg`;
 
@@ -356,38 +365,32 @@ const HockeyPlayerCardContent = ({
   const maxProjectedPoints = 8; 
   const projectionPercentage = Math.min((projectedPoints / maxProjectedPoints) * 100, 100);
 
-  // Disable drag if player is locked
-  const canDrag = draggable && !isLocked;
-  
-  // Don't pass isDragging as a DOM prop — it's used in className logic only
-  const dragProps = canDrag ? {
-    ...attributes,
-    ...listeners,
-  } : {};
+  // Card body = tap-to-swap (select, or complete a swap against the
+  // selected player). Falls back to onClick so any caller that hasn't
+  // wired the new prop yet still behaves like before.
+  const handleCardTap = onSwapTap ?? onClick;
 
   return (
     <Card
-      ref={draggable ? setNodeRef : undefined}
-      style={style}
-      {...dragProps}
       className={cn(
-        "relative overflow-visible transition-all",
-        canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed",
-        "h-[130px] flex flex-col",
+        "relative overflow-visible transition-all cursor-pointer",
+        "min-h-[134px] flex flex-col",
+        // Position spine — always present, regardless of which grid renders this card.
+        "before:content-[''] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[3px] before:rounded-l-lg",
+        accent.spine,
         isInSlot
           ? "border-0 bg-transparent shadow-none"
           : "border border-border/40 hover:border-primary/50 hover:shadow-md",
-        isDragging && "shadow-xl z-50 opacity-90",
-        isLocked && "opacity-75 bg-muted/30",
+        isLocked && "opacity-75 bg-muted/30 cursor-not-allowed",
         isSwapSelected && "!ring-2 !ring-pastel-orange !ring-offset-1 !border-pastel-orange !shadow-lg",
         isSwapTarget && "!ring-2 !ring-pastel-sage !ring-offset-1 !border-pastel-sage animate-pulse",
         className
       )}
-      onClick={onClick}
+      onClick={handleCardTap}
     >
       {/* Lock Overlay */}
       {isLocked && (
-        <div 
+        <div
           className="absolute inset-0 bg-background/60 backdrop-blur-[1px] z-20 flex items-center justify-center pointer-events-none"
           title="Player's game has started - cannot be moved"
         >
@@ -399,22 +402,9 @@ const HockeyPlayerCardContent = ({
       )}
 
       {/* Surfer Varsity Header - MAXIMUM GREEN VIBES */}
-      <div className="relative p-2 bg-gradient-to-r from-pastel-sage/25 via-pastel-sage/15 to-pastel-sage/25 border-b-2 border-pastel-sage/50 flex items-center gap-2 min-h-[42px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-gradient-to-r before:from-pastel-sage before:via-[#7CB518] before:to-pastel-sage before:opacity-60">
-        {getStatusBadge()}
-        
-        {/* Lock Icon Badge - Varsity Style */}
-        {isLocked && (
-          <Badge 
-            variant="secondary"
-            className="absolute top-1 left-1 text-[7px] font-bold h-5 px-1.5 z-10 gap-0.5 flex items-center bg-pastel-sage/30 text-pastel-cream border-2 border-pastel-sage rounded-lg shadow-sm"
-            title="Player's game has started - cannot be moved"
-          >
-            <Lock className="w-3 h-3" />
-          </Badge>
-        )}
-
+      <div className="relative p-2 bg-gradient-to-r from-pastel-sage/25 via-pastel-sage/15 to-pastel-sage/25 border-b-2 border-pastel-sage/50 flex items-center gap-2 min-h-[46px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-gradient-to-r before:from-pastel-sage before:via-[#7CB518] before:to-pastel-sage before:opacity-60">
         {/* Player headshot → team crest → Shield glyph */}
-        <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-pastel-sage/20 to-pastel-sage/10 rounded-xl shadow-varsity p-1 border-2 border-pastel-sage relative overflow-hidden before:content-[''] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-br before:from-transparent before:to-pastel-sage/20 hover:border-[#7CB518] hover:shadow-[0_0_12px_rgba(124,181,24,0.5)] transition-all">
+        <div className="w-11 h-11 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-pastel-sage/20 to-pastel-sage/10 rounded-xl shadow-varsity p-1 border-2 border-pastel-sage relative overflow-hidden before:content-[''] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-br before:from-transparent before:to-pastel-sage/20 hover:border-[#7CB518] hover:shadow-[0_0_12px_rgba(124,181,24,0.5)] transition-all">
            {player.image && !headshotError ? (
              <img
                src={player.image}
@@ -440,29 +430,30 @@ const HockeyPlayerCardContent = ({
 
         {/* Player Name and Team - Varsity Typography */}
         <div className="flex-1 min-w-0 pr-5">
-          <h3 
-            className="font-display font-bold text-[11px] leading-tight line-clamp-2 cursor-pointer hover:text-pastel-sage transition-colors text-pastel-cream"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onClick?.();
-            }}
-          >
-            {player.name}
-          </h3>
+          <div className="flex items-center gap-1">
+            <h3
+              className="font-display font-bold text-[11px] leading-tight line-clamp-2 cursor-pointer hover:text-pastel-sage transition-colors text-pastel-cream"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClick?.();
+              }}
+            >
+              {player.name}
+            </h3>
+            {getStatusBadge()}
+          </div>
           <div className="flex items-center text-[9px] text-pastel-sage font-display font-bold mt-1 gap-1 uppercase tracking-wide">
             <span>{teamAbbr}</span>
             <span>•</span>
             <span>#{player.number}</span>
-            {(player.status === 'IR' || player.status === 'SUSP') && (
-              <Plus className="w-3 h-3 text-destructive ml-0.5 flex-shrink-0 stroke-[3]" />
-            )}
           </div>
         </div>
 
-        {/* Position Badge - GREEN VARSITY PATCH absolute top right */}
-        <Badge 
-          className="absolute top-0.5 right-0.5 bg-gradient-to-br from-pastel-sage to-[#7CB518] border-2 border-white/10 text-pastel-cream font-varsity shadow-patch text-[9px] tracking-wider font-black h-5 px-2"
+        {/* Position Badge - VARSITY PATCH absolute top right, tinted per position group
+            so the slot is legible at a glance regardless of which grid renders the card. */}
+        <Badge
+          className={cn("absolute top-0.5 right-0.5 bg-gradient-to-br border-2 border-white/10 text-pastel-cream font-varsity shadow-patch text-[9px] tracking-wider font-black h-5 px-2", accent.badge)}
         >
           {positionAbbr}
         </Badge>
@@ -534,8 +525,31 @@ const HockeyPlayerCardContent = ({
         })()}
       </div>
 
+      {/* Scouting note — the Sleeper/Yahoo/ESPN one-liner under the stat line.
+          Single row, truncated: the full writeup lives in the player modal.
+          Derived from the same stats rendered above it, so the note and the
+          numbers cannot disagree (see utils/playerWriteup). */}
+      {writeup.cardNote && (
+        <div className="px-2 py-0.5 bg-[#1A2A20]/50 border-t border-pastel-sage/25 flex items-center gap-1.5">
+          <span
+            className={cn(
+              'w-1 h-1 rounded-full flex-shrink-0',
+              writeup.cardTone === 'caution'
+                ? 'bg-amber-400'
+                : writeup.cardTone === 'positive'
+                  ? 'bg-pastel-sage'
+                  : 'bg-pastel-cream/70',
+            )}
+            aria-hidden="true"
+          />
+          <span className="text-[8px] leading-tight font-display text-white/70 truncate">
+            {writeup.cardNote}
+          </span>
+        </div>
+      )}
+
       {/* Projected Points / Game Bar - VARSITY SCOREBOARD STYLE */}
-      <div className="relative px-2 pb-2 pt-1.5 bg-gradient-to-br from-pastel-sage/15 via-white/50 to-pastel-sage/10 flex flex-col justify-center gap-1.5 border-t-2 border-pastel-sage/40 min-h-[32px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-pastel-sage before:to-transparent before:opacity-60">
+      <div className="relative px-2 pb-2 pt-1.5 bg-gradient-to-br from-pastel-sage/18 via-pastel-sage/28 to-pastel-sage/12 flex flex-col justify-center gap-1.5 border-t-2 border-pastel-sage/40 min-h-[32px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-pastel-sage before:to-transparent before:opacity-60">
         <div className="flex items-center justify-between h-3.5">
           <div className="flex items-center gap-1.5">
             {hasGameOnSelectedDate ? (

@@ -2,7 +2,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Star, AlertCircle, Clock, Trash2, Flame, Snowflake, CalendarDays, Loader2, CheckCircle2 } from 'lucide-react';
+import { Star, AlertCircle, Clock, Trash2, Flame, Snowflake, CalendarDays, Loader2, CheckCircle2, Newspaper } from 'lucide-react';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { cn } from '@/lib/utils';
 import { LeagueService } from '@/services/LeagueService';
@@ -17,6 +17,9 @@ import { playerApi } from '@/api/players';
 import { MatchupService } from '@/services/MatchupService';
 import { matchupApi } from '@/api/matchups';
 import { ScoringCalculator } from '@/utils/scoringUtils';
+import { generatePlayerWriteup, WriteupTone } from '@/utils/playerWriteup';
+import { getUpcomingSeasonStartDate } from '@citrus/shared';
+import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 
 /* 2026-08-19 visual audit — muted-text correction.
    text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
@@ -84,6 +87,17 @@ const posColors: Record<string, { bg: string; text: string; border: string }> = 
   RW: { bg: 'bg-citrus-orange', text: 'text-white', border: 'border-citrus-orange' },
   D:  { bg: 'bg-citrus-forest', text: 'text-white', border: 'border-citrus-forest' },
   G:  { bg: 'bg-citrus-peach', text: 'text-pastel-forest', border: 'border-citrus-peach' },
+};
+
+/**
+ * Scouting-tag palette. Caution borrows the amber/red language the status
+ * badges already use for injuries, deliberately NOT orange — orange is spoken
+ * for as the app's "this is you" identity signal (Standings, matchup ScoreCard).
+ */
+const WRITEUP_TAG_STYLES: Record<WriteupTone, string> = {
+  positive: 'bg-pastel-sage/20 text-pastel-cream ring-pastel-sage/40',
+  neutral: 'bg-white/5 text-white/70 ring-white/15',
+  caution: 'bg-amber-500/15 text-amber-200 ring-amber-500/30',
 };
 
 const getPositionAbbr = (pos: string) => {
@@ -306,10 +320,18 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     fetchGameLog();
   }, [isOpen, player]);
 
+  // MUST sit above the `if (!player) return null` below — a hook called after
+  // an early return runs conditionally, which breaks the Rules of Hooks and
+  // desyncs every hook after it the moment `player` goes null on close.
+  const { notes: citrusNotes } = useCitrusPlayerNotes(player?.id, isOpen);
+
   if (!player) return null;
 
   const isGoalie = player.position === 'Goalie' || player.position === 'G';
   const stats = player.stats || {};
+  // Pure function of `player` — cheap enough to run inline, and deliberately
+  // not memoised on a value that changes identity every render anyway.
+  const writeup = generatePlayerWriteup(player);
   const posAbbr = getPositionAbbr(player.position);
   const posStyle = posColors[posAbbr] || posColors['C'];
   const teamAbbr = player.teamAbbreviation || player.team?.split(' ').pop()?.substring(0, 3).toUpperCase() || '';
@@ -443,10 +465,16 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                       Jul–Sep is the NHL off-season — say so instead. */}
                   <span className="text-white/55 text-sm font-display italic">
                     {(() => {
-                      const m = new Date().getMonth();
-                      return m >= 6 && m <= 8
-                        ? 'Off-season — games return in October'
-                        : 'No upcoming games';
+                      // Was hard-coded to "return in October", which is wrong
+                      // for 2026-27: that season opens Sept 29. Read the real
+                      // opener instead of naming a month.
+                      const opener = getUpcomingSeasonStartDate();
+                      if (!opener) return 'No upcoming games';
+                      const label = new Date(`${opener}T00:00:00`).toLocaleDateString(undefined, {
+                        month: 'long',
+                        day: 'numeric',
+                      });
+                      return `Off-season — games return ${label}`;
                     })()}
                   </span>
                 </>
@@ -487,6 +515,102 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
             {/* ─── Overview Tab ─── */}
             <TabsContent value="stats" className="mt-0 space-y-4">
+              {/* Scouting report — leads the tab the way ESPN/Sleeper lead
+                  with a blurb. Derived from the same stat line rendered
+                  directly below it (see utils/playerWriteup), so the prose and
+                  the numbers can never disagree. */}
+              <div className="py-3 px-3.5 bg-white/5 rounded-xl border border-citrus-sage/15">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <CitrusSparkle className="w-3 h-3 text-citrus-orange" aria-hidden="true" />
+                    <span className="text-[9px] font-display uppercase tracking-[0.18em] text-pastel-cream/60">
+                      Player Outlook
+                    </span>
+                  </div>
+                  {/* Bylined, the way Sleeper credits Rotowire. This is our own
+                      analysis, derived from our own numbers — so it says so. */}
+                  <span className="text-[9px] font-display text-white/55 flex-shrink-0">
+                    via Citrus
+                  </span>
+                </div>
+                <div className="text-sm font-display font-bold text-pastel-cream leading-snug">
+                  {writeup.headline}
+                </div>
+                <p className="mt-1 text-[13px] leading-relaxed text-white/70">
+                  {writeup.summary}
+                </p>
+                {writeup.analysis && (
+                  <p className="mt-2 text-[13px] leading-relaxed text-white/70">
+                    <span className="font-display font-bold text-pastel-cream">Analysis: </span>
+                    {writeup.analysis}
+                  </p>
+                )}
+                {writeup.tags.length > 0 && (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {writeup.tags.map((tag) => (
+                      <span
+                        key={tag.label}
+                        className={cn(
+                          'inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-jbmono uppercase tracking-wider font-bold ring-1',
+                          WRITEUP_TAG_STYLES[tag.tone],
+                        )}
+                      >
+                        {tag.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Latest News — Citrus notes generated from our own shot-quality
+                  data (citrus_news). Same slot Sleeper fills with Rotowire.
+                  Renders nothing at all when there are no notes; an empty
+                  "Latest News" header would imply the feed had failed. */}
+              {citrusNotes.length > 0 && (
+                <div className="py-3 px-3.5 bg-white/5 rounded-xl border border-citrus-sage/15">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Newspaper className="w-3 h-3 text-citrus-orange" aria-hidden="true" />
+                      <span className="text-[9px] font-display uppercase tracking-[0.18em] text-pastel-cream/60">
+                        Latest News
+                      </span>
+                    </div>
+                    <span className="text-[9px] font-display text-white/55 flex-shrink-0">via Citrus</span>
+                  </div>
+                  <div className="space-y-3">
+                    {citrusNotes.map((note) => (
+                      <div key={note.id}>
+                        <div className="flex items-start gap-1.5">
+                          <span
+                            className={cn(
+                              'w-1 h-1 rounded-full flex-shrink-0 mt-1.5',
+                              note.severity === 'caution'
+                                ? 'bg-amber-400'
+                                : note.severity === 'positive'
+                                  ? 'bg-pastel-sage'
+                                  : 'bg-pastel-cream/70',
+                            )}
+                            aria-hidden="true"
+                          />
+                          <div className="min-w-0">
+                            <div className="text-sm font-display font-bold text-pastel-cream leading-snug">
+                              {note.headline}
+                            </div>
+                            <p className="mt-1 text-[13px] leading-relaxed text-white/70">{note.body}</p>
+                            {note.analysis && (
+                              <p className="mt-1.5 text-[13px] leading-relaxed text-white/70">
+                                <span className="font-display font-bold text-pastel-cream">Analysis: </span>
+                                {note.analysis}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Key stats grid */}
               {isGoalie ? (
                 <div className="grid grid-cols-3 gap-2">

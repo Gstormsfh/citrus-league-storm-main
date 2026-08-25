@@ -211,19 +211,39 @@ jobs:
         if: steps.check-gcp.outputs.has_creds == 'true'
         run: |
           set -euo pipefail
+          # Read the image off the revision ACTUALLY SERVING TRAFFIC, not off
+          # spec.template — the spec updates the moment the deploy is accepted,
+          # even when the new revision never becomes ready and traffic stays on
+          # the old one. Checking spec here would pass in exactly the failure
+          # this step exists to catch (2026-08-24: first version of this guard
+          # did precisely that and reported green over a stale revision).
           SERVING=$(gcloud run services describe citrus-api \
             --region=us-central1 \
             --format='value(status.traffic[0].revisionName)')
-          IMAGE=$(gcloud run services describe citrus-api \
+          LATEST_READY=$(gcloud run services describe citrus-api \
             --region=us-central1 \
-            --format='value(spec.template.spec.containers[0].image)')
-          echo "serving revision: $SERVING"
-          echo "serving image:    $IMAGE"
-          if [ "${IMAGE##*:}" != "${{ github.sha }}" ]; then
-            echo "::error::Cloud Run is serving image tag ${IMAGE##*:}, expected ${{ github.sha }}. The deploy did not take effect."
+            --format='value(status.latestReadyRevisionName)')
+          LATEST_CREATED=$(gcloud run services describe citrus-api \
+            --region=us-central1 \
+            --format='value(status.latestCreatedRevisionName)')
+          SERVING_IMAGE=$(gcloud run revisions describe "$SERVING" \
+            --region=us-central1 \
+            --format='value(spec.containers[0].image)')
+
+          echo "serving revision : $SERVING"
+          echo "latest ready     : $LATEST_READY"
+          echo "latest created   : $LATEST_CREATED"
+          echo "serving image    : $SERVING_IMAGE"
+
+          if [ "$LATEST_CREATED" != "$LATEST_READY" ]; then
+            echo "::error::Revision $LATEST_CREATED was created but never became ready. Cloud Run is still serving $SERVING. Check the revision logs."
             exit 1
           fi
-          echo "Serving revision matches this build."
+          if [ "${SERVING_IMAGE##*:}" != "${{ github.sha }}" ]; then
+            echo "::error::Traffic is on image tag ${SERVING_IMAGE##*:}, expected ${{ github.sha }}. The deploy did not take effect."
+            exit 1
+          fi
+          echo "Serving revision $SERVING is running this build."
 
       - name: API health check
         if: steps.check-gcp.outputs.has_creds == 'true'
