@@ -71,6 +71,9 @@ function makeSupabase(tables: Record<string, any[]>, opts: { pageCap?: number } 
   return api as any;
 }
 
+/** Fixed offseason moment; detectors take `now` so they're testable at a date. */
+const OFFSEASON = new Date(2026, 7, 25);
+
 const directory = (n: number) =>
   Array.from({ length: n }, (_, i) => ({
     season: 2025,
@@ -124,7 +127,7 @@ describe('bounce-back detector', () => {
       player_directory: directory(1),
       player_season_stats: [row()],
     });
-    const notes = await detector.run(sb, 2025);
+    const notes = await detector.run(sb, 2025, OFFSEASON);
     expect(notes).toHaveLength(1);
     expect(notes[0].body).toContain('10 goals');
     expect(notes[0].body).toContain('25 expected');
@@ -136,7 +139,7 @@ describe('bounce-back detector', () => {
       player_directory: directory(1),
       player_season_stats: [row({ goals: 22, x_goals: 25 })],
     });
-    expect(await detector.run(sb, 2025)).toHaveLength(0);
+    expect(await detector.run(sb, 2025, OFFSEASON)).toHaveLength(0);
   });
 
   it('does NOT fire on a tiny expected-goals sample, however lopsided', async () => {
@@ -145,7 +148,7 @@ describe('bounce-back detector', () => {
       player_directory: directory(1),
       player_season_stats: [row({ goals: 1, x_goals: 5 })],
     });
-    expect(await detector.run(sb, 2025)).toHaveLength(0);
+    expect(await detector.run(sb, 2025, OFFSEASON)).toHaveLength(0);
   });
 
   it('skips a player with no directory entry rather than naming him "undefined"', async () => {
@@ -153,7 +156,7 @@ describe('bounce-back detector', () => {
       player_directory: [],
       player_season_stats: [row()],
     });
-    expect(await detector.run(sb, 2025)).toHaveLength(0);
+    expect(await detector.run(sb, 2025, OFFSEASON)).toHaveLength(0);
   });
 
   it('paginates past the 1,000-row cap instead of silently losing players', async () => {
@@ -161,7 +164,7 @@ describe('bounce-back detector', () => {
     // no error — the exact failure this guards.
     const stats = Array.from({ length: 1200 }, (_, i) => row({ player_id: 1000 + i }));
     const sb = makeSupabase({ player_directory: directory(1200), player_season_stats: stats });
-    const notes = await detector.run(sb, 2025);
+    const notes = await detector.run(sb, 2025, OFFSEASON);
     expect(notes).toHaveLength(1200);
   });
 });
@@ -182,7 +185,7 @@ describe('regression-risk detector', () => {
 
   it('fires on a large over-performance', async () => {
     const sb = makeSupabase({ player_directory: directory(1), player_season_stats: [row()] });
-    const notes = await detector.run(sb, 2025);
+    const notes = await detector.run(sb, 2025, OFFSEASON);
     expect(notes).toHaveLength(1);
     expect(notes[0].severity).toBe('caution');
   });
@@ -191,7 +194,7 @@ describe('regression-risk detector', () => {
     // Elite shooters genuinely do beat xG repeatedly. Copy that ignores this
     // is a horoscope, so the note must acknowledge the skill side.
     const sb = makeSupabase({ player_directory: directory(1), player_season_stats: [row()] });
-    const [note] = await detector.run(sb, 2025);
+    const [note] = await detector.run(sb, 2025, OFFSEASON);
     expect(note.analysis).toMatch(/flag, not a verdict/i);
     expect(note.analysis).toMatch(/elite shooters/i);
   });
@@ -201,7 +204,7 @@ describe('regression-risk detector', () => {
       player_directory: directory(1),
       player_season_stats: [row({ goals: 8, x_goals: 3 })],
     });
-    expect(await detector.run(sb, 2025)).toHaveLength(0);
+    expect(await detector.run(sb, 2025, OFFSEASON)).toHaveLength(0);
   });
 });
 
@@ -224,7 +227,7 @@ describe('usage-surge detector', () => {
       player_directory: directory(1),
       player_season_stats: [mk(2025, 1000, 18), mk(2024, 1000, 15)],
     });
-    const notes = await detector.run(sb, 2025);
+    const notes = await detector.run(sb, 2025, OFFSEASON);
     expect(notes).toHaveLength(1);
     expect(notes[0].headline).toContain('3');
   });
@@ -234,7 +237,7 @@ describe('usage-surge detector', () => {
       player_directory: directory(1),
       player_season_stats: [mk(2025, 1000, 16), mk(2024, 1000, 15)],
     });
-    expect(await detector.run(sb, 2025)).toHaveLength(0);
+    expect(await detector.run(sb, 2025, OFFSEASON)).toHaveLength(0);
   });
 
   it('does NOT fire without a prior season to compare against', async () => {
@@ -242,7 +245,7 @@ describe('usage-surge detector', () => {
       player_directory: directory(1),
       player_season_stats: [mk(2025, 1000, 22)],
     });
-    expect(await detector.run(sb, 2025)).toHaveLength(0);
+    expect(await detector.run(sb, 2025, OFFSEASON)).toHaveLength(0);
   });
 });
 
@@ -513,7 +516,7 @@ describe('note shape', () => {
         },
       ],
     });
-    const [note] = (await detector.run(sb, 2025)) as GeneratedNote[];
+    const [note] = (await detector.run(sb, 2025, OFFSEASON)) as GeneratedNote[];
     expect(note.dedupeKey).toBe('bounce-back:2025:1000');
     expect(note.headline.length).toBeGreaterThan(0);
     expect(note.body.length).toBeGreaterThan(0);
