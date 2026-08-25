@@ -75,6 +75,7 @@ import {
 import { startUwsServer, type UwsServerHandle } from './uws-server';
 import { createDraftInitializedPredicate } from './joinPathPrecheck';
 import { LobbyRegistry, type LobbyConfig } from './LobbyRegistry';
+import { OrphanedDraftScanner } from './orphanedDraftScanner';
 import { DraftServiceV2 } from '../services/DraftServiceV2';
 import { supabaseAdmin } from '../lib/supabase';
 import {
@@ -683,6 +684,27 @@ lobbyRegistry.startIdleEvictionTimer();
 // env, or opts; 0 disables. Tests disable via vitest setup.
 lobbyRegistry.startClockLivenessScanner();
 
+// Chunk 11g.9 (2026-08-24): start the orphaned-draft scanner — the
+// in-server replacement for the pgmq `safety_net` autopick path.
+//
+// performBootScan covers engine restart (once, at startup) and
+// startClockLivenessScanner covers stalled clocks on IN-REGISTRY
+// lobbies. Neither covers an in_progress league whose lobby left the
+// registry mid-run (idle eviction with no connected clients), whose
+// clock then stops until a client reconnects. That gap is what
+// draft_deadline_sweep's pgmq `safety_net` message was filling, and
+// this scanner replaces it — by reinstating the LOBBY only, never by
+// making a pick, so autopick keeps exactly one implementation.
+//
+// Config: ORPHAN_SCAN_MS / ORPHAN_SCAN_GRACE_MS env; 0 disables.
+const orphanedDraftScanner = new OrphanedDraftScanner({
+  registry: lobbyRegistry,
+  supabaseAdmin,
+});
+if (process.env.EVENT_SUBSCRIPTION_DISABLED !== '1') {
+  orphanedDraftScanner.start();
+}
+
 // ENGINE-EAR v3 Slice 1 item 2 (E106, 2026-08-11): BOOT-SCAN
 // resumes in_progress + paused leagues on engine startup.
 //
@@ -893,6 +915,10 @@ function shutdown(signal: string) {
   // that's already being torn down. Same pattern as the idle-eviction
   // stop above.
   lobbyRegistry.stopClockLivenessScanner();
+  // Stop the orphan scanner BEFORE lobbies are torn down, so a late
+  // scan cannot re-adopt a lobby that is already closing (same
+  // ordering requirement as the clock-liveness scanner above).
+  orphanedDraftScanner.stop();
 
   // Chunk 11g.7 sub-step 7e: stop the LISTEN/NOTIFY subscription
   // FIRST so no new external events fire mid-teardown. The .stop()

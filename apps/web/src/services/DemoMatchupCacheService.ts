@@ -1,15 +1,20 @@
 /**
  * DemoMatchupCacheService — Fetches the pre-built demo matchup payload
- * from the demo-matchup-cache Edge Function.
+ * from the API server.
  *
- * Replaces ~16 individual Supabase queries with a single GET request
- * that returns everything the guest Matchup page needs, served from
- * an in-memory edge cache (5-min TTL).
+ * Chunk 11g.9 (2026-08-24): repointed off the `demo-matchup-cache`
+ * Supabase Edge Function and onto `GET /api/demo/matchup`, which is
+ * the same payload builder running in-process on the API server. The
+ * server-side cache is warm and shared (Cloud Run min-instances=1)
+ * rather than per-edge-isolate, so the hit rate is strictly better
+ * than the function it replaces.
  *
- * Scalability: handles 10,000+ concurrent guests without hitting DB.
+ * Response is the standard API envelope `{ data: <payload> }`, so this
+ * unwraps `.data` — the Edge Function returned the payload bare.
  */
 
-const EDGE_FN_PATH = '/functions/v1/demo-matchup-cache';
+import { API_BASE_URL } from '@/api/client';
+const DEMO_MATCHUP_PATH = '/api/demo/matchup';
 
 export interface DemoMatchupPayload {
   league: any;
@@ -47,30 +52,23 @@ export const DemoMatchupCacheService = {
       return clientCache.data;
     }
 
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !anonKey) {
-      throw new Error('Missing Supabase environment variables');
-    }
-
     const params = week !== undefined ? `?week=${week}` : '';
-    const url = `${supabaseUrl}${EDGE_FN_PATH}${params}`;
+    const url = `${API_BASE_URL}${DEMO_MATCHUP_PATH}${params}`;
 
+    // Deliberately a bare fetch, not apiClient: this is the guest path
+    // and must never attach or refresh an auth session.
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'apikey': anonKey,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
     });
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`Demo cache fetch failed (${response.status}): ${body}`);
+      throw new Error(`Demo payload fetch failed (${response.status}): ${body}`);
     }
 
-    const data: DemoMatchupPayload = await response.json();
+    const envelope = await response.json();
+    const data: DemoMatchupPayload = envelope?.data ?? envelope;
 
     // Update client cache
     clientCache = { week: data.week, data, fetchedAt: Date.now() };

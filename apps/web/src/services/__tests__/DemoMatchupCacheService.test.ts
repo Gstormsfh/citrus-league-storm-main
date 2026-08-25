@@ -60,20 +60,19 @@ describe('DemoMatchupCacheService', () => {
   // getPayload
   // ---------------------------------------------------------------------------
   describe('getPayload', () => {
-    it('fetches from edge function with correct URL and headers', async () => {
+    it('fetches from the API server with correct URL and headers', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(mockPayload),
+        json: () => Promise.resolve({ data: mockPayload }),
       });
 
       const result = await DemoMatchupCacheService.getPayload();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://test.supabase.co/functions/v1/demo-matchup-cache',
+        '/api/demo/matchup',
         {
           method: 'GET',
           headers: {
-            apikey: 'test-anon-key',
             'Content-Type': 'application/json',
           },
         }
@@ -84,13 +83,13 @@ describe('DemoMatchupCacheService', () => {
     it('appends week query parameter when provided', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ ...mockPayload, week: 5 }),
+        json: () => Promise.resolve({ data: { ...mockPayload, week: 5 } }),
       });
 
       await DemoMatchupCacheService.getPayload(5);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://test.supabase.co/functions/v1/demo-matchup-cache?week=5',
+        '/api/demo/matchup?week=5',
         expect.any(Object)
       );
     });
@@ -98,7 +97,7 @@ describe('DemoMatchupCacheService', () => {
     it('returns cached data on subsequent calls within TTL', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(mockPayload),
+        json: () => Promise.resolve({ data: mockPayload }),
       });
 
       // First call
@@ -113,7 +112,7 @@ describe('DemoMatchupCacheService', () => {
     it('re-fetches after client cache expires (1 minute)', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(mockPayload),
+        json: () => Promise.resolve({ data: mockPayload }),
       });
 
       // First call
@@ -136,32 +135,44 @@ describe('DemoMatchupCacheService', () => {
       });
 
       await expect(DemoMatchupCacheService.getPayload()).rejects.toThrow(
-        'Demo cache fetch failed (500): Internal Server Error'
+        'Demo payload fetch failed (500): Internal Server Error'
       );
     });
 
-    it('throws when environment variables are missing', async () => {
-      vi.stubEnv('VITE_SUPABASE_URL', '');
-      vi.stubEnv('VITE_SUPABASE_ANON_KEY', '');
+    // Chunk 11g.9: the old 'throws when environment variables are
+    // missing' test is gone with the Edge Function — the service no
+    // longer reads VITE_SUPABASE_* at all, it posts to the API server.
+    // What replaced it is envelope unwrapping, tested here.
+    it('unwraps the { data } API envelope', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: mockPayload }),
+      });
 
-      // Re-import to pick up new env
-      vi.resetModules();
-      const mod = await import('../DemoMatchupCacheService');
+      const result = await DemoMatchupCacheService.getPayload();
+      expect(result).toEqual(mockPayload);
+      expect(result).not.toHaveProperty('data');
+    });
 
-      await expect(mod.DemoMatchupCacheService.getPayload()).rejects.toThrow(
-        'Missing Supabase environment variables'
-      );
+    it('tolerates a bare payload with no envelope', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockPayload),
+      });
+
+      const result = await DemoMatchupCacheService.getPayload();
+      expect(result).toEqual(mockPayload);
     });
 
     it('re-fetches when requested week differs from cached week', async () => {
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
-          json: () => Promise.resolve({ ...mockPayload, week: 1 }),
+          json: () => Promise.resolve({ data: { ...mockPayload, week: 1 } }),
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: () => Promise.resolve({ ...mockPayload, week: 3 }),
+          json: () => Promise.resolve({ data: { ...mockPayload, week: 3 } }),
         });
 
       await DemoMatchupCacheService.getPayload(1);
@@ -178,7 +189,7 @@ describe('DemoMatchupCacheService', () => {
     it('forces re-fetch after cache is cleared', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(mockPayload),
+        json: () => Promise.resolve({ data: mockPayload }),
       });
 
       await DemoMatchupCacheService.getPayload();

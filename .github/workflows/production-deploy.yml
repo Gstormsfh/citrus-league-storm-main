@@ -161,6 +161,13 @@ jobs:
             SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
             SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
             SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+            # Chunk 11g.9: Stormy moved off the Edge Function, so the
+            # Anthropic key has to reach the API server. It must be set
+            # HERE rather than by `gcloud run services update` — this
+            # env_vars block REPLACES the service's environment on every
+            # deploy, so a manually-set var is wiped by the next push
+            # (same failure shape as the scaling flags below).
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
           # ── Cloud Run scaling config ────────────────────────────────
           # These flags MUST stay in sync with ops/cloudrun/service.yaml.
           # The April 10 disaster (LIVE_DRAFT_DISASTER_POSTMORTEM.md §3)
@@ -195,50 +202,13 @@ jobs:
             fi
           fi
 
-  # ── Deploy Supabase edge functions ──────────────────────────────────
-  # Runs in parallel with API + web deploys. The streaming Stormy chat
-  # function lives here. Deploy is a no-op when the secrets aren't set,
-  # so this step is safe to leave in even before secrets are configured.
+  # ── Deploy Supabase Edge Functions — REMOVED (chunk 11g.9) ─────────
+  # This job deployed `stormy-chat` on every push to master. Stormy now
+  # lives at POST /api/stormy/chat on the API server (deploy-api above),
+  # and supabase/functions/stormy-chat no longer exists — leaving the job
+  # in place would fail the deploy on the next push.
   #
-  # To enable: add SUPABASE_ACCESS_TOKEN (Personal Access Token) and
-  # SUPABASE_PROJECT_REF (project ref slug) as repo secrets.
-  deploy-functions:
-    name: Deploy Supabase Edge Functions
-    needs: gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: production
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Check Supabase credentials
-        id: check-supa
-        run: |
-          if [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_PROJECT_REF" ]; then
-            echo "has_creds=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_creds=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping edge function deploy — set SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF secrets to enable"
-          fi
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-
-      - name: Install Supabase CLI
-        if: steps.check-supa.outputs.has_creds == 'true'
-        run: |
-          curl -L https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz \
-            | sudo tar xz -C /usr/local/bin
-
-      - name: Deploy stormy-chat function
-        if: steps.check-supa.outputs.has_creds == 'true'
-        run: |
-          supabase functions deploy stormy-chat \
-            --project-ref "$SUPABASE_PROJECT_REF" \
-            --no-verify-jwt
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+  # Nothing replaces this job: there are no Edge Functions left to deploy.
 
   # ── Deploy frontend to Firebase Hosting ─────────────────────────────
   deploy:

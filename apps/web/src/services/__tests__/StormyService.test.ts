@@ -26,6 +26,48 @@ const mockFunctionsInvoke = vi.fn().mockResolvedValue({
 
 const mockFrom = vi.fn(() => createChainMock());
 
+// Chunk 11g.9 (2026-08-24): Stormy moved off the `stormy-chat` Edge
+// Function and onto POST /api/stormy/chat, so sendMessage is mocked at
+// the apiClient boundary now, not at supabase.functions.invoke.
+//
+// ApiError must be a real class here — StormyService branches on
+// `err instanceof ApiError` to decide whether to surface the server's
+// user-facing rate-limit copy or rethrow.
+//
+// Both live inside vi.hoisted() because vi.mock factories are hoisted
+// to the top of the module: a plain `class MockApiError` declaration
+// below would be in the temporal dead zone when the factory runs.
+const { MockApiError, mockApiPost } = vi.hoisted(() => {
+  class MockApiError extends Error {
+    status: number;
+    data: unknown;
+    constructor(message: string, status: number, data?: unknown) {
+      super(message);
+      this.name = 'ApiError';
+      this.status = status;
+      this.data = data;
+    }
+  }
+  return {
+    MockApiError,
+    mockApiPost: vi.fn().mockResolvedValue({
+      data: { response: 'Stormy says hello!' },
+    }),
+  };
+});
+
+vi.mock('@/api/client', () => ({
+  API_BASE_URL: '',
+  ApiError: MockApiError,
+  apiClient: {
+    get: vi.fn(),
+    post: (...args: unknown[]) => mockApiPost(...args),
+    put: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
+
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
@@ -88,9 +130,8 @@ describe('StormyService', () => {
     vi.clearAllMocks();
     mockFrom.mockImplementation(() => createChainMock());
     mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-user-1' } } });
-    mockFunctionsInvoke.mockResolvedValue({
+    mockApiPost.mockResolvedValue({
       data: { response: 'Stormy says hello!' },
-      error: null,
     });
   });
 
@@ -98,7 +139,7 @@ describe('StormyService', () => {
   // sendMessage
   // ---------------------------------------------------------------------------
   describe('sendMessage', () => {
-    it('calls edge function with message and history', async () => {
+    it('calls POST /api/stormy/chat with message and history', async () => {
       const history: StormyMessage[] = [
         { role: 'user', content: 'Who should I start?' },
         { role: 'assistant', content: 'Check your lineup.' },
@@ -106,15 +147,13 @@ describe('StormyService', () => {
 
       const result = await StormyService.sendMessage('What about my goalie?', history);
 
-      expect(mockFunctionsInvoke).toHaveBeenCalledWith('stormy-chat', {
-        body: {
-          message: 'What about my goalie?',
-          conversationHistory: [
-            { role: 'user', content: 'Who should I start?' },
-            { role: 'assistant', content: 'Check your lineup.' },
-          ],
-          context: '',
-        },
+      expect(mockApiPost).toHaveBeenCalledWith('/api/stormy/chat', {
+        message: 'What about my goalie?',
+        conversationHistory: [
+          { role: 'user', content: 'Who should I start?' },
+          { role: 'assistant', content: 'Check your lineup.' },
+        ],
+        context: '',
       });
       expect(result.response).toBe('Stormy says hello!');
       expect(result.error).toBeUndefined();
@@ -129,17 +168,18 @@ describe('StormyService', () => {
 
       await StormyService.sendMessage('Help me', [], context);
 
-      const call = mockFunctionsInvoke.mock.calls[0];
-      expect(call[1].body.context).toContain('Page: matchup');
-      expect(call[1].body.context).toContain('League: Test League');
-      expect(call[1].body.context).toContain("User's team: My Team");
+      const call = mockApiPost.mock.calls[0];
+      expect(call[1].context).toContain('Page: matchup');
+      expect(call[1].context).toContain('League: Test League');
+      expect(call[1].context).toContain("User's team: My Team");
     });
 
-    it('returns error from edge function data.error', async () => {
-      mockFunctionsInvoke.mockResolvedValue({
-        data: { error: 'Rate limit exceeded' },
-        error: null,
-      });
+    it('surfaces the server rate-limit message from a 429', async () => {
+      mockApiPost.mockRejectedValue(
+        new MockApiError('API request failed with status 429', 429, {
+          error: { code: 'RATE_LIMITED', message: 'Rate limit exceeded' },
+        }),
+      );
 
       const result = await StormyService.sendMessage('Hello', []);
 
@@ -147,20 +187,19 @@ describe('StormyService', () => {
       expect(result.error).toBe('Rate limit exceeded');
     });
 
-    it('returns error when edge function invocation fails', async () => {
-      mockFunctionsInvoke.mockResolvedValue({
-        data: null,
-        error: { message: 'Edge function unreachable' },
-      });
+    it('falls back to the ApiError message when no envelope error is present', async () => {
+      mockApiPost.mockRejectedValue(
+        new MockApiError('Stormy is unreachable', 502, undefined),
+      );
 
       const result = await StormyService.sendMessage('Hello', []);
 
       expect(result.response).toBe('');
-      expect(result.error).toBe('Edge function unreachable');
+      expect(result.error).toBe('Stormy is unreachable');
     });
 
     it('catches exceptions and returns error message', async () => {
-      mockFunctionsInvoke.mockRejectedValue(new Error('Network timeout'));
+      mockApiPost.mockRejectedValue(new Error('Network timeout'));
 
       const result = await StormyService.sendMessage('Hello', []);
 
@@ -169,7 +208,7 @@ describe('StormyService', () => {
     });
 
     it('returns usage data when available', async () => {
-      mockFunctionsInvoke.mockResolvedValue({
+      mockApiPost.mockResolvedValue({
         data: {
           response: 'Answer here',
           usage: {
@@ -207,6 +246,17 @@ describe('StormyService', () => {
           functions: {
             invoke: (...args: unknown[]) => mockFunctionsInvoke(...args),
           },
+        },
+      }));
+      vi.doMock('@/api/client', () => ({
+        API_BASE_URL: '',
+        ApiError: MockApiError,
+        apiClient: {
+          get: vi.fn(),
+          post: (...args: unknown[]) => mockApiPost(...args),
+          put: vi.fn(),
+          patch: vi.fn(),
+          delete: vi.fn(),
         },
       }));
       vi.doMock('@/utils/logger', () => ({
@@ -257,8 +307,8 @@ describe('StormyService', () => {
 
       await StormyService.sendMessage('test', [], context);
 
-      const call = mockFunctionsInvoke.mock.calls[0];
-      const contextStr = call[1].body.context;
+      const call = mockApiPost.mock.calls[0];
+      const contextStr = call[1].context;
       expect(contextStr).toContain('Page: roster');
       expect(contextStr).toContain('League scoring: G:3 A:2');
       expect(contextStr).toContain('=== YOUR DRAFTED ROSTER ===');
