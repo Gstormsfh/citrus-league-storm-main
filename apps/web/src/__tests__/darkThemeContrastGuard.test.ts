@@ -149,12 +149,18 @@ describe('dark-theme contrast guard', () => {
     const offenders: string[] = [];
     for (const f of FILES.filter(inScope)) {
       const src = code(readFileSync(f, 'utf8'));
-      for (const m of src.matchAll(/\bbg-white\/(\d{1,3})\b/g)) {
-        const a = Number(m[1]);
+      // `bg-white/NN` AND gradient stops. A stop lands the same mid-grey on
+      // the page as a flat fill does — `via-white/50` inside a
+      // `bg-gradient-to-br` paints the dead zone straight down the middle of
+      // the element. The original regex only knew about `bg-`, which is how
+      // HockeyPlayerCard's projection bar shipped the exact surface this
+      // guard's own comment describes (found 2026-08-24, roster audit).
+      for (const m of src.matchAll(/\b(bg|from|via|to)-white\/(\d{1,3})\b/g)) {
+        const a = Number(m[2]);
         // /85+ is a deliberate near-opaque LIGHT surface (the cookie
         // banner, the hover state of a solid white button) and carries
         // its own dark text — it is out of the mid-grey dead zone.
-        if (a >= 40 && a < 85) offenders.push(`${REL(f)}: bg-white/${a}`);
+        if (a >= 40 && a < 85) offenders.push(`${REL(f)}: ${m[1]}-white/${a}`);
       }
     }
     expect(offenders, `mid-grey dead-zone surfaces:\n${offenders.join('\n')}`).toEqual([]);

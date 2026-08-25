@@ -1993,6 +1993,23 @@ const Roster = () => {
     };
   }, [roster, projectionsByDate, dailyStatsByDateMap, gameStatusMap, selectedDate, profile?.timezone]);
 
+  /**
+   * Are the daily projections for the selected date actually loaded?
+   *
+   * `displayRoster` treats "no projection row" as "no game" — correct once
+   * the fetch has landed, catastrophic before it. With no entry for the
+   * date, EVERY player enriches to { nextGame: undefined, projectedPoints: 0 },
+   * which makes Auto Lineup's sort a no-op over an all-equal list: Array.sort
+   * is stable, so the existing lineup survives untouched and the button
+   * silently does nothing while reporting success.
+   *
+   * Gate the button on this rather than letting it run against a blank slate.
+   */
+  const projectionsReadyForSelectedDate = useMemo(
+    () => projectionsByDate.has(selectedDate || getTodayMST()),
+    [projectionsByDate, selectedDate],
+  );
+
   // Load CitrusPuck Analytics
   useEffect(() => {
     // Only load if roster is loaded and not already loaded
@@ -2260,17 +2277,55 @@ const Roster = () => {
   }, [searchParams, loading, userTeamId]);
 
   const handleAutoLineup = () => {
+    // Refuse to run against unloaded projections rather than no-op silently.
+    if (!projectionsReadyForSelectedDate) {
+      toast({
+        title: 'Projections still loading',
+        description: "Give it a second — optimizing now would keep your current lineup.",
+      });
+      return;
+    }
+
+    // THE ENRICHMENT LIVES IN `displayRoster`, NOT IN `roster` STATE.
+    //
+    // `roster` is the structural source of truth; `displayRoster` is a
+    // useMemo that layers on the selected date's projections and game info
+    // at render time and never writes back. So `prev.starters` / `prev.bench`
+    // carry `projectedPoints: 0` for EVERY player (set in loadRoster, never
+    // updated) and a `nextGame` that reflects page-load time rather than the
+    // selected date.
+    //
+    // Sorting `prev` therefore compared 0 against 0 on every pair, and the
+    // games-today check only worked by accident on the load date. Stable sort
+    // + all-equal comparator = the lineup never changed. That is the
+    // "center with a game stays benched" bug.
+    //
+    // Fix: read both sort keys off the enriched view, keyed by player id.
+    const enrichedById = new Map<string | number, HockeyPlayer>();
+    for (const p of [...displayRoster.starters, ...displayRoster.bench]) {
+      enrichedById.set(p.id, p);
+    }
+    const enriched = (p: HockeyPlayer): HockeyPlayer => enrichedById.get(p.id) ?? p;
+
+    /** Explicit boolean — `nextGame.isToday` is tri-state (true/false/undefined). */
+    const hasGameToday = (p: HockeyPlayer): boolean =>
+      enriched(p).nextGame?.isToday === true;
+
+    const projectedFor = (p: HockeyPlayer): number =>
+      enriched(p).projectedPoints || 0;
+
     setRoster((prev) => {
       // 1. Gather all active players (exclude IR)
       const allActivePlayers = [...prev.starters, ...prev.bench];
 
-      // 2. Helper to sort players: Games Today > Projected Points
+      // 2. Sort: a player with a game ALWAYS outranks one without, whatever
+      //    the projections say. Projections only break ties inside a group.
       const sortBestPlayers = (players: HockeyPlayer[]) => {
         return [...players].sort((a, b) => {
-          if (a.nextGame?.isToday !== b.nextGame?.isToday) {
-            return a.nextGame?.isToday ? -1 : 1;
-          }
-          return (b.projectedPoints || 0) - (a.projectedPoints || 0);
+          const aPlays = hasGameToday(a);
+          const bPlays = hasGameToday(b);
+          if (aPlays !== bPlays) return aPlays ? -1 : 1;
+          return projectedFor(b) - projectedFor(a);
         });
       };
 
@@ -2391,8 +2446,8 @@ const Roster = () => {
     });
 
     toast({
-      title: "Lineup Optimized",
-      description: "Best players set based on today's games and projections.",
+      title: 'Lineup Optimized',
+      description: "Players with games start first, ranked by projection.",
     });
   };
 
@@ -3060,7 +3115,13 @@ const Roster = () => {
                   <Button
                     onClick={handleAutoLineup}
                     variant="outline"
-                    className="flex gap-2 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold"
+                    disabled={!projectionsReadyForSelectedDate}
+                    title={
+                      projectionsReadyForSelectedDate
+                        ? 'Set the best lineup for this date'
+                        : 'Loading projections for this date…'
+                    }
+                    className="flex gap-2 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Wand2 className="w-4 h-4" aria-hidden="true" />
                     Auto Lineup

@@ -535,7 +535,7 @@ const HockeyPlayerCardContent = ({
       </div>
 
       {/* Projected Points / Game Bar - VARSITY SCOREBOARD STYLE */}
-      <div className="relative px-2 pb-2 pt-1.5 bg-gradient-to-br from-pastel-sage/15 via-white/50 to-pastel-sage/10 flex flex-col justify-center gap-1.5 border-t-2 border-pastel-sage/40 min-h-[32px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-pastel-sage before:to-transparent before:opacity-60">
+      <div className="relative px-2 pb-2 pt-1.5 bg-gradient-to-br from-pastel-sage/18 via-pastel-sage/28 to-pastel-sage/12 flex flex-col justify-center gap-1.5 border-t-2 border-pastel-sage/40 min-h-[32px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-pastel-sage before:to-transparent before:opacity-60">
         <div className="flex items-center justify-between h-3.5">
           <div className="flex items-center gap-1.5">
             {hasGameOnSelectedDate ? (

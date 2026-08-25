@@ -158,7 +158,7 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
           </div>
 
           {/* ─── Cap Hit Section ─── */}
-          <div className="px-2 md:px-2.5 py-1.5 md:py-2 border-t-2 border-citrus-sage/20 bg-gradient-to-br from-white/60 to-citrus-cream/30">
+          <div className="px-2 md:px-2.5 py-1.5 md:py-2 border-t-2 border-citrus-sage/20 bg-gradient-to-br from-citrus-cream/45 to-citrus-cream/25">
             {/* Cap hit + Status badge */}
             <div className="flex items-baseline justify-between gap-1">
               <span className="font-varsity text-xs md:text-base text-pastel-cream leading-none tracking-tight">
