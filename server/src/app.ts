@@ -70,6 +70,26 @@ const corsOrigins: string[] = [
   'https://www.citrusfantasysports.com',
   'https://citrus-fantasy-staging.web.app',
   'https://citrus-fantasy-staging.firebaseapp.com',
+  // ── Native shell (2026-08-25, pre-TestFlight) ──────────────────────
+  // The iOS Capacitor build is NOT served from any of the domains above.
+  // WKWebView loads it from a custom scheme — capacitor://localhost by
+  // default, which is what capacitor.config.json resolves to since it sets
+  // no server.hostname or iosScheme — and every /api call from the app is
+  // therefore cross-origin. Without these entries the TestFlight build
+  // reaches the API and is refused by CORS on every request: no 404, no
+  // useful error, just a dead app on device.
+  //
+  // This is the CORS half of the problem nativeApiOriginGuard.test.ts
+  // solves the URL half of. That guard stops relative /api fetches, which
+  // fixed the request TARGET; this fixes whether the server will answer.
+  //
+  // Custom schemes only. A page in a normal browser cannot claim an Origin
+  // of capacitor:// or ionic://, so these do not widen the web surface.
+  // Android's shell uses http(s)://localhost and is deliberately NOT added
+  // here — that origin IS reachable from an ordinary local page, so it
+  // should be a considered decision when Android ships, not a freebie now.
+  'capacitor://localhost',
+  'ionic://localhost',
 ];
 if (!isProduction) {
   corsOrigins.push('http://localhost:8080', 'http://localhost:5173');
