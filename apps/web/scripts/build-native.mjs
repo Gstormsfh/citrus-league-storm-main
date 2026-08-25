@@ -37,8 +37,36 @@ const fail = (msg) => { console.error('\n✗ NATIVE BUILD REJECTED: ' + msg + '\
 
 if (!/https:\/\/[a-z0-9]+\.supabase\.co/.test(blob))
   fail('no Supabase URL baked into the bundle — env vars were missing at build time (this build white-screens on load).');
-if (!process.env.VITE_API_URL)
-  fail('VITE_API_URL is not set — every API call would fail against capacitor://localhost. Add it to .env.');
+// VITE_API_URL RESOLUTION (fixed 2026-08-25).
+//
+// This used to test `process.env.VITE_API_URL`, which Node only populates from
+// the actual shell environment — it never reads .env files; Vite does that
+// itself and inlines the value at build time. So a correctly configured .env
+// build was rejected with an error instructing you to "Add it to .env", which
+// you already had. The check was looking in the wrong place.
+//
+// Resolve from the shell first, then the .env files Vite itself would load for
+// this mode (staging), and then assert the value actually reached the bundle —
+// which is the only thing that really proves the native build can talk to the
+// API at all.
+const readEnvFile = (file) => {
+  try {
+    return readFileSync(join(process.cwd(), file), 'utf8');
+  } catch {
+    return '';
+  }
+};
+const apiUrl =
+  process.env.VITE_API_URL ||
+  ['.env.staging.local', '.env.staging', '.env.local', '.env']
+    .map((f) => readEnvFile(f).match(/^\s*VITE_API_URL\s*=\s*(.+?)\s*$/m)?.[1])
+    .find(Boolean) ||
+  '';
+
+if (!apiUrl)
+  fail('VITE_API_URL is not set — every API call would fail against capacitor://localhost. Set it in apps/web/.env.');
+if (!blob.includes(apiUrl.replace(/\/+$/, '')))
+  fail(`VITE_API_URL (${apiUrl}) never made it into the bundle — the build did not pick up your env. Every API call would fail on device.`);
 if (indexHtml.includes('adsbygoogle'))
   fail('AdSense loader survived into the native build — the VITE_NATIVE strip did not run.');
 
