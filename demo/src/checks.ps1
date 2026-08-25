@@ -88,17 +88,55 @@ else {
   & node -e "import('playwright').then(function(){process.exit(0)},function(){process.exit(1)})" 2>$null | Out-Null
   if ($LASTEXITCODE -eq 0) { $pwHere = $true }
 }
+# `& npm install ...` from PowerShell goes through npm's own npm.ps1 shim,
+# which on some Node builds mangles the arguments and hands npm the string
+# "pm" as the command. cmd.exe uses npm.cmd instead and is not subject to
+# it. Everywhere else, call the executable with a real argument array.
+#
+# The output is piped to Write-Host on purpose: a PowerShell function
+# returns everything written to the output stream, so a bare call would
+# make this hand back npm's entire log AND the exit code as one array,
+# and "$code -ne 0" would then be comparing an array to a number.
+#
+# And it is NOT called Npm. PowerShell resolves a command name to a
+# function before an executable, and the match is case-insensitive, so a
+# helper called Npm turns `& $exe` into a call to itself the moment $exe
+# is "npm". It recursed once, ran /usr/bin/install with the leftovers,
+# and reported that npm had failed.
+$onWindows = $true
+if ($PSVersionTable.PSVersion.Major -ge 6) { $onWindows = $IsWindows }
+function RunTool($exe, $rest) {
+  if ($onWindows) {
+    & cmd /c ($exe + ' ' + ($rest -join ' ')) 2>&1 |
+      ForEach-Object { Write-Host ('      ' + $_) -ForegroundColor DarkGray }
+  } else {
+    & $exe @rest 2>&1 |
+      ForEach-Object { Write-Host ('      ' + $_) -ForegroundColor DarkGray }
+  }
+  return $LASTEXITCODE
+}
+
 if (-not $pwHere) {
   Say "playwright is not installed here. Fetching it (this takes a minute)." Yellow
-  & npm install --no-package-lock playwright
-  if ($LASTEXITCODE -ne 0) { Say "npm install failed" Red; exit 1 }
+  $code = RunTool 'npm' @('install', '--no-package-lock', 'playwright')
+  # npm's exit code is not always the truth; look for the thing itself
+  if (-not (Test-Path $pwRoot)) {
+    Say ("  npm could not install playwright here (exit " + $code + "). By hand,") Red
+    Say "  from this folder:" Red
+    Say '    cmd /c "npm install --no-package-lock playwright"' Red
+    Say '    cmd /c "npx playwright install chromium"' Red
+    Say "  Then run this script again. Nothing else is wrong -- the page is" Red
+    Say "  built and opens fine; only the checks need a headless browser." Red
+    exit 1
+  }
   Say "downloading a Chromium for it (about 150 MB, once)" Yellow
-  & npx playwright install chromium
-  if ($LASTEXITCODE -ne 0) {
-    Say "  Could not fetch the browser. Everything above this line worked --" Red
-    Say "  the page is built and opens fine; it is only the checks that need" Red
-    Say "  a headless Chromium. Usually a proxy or a firewall. Retry with:" Red
-    Say "    npx playwright install chromium" Red
+  $code = RunTool 'npx' @('playwright', 'install', 'chromium')
+  if ($code -ne 0) {
+    Say ("  Could not fetch the browser (exit " + $code + "). Everything above") Red
+    Say "  this line worked -- the page is built and opens fine; it is only" Red
+    Say "  the checks that need a headless Chromium. Usually a proxy or a" Red
+    Say "  firewall. Retry with:" Red
+    Say '    cmd /c "npx playwright install chromium"' Red
     exit 1
   }
 }
