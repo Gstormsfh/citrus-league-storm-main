@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { logger, getCurrentSeason } from '@citrus/shared';
+import { logger, getCurrentSeason, getProjectionsSeason } from '@citrus/shared';
 
 /**
  * Citrus News Engine — first-party player notes generated from our own data.
@@ -644,12 +644,194 @@ const pointStreakDetector: Detector = {
   },
 };
 
+
+// ── Detector 8: 2026-27 season outlook ───────────────────────────────
+// The forward-looking counterpart to the retrospective detectors above.
+// Everything else here describes a season that already happened; this is the
+// one that answers "what should I expect next year", which in the offseason
+// is the only question a manager actually has.
+//
+// TWO KINDS OF "POINTS" LIVE IN THIS TABLE AND THEY ARE NOT THE SAME.
+// total_projected_points / avg_points_per_game are FANTASY points from the
+// league scoring engine; projected_goals / projected_assists are real NHL
+// counting stats. McDavid reads 495.0 and 6.11 against 36.8G/89.9A — i.e.
+// 6.11 fantasy points across 81 games, not 495 NHL points. Copy that blurred
+// the two would be transparently wrong to anyone who follows hockey, so the
+// prose always labels the fantasy figures as fantasy.
+//
+// Tiers calibrated on the real 2026 projection set (654 skaters, >=40 games):
+// p90 = 3.96 fantasy PPG, p75 = 3.16, median = 2.45. 62 players clear 4.0,
+// which is about five per team in a 12-team league — a real top tier.
+//
+// Goalies get a different treatment on purpose: their per-game fantasy output
+// is tightly bunched (median 6.81, max 7.62), so rate says almost nothing.
+// Only 15 of 70 project 50+ appearances, and that workload gap is the whole
+// story for a fantasy goalie.
+interface RosProjectionRow {
+  player_id: number;
+  player_name: string | null;
+  team_abbrev: string | null;
+  position: string | null;
+  is_goalie: boolean;
+  games_remaining: number;
+  total_projected_points: number;
+  projected_goals: number;
+  projected_assists: number;
+  projected_sog: number;
+  projected_hits: number;
+  projected_blocks: number;
+  projected_ppp: number;
+  avg_points_per_game: number;
+  projected_wins_ros: number;
+  projected_saves_ros: number;
+  projected_shutouts_ros: number;
+}
+
+const ROS_COLUMNS =
+  'player_id, player_name, team_abbrev, position, is_goalie, games_remaining, ' +
+  'total_projected_points, projected_goals, projected_assists, projected_sog, ' +
+  'projected_hits, projected_blocks, projected_ppp, avg_points_per_game, ' +
+  'projected_wins_ros, projected_saves_ros, projected_shutouts_ros';
+
+/** "2026-27" from 2026. */
+function seasonLabel(season: number): string {
+  return `${season}-${String((season + 1) % 100).padStart(2, '0')}`;
+}
+
+const seasonOutlookDetector: Detector = {
+  kind: 'season-outlook',
+  label: 'Season outlook',
+  phase: 'offseason',
+  async run(supabase, _season, now) {
+    // The season ROS projections DESCRIBE, which in the offseason run-up is
+    // the upcoming one — not getCurrentSeason(), which is still the season
+    // that just finished. This is exactly what getProjectionsSeason exists for.
+    const outlookSeason = getProjectionsSeason(now);
+    const label = seasonLabel(outlookSeason);
+
+    const rows = await fetchAllRows<RosProjectionRow>(
+      () =>
+        supabase
+          .from('player_ros_projections')
+          .select(ROS_COLUMNS)
+          .eq('season', outlookSeason),
+      'season-outlook query',
+    );
+
+    const notes: GeneratedNote[] = [];
+    for (const row of rows) {
+      const name = (row.player_name || '').trim();
+      if (!name) continue;
+      const gp = Number(row.games_remaining) || 0;
+      const surname = lastName(name);
+
+      if (row.is_goalie) {
+        // Workload first: starts are most of a fantasy goalie's value.
+        if (gp < 20) continue;
+        const wins = Number(row.projected_wins_ros) || 0;
+        const saves = Number(row.projected_saves_ros) || 0;
+        const shutouts = Number(row.projected_shutouts_ros) || 0;
+
+        let tier: string;
+        let verdict: string;
+        if (gp >= 55) {
+          tier = 'Clear starter';
+          verdict = `${gp} projected appearances is an undisputed crease. That volume is the single most valuable thing a fantasy goalie offers, and it is what separates the position's first tier from everyone else.`;
+        } else if (gp >= 45) {
+          tier = "Starter's share";
+          verdict = `${gp} projected appearances is a starter's workload with a real backup behind him. Draftable as a number one, but the margin for a cold stretch is thinner than it looks.`;
+        } else if (gp >= 30) {
+          tier = 'Committee crease';
+          verdict = `${gp} projected appearances points at a split crease. Committee goalies win you weeks and lose you months — better as a matchup streamer than a set-and-forget starter.`;
+        } else {
+          tier = 'Backup';
+          verdict = `${gp} projected appearances is backup usage. Worth a look only if the starter ahead of him is fragile or the schedule is unusually heavy.`;
+        }
+
+        notes.push({
+          dedupeKey: `season-outlook:${outlookSeason}:${row.player_id}`,
+          kind: 'season-outlook',
+          playerId: row.player_id,
+          season: outlookSeason,
+          headline: `${label} Outlook: ${tier}`,
+          body:
+            `${name} projects for ${gp} appearances in ${label}, with ${Math.round(wins)} wins and ` +
+            `${Math.round(saves)} saves${shutouts >= 1 ? ` and ${shutouts.toFixed(1)} shutouts` : ''}.`,
+          analysis: verdict,
+          severity: gp >= 45 ? 'positive' : 'info',
+          tags: [`${label} Outlook`, 'Goalie', tier],
+        });
+        continue;
+      }
+
+      if (gp < 40) continue;
+      const fppg = Number(row.avg_points_per_game) || 0;
+      if (fppg <= 0) continue;
+
+      const goals = Number(row.projected_goals) || 0;
+      const assists = Number(row.projected_assists) || 0;
+      const totalFantasy = Number(row.total_projected_points) || 0;
+
+      let tier: string;
+      let verdict: string;
+      if (fppg >= 4.5) {
+        tier = 'Elite fantasy asset';
+        verdict = `A first-round profile. Roughly the top of the projection set, and the kind of player you build a roster around rather than fit into one.`;
+      } else if (fppg >= 4.0) {
+        tier = 'Top-tier starter';
+        verdict = `Only about 60 skaters project at this rate — around five per team in a 12-team league. That is a genuine early-round starter, not a good player who happens to be available.`;
+      } else if (fppg >= 3.15) {
+        tier = 'Weekly starter';
+        verdict = `Comfortably above the median projection. The kind of player you start every week without checking the matchup first.`;
+      } else if (fppg >= 2.45) {
+        tier = 'Depth piece';
+        verdict = `Right around the middle of the projection set. Useful on a bench, worth starting on a heavy schedule week, not someone to reach for.`;
+      } else {
+        tier = 'Streamer';
+        verdict = `Below the median projection. Best used as a schedule-driven streamer than a rostered starter — the value is in the games played, not the rate.`;
+      }
+
+      // Peripherals are the whole case for a lot of otherwise ordinary
+      // players in leagues that count them.
+      const hits = Number(row.projected_hits) || 0;
+      const blocks = Number(row.projected_blocks) || 0;
+      const sog = Number(row.projected_sog) || 0;
+      const ppp = Number(row.projected_ppp) || 0;
+      const extras: string[] = [];
+      if (sog >= 200) extras.push(`${Math.round(sog)} shots`);
+      if (hits + blocks >= 200) extras.push(`${Math.round(hits)} hits and ${Math.round(blocks)} blocks`);
+      if (ppp >= 25) extras.push(`${Math.round(ppp)} power-play points`);
+
+      const extraSentence = extras.length
+        ? ` The projection also has him at ${extras.join(', ')}, which matters more in category leagues than the headline rate does.`
+        : '';
+
+      notes.push({
+        dedupeKey: `season-outlook:${outlookSeason}:${row.player_id}`,
+        kind: 'season-outlook',
+        playerId: row.player_id,
+        season: outlookSeason,
+        headline: `${label} Outlook: ${tier}`,
+        body:
+          `${name} projects for ${Math.round(goals)} goals and ${Math.round(assists)} assists across ` +
+          `${gp} games in ${label} — ${fmt(fppg, 2)} fantasy points per game, ` +
+          `${Math.round(totalFantasy)} on the season.`,
+        analysis: `${verdict}${extraSentence}`,
+        severity: fppg >= 3.15 ? 'positive' : 'info',
+        tags: [`${label} Outlook`, tier],
+      });
+    }
+    return notes;
+  },
+};
+
 export const DETECTORS: Detector[] = [
   // Offseason
   bounceBackDetector,
   regressionRiskDetector,
   usageSurgeDetector,
   goalieWorkloadDetector,
+  seasonOutlookDetector,
   // In-season
   bigGameDetector,
   goalieGemDetector,

@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Search, ShieldAlert } from 'lucide-react';
 import { apiClient } from '@/api/client';
+import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 
 export interface DashboardPlayer {
   id: number;
@@ -146,6 +147,9 @@ function MetricRow({ label, value, children }: { label: string; value: string; c
 }
 
 function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardPlayer; skaters: DashboardPlayer[]; goalies: DashboardPlayer[] }) {
+  // Citrus notes for this player — the season outlook plus any standing
+  // analysis. Fails soft: no notes simply renders nothing.
+  const { notes: citrusNotes } = useCitrusPlayerNotes(player.id);
   const garComponents = [
     { label: 'EV Offense', v: player.gar_evo },
     { label: 'EV Defense', v: player.gar_evd },
@@ -208,6 +212,29 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
           </div>
         ))}
       </div>
+
+      {citrusNotes.length > 0 && (
+        <div className="mt-5">
+          <h3 className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-pastel-orange">
+            <span>Outlook</span>
+            <span className="font-normal normal-case tracking-normal text-muted-foreground">via Citrus</span>
+          </h3>
+          <div className="mt-2 space-y-3">
+            {citrusNotes.map((note) => (
+              <div key={note.id} className="rounded-xl border border-border bg-white/5 px-3 py-2.5">
+                <div className="text-sm font-bold text-pastel-cream">{note.headline}</div>
+                <p className="mt-1 text-[13px] leading-relaxed text-white/70">{note.body}</p>
+                {note.analysis && (
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-white/70">
+                    <span className="font-bold text-pastel-cream">Analysis: </span>
+                    {note.analysis}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!player.is_goalie && (
         <>
