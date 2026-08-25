@@ -3305,7 +3305,11 @@ const Roster = () => {
                   {/* Desktop: grid with tap-to-swap (2026-08-25: no more drag-and-drop anywhere) */}
                   {/* Demo league: read-only (no swap) */}
                   {(() => {
-                    const canEdit = !(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' || (userTeam && isDemoLeague(userTeam.league_id)));
+                    // 'logged-in-no-league' is not checked here on purpose: the
+                    // early return further up this render already handles that
+                    // state, so by this point the only values left are 'guest'
+                    // and 'active-user'. Comparing against it was dead code.
+                    const canEdit = !(userLeagueState === 'guest' || (userTeam && isDemoLeague(userTeam.league_id)));
                     return isMobile ? (
                     <div>
                       {/* Tap-to-swap cancel bar */}

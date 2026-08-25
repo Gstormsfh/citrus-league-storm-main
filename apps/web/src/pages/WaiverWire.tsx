@@ -309,7 +309,14 @@ const WaiverWire = () => {
             ?.waiver_period_hours) ?? 48) * 60 * 60 * 1000;
         const nowMs = Date.now();
         const map = new Map<string, string>();
-        for (const r of (waiverRows ?? []) as Array<{ player_id: number | string; dropped_at: string }>) {
+        // Cast through unknown: player_waiver_status EXISTS in the database
+        // but is absent from src/integrations/supabase/types.ts, which declares
+        // 21 of production's ~130 public tables. Missing a table makes the
+        // client resolve .select() to SelectQueryError<"column 'player_id' does
+        // not exist on 'players'."> and friends, so a direct assertion is
+        // rejected. The query itself is correct and works at runtime; the fix
+        // is regenerating types.ts, not changing this line.
+        for (const r of (waiverRows ?? []) as unknown as Array<{ player_id: number | string; dropped_at: string }>) {
           const droppedMs = new Date(r.dropped_at).getTime();
           if (nowMs - droppedMs < windowMs) {
             map.set(String(r.player_id), new Date(droppedMs + windowMs).toISOString());
