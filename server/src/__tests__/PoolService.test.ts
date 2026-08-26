@@ -10,6 +10,14 @@ vi.mock('../services/LeagueMembershipService', () => ({
   },
 }));
 
+// Mock the admin client the scoring RPCs run on
+const mockRpc = vi.fn();
+vi.mock('../lib/supabase', () => ({
+  getSupabaseAdmin: () => ({ rpc: mockRpc }),
+  createUserClient: vi.fn(),
+  supabaseAdmin: {},
+}));
+
 // Mock ScheduleService
 const mockGetGamesForDateRange = vi.fn().mockResolvedValue({ games: [] });
 vi.mock('../services/ScheduleService', () => ({
@@ -131,131 +139,52 @@ describe('PoolService', () => {
     });
   });
 
-  describe('scorePickemWeek', () => {
-    it('scores picks as correct or incorrect', async () => {
-      const picks = [
-        { id: 'p1', game_id: 'g1', picked_team: 'TOR' },
-        { id: 'p2', game_id: 'g2', picked_team: 'MTL' },
-      ];
-      const selectChain = createChain({ data: picks, error: null });
-      const updateChain = createChain({ error: null });
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return selectChain;
-        return updateChain;
-      });
+  // ── Pool scoring ────────────────────────────────────────────────────
+  //
+  // Scoring no longer accepts results from the caller. Each scorer delegates to a
+  // SECURITY DEFINER RPC that derives its winners from nhl_games, so these tests
+  // assert the delegation contract rather than re-testing win/loss arithmetic
+  // that now lives in the database.
 
-      const result = await service.scorePickemWeek('league-1', 1, [
-        { game_id: 'g1', winning_team: 'TOR' },
-        { game_id: 'g2', winning_team: 'OTT' },
-      ]);
+  describe('pool scoring delegates to the database', () => {
+    const cases: Array<[string, string]> = [
+      ['scorePickemWeek', 'score_pickem_week'],
+      ['scorePickemWeekATS', 'score_pickem_week'],
+      ['scoreSurvivorWeek', 'score_survivor_week'],
+      ['scoreConfidenceWeek', 'score_confidence_week'],
+    ];
 
+    it.each(cases)('%s calls %s with only the league and week', async (method, rpc) => {
+      mockRpc.mockResolvedValueOnce({ data: [{}, {}], error: null });
+      const result = await (service as any)[method]('league-1', 7);
+      expect(mockRpc).toHaveBeenCalledWith(rpc, { p_league_id: 'league-1', p_week_number: 7 });
       expect(result.scored).toBe(2);
     });
 
-    it('skips games not in results', async () => {
-      const picks = [{ id: 'p1', game_id: 'g99', picked_team: 'TOR' }];
-      mockSupabase.from = vi.fn(() => createChain({ data: picks, error: null }));
-
-      const result = await service.scorePickemWeek('league-1', 1, []);
-
-      expect(result.scored).toBe(0);
+    it.each(cases)('%s surfaces an rpc error rather than swallowing it', async (method) => {
+      // supabase-js .rpc() RETURNS its error instead of throwing, so a bare await
+      // would report success on a failed scoring run.
+      mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'permission denied' } });
+      await expect((service as any)[method]('league-1', 7)).rejects.toThrow('permission denied');
     });
 
-    it('marks TIE games as incorrect', async () => {
-      const picks = [{ id: 'p1', game_id: 'g1', picked_team: 'TOR' }];
-      const selectChain = createChain({ data: picks, error: null });
-      const updateChain = createChain({ error: null });
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return selectChain;
-        return updateChain;
-      });
+    it('reports zero scored when the rpc returns no rows', async () => {
+      mockRpc.mockResolvedValueOnce({ data: [], error: null });
+      await expect(service.scoreConfidenceWeek('league-1', 7)).resolves.toEqual({ scored: 0 });
+    });
 
-      const result = await service.scorePickemWeek('league-1', 1, [
-        { game_id: 'g1', winning_team: 'TIE' },
+    it('ignores any result set a caller tries to pass', async () => {
+      mockRpc.mockResolvedValueOnce({ data: [], error: null });
+      await (service as any).scoreConfidenceWeek('league-1', 7, [
+        { game_id: 'g1', winning_team: 'WHATEVER-I-SAY' },
       ]);
-
-      expect(result.scored).toBe(1);
-      expect(updateChain.update).toHaveBeenCalledWith({ is_correct: false });
-    });
-
-    it('throws on fetch error', async () => {
-      mockSupabase.from = vi.fn(() => createChain({ data: null, error: { message: 'DB down' } }));
-
-      await expect(
-        service.scorePickemWeek('league-1', 1, []),
-      ).rejects.toThrow('DB down');
+      expect(mockRpc).toHaveBeenCalledWith('score_confidence_week', {
+        p_league_id: 'league-1',
+        p_week_number: 7,
+      });
     });
   });
 
-  describe('scorePickemWeekATS', () => {
-    it('scores ATS picks using spread', async () => {
-      const picks = [
-        { id: 'p1', game_id: 'g1', picked_team: 'TOR', spread_value: -1.5 },
-      ];
-      const selectChain = createChain({ data: picks, error: null });
-      const updateChain = createChain({ error: null });
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return selectChain;
-        return updateChain;
-      });
-
-      const result = await service.scorePickemWeekATS('league-1', 1, [
-        { game_id: 'g1', home_team: 'TOR', away_team: 'MTL', home_score: 5, away_score: 2, status: 'final' },
-      ]);
-
-      expect(result.scored).toBe(1);
-      // TOR picked, home team, 5 + (-1.5) = 3.5 > 2 = correct
-      expect(updateChain.update).toHaveBeenCalledWith({ is_correct: true });
-    });
-
-    it('marks postponed games as incorrect', async () => {
-      const picks = [
-        { id: 'p1', game_id: 'g1', picked_team: 'TOR', spread_value: 0 },
-      ];
-      const selectChain = createChain({ data: picks, error: null });
-      const updateChain = createChain({ error: null });
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return selectChain;
-        return updateChain;
-      });
-
-      const result = await service.scorePickemWeekATS('league-1', 1, [
-        { game_id: 'g1', home_team: 'TOR', away_team: 'MTL', home_score: 0, away_score: 0, status: 'postponed' },
-      ]);
-
-      expect(result.scored).toBe(1);
-      expect(updateChain.update).toHaveBeenCalledWith({ is_correct: false });
-    });
-
-    it('handles away team pick correctly', async () => {
-      const picks = [
-        { id: 'p1', game_id: 'g1', picked_team: 'MTL', spread_value: 1.5 },
-      ];
-      const selectChain = createChain({ data: picks, error: null });
-      const updateChain = createChain({ error: null });
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return selectChain;
-        return updateChain;
-      });
-
-      await service.scorePickemWeekATS('league-1', 1, [
-        { game_id: 'g1', home_team: 'TOR', away_team: 'MTL', home_score: 3, away_score: 2, status: 'final' },
-      ]);
-
-      // MTL away: 2 + 1.5 = 3.5 > 3 = correct
-      expect(updateChain.update).toHaveBeenCalledWith({ is_correct: true });
-    });
-  });
 
   describe('getPickemStandings', () => {
     it('returns aggregated standings sorted by correct picks', async () => {
@@ -397,40 +326,6 @@ describe('PoolService', () => {
     });
   });
 
-  describe('scoreSurvivorWeek', () => {
-    it('scores survivor selections based on team results', async () => {
-      const selections = [
-        { id: 's1', picked_team: 'TOR' },
-        { id: 's2', picked_team: 'MTL' },
-      ];
-      const selectChain = createChain({ data: selections, error: null });
-      const updateChain = createChain({ error: null });
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return selectChain;
-        return updateChain;
-      });
-
-      const result = await service.scoreSurvivorWeek('league-1', 1, [
-        { team: 'TOR', won: true },
-        { team: 'MTL', won: false },
-      ]);
-
-      expect(result.scored).toBe(2);
-    });
-
-    it('skips teams not in results', async () => {
-      const selections = [{ id: 's1', picked_team: 'VAN' }];
-      mockSupabase.from = vi.fn(() => createChain({ data: selections, error: null }));
-
-      const result = await service.scoreSurvivorWeek('league-1', 1, [
-        { team: 'TOR', won: true },
-      ]);
-
-      expect(result.scored).toBe(0);
-    });
-  });
 
   describe('getSurvivorStandings', () => {
     it('returns standings sorted by active first then by weeks played', async () => {
@@ -590,75 +485,6 @@ describe('PoolService', () => {
     });
   });
 
-  describe('scoreConfidenceWeek', () => {
-    it('awards points for correct picks', async () => {
-      const picks = [
-        { id: 'c1', game_id: 'g1', picked_team: 'TOR', confidence_points: 3 },
-        { id: 'c2', game_id: 'g2', picked_team: 'MTL', confidence_points: 1 },
-      ];
-      const selectChain = createChain({ data: picks, error: null });
-      const updateChain = createChain({ error: null });
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return selectChain;
-        return updateChain;
-      });
-
-      const result = await service.scoreConfidenceWeek('league-1', 1, [
-        { game_id: 'g1', winning_team: 'TOR' },
-        { game_id: 'g2', winning_team: 'OTT' },
-      ]);
-
-      expect(result.scored).toBe(2);
-    });
-
-    it('awards 0 points for incorrect picks', async () => {
-      const picks = [
-        { id: 'c1', game_id: 'g1', picked_team: 'TOR', confidence_points: 5 },
-      ];
-      const selectChain = createChain({ data: picks, error: null });
-      const updateChain = createChain({ error: null });
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return selectChain;
-        return updateChain;
-      });
-
-      await service.scoreConfidenceWeek('league-1', 1, [
-        { game_id: 'g1', winning_team: 'MTL' },
-      ]);
-
-      expect(updateChain.update).toHaveBeenCalledWith({
-        is_correct: false,
-        points_earned: 0,
-      });
-    });
-
-    it('marks TIE as incorrect with 0 points', async () => {
-      const picks = [
-        { id: 'c1', game_id: 'g1', picked_team: 'TOR', confidence_points: 3 },
-      ];
-      const selectChain = createChain({ data: picks, error: null });
-      const updateChain = createChain({ error: null });
-      let callCount = 0;
-      mockSupabase.from = vi.fn(() => {
-        callCount++;
-        if (callCount === 1) return selectChain;
-        return updateChain;
-      });
-
-      await service.scoreConfidenceWeek('league-1', 1, [
-        { game_id: 'g1', winning_team: 'TIE' },
-      ]);
-
-      expect(updateChain.update).toHaveBeenCalledWith({
-        is_correct: false,
-        points_earned: 0,
-      });
-    });
-  });
 
   describe('getConfidenceStandings', () => {
     it('returns standings sorted by total points', async () => {

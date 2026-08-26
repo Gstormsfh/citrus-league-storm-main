@@ -1,8 +1,9 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, SEASON_START_YEAR } from '@citrus/shared';
+import { COLUMNS, SEASON_START_YEAR, getSeasonStartDate } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { ScheduleService } from './ScheduleService';
 import { AppError } from '../lib/errors';
+import { getSupabaseAdmin } from '../lib/supabase';
 
 /**
  * PoolService — Server-side gameplay layer for Pick'em, Survivor, and Confidence pools.
@@ -23,13 +24,36 @@ export class PoolService {
 
   // ── Week Helpers ────────────────────────────────────────────────────
 
+  /**
+   * Sunday on or before the season's first game — the start of pool week 1.
+   *
+   * Was "first Sunday ON OR AFTER October 1". That is only correct when the
+   * season opens in October. The 2026-27 season opens 2026-09-29, so the old
+   * rule placed week 1 at 2026-10-04 and stranded the first five days of the
+   * season — 34 games, including opening night — outside every pool week.
+   *
+   * The SQL side already had this right: get_current_pool_week is documented
+   * "Anchored on the Sunday on or before the season opener" and returns week 1
+   * for 2026-09-27..2026-10-03. This TS layer disagreed with the layer that
+   * actually scores, so the pick'em page would have listed the WRONG GAMES for
+   * week 1 on opening night while the scorer graded the right ones.
+   *
+   * No-op for 2025 (both rules give 2025-10-05).
+   */
+  private getFirstPoolSunday(): Date {
+    const start = getSeasonStartDate(SEASON_START_YEAR);
+    const anchor = start
+      ? new Date(`${start}T00:00:00Z`)
+      : new Date(Date.UTC(SEASON_START_YEAR, 9, 1));
+    const firstSunday = new Date(anchor);
+    firstSunday.setUTCDate(anchor.getUTCDate() - anchor.getUTCDay());
+    firstSunday.setUTCHours(0, 0, 0, 0);
+    return firstSunday;
+  }
+
   /** Get the current NHL week number. */
   getCurrentWeek(): number {
-    const oct1 = new Date(SEASON_START_YEAR, 9, 1);
-    const dayOfWeek = oct1.getDay();
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-    const firstSunday = new Date(oct1);
-    firstSunday.setDate(oct1.getDate() + daysUntilSunday);
+    const firstSunday = this.getFirstPoolSunday();
 
     const now = new Date();
     const diffMs = now.getTime() - firstSunday.getTime();
@@ -39,16 +63,12 @@ export class PoolService {
 
   /** Get week date range (Sunday–Saturday). */
   private getWeekDateRange(weekNumber: number): { start: string; end: string } {
-    const oct1 = new Date(SEASON_START_YEAR, 9, 1);
-    const dayOfWeek = oct1.getDay();
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-    const firstSunday = new Date(oct1);
-    firstSunday.setDate(oct1.getDate() + daysUntilSunday);
+    const firstSunday = this.getFirstPoolSunday();
 
     const start = new Date(firstSunday);
-    start.setDate(firstSunday.getDate() + (weekNumber - 1) * 7);
+    start.setUTCDate(firstSunday.getUTCDate() + (weekNumber - 1) * 7);
     const end = new Date(start);
-    end.setDate(start.getDate() + 6);
+    end.setUTCDate(start.getUTCDate() + 6);
 
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
     return { start: fmt(start), end: fmt(end) };
@@ -67,6 +87,35 @@ export class PoolService {
     if (!game.game_time) return false;
     const gameDateTime = new Date(`${game.game_date}T${game.game_time}`);
     return new Date() >= gameDateTime;
+  }
+
+  /**
+   * Run a pool scoring RPC on the admin client.
+   *
+   * Every pool scorer derives its own winners from `nhl_games` inside the database.
+   * Results are deliberately NOT accepted from the caller. The previous
+   * implementation trusted a client-supplied result set, which let any league member
+   * mark their own losing picks correct. It was also broken for honest callers: it
+   * ran under the caller's RLS context, and the UPDATE policy on these tables is
+   * `user_id = auth.uid()`, so a commissioner scoring the week silently scored only
+   * their own row and left every other manager unscored.
+   *
+   * These RPCs are granted to service_role only, hence the admin client.
+   *
+   * supabase-js `.rpc()` RETURNS its error rather than throwing, so `error` must be
+   * destructured and checked explicitly. A bare await would fail silently.
+   */
+  private async runScoringRpc(
+    fn: 'score_pickem_week' | 'score_survivor_week' | 'score_confidence_week',
+    leagueId: string,
+    weekNumber: number,
+  ): Promise<{ scored: number }> {
+    const { data, error } = await getSupabaseAdmin().rpc(fn, {
+      p_league_id: leagueId,
+      p_week_number: weekNumber,
+    });
+    if (error) throw AppError.internal(`${fn} failed: ${error.message}`);
+    return { scored: Array.isArray(data) ? data.length : 0 };
   }
 
   // ── Pick'em Pool ────────────────────────────────────────────────────
@@ -129,84 +178,19 @@ export class PoolService {
     return data || [];
   }
 
-  /** Score Pick'em picks for a week. */
-  async scorePickemWeek(
-    leagueId: string,
-    weekNumber: number,
-    gameResults: Array<{ game_id: string; winning_team: string }>,
-  ) {
-    const resultMap = new Map(gameResults.map(g => [g.game_id, g.winning_team]));
-
-    const { data: picks, error: fetchErr } = await this.supabase
-      .from('pool_picks')
-      .select('id, game_id, picked_team')
-      .eq('league_id', leagueId)
-      .eq('week_number', weekNumber);
-
-    if (fetchErr) throw AppError.internal(fetchErr.message);
-
-    let scored = 0;
-    for (const pick of (picks ?? [])) {
-      const winner = resultMap.get(pick.game_id);
-      if (winner === undefined) continue;
-
-      const isCorrect = winner !== 'TIE' && winner !== 'POSTPONED' && pick.picked_team === winner;
-
-      await this.supabase
-        .from('pool_picks')
-        .update({ is_correct: isCorrect })
-        .eq('id', pick.id);
-      scored++;
-    }
-    return { scored };
+  /** Score Pick'em picks for a week. Winners come from `nhl_games`, never the caller. */
+  async scorePickemWeek(leagueId: string, weekNumber: number) {
+    return this.runScoringRpc('score_pickem_week', leagueId, weekNumber);
   }
 
-  /** Score Pick'em ATS picks for a week. */
-  async scorePickemWeekATS(
-    leagueId: string,
-    weekNumber: number,
-    gameResults: Array<{
-      game_id: string;
-      home_team: string;
-      away_team: string;
-      home_score: number;
-      away_score: number;
-      status: string;
-    }>,
-  ) {
-    const resultMap = new Map(gameResults.map(g => [g.game_id, g]));
-
-    const { data: picks, error: fetchErr } = await this.supabase
-      .from('pool_picks')
-      .select('id, game_id, picked_team, spread_value')
-      .eq('league_id', leagueId)
-      .eq('week_number', weekNumber);
-
-    if (fetchErr) throw AppError.internal(fetchErr.message);
-
-    let scored = 0;
-    for (const pick of (picks ?? [])) {
-      const game = resultMap.get(pick.game_id);
-      if (!game || game.status === 'postponed') {
-        if (game?.status === 'postponed') {
-          await this.supabase.from('pool_picks').update({ is_correct: false }).eq('id', pick.id);
-          scored++;
-        }
-        continue;
-      }
-
-      const spread = pick.spread_value ?? 0;
-      let isCorrect = false;
-      if (pick.picked_team === game.home_team) {
-        isCorrect = (game.home_score + spread) > game.away_score;
-      } else if (pick.picked_team === game.away_team) {
-        isCorrect = (game.away_score + spread) > game.home_score;
-      }
-
-      await this.supabase.from('pool_picks').update({ is_correct: isCorrect }).eq('id', pick.id);
-      scored++;
-    }
-    return { scored };
+  /**
+   * Score Pick'em ATS picks for a week.
+   *
+   * `score_pickem_week` applies `pool_picks.spread_value` when it is present and
+   * non-zero, so ATS and straight-up share one authoritative implementation.
+   */
+  async scorePickemWeekATS(leagueId: string, weekNumber: number) {
+    return this.runScoringRpc('score_pickem_week', leagueId, weekNumber);
   }
 
   /**
@@ -340,29 +324,8 @@ export class PoolService {
   }
 
   /** Score survivor picks for a week. */
-  async scoreSurvivorWeek(
-    leagueId: string,
-    weekNumber: number,
-    teamResults: Array<{ team: string; won: boolean }>,
-  ) {
-    const resultMap = new Map(teamResults.map(t => [t.team, t.won]));
-
-    const { data: selections, error: fetchErr } = await this.supabase
-      .from('survivor_selections')
-      .select('id, picked_team')
-      .eq('league_id', leagueId)
-      .eq('week_number', weekNumber);
-
-    if (fetchErr) throw AppError.internal(fetchErr.message);
-
-    let scored = 0;
-    for (const sel of (selections ?? [])) {
-      const won = resultMap.get(sel.picked_team);
-      if (won === undefined) continue;
-      await this.supabase.from('survivor_selections').update({ is_correct: won }).eq('id', sel.id);
-      scored++;
-    }
-    return { scored };
+  async scoreSurvivorWeek(leagueId: string, weekNumber: number) {
+    return this.runScoringRpc('score_survivor_week', leagueId, weekNumber);
   }
 
   /** Get survivor standings with elimination status. */
@@ -533,34 +496,8 @@ export class PoolService {
   }
 
   /** Score confidence picks for a week. */
-  async scoreConfidenceWeek(
-    leagueId: string,
-    weekNumber: number,
-    gameResults: Array<{ game_id: string; winning_team: string }>,
-  ) {
-    const resultMap = new Map(gameResults.map(g => [g.game_id, g.winning_team]));
-
-    const { data: picks, error: fetchErr } = await this.supabase
-      .from('confidence_picks')
-      .select('id, game_id, picked_team, confidence_points')
-      .eq('league_id', leagueId)
-      .eq('week_number', weekNumber);
-
-    if (fetchErr) throw AppError.internal(fetchErr.message);
-
-    let scored = 0;
-    for (const pick of (picks ?? [])) {
-      const winner = resultMap.get(pick.game_id);
-      if (winner === undefined) continue;
-      const isCorrect = winner !== 'TIE' && winner !== 'POSTPONED' && pick.picked_team === winner;
-      const pointsEarned = isCorrect ? pick.confidence_points : 0;
-      await this.supabase
-        .from('confidence_picks')
-        .update({ is_correct: isCorrect, points_earned: pointsEarned })
-        .eq('id', pick.id);
-      scored++;
-    }
-    return { scored };
+  async scoreConfidenceWeek(leagueId: string, weekNumber: number) {
+    return this.runScoringRpc('score_confidence_week', leagueId, weekNumber);
   }
 
   /** Get cumulative confidence pool standings. */
