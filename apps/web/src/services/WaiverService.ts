@@ -367,19 +367,52 @@ export class WaiverService {
         players = players.filter(p => p.full_name.toLowerCase().includes(lowerSearch));
       }
 
-      // Sort by name and limit
+      /*
+       * BEST AVAILABLE FIRST, NOT ALPHABETICAL.
+       *
+       * This sorted by name and cut at 50, so the waiver wire opened on
+       * whoever happened to be early in the alphabet and hid everyone after
+       * the fiftieth Aaron. Nobody scans a wire alphabetically.
+       *
+       * The ranking value is each player's own primary counter — points for a
+       * skater, wins for a goalie. That is a heuristic for ORDERING, not a
+       * projection, and it is not displayed as one: the row shows the actual
+       * stat next to the actual position. The precise version is the league's
+       * own scoring applied via ScoringCalculator, which needs the league's
+       * settings threaded into this method; worth doing, bigger than this fix.
+       */
+      const rank = (p: (typeof players)[number]) =>
+        p.position === 'G' ? (p.wins ?? 0) : (p.points ?? 0);
+
       players = players
-        .sort((a, b) => a.full_name.localeCompare(b.full_name))
+        .sort((a, b) => rank(b) - rank(a) || a.full_name.localeCompare(b.full_name))
         .slice(0, 50);
 
-      // Map to the expected format for WaiverWire UI
+      /*
+       * Carry the production through.
+       *
+       * This mapping used to return six identity fields and drop every stat on
+       * the floor, even though `p` is the full player object and the numbers
+       * were already in memory. The waiver wire then rendered a list of names
+       * with nothing to choose between them — a manager had to leave the page
+       * and look each one up. Free: no extra request, same objects.
+       */
       return players.map(p => ({
         player_id: Number(p.id),
         full_name: p.full_name,
         position_code: p.position,
         team_abbrev: p.team,
         jersey_number: p.jersey_number || '',
-        is_goalie: p.position === 'G'
+        is_goalie: p.position === 'G',
+        games_played: p.position === 'G' ? (p.goalie_gp ?? p.games_played ?? 0) : (p.games_played ?? 0),
+        points: p.points ?? 0,
+        goals: p.goals ?? 0,
+        assists: p.assists ?? 0,
+        wins: p.wins ?? null,
+        losses: p.losses ?? null,
+        shutouts: p.shutouts ?? null,
+        save_percentage: p.save_percentage ?? null,
+        goals_against_average: p.goals_against_average ?? null,
       }));
     } catch (error: unknown) {
       logger.error('Error fetching available players:', error);
