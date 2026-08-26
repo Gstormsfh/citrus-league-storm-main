@@ -1,0 +1,17 @@
+# 76 is a MEASUREMENT of this tree on 2026-08-26, not a target inherited from
+# anywhere. It was counted by running `npx tsc --noEmit -p tsconfig.app.json`
+# on master after the citrus-property web merge, and it is the number the
+# ratchet in .github/workflows/ci.yml compares against.
+#
+# The branch this merge came from measured 54, on a tree that also carried its
+# armchair-gm token migration and its own versions of files master has since
+# rewritten. This tree cannot reach 54 by resolving conflicts better: 46 of the
+# 76 live in MatchupService.ts (29) and DraftService.ts (17), and DraftService
+# is not in that branch's diff at all.
+#
+# Progress so far: 151 -> 91 -> 76.
+#
+# LOWER THIS when armchair-gm lands after its visual review -- part of the
+# remaining gap is there. Lowering it is how a win gets locked in; the ratchet
+# only fails when the count RISES.
+76
