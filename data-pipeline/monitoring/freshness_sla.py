@@ -121,14 +121,15 @@ TIER_A: List[FreshnessSLA] = [
         severity=SEVERITY_WARN,
         rationale="Authoritative shift data; downstream of NHL official feed.",
     ),
-    FreshnessSLA(
-        table="player_shifts",
-        timestamp_column="updated_at",
-        in_season_hours=24.0,
-        offseason_hours=168.0,
-        severity=SEVERITY_WARN,
-        rationale="PBP-derived shift inference.",
-    ),
+    # player_shifts was removed from this matrix on 2026-08-26. It was never
+    # shift data: calculate_player_toi.py inferred intervals from the events a
+    # player happened to appear in, and the table reconciled with
+    # player_game_stats.nhl_toi_seconds for 4.0% of player-games. Watching it
+    # for freshness was watching the wrong thing twice over -- it was FRESH and
+    # WRONG from its first row in 2017, and the WARN it did eventually raise
+    # every hour from 4 January onward went to a Slack webhook that is unset.
+    # Correctness now lives in check_data_invariants.py, which fails the build.
+    # player_shifts_official above is the real thing and stays.
     FreshnessSLA(
         table="player_toi_by_situation",
         timestamp_column="updated_at",
