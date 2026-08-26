@@ -42,7 +42,6 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
       { label: 'Features', to: '/features' },
       { label: 'Pricing', to: '/pricing' },
       { label: 'Blog', to: '/blog' },
-      { label: 'Careers', to: '/careers' },
       { label: 'Contact', to: '/contact' },
     ],
   },

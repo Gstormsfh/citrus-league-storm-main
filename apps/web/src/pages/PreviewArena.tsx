@@ -8,7 +8,7 @@ const GAME_MODES = [
     label: 'Fantasy Hockey',
     headline: 'Snake · Auction · Salary',
     body: 'Run any league format with the deepest projections in fantasy hockey.',
-    badge: '47K+ leagues',
+    badge: 'Any format',
     accent: 'orange',
     icon: Trophy,
     seasonal: 'Live now',
@@ -17,7 +17,7 @@ const GAME_MODES = [
     label: 'Hockey Pickem',
     headline: 'Pick the night, every night',
     body: 'Daily NHL pickem — straight up or against the spread, your call.',
-    badge: '23K+ players',
+    badge: 'Every night',
     accent: 'sage',
     icon: Flame,
     seasonal: 'Daily',
@@ -26,7 +26,7 @@ const GAME_MODES = [
     label: 'Survivor Pool',
     headline: "One pick, can't lose",
     body: 'Choose one team a week. Win or you\'re out. Last manager standing wins it all.',
-    badge: '8K+ pools',
+    badge: 'One pick a week',
     accent: 'butter',
     icon: Activity,
     seasonal: 'Weekly',
@@ -35,7 +35,7 @@ const GAME_MODES = [
     label: 'Bracket Mania',
     headline: 'Stanley Cup brackets',
     body: 'Pick the entire playoff bracket. Confidence points multiply your edge.',
-    badge: '14K+ brackets',
+    badge: 'Confidence points',
     accent: 'sage',
     icon: Sparkles,
     seasonal: 'Apr–Jun',
@@ -179,28 +179,11 @@ export default function PreviewArena() {
                 Try a mock draft →
               </Link>
             </div>
-            {/* Social proof */}
-            <div className="flex items-center gap-3">
-              <div className="flex -space-x-2">
-                {['JK', 'AM', 'SD', 'TR', 'MV'].map((init, i) => (
-                  <div
-                    key={init}
-                    className="w-9 h-9 rounded-full bg-pastel-sage/30 ring-2 ring-[#0F1F15] flex items-center justify-center font-jbmono text-[10px] font-bold text-pastel-cream"
-                    style={{ zIndex: 5 - i }}
-                  >
-                    {init}
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div className="font-jbmono text-[11px] tracking-wider uppercase text-pastel-cream font-bold">
-                  47,000+ MANAGERS
-                </div>
-                <div className="font-jbmono text-[10px] text-white/55">
-                  drafting on Citrus this season
-                </div>
-              </div>
-            </div>
+            {/* No social proof until there is proof. The invented
+                "47,000+ MANAGERS drafting on Citrus this season", with a row of
+                invented member avatars, was removed 2026-08-26 — these are
+                public, crawlable, unauthenticated routes, and a fabricated user
+                count is the single worst thing to have on one. */}
           </div>
 
           {/* RIGHT — League dashboard preview (no projections, no fake phone) */}
@@ -355,7 +338,9 @@ export default function PreviewArena() {
                 <span className="absolute inline-flex w-full h-full bg-pastel-orange rounded-full opacity-75 animate-ping" />
                 <span className="relative inline-flex w-1.5 h-1.5 bg-pastel-orange rounded-full" />
               </span>
-              7 Games Tonight · Puck drops at 7pm ET
+              {/* was: "7 Games Tonight · Puck drops at 7pm ET" — a static string
+                  under a live pulse. Removed 2026-08-26. */}
+              Built for the 2026-27 season
             </div>
             <h2 className="font-sans font-black text-[2.5rem] md:text-[3.5rem] leading-[1] tracking-[-0.03em] mb-5 text-pastel-cream">
               Your league is <span className="text-pastel-orange">waiting</span>.
@@ -387,7 +372,7 @@ export default function PreviewArena() {
           {[
             { title: 'Play', links: ['Fantasy Hockey', 'Pickem', 'Survivor', 'Mock Draft'] },
             { title: 'Tools', links: ['Projections', 'Live Scores', 'Stormy AI', 'Trade Analyzer'] },
-            { title: 'Citrus', links: ['About', 'Careers', 'Privacy', 'Terms'] },
+            { title: 'Citrus', links: ['About', 'Privacy', 'Terms'] },
           ].map((col) => (
             <div key={col.title}>
               <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 mb-3 font-bold">

@@ -3,11 +3,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { leagueApi } from '@/api/leagues';
 import Navbar from '@/components/Navbar';
+import { Narwhal } from '@/components/icons/Narwhal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, AlertCircle } from 'lucide-react';
-import { Narwhal } from '@/components/icons/Narwhal';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
 import { ScheduleService } from '@/services/ScheduleService';
@@ -15,35 +15,14 @@ import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import {
   HockeyFooter,
   XGModelIcon,
-  CrossedSticksIcon,
-  PuckIcon,
-  MaskIcon,
-  NetIcon,
   ScoreboardIcon,
   RangeIcon,
-  MascotPortrait,
 } from '@/components/citrus2';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
-
-interface PositionStats {
-  position: string;
-  grade: string;
-  score: number;
-  avgPoints: number;
-  leagueRank: number;
-  description: string;
-  strengths: string[];
-  weaknesses: string[];
-  suggestion?: string;
-  /** Six-week sparkline trend (mock until real data wired) */
-  trend: number[];
-  /** 5-axis radar values 0..100 — Score, Volume, Consistency, Streak, Schedule */
-  radar: { score: number; volume: number; consistency: number; streak: number; schedule: number };
-}
 
 interface FreeAgentRec {
   id: number;
@@ -56,148 +35,6 @@ interface FreeAgentRec {
   rostered: number;
 }
 
-/**
- * Inline 5-axis radar chart — pure SVG, no chart library. Renders the team's
- * profile (filled pastel-orange polygon) over a faint league-avg shape (cream
- * outline). Position-card-sized, ~120px square.
- */
-function PositionRadar({ values, leagueAvg = 60 }: { values: PositionStats['radar']; leagueAvg?: number }) {
-  const labels = [
-    { key: 'score', short: 'PTS' },
-    { key: 'volume', short: 'VOL' },
-    { key: 'consistency', short: 'CON' },
-    { key: 'streak', short: 'STK' },
-    { key: 'schedule', short: 'SCH' },
-  ] as const;
-  const cx = 60;
-  const cy = 60;
-  const radius = 48;
-  // Compute points around a regular pentagon
-  const angleFor = (i: number) => (Math.PI * 2 * i) / labels.length - Math.PI / 2;
-  const teamPoints = labels
-    .map((l, i) => {
-      const v = values[l.key];
-      const r = (v / 100) * radius;
-      const x = cx + r * Math.cos(angleFor(i));
-      const y = cy + r * Math.sin(angleFor(i));
-      return `${x},${y}`;
-    })
-    .join(' ');
-  const avgPoints = labels
-    .map((_, i) => {
-      const r = (leagueAvg / 100) * radius;
-      const x = cx + r * Math.cos(angleFor(i));
-      const y = cy + r * Math.sin(angleFor(i));
-      return `${x},${y}`;
-    })
-    .join(' ');
-  return (
-    <svg viewBox="0 0 120 120" width="120" height="120" className="shrink-0" aria-hidden="true">
-      {/* Concentric reference rings */}
-      {[0.33, 0.66, 1].map((s, i) => (
-        <polygon
-          key={i}
-          points={labels
-            .map((_, idx) => {
-              const r = s * radius;
-              const x = cx + r * Math.cos(angleFor(idx));
-              const y = cy + r * Math.sin(angleFor(idx));
-              return `${x},${y}`;
-            })
-            .join(' ')}
-          fill="none"
-          stroke="rgba(255,255,255,0.08)"
-          strokeWidth="1"
-        />
-      ))}
-      {/* Spokes */}
-      {labels.map((_, i) => {
-        const x = cx + radius * Math.cos(angleFor(i));
-        const y = cy + radius * Math.sin(angleFor(i));
-        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />;
-      })}
-      {/* League avg outline */}
-      <polygon
-        points={avgPoints}
-        fill="rgba(255,234,205,0.05)"
-        stroke="rgba(255,234,205,0.45)"
-        strokeWidth="1"
-        strokeDasharray="2 3"
-      />
-      {/* Team polygon */}
-      <polygon
-        points={teamPoints}
-        fill="rgba(255,168,87,0.30)"
-        stroke="#FFA857"
-        strokeWidth="1.5"
-      />
-      {/* Labels */}
-      {labels.map((l, i) => {
-        const r = radius + 10;
-        const x = cx + r * Math.cos(angleFor(i));
-        const y = cy + r * Math.sin(angleFor(i));
-        return (
-          <text
-            key={l.key}
-            x={x}
-            y={y}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fontFamily="JetBrains Mono, monospace"
-            fontSize="7"
-            fontWeight="700"
-            fill="rgba(255,255,255,0.55)"
-            letterSpacing="1.5"
-          >
-            {l.short}
-          </text>
-        );
-      })}
-    </svg>
-  );
-}
-
-/**
- * Inline 6-week sparkline — pure SVG. Shows trajectory color-coded by trend
- * direction (sage = up, red-300 = down, white/55 = flat).
- */
-function Sparkline({ values, height = 32 }: { values: number[]; height?: number }) {
-  if (values.length < 2) return null;
-  const w = 120;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = Math.max(1, max - min);
-  const step = w / (values.length - 1);
-  const path = values
-    .map((v, i) => {
-      const x = i * step;
-      const y = height - ((v - min) / range) * (height - 4) - 2;
-      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
-    .join(' ');
-  // Trend tone: compare last value to first
-  const delta = values[values.length - 1] - values[0];
-  const stroke = delta > 1 ? '#A6D3A0' : delta < -1 ? '#FCA5A5' : 'rgba(255,255,255,0.45)';
-  return (
-    <svg viewBox={`0 0 ${w} ${height}`} width={w} height={height} className="shrink-0" aria-hidden="true">
-      <path d={path} fill="none" stroke={stroke} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-      {/* Last point dot */}
-      <circle
-        cx={(values.length - 1) * step}
-        cy={height - ((values[values.length - 1] - min) / range) * (height - 4) - 2}
-        r="2.25"
-        fill={stroke}
-      />
-    </svg>
-  );
-}
-
-const POSITION_ICONS: Record<string, React.ElementType> = {
-  Centers: CrossedSticksIcon,
-  Wingers: PuckIcon,
-  Defense: NetIcon,
-  Goalies: MaskIcon,
-};
 
 const TeamAnalytics = () => {
   const { user } = useAuth();
@@ -328,77 +165,25 @@ const TeamAnalytics = () => {
     return <Navigate to={getPoolRoute(_poolType!, activeLeagueId)} replace />;
   }
 
-  // Mock Analysis Data — augmented with sparkline trend and 5-axis radar so
-  // each positional card actually shows real visualization rather than just
-  // a single Progress bar. Real data plumbs in via a future analytics API.
-  const positionalAnalysis: PositionStats[] = [
-    {
-      position: "Centers",
-      grade: "A+",
-      score: 98,
-      avgPoints: 14.2,
-      leagueRank: 1,
-      description: "Elite production. Top-line center duo provides an unmatched floor and ceiling.",
-      strengths: ["Scoring", "Assists", "Consistency"],
-      weaknesses: [],
-      suggestion: "Hold steady. No improvements needed.",
-      trend: [11.2, 12.8, 12.4, 13.5, 14.0, 14.2],
-      radar: { score: 96, volume: 92, consistency: 88, streak: 90, schedule: 82 },
-    },
-    {
-      position: "Wingers",
-      grade: "B",
-      score: 82,
-      avgPoints: 8.5,
-      leagueRank: 5,
-      description: "Solid but inconsistent. Top-line wing carrying load, secondary scoring lacking.",
-      strengths: ["Goal Scoring"],
-      weaknesses: ["Assists", "+/-"],
-      suggestion: "Look for a playmaking winger on waivers to balance the scoring dependence.",
-      trend: [9.4, 8.8, 7.9, 9.1, 8.2, 8.5],
-      radar: { score: 78, volume: 80, consistency: 60, streak: 55, schedule: 78 },
-    },
-    {
-      position: "Defense",
-      grade: "A-",
-      score: 91,
-      avgPoints: 9.8,
-      leagueRank: 2,
-      description: "Very strong top pair. Top-pair right-shot performing like a top-5 option.",
-      strengths: ["Power Play Points", "Blocks"],
-      weaknesses: ["Depth"],
-      suggestion: "Consider streaming a 4th defenseman for off-nights.",
-      trend: [8.1, 8.7, 9.2, 9.0, 9.6, 9.8],
-      radar: { score: 88, volume: 84, consistency: 86, streak: 92, schedule: 70 },
-    },
-    {
-      position: "Goalies",
-      grade: "C-",
-      score: 72,
-      avgPoints: 4.1,
-      leagueRank: 9,
-      description: "Underperforming significantly. Starter has been volatile.",
-      strengths: ["Saves"],
-      weaknesses: ["GAA", "Wins"],
-      suggestion: "Urgent upgrade recommended. Target a starter on a defensive team.",
-      trend: [5.8, 5.2, 4.8, 4.3, 3.9, 4.1],
-      radar: { score: 58, volume: 70, consistency: 42, streak: 35, schedule: 60 },
-    }
-  ];
+  /*
+   * THE FABRICATED ROSTER DEEP-DIVE LIVED HERE UNTIL 2026-08-26.
+   *
+   * A `positionalAnalysis` literal: Centers A+ / 98 / 14.2 avg / league rank 1,
+   * Wingers B, Defense A-, Goalies C-, each with a six-week sparkline, a
+   * five-axis radar, hand-written strengths, weaknesses and a "Stormy's
+   * Suggestion". Identical for every team in every league, forever. A
+   * "Preview · live after opening night" chip covered the section heading and
+   * nothing else — the 92.4/100 Team Rating, the sidebar radar, the "Your
+   * goalie grade is C-" alert and the "Lemon says" tile all sat outside it.
+   *
+   * It is not rebuilt here. The Roster page's Trends & Analytics tab now
+   * computes the same thing for real — per-game production against stated
+   * per-position baselines, in utils/teamGrades.ts, with tests — and two
+   * grades for one roster is one grade too many. This page keeps what it
+   * always did honestly: the schedule-and-free-agent work below, which is
+   * computed from real rosters and the real NHL schedule.
+   */
 
-  const getGradeColor = (grade: string) => {
-    if (grade.startsWith('A')) return "text-pastel-sage-soft bg-pastel-sage/15 border-pastel-sage/30";
-    if (grade.startsWith('B')) return "text-blue-300 bg-blue-400/15 border-blue-400/30";
-    if (grade.startsWith('C')) return "text-amber-300 bg-amber-400/15 border-amber-400/30";
-    return "text-red-300 bg-red-400/15 border-red-400/30";
-  };
-
-  const gradeBorderColor = (grade: string) => {
-    if (grade.startsWith('A')) return '#A6D3A0';
-    if (grade.startsWith('B')) return '#93C5FD';
-    if (grade.startsWith('C')) return '#FCD34D';
-    return '#FCA5A5';
-  };
 
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
@@ -420,144 +205,81 @@ const TeamAnalytics = () => {
                     <XGModelIcon className="w-3.5 h-3.5" strokeWidth={2} />
                     ✦ Stormy Analytics
                   </div>
+                  {/* Was "Roster Deep-Dive / AI-Powered Roster Optimization"
+                      over a page whose deep-dive was a literal. What this page
+                      actually does — and did honestly all along — is find free
+                      agents whose teams play the most games this week. */}
                   <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none mb-2">
-                    Roster Deep-Dive
+                    Waiver Wire &amp; Schedule
                   </h1>
                   <p className="text-sm text-white/55 flex items-center gap-2">
                     <Narwhal className="h-4 w-4 text-pastel-orange" />
-                    AI-Powered Roster Optimization
+                    Free agents with the best week ahead
                   </p>
                 </div>
-                <div className="flex gap-3">
-                  <Card className="px-5 py-3 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_8px_24px_-12px_rgba(255,168,87,0.3)]">
-                    <div className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold">Team Rating</div>
-                    <div className="font-calistoga text-3xl text-pastel-cream mt-1 leading-none tabular-nums">
-                      92.4 <span className="text-sm font-normal text-white/55 align-middle">/ 100</span>
-                    </div>
-                  </Card>
-                </div>
+                {/* A "Team Rating 92.4 / 100" card stood here — a literal, on every
+                    team, with no disclaimer. Removed 2026-08-26. */}
               </div>
 
               {isGuestMode(userLeagueState) && (
                 <div className="mb-6 max-w-5xl mx-auto">
                   <LeagueCreationCTA
                     title="You're viewing demo analytics"
-                    description="Sign up to see personalized analytics for your team and get AI-powered recommendations."
+                    description="Sign up to see analytics for your own team."
                     variant="compact"
                   />
                 </div>
               )}
 
               <div className="max-w-5xl mx-auto grid lg:grid-cols-3 gap-6">
-                {/* Positional Deep Dive */}
+                {/* Where the fabricated Positional Deep-Dive used to be. The
+                    real version of this — per-position production measured
+                    against stated baselines — now lives on the Roster page and
+                    is computed from the user's actual roster. */}
                 <div className="lg:col-span-2 space-y-4">
                   <h2 className="font-calistoga text-2xl text-pastel-cream flex items-center gap-2">
                     <ScoreboardIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} />
-                    Positional Deep Dive
-                    {/* SWEEP FIX (2026-08-16): this section's grades/trends are
-                        illustrative until the analytics API lands — say so
-                        instead of presenting fabricated A+ grades as real. */}
-                    <span className="ml-1 px-2.5 py-0.5 rounded-full bg-pastel-orange/15 ring-1 ring-pastel-orange/40 text-pastel-orange-soft text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold">
-                      Preview · live after opening night
-                    </span>
+                    Positional breakdown
                   </h2>
 
-                  <div className="space-y-4">
-                    {positionalAnalysis.map((pos) => {
-                      const PosIcon = POSITION_ICONS[pos.position] || PuckIcon;
-                      return (
-                        <Card
-                          key={pos.position}
-                          className="overflow-hidden border-0 bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] border-l-4"
-                          style={{ borderLeftColor: gradeBorderColor(pos.grade) }}
-                        >
-                          <CardContent className="p-6">
-                            {/* Top row: name + grade + avg pts */}
-                            <div className="flex justify-between items-start mb-4 gap-4">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2 mb-1">
-                                  <PosIcon className="w-5 h-5 text-pastel-orange shrink-0" strokeWidth={2} />
-                                  <h3 className="font-calistoga text-xl text-pastel-cream">{pos.position}</h3>
-                                  <Badge variant="outline" className={`${getGradeColor(pos.grade)} font-jbmono text-[10px] uppercase tracking-[0.18em] font-bold`}>Grade: {pos.grade}</Badge>
-                                  <Badge variant="secondary" className="text-[10px] font-jbmono uppercase tracking-[0.18em] bg-white/5 ring-1 ring-white/10 text-white/70 hover:bg-white/10 border-0">Rank #{pos.leagueRank}</Badge>
-                                </div>
-                                <p className="text-sm text-white/55 leading-relaxed">{pos.description}</p>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <div className="font-calistoga text-3xl text-pastel-cream leading-none tabular-nums">{pos.avgPoints}</div>
-                                <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 mt-1">Avg Pts/Gm</div>
-                              </div>
-                            </div>
-
-                            {/* Real data viz row: radar + sparkline + score breakdown */}
-                            <div className="grid grid-cols-1 md:grid-cols-[120px_1fr] gap-4 items-center mb-3">
-                              <PositionRadar values={pos.radar} />
-                              <div className="space-y-3">
-                                <div>
-                                  <div className="flex justify-between items-end mb-1">
-                                    <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 font-bold">Last 6 weeks</div>
-                                    <Sparkline values={pos.trend} />
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="flex justify-between items-center text-[10px] font-jbmono uppercase tracking-[0.22em] mb-1.5">
-                                    <span className="text-white/55">Performance Score</span>
-                                    <span className="text-pastel-cream font-bold tabular-nums">{pos.score}/100</span>
-                                  </div>
-                                  <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                                    <div
-                                      className="h-full rounded-full bg-pastel-orange"
-                                      style={{ width: `${pos.score}%` }}
-                                    />
-                                  </div>
-                                </div>
-                                {/* Strengths / weaknesses chips — actual content, not implied */}
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  {pos.strengths.map(s => (
-                                    <span key={s} className="px-2 py-0.5 rounded-md bg-pastel-sage/15 ring-1 ring-pastel-sage/30 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold text-pastel-sage-soft">
-                                      ↑ {s}
-                                    </span>
-                                  ))}
-                                  {pos.weaknesses.map(w => (
-                                    <span key={w} className="px-2 py-0.5 rounded-md bg-red-400/15 ring-1 ring-red-400/30 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold text-red-300">
-                                      ↓ {w}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-
-                            {pos.suggestion && (
-                              <div className="bg-pastel-orange/8 ring-1 ring-pastel-orange/20 p-3 rounded-xl flex gap-3 items-start">
-                                <Narwhal className="h-5 w-5 text-pastel-orange shrink-0 mt-0.5" />
-                                <div className="space-y-1">
-                                  <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold text-pastel-orange-soft">Stormy's Suggestion</div>
-                                  <p className="text-xs text-white/70 leading-relaxed">{pos.suggestion}</p>
-                                </div>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
+                  <Card className="border-0 bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                    <CardContent className="p-6">
+                      <p className="text-sm text-white/70 leading-relaxed mb-4">
+                        Your positional grades are computed on the Roster page, under
+                        Trends &amp; Analytics — offense, peripherals, goaltending and
+                        depth, each measured as a share of elite starter pace, per game,
+                        from the players you actually have.
+                      </p>
+                      <Link
+                        to="/roster"
+                        className="inline-flex items-center gap-1.5 text-[13px] font-bold text-pastel-orange-soft hover:text-pastel-orange transition-colors"
+                      >
+                        Open Trends &amp; Analytics <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
+                      </Link>
+                    </CardContent>
+                  </Card>
                 </div>
 
                 {/* Right Column: AI Recommended Targets */}
                 <div className="space-y-4">
                   <h2 className="font-calistoga text-2xl text-pastel-cream flex items-center gap-2">
                     <RangeIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} />
-                    AI Recommended Targets
+                    Free agents worth a look
                   </h2>
 
                   <Card className="bg-[#1A2A20] border-0 ring-1 ring-amber-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(251,191,36,0.15)] relative overflow-hidden">
                     <div aria-hidden="true" className="absolute top-0 right-0 w-48 h-48 bg-amber-400/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
                     <CardHeader className="relative z-10">
+                      {/* Headed "Urgent: Goaltending" with the line "Your goalie
+                          grade is C-. Improving this position is the #1 priority to
+                          increase win probability." — a personalised diagnosis of a
+                          roster nothing on this page had looked at. The list below
+                          it is real: available goalies, ranked. Removed 2026-08-26. */}
                       <CardTitle className="font-calistoga text-lg text-amber-300 flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4" /> Urgent: Goaltending
+                        <AlertCircle className="h-4 w-4" /> Goalies on the wire
                       </CardTitle>
                       <CardDescription className="text-white/55">
-                        Your goalie grade is C-. Improving this position is the #1 priority to increase win probability.
+                        Available goalies, by points per game and games this week.
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="relative z-10">
@@ -642,32 +364,15 @@ const TeamAnalytics = () => {
                 rented ad slot used to be. */}
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
-                <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
-                  <div aria-hidden="true" className="absolute -top-10 -right-10 w-36 h-36 bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />
-                  <div className="relative z-10">
-                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-3">
-                      ✦ Team-strength radar
-                    </div>
-                    <div className="flex items-center justify-center mb-3">
-                      <PositionRadar values={{ score: 92, volume: 86, consistency: 78, streak: 80, schedule: 74 }} leagueAvg={60} />
-                    </div>
-                    <div className="text-[10px] text-white/55 leading-relaxed text-center">
-                      <span className="text-pastel-orange font-bold">Solid orange</span> = your team. <span className="text-white/70">Dashed</span> = league avg.
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
-                  <MascotPortrait id="lemon" />
-                  <div className="p-4">
-                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-sage-soft font-bold mb-1">
-                      ✦ Lemon says
-                    </div>
-                    <div className="font-calistoga text-xl text-pastel-cream mb-2">Tape doesn't lie</div>
-                    <p className="text-xs text-white/70 leading-relaxed">
-                      Goalie's a 35/100 streak — the matchup model wants a swap. Centers carry the team; don't break them up.
-                    </p>
-                  </div>
-                </div>
+                {/* Two tiles stood here and both were invented:
+                     - a "Team-strength radar" whose team shape was the constant
+                       {score:92, volume:86, consistency:78, streak:80,
+                       schedule:74} and whose "league avg" was a flat 60 on every
+                       axis, with a legend telling the user which was which;
+                     - a "Lemon says" tile reading "Goalie's a 35/100 streak — the
+                       matchup model wants a swap", citing a model that was never
+                       run.
+                    Removed 2026-08-26. Real team shape is on the Roster page. */}
               </div>
             </aside>
 
