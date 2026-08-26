@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -179,7 +180,7 @@ const Auth = () => {
         navigate('/verify-email', { state: { email }, replace: true });
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Sign-up hit a snag — try again in a moment.";
+      const errorMessage = userMessage(err, "Sign-up hit a snag — try again in a moment.");
       setError(errorMessage);
       setLoading(false);
     }
@@ -211,7 +212,7 @@ const Auth = () => {
       if (error) setError(error.message || "Couldn't send that reset link — try again in a moment.");
       else setResetSuccess(true);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Couldn't send that reset link — try again in a moment.";
+      const errorMessage = userMessage(err, "Couldn't send that reset link — try again in a moment.");
       setError(errorMessage);
     } finally { setResetLoading(false); }
   };

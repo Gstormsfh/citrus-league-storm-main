@@ -949,7 +949,7 @@ export default function PoolPlayoffHub() {
                   <div className="text-[10px] uppercase font-display text-white/50">Join Code</div>
                   <button
                     onClick={copyJoinCode}
-                    className="w-full flex items-center justify-between p-2 rounded ring-1 ring-pastel-sage/30 bg-pastel-sage/8 hover:bg-pastel-sage/15 transition-colors"
+                    className="w-full flex items-center justify-between p-2 rounded ring-1 ring-pastel-sage/30 bg-pastel-sage/[0.08] hover:bg-pastel-sage/15 transition-colors"
                   >
                     <span className="text-lg font-mono font-bold text-pastel-cream tracking-wider">{league.join_code}</span>
                     {copied ? <Check className="h-4 w-4 text-green-400" aria-hidden="true" /> : <Copy className="h-4 w-4 text-white/50" aria-hidden="true" />}

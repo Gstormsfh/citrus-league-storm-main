@@ -11,6 +11,7 @@
  * function behind this any more.
  */
 
+import { userMessage } from '@/lib/userMessage';
 import { supabase } from "@/integrations/supabase/client";
 import { apiClient, ApiError } from "@/api/client";
 import {
@@ -128,7 +129,7 @@ class StormyServiceImpl {
       };
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "Something went wrong.";
+        userMessage(err, "Something went wrong.");
       return {
         response: "",
         error: msg,
