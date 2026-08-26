@@ -33,6 +33,15 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- EXPORT COMPLIANCE (2026-08-26). Without this key, every upload parks
+	     in App Store Connect as "Missing Compliance" and cannot be handed to
+	     TestFlight testers until someone answers the export questionnaire by
+	     hand, per build. Declared false because the app's only cryptography is
+	     HTTPS/TLS through the OS's own APIs, which is exempt under Category 5
+	     Part 2 note 4. If the app ever ships its OWN crypto, this must be
+	     revisited — it is a legal declaration, not a build flag. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

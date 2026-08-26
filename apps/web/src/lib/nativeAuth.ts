@@ -45,6 +45,40 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export const NATIVE_AUTH_SCHEME = 'citrussports';
 export const NATIVE_AUTH_CALLBACK = `${NATIVE_AUTH_SCHEME}://auth-callback`;
 
+/**
+ * Password recovery gets its OWN callback rather than reusing auth-callback,
+ * because completing it means more than minting a session: the app has to land
+ * the user on the form where they choose a new password. A distinct URL lets
+ * the listener tell "you signed in" from "you are here to set a password"
+ * without inspecting Supabase's query params, which differ between flows.
+ */
+export const NATIVE_RESET_CALLBACK = `${NATIVE_AUTH_SCHEME}://reset-password`;
+
+/** Web paths an emailed auth link can legitimately return to. */
+export type AuthRedirectPath = '/auth/callback' | '/reset-password';
+
+/**
+ * Where an emailed auth link should send the user back to.
+ *
+ * In a browser this is the web origin, unchanged. In the native shell it MUST
+ * be the custom scheme, because `window.location.origin` there is
+ * `capacitor://localhost` — a scheme iOS Mail cannot open, that is not
+ * registered in Info.plist (only `citrussports` is), and that Supabase would
+ * reject as un-allowlisted even if it could be opened. Building an email
+ * redirect from the origin produces a link that is simply dead on device: the
+ * user taps it and nothing at all happens.
+ *
+ * That was the state of every email flow in AuthContext before 2026-08-25 —
+ * sign-up confirmation, resend, and password reset. OAuth had been fixed
+ * (beginNativeOAuth above); the email flows were never brought along.
+ */
+export function authRedirectUrl(path: AuthRedirectPath): string {
+  if (!isNativeShell()) {
+    return `${window.location.origin}${path}`;
+  }
+  return path === '/reset-password' ? NATIVE_RESET_CALLBACK : NATIVE_AUTH_CALLBACK;
+}
+
 /** True only inside the iOS/Android shell — false in every browser. */
 export function isNativeShell(): boolean {
   return Capacitor.isNativePlatform();
@@ -80,6 +114,109 @@ export async function beginNativeOAuth(
 }
 
 /**
+ * Subscribe to inbound deep links whose URL starts with `prefix`.
+ *
+ * Covers BOTH ways a link can arrive, which is the part that is easy to get
+ * wrong:
+ *
+ *   • WARM  — the app is already running and iOS re-enters it. Capacitor fires
+ *             'appUrlOpen'.
+ *   • COLD  — the app was not running. The link is what launched it, and
+ *             whether 'appUrlOpen' also fires is not something to rely on, so
+ *             `getLaunchUrl()` is checked once at registration.
+ *
+ * Cold start is the COMMON case for an emailed password-reset link: the user
+ * is in Mail, not in the app. Handling only 'appUrlOpen' would work every time
+ * you tested it with the app open and fail for the people it was built for.
+ *
+ * `handled` guards the overlap — if a cold launch delivers the URL through
+ * both routes, the PKCE code is exchanged once. A second exchange of the same
+ * code fails and would clobber the session that just succeeded.
+ *
+ * Returns an unsubscriber. In every browser this is a no-op that registers
+ * nothing, so the web app is untouched.
+ */
+function onDeepLink(prefix: string, handler: (url: string) => Promise<void>): () => void {
+  if (!isNativeShell()) {
+    return () => {};
+  }
+
+  let removed = false;
+  let remove: (() => void) | null = null;
+  const handled = new Set<string>();
+
+  const dispatch = async (url: string | undefined | null) => {
+    if (!url || !url.startsWith(prefix) || handled.has(url)) return;
+    handled.add(url);
+    await handler(url);
+  };
+
+  (async () => {
+    const { App } = await import('@capacitor/app');
+
+    // Returns the promise rather than firing and forgetting. Capacitor ignores
+    // the return value, but it makes the handler awaitable, which is the
+    // difference between a test that verifies the exchange and one that races it.
+    const handle = await App.addListener('appUrlOpen', ({ url }) => dispatch(url));
+    if (removed) {
+      handle.remove();
+    } else {
+      remove = () => handle.remove();
+    }
+
+    // Cold start: the link that launched the app is not delivered by the
+    // listener above on every path, so ask for it directly.
+    //
+    // Feature-detected rather than called outright. This is an optional extra
+    // on top of a listener that is already registered, so a plugin build
+    // without it must degrade to warm-launch-only — not reject and take the
+    // whole registration down with it.
+    const launch =
+      typeof App.getLaunchUrl === 'function' ? await App.getLaunchUrl().catch(() => null) : null;
+    if (!removed) void dispatch(launch?.url);
+  })();
+
+  return () => {
+    removed = true;
+    remove?.();
+  };
+}
+
+/**
+ * Exchange the PKCE code carried by a callback URL for a session.
+ *
+ * The code_verifier lives in the webview's own storage — the same storage the
+ * flow was started from — which is why the exchange has to happen HERE, in the
+ * app, and not in the system browser that handled the authorization leg.
+ */
+async function completeCodeExchange(
+  supabase: SupabaseClient,
+  url: string,
+  onError: (message: string) => void,
+): Promise<boolean> {
+  try {
+    const { Browser } = await import('@capacitor/browser');
+    await Browser.close().catch(() => {
+      /* sheet may already be closed — not an error */
+    });
+    const code = new URL(url).searchParams.get('code');
+    if (!code) {
+      onError('Sign-in was cancelled or the callback was malformed.');
+      return false;
+    }
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      onError(error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    onError(e instanceof Error ? e.message : 'Sign-in failed completing the session.');
+    return false;
+  }
+}
+
+/**
  * Idempotent app-launch hook: completes the PKCE exchange when iOS
  * re-enters the app via citrussports://auth-callback?code=...
  *
@@ -92,42 +229,35 @@ export function registerNativeAuthListener(
   supabase: SupabaseClient,
   onError: (message: string) => void,
 ): () => void {
-  if (!isNativeShell()) {
-    return () => {};
-  }
+  return onDeepLink(NATIVE_AUTH_CALLBACK, async (url) => {
+    await completeCodeExchange(supabase, url, onError);
+  });
+}
 
-  let removed = false;
-  let remove: (() => void) | null = null;
-
-  (async () => {
-    const { App } = await import('@capacitor/app');
-    const handle = await App.addListener('appUrlOpen', async ({ url }) => {
-      if (!url.startsWith(NATIVE_AUTH_CALLBACK)) return;
-      try {
-        const { Browser } = await import('@capacitor/browser');
-        await Browser.close().catch(() => {
-          /* sheet may already be closed — not an error */
-        });
-        const code = new URL(url).searchParams.get('code');
-        if (!code) {
-          onError('Sign-in was cancelled or the callback was malformed.');
-          return;
-        }
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) onError(error.message);
-      } catch (e) {
-        onError(e instanceof Error ? e.message : 'Sign-in failed completing the session.');
-      }
-    });
-    if (removed) {
-      handle.remove();
-    } else {
-      remove = () => handle.remove();
-    }
-  })();
-
-  return () => {
-    removed = true;
-    remove?.();
-  };
+/**
+ * Completes a password-recovery deep link and reports where to send the user.
+ *
+ * Separate from registerNativeAuthListener because navigation needs a router,
+ * and AuthProvider is mounted OUTSIDE BrowserRouter in App.tsx — it has no
+ * useNavigate to give. So this is registered from a component inside the
+ * router instead (components/NativeAuthDeepLink.tsx), the same arrangement
+ * PushDeepLink already uses for notification taps.
+ *
+ * The two listeners cannot collide: NATIVE_AUTH_CALLBACK is
+ * `citrussports://auth-callback` and this one is `citrussports://reset-password`,
+ * so neither prefix matches the other's URLs.
+ */
+export function registerNativeRecoveryListener(
+  supabase: SupabaseClient,
+  onRecovery: (path: AuthRedirectPath) => void,
+  onError: (message: string) => void,
+): () => void {
+  return onDeepLink(NATIVE_RESET_CALLBACK, async (url) => {
+    const ok = await completeCodeExchange(supabase, url, onError);
+    // Navigate even when the exchange failed: /reset-password renders an
+    // honest "this link expired" state, which beats stranding the user on
+    // whatever screen the app happened to launch into with no explanation.
+    onRecovery('/reset-password');
+    if (!ok) return;
+  });
 }

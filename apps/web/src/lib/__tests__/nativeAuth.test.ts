@@ -18,7 +18,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { isNativeMock, browserOpenMock, browserCloseMock, addListenerMock } =
+const { isNativeMock, browserOpenMock, browserCloseMock, addListenerMock, getLaunchUrlMock } =
   vi.hoisted(() => ({
     isNativeMock: vi.fn(() => false),
     browserOpenMock: vi.fn(async () => {}),
@@ -28,6 +28,9 @@ const { isNativeMock, browserOpenMock, browserCloseMock, addListenerMock } =
         remove: vi.fn(),
       }),
     ),
+    // Cold start. The real @capacitor/app exposes this; the mock did not, which
+    // is how an un-guarded call to it slipped in unnoticed.
+    getLaunchUrlMock: vi.fn(async (): Promise<{ url: string } | null> => null),
   }));
 
 vi.mock('@capacitor/core', () => ({
@@ -37,14 +40,17 @@ vi.mock('@capacitor/browser', () => ({
   Browser: { open: browserOpenMock, close: browserCloseMock },
 }));
 vi.mock('@capacitor/app', () => ({
-  App: { addListener: addListenerMock },
+  App: { addListener: addListenerMock, getLaunchUrl: getLaunchUrlMock },
 }));
 
 import {
   isNativeShell,
   beginNativeOAuth,
   registerNativeAuthListener,
+  registerNativeRecoveryListener,
+  authRedirectUrl,
   NATIVE_AUTH_CALLBACK,
+  NATIVE_RESET_CALLBACK,
 } from '../nativeAuth';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -67,6 +73,7 @@ beforeEach(() => {
   browserOpenMock.mockClear();
   browserCloseMock.mockClear();
   addListenerMock.mockClear().mockResolvedValue({ remove: vi.fn() });
+  getLaunchUrlMock.mockReset().mockResolvedValue(null);
 });
 
 describe('the web path must be untouched (THE invariant)', () => {
@@ -161,5 +168,164 @@ describe('the callback completes PKCE inside the app', () => {
 
     expect(supabase.auth.exchangeCodeForSession).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledWith('Sign-in was cancelled or the callback was malformed.');
+  });
+});
+
+// ===========================================================================
+// EMAIL REDIRECTS (2026-08-26)
+//
+// OAuth was given a native path in August; the EMAIL flows were not. They
+// built their redirect from window.location.origin, which inside the shell is
+// capacitor://localhost — a scheme iOS Mail cannot open and that Info.plist
+// does not register. Password reset has no server-side alternative the way
+// signUp does, so on device a forgotten password was an unrecoverable state.
+// ===========================================================================
+
+describe('authRedirectUrl', () => {
+  it('uses the web origin in a browser — unchanged behaviour', () => {
+    isNativeMock.mockReturnValue(false);
+    expect(authRedirectUrl('/auth/callback')).toBe(`${window.location.origin}/auth/callback`);
+    expect(authRedirectUrl('/reset-password')).toBe(`${window.location.origin}/reset-password`);
+  });
+
+  it('uses the custom scheme in the shell, never capacitor://localhost', () => {
+    isNativeMock.mockReturnValue(true);
+    expect(authRedirectUrl('/auth/callback')).toBe(NATIVE_AUTH_CALLBACK);
+    expect(authRedirectUrl('/reset-password')).toBe(NATIVE_RESET_CALLBACK);
+  });
+
+  it('never emits a capacitor:// URL for any path', () => {
+    isNativeMock.mockReturnValue(true);
+    for (const p of ['/auth/callback', '/reset-password'] as const) {
+      expect(authRedirectUrl(p)).not.toMatch(/^capacitor:/);
+      expect(authRedirectUrl(p)).toMatch(/^citrussports:\/\//);
+    }
+  });
+});
+
+describe('the recovery deep link', () => {
+  async function register(supabase: ReturnType<typeof mkSupabase>) {
+    isNativeMock.mockReturnValue(true);
+    const onRecovery = vi.fn();
+    const onError = vi.fn();
+    let captured: ((e: { url: string }) => void) | null = null;
+    addListenerMock.mockImplementation(async (_evt: string, cb: (e: { url: string }) => void) => {
+      captured = cb;
+      return { remove: vi.fn() };
+    });
+    const off = registerNativeRecoveryListener(supabase, onRecovery, onError);
+    await vi.waitFor(() => expect(captured).toBeTruthy());
+    return { fire: (url: string) => captured!({ url }), onRecovery, onError, off };
+  }
+
+  it('is a no-op on web — the App plugin is never loaded', () => {
+    isNativeMock.mockReturnValue(false);
+    const off = registerNativeRecoveryListener(mkSupabase(), vi.fn(), vi.fn());
+    expect(typeof off).toBe('function');
+    off();
+    expect(addListenerMock).not.toHaveBeenCalled();
+  });
+
+  it('exchanges the code and sends the user to the reset form', async () => {
+    const supabase = mkSupabase();
+    const { fire, onRecovery, onError } = await register(supabase);
+
+    fire(`${NATIVE_RESET_CALLBACK}?code=rec123`);
+
+    await vi.waitFor(() => expect(onRecovery).toHaveBeenCalledWith('/reset-password'));
+    expect(supabase.auth.exchangeCodeForSession).toHaveBeenCalledWith('rec123');
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('still navigates when the exchange fails, so the user sees an honest expired-link screen', async () => {
+    const supabase = mkSupabase();
+    supabase.auth.exchangeCodeForSession.mockResolvedValue({
+      data: {},
+      error: { message: 'code expired' },
+    });
+    const { fire, onRecovery, onError } = await register(supabase);
+
+    fire(`${NATIVE_RESET_CALLBACK}?code=stale`);
+
+    await vi.waitFor(() => expect(onRecovery).toHaveBeenCalledWith('/reset-password'));
+    expect(onError).toHaveBeenCalledWith('code expired');
+  });
+
+  it('does not answer the OAuth callback — the two listeners never overlap', async () => {
+    const supabase = mkSupabase();
+    const { fire, onRecovery } = await register(supabase);
+
+    fire(`${NATIVE_AUTH_CALLBACK}?code=oauth`);
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(supabase.auth.exchangeCodeForSession).not.toHaveBeenCalled();
+    expect(onRecovery).not.toHaveBeenCalled();
+  });
+
+  it('exchanges a given code ONCE even if the URL arrives twice', async () => {
+    // A cold launch can surface the same URL through getLaunchUrl AND the
+    // listener. A second exchange of one code fails and clobbers the session
+    // the first one just established.
+    const supabase = mkSupabase();
+    const { fire, onRecovery } = await register(supabase);
+
+    fire(`${NATIVE_RESET_CALLBACK}?code=dup`);
+    fire(`${NATIVE_RESET_CALLBACK}?code=dup`);
+
+    await vi.waitFor(() => expect(onRecovery).toHaveBeenCalled());
+    expect(supabase.auth.exchangeCodeForSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('cold start', () => {
+  it('picks up the link that LAUNCHED the app, not just warm re-entry', async () => {
+    // The common case for an emailed reset link: the user is in Mail and the
+    // app is not running. Handling only appUrlOpen works every time you test
+    // it with the app open and fails for the people it was built for.
+    isNativeMock.mockReturnValue(true);
+    getLaunchUrlMock.mockResolvedValue({ url: `${NATIVE_RESET_CALLBACK}?code=cold` });
+    const supabase = mkSupabase();
+    const onRecovery = vi.fn();
+
+    registerNativeRecoveryListener(supabase, onRecovery, vi.fn());
+
+    await vi.waitFor(() => expect(supabase.auth.exchangeCodeForSession).toHaveBeenCalledWith('cold'));
+    expect(onRecovery).toHaveBeenCalledWith('/reset-password');
+  });
+
+  it('ignores a launch URL belonging to someone else', async () => {
+    isNativeMock.mockReturnValue(true);
+    getLaunchUrlMock.mockResolvedValue({ url: 'citrussports://league-invite/xyz' });
+    const supabase = mkSupabase();
+
+    registerNativeRecoveryListener(supabase, vi.fn(), vi.fn());
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(supabase.auth.exchangeCodeForSession).not.toHaveBeenCalled();
+  });
+
+  it('degrades to warm-launch-only when the plugin has no getLaunchUrl', async () => {
+    // Regression guard: calling it outright rejected the whole registration on
+    // a plugin build without it, taking the warm listener down too.
+    isNativeMock.mockReturnValue(true);
+    const { App } = await import('@capacitor/app');
+    const saved = (App as unknown as Record<string, unknown>).getLaunchUrl;
+    delete (App as unknown as Record<string, unknown>).getLaunchUrl;
+    try {
+      const supabase = mkSupabase();
+      let captured: ((e: { url: string }) => void) | null = null;
+      addListenerMock.mockImplementation(async (_evt: string, cb: (e: { url: string }) => void) => {
+        captured = cb;
+        return { remove: vi.fn() };
+      });
+      const onRecovery = vi.fn();
+      registerNativeRecoveryListener(supabase, onRecovery, vi.fn());
+
+      await vi.waitFor(() => expect(captured).toBeTruthy());
+      captured!({ url: `${NATIVE_RESET_CALLBACK}?code=warm` });
+      await vi.waitFor(() => expect(onRecovery).toHaveBeenCalledWith('/reset-password'));
+    } finally {
+      (App as unknown as Record<string, unknown>).getLaunchUrl = saved;
+    }
   });
 });

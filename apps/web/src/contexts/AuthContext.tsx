@@ -10,6 +10,7 @@ import {
   isNativeShell,
   beginNativeOAuth,
   registerNativeAuthListener,
+  authRedirectUrl,
 } from '@/lib/nativeAuth';
 import { registerForPush, unregisterDeviceToken } from '@/lib/pushNotifications';
 
@@ -247,8 +248,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Fallback: server created user but didn't return session — sign in client-side
       return await supabase.auth.signInWithPassword({ email, password });
     } catch {
-      // Fallback: use Supabase client signup (requires email verification)
-      const redirectUrl = `${window.location.origin}/auth/callback`;
+      // Fallback: use Supabase client signup (requires email verification).
+      // authRedirectUrl, not window.location.origin — on device the origin is
+      // capacitor://localhost and the confirmation link would be un-openable.
+      const redirectUrl = authRedirectUrl('/auth/callback');
       return supabase.auth.signUp({
         email,
         password,
@@ -276,7 +279,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const resetPassword = async (email: string) => {
-    const redirectUrl = `${window.location.origin}/reset-password`;
+    // The ONLY password-reset path — there is no server-side equivalent the
+    // way signUp has one. Built from window.location.origin this produced
+    // `capacitor://localhost/reset-password` on device: a link iOS Mail
+    // cannot open, so a tester who forgot their password was locked out with
+    // no route back in.
+    const redirectUrl = authRedirectUrl('/reset-password');
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl,
     });
@@ -291,7 +299,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signInWithOAuth = async (provider: 'google' | 'apple') => {
-    const redirectUrl = `${window.location.origin}/auth/callback`;
+    const redirectUrl = authRedirectUrl('/auth/callback');
 
     // Provider-specific scopes and query params for a complete profile
     const providerOptions: Record<string, { scopes?: string; queryParams?: Record<string, string> }> = {
@@ -331,7 +339,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const resendVerificationEmail = async (email: string) => {
-    const redirectUrl = `${window.location.origin}/auth/callback`;
+    const redirectUrl = authRedirectUrl('/auth/callback');
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
