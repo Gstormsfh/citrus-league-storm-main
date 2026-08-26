@@ -696,8 +696,18 @@ const TradeAnalyzer = () => {
             mobile/tablet flows naturally. */}
         {viewMode === 'list' ? (
         <div className="grid lg:grid-cols-12 gap-6 lg:h-[calc(100vh-240px)] lg:min-h-[600px]">
+          {/*
+            * MOBILE ORDER: my roster, their roster, then the proposal.
+            *
+            * The DOM order is the three desktop columns — mine, proposal,
+            * theirs — which is right when they sit side by side. Stacked on a
+            * phone it put the partner's roster about a thousand pixels BELOW
+            * the proposal box you are supposed to fill from it, so building a
+            * trade meant scrolling past the empty thing you were filling to
+            * reach the players you were filling it with.
+            */}
           {/* Left Column: My Team */}
-          <Card className="lg:col-span-3 flex flex-col h-full bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+          <Card className="order-1 lg:order-none lg:col-span-3 flex flex-col h-full bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2 font-calistoga text-pastel-cream">
                 <Badge className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold border-0">You</Badge>
@@ -767,7 +777,7 @@ const TradeAnalyzer = () => {
           </Card>
 
           {/* Middle Column: Trade Deck */}
-          <div className="lg:col-span-6 flex flex-col gap-6 h-full overflow-y-auto">
+          <div className="order-3 lg:order-none lg:col-span-6 flex flex-col gap-6 h-full overflow-y-auto">
             {/* Trade Area */}
             <Card className="flex-1 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/20 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden">
               <CardHeader className="border-b border-white/10 bg-white/[0.03] pb-4">
@@ -781,9 +791,15 @@ const TradeAnalyzer = () => {
                         {Math.abs(valueDiff) < 10 ? "Balanced Deal" : "Trade Impact"}
                       </Badge>
                     )}
+                    {/* Desktop only. In the three-column layout this sits
+                        beside the proposal and reads as a header action. Stacked
+                        on a phone it becomes a second identical "Submit Trade
+                        Offer" about 450px above the real one, both disabled,
+                        with the empty drop zones you have not filled in between
+                        them. One button, at the end of the flow. */}
                     <Button
                       size="sm"
-                      className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
+                      className="hidden lg:inline-flex bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
                       disabled={myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
                       onClick={handleProposeTrade}
                     >
@@ -903,8 +919,10 @@ const TradeAnalyzer = () => {
                     </div>
                   )}
 
+                  {/* Was "Add a message to your trade offer (optional)", which
+                      clipped mid-word at 393px. */}
                   <Input
-                    placeholder="Add a message to your trade offer (optional)"
+                    placeholder="Add a message (optional)"
                     className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                     value={tradeMessage}
                     onChange={(e) => setTradeMessage(e.target.value)}
@@ -922,7 +940,7 @@ const TradeAnalyzer = () => {
           </div>
 
           {/* Right Column: Their Team */}
-          <Card className={`lg:col-span-3 flex flex-col h-full bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] transition-opacity ${!selectedPartnerTeam ? 'opacity-60 pointer-events-none' : ''}`}>
+          <Card className={`order-2 lg:order-none lg:col-span-3 flex flex-col h-full bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] transition-opacity ${!selectedPartnerTeam ? 'opacity-60 pointer-events-none' : ''}`}>
             <CardHeader className="pb-3">
                <CardTitle className="text-lg flex items-center gap-2 font-calistoga text-pastel-cream">
                 {selectedPartnerTeam ? (
