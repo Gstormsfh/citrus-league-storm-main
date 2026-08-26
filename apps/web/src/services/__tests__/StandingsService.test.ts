@@ -71,6 +71,7 @@ vi.mock('@/utils/scoringUtils', () => ({
 // =============================================================================
 
 import { StandingsService } from '../StandingsService';
+import type { Team } from '../LeagueService';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -86,7 +87,19 @@ beforeEach(() => {
 // Helpers
 // =============================================================================
 
-const makeTeams = (ids: string[]) => ids.map(id => ({ id, name: `Team ${id}` }));
+// Build real Team fixtures. This used to return { id, name }, which is not a Team
+// -- the field is team_name, and league_id / owner_id / timestamps are required.
+// Every call site failed to typecheck, and `name` was silently ignored by the code
+// under test, so the fixtures were not exercising the field the service reads.
+const makeTeams = (ids: string[]): Team[] =>
+  ids.map(id => ({
+    id,
+    league_id: 'league-1',
+    owner_id: `owner-${id}`,
+    team_name: `Team ${id}`,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+  }));
 
 // =============================================================================
 // calculateTeamStandings

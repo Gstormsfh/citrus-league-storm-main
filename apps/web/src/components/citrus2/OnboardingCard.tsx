@@ -32,7 +32,7 @@ export function OnboardingCard({
 }) {
   const a = ACCENT_CLASSES[accent];
   const button = (
-    <button className="mt-auto inline-flex items-center gap-1.5 bg-pastel-orange text-[#581E00] px-5 h-10 rounded-md text-[13px] font-bold hover:bg-pastel-orange-soft transition-all duration-200 active:scale-95 group/btn w-fit">
+    <button className="mt-auto inline-flex items-center gap-1.5 bg-pastel-orange text-[#581E00] px-5 h-11 rounded-md text-[13px] font-bold hover:bg-pastel-orange-soft transition-all duration-200 active:scale-95 group/btn w-fit">
       {ctaLabel} <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" strokeWidth={2.5} />
     </button>
   );

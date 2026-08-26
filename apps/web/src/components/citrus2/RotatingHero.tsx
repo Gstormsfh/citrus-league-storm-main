@@ -89,12 +89,18 @@ export function RotatingHero({
       </div>
 
       {/* Indicator dots */}
-      <div className="flex items-center justify-center gap-2 mt-10">
+      {/* gap-3 (12px) pairs with before:-inset-x-1.5 (6px a side) so the hit
+          areas meet exactly and never overlap. */}
+      <div className="flex items-center justify-center gap-3 mt-10">
         {slides.map((s, i) => (
           <button
             key={s.id}
             onClick={() => setActive(i)}
-            className={`h-1.5 rounded-full transition-all ${
+            // The visible bar stays 6px tall. The ::before extends the TOUCH
+            // TARGET to 44px without affecting layout — these dots are the only
+            // way to reach slides 2-5, and at 48x6 / 32x6 they were effectively
+            // unhittable on a phone.
+            className={`relative h-1.5 rounded-full transition-all before:absolute before:content-[''] before:-inset-x-1.5 before:top-1/2 before:h-11 before:-translate-y-1/2 ${
               active === i
                 ? 'bg-pastel-orange w-12'
                 : 'bg-white/15 w-8 hover:bg-white/30'

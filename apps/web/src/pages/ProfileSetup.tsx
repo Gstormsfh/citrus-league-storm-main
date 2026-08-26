@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useNavigate } from 'react-router-dom';
@@ -99,7 +100,7 @@ const ProfileSetup = () => {
       // S-1 Entry 21 P-c fix (2026-08-09): typed `unknown` instead of
       // `any` (project standard; new code MUST NOT use `any` per
       // CLAUDE.md code standards).
-      const message = err instanceof Error ? err.message : 'Failed to update profile';
+      const message = userMessage(err, 'Failed to update profile');
       setError(message);
       setLoading(false);
     }

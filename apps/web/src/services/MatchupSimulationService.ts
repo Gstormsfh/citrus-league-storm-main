@@ -18,6 +18,7 @@
 
 import { matchupApi } from '@/api/matchups';
 import { logger } from '@/utils/logger';
+import { getCurrentSeason } from '@citrus/shared';
 
 // ============================================================================
 // TYPES
@@ -173,7 +174,7 @@ export class MatchupSimulationService {
    */
   static async getBrierScore(
     leagueId: string,
-    season: number = 2025
+    season: number = getCurrentSeason()
   ): Promise<BrierScore | null> {
     try {
       const response = await matchupApi.getBrierScore(leagueId, season);

@@ -132,7 +132,11 @@ export const PlayoffService = {
         throw new Error(response.error);
       }
 
-      const data = response.data;
+      const data = response.data as Partial<{
+        bracket: unknown;
+        seeds: unknown[];
+        series: unknown[];
+      }> | undefined;
       if (!data || !data.bracket) {
         return { bracket: null, seeds: [], series: [], error: null };
       }

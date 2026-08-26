@@ -47,29 +47,20 @@ export const poolApi = {
     return apiClient.get(`/api/pools/pickem/${leagueId}/standings`);
   },
 
-  /** Score Pick'em picks for a week. */
-  scorePickemWeek(
-    leagueId: string,
-    weekNumber: number,
-    gameResults: Array<{ game_id: string; winning_team: string }>,
-  ) {
-    return apiClient.post(`/api/pools/pickem/${leagueId}/score`, { weekNumber, gameResults });
+  /**
+   * Score Pick'em picks for a week. Commissioner only.
+   *
+   * Results are intentionally not sent: the server derives every winner from
+   * `nhl_games`. Passing them from the client previously let a member score
+   * their own picks however they liked.
+   */
+  scorePickemWeek(leagueId: string, weekNumber: number) {
+    return apiClient.post(`/api/pools/pickem/${leagueId}/score`, { weekNumber });
   },
 
-  /** Score Pick'em ATS picks for a week. */
-  scorePickemWeekATS(
-    leagueId: string,
-    weekNumber: number,
-    gameResults: Array<{
-      game_id: string;
-      home_team: string;
-      away_team: string;
-      home_score: number;
-      away_score: number;
-      status: string;
-    }>,
-  ) {
-    return apiClient.post(`/api/pools/pickem/${leagueId}/score-ats`, { weekNumber, gameResults });
+  /** Score Pick'em ATS picks for a week. Commissioner only. */
+  scorePickemWeekATS(leagueId: string, weekNumber: number) {
+    return apiClient.post(`/api/pools/pickem/${leagueId}/score-ats`, { weekNumber });
   },
 
   // ── Survivor ─────────────────────────────────────────────────────────
@@ -102,13 +93,9 @@ export const poolApi = {
     return apiClient.get<{ eliminated: boolean }>(`/api/pools/survivor/${leagueId}/eliminated${qs}`);
   },
 
-  /** Score survivor picks for a week. */
-  scoreSurvivorWeek(
-    leagueId: string,
-    weekNumber: number,
-    teamResults: Array<{ team: string; won: boolean }>,
-  ) {
-    return apiClient.post(`/api/pools/survivor/${leagueId}/score`, { weekNumber, teamResults });
+  /** Score survivor picks for a week. Commissioner only. */
+  scoreSurvivorWeek(leagueId: string, weekNumber: number) {
+    return apiClient.post(`/api/pools/survivor/${leagueId}/score`, { weekNumber });
   },
 
   // ── Confidence ───────────────────────────────────────────────────────
@@ -132,12 +119,8 @@ export const poolApi = {
     return apiClient.get(`/api/pools/confidence/${leagueId}/standings`);
   },
 
-  /** Score confidence picks for a week. */
-  scoreConfidenceWeek(
-    leagueId: string,
-    weekNumber: number,
-    gameResults: Array<{ game_id: string; winning_team: string }>,
-  ) {
-    return apiClient.post(`/api/pools/confidence/${leagueId}/score`, { weekNumber, gameResults });
+  /** Score confidence picks for a week. Commissioner only. */
+  scoreConfidenceWeek(leagueId: string, weekNumber: number) {
+    return apiClient.post(`/api/pools/confidence/${leagueId}/score`, { weekNumber });
   },
 };

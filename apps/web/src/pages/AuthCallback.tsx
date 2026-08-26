@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
@@ -110,7 +111,7 @@ const AuthCallback = () => {
           fail("Sign-in took too long — head back and try again.");
         }, 10000);
       } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : "Sign-in hit a snag — head back and try again.";
+        const errorMessage = userMessage(err, "Sign-in hit a snag — head back and try again.");
         fail(errorMessage);
       }
     };

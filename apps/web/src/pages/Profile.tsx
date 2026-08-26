@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -8,7 +9,7 @@ import { HockeyFooter } from '@/components/citrus2';
 import { accountApi } from '@/api/account';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
-import { UserAccountService } from '@/services/UserAccountService';
+import { UserAccountService, type ConsentStatus } from '@/services/UserAccountService';
 import { LeagueService } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { WaiverService } from '@/services/WaiverService';
@@ -59,10 +60,31 @@ import {
   Download,
   ExternalLink,
   Trash2,
-  Pencil
+  Pencil,
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { logger } from '@/utils/logger';
 import { DEFAULT_SCORING } from '@/utils/scoringUtils';
+
+/** 'privacy_policy' -> 'Privacy Policy'. Policy types come from the DB, so this
+ *  formats whatever is there rather than switching on a fixed list. */
+const prettyPolicy = (t: string) =>
+  t.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
+
+const CONSENT_PRESENTATION: Record<
+  ConsentStatus['status'],
+  { label: string; tone: string; action: 'grant' | 'withdraw'; blurb: string }
+> = {
+  current:     { label: 'Active',        tone: 'text-emerald-300 ring-emerald-300/30',
+                 action: 'withdraw', blurb: 'You have accepted the current version.' },
+  outdated:    { label: 'Update needed', tone: 'text-amber-300 ring-amber-300/30',
+                 action: 'grant',    blurb: 'This policy has changed since you accepted it.' },
+  withdrawn:   { label: 'Withdrawn',     tone: 'text-white/60 ring-white/20',
+                 action: 'grant',    blurb: 'You withdrew consent. You can grant it again at any time.' },
+  never_given: { label: 'Not recorded',  tone: 'text-amber-300 ring-amber-300/30',
+                 action: 'grant',    blurb: 'We have no consent on record for this policy.' },
+};
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -177,6 +199,10 @@ const Profile = () => {
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [consentRows, setConsentRows] = useState<ConsentStatus[]>([]);
+  const [consentLoading, setConsentLoading] = useState(true);
+  const [consentError, setConsentError] = useState<string | null>(null);
+  const [consentBusy, setConsentBusy] = useState<string | null>(null);
   const [settingsMessage, setSettingsMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -783,7 +809,7 @@ const Profile = () => {
     } catch (error: unknown) {
       toast({
         title: "Profile Hiccup",
-        description: error instanceof Error ? error.message : 'Failed to update display name.',
+        description: userMessage(error, 'Failed to update display name.'),
         variant: 'destructive',
       });
     } finally {
@@ -816,10 +842,62 @@ const Profile = () => {
       logger.error('Password change error:', error);
       setSettingsMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Failed to update password',
+        text: userMessage(error, 'Failed to update password'),
       });
     } finally {
       setChangePasswordLoading(false);
+    }
+  };
+
+  // ── GDPR consent ──────────────────────────────────────────────────
+  // The server side of this shipped without a caller, which meant a user could
+  // neither see what they had agreed to nor withdraw it — Art. 7(3) requires
+  // withdrawal to be as easy as granting.
+  const loadConsent = async () => {
+    setConsentLoading(true);
+    setConsentError(null);
+    const result = await UserAccountService.getConsentStatus();
+    if (!result.success) {
+      // Show the failure rather than an empty list: "no policies" and "we could
+      // not read your policies" must not look identical.
+      setConsentError(result.error || 'Could not load your consent status.');
+      setConsentRows([]);
+    } else {
+      setConsentRows(result.data ?? []);
+    }
+    setConsentLoading(false);
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    void loadConsent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  const handleGrantConsent = async (row: ConsentStatus) => {
+    setConsentBusy(row.policy_type);
+    const result = await UserAccountService.grantConsent(row.policy_type, row.required_version);
+    setConsentBusy(null);
+    if (result.success) {
+      toast({ title: 'Consent recorded', description: `${prettyPolicy(row.policy_type)} v${row.required_version}.` });
+      await loadConsent();
+    } else {
+      toast({ title: 'Could not record consent', description: result.error, variant: 'destructive' });
+    }
+  };
+
+  const handleWithdrawConsent = async (row: ConsentStatus) => {
+    setConsentBusy(row.policy_type);
+    const result = await UserAccountService.withdrawConsent(row.policy_type);
+    setConsentBusy(null);
+    if (result.success) {
+      toast({
+        title: 'Consent withdrawn',
+        description: `${prettyPolicy(row.policy_type)}. Your grant date and withdrawal date are both kept as a record.`,
+      });
+      await loadConsent();
+    } else {
+      toast({ title: 'Could not withdraw consent', description: result.error, variant: 'destructive' });
     }
   };
 
@@ -845,7 +923,7 @@ const Profile = () => {
       logger.error('Data export error:', error);
       setSettingsMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Failed to export data. Please try again.',
+        text: userMessage(error, 'Failed to export data. Please try again.'),
       });
     } finally {
       setExportLoading(false);
@@ -867,7 +945,7 @@ const Profile = () => {
       logger.error('Account deletion error:', error);
       setSettingsMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Failed to delete account. Please contact support.',
+        text: userMessage(error, 'Failed to delete account. Please contact support.'),
       });
       setDeleteAccountLoading(false);
     }
@@ -2048,6 +2126,85 @@ const Profile = () => {
                           <><Download className="mr-2 h-4 w-4" />Export My Data</>
                         )}
                       </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Privacy & Consent */}
+                  <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                        <ShieldCheck className="h-5 w-5 text-pastel-orange" />
+                        Privacy &amp; Consent
+                      </CardTitle>
+                      <CardDescription className="text-white/55">
+                        What you have agreed to, and how to change it
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {consentLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-white/55">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading your consent record…
+                        </div>
+                      ) : consentError ? (
+                        <div className="flex items-start gap-2 rounded-xl bg-red-500/10 ring-1 ring-red-400/30 p-3">
+                          <ShieldAlert className="h-4 w-4 text-red-300 mt-0.5 shrink-0" />
+                          <div className="text-sm">
+                            <p className="text-red-200 font-bold">Could not load your consent record</p>
+                            <p className="text-white/55 mt-1">{consentError}</p>
+                            <Button variant="outline" onClick={loadConsent}
+                              className="mt-3 h-8 bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 font-bold">
+                              Try again
+                            </Button>
+                          </div>
+                        </div>
+                      ) : consentRows.length === 0 ? (
+                        <p className="text-sm text-white/55">No policies are currently in force.</p>
+                      ) : (
+                        consentRows.map((row) => {
+                          const view = CONSENT_PRESENTATION[row.status] ?? CONSENT_PRESENTATION.never_given;
+                          const busy = consentBusy === row.policy_type;
+                          return (
+                            <div key={row.policy_type}
+                              className="rounded-xl bg-black/20 ring-1 ring-white/10 p-3 flex flex-wrap items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-pastel-cream">{prettyPolicy(row.policy_type)}</span>
+                                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ring-1 ${view.tone}`}>
+                                    {view.label}
+                                  </span>
+                                  <span className="text-[11px] text-white/55">v{row.required_version}</span>
+                                </div>
+                                <p className="text-xs text-white/55 mt-1">{view.blurb}</p>
+                                {row.consented_at && (
+                                  <p className="text-[11px] text-white/55 mt-0.5">
+                                    Accepted {new Date(row.consented_at).toLocaleDateString()}
+                                    {row.consented_version ? ` (v${row.consented_version})` : ''}
+                                    {row.withdrawn_at ? ` · withdrawn ${new Date(row.withdrawn_at).toLocaleDateString()}` : ''}
+                                  </p>
+                                )}
+                              </div>
+                              {view.action === 'withdraw' ? (
+                                <Button variant="outline" disabled={busy}
+                                  onClick={() => handleWithdrawConsent(row)}
+                                  className="h-8 bg-transparent border border-white/20 text-white/70 hover:bg-white/5 hover:text-pastel-cream font-bold disabled:opacity-50">
+                                  {busy ? <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Working…</> : 'Withdraw'}
+                                </Button>
+                              ) : (
+                                <Button disabled={busy}
+                                  onClick={() => handleGrantConsent(row)}
+                                  className="h-8 bg-pastel-orange text-[#581E00] hover:bg-pastel-orange/90 font-bold disabled:opacity-50">
+                                  {busy ? <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Working…</> : 'Accept'}
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                      <p className="text-xs text-white/55 leading-relaxed pt-1">
+                        Withdrawing consent keeps both the date you granted it and the date you withdrew it, because
+                        the record of when you changed your mind matters as much as the consent itself.
+                      </p>
                     </CardContent>
                   </Card>
 

@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useMemo, useRef } from "react";
 import { visibleLeagueTypes } from '@/utils/leagueTypeHelpers';
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -736,7 +737,7 @@ const CreateLeague = () => {
       setLoading(false);
       routeToLeague(league.id, league.settings as Record<string, unknown> | null);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Couldn't join that league — try again in a moment.";
+      const errorMessage = userMessage(err, "Couldn't join that league — try again in a moment.");
 
       // "Already a member" is a success case — the first attempt actually
       // joined (even if the response looked glitchy). Redirect them to the
@@ -1369,7 +1370,7 @@ const CreateLeague = () => {
 
                       {/* Auction-Specific Settings */}
                       {isAuction && (
-                        <div className="mt-6 p-4 rounded-xl border-2 border-dashed border-pastel-orange/40 bg-pastel-orange/8">
+                        <div className="mt-6 p-4 rounded-xl border-2 border-dashed border-pastel-orange/40 bg-pastel-orange/[0.08]">
                           <h4 className="font-semibold text-sm mb-4 flex items-center gap-2">
                             <DollarSign className="w-4 h-4 text-pastel-orange" />
                             Auction Settings

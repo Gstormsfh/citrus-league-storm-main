@@ -36,6 +36,34 @@ export interface TradeOfferWithPlayers extends TradeOffer {
   requested_players: TradePlayerSummary[];
 }
 
+/**
+ * Wire shapes for the trade endpoints.
+ *
+ * Every field is listed in BOTH snake_case and camelCase, and that is intentional
+ * rather than sloppy: the SQL RPCs return snake_case (submit_trade_vote yields
+ * veto_count / approve_count / votes_needed / is_vetoed) while some server routes
+ * re-map to camelCase. The service already reads them defensively with `??`
+ * fallbacks; these types just describe what it was always doing. Previously the
+ * payload was `unknown`, so a genuine casing mismatch here would not have been
+ * caught by the compiler.
+ */
+type TradeCreateResponse = Partial<{ id: string; tradeId: string; message: string }>;
+
+type TradeVoteResponse = Partial<{
+  success: boolean;
+  message: string;
+  vetoCount: number;    veto_count: number;
+  approveCount: number; approve_count: number;
+  votesNeeded: number;  votes_needed: number;
+  isVetoed: boolean;    is_vetoed: boolean;
+}>;
+
+type TradeReviewSettingsResponse = Partial<{
+  reviewType: string;        trade_review_type: string;
+  reviewPeriodHours: number; trade_review_period_hours: number;
+  vetoThreshold: number;     trade_veto_threshold: number;
+}>;
+
 export class TradeService {
   /**
    * Create a new trade proposal
@@ -62,7 +90,8 @@ export class TradeService {
         return { success: false, error: result.error };
       }
 
-      const tradeId = result.data?.id || result.data?.tradeId;
+      const created = result.data as TradeCreateResponse | undefined;
+      const tradeId = created?.id || created?.tradeId;
 
       accountApi.logSecurityEvent('TRADE_OFFER', leagueId, {
         tradeId, fromTeamId, toTeamId,
@@ -102,8 +131,9 @@ export class TradeService {
       } catch { /* best-effort */ }
 
       // Server may return a message for review-routed trades
-      if (result.data?.message) {
-        return { success: true, error: result.data.message };
+      const routed = result.data as TradeCreateResponse | undefined;
+      if (routed?.message) {
+        return { success: true, error: routed.message };
       }
 
       return { success: true };
@@ -233,7 +263,7 @@ export class TradeService {
 
       return {
         success: true,
-        reviewType: result.data?.reviewType || 'none',
+        reviewType: (result.data as TradeReviewSettingsResponse | undefined)?.reviewType || 'none',
       };
     } catch (error: unknown) {
       logger.error('Error submitting trade for review:', error);
@@ -277,7 +307,7 @@ export class TradeService {
         };
       }
 
-      const data = result.data || {};
+      const data = (result.data || {}) as TradeVoteResponse;
       return {
         success: data.success ?? true,
         vetoCount: data.vetoCount ?? data.veto_count ?? 0,
@@ -315,7 +345,7 @@ export class TradeService {
         return { votes: [], error: result.error };
       }
 
-      const votes = (result.data || []).map((v: { voter_team_id?: string; voterTeamId?: string; vote: 'approve' | 'veto'; created_at?: string; createdAt?: string }) => ({
+      const votes = ((result.data || []) as Array<{ voter_team_id?: string; voterTeamId?: string; vote: 'approve' | 'veto'; created_at?: string; createdAt?: string }>).map((v: { voter_team_id?: string; voterTeamId?: string; vote: 'approve' | 'veto'; created_at?: string; createdAt?: string }) => ({
         voterTeamId: v.voterTeamId || v.voter_team_id || '',
         vote: v.vote,
         createdAt: v.createdAt || v.created_at || '',
@@ -377,7 +407,7 @@ export class TradeService {
         };
       }
 
-      const data = result.data || {};
+      const data = (result.data || {}) as TradeReviewSettingsResponse;
       return {
         reviewType: data.reviewType ?? data.trade_review_type ?? 'none',
         reviewPeriodHours: data.reviewPeriodHours ?? data.trade_review_period_hours ?? 48,
