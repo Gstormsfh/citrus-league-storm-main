@@ -112,6 +112,37 @@ const CACHE_TTL = 2 * 60 * 1000;
 
 function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talent?: Partial<TalentMetricsRow>, goalieGsax?: GoalieGsaxRow): NormalizedPlayer {
   const rosterStatus = talent?.roster_status ?? null;
+  const isGoalie = p.position_code === 'G';
+
+  // GAMES PLAYED MEANS "GAMES THIS PLAYER APPEARED IN".
+  //
+  // player_season_stats carries two counters and they are not
+  // interchangeable. `games_played` is games DRESSED; for a goalie that
+  // includes every night he backed up. `goalie_gp` is games PLAYED.
+  // Verified against production, season 2025, 102 goalies: games_played
+  // averages 51.2 while goalie_gp averages 27.1. Vasilevskiy reads 75
+  // dressed against 58 played.
+  //
+  // Every consumer of this field either prints it as "GP" or divides by it
+  // to get a per-game rate, so the skater column made a starting goalie's
+  // TOI/game render ~26:00 instead of ~59:00, and his fantasy
+  // points-per-game come out roughly 30% low.
+  //
+  // Three call sites had already patched this locally — MatchupService,
+  // TradeAnalyzer and DropPlayerForAddDialog — with three slightly
+  // different expressions, which is exactly why the same goalie showed a
+  // different stat line depending on which screen opened his card. Three
+  // independent local fixes for one defect is the signal that the defect
+  // belongs upstream. Resolving it here, where the payload is built, is
+  // what makes every screen agree.
+  //
+  // goalie_gp stays on the payload unchanged for callers that want it
+  // explicitly. goalie_gp = 0 on a goalie is not missing data: all four
+  // such rows in season 2025 also carry zero saves, zero TOI and zero
+  // decisions. Those players genuinely never played, and "no appearances"
+  // is the honest card.
+  const gamesPlayed = isGoalie ? (stat.goalie_gp || 0) : (stat.games_played || 0);
+
   return {
     id: p.player_id,
     full_name: p.full_name,
@@ -119,12 +150,12 @@ function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talen
     team: p.team_abbrev,
     jersey_number: p.jersey_number ? parseInt(p.jersey_number, 10) : null,
     headshot_url: p.headshot_url,
-    is_goalie: p.position_code === 'G',
+    is_goalie: isGoalie,
     status: rosterStatus === 'IR' || rosterStatus === 'LTIR' ? 'injured' : 'active',
     roster_status: rosterStatus,
     is_ir_eligible: talent?.is_ir_eligible || false,
     eligible_positions: (p.eligible_positions && p.eligible_positions.length > 0) ? p.eligible_positions : [p.position_code],
-    games_played: stat.games_played || 0,
+    games_played: gamesPlayed,
     goals: stat.nhl_goals || 0,
     assists: stat.nhl_assists || 0,
     points: (stat.nhl_goals || 0) + (stat.nhl_assists || 0),

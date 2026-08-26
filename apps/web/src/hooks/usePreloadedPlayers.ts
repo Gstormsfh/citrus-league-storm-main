@@ -114,13 +114,35 @@ interface SeasonStatsRow {
    * (PlayerService.ts:150) — the two loaders disagreed.
    */
   x_goals: number | null;
+  /**
+   * Goalie appearances. Distinct from `games_played`, which counts games
+   * DRESSED and therefore includes a backup's bench nights. See the note on
+   * `applySeasonStats` — this is the same "two loaders disagreed" shape as
+   * x_goals above, one column over.
+   */
+  goalie_gp: number | null;
 }
 
 const n = (v: number | null | undefined): number => (typeof v === 'number' ? v : 0);
 
 /** Mutates `p` in place with the player's real season production. */
 function applySeasonStats(p: Player, s: SeasonStatsRow): void {
-  p.games_played = n(s.games_played);
+  // `wins !== null` is this file's goalie test — directoryRowToPlayer seeds
+  // the four goalie counters to 0 for goalies and null for skaters.
+  const isGoalie = p.wins !== null || p.saves !== null;
+
+  // GAMES PLAYED MEANS "GAMES THIS PLAYER APPEARED IN" — matching the
+  // server normalizer in server/src/services/PlayerService.ts. `games_played`
+  // is games DRESSED and counts a goalie's backup nights; `goalie_gp` is
+  // games PLAYED. Season 2025: Vasilevskiy is 75 dressed, 58 played.
+  //
+  // This loader is the DRAFT POOL's independent path to the same rows, and
+  // it did not fetch goalie_gp at all — so a goalie's GP, TOI/game and
+  // fantasy-points-per-game in the draft room disagreed with the identical
+  // player on every API-backed screen. Same shape as the x_goals note above:
+  // two loaders reading one table, one of them missing a column, nothing
+  // ever erroring.
+  p.games_played = isGoalie ? n(s.goalie_gp) : n(s.games_played);
   p.goals = n(s.nhl_goals);
   p.assists = n(s.nhl_assists);
   p.points = n(s.nhl_points);
@@ -146,6 +168,10 @@ function applySeasonStats(p: Player, s: SeasonStatsRow): void {
     p.goals_against = n(s.nhl_goals_against);
     p.save_percentage = typeof s.nhl_save_pct === 'number' ? s.nhl_save_pct : null;
     p.goals_against_average = typeof s.nhl_gaa === 'number' ? s.nhl_gaa : null;
+    // Carried explicitly too: DropPlayerForAddDialog reads goalie_gp rather
+    // than games_played, and left undefined it printed 0 for every goalie
+    // sourced from this loader.
+    p.goalie_gp = n(s.goalie_gp);
   }
 }
 
@@ -185,6 +211,7 @@ function directoryRowToPlayer(row: DirectoryRow): Player {
     losses: isGoalie ? 0 : null,
     ot_losses: isGoalie ? 0 : null,
     saves: isGoalie ? 0 : null,
+    goalie_gp: isGoalie ? 0 : undefined,
     goals_against_average: isGoalie ? null : null,
     save_percentage: isGoalie ? null : null,
     highDangerSavePct: 0,
@@ -346,7 +373,7 @@ export function usePreloadedPlayers(): UsePreloadedPlayersResult {
             const { data: statsData, error: statsErr } = await statsClient
               .from('player_season_stats')
               .select(
-                'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa, x_goals',
+                'player_id, games_played, goalie_gp, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa, x_goals',
               )
               .eq('season', CURRENT_SEASON)
               .order('player_id', { ascending: true })
