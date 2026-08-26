@@ -64,6 +64,7 @@ describe('usePreloadedPlayers — the season-stats query', () => {
       'nhl_gaa',
       'nhl_save_pct',
       'x_goals',
+      'goalie_gp',
     ]) {
       expect(cols, `${required} dropped from the select list`).toContain(required);
     }
@@ -86,6 +87,29 @@ describe('usePreloadedPlayers — the merge', () => {
 
   it('types x_goals on the row interface so a rename breaks the build', () => {
     expect(SOURCE).toMatch(/x_goals:\s*number\s*\|\s*null/);
+  });
+
+  // ── goalie games played (2026-08-26) ─────────────────────────────────────
+  // Same failure shape as x_goals, one column over. This loader is the draft
+  // pool's independent path into player_season_stats and never asked for
+  // goalie_gp, so it fell back to `games_played` — which counts games
+  // DRESSED, backup nights included. Production season 2025: Vasilevskiy is
+  // 75 dressed against 58 played, and across 102 goalies the two columns
+  // average 51.2 and 27.1. Every screen divides by this number, so the draft
+  // room showed a starter at roughly 26 minutes a night instead of 59 and
+  // undercounted his fantasy points-per-game by about a third — while the
+  // API-backed screens, which do read goalie_gp, showed something different
+  // for the same player.
+  it('reads goalie appearances from goalie_gp, not the dressed count', () => {
+    expect(SOURCE).toMatch(/p\.games_played\s*=\s*isGoalie\s*\?\s*n\(s\.goalie_gp\)\s*:\s*n\(s\.games_played\)/);
+  });
+
+  it('types goalie_gp on the row interface so a rename breaks the build', () => {
+    expect(SOURCE).toMatch(/goalie_gp:\s*number\s*\|\s*null/);
+  });
+
+  it('carries goalie_gp onto the player — DropPlayerForAddDialog reads it directly', () => {
+    expect(SOURCE).toMatch(/p\.goalie_gp\s*=\s*n\(s\.goalie_gp\)/);
   });
 
   it('the directory seed still starts xG at 0 (the merge is what fills it)', () => {
