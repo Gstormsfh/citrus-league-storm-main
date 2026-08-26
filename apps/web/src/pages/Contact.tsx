@@ -3,6 +3,23 @@ import { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+/*
+ * THE WHOLE BODY OF THIS PAGE WAS INVISIBLE.
+ *
+ * Both cards carried `animated-element`, which is `opacity: 0` until an
+ * IntersectionObserver adds `.animate`. Only Profile.tsx and Standings.tsx
+ * install that observer; Contact never did. So the form, the message box, the
+ * send button and the email address all rendered, laid out, occupied 846px of
+ * the page — and painted nothing. Between the header and the footer there was
+ * a screenful of empty green.
+ *
+ * Reported from an iPhone as "contact page gets off". It was not a layout bug.
+ *
+ * The class is simply gone from here: a contact form does not need to fade in,
+ * and it certainly does not need to depend on a scroll observer to exist. The
+ * class itself is also now fail-visible (see index.css) so this cannot happen
+ * silently to the next page that uses it.
+ */
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -71,7 +88,7 @@ const Contact = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
             <div className="md:col-span-2">
-              <Card className="animated-element">
+              <Card>
                 <CardHeader>
                   <CardTitle>Send a Message</CardTitle>
                   <CardDescription>
@@ -152,7 +169,7 @@ const Contact = () => {
             </div>
 
             <div className="space-y-6">
-              <Card className="animated-element">
+              <Card>
                 <CardHeader>
                   <CardTitle>Contact Information</CardTitle>
                 </CardHeader>

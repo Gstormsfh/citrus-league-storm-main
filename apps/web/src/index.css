@@ -816,13 +816,28 @@
   @apply py-20 px-6 md:px-12 lg:px-24;
   }
   
-  /* Element animations */
+  /* Element animations.
+   *
+   * FAIL VISIBLE. This was `opacity: 0` with no way back unless an
+   * IntersectionObserver somewhere added `.animate` — so a page that used the
+   * class without installing that observer rendered its content and painted
+   * none of it. That is exactly what happened to the Contact page, which was
+   * blank between the header and the footer for as long as the class was on it.
+   *
+   * The fallback animation reveals the element on its own after a beat, so the
+   * worst case is now a late fade rather than permanently invisible content.
+   * A JS reveal still wins — `.animate` overrides the fallback and runs the
+   * intended fade immediately.
+   */
   .animated-element {
   @apply opacity-0;
+  animation: citrus-reveal-fallback 0.4s ease-out 1.2s forwards;
   }
   
   .animated-element.animate {
   @apply animate-fade-in;
+  animation-delay: 0s;
+  opacity: 1;
   }
   
   /* Premium gradients */
@@ -2035,4 +2050,12 @@ html, body {
 /* Loading screen in dark mode */
 .dark .bg-\[\#2E7D32\] {
   background-color: hsl(30 80% 40%) !important;
+}
+
+
+/* Safety net for .animated-element — see the note beside it above. Content that
+   is never revealed by script reveals itself. */
+@keyframes citrus-reveal-fallback {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
