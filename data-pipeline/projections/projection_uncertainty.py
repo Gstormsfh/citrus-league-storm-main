@@ -740,16 +740,20 @@ def build_player_context(
             # Use shots on goal as proxy for shot count (actual shots table may be large)
             context["shot_count"] = int(float(player_stats[0].get("nhl_shots_on_goal", 0)))
 
-        # Get total xG from raw_shots for current season
+        # Get total xG from raw_shots for current season. xg_v5 is our model;
+        # xg_value is the retired bulk-import column, which scores AUC 0.936
+        # against an honest pre-shot ceiling near 0.82 because it reads the
+        # outcome. Summing it here inflated every player's expected total and
+        # therefore shrank the uncertainty band around it.
         shots = db.select(
             "raw_shots",
-            select="xg_value",
+            select="xg_v5",
             filters=[("player_id", "eq", player_id), ("season", "eq", season)],
             limit=10000
         )
         if shots:
             context["total_xg"] = sum(
-                float(s.get("xg_value", 0) or 0) for s in shots
+                float(s.get("xg_v5", 0) or 0) for s in shots
             )
             context["shot_count"] = max(context["shot_count"], len(shots))
     except Exception as e:

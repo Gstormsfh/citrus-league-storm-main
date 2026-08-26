@@ -1,0 +1,21 @@
+{
+  "n_weeks": 1000,
+  "seed": 42,
+  "citrus": {
+    "brier": 0.1456,
+    "log_loss": 0.4442,
+    "mean_pred": 0.48
+  },
+  "yahoo_espn_strict": {
+    "brier": 0.1876,
+    "log_loss": 0.5931,
+    "mean_pred": 0.472,
+    "note": "Declares 90% confidence in higher point-sum side; no variance modeling."
+  },
+  "yahoo_espn_logistic": {
+    "brier": 0.1533,
+    "log_loss": 0.4703,
+    "mean_pred": 0.4842,
+    "note": "Charitable upgrade: logistic on point-sum spread (not actually shipped by competitors)."
+  }
+}

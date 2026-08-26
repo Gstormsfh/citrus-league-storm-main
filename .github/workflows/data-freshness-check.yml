@@ -50,7 +50,6 @@ jobs:
           # workflow on non-zero exit as a second signal path.
           CITRUS_ALERT_SLACK_WEBHOOK: ${{ secrets.CITRUS_ALERT_SLACK_WEBHOOK }}
           CITRUS_ALERT_PAGERDUTY_KEY: ${{ secrets.CITRUS_ALERT_PAGERDUTY_KEY }}
-          CITRUS_ALERT_EMAIL: ${{ secrets.CITRUS_ALERT_EMAIL }}
         shell: bash
         run: |
           # WHY THIS IS NOT A BARE `python ...` CALL

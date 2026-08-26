@@ -1,0 +1,36 @@
+{
+  "n_player_games": 10000,
+  "seed": 42,
+  "results": {
+    "citrus": {
+      "name": "Citrus (full xG+MC+Bayesian)",
+      "n": 10000,
+      "mae": 1.5418,
+      "rmse": 2.0056,
+      "r2": 0.1482,
+      "spearman": 0.3137,
+      "hit_within_20pct": 0.2692,
+      "bias": -0.0848
+    },
+    "yahoo_baseline": {
+      "name": "Replicated Yahoo BLITZ methodology",
+      "n": 10000,
+      "mae": 1.5593,
+      "rmse": 2.0585,
+      "r2": 0.1027,
+      "spearman": 0.2729,
+      "hit_within_20pct": 0.2682,
+      "bias": 0.0052
+    },
+    "espn_baseline": {
+      "name": "Replicated ESPN methodology",
+      "n": 10000,
+      "mae": 1.5391,
+      "rmse": 2.0244,
+      "r2": 0.1322,
+      "spearman": 0.3005,
+      "hit_within_20pct": 0.2685,
+      "bias": 0.0026
+    }
+  }
+}

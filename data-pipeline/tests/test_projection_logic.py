@@ -19,6 +19,10 @@ import pytest
 
 # Set dummy env vars so the module can be imported without a real Supabase connection.
 # These are never used — all tested functions are pure logic with no DB calls.
+# NOTE: these are MODULE-level and therefore process-wide from the moment pytest
+# collects this file. test_nhl_season_year_parity.py guards against exactly these
+# placeholder values -- if you change them, update _PLACEHOLDER_URL_HOSTS /
+# _PLACEHOLDER_KEY_PREFIXES there or its live tests will try to hit the network.
 os.environ.setdefault("VITE_SUPABASE_URL", "https://test.supabase.co")
 os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "test-key-for-unit-tests")
 

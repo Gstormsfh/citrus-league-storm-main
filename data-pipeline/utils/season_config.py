@@ -42,6 +42,9 @@ from typing import List, Optional, Tuple
 # season by agreement.
 SEASON_START_DATES = {
     2026: _dt.date(2026, 9, 29),
+    # Inert for the derivation (the lookup only reads by_calendar + 1); listed
+    # so season_start_date(2025) answers 7 Oct rather than the 1 Oct default.
+    2025: _dt.date(2025, 10, 7),
 }
 
 
@@ -98,7 +101,7 @@ def live_season_filter(season: Optional[int] = None) -> Tuple[str, str, int]:
     Example:
         rows = db.select(
             "raw_shots",
-            select="player_id,xg_value",
+            select="player_id,xg_v5",
             filters=[live_season_filter(), ("player_id", "eq", pid)],
         )
     """
@@ -109,6 +112,14 @@ def live_season_filter(season: Optional[int] = None) -> Tuple[str, str, int]:
 
 def derive_nhl_season_year(d: _dt.date) -> int:
     """Python mirror of public.get_nhl_season_year (SQL, IMMUTABLE).
+
+    DO NOT "fix" this to handle September openers. It is deliberately the
+    CALENDAR rule and nothing else -- its whole job is to stay bit-for-bit
+    identical to the SQL function of the same name, which
+    test_nhl_season_year_parity.py enforces over PostgREST. The product-path
+    question "what season is it right now" is answered by current_season() /
+    _derive_from_today(), which consult SEASON_START_DATES first and therefore get
+    2026-09-29 right.
 
     NHL seasons run Oct→Jun. Months 10-12 use the current year; months 1-9
     use the previous year. Any drift between this function and the SQL side
