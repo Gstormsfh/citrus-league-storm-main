@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
-import { membershipMiddleware } from '../middleware/membership';
+import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
 import { z } from 'zod';
 import { validateBody, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
@@ -40,40 +40,17 @@ const confidencePicksSchema = z.object({
   })).min(1, 'At least one pick is required'),
 });
 
-const scorePickemSchema = z.object({
+// Scoring takes the week and nothing else.
+//
+// These endpoints used to accept the game results in the request body. That let any
+// authenticated league member POST a result set of their choosing and mark their own
+// losing picks correct. It was also broken for honest callers: scoring ran under the
+// caller's RLS context and the UPDATE policy on the pick tables is
+// `user_id = auth.uid()`, so scoring a week only ever updated the caller's own row.
+//
+// Winners are now derived from `nhl_games` by the SECURITY DEFINER scorers.
+const scoreWeekSchema = z.object({
   weekNumber: z.number().int().min(1),
-  gameResults: z.array(z.object({
-    game_id: z.string().min(1),
-    winning_team: z.string().min(1),
-  })),
-});
-
-const scorePickemATSSchema = z.object({
-  weekNumber: z.number().int().min(1),
-  gameResults: z.array(z.object({
-    game_id: z.string().min(1),
-    home_team: z.string().min(1),
-    away_team: z.string().min(1),
-    home_score: z.number(),
-    away_score: z.number(),
-    status: z.string(),
-  })),
-});
-
-const scoreSurvivorSchema = z.object({
-  weekNumber: z.number().int().min(1),
-  teamResults: z.array(z.object({
-    team: z.string().min(1),
-    won: z.boolean(),
-  })),
-});
-
-const scoreConfidenceSchema = z.object({
-  weekNumber: z.number().int().min(1),
-  gameResults: z.array(z.object({
-    game_id: z.string().min(1),
-    winning_team: z.string().min(1),
-  })),
 });
 
 // ── Shared Helper ────────────────────────────────────────────────────
@@ -280,12 +257,12 @@ poolRoutes.get('/pickem/:leagueId/standings', membershipMiddleware, async (c) =>
 });
 
 // POST /api/pools/pickem/:leagueId/score — Score a week (admin/scoring pipeline)
-poolRoutes.post('/pickem/:leagueId/score', membershipMiddleware, validateBody(scorePickemSchema), async (c) => {
+poolRoutes.post('/pickem/:leagueId/score', commissionerMiddleware, validateBody(scoreWeekSchema), async (c) => {
   try {
     const leagueId = c.req.param('leagueId');
-    const body = getValidatedBody<z.infer<typeof scorePickemSchema>>(c);
+    const body = getValidatedBody<z.infer<typeof scoreWeekSchema>>(c);
     const service = createPoolService(c);
-    const result = await service.scorePickemWeek(leagueId, body.weekNumber, body.gameResults as any);
+    const result = await service.scorePickemWeek(leagueId, body.weekNumber);
     return ok(c, result);
   } catch (err) {
     return handleError(c, err, 'Failed to score picks');
@@ -293,12 +270,12 @@ poolRoutes.post('/pickem/:leagueId/score', membershipMiddleware, validateBody(sc
 });
 
 // POST /api/pools/pickem/:leagueId/score-ats — Score ATS picks
-poolRoutes.post('/pickem/:leagueId/score-ats', membershipMiddleware, validateBody(scorePickemATSSchema), async (c) => {
+poolRoutes.post('/pickem/:leagueId/score-ats', commissionerMiddleware, validateBody(scoreWeekSchema), async (c) => {
   try {
     const leagueId = c.req.param('leagueId');
-    const body = getValidatedBody<z.infer<typeof scorePickemATSSchema>>(c);
+    const body = getValidatedBody<z.infer<typeof scoreWeekSchema>>(c);
     const service = createPoolService(c);
-    const result = await service.scorePickemWeekATS(leagueId, body.weekNumber, body.gameResults as any);
+    const result = await service.scorePickemWeekATS(leagueId, body.weekNumber);
     return ok(c, result);
   } catch (err) {
     return handleError(c, err, 'Failed to score ATS picks');
@@ -372,12 +349,12 @@ poolRoutes.get('/survivor/:leagueId/eliminated', membershipMiddleware, async (c)
 });
 
 // POST /api/pools/survivor/:leagueId/score — Score a week
-poolRoutes.post('/survivor/:leagueId/score', membershipMiddleware, validateBody(scoreSurvivorSchema), async (c) => {
+poolRoutes.post('/survivor/:leagueId/score', commissionerMiddleware, validateBody(scoreWeekSchema), async (c) => {
   try {
     const leagueId = c.req.param('leagueId');
-    const body = getValidatedBody<z.infer<typeof scoreSurvivorSchema>>(c);
+    const body = getValidatedBody<z.infer<typeof scoreWeekSchema>>(c);
     const service = createPoolService(c);
-    const result = await service.scoreSurvivorWeek(leagueId, body.weekNumber, body.teamResults as any);
+    const result = await service.scoreSurvivorWeek(leagueId, body.weekNumber);
     return ok(c, result);
   } catch (err) {
     return handleError(c, err, 'Failed to score survivor picks');
@@ -427,12 +404,12 @@ poolRoutes.get('/confidence/:leagueId/standings', membershipMiddleware, async (c
 });
 
 // POST /api/pools/confidence/:leagueId/score — Score a week
-poolRoutes.post('/confidence/:leagueId/score', membershipMiddleware, validateBody(scoreConfidenceSchema), async (c) => {
+poolRoutes.post('/confidence/:leagueId/score', commissionerMiddleware, validateBody(scoreWeekSchema), async (c) => {
   try {
     const leagueId = c.req.param('leagueId');
-    const body = getValidatedBody<z.infer<typeof scoreConfidenceSchema>>(c);
+    const body = getValidatedBody<z.infer<typeof scoreWeekSchema>>(c);
     const service = createPoolService(c);
-    const result = await service.scoreConfidenceWeek(leagueId, body.weekNumber, body.gameResults as any);
+    const result = await service.scoreConfidenceWeek(leagueId, body.weekNumber);
     return ok(c, result);
   } catch (err) {
     return handleError(c, err, 'Failed to score confidence picks');

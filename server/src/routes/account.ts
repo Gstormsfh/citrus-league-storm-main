@@ -66,6 +66,41 @@ accountRoutes.post('/consent', validateBody(schemas.recordConsent), async (c) =>
   return ok(c, { success: true });
 });
 
+// GET /api/account/consent — what the user still owes (current | outdated | withdrawn | never_given)
+accountRoutes.get('/consent', async (c) => {
+  try {
+    const supabase = createUserClient(c.get('userToken'));
+    const service = new AccountService(supabase);
+    const result = await service.getConsentStatus();
+    if (!result.success) return fail(c, AppError.internal('Failed to read consent status'));
+    return ok(c, result.data);
+  } catch (err) {
+    return handleError(c, err, 'Failed to read consent status');
+  }
+});
+
+// POST /api/account/consent/withdraw — GDPR Art. 7(3): withdrawing must be as
+// easy as giving. POST, not DELETE: the grant row is kept and stamped
+// withdrawn_at, because Art. 7 needs the withdrawal date as much as the
+// consent date. (apiClient.delete() also sends no body.)
+accountRoutes.post('/consent/withdraw', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+    const policyType = typeof body.policyType === 'string' ? body.policyType : null;
+    if (!policyType) return fail(c, AppError.badRequest('policyType is required'));
+    const supabase = createUserClient(c.get('userToken'));
+    const service = new AccountService(supabase);
+    const result = await service.withdrawConsent(
+      policyType,
+      typeof body.version === 'string' ? body.version : null,
+    );
+    if (!result.success) return fail(c, AppError.internal('Failed to withdraw consent'));
+    return ok(c, result.data);
+  } catch (err) {
+    return handleError(c, err, 'Failed to withdraw consent');
+  }
+});
+
 // POST /api/account/audit-log
 accountRoutes.post('/audit-log', validateBody(schemas.auditLog), async (c) => {
   const body = getValidatedBody<z.infer<typeof schemas.auditLog>>(c);

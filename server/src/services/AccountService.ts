@@ -61,6 +61,41 @@ export class AccountService {
     return { success: true as const };
   }
 
+  /** GDPR Art. 7(3) — withdraw a consent the user previously gave. */
+  async withdrawConsent(policyType: string, version?: string | null) {
+    const { data, error } = await this.supabase.rpc('withdraw_user_consent', {
+      p_policy_type: policyType,
+      p_version: version ?? null,
+    });
+    if (error) {
+      logger.error('[AccountService] consent withdrawal REJECTED', {
+        policyType, version, code: error.code, message: error.message,
+      });
+      return { success: false as const, error: error.message };
+    }
+    return { success: true as const, data };
+  }
+
+  /**
+   * What the user still owes: one row per policy in force, each
+   * current | outdated | withdrawn | never_given.
+   *
+   * never_given is the honest state for the 72 accounts that signed up while
+   * public.record_user_consent did not exist. They were not backfilled --
+   * writing consent rows for people who never gave one manufactures exactly
+   * the evidence this ledger exists to provide.
+   */
+  async getConsentStatus() {
+    const { data, error } = await this.supabase.rpc('get_user_consent_status');
+    if (error) {
+      logger.error('[AccountService] consent status read failed', {
+        code: error.code, message: error.message,
+      });
+      return { success: false as const, error: error.message };
+    }
+    return { success: true as const, data: data || [] };
+  }
+
   async logSecurityEvent(eventType: string, leagueId: string | null, details: Record<string, unknown>, severity: string = 'INFO') {
     const { error } = await this.supabase.rpc('log_security_event', {
       p_event_type: eventType, p_league_id: leagueId || null,
