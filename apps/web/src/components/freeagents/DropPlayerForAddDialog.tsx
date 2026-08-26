@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, ArrowUpDown } from 'lucide-react';
 import { Player, PlayerService } from '@/services/PlayerService';
 import { WaiverService } from '@/services/WaiverService';
@@ -195,19 +194,27 @@ export function DropPlayerForAddDialog({
   };
 
   // Render helpers ---------------------------------------------------------
+  // Column visibility is the mobile fix, not horizontal scrolling. 34rem of
+  // columns on a 393px screen means every phone user drags sideways to read a
+  // stat line — and with two tables that scrolled independently, the row you
+  // were comparing against slid out of alignment while you did it. The five
+  // columns that decide a drop (position, name, team, games, production) fit a
+  // phone with room to spare; the rest appear at sm.
+  const HIDE_SM = 'hidden sm:table-cell';
+
   const SkaterHeader = (
     <tr className="text-[11px] uppercase tracking-wide text-muted-foreground border-b">
       <Th>Pos</Th>
       <Th onClick={() => toggleSort('name')} sortable active={sortKey==='name'}>Player</Th>
-      <Th>Team</Th>
+      <Th className={HIDE_SM}>Team</Th>
       <Th onClick={() => toggleSort('gp')} sortable active={sortKey==='gp'} className="text-right">GP</Th>
-      <Th onClick={() => toggleSort('g')} sortable active={sortKey==='g'} className="text-right">G</Th>
-      <Th onClick={() => toggleSort('a')} sortable active={sortKey==='a'} className="text-right">A</Th>
       <Th onClick={() => toggleSort('pts')} sortable active={sortKey==='pts'} className="text-right">PTS</Th>
-      <Th onClick={() => toggleSort('plus_minus')} sortable active={sortKey==='plus_minus'} className="text-right">+/-</Th>
-      <Th onClick={() => toggleSort('sog')} sortable active={sortKey==='sog'} className="text-right">SOG</Th>
-      <Th onClick={() => toggleSort('hit')} sortable active={sortKey==='hit'} className="text-right">HIT</Th>
-      <Th onClick={() => toggleSort('blk')} sortable active={sortKey==='blk'} className="text-right">BLK</Th>
+      <Th onClick={() => toggleSort('g')} sortable active={sortKey==='g'} className={`text-right ${HIDE_SM}`}>G</Th>
+      <Th onClick={() => toggleSort('a')} sortable active={sortKey==='a'} className={`text-right ${HIDE_SM}`}>A</Th>
+      <Th onClick={() => toggleSort('plus_minus')} sortable active={sortKey==='plus_minus'} className={`text-right ${HIDE_SM}`}>+/-</Th>
+      <Th onClick={() => toggleSort('sog')} sortable active={sortKey==='sog'} className={`text-right ${HIDE_SM}`}>SOG</Th>
+      <Th onClick={() => toggleSort('hit')} sortable active={sortKey==='hit'} className={`text-right ${HIDE_SM}`}>HIT</Th>
+      <Th onClick={() => toggleSort('blk')} sortable active={sortKey==='blk'} className={`text-right ${HIDE_SM}`}>BLK</Th>
     </tr>
   );
 
@@ -215,39 +222,44 @@ export function DropPlayerForAddDialog({
     <tr className="text-[11px] uppercase tracking-wide text-muted-foreground border-b">
       <Th>Pos</Th>
       <Th onClick={() => toggleSort('name')} sortable active={sortKey==='name'}>Player</Th>
-      <Th>Team</Th>
+      <Th className={HIDE_SM}>Team</Th>
       <Th onClick={() => toggleSort('gp')} sortable active={sortKey==='gp'} className="text-right">GP</Th>
-      <Th onClick={() => toggleSort('w')} sortable active={sortKey==='w'} className="text-right">W</Th>
-      <Th onClick={() => toggleSort('l')} sortable active={sortKey==='l'} className="text-right">L</Th>
       <Th onClick={() => toggleSort('gaa')} sortable active={sortKey==='gaa'} className="text-right">GAA</Th>
       <Th onClick={() => toggleSort('svp')} sortable active={sortKey==='svp'} className="text-right">SV%</Th>
-      <Th onClick={() => toggleSort('so')} sortable active={sortKey==='so'} className="text-right">SO</Th>
+      <Th onClick={() => toggleSort('w')} sortable active={sortKey==='w'} className={`text-right ${HIDE_SM}`}>W</Th>
+      <Th onClick={() => toggleSort('l')} sortable active={sortKey==='l'} className={`text-right ${HIDE_SM}`}>L</Th>
+      <Th onClick={() => toggleSort('so')} sortable active={sortKey==='so'} className={`text-right ${HIDE_SM}`}>SO</Th>
     </tr>
   );
+
+  const rowClass = (opts: { selected?: boolean; comparison?: boolean }) =>
+    `border-b text-sm transition-colors ${
+      opts.comparison
+        ? 'bg-emerald-500/10 font-medium cursor-default'
+        : opts.selected
+          ? 'bg-primary/15 cursor-pointer'
+          : 'hover:bg-muted cursor-pointer'
+    }`;
 
   const renderSkaterRow = (p: Player, opts: { selected?: boolean; comparison?: boolean } = {}) => (
     <tr
       key={`s-${p.id}`}
       onClick={opts.comparison ? undefined : () => setSelectedDropId(String(p.id))}
-      className={`border-b text-sm transition-colors ${
-        opts.comparison
-          ? 'bg-emerald-500/10 font-medium cursor-default'
-          : opts.selected
-            ? 'bg-primary/15 cursor-pointer'
-            : 'hover:bg-muted cursor-pointer'
-      }`}
+      className={rowClass(opts)}
     >
-      <td className="px-3 py-2"><Badge variant="secondary" className="w-8 justify-center">{p.position}</Badge></td>
-      <td className="px-3 py-2 font-medium truncate max-w-[180px]">{p.full_name}</td>
-      <td className="px-3 py-2 text-muted-foreground">{p.team}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.games_played)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.goals)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.assists)}</td>
-      <td className="px-3 py-2 text-right tabular-nums font-semibold">{num(p.points)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.plus_minus)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.shots)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.hits)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.blocks)}</td>
+      <td className="px-2 py-2 sm:px-3"><Badge variant="secondary" className="w-8 justify-center">{p.position}</Badge></td>
+      <td className="px-2 py-2 sm:px-3 font-medium">
+        <span className="block truncate max-w-[7.5rem] sm:max-w-[11rem]">{p.full_name}</span>
+      </td>
+      <td className={`px-2 py-2 sm:px-3 text-muted-foreground ${HIDE_SM}`}>{p.team}</td>
+      <td className="px-2 py-2 sm:px-3 text-right tabular-nums">{num(p.games_played)}</td>
+      <td className="px-2 py-2 sm:px-3 text-right tabular-nums font-semibold">{num(p.points)}</td>
+      <td className={`px-2 py-2 sm:px-3 text-right tabular-nums ${HIDE_SM}`}>{num(p.goals)}</td>
+      <td className={`px-2 py-2 sm:px-3 text-right tabular-nums ${HIDE_SM}`}>{num(p.assists)}</td>
+      <td className={`px-2 py-2 sm:px-3 text-right tabular-nums ${HIDE_SM}`}>{num(p.plus_minus)}</td>
+      <td className={`px-2 py-2 sm:px-3 text-right tabular-nums ${HIDE_SM}`}>{num(p.shots)}</td>
+      <td className={`px-2 py-2 sm:px-3 text-right tabular-nums ${HIDE_SM}`}>{num(p.hits)}</td>
+      <td className={`px-2 py-2 sm:px-3 text-right tabular-nums ${HIDE_SM}`}>{num(p.blocks)}</td>
     </tr>
   );
 
@@ -255,60 +267,88 @@ export function DropPlayerForAddDialog({
     <tr
       key={`g-${p.id}`}
       onClick={opts.comparison ? undefined : () => setSelectedDropId(String(p.id))}
-      className={`border-b text-sm transition-colors ${
-        opts.comparison
-          ? 'bg-emerald-500/10 font-medium cursor-default'
-          : opts.selected
-            ? 'bg-primary/15 cursor-pointer'
-            : 'hover:bg-muted cursor-pointer'
-      }`}
+      className={rowClass(opts)}
     >
-      <td className="px-3 py-2"><Badge variant="secondary" className="w-8 justify-center">G</Badge></td>
-      <td className="px-3 py-2 font-medium truncate max-w-[180px]">{p.full_name}</td>
-      <td className="px-3 py-2 text-muted-foreground">{p.team}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.goalie_gp ?? 0)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.wins)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.losses)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.goals_against_average, 2)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.save_percentage ? p.save_percentage * 100 : null, 1)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{num(p.shutouts ?? 0)}</td>
+      <td className="px-2 py-2 sm:px-3"><Badge variant="secondary" className="w-8 justify-center">G</Badge></td>
+      <td className="px-2 py-2 sm:px-3 font-medium">
+        <span className="block truncate max-w-[7.5rem] sm:max-w-[11rem]">{p.full_name}</span>
+      </td>
+      <td className={`px-2 py-2 sm:px-3 text-muted-foreground ${HIDE_SM}`}>{p.team}</td>
+      <td className="px-2 py-2 sm:px-3 text-right tabular-nums">{num(p.goalie_gp ?? 0)}</td>
+      <td className="px-2 py-2 sm:px-3 text-right tabular-nums font-semibold">{num(p.goals_against_average, 2)}</td>
+      <td className="px-2 py-2 sm:px-3 text-right tabular-nums">{num(p.save_percentage ? p.save_percentage * 100 : null, 1)}</td>
+      <td className={`px-2 py-2 sm:px-3 text-right tabular-nums ${HIDE_SM}`}>{num(p.wins)}</td>
+      <td className={`px-2 py-2 sm:px-3 text-right tabular-nums ${HIDE_SM}`}>{num(p.losses)}</td>
+      <td className={`px-2 py-2 sm:px-3 text-right tabular-nums ${HIDE_SM}`}>{num(p.shutouts ?? 0)}</td>
     </tr>
   );
 
+  /*
+   * SKATERS AND GOALIES ARE SEPARATE TABLES, NOT ONE MIXED LIST.
+   *
+   * They were one table with one header, chosen by the position filter. Under
+   * the default "All" filter that header was the SKATER header while goalie
+   * rows still rendered goalie cells — nine cells beneath eleven columns — so
+   * a goalie's wins printed under Goals and his save percentage under Assists.
+   * Every goalie on the roster showed a wrong stat line, silently, because
+   * nothing about a table with too few cells errors.
+   *
+   * Two tables inside ONE scroller: each is internally aligned, they read as
+   * the two sections they actually are, and there is still only one thing on
+   * the page that scrolls.
+   */
+  const skaters = filteredRoster.filter((p) => !isGoalie(p));
+  const goalies = filteredRoster.filter(isGoalie);
+
   return (
     <Dialog open={open} onOpenChange={(v) => !submitting && onOpenChange(v)}>
-      <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>
+      {/*
+        * HEIGHT HAS TO BE DEFINITE, NOT JUST CAPPED.
+        *
+        * This was `max-h-[90vh] flex flex-col` with an auto height. In a
+        * column flex container whose height is indefinite, `flex-basis: 0%`
+        * cannot resolve and is treated as content — so the roster box sized
+        * itself to its child (a fixed 42vh scroll viewport), the dialog then
+        * clamped to 90vh, and the roster box shrank to absorb the overflow
+        * while the viewport inside it did NOT. Measured on an iPhone 393x852:
+        * a 274px box clipping a 358px viewport. The scroller believed the
+        * bottom 84px were already on screen, so it would not scroll them into
+        * view and the last two players could never be reached or dropped.
+        *
+        * A definite height on the phone makes flex resolve once, honestly,
+        * and every child below is shrink-0 except the list — so the list is
+        * the only thing that can absorb a squeeze, which is what we want it
+        * to do.
+        */}
+      <DialogContent className="sm:max-w-5xl max-h-[92dvh] sm:max-h-[90vh] flex flex-col overflow-hidden gap-3 p-4 sm:p-6">
+        <DialogHeader className="shrink-0">
+          <DialogTitle className="text-base sm:text-lg pr-8">
             Drop a player to add <span className="text-emerald-600">{addPlayer?.full_name ?? 'player'}</span>
           </DialogTitle>
-          <DialogDescription>
-            Select a player from your roster to drop. Add and drop happen atomically — if anything fails,
-            neither change is saved. If {addPlayer?.full_name ?? 'this player'} is on waivers, a claim will
-            be submitted automatically with your selected drop as the conditional drop.
+          {/*
+            * Six lines of legalese cost ~180px of a 852px phone — more than
+            * four roster rows — to say something the user finds out anyway by
+            * pressing the button. The short form carries the one fact that
+            * changes behaviour; the full explanation stays for the desktop
+            * layout that has room for it.
+            */}
+          <DialogDescription className="text-xs sm:text-sm">
+            <span className="sm:hidden">Add and drop happen together — if either fails, nothing is saved.</span>
+            <span className="hidden sm:inline">
+              Select a player from your roster to drop. Add and drop happen atomically — if anything fails,
+              neither change is saved. If {addPlayer?.full_name ?? 'this player'} is on waivers, a claim will
+              be submitted automatically with your selected drop as the conditional drop.
+            </span>
           </DialogDescription>
         </DialogHeader>
 
-        {/* Adding section.
-            *
-            * shrink-0 is load-bearing. DialogContent is `flex flex-col` with
-            * max-h-[90vh]; on a phone the description, filter chips, roster
-            * list and two buttons together exceed that, so flexbox shrinks
-            * whichever children let it — and this block did. Combined with
-            * overflow-hidden that sliced the added player's row in half, which
-            * is what it looked like on an iPhone 17: a header and the top of a
-            * row, and no way to see the rest.
-            *
-            * overflow-x-auto rather than hidden: the columns (POS / PLAYER /
-            * TEAM / GP / W) do not fit 390px, and clipping them left no way to
-            * reach the stats you are supposed to be comparing against.
-            */}
+        {/* The player being added, in the same column set as the list below it. */}
         {addPlayer && (
           <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 shrink-0 overflow-x-auto">
-            <div className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-emerald-700 font-semibold">
+            <div className="px-2 sm:px-3 py-1 text-[11px] uppercase tracking-wide text-emerald-700 font-semibold">
               Adding
             </div>
-            <table className="w-full min-w-[34rem]">
+            <table className="w-full">
               <thead>{addingGoalie ? GoalieHeader : SkaterHeader}</thead>
               <tbody>
                 {addingGoalie
@@ -320,7 +360,7 @@ export function DropPlayerForAddDialog({
         )}
 
         {/* Filter chips */}
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-muted-foreground">Filter:</span>
           {POS_FILTERS.map((f) => (
             <button
@@ -335,50 +375,55 @@ export function DropPlayerForAddDialog({
             </button>
           ))}
           <span className="ml-auto text-xs text-muted-foreground">
-            {filteredRoster.length} player{filteredRoster.length === 1 ? '' : 's'}
+            {filteredRoster.length}
           </span>
         </div>
 
-        {/* Roster table */}
         {/*
-          * Height was a flat 420px, which is most of an iPhone's usable height
-          * once the header, description and buttons are accounted for. Scaled
-          * to the viewport with the old value as the desktop ceiling.
+          * ONE SCROLLER. The viewport and the box that clips it are the same
+          * element, so they cannot disagree about how far there is to scroll —
+          * which is the entire bug above. It also replaces two nested
+          * scrollers (a Radix ScrollArea owning the vertical axis wrapped
+          * around a div owning the horizontal one); on a touch screen a drag
+          * that is a few degrees off vertical gets captured by the wrong one
+          * of those and the list appears to refuse to move.
+          *
+          * overscroll-contain stops a flick that reaches the end of the list
+          * from chaining into the locked page behind the dialog and rubber-
+          * banding back.
           */}
-        <div className="rounded-md border flex-1 min-h-0 overflow-hidden">
-          <ScrollArea className="h-[min(420px,42vh)]">
-            {loadingRoster ? (
-              <div className="flex h-[min(420px,42vh)] items-center justify-center text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading roster...
-              </div>
-            ) : filteredRoster.length === 0 ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">
-                No matching players on your roster.
-              </div>
-            ) : (
-              // Horizontal scroll lives on this wrapper, not the ScrollArea:
-              // the ScrollArea owns the vertical axis and the sticky header,
-              // and nesting a second scroller on the same axis fights it.
-              <div className="overflow-x-auto">
-              <table className="w-full min-w-[34rem]">
-                <thead className="sticky top-0 bg-background z-10">
-                  {posFilter === 'G' ? GoalieHeader : SkaterHeader}
-                </thead>
-                <tbody>
-                  {filteredRoster.map((p) => {
-                    const selected = selectedDropId === String(p.id);
-                    return posFilter === 'G' || isGoalie(p)
-                      ? renderGoalieRow(p, { selected })
-                      : renderSkaterRow(p, { selected });
-                  })}
-                </tbody>
-              </table>
-              </div>
-            )}
-          </ScrollArea>
+        <div data-testid="roster-list" className="rounded-md border flex-1 min-h-0 overflow-auto overscroll-contain">
+          {loadingRoster ? (
+            <div className="flex h-full min-h-[8rem] items-center justify-center text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading roster...
+            </div>
+          ) : filteredRoster.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              No matching players on your roster.
+            </div>
+          ) : (
+            <>
+              {skaters.length > 0 && (
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-background z-10">{SkaterHeader}</thead>
+                  <tbody>
+                    {skaters.map((p) => renderSkaterRow(p, { selected: selectedDropId === String(p.id) }))}
+                  </tbody>
+                </table>
+              )}
+              {goalies.length > 0 && (
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-background z-10">{GoalieHeader}</thead>
+                  <tbody>
+                    {goalies.map((p) => renderGoalieRow(p, { selected: selectedDropId === String(p.id) }))}
+                  </tbody>
+                </table>
+              )}
+            </>
+          )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 flex-row justify-end gap-2 sm:gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancel
           </Button>
@@ -418,7 +463,7 @@ function Th({
   return (
     <th
       onClick={onClick}
-      className={`px-3 py-2 text-left font-semibold ${className} ${
+      className={`px-2 py-2 sm:px-3 text-left font-semibold ${className} ${
         sortable ? 'cursor-pointer select-none hover:text-foreground' : ''
       } ${active ? 'text-foreground' : ''}`}
     >
