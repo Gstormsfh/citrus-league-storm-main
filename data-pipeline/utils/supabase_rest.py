@@ -238,16 +238,102 @@ class SupabaseRest:
           params[k] = v
     return urlencode(params, doseq=True)
 
-  def select(self, table: str, select: str = "*", filters: Optional[List[Filter]] = None, order: Optional[str] = None,
-             limit: Optional[int] = None, offset: Optional[int] = None) -> List[dict]:
+  # PostgREST caps every response at db-max-rows, which is 1000 on this project.
+  # A read asking for more gets 1000 and no error. Measured 2026-08-26: twenty-two
+  # active reads ask for 2,000 to 100,000 rows and silently receive 1,000 —
+  # including the daily projections path, which asks for "all shots in these
+  # games" with limit=50000.
+  SAFE_PAGE = 1000
+
+  def _select_once(self, table: str, select: str, filters, order, limit, offset,
+                   want_total: bool = False):
+    """One request. Returns (rows, total_available_or_None)."""
     qs = self._build_query(select=select, filters=filters, order=order, limit=limit, offset=offset)
     url = f"{self.rest_base}/{table}"
     if qs:
       url = f"{url}?{qs}"
-    r = self._request_with_retry("GET", url, headers=self._headers(), timeout=self.timeout_seconds)
+    hdr = self._headers({"Prefer": "count=exact"}) if want_total else self._headers()
+    r = self._request_with_retry("GET", url, headers=hdr, timeout=self.timeout_seconds)
     if r.status_code >= 400:
       raise RuntimeError(f"Supabase select failed ({table}): {r.status_code} {r.text}")
-    return r.json() if r.text else []
+    rows = r.json() if r.text else []
+    total = None
+    if want_total:
+      cr = r.headers.get("Content-Range") or r.headers.get("content-range")
+      if cr and "/" in cr:
+        tail = cr.split("/", 1)[1].strip()
+        if tail.isdigit():
+          total = int(tail)
+    return rows, total
+
+  def select(self, table: str, select: str = "*", filters: Optional[List[Filter]] = None, order: Optional[str] = None,
+             limit: Optional[int] = None, offset: Optional[int] = None) -> List[dict]:
+    """Read rows, paging transparently rather than being silently truncated.
+
+    A caller asking for at most SAFE_PAGE rows gets exactly the behaviour it
+    always had: one request, one response. Nothing about those call sites
+    changes.
+
+    A caller asking for more than that — or for no limit at all — used to
+    receive whatever the server was willing to return in one go and had no way
+    to tell that was not everything. It now pages until it has the whole
+    result, and checks the tally against the count PostgREST reports in
+    Content-Range. If those disagree it raises, because returning part of an
+    answer while looking like the whole one is the failure this guards.
+
+    Offset paging needs a stable sort. When the caller supplies no `order`, a
+    deterministic one is added on `id`; a table without that column falls back
+    to the caller's original request and a warning, rather than failing.
+    """
+    if limit is not None and int(limit) <= self.SAFE_PAGE:
+      rows, _ = self._select_once(table, select, filters, order, limit, offset)
+      return rows
+
+    want = None if limit is None else int(limit)
+    page_order = order
+    fallback_tried = False
+    if page_order is None:
+      # deterministic order so offset paging cannot repeat or skip
+      page_order = "id.asc"
+
+    out: List[dict] = []
+    off = int(offset or 0)
+    total = None
+    while True:
+      take = self.SAFE_PAGE if want is None else min(self.SAFE_PAGE, want - len(out))
+      if take <= 0:
+        break
+      try:
+        rows, t = self._select_once(table, select, filters, page_order, take, off,
+                                    want_total=(total is None))
+      except RuntimeError as e:
+        # a table with no `id` column rejects the order we added; drop it once
+        if page_order == "id.asc" and order is None and not fallback_tried:
+          fallback_tried = True
+          page_order = None
+          print(f"   [WARN] {table}: no id column to page by, falling back to unordered "
+                f"paging. Add an explicit order= to this call.")
+          continue
+        raise
+      if t is not None and total is None:
+        total = t
+      out.extend(rows)
+      if len(rows) < take:
+        break
+      off += len(rows)
+
+    if total is not None:
+      expected = max(0, total - int(offset or 0))
+      if want is not None:
+        expected = min(want, expected)
+      if len(out) != expected:
+        raise RuntimeError(
+          f"Supabase select ({table}): TRUNCATION — paged to {len(out)} rows but "
+          f"Content-Range reports {total} available with offset={offset!r} "
+          f"limit={limit!r}, so {expected} were expected. filters={filters!r}. "
+          f"Refusing to return part of an answer as if it were the whole one."
+        )
+    return out
 
   def select_exact(self, table: str, select: str = "*", filters: Optional[List[Filter]] = None,
                    order: Optional[str] = None, limit: Optional[int] = None,
@@ -267,8 +353,10 @@ class SupabaseRest:
       less means the transport dropped rows silently.
     * If the caller did not specify limit/offset (full-table select),
       the returned row count must equal the total from Content-Range.
-    * PostgREST caps unpaged responses at its own max-rows limit; use
-      paginated calls or explicit `limit=100000` for large scans.
+    * PostgREST caps every response at db-max-rows (1000 on this project).
+      A large `limit=` does NOT defeat that — it just returns 1000 rows and
+      no error. `select()` above now pages transparently; prefer it. Do not
+      write `limit=100000` and assume you got 100000.
 
     Callers that iterate pages should combine with `_expected_total()`
     below or simply loop until returned rows < requested limit.
