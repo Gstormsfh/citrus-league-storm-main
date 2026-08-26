@@ -20,7 +20,8 @@ export const MatchupScoreJobService = {
   async lockCompletedDays(): Promise<{ lockedCount: number; error: Error | null }> {
     try {
       const response = await matchupApi.lockCompletedDays();
-      return { lockedCount: response.data?.lockedCount || 0, error: null };
+      const payload = response.data as { lockedCount?: number } | undefined;
+      return { lockedCount: payload?.lockedCount || 0, error: null };
     } catch (error) {
       logger.error('[MatchupScoreJobService] Exception in lockCompletedDays:', error);
       return { lockedCount: 0, error: error as Error };
@@ -82,7 +83,11 @@ export const MatchupScoreJobService = {
   }> {
     try {
       const response = await matchupApi.getJobStatus();
-      const data = response.data || {};
+      const data = (response.data || {}) as Partial<{
+        lastRun: string;
+        totalMatchups: number;
+        lockedDays: number;
+      }>;
       return {
         lastRun: data.lastRun ? new Date(data.lastRun) : null,
         totalMatchups: data.totalMatchups || 0,

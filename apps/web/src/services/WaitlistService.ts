@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { publicApi } from '@/api/public';
 import { logger } from '@/utils/logger';
 
@@ -29,7 +30,7 @@ export const WaitlistService = {
       return result || { success: true, message: "Successfully added to waitlist!" };
     } catch (error: unknown) {
       logger.error('WaitlistService: Error adding email:', error);
-      const msg = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
+      const msg = userMessage(error, 'An unexpected error occurred. Please try again.');
       return { success: false, message: msg };
     }
   },

@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -49,7 +50,7 @@ const VerifyEmail = () => {
         setSuccess(true);
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "That resend hit a snag — try again in a moment.";
+      const errorMessage = userMessage(err, "That resend hit a snag — try again in a moment.");
       setError(errorMessage);
     } finally {
       setLoading(false);

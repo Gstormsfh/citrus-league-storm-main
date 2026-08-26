@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate, Navigate, Link } from "react-router-dom";
 import { HockeyFooter, StormyLoading } from '@/components/citrus2';
@@ -1027,7 +1028,7 @@ const Matchup = () => {
         // Only show errors after we've successfully initialized at least once
         if (hasInitializedRef.current) {
           // We've initialized before, so it's safe to show the error
-          setError(error instanceof Error ? error.message : 'Failed to load demo matchup');
+          setError(userMessage(error, 'Failed to load demo matchup'));
           setLoading(false);
           hasInitializedRef.current = true;
         } else {

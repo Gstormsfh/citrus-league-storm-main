@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -370,7 +371,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         toast({ title: "Drop Didn't Take", description: (error as { message?: string })?.message || "Couldn't drop the player — try again in a moment.", variant: "destructive" });
       }
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to drop player.";
+      const message = userMessage(error, "Failed to drop player.");
       toast({ title: "Drop Didn't Take", description: message, variant: "destructive" });
     } finally {
       setIsDropping(false);

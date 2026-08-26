@@ -21,7 +21,7 @@ export function StormyHeroTile({ exchange }: { exchange: StormyExchange }) {
       {/* Unified card */}
       <div className="relative bg-pastel-surface-tile border border-white/10 rounded-2xl shadow-[0_30px_70px_-20px_rgba(0,0,0,0.6)]">
         {/* Stormy persona header — portrait peeks above the card edge */}
-        <div className="flex items-center gap-4 px-5 pt-5 pb-4 border-b border-white/10 bg-gradient-to-b from-pastel-orange/8 to-transparent">
+        <div className="flex items-center gap-4 px-5 pt-5 pb-4 border-b border-white/10 bg-gradient-to-b from-pastel-orange/[0.08] to-transparent">
           <div className="relative -mt-12 flex-shrink-0">
             <div className="rounded-full ring-4 ring-pastel-surface-tile shadow-[0_12px_32px_-8px_rgba(255,107,26,0.4)]">
               <MascotAvatar id="stormy" size="lg" ring={false} className="ring-2 ring-pastel-orange/40" />

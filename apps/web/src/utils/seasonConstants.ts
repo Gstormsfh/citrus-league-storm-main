@@ -14,6 +14,7 @@ export {
   DEFAULT_TEST_DATE,
   getCurrentSeason,
   getSeasonGameCount,
-  getSeasonYearForDate,
   getHeadshotUrl,
+  getSeasonStartDate,
+  getSeasonYearForDate,
 } from '@citrus/shared';

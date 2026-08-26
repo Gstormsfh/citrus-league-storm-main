@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -523,7 +524,7 @@ const PlayoffBracket = () => {
       setTeamNames(names);
     } catch (err: unknown) {
       logger.error('[PlayoffBracket] Error loading:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load playoff bracket');
+      setError(userMessage(err, 'Failed to load playoff bracket'));
     } finally {
       setLoading(false);
     }
@@ -553,7 +554,7 @@ const PlayoffBracket = () => {
     } catch (err: unknown) {
       toast({
         title: "Bracket Didn't Build",
-        description: err instanceof Error ? err.message : "Couldn't generate the bracket — try again in a moment.",
+        description: userMessage(err, "Couldn't generate the bracket — try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -577,7 +578,7 @@ const PlayoffBracket = () => {
     } catch (err: unknown) {
       toast({
         title: "Round Didn't Advance",
-        description: err instanceof Error ? err.message : "Couldn't advance the round — try again in a moment.",
+        description: userMessage(err, "Couldn't advance the round — try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -599,7 +600,7 @@ const PlayoffBracket = () => {
     } catch (err: unknown) {
       toast({
         title: "Bracket Reset Didn't Take",
-        description: err instanceof Error ? err.message : "Couldn't reset the bracket — try again in a moment.",
+        description: userMessage(err, "Couldn't reset the bracket — try again in a moment."),
         variant: 'destructive',
       });
     } finally {

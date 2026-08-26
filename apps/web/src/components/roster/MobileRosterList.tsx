@@ -369,7 +369,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
         <div
           className={cn(
             "flex-1 flex items-center justify-center py-1.5 rounded-md border border-dashed",
-            isEligibleTarget ? "border-pastel-sage bg-pastel-sage/5" : "border-white/10 bg-white/3",
+            isEligibleTarget ? "border-pastel-sage bg-pastel-sage/5" : "border-white/10 bg-white/[0.03]",
           )}
           onClick={onEmptySlotTap}
         >

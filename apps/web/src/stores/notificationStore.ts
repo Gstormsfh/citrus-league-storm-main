@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { create } from 'zustand';
 import { NotificationService, Notification } from '@/services/NotificationService';
 import { logger } from '@/utils/logger';
@@ -50,14 +51,15 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const { data, error } = await NotificationService.getNotifications(leagueId, userId);
 
       if (error) {
-        // Handle different error types
+        // NotificationService returns its error untyped; describe what we read.
+        const err = error as { code?: number; message?: string };
         let errorMessage = 'Failed to load notifications';
-        if (error.code === 401) {
+        if (err.code === 401) {
           errorMessage = 'Please sign in to view notifications';
-        } else if (error.code === 403) {
+        } else if (err.code === 403) {
           errorMessage = 'You do not have access to this league';
-        } else if (error.message) {
-          errorMessage = error.message;
+        } else if (err.message) {
+          errorMessage = err.message;
         }
 
         set((state) => {
@@ -85,7 +87,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       logger.error('[NotificationStore] Error loading notifications:', error);
       set((state) => {
         const newErrors = new Map(state.errors);
-        newErrors.set(leagueId, error instanceof Error ? error.message : 'Failed to load notifications');
+        newErrors.set(leagueId, userMessage(error, 'Failed to load notifications'));
         const newLoading = new Map(state.loading);
         newLoading.set(leagueId, false);
         return { errors: newErrors, loading: newLoading };

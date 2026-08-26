@@ -172,7 +172,12 @@ export class KeeperService {
         };
       }
 
-      const result = response.data;
+      const result = response.data as Partial<{
+        is_valid: boolean;
+        error_message: string | null;
+        keepers_count: number;
+        max_keepers: number;
+      }> | undefined;
       return {
         is_valid: result?.is_valid ?? false,
         error_message: result?.error_message ?? null,
@@ -233,7 +238,7 @@ export class KeeperService {
         return { results: [], error: response.error };
       }
 
-      const results = (response.data || []).map((row: any) => ({
+      const results = ((response.data || []) as Array<Record<string, any>>).map((row: any) => ({
         teamId: row.team_id || row.teamId,
         keepersLocked: row.keepers_locked || row.keepersLocked || 0,
         roundsConsumed: row.rounds_consumed || row.roundsConsumed || [],

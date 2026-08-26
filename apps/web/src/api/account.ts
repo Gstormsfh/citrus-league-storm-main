@@ -59,6 +59,16 @@ export const accountApi = {
   recordConsent(policyType: string, version: string) {
     return apiClient.post('/api/account/consent', { policyType, version });
   },
+
+  /** One row per policy in force: current | outdated | withdrawn | never_given. */
+  getConsentStatus() {
+    return apiClient.get('/api/account/consent');
+  },
+
+  /** GDPR Art. 7(3). Omit version to withdraw every live version of the policy. */
+  withdrawConsent(policyType: string, version?: string) {
+    return apiClient.post('/api/account/consent/withdraw', { policyType, version });
+  },
   logSecurityEvent(eventType: string, leagueId?: string | null, details?: Record<string, unknown>, severity?: string) {
     return apiClient.post('/api/account/audit-log', { eventType, leagueId, details, severity });
   },
