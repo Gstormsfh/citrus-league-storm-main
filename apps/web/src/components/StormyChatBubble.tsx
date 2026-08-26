@@ -67,9 +67,70 @@ interface ChatMessage {
 
 // ── Component ────────────────────────────────────────────────────
 
+/**
+ * True while the user is typing into a form field anywhere on the page.
+ *
+ * The FAB is `position: fixed` at the bottom-left with z-index 100, so it sits
+ * on top of whatever the page has in that corner. On list screens that is
+ * harmless — the 2026-08-23 mobile fix moved it left precisely because the
+ * right side was eating the Free Agents "+" buttons, and the left only covers
+ * avatars. But that reasoning was about LISTS. On a FORM the left edge is
+ * where every input starts, so a 56px opaque circle lands squarely on top of
+ * one: on Profile it covers the first characters of "Confirm new password".
+ *
+ * Moving it back to the right just relocates the collision. Instead the FAB
+ * gets out of the way while a field has focus and comes back on blur — which
+ * also matches what it should do on mobile when the keyboard is up.
+ *
+ * Listens on the document rather than per-field so this holds for every form
+ * in the app, including ones written later. focusout is deferred a tick
+ * because activeElement is momentarily <body> between two fields, and without
+ * that the FAB flashes back while tabbing.
+ */
+function useTextFieldFocused(): boolean {
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    const NON_TEXT_INPUTS = new Set([
+      'button', 'submit', 'reset', 'checkbox', 'radio', 'range', 'color', 'file', 'image',
+    ]);
+
+    const isTextEntry = (el: Element | null): boolean => {
+      if (!(el instanceof HTMLElement)) return false;
+      // isContentEditable is the correct API — it accounts for the attribute
+      // being inherited from an ancestor. The attribute check beside it covers
+      // environments that do not implement the property (jsdom is one, which
+      // is why the attribute path is the one under test).
+      if (el.isContentEditable) return true;
+      const editable = el.getAttribute('contenteditable');
+      if (editable === '' || editable === 'true' || editable === 'plaintext-only') return true;
+      if (el.tagName === 'TEXTAREA') return true;
+      if (el.tagName !== 'INPUT') return false;
+      return !NON_TEXT_INPUTS.has((el as HTMLInputElement).type);
+    };
+
+    const update = () => setFocused(isTextEntry(document.activeElement));
+    const onFocusOut = () => window.setTimeout(update, 0);
+
+    document.addEventListener('focusin', update);
+    document.addEventListener('focusout', onFocusOut);
+    update();
+
+    return () => {
+      document.removeEventListener('focusin', update);
+      document.removeEventListener('focusout', onFocusOut);
+    };
+  }, []);
+
+  return focused;
+}
+
 export const StormyChatBubble = () => {
   const location = useLocation();
   const isMobile = useIsMobile();
+  // Only consulted for the closed FAB below. The open chat card must never
+  // hide itself when its OWN input takes focus.
+  const textFieldFocused = useTextFieldFocused();
   const auth = useAuth();
   const league = useLeague();
   const activeLeague = league?.activeLeague ?? null;
@@ -237,7 +298,14 @@ export const StormyChatBubble = () => {
           left: isMobile ? '1rem' : '1.5rem',
           right: 'auto',
           zIndex: 100,
+          opacity: textFieldFocused ? 0 : 1,
+          pointerEvents: textFieldFocused ? 'none' : 'auto',
         }}
+        // Icon-only control: without this it announces as an unnamed button.
+        aria-label="Ask Stormy"
+        data-testid="stormy-fab"
+        aria-hidden={textFieldFocused}
+        tabIndex={textFieldFocused ? -1 : 0}
       >
         <Narwhal className="h-7 w-7 text-pastel-cream relative z-10 pointer-events-none" />
         <span className="absolute -top-1 -right-1 h-3 w-3 bg-pastel-sage rounded-full ring-2 ring-pastel-surface animate-pulse pointer-events-none" />
