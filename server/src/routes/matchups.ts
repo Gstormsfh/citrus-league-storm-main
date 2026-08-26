@@ -442,6 +442,30 @@ matchupRoutes.post('/daily-game-stats', validateBody(schemas.matchupPlayerIds), 
   return ok(c, stats);
 });
 
+// POST /api/matchups/player-game-log — one player's per-game stats over a range.
+// Replaces up to 82 per-date calls from the Player Stats modal with one.
+matchupRoutes.post('/player-game-log', validateBody(schemas.playerGameLogRange), async (c) => {
+  const body = getValidatedBody<z.infer<typeof schemas.playerGameLogRange>>(c);
+
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new MatchupService(supabase);
+
+  const [logResult, projResult] = await Promise.all([
+    service.getPlayerGameLog(body.playerId, body.startDate, body.endDate),
+    service.getPlayerProjectionLog(body.playerId, body.startDate, body.endDate),
+  ]);
+
+  if (logResult.error) {
+    return handleError(c, logResult.error, 'Failed to fetch player game log');
+  }
+  // Projections are supplementary — a player with none still has a game log.
+  if (projResult.error) {
+    return ok(c, { games: logResult.games, projections: [] });
+  }
+
+  return ok(c, { games: logResult.games, projections: projResult.projections });
+});
+
 // POST /api/matchups/matchup-stats — Get weekly matchup stats for players
 matchupRoutes.post('/matchup-stats', validateBody(schemas.matchupPlayerIdsRange), async (c) => {
   const body = getValidatedBody<z.infer<typeof schemas.matchupPlayerIdsRange>>(c);

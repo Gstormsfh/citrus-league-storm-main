@@ -339,6 +339,12 @@ export const schemas = {
     endDate: z.string().min(1, 'endDate is required'),
   }),
 
+  playerGameLogRange: z.object({
+    playerId: z.number().int(),
+    startDate: z.string().min(1, 'startDate is required'),
+    endDate: z.string().min(1, 'endDate is required'),
+  }),
+
   matchupUpdateScores: z.object({
     leagueId: z.string().optional(),
   }),
