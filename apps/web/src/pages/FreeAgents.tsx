@@ -227,6 +227,58 @@ const FreeAgents = () => {
     }
   };
 
+  /**
+   * Adds the "on waivers, clears <when>" badge after the list is already up.
+   *
+   * Two independent reads, run together rather than one after the other, and
+   * both entirely optional: a failure here costs a badge, not a page. The
+   * result is applied with a functional update so it cannot race the initial
+   * setPlayers above it.
+   */
+  const enrichWithWaiverStatus = async (leagueId: string) => {
+    try {
+      const db = supabase as unknown as {
+        from: (t: string) => any;
+      };
+      const [waiverRes, periodRes] = await Promise.all([
+        db.from('player_waiver_status')
+          .select('player_id, dropped_at')
+          .eq('league_id', leagueId)
+          .is('cleared_at', null),
+        // SETTINGS-ENFORCEMENT (2026-08-16) — was hardcoded 48h; read the
+        // league's configured period. 48 remains only as the absent-config
+        // fallback.
+        db.from('leagues')
+          .select('waiver_period_hours')
+          .eq('id', leagueId)
+          .single(),
+      ]);
+
+      const waiverRows = (waiverRes?.data ?? []) as Array<{ player_id: number; dropped_at: string }>;
+      const periodRow = (periodRes?.data ?? null) as { waiver_period_hours: number | null } | null;
+
+      const waiverWindowMs = (periodRow?.waiver_period_hours ?? 48) * 60 * 60 * 1000;
+      const now = Date.now();
+      const waiverMap = new Map<string, string>();
+      for (const r of waiverRows) {
+        const droppedMs = new Date(r.dropped_at).getTime();
+        if (now - droppedMs < waiverWindowMs) {
+          waiverMap.set(String(r.player_id), new Date(droppedMs + waiverWindowMs).toISOString());
+        }
+      }
+      if (waiverMap.size === 0) return;
+
+      setPlayers((prev) =>
+        prev.map((p) => {
+          const clearsAt = waiverMap.get(String(p.id));
+          return clearsAt ? { ...p, is_on_waivers: true, waiver_clears_at: clearsAt } : p;
+        }),
+      );
+    } catch (err) {
+      logger.warn('Failed to load waiver status for free agents', err);
+    }
+  };
+
   const fetchPlayers = async () => {
     try {
       setLoading(true);
@@ -312,59 +364,24 @@ const FreeAgents = () => {
       // Dropped players (with deleted_at) will be included as free agents
       const freeAgentResult = await LeagueService.getFreeAgents(allPlayers, currentLeagueId, user.id);
 
-      // Enrich free agents with waiver status (rows where cleared_at IS NULL and within waiver window)
-      if (currentLeagueId) {
-        try {
-          const { data: waiverRows } = await (supabase as unknown as {
-            from: (t: string) => {
-              select: (c: string) => {
-                eq: (k: string, v: string) => {
-                  is: (k: string, v: null) => Promise<{ data: Array<{ player_id: number; dropped_at: string }> | null }>
-                }
-              }
-            }
-          })
-            .from('player_waiver_status')
-            .select('player_id, dropped_at')
-            .eq('league_id', currentLeagueId)
-            .is('cleared_at', null);
-          // SETTINGS-ENFORCEMENT (2026-08-16) — was hardcoded 48h;
-          // read the league's configured period. 48 remains only as the
-          // absent-config fallback.
-          const { data: periodRow } = await (supabase as unknown as {
-            from: (t: string) => {
-              select: (c: string) => {
-                eq: (k: string, v: string) => {
-                  single: () => Promise<{ data: { waiver_period_hours: number | null } | null }>
-                }
-              }
-            }
-          })
-            .from('leagues')
-            .select('waiver_period_hours')
-            .eq('id', currentLeagueId)
-            .single();
-          const waiverWindowMs = (periodRow?.waiver_period_hours ?? 48) * 60 * 60 * 1000;
-          const now = Date.now();
-          const waiverMap = new Map<string, string>();
-          for (const r of (waiverRows || [])) {
-            const droppedMs = new Date(r.dropped_at).getTime();
-            if (now - droppedMs < waiverWindowMs) {
-              waiverMap.set(String(r.player_id), new Date(droppedMs + waiverWindowMs).toISOString());
-            }
-          }
-          if (waiverMap.size > 0) {
-            freeAgentResult.players = freeAgentResult.players.map(p => {
-              const clearsAt = waiverMap.get(String(p.id));
-              return clearsAt ? { ...p, is_on_waivers: true, waiver_clears_at: clearsAt } : p;
-            });
-          }
-        } catch (err) {
-          logger.warn('Failed to load waiver status for free agents', err);
-        }
-      }
-
+      /*
+       * THE LIST IS READY. RENDER IT.
+       *
+       * Two supabase reads used to sit between getFreeAgents() and
+       * setPlayers() — a waiver-status lookup and the league's waiver period —
+       * awaited serially, inside the same try whose `finally` clears `loading`.
+       * Neither decides whether a free agent can be shown; they add an "on
+       * waivers, clears Thursday" badge. So the page held "Loading free
+       * agents…" over a list it already had, for two extra round trips — and
+       * if either request never settled, which is the ordinary case when a
+       * phone drops its connection mid-request, it held that forever.
+       *
+       * Same shape as the fix on the waiver wire. Show the list, then let the
+       * badge arrive when it arrives.
+       */
       setPlayers(freeAgentResult.players);
+      if (currentLeagueId) void enrichWithWaiverStatus(currentLeagueId);
+
       setRosterLookupFailed(freeAgentResult.rosterLookupFailed);
       if (freeAgentResult.rosterLookupFailed) {
         logger.warn(`Roster lookup failed for league ${currentLeagueId} — showing all players as free agents`);
@@ -1502,24 +1519,54 @@ const FreeAgents = () => {
 
                     {/* Top Projected + Schedule Combined Table */}
                     <Card>
-                      <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-lg font-bold flex items-center gap-2">
-                          <Calendar className="h-5 w-5 text-blue-500" />
-                          Top Projected <span className="text-[10px] font-normal text-white/55">rest of week</span>
-                          {weeklyProjections.size === 0 && (
-                            <Badge variant="outline" className="text-[11px] ml-2 bg-white/5 ring-1 ring-pastel-sage/30 text-pastel-cream border-0">
-                              Loading...
-                            </Badge>
-                          )}
-                          {weeklyProjections.size > 0 && (
-                            <Badge className="text-[11px] ml-2 bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0">
-                              Live Data
-                            </Badge>
-                          )}
-                        </CardTitle>
-                        <Button variant="ghost" size="sm" onClick={() => setActiveTab('schedule')}>See All</Button>
+                      {/*
+                        * Four things shared one flex row here — icon, "Top
+                        * Projected", "rest of week", a badge and a See All
+                        * button. On a 393px phone every one of them wrapped, so
+                        * the header rendered as four ragged two-line columns.
+                        * The subtitle drops below the title on mobile.
+                        *
+                        * The badge also said "Loading..." forever whenever there
+                        * were no projections to load — which is every day of the
+                        * offseason, since there are no games left in the week.
+                        * "Loading" and "nothing here" are different states and
+                        * the user can tell.
+                        */}
+                      <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
+                        <div className="min-w-0">
+                          <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 flex-wrap">
+                            <Calendar className="h-5 w-5 text-blue-500 shrink-0" />
+                            Top Projected
+                            {loadingProjections && (
+                              <Badge variant="outline" className="text-[11px] bg-white/5 ring-1 ring-pastel-sage/30 text-pastel-cream border-0">
+                                Loading…
+                              </Badge>
+                            )}
+                            {!loadingProjections && weeklyProjections.size > 0 && (
+                              <Badge className="text-[11px] bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0">
+                                Live Data
+                              </Badge>
+                            )}
+                          </CardTitle>
+                          <p className="text-[11px] font-normal text-white/55 mt-0.5">
+                            {!loadingProjections && weeklyProjections.size === 0
+                              ? 'No games left this week'
+                              : 'Rest of week'}
+                          </p>
+                        </div>
+                        <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setActiveTab('schedule')}>See All</Button>
                       </CardHeader>
                       <CardContent className="p-0">
+                        {/* An empty list under a heading reads as a broken card.
+                            Say why it is empty — in the offseason it is empty
+                            every day, and "no games" is the answer. */}
+                        {!loadingProjections && topProjected.length === 0 && (
+                          <div className="px-4 py-6 text-center text-sm text-white/55">
+                            {weeklyProjections.size === 0
+                              ? 'No games left this week — projections return with the schedule.'
+                              : 'No projected free agents to show.'}
+                          </div>
+                        )}
                         {/* Mobile List View - Compact with Schedule Icons */}
                         <div className="md:hidden">
                           {topProjected.map(player => (
@@ -2488,8 +2535,8 @@ const FreeAgents = () => {
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">Sort tips</div>
                   </div>
                   <p className="text-[11px] text-white/70 leading-relaxed">
-                    Click any column header to sort. Tap a player row for full stats and projection breakdown.
-                  </p>
+                    <span className="md:hidden">Tap a player row for full stats and a projection breakdown.</span>
+                    <span className="hidden md:inline">Click any column header to sort. Click a player row for full stats and projection breakdown.</span></p>
                 </div>
               </div>
             </aside>
