@@ -86,7 +86,7 @@ def live_season_filter(season: Optional[int] = None) -> Tuple[str, str, int]:
     Example:
         rows = db.select(
             "raw_shots",
-            select="player_id,xg_value",
+            select="player_id,xg_v5",
             filters=[live_season_filter(), ("player_id", "eq", pid)],
         )
     """

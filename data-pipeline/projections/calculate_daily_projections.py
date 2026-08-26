@@ -95,6 +95,12 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
 from data_pipeline.utils.season_config import current_season as _current_season
+
+# High-danger cutoff on OUR model. Calibrated xg_v5 puts 3.92% of
+# regular-season shots above 0.20, which is what the retired xg_value
+# column used to capture at 0.30 (3.54%). If the scorer is ever refit
+# so the spread moves, re-measure this rather than assuming 0.20.
+HIGH_DANGER_XG = 0.20
 # Derived from today's date at import time; env override still honored for
 # manual backfills of historical seasons. The former hardcoded '2025'
 # fallback would have silently misfiled every 2026-10-01+ projection.
@@ -817,9 +823,16 @@ def get_team_xga_per_60(
         
         # Get all shots in these games
         # raw_shots doesn't have team_abbrev, but has team_code, is_home_team, home_team_abbrev, away_team_abbrev
+        # xg_v5 is our model. The three columns this used to read --
+        # xg_value, shooting_talent_adjusted_xg, flurry_adjusted_xg -- all came
+        # from the retired bulk import. xg_value scores AUC 0.936 against an
+        # honest pre-shot ceiling of about 0.82: it reads the outcome. The
+        # database-side separation invariant never caught this because it
+        # inspects views and SQL functions, and this reads the columns straight
+        # over PostgREST.
         all_shots = db.select(
             "raw_shots",
-            select="game_id,team_code,is_home_team,home_team_abbrev,away_team_abbrev,xg_value,shooting_talent_adjusted_xg,flurry_adjusted_xg",
+            select="game_id,team_code,is_home_team,home_team_abbrev,away_team_abbrev,xg_v5",
             filters=[("game_id", "in", team_game_ids)],
             limit=50000  # Large limit for all shots in these games
         )
@@ -887,14 +900,11 @@ def get_team_xga_per_60(
                             continue
                     
                     if shot_team == opponent_team:
-                        # Use best available xG value
-                        xg_val = (
-                            float(shot.get("shooting_talent_adjusted_xg", 0)) or
-                            float(shot.get("flurry_adjusted_xg", 0)) or
-                            float(shot.get("xg_value", 0)) or
-                            0.0
-                        )
-                        total_xga += xg_val
+                        # Our model or nothing. No fallback chain: a missing
+                        # xg_v5 means the shot was not scored, and silently
+                        # substituting a third-party number is how the leaked
+                        # model survived nine seasons in the serving path.
+                        total_xga += float(shot.get("xg_v5") or 0.0)
         
         # Calculate xGA per 60
         if total_toi > 0:
@@ -1435,7 +1445,7 @@ def get_opponent_offensive_context(
         # Get shots data for opponent's recent games
         shots = db.select(
             "raw_shots",
-            select="game_id,is_goal,xg_value,shooting_talent_adjusted_xg",
+            select="game_id,is_goal,xg_v5",
             filters=[("game_id", "in", opponent_game_ids)],
             limit=10000
         )
@@ -1450,16 +1460,24 @@ def get_opponent_offensive_context(
             if game_id:
                 game_ids_seen.add(game_id)
             
-            # Use shooting_talent_adjusted_xg if available, else xg_value
-            xg = float(shot.get("shooting_talent_adjusted_xg") or shot.get("xg_value") or 0.0)
+            # Our model. shooting_talent_adjusted_xg was doubly wrong here: it
+            # is a bulk-import column, and it already bakes the shooter's
+            # finishing history into the number -- so dividing goals by it to
+            # get a "finishing ratio" applied finishing talent twice.
+            xg = float(shot.get("xg_v5") or 0.0)
             
             if shot.get("is_goal"):
                 total_goals += 1
             
             total_xg += xg
             
-            # High-danger: xG > 0.3
-            if xg > 0.3:
+            # High-danger. The threshold moves with the column: the old
+            # xg_value put 3.54% of shots above 0.30, while xg_v5 -- which is
+            # calibrated rather than inflated -- puts only 1.44% there and
+            # 3.92% above 0.20. Keeping 0.30 would have cut the high-danger
+            # population by sixty percent overnight and read as a league-wide
+            # collapse in chance quality.
+            if xg > HIGH_DANGER_XG:
                 hd_shots += 1
         
         total_games = len(game_ids_seen) if game_ids_seen else 1
