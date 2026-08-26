@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
@@ -242,6 +242,32 @@ const WaiverWire = () => {
     }
   }, [user, activeLeagueId, loadWaiverData]);
 
+  /*
+   * THE WIRE SHOWS PLAYERS WHEN YOU ARRIVE.
+   *
+   * `searchPlayers` used to be reachable only from the Search button or the
+   * Enter key, so this page opened with an empty list under a heading reading
+   * "Search Available Players" — a waiver screen showing no available players
+   * until you typed. The one thing it exists to do needed a deliberate action
+   * to start.
+   *
+   * The effect lives HERE, above the pool-league redirect, because a hook after
+   * an early return runs in a different order on the render that returns —
+   * React's rules-of-hooks, and a real crash the first time a pool league opens
+   * this page. It reaches searchPlayers through a ref, which is assigned below
+   * where that function is declared.
+   */
+  const searchPlayersRef = useRef<() => Promise<void>>();
+
+  // Load the wire on arrival, and again when the filter or the query changes.
+  // 250ms is short enough that a position tap feels immediate and long enough
+  // that typing a name does not fire a request per keystroke.
+  useEffect(() => {
+    if (!activeLeagueId) return;
+    const timer = setTimeout(() => { void searchPlayersRef.current?.(); }, 250);
+    return () => clearTimeout(timer);
+  }, [activeLeagueId, positionFilter, searchTerm]);
+
   // Redirect pool leagues to their pool page
   const _leagueType = activeLeagueFormat?.leagueType;
   if (isPoolLeague(_leagueType) && activeLeagueId) {
@@ -267,6 +293,19 @@ const WaiverWire = () => {
         ? players.filter((p: any) => ['C', 'LW', 'RW'].includes(p.position_code?.toUpperCase()))
         : players;
       setAvailablePlayers(filteredPlayers);
+
+      /*
+       * THE LIST IS READY HERE. STOP THE SPINNER HERE.
+       *
+       * Everything below this line is enrichment — game-lock badges and
+       * on-waivers countdowns. Both are nice; neither decides whether the user
+       * can see the wire. They used to sit inside the same try/finally, so a
+       * slow or hanging enrichment query left "Loading the wire…" on screen
+       * over a list that had already rendered — and if one of them never
+       * settled (a dropped connection mid-request is the ordinary case on a
+       * phone), the spinner never cleared at all.
+       */
+      setSearchLoading(false);
 
       // Check which teams have started/live games today (those players are game-locked)
       const uniqueTeams = [...new Set(players.map((p: any) => p.team_abbrev).filter(Boolean))];
@@ -332,6 +371,7 @@ const WaiverWire = () => {
       setSearchLoading(false);
     }
   };
+  searchPlayersRef.current = searchPlayers;
 
   const handleSubmitClaim = async () => {
     if (!selectedPlayer || !myTeamId || !activeLeagueId) return;
@@ -599,10 +639,12 @@ const WaiverWire = () => {
               <CardHeader>
                 <CardTitle className="font-calistoga text-xl text-pastel-cream flex items-center gap-2">
                   <Search className="w-5 h-5 text-pastel-orange" />
-                  Search Available Players
+                  Available Players
                 </CardTitle>
                 <CardDescription className="text-white/55">
-                  Find players to add via waiver claim
+                  {searchLoading
+                    ? 'Loading the wire…'
+                    : `${availablePlayers.length} available — tap one to claim`}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -611,7 +653,9 @@ const WaiverWire = () => {
                     matches their position (Stormy the AGM = All, Lemon the
                     forward = F, Kiwi the D-man = D, Pineapple the goalie = G).
                     Existing Select stays for granular C/LW/RW. */}
-                <div className="flex flex-wrap gap-2 mb-3">
+                {/* One row that scrolls, rather than wrapping to two and
+                    leaving "Goalies" stranded on a line of its own. */}
+                <div className="flex gap-2 mb-3 overflow-x-auto -mx-1 px-1 pb-1 sm:flex-wrap sm:overflow-visible">
                   {[
                     { value: 'all', label: 'All', mascot: 'stormy' as const, ring: 'ring-pastel-orange' },
                     { value: 'F', label: 'Forwards', mascot: 'lemon' as const, ring: 'ring-pastel-orange' },
@@ -625,7 +669,7 @@ const WaiverWire = () => {
                         type="button"
                         onClick={() => setPositionFilter(chip.value)}
                         className={cn(
-                          'flex items-center gap-2 pl-1 pr-3 py-1 rounded-full ring-1 transition-all font-jbmono text-[10px] uppercase tracking-[0.18em] font-bold',
+                          'flex shrink-0 items-center gap-2 pl-1 pr-3 py-1 rounded-full ring-1 transition-all font-jbmono text-[10px] uppercase tracking-[0.18em] font-bold',
                           active
                             ? `bg-pastel-orange text-[#581E00] ${chip.ring} shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]`
                             : 'bg-white/5 text-white/70 ring-white/10 hover:bg-white/10 hover:text-pastel-cream',
@@ -635,7 +679,7 @@ const WaiverWire = () => {
                         <img
                           src={MASCOTS[chip.mascot].image}
                           alt=""
-                          className="w-7 h-7 rounded-full object-cover ring-2 ring-[#0F1F15]/20"
+                          className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover ring-2 ring-[#0F1F15]/20"
                           loading="lazy"
                         />
                         {chip.label}
@@ -677,66 +721,107 @@ const WaiverWire = () => {
                       )}
                     </SelectContent>
                   </Select>
-                  <Button
-                    onClick={searchPlayers}
-                    disabled={searchLoading}
-                    className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] disabled:opacity-50 h-12"
-                  >
-                    {searchLoading ? 'Searching…' : 'Search'}
-                  </Button>
+                  {/* The Search button is gone: the list loads on arrival and
+                      updates as you type or tap a position. A full-width glowing
+                      orange pill was the loudest element on the page, for an
+                      action the page now performs by itself. */}
                 </div>
 
-                {availablePlayers.length > 0 && (
-                  <div className="space-y-2">
+                {/*
+                  * ROWS YOU CAN DECIDE FROM.
+                  *
+                  * Each row used to be ~110px of name, a "Free Agent" badge and
+                  * a glowing orange pill — seven players to a phone screen, with
+                  * no games played, no points, nothing to choose between them.
+                  * A waiver wire whose rows carry no production is a list of
+                  * names, and the manager has to leave the page to use it.
+                  *
+                  * The "Free Agent" badge is gone from the default case for the
+                  * same reason: when every row says the same thing, the row says
+                  * nothing. It appears only when the status is NOT the default —
+                  * on waivers, or game-locked — which is the case that changes
+                  * what the button does.
+                  *
+                  * The separator line also printed "· · #27" when position and
+                  * team were missing. Parts are joined now, so absent fields
+                  * leave no punctuation behind.
+                  */}
+                {searchLoading && availablePlayers.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-white/55">Loading the wire…</div>
+                ) : availablePlayers.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-white/55">
+                    {searchTerm ? `No available players matching “${searchTerm}”.` : 'No available players right now.'}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-white/5 rounded-xl ring-1 ring-white/10 overflow-hidden">
                     {availablePlayers.map((player) => {
                       const isGameLocked = lockedTeams.has(player.team_abbrev);
-                      // 2026-08-24 polish: a player is on the wire when
-                      // EITHER signal says so — recently dropped (real
-                      // waiver window) or team game-locked.
+                      // A player is on the wire when EITHER signal says so —
+                      // recently dropped (real waiver window) or game-locked.
                       const waiverClearsAt = onWaiversClearsAt.get(String(player.player_id)) ?? null;
                       const isOnWaivers = waiverClearsAt !== null;
                       const treatAsWaiver = isGameLocked || isOnWaivers;
+                      // A goalie's points are always zero, so a PTS column tells
+                      // a manager nothing about the one position where the
+                      // decision is hardest. Show wins, and label it.
+                      const isG = player.is_goalie || player.position_code === 'G';
+                      const gp = Number(player.games_played ?? 0);
+                      const headline = isG ? Number(player.wins ?? 0) : Number(player.points ?? 0);
+                      const headlineLabel = isG ? 'w' : 'pts';
+                      const meta = [
+                        player.team_abbrev,
+                        gp > 0 ? `${gp} GP` : null,
+                        isG && player.save_percentage
+                          ? `${(player.save_percentage * 100).toFixed(1)} SV%`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ');
                       return (
-                      <div key={player.player_id} className="flex items-center justify-between gap-3 p-4 bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/40 hover:bg-white/[0.07] rounded-xl transition-all">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-pastel-cream truncate">
-                              {player.full_name}
-                            </span>
-                            {treatAsWaiver ? (
-                              <Badge
-                                className="bg-amber-400/20 ring-1 ring-amber-400/40 text-amber-300 border-0 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold gap-1 h-5"
-                                title={isOnWaivers ? `Waiver window clears ${formatMoment(waiverClearsAt) ?? ''}` : 'Game-locked — claims process through waivers'}
-                              >
-                                <Lock className="w-3 h-3" />
-                                {isOnWaivers ? 'On Waivers' : 'Waiver'}
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold gap-1 h-5">
-                                <Zap className="w-3 h-3" />
-                                Free Agent
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="text-xs text-white/55 mt-1 tabular-nums">
-                            {player.position_code} · {player.team_abbrev} · #{player.jersey_number}
-                            {isOnWaivers && (
-                              <span className="text-amber-300/80"> · clears {formatMoment(waiverClearsAt)}</span>
-                            )}
-                          </div>
-                        </div>
-                        <Button
-                          onClick={() => setSelectedPlayer(player)}
-                          size="sm"
-                          className={treatAsWaiver
-                            ? "bg-amber-400/20 ring-1 ring-amber-400/40 text-amber-300 hover:bg-amber-400/30 font-bold shrink-0"
-                            : "bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] shrink-0"
-                          }
+                        <div
+                          key={player.player_id}
+                          className="flex items-center gap-3 px-3 py-2.5 bg-white/[0.03] hover:bg-white/[0.07] transition-colors"
                         >
-                          {treatAsWaiver ? 'Claim' : 'Add'}
-                        </Button>
-                      </div>
-                    );})}
+                          <Badge variant="secondary" className="w-9 shrink-0 justify-center text-[10px] font-jbmono font-bold">
+                            {player.position_code || '—'}
+                          </Badge>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm text-pastel-cream truncate">
+                              {player.full_name}
+                            </div>
+                            <div className="text-[11px] text-white/55 tabular-nums truncate">
+                              {meta}
+                              {treatAsWaiver && (
+                                <span className="text-amber-300/90">
+                                  {meta ? ' · ' : ''}
+                                  {isOnWaivers
+                                    ? `on waivers, clears ${formatMoment(waiverClearsAt)}`
+                                    : 'game-locked'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0 w-12">
+                            <div className="font-bold text-sm text-pastel-cream tabular-nums leading-none">{headline}</div>
+                            <div className="text-[9px] font-jbmono uppercase tracking-[0.18em] text-white/55">{headlineLabel}</div>
+                          </div>
+
+                          <Button
+                            onClick={() => setSelectedPlayer(player)}
+                            size="sm"
+                            variant="outline"
+                            className={treatAsWaiver
+                              ? 'h-8 px-3 shrink-0 border-amber-400/40 text-amber-300 hover:bg-amber-400/15 font-bold text-xs'
+                              : 'h-8 px-3 shrink-0 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/15 font-bold text-xs'
+                            }
+                          >
+                            {treatAsWaiver ? 'Claim' : 'Add'}
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -1036,13 +1121,9 @@ const WaiverWire = () => {
                         {waiverClaims.filter(c => c.status !== 'pending').length}
                       </span>
                     </div>
-                    <div className="h-px bg-white/10" />
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-[11px] text-white/55">My priority</span>
-                      <span className="font-jbmono text-[11px] text-pastel-orange tabular-nums font-bold">
-                        {myPriority !== null ? `#${myPriority}` : '—'}
-                      </span>
-                    </div>
+                    {/* "My priority" was here too. It is a six-line-tall
+                        number in its own card at the top of this same page —
+                        printing it twice makes the rail look like filler. */}
                   </div>
                 </div>
                 <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
@@ -1053,7 +1134,12 @@ const WaiverWire = () => {
                   <ul className="text-[11px] text-white/70 space-y-1.5 leading-relaxed">
                     <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Stack high game-count weeks first</li>
                     <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Goalie streamers beat forward streamers if behind</li>
-                    <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Save 30%+ FAAB for trade deadline pickups</li>
+                    {/* Only true in a FAAB league. A rolling-priority league
+                        has no budget to save, and advice that does not apply to
+                        your settings reads as filler. */}
+                    {isFAAB && (
+                      <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Save 30%+ of your FAAB for trade-deadline pickups</li>
+                    )}
                   </ul>
                 </div>
               </div>
