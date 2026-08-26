@@ -95,6 +95,13 @@ export const LineupService = {
     matchupId: string
   ): Promise<{ backfilledCount: number; error: unknown }> {
     try {
+// The API layer returns the transport envelope: server routes reply with
+// `ok(c, payload)` which serialises to `{ data: payload }`, and apiClient resolves
+// to that object. Reading `result.thing` therefore reads the envelope, not the
+// payload, and yields undefined every time -- which the `|| 0` / `?? true`
+// fallbacks then quietly converted into a plausible-looking answer.
+// Unwrap `.data` first. (canUpdateRosterForDate was the sharp one: `?? true`
+// turned a permanently-undefined read into a permanent "yes, you may edit".)
       const result = await rosterApi.backfillDailyRosters(leagueId, String(teamId), matchupId);
       // The payload is under `.data` — the server wraps every success in
       // `{ data: ... }`. Reading result.backfilledCount directly returned
@@ -286,7 +293,19 @@ export const LineupService = {
       if (fetchMissingPlayers && missingPlayerIds.length > 0) {
         const missingPlayers = await PlayerService.getPlayersByIds(missingPlayerIds);
 
-        missingPlayers.forEach((player: Player) => {
+        // PlayerService returns directory rows, which carry more than the Player
+        // interface describes (full_name AND name, gaa/svPct for goalies,
+        // fantasy_points, projected_points, team_abbreviation). The reads below were
+        // already written defensively for both shapes; this types what they read.
+        type MissingPlayerRow = Player & Partial<{
+          name: string;
+          gaa: number;
+          svPct: number;
+          fantasy_points: number;
+          projected_points: number;
+          team_abbreviation: string;
+        }>;
+        missingPlayers.forEach((player: MissingPlayerRow) => {
           const transformedPlayer = {
             id: player.id,
             name: player.full_name || player.name || 'Unknown Player',
@@ -375,6 +394,14 @@ export const LineupService = {
       if (!lineup) {
         return { lineup: null, error: null };
       }
+
+      // Unwrap the transport envelope — see the note on backfillMissingDailyRosters.
+      const payload = result.data as {
+        starters?: string[];
+        bench?: string[];
+        ir?: string[];
+        slot_assignments?: Record<string, string>;
+      } | undefined;
 
       return {
         lineup: {

@@ -383,7 +383,7 @@ export const LeagueService = {
         roster_size: rosterSize,
         draft_rounds: draftRounds,
       });
-      const data = response.data;
+      const data = response.data as { league?: League; team?: Team } | undefined;
       // ARCHITECT 2026-08-12 (LEAGUE-CACHE / inbox E126) — see the note in
       // joinLeagueByCode. Creating a league changes the same membership the
       // 'userLeagues' key caches, so the cache must not survive it.
@@ -515,7 +515,7 @@ async joinLeagueByCode(
     return getLeagueCachedOrFetch(`leagueTeams:${leagueId}`, async () => {
       try {
         const response = await leagueApi.getTeams(leagueId);
-        return { teams: response.data || [], error: null };
+        return { teams: (response.data || []) as Team[], error: null };
       } catch (error) {
         logger.error('Exception in getLeagueTeams:', error);
         return { teams: [], error };
@@ -623,7 +623,7 @@ async joinLeagueByCode(
     return getLeagueCachedOrFetch(`userTeam:${leagueId}`, async () => {
       try {
         const response = await leagueApi.getMyTeam(leagueId);
-        return { team: response.data || null, error: null };
+        return { team: (response.data || null) as Team | null, error: null };
       } catch (error) {
         return { team: null, error };
       }
@@ -1364,7 +1364,7 @@ async joinLeagueByCode(
 
       // Get user's team ID
       const teamResult = await leagueApi.getMyTeam(leagueId);
-      const teamId = teamResult.data?.id;
+      const teamId = (teamResult.data as Team | undefined)?.id;
       if (!teamId) return { success: false, error: new Error('Team not found') };
 
       const dropResult = await waiverApi.dropPlayer(leagueId, { teamId, playerId });
@@ -1415,7 +1415,7 @@ async joinLeagueByCode(
 
       // Get user's team ID
       const teamResult = await leagueApiImport.getMyTeam(leagueId);
-      const teamId = teamResult.data?.id;
+      const teamId = (teamResult.data as Team | undefined)?.id;
       if (!teamId) return { success: false, error: new Error('Team not found') };
 
       const addResult = await waiverApi.addFreeAgent(leagueId, { teamId, playerId });

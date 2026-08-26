@@ -140,7 +140,16 @@ export const WinProbabilityBar = ({
           </span>
           {hasSimulation && (
             <span
-              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono border ${confidence.color} border-current/20 bg-current/5`}
+              // border-current/20 and bg-current/5 compiled to nothing: Tailwind
+              // cannot build an alpha channel from the `currentColor` keyword, so
+              // this badge had no border colour and no fill. color-mix keeps the
+              // original intent — both derived from whatever ${confidence.color}
+              // sets — and is a real declaration rather than a dead class.
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono border ${confidence.color}`}
+              style={{
+                borderColor: 'color-mix(in srgb, currentColor 20%, transparent)',
+                backgroundColor: 'color-mix(in srgb, currentColor 5%, transparent)',
+              }}
             >
               <BarChart3 className="w-2.5 h-2.5" />
               {confidence.label}

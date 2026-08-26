@@ -1,3 +1,4 @@
+import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
@@ -55,6 +56,10 @@ const LeagueDashboard = () => {
   const [league, setLeague] = useState<League | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [userTeam, setUserTeam] = useState<Team | null>(null);
+  /** Players on the signed-in manager's roster. null = not known yet or the
+   *  request failed — deliberately distinct from 0, so the UI can decline to
+   *  claim anything rather than guessing in either direction. */
+  const [myRosterCount, setMyRosterCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   // Commissioner Settings State
@@ -247,8 +252,23 @@ const LeagueDashboard = () => {
       // Load user's team
       const { team: userTeamData } = await LeagueService.getUserTeam(leagueId, user.id);
       setUserTeam(userTeamData);
+
+      // One request, so the dashboard can tell "draft says complete AND a roster
+      // exists" apart from "draft says complete and nothing landed". Without it
+      // the League pulse asserted "Rosters set. Time to play." purely from
+      // draft_status, which is a flag, not evidence — the exact failure mode
+      // that left 29 leagues last season marked complete with zero picks.
+      // null stays null on error: unknown is reported as unknown, never as zero.
+      if (userTeamData?.id) {
+        try {
+          const ids = await rosterApi.getPlayerIds(leagueId, userTeamData.id);
+          setMyRosterCount(((ids.data || []) as unknown[]).length);
+        } catch {
+          setMyRosterCount(null);
+        }
+      }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Couldn't load the league — refresh to try again.");
+      setError(userMessage(err, "Couldn't load the league — refresh to try again."));
     } finally {
       setLoading(false);
     }
@@ -354,7 +374,7 @@ const LeagueDashboard = () => {
       logger.error('handleSimulateFill: Exception:', err);
       toast({
         title: "Simulation Didn't Take",
-        description: err instanceof Error ? err.message : "Couldn't simulate the teams — try again in a moment.",
+        description: userMessage(err, "Couldn't simulate the teams — try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -420,7 +440,7 @@ const LeagueDashboard = () => {
         if (saved) {
           const { weeklyAddLimit = 0, seasonAddLimit = 0, faabBudget = 100 } = waiverSettings;
           const leagueResponse = await leagueApi.getLeague(leagueId);
-          const currentLeague = leagueResponse.data as Record<string, unknown> | undefined;
+          const currentLeague = leagueResponse.data;
           if (currentLeague) {
             const currentSettings = (currentLeague.settings as LeagueSettings) || {};
             await leagueApi.updateSettings(leagueId, {
@@ -478,7 +498,7 @@ const LeagueDashboard = () => {
       } else if (activeSettingsTab === 'playoffs') {
         // Save playoff settings into the JSONB settings column
         const leagueResponse = await leagueApi.getLeague(leagueId);
-        const currentLeague = leagueResponse.data as Record<string, unknown> | undefined;
+        const currentLeague = leagueResponse.data;
         if (currentLeague) {
           const currentSettings = (currentLeague.settings as LeagueSettings) || {};
           const { error: playoffErr } = await leagueApi.updateSettings(leagueId, {
@@ -516,7 +536,7 @@ const LeagueDashboard = () => {
     } catch (err: unknown) {
       toast({
         title: "Settings Didn't Stick",
-        description: err instanceof Error ? err.message : "Couldn't save the settings — try again in a moment.",
+        description: userMessage(err, "Couldn't save the settings — try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -588,7 +608,7 @@ const LeagueDashboard = () => {
     } catch (err: unknown) {
       toast({
         title: "Waivers Didn't Process",
-        description: err instanceof Error ? err.message : "Couldn't process the waiver run — retrying might help.",
+        description: userMessage(err, "Couldn't process the waiver run — retrying might help."),
         variant: 'destructive',
       });
     } finally {
@@ -639,7 +659,7 @@ const LeagueDashboard = () => {
     } catch (err: unknown) {
       toast({
         title: "Roster Sync Didn't Take",
-        description: err instanceof Error ? err.message : "Couldn't sync the rosters — try again in a moment.",
+        description: userMessage(err, "Couldn't sync the rosters — try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -1628,8 +1648,11 @@ Your Commissioner`);
                 </CardTitle>
               </CardHeader>
               <CardContent className="relative z-10">
-                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.roster_size}</div>
-                <p className="text-xs text-white/55 mt-2">Players per team</p>
+                {/* An unset setting rendered as a confident "0" reads as a real
+                    configured value. Show an em dash so the tile says
+                    "not configured" rather than asserting zero. */}
+                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.roster_size || '—'}</div>
+                <p className="text-xs text-white/55 mt-2">{league.roster_size ? 'Players per team' : 'Not configured'}</p>
               </CardContent>
             </Card>
 
@@ -1642,8 +1665,8 @@ Your Commissioner`);
                 </CardTitle>
               </CardHeader>
               <CardContent className="relative z-10">
-                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.draft_rounds}</div>
-                <p className="text-xs text-white/55 mt-2">Total draft rounds</p>
+                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.draft_rounds || '—'}</div>
+                <p className="text-xs text-white/55 mt-2">{league.draft_rounds ? 'Total draft rounds' : 'Not configured'}</p>
               </CardContent>
             </Card>
           </div>
@@ -1878,7 +1901,17 @@ Your Commissioner`);
                       {' '}
                       {league.draft_status === 'not_started' && 'Draft is on deck.'}
                       {league.draft_status === 'in_progress' && 'Draft is live — get in there.'}
-                      {league.draft_status === 'completed' && 'Rosters set. Time to play.'}
+                      {/* Tri-state. "Rosters set" is only claimed when a roster
+                          was actually observed. myRosterCount === null means we
+                          could not check, and we say nothing rather than guess. */}
+                      {league.draft_status === 'completed' && myRosterCount === null && 'Draft complete.'}
+                      {league.draft_status === 'completed' && myRosterCount !== null && myRosterCount > 0 && 'Rosters set. Time to play.'}
+                      {league.draft_status === 'completed' && myRosterCount === 0 && (
+                        <span className="text-pastel-orange-soft font-semibold">
+                          Draft is marked complete, but your roster is empty. Nothing was assigned —
+                          the commissioner can re-sync rosters in League Settings before week 1.
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>

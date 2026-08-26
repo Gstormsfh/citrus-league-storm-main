@@ -15,8 +15,18 @@ import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
 import { matchupApi } from '@/api/matchups';
 
-// Shared stat shape used by calculateMatchupWeekPoints and matchup stats
-interface MatchupWeekStats {
+// Shared stat shape for a player's weekly totals.
+//
+// Declared as a `type`, not an `interface`, deliberately: an interface gets no
+// implicit index signature, so it will not assign to Record<string, number> and
+// every call passing one into the scoring helpers failed to compile.
+//
+// This is also the single definition of the shape. It used to be re-declared
+// inline in four places and three of them had drifted -- the producer
+// (fetchMatchupStatsForPlayers) returns ppp / shp / hits / pim / plus_minus, and
+// two consumers still described the older four-category shape. The values were
+// always present at runtime; the types had simply stopped describing them.
+type MatchupWeekStats = {
   goals?: number;
   assists?: number;
   sog?: number;
@@ -2783,7 +2793,7 @@ export const MatchupService = {
     startDate: Date,
     endDate: Date,
     usePublicApi: boolean = false
-  ): Promise<Map<number, { goals: number; assists: number; sog: number; blocks: number; ppp: number; shp: number; hits: number; pim: number; plus_minus: number; xGoals: number; wins?: number; saves?: number; shutouts?: number; goals_against?: number }>> {
+  ): Promise<Map<number, MatchupWeekStats>> {
     try {
       // Use local timezone formatting to avoid UTC shift from toISOString()
       const formatLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -2800,24 +2810,7 @@ export const MatchupService = {
       }
       const data = response.data ? Object.values(response.data) : [];
 
-      const statsMap = new Map<number, {
-        goals: number;
-        assists: number;
-        sog: number;
-        blocks: number;
-        // NEW: All 8 stat categories
-        ppp: number;           // Power Play Points
-        shp: number;           // Shorthanded Points
-        hits: number;          // Hits
-        pim: number;          // Penalty Minutes
-        plus_minus: number;    // Plus/Minus
-        xGoals: number;
-        // Goalie stats
-        wins?: number;
-        saves?: number;
-        shutouts?: number;
-        goals_against?: number;
-      }>();
+      const statsMap = new Map<number, MatchupWeekStats>();
       ((data || []) as Array<{ player_id: number; goals?: number; assists?: number; shots_on_goal?: number; blocks?: number; ppp?: number; shp?: number; hits?: number; pim?: number; plus_minus?: number; x_goals?: string | number; wins?: number; saves?: number; shutouts?: number; goals_against?: number }>).forEach((row) => {
         const goalieStats = {
           wins: Number(row.wins) || 0,

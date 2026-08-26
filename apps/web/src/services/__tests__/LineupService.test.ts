@@ -9,6 +9,10 @@ vi.mock('@/api/rosters', () => ({
     saveLineup: vi.fn(),
     getLineup: vi.fn(),
     getDailyRoster: vi.fn(),
+    // NOTE: these resolve to the transport envelope { data: payload }, because
+    // that is what apiClient returns — server routes reply with ok(c, payload).
+    // Mocking the payload flat is what let LineupService read the wrong level
+    // and still pass.
     canUpdateRoster: vi.fn(),
     backfillDailyRosters: vi.fn(),
     backfillAllMatchups: vi.fn(),
