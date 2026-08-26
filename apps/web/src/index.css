@@ -1675,8 +1675,16 @@
   body, html, #root {
     padding: 0 !important;
     margin: 0 !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
+  }
+
+  /* STICKY FIX (2026-08-26) — the overflow pair that used to live in the
+     rule above is gone. `overflow-x: hidden` on html/body forces
+     overflow-y to `auto` per spec, making both of them scroll
+     containers, which killed every position:sticky in the app on phones
+     (see the html, body note near the end of this file). Horizontal
+     clipping is kept, on body only, with clip instead of hidden. */
+  body {
+    overflow-x: clip !important;
   }
   
   /* Main content scroll area - ZERO padding */
@@ -1896,13 +1904,43 @@
    Ensures vertical scrolling always works.
    ========================================== */
 html, body {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  /* STICKY FIX (2026-08-26) — NO overflow declarations here.
+     This block used to carry `overflow-y: auto !important; overflow-x:
+     hidden !important`, which silently overrode the SCROLL FIX in
+     @layer base above (layered non-important loses to unlayered
+     !important) and re-created the exact trap that fix documents:
+
+       - overflow-x:hidden forces overflow-y out of `visible` per spec,
+         so BOTH html and body became scroll containers again — the
+         html+body double-scroller that broke wheel/trackpad routing.
+       - A position:sticky element sticks to its NEAREST SCROLLING
+         ANCESTOR. With body scrolling, every sticky element in the app
+         stuck to body — whose scroll height equals its content height,
+         so it never scrolls. Sticky was inert app-wide: the nav, the
+         draft clock, the player-pool and draft-board headers, the
+         matchup team header. 60+ elements, none of them sticking.
+
+     Measured in Chromium at 393x852 and 1440x900 before the fix: the
+     draft room's `sticky top-0` clock moved -1484px for a 1500px scroll,
+     i.e. it scrolled away exactly like a static element.
+
+     The viewport is the one true scroller. It scrolls by default; it
+     does not need to be told to. Horizontal clipping lives on `body`
+     below, via clip rather than hidden. */
+
   /* Force vertical-pan on the document so nested horizontal carousels
      (game-modes, news chips, draft tables, etc) can never trap a
      vertical swipe. Carousels still get pan-x on themselves; this just
      guarantees pan-y propagates back out to the document on Android. */
   touch-action: pan-y !important;
+}
+
+body {
+  /* clip, NOT hidden: clips horizontal overflow without turning body
+     into a scroll container. Same reasoning as `.matchup-wrapper` and
+     the @layer base `body` rule — restated unlayered because unlayered
+     declarations win over layered ones. */
+  overflow-x: clip !important;
 }
 
 #root {
