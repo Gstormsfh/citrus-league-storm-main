@@ -95,3 +95,4 @@ _to_delete/
 scripts/proof/results/
 *.local.mjs
 *.local.json
+supabase/.branches/

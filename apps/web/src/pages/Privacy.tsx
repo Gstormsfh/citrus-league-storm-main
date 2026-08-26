@@ -166,7 +166,7 @@ const Privacy = () => {
                 <li><strong>Right to Opt-Out:</strong> We do not sell personal information, so there is nothing to opt-out of</li>
                 <li><strong>Right to Non-Discrimination:</strong> We will not discriminate against you for exercising your CCPA rights</li>
               </ul>
-              <p className="mt-2">To exercise these rights, contact us at <a href="mailto:privacy@citrusfantasy.com" className="text-green-700 hover:underline">privacy@citrusfantasy.com</a></p>
+              <p className="mt-2">To exercise these rights, contact us at <a href="mailto:privacy@citrusfantasysports.com" className="text-green-700 hover:underline">privacy@citrusfantasy.com</a></p>
             </section>
 
             <section>
